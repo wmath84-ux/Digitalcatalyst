@@ -26,6 +26,7 @@ import HelpModal from "./HelpModal";
 import { SHOWCASE_CARDS } from "../data/showcase";
 import { FALLBACK_SUBSCRIPTION_CATALOG } from "../data/fallbackCatalog";
 import { useAuth } from "../../context/AuthContext";
+import { useCatalog } from "../../context/CatalogContext";
 import {
   startCheckout,
   type SubscriptionCatalog,
@@ -37,6 +38,7 @@ export type BillingCycle = "monthly" | "yearly";
 
 export default function SubscriptionPage() {
   const { user } = useAuth();
+  const { products: availableProducts } = useCatalog();
 
   // ---------- Server-driven state ----------
   const [catalog, setCatalog] = useState<SubscriptionCatalog | null>(null);
@@ -169,7 +171,9 @@ export default function SubscriptionPage() {
         .reduce((sum, f) => sum + (f.pricePaise || 0), 0),
     [selectedFeatureRecords, includedFeatureIds],
   );
-  const subtotalPaise = selectedPlanPricePaise + featuresTotalPaise;
+  const selectedProductRecords = useMemo(() => availableProducts.filter((product) => selectedCourseIds.includes(product.id)), [availableProducts, selectedCourseIds]);
+  const productsTotalPaise = useMemo(() => selectedProductRecords.reduce((sum, product) => sum + Math.max(0, Math.round(product.price * 100)), 0), [selectedProductRecords]);
+  const subtotalPaise = selectedPlanPricePaise + featuresTotalPaise + productsTotalPaise;
   const couponDiscountPaise = appliedReferral?.discountPaise || appliedCoupon?.discountPaise || 0;
   // Server-validated floor: minimum payable = plan's minimum
   // payable paise (admin-set), default 0.
@@ -385,7 +389,7 @@ export default function SubscriptionPage() {
         <CourseSelectTrigger
           selectedIds={selectedCourseIds}
           onOpen={() => setCourseModalOpen(true)}
-          catalog={catalog}
+          products={availableProducts}
         />
 
         {/* Feature selector trigger */}
@@ -429,6 +433,8 @@ export default function SubscriptionPage() {
           featuresTotalPaise={featuresTotalPaise}
           featuresCount={selectedFeatureIds.filter((id) => !includedFeatureIds.has(id)).length}
           includedFeatureCount={includedFeatureIds.size}
+          productsCount={selectedProductRecords.length}
+          productsTotalPaise={productsTotalPaise}
           couponDiscountPaise={couponDiscountPaise}
           couponCode={appliedReferral?.code ?? appliedCoupon?.code ?? null}
           minPayablePaise={minPayablePaise}
@@ -468,7 +474,7 @@ export default function SubscriptionPage() {
         selected={selectedCourseIds}
         onClose={() => setCourseModalOpen(false)}
         onChangeSelected={setSelectedCourseIds}
-        catalog={catalog}
+        products={availableProducts}
       />
 
       <FeatureSelectModal

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import {
   Bell,
   CalendarClock,
@@ -27,6 +29,7 @@ import type { ToastMessage } from "./components/ui/Toast";
 import { initialNotes, initialReminders, initialSchedule, initialTasks } from "./data/sampleData";
 import type { NoteColor, QuickNote, Reminder, ScheduleEvent, Task, TaskStatus } from "./types";
 import { useCommerce } from "./context/CommerceContext";
+import { useMyDayAccess } from "./hooks/useMyDayAccess";
 
 const NOTE_COLORS: NoteColor[] = ["amber", "sky", "rose", "emerald", "violet"];
 type DaySection = "overview" | "tasks" | "schedule" | "reminders" | "notes";
@@ -40,10 +43,6 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   }
 }
 
-function persist<T>(key: string, value: T) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
 const CREATE_OPTIONS: { id: DaySection; label: string; hint: string; icon: typeof ClipboardList }[] = [
   { id: "tasks", label: "Today Task", hint: "Plan what you need to finish today", icon: ClipboardList },
   { id: "schedule", label: "Daily Schedule", hint: "Block time for classes and study", icon: CalendarClock },
@@ -53,6 +52,9 @@ const CREATE_OPTIONS: { id: DaySection; label: string; hint: string; icon: typeo
 
 export default function App() {
   const { cartIds } = useCommerce();
+  const { hasAccess: hasMyDayAccess, uid } = useMyDayAccess();
+  const [cloudLoaded, setCloudLoaded] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>(() => loadFromStorage("myday_tasks", initialTasks));
   const [schedule, setSchedule] = useState<ScheduleEvent[]>(() => loadFromStorage("myday_schedule", initialSchedule));
   const [notes, setNotes] = useState<QuickNote[]>(() => loadFromStorage("myday_notes", initialNotes));
@@ -83,10 +85,32 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  useEffect(() => { persist("myday_tasks", tasks); }, [tasks]);
-  useEffect(() => { persist("myday_schedule", schedule); }, [schedule]);
-  useEffect(() => { persist("myday_notes", notes); }, [notes]);
-  useEffect(() => { persist("myday_reminders", reminders); }, [reminders]);
+  const canSaveMyDay = useCallback(() => {
+    if (hasMyDayAccess) return true;
+    setPaywallOpen(true);
+    return false;
+  }, [hasMyDayAccess]);
+
+  useEffect(() => {
+    if (!uid || !hasMyDayAccess) { setCloudLoaded(false); return undefined; }
+    let cancelled = false;
+    void getDoc(doc(db, "users", uid, "myDay", "current")).then((snapshot) => {
+      if (cancelled) return;
+      const data = snapshot.data() || {};
+      if (!snapshot.exists()) { setTasks([]); setSchedule([]); setNotes([]); setReminders([]); }
+      if (Array.isArray(data.tasks)) setTasks(data.tasks as Task[]);
+      if (Array.isArray(data.schedule)) setSchedule(data.schedule as ScheduleEvent[]);
+      if (Array.isArray(data.notes)) setNotes(data.notes as QuickNote[]);
+      if (Array.isArray(data.reminders)) setReminders(data.reminders as Reminder[]);
+      setCloudLoaded(true);
+    }).catch(() => setCloudLoaded(false));
+    return () => { cancelled = true; };
+  }, [hasMyDayAccess, uid]);
+
+  useEffect(() => {
+    if (!uid || !hasMyDayAccess || !cloudLoaded) return;
+    void setDoc(doc(db, "users", uid, "myDay", "current"), { tasks, schedule, notes, reminders, updatedAt: serverTimestamp() }, { merge: true });
+  }, [cloudLoaded, hasMyDayAccess, notes, reminders, schedule, tasks, uid]);
 
   const handleNavigate = useCallback((id: string) => {
     if (id === "home") {
@@ -145,6 +169,7 @@ export default function App() {
   }, []);
 
   const handleSaveTask = useCallback((task: Task) => {
+    if (!canSaveMyDay()) return;
     setTasks((prev) => {
       const exists = prev.some((t) => t.id === task.id);
       if (exists) return prev.map((t) => (t.id === task.id ? task : t));
@@ -152,7 +177,7 @@ export default function App() {
     });
     setTaskModalOpen(false);
     addToast(editingTask ? "Task updated successfully" : "New task created");
-  }, [addToast, editingTask]);
+  }, [addToast, canSaveMyDay, editingTask]);
 
   const openAddEvent = useCallback(() => {
     setEditingEvent(null);
@@ -165,6 +190,7 @@ export default function App() {
   }, []);
 
   const handleSaveEvent = useCallback((event: ScheduleEvent) => {
+    if (!canSaveMyDay()) return;
     setSchedule((prev) => {
       const exists = prev.some((e) => e.id === event.id);
       if (exists) return prev.map((e) => (e.id === event.id ? event : e));
@@ -172,7 +198,7 @@ export default function App() {
     });
     setScheduleModalOpen(false);
     addToast(editingEvent ? "Event updated" : "Event added to schedule");
-  }, [addToast, editingEvent]);
+  }, [addToast, canSaveMyDay, editingEvent]);
 
   const handleDeleteEvent = useCallback((id: string) => {
     showConfirm("Delete Event", "Remove this event from your schedule?", () => {
@@ -183,6 +209,7 @@ export default function App() {
   }, [addToast, showConfirm]);
 
   const handleAddNote = useCallback((text: string) => {
+    if (!canSaveMyDay()) return;
     const note: QuickNote = {
       id: crypto.randomUUID(),
       text,
@@ -191,12 +218,13 @@ export default function App() {
     };
     setNotes((prev) => [note, ...prev]);
     addToast("Note saved");
-  }, [addToast]);
+  }, [addToast, canSaveMyDay]);
 
   const handleEditNote = useCallback((id: string, text: string) => {
+    if (!canSaveMyDay()) return;
     setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, text } : n)));
     addToast("Note updated");
-  }, [addToast]);
+  }, [addToast, canSaveMyDay]);
 
   const handleDeleteNote = useCallback((id: string) => {
     setNotes((prev) => prev.filter((n) => n.id !== id));
@@ -204,9 +232,10 @@ export default function App() {
   }, [addToast]);
 
   const handleAddReminder = useCallback((reminder: Reminder) => {
+    if (!canSaveMyDay()) return;
     setReminders((prev) => [...prev, reminder]);
     addToast("Reminder set");
-  }, [addToast]);
+  }, [addToast, canSaveMyDay]);
 
   const handleEditReminder = useCallback((reminder: Reminder) => {
     setReminders((prev) => prev.map((r) => (r.id === reminder.id ? reminder : r)));
@@ -523,6 +552,17 @@ export default function App() {
         onConfirm={confirmConfig.onConfirm}
         onCancel={() => setConfirmOpen(false)}
       />
+
+      {paywallOpen && (
+        <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/50 px-5" onClick={() => setPaywallOpen(false)}>
+          <div className="w-full max-w-sm rounded-3xl bg-white p-5 text-center shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <h2 className="text-lg font-black text-slate-900">My Day cloud saving</h2>
+            <p className="mt-2 text-sm leading-5 text-slate-500">Cloud saving has ongoing server costs. Subscribe to save tasks, schedules and notes.</p>
+            <button onClick={() => { window.location.hash = "#/subscription"; }} className="mt-5 w-full rounded-2xl bg-violet-600 py-3 text-sm font-black text-white">View subscription</button>
+            <button onClick={() => setPaywallOpen(false)} className="mt-2 w-full py-2 text-xs font-bold text-slate-400">Not now</button>
+          </div>
+        </div>
+      )}
 
       <Toast toasts={toasts} onRemove={removeToast} />
     </div>

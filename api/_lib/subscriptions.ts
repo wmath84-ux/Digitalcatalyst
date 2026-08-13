@@ -18,7 +18,7 @@
 //      Razorpay capture.
 
 import { Timestamp, type Firestore } from "firebase-admin/firestore";
-import { adminDb } from "./firebaseAdmin";
+import { adminDb, parseProductPricePaise } from "./firebaseAdmin";
 import {
   buildSubscriptionLineItems,
   computeCycleExpiresAt,
@@ -64,7 +64,7 @@ export const loadPlanById = async (
   if (!snap.exists) return null;
   const plan = normalisePlanDoc(snap.data() || {}, snap.id);
   if (!plan) return null;
-  return plan;
+  return { ...plan, includedFeatureIds: [] };
 };
 
 /** Load all active plans (for the catalog endpoint). */
@@ -76,7 +76,7 @@ export const loadActivePlans = async (
   const plans: SubscriptionPlanDoc[] = [];
   for (const doc of snap.docs) {
     const plan = normalisePlanDoc(doc.data() || {}, doc.id);
-    if (plan && plan.active) plans.push(plan);
+    if (plan && plan.active) plans.push({ ...plan, includedFeatureIds: [] });
   }
   plans.sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
   return plans;
@@ -91,7 +91,10 @@ export const loadActiveFeatures = async (
   const features: SubscriptionFeatureDoc[] = [];
   for (const doc of snap.docs) {
     const feature = normaliseFeatureDoc(doc.data() || {}, doc.id);
-    if (feature && feature.active) features.push(feature);
+    if (feature && feature.active && feature.id === "my-day") features.push(feature);
+  }
+  if (!features.some((feature) => feature.id === "my-day")) {
+    features.push({ id: "my-day", name: "My Day cloud saving", description: "Securely save and sync tasks, schedules, reminders and notes.", icon: "calendar", pricePaise: 14900, included: false, active: true, badge: "PAID", sortOrder: 0 });
   }
   features.sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
   return features;
@@ -167,6 +170,7 @@ export const loadSubscriptionSelectionContext = async (
   | { ok: false; status: number; error: string; code: string }
 > => {
   const now = options.now ?? Date.now();
+  const db = options.db ?? adminDb();
   const planId = String(selection.subscriptionPlanId || "").trim();
   if (!planId) {
     return { ok: false, status: 400, code: "SUBSCRIPTION_PLAN_REQUIRED", error: "Plan id is required." };
@@ -213,6 +217,24 @@ export const loadSubscriptionSelectionContext = async (
     productUnlocks,
     moduleUnlocks,
   });
+  // Buyer-selected bonus products are loaded from the live server catalog.
+  // Their IDs and prices are never trusted from the client.
+  const selectedProductIds = Array.from(new Set((selection.productIds || []).map(String)));
+  if (selectedProductIds.length) {
+    const refs = selectedProductIds.map((id) => db.collection("siteProducts").doc(id));
+    const snapshots = await db.getAll(...refs);
+    for (let index = 0; index < snapshots.length; index += 1) {
+      const snapshot = snapshots[index];
+      const data = snapshot.data() || {};
+      if (!snapshot.exists || data.isVisible === false || data.inStock === false) {
+        return { ok: false, status: 404, code: "SUBSCRIPTION_PRODUCT_UNAVAILABLE", error: "A selected bonus product is no longer available." };
+      }
+      const productId = selectedProductIds[index];
+      const effectivePrice = parseProductPricePaise(data);
+      const regularPrice = parseProductPricePaise({ ...data, salePrice: null });
+      lineItems.push({ id: `subscription_product:${plan.id}:${productId}`, kind: "subscription_features", productId, moduleId: null, resourceId: null, updateId: null, subscriptionPlanId: plan.id, featureId: null, title: String(data.title || "Bonus product"), parentTitle: plan.name, regularPrice, salePrice: effectivePrice < regularPrice ? effectivePrice : null, effectivePrice, quantity: 1, alreadyOwned: false, entitlementId: productId });
+    }
+  }
   const expiresAt = computeCycleExpiresAt(plan, cycle, now);
   return {
     ok: true,

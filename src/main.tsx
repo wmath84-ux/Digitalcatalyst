@@ -443,6 +443,7 @@ function Root() {
         }}
         onNavigateToProduct={navigateToProduct}
         onNavigateToProductReview={navigateToProductReview}
+        onNavigateToCourse={navigateToCourse}
         onNavigateToMyDay={() => {
           window.location.hash = MY_DAY_HASH;
         }}
@@ -606,6 +607,7 @@ function Root() {
       }}
       onNavigateToProduct={navigateToProduct}
       onNavigateToProductReview={navigateToProductReview}
+      onNavigateToCourse={navigateToCourse}
       onNavigateToMyDay={() => {
         window.location.hash = MY_DAY_HASH;
       }}

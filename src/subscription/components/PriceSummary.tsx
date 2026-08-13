@@ -15,6 +15,8 @@ interface Props {
   featuresTotalPaise: number;
   featuresCount: number;
   includedFeatureCount: number;
+  productsCount: number;
+  productsTotalPaise: number;
   couponDiscountPaise: number;
   couponCode: string | null;
   minPayablePaise: number;
@@ -31,6 +33,8 @@ export default function PriceSummary({
   featuresTotalPaise,
   featuresCount,
   includedFeatureCount,
+  productsCount,
+  productsTotalPaise,
   couponDiscountPaise,
   couponCode,
   minPayablePaise,
@@ -66,6 +70,13 @@ export default function PriceSummary({
             <div className="flex justify-between text-emerald-700" data-subscription-row="included">
               <span>Included features ({includedFeatureCount})</span>
               <span className="font-medium">Free</span>
+            </div>
+          ) : null}
+
+          {productsCount > 0 ? (
+            <div className="flex justify-between text-slate-500" data-subscription-row="products">
+              <span>Bonus products ({productsCount})</span>
+              <span className="font-medium text-slate-700">{formatRupee(productsTotalPaise)}</span>
             </div>
           ) : null}
 

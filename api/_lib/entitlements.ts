@@ -545,9 +545,14 @@ export const grantSubscriptionFromQuote = async (
   const moduleUnlocks = (quote.verifiedLineItems || [])
     .filter((line) => line.kind === "subscription_features" && line.productId && line.moduleId)
     .map((line) => ({ planId: plan.id, productId: String(line.productId), moduleId: String(line.moduleId), active: true }));
+  const effectivePlan: SubscriptionPlanDoc = {
+    ...plan,
+    includedProductIds: Array.from(new Set([...(plan.includedProductIds || []), ...productUnlocks.map((unlock) => unlock.productId)])),
+    includedModuleKeys: Array.from(new Set([...(plan.includedModuleKeys || []), ...moduleUnlocks.map((unlock) => `${unlock.productId}:${unlock.moduleId}`)])),
+  };
   // Subscription-specific entitlement ids.
   const subscriptionEntitlementIds = collectSubscriptionEntitlementIds({
-    plan,
+    plan: effectivePlan,
     cycle,
     selectedFeatureIds: uniqueFeatures,
     productUnlocks: productUnlocks as never,
@@ -591,7 +596,7 @@ export const grantSubscriptionFromQuote = async (
     // 2. The subscription record.
     const sub = await writeSubscriptionAfterPayment(tx, {
       uid: quote.uid,
-      plan,
+      plan: effectivePlan,
       cycle,
       selectedFeatureIds: uniqueFeatures,
       orderId,

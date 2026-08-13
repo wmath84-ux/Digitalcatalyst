@@ -20,6 +20,7 @@ import {
   BarChart3,
   Rocket,
   Sparkles,
+  CalendarDays,
 } from "lucide-react";
 import type { SubscriptionFeatureDoc } from "../utils/subscriptionCatalog";
 
@@ -32,6 +33,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   "message-circle": <MessageCircle className="h-4.5 w-4.5" />,
   "bar-chart-3": <BarChart3 className="h-4.5 w-4.5" />,
   rocket: <Rocket className="h-4.5 w-4.5" />,
+  calendar: <CalendarDays className="h-4.5 w-4.5" />,
 };
 
 const ICON_BG: Record<string, string> = {
@@ -43,6 +45,7 @@ const ICON_BG: Record<string, string> = {
   "message-circle": "bg-indigo-50 text-indigo-500",
   "bar-chart-3": "bg-cyan-50 text-cyan-600",
   rocket: "bg-orange-50 text-orange-500",
+  calendar: "bg-violet-50 text-violet-600",
 };
 
 const formatRupee = (paise: number): string =>

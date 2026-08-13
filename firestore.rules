@@ -53,6 +53,22 @@ service cloud.firestore {
         allow update, delete: if isAdmin();
       }
 
+      match /subscription/{documentId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isAdmin();
+      }
+
+      match /myDay/{documentId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && documentId == 'current'
+          && exists(/databases/$(database)/documents/users/$(uid)/subscription/current)
+          && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.status == 'active'
+          && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.expiresAt > request.time
+          && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.features.hasAny(['my-day']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
       match /courseProgress/{productId} {
         allow read: if isOwner(uid) || isAdmin();
         allow create, update: if isOwner(uid)

@@ -1,4 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../../firebase";
 import Header from "./components/Header";
 import HeroCarousel from "./components/HeroCarousel";
 import CategoryNav from "./components/CategoryNav";
@@ -16,6 +18,7 @@ interface AppProps {
   onNavigateToStore: () => void;
   onNavigateToProduct: (product: Product) => void;
   onNavigateToProductReview: (product: Product) => void;
+  onNavigateToCourse: (product: Product) => void;
   onNavigateToMyDay: () => void;
   onNavigateToProfile: () => void;
   onNavigateToPurchases?: () => void;
@@ -29,6 +32,7 @@ export default function App({
   onNavigateToStore,
   onNavigateToProduct,
   onNavigateToProductReview,
+  onNavigateToCourse,
   onNavigateToMyDay,
   onNavigateToProfile,
   onNavigateToPurchases,
@@ -54,13 +58,36 @@ export default function App({
   })), [catalogProducts]);
   const { reviews: homepageReviews } = useHomepageProductReviews(catalogProducts, fallbackReviews, 6);
   const userName = user?.name?.split(" ")[0] || "Learner";
+  const [progressRecords, setProgressRecords] = useState<Array<{ productId: string; completedFileIds: string[]; updatedAt: number }>>([]);
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    if (!user) { setProgressRecords([]); return undefined; }
+    return onSnapshot(collection(db, "users", user.id, "courseProgress"), (snapshot) => {
+      setProgressRecords(snapshot.docs.map((item) => {
+        const data = item.data() || {};
+        const stamp = data.lastOpenedAt || data.updatedAt;
+        const updatedAt = stamp && typeof stamp.toMillis === "function" ? stamp.toMillis() : Number(stamp || 0);
+        return { productId: String(data.productId || item.id), completedFileIds: Array.isArray(data.completedFileIds) ? data.completedFileIds.map(String) : [], updatedAt };
+      }));
+    }, () => setProgressRecords([]));
+  }, [user]);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const contentTopRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number | null>(null);
 
-  const continueLearningItem = products[0];
+  const continueProgressRecord = useMemo(() => [...progressRecords]
+    .filter((record) => catalogProducts.some((product) => product.id === record.productId))
+    .sort((a, b) => b.updatedAt - a.updatedAt)[0] || null, [catalogProducts, progressRecords]);
+  const continueLearningItem = continueProgressRecord ? products.find((product) => product.id === continueProgressRecord.productId) || null : null;
+  const continueProgress = useMemo(() => {
+    if (!continueProgressRecord) return 0;
+    const product = catalogProducts.find((item) => item.id === continueProgressRecord.productId);
+    const countResources = (modules: NonNullable<typeof product>["canonicalModules"] = []): number => (modules || []).reduce((total, module) => total + (module.resources?.length || 0) + countResources(module.modules || []), 0);
+    const total = product ? countResources(product.canonicalModules) : 0;
+    return total > 0 ? Math.min(100, Math.round((continueProgressRecord.completedFileIds.length / total) * 100)) : 0;
+  }, [catalogProducts, continueProgressRecord]);
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const searchResults: Product[] = useMemo(() => {
@@ -95,8 +122,6 @@ export default function App({
     if (activeCategory === "all") return products;
     return products.filter((p) => p.category === activeCategory);
   }, [activeCategory, products]);
-
-  const [continueProgress, setContinueProgress] = useState(42);
 
   const handleSelectSuggestion = (product: Product) => {
     setSearchQuery(product.title);
@@ -206,8 +231,8 @@ export default function App({
                   author={continueLearningItem.author}
                   image={continueLearningItem.image}
                   progress={continueProgress}
-                  onResume={() => setContinueProgress((prev) => Math.min(100, prev + 14))}
-                  onClick={onNavigateToPurchases}
+                  onResume={() => onNavigateToCourse(continueLearningItem)}
+                  onClick={() => onNavigateToCourse(continueLearningItem)}
                 />
               )}
 
