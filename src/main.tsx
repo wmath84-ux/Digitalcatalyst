@@ -9,14 +9,13 @@ import CheckoutApp from "./components/checkout/CheckoutApp";
 import MyDayApp from "./MyDayApp";
 import ProfileApp from "./profile/App";
 import CourseRouteGuard from "./components/CourseRouteGuard";
-import CommunityApp from "./community/App";
 import CartWishlistApp from "./CartWishlistApp";
 import SubscriptionApp from "./subscription/App";
 import LandingApp from "./LandingApp";
 import AuthApp from "./AuthApp";
 import AdminLoginApp from "./AdminLoginApp";
-import AiChatApp from "./ai-chat/App";
 import AdminApp from "./admin/AdminApp";
+import NotificationsPage from "./components/NotificationsPage";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
@@ -44,11 +43,10 @@ const CHECKOUT_HASH = "#/checkout";
 const MY_DAY_HASH = "#/my-day";
 const PROFILE_HASH = "#/profile";
 const COURSE_HASH = "#/course/";
-const COMMUNITY_HASH = "#/community";
 const CART_HASH = "#/cart";
 const FAVORITES_HASH = "#/favorites";
 const SUBSCRIPTION_HASH = "#/subscription";
-const AI_CHAT_HASH = "#/ai-chat";
+const NOTIFICATIONS_HASH = "#/notifications";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
 
@@ -79,9 +77,7 @@ const AUTH_REQUIRED_PREFIXES = [
   MY_DAY_HASH,
   PROFILE_HASH,
   COURSE_HASH,
-  COMMUNITY_HASH,
   SUBSCRIPTION_HASH,
-  AI_CHAT_HASH,
 ];
 
 const requiresAuthentication = (hash: string) =>
@@ -126,7 +122,7 @@ const startCheckout = ({
 
 function Root() {
   const { user, loading, logout } = useAuth();
-  const { products: catalogProducts } = useCatalog();
+  const { products: catalogProducts, purchasedIds } = useCatalog();
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
@@ -277,7 +273,7 @@ function Root() {
   };
 
   const handleShoppingNavigation = (tab: CartTabKey) => {
-    if (tab === "home") window.location.hash = STORE_HASH;
+    if (tab === "home") window.location.hash = HOME_HASH;
     if (tab === "favorites") window.location.hash = FAVORITES_HASH;
     if (tab === "cart") window.location.hash = CART_HASH;
   };
@@ -371,7 +367,13 @@ function Root() {
           window.location.hash = PROFILE_HASH;
         }}
         onNavigateToPurchases={() => {
+          window.location.hash = `${STORE_HASH}/purchases`;
+        }}
+        onNavigateToFavorites={() => {
           window.location.hash = FAVORITES_HASH;
+        }}
+        onNavigateToNotifications={() => {
+          window.location.hash = NOTIFICATIONS_HASH;
         }}
       />
     );
@@ -413,8 +415,27 @@ function Root() {
 
   if (hash.startsWith(ADMIN_HASH)) return user && hasAdminSession(user.id, user.email, user.role) ? <AdminApp /> : <AdminLoginApp />;
   if (hash.startsWith(SUBSCRIPTION_HASH)) return <SubscriptionApp />;
-  if (hash.startsWith(AI_CHAT_HASH)) return <AiChatApp />;
-  if (hash.startsWith(COMMUNITY_HASH)) return <CommunityApp />;
+  if (hash.startsWith(NOTIFICATIONS_HASH)) {
+    return (
+      <NotificationsPage
+        cartCount={cartIds.size}
+        purchasesBadge={purchasedIds.size}
+        onNavigateToCart={() => {
+          window.location.hash = CART_HASH;
+        }}
+        onNavigateToSubscription={() => {
+          window.location.hash = SUBSCRIPTION_HASH;
+        }}
+        onNavigateFooter={(tab) => {
+          if (tab === "home") window.location.hash = HOME_HASH;
+          else if (tab === "myday") window.location.hash = MY_DAY_HASH;
+          else if (tab === "store") window.location.hash = STORE_HASH;
+          else if (tab === "purchases") window.location.hash = `${STORE_HASH}/purchases`;
+          else if (tab === "profile") window.location.hash = PROFILE_HASH;
+        }}
+      />
+    );
+  }
   if (hash.startsWith(COURSE_HASH)) {
     if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = STORE_HASH; }} />;
     return (
@@ -439,9 +460,15 @@ function Root() {
         onNavigateToProfile={() => {
           window.location.hash = PROFILE_HASH;
         }}
+        onNavigateToHome={() => {
+          window.location.hash = HOME_HASH;
+        }}
         onNavigateToCourse={navigateToCourse}
-        onNavigateToCommunity={() => {
-          window.location.hash = COMMUNITY_HASH;
+        onNavigateToSubscription={() => {
+          window.location.hash = SUBSCRIPTION_HASH;
+        }}
+        onNavigateToNotifications={() => {
+          window.location.hash = NOTIFICATIONS_HASH;
         }}
         cartIds={cartIds}
         favoriteIds={favoriteIds}
@@ -470,7 +497,13 @@ function Root() {
         window.location.hash = PROFILE_HASH;
       }}
       onNavigateToPurchases={() => {
+        window.location.hash = `${STORE_HASH}/purchases`;
+      }}
+      onNavigateToFavorites={() => {
         window.location.hash = FAVORITES_HASH;
+      }}
+      onNavigateToNotifications={() => {
+        window.location.hash = NOTIFICATIONS_HASH;
       }}
     />
   );

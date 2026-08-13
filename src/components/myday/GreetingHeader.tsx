@@ -1,4 +1,4 @@
-import { CalendarDays, Flame, Target, TrendingUp } from "lucide-react";
+import { CalendarDays, Flame, Target } from "lucide-react";
 import ProgressRing from "./ProgressRing";
 
 interface GreetingHeaderProps {
@@ -6,7 +6,6 @@ interface GreetingHeaderProps {
   completed: number;
   total: number;
   streak: number;
-  coins: number;
 }
 
 function getGreeting(): string {
@@ -33,7 +32,7 @@ const formattedDate = new Date().toLocaleDateString("en-US", {
   year: "numeric",
 });
 
-export default function GreetingHeader({ name, completed, total, streak, coins }: GreetingHeaderProps) {
+export default function GreetingHeader({ name, completed, total, streak }: GreetingHeaderProps) {
   const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
 
   return (
@@ -72,10 +71,6 @@ export default function GreetingHeader({ name, completed, total, streak, coins }
               <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-400/20 px-3 py-1.5 text-xs font-semibold text-orange-100 ring-1 ring-inset ring-orange-300/20">
                 <Flame className="h-3.5 w-3.5 text-orange-300" />
                 {streak}-day streak
-              </div>
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-3 py-1.5 text-xs font-semibold text-amber-100 ring-1 ring-inset ring-amber-300/20">
-                <TrendingUp className="h-3.5 w-3.5 text-amber-300" />
-                {coins.toLocaleString()} coins
               </div>
             </div>
           </div>

@@ -29,9 +29,8 @@ export default function Hero() {
           </h1>
 
           <p className="mt-6 max-w-xl text-base leading-relaxed text-slate-300 sm:text-lg">
-            Premium PDFs, cinematic video lectures, a lightning-fast Gemini AI mentor,
-            and an EduCoin economy — one immersive platform engineered to accelerate
-            how you learn.
+            Premium PDFs, cinematic video lectures, and a focused study planner —
+            one immersive platform engineered to accelerate how you learn.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center gap-4">
@@ -63,7 +62,7 @@ export default function Hero() {
               <span className="h-2 w-2 rounded-full bg-cyan-400" /> 1200+ Video Lectures
             </div>
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-fuchsia-400" /> Gemini AI Mentor
+              <span className="h-2 w-2 rounded-full bg-fuchsia-400" /> My Day Planner
             </div>
           </div>
         </motion.div>

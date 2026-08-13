@@ -1,7 +1,7 @@
 {
   "name": "Eduvora",
   "short_name": "Eduvora",
-  "description": "Eduvora student learning app for notes, courses, AI mentor, and digital study resources.",
+  "description": "Eduvora student learning app for notes, courses, and digital study resources.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

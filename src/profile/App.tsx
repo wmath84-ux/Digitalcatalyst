@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import {
   ArrowLeft,
   Bell,
@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Crown,
   Heart,
-  History,
   LoaderCircle,
   Lock,
   LogOut,
@@ -16,7 +15,6 @@ import {
   ShoppingBag,
   Sparkles,
   UserRound,
-  Wallet,
   X,
 } from "lucide-react";
 import { db } from "../../firebase";
@@ -25,7 +23,7 @@ import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
 
-type Modal = "edit" | "coins" | "settings" | null;
+type Modal = "edit" | "settings" | null;
 type Preferences = {
   push: boolean;
   email: boolean;
@@ -34,20 +32,12 @@ type Preferences = {
   shareActivity: boolean;
 };
 
-type CoinEntry = { id: string; amount: number; reason: string; createdAt: Date | null };
-
 const DEFAULT_PREFERENCES: Preferences = {
   push: true,
   email: true,
   promotions: false,
   profileVisible: true,
   shareActivity: true,
-};
-
-const toDate = (value: unknown): Date | null => {
-  if (value && typeof value === "object" && "toDate" in value && typeof (value as { toDate?: unknown }).toDate === "function") return (value as { toDate: () => Date }).toDate();
-  const date = new Date(String(value || ""));
-  return Number.isNaN(date.getTime()) ? null : date;
 };
 
 export default function ProfileApp() {
@@ -59,7 +49,6 @@ export default function ProfileApp() {
   // authoritative "Purchased" count.
   const { ownedProductIds: canonicalOwnedIds, signedIn } = useOwnedProducts();
   const [modal, setModal] = useState<Modal>(null);
-  const [coinHistory, setCoinHistory] = useState<CoinEntry[]>([]);
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
   const [preferencesSaving, setPreferencesSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -70,14 +59,7 @@ export default function ProfileApp() {
       const data = snapshot.data() || {};
       setPreferences({ ...DEFAULT_PREFERENCES, ...(data.preferences || {}) });
     });
-    const unsubscribeCoins = onSnapshot(collection(db, "users", user.id, "coinTransactions"), (snapshot) => {
-      const entries = snapshot.docs.map((item) => {
-        const data = item.data();
-        return { id: item.id, amount: Number(data.amount || 0), reason: String(data.reason || data.title || "EduCoin activity"), createdAt: toDate(data.createdAt || data.date) };
-      }).sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-      setCoinHistory(entries);
-    }, (error) => console.warn("Coin history sync failed", error));
-    return () => { unsubscribeProfile(); unsubscribeCoins(); };
+    return () => { unsubscribeProfile(); };
   }, [user]);
 
   const purchasedProducts = useMemo(() => products.filter((product) => purchasedIds.has(product.id)), [products, purchasedIds]);
@@ -122,10 +104,7 @@ export default function ProfileApp() {
           <button onClick={() => setModal("edit")} className="relative mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/15 py-3 text-sm font-black ring-1 ring-white/30"><Pencil size={15} /> Edit profile</button>
         </section>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-100 text-xl">🪙</div><Wallet className="text-slate-300" /></div><p className="mt-4 text-xs font-bold text-slate-400">EduCoin balance</p><p className="text-3xl font-black">{user.coins.toLocaleString("en-IN")}</p><button onClick={() => setModal("coins")} className="mt-4 flex items-center gap-2 text-xs font-black text-amber-700"><History size={14} /> View verified history</button></section>
-          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-100"><Crown className="text-violet-600" /></div><span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black uppercase text-emerald-700">{user.subscriptionTier || "basic"}</span></div><p className="mt-4 text-xs font-bold text-slate-400">Membership</p><p className="text-xl font-black capitalize">{user.subscriptionTier === "basic" ? "Basic learner" : `${user.subscriptionTier} membership`}</p><button onClick={() => { window.location.hash = "#/subscription"; }} className="mt-4 flex items-center gap-1 text-xs font-black text-violet-700">Manage membership <ChevronRight size={14} /></button></section>
-        </div>
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-100"><Crown className="text-violet-600" /></div><span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black uppercase text-emerald-700">{user.subscriptionTier || "basic"}</span></div><p className="mt-4 text-xs font-bold text-slate-400">Membership</p><p className="text-xl font-black capitalize">{user.subscriptionTier === "basic" ? "Basic learner" : `${user.subscriptionTier} membership`}</p><button onClick={() => { window.location.hash = "#/subscription"; }} className="mt-4 flex items-center gap-1 text-xs font-black text-violet-700">Manage membership <ChevronRight size={14} /></button></section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-xs font-black uppercase tracking-wider text-slate-400">My library</h3>
           {(() => {
@@ -147,7 +126,6 @@ export default function ProfileApp() {
       </main>
 
       {modal === "edit" && <EditModal user={user} onClose={() => setModal(null)} onSave={async (details) => { const result = await updateAccount(details); setMessage(result.message); if (result.success) setModal(null); return result.success; }} />}
-      {modal === "coins" && <BaseModal title="EduCoin history" onClose={() => setModal(null)}>{coinHistory.length === 0 ? <Empty icon={<History />} title="No coin activity yet" text="Verified rewards and spends will appear here." /> : <div className="space-y-2">{coinHistory.map((entry) => <div key={entry.id} className="flex items-center justify-between rounded-xl bg-slate-50 p-3"><div><p className="text-sm font-bold">{entry.reason}</p><p className="text-[11px] text-slate-400">{entry.createdAt?.toLocaleString("en-IN") || "Recently"}</p></div><span className={`font-black ${entry.amount >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{entry.amount >= 0 ? "+" : ""}{entry.amount}</span></div>)}</div>}</BaseModal>}
       {modal === "settings" && <BaseModal title="Preferences" onClose={() => setModal(null)}><div className="space-y-2"><PreferenceRow icon={<Bell />} label="Push notifications" checked={preferences.push} onChange={(checked) => void savePreferences({ ...preferences, push: checked })} /><PreferenceRow icon={<Sparkles />} label="Email updates" checked={preferences.email} onChange={(checked) => void savePreferences({ ...preferences, email: checked })} /><PreferenceRow icon={<Bell />} label="Promotions" checked={preferences.promotions} onChange={(checked) => void savePreferences({ ...preferences, promotions: checked })} /><PreferenceRow icon={<UserRound />} label="Public profile" checked={preferences.profileVisible} onChange={(checked) => void savePreferences({ ...preferences, profileVisible: checked })} /><PreferenceRow icon={<Lock />} label="Share learning activity" checked={preferences.shareActivity} onChange={(checked) => void savePreferences({ ...preferences, shareActivity: checked })} /></div></BaseModal>}
     </div>
   );
@@ -155,7 +133,6 @@ export default function ProfileApp() {
 
 function LibraryStat({ icon, value, label, onClick }: { icon: React.ReactNode; value: number; label: string; onClick: () => void }) { return <button onClick={onClick} className="rounded-2xl bg-slate-50 p-3 text-center"><span className="mx-auto flex justify-center text-violet-600">{icon}</span><span className="mt-2 block text-xl font-black">{value}</span><span className="block text-[10px] font-bold text-slate-400">{label}</span></button>; }
 function BaseModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) { return <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 sm:items-center sm:p-6"><div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"><div className="mb-5 flex items-center justify-between"><h2 className="text-xl font-black">{title}</h2><button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100"><X size={17} /></button></div>{children}</div></div>; }
-function Empty({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) { return <div className="py-10 text-center text-slate-400"><div className="flex justify-center">{icon}</div><p className="mt-3 font-black text-slate-700">{title}</p><p className="mt-1 text-sm">{text}</p></div>; }
 function PreferenceRow({ icon, label, checked, onChange }: { icon: React.ReactNode; label: string; checked: boolean; onChange: (checked: boolean) => void }) { return <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4"><span className="text-violet-600">{icon}</span><span className="flex-1 text-sm font-bold">{label}</span><button role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`relative h-7 w-12 rounded-full ${checked ? "bg-violet-600" : "bg-slate-300"}`}><span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} /></button></div>; }
 
 function EditModal({ user, onClose, onSave }: { user: NonNullable<ReturnType<typeof useAuth>["user"]>; onClose: () => void; onSave: (details: { name: string; mobile: string; bio: string }) => Promise<boolean> }) {

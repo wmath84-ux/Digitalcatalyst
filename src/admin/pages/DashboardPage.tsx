@@ -11,12 +11,7 @@ type DashboardData = {
   orders: { verified: number; pending: number; failed: number };
   revenue: { total: number };
   subscriptions: { active: number; expiring: number };
-  coins: { issued: number; redeemed: number };
-  badges: { active: number };
-  streaks: { active: number };
-  challenges: { active: number };
   reviews: { pending: number };
-  moderation: { reported: number };
   recentOrders: {
     id: string;
     customerName: string | null;
@@ -32,12 +27,8 @@ const QUICK_ACTIONS = [
   { label: "Add Product", href: "/admin/products/new" },
   { label: "Open Orders", href: "/admin/orders" },
   { label: "Open Customers", href: "/admin/customers" },
-  { label: "Create Badge", href: "/admin/rewards?tab=badges" },
-  { label: "Create Streak", href: "/admin/rewards?tab=streaks" },
-  { label: "Create Challenge", href: "/admin/rewards?tab=challenges" },
   { label: "Create Coupon", href: "/admin/coupons" },
   { label: "Configure Subscription", href: "/admin/subscriptions" },
-  { label: "Open Moderation", href: "/admin/moderation" },
 ];
 
 export default function DashboardPage() {
@@ -102,20 +93,9 @@ export default function DashboardPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Rewards">
-        <div className="grid grid-cols-2 gap-2">
-          <StatCard label="EduCoins issued" value={data.coins.issued} />
-          <StatCard label="EduCoins redeemed" value={data.coins.redeemed} />
-          <StatCard label="Active badges" value={data.badges.active} />
-          <StatCard label="Active streaks" value={data.streaks.active} />
-          <StatCard label="Active challenges" value={data.challenges.active} />
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Reviews & moderation">
+      <SectionCard title="Reviews">
         <div className="grid grid-cols-2 gap-2">
           <StatCard label="Pending reviews" value={data.reviews.pending} tone={data.reviews.pending > 0 ? "warn" : undefined} />
-          <StatCard label="Reported content" value={data.moderation.reported} tone={data.moderation.reported > 0 ? "danger" : undefined} />
         </div>
       </SectionCard>
 

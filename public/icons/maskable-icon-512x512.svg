@@ -1,17 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Digital Catalyst maskable app logo">
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Eduvora app logo">
   <defs>
-    <linearGradient id="dc-mask-bg" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#38bdf8"/>
-      <stop offset="0.5" stop-color="#2563eb"/>
-      <stop offset="1" stop-color="#4f46e5"/>
+    <linearGradient id="eduvora-mask-512" x1="64" y1="42" x2="448" y2="470" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#7c3aed"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" fill="url(#dc-mask-bg)"/>
-  <circle cx="378" cy="132" r="30" fill="#facc15"/>
-  <path d="M378 66v34M378 164v34M312 132h34M410 132h34" stroke="#fef3c7" stroke-width="14" stroke-linecap="round"/>
-  <g transform="translate(0 20)">
-    <path d="M86 156c0-24 20-44 44-44h84c31 0 58 17 72 44v206c-15-20-41-33-72-33h-84c-24 0-44-20-44-44V156z" fill="#ffffff"/>
-    <path d="M426 112c24 0 44 20 44 44v129c0 24-20 44-44 44h-84c-31 0-57 13-72 33V156c14-27 41-44 72-44h84z" fill="#eff6ff"/>
-    <path d="M168 204h62M168 250h62M326 204h74M326 250h74" stroke="#2563eb" stroke-width="17" stroke-linecap="round" opacity=".72"/>
+  <rect width="512" height="512" fill="url(#eduvora-mask-512)"/>
+  <g fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M128 168c0-24 19-44 44-44h84v264h-84c-25 0-44-20-44-44V168z"/>
+    <path d="M384 168c0-24-19-44-44-44h-84v264h84c25 0 44-20 44-44V168z"/>
   </g>
 </svg>

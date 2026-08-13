@@ -1,13 +1,20 @@
-import { BellIcon, BookIcon, CartIcon, UserIcon } from "./icons";
+import { BellIcon, BookIcon, CartIcon, CrownIcon } from "./icons";
 
 type HeaderProps = {
   cartCount: number;
   notifCount: number;
-  onNavigateToProfile: () => void;
+  onNavigateToSubscription: () => void;
   onNavigateToCart: () => void;
+  onNavigateToNotifications: () => void;
 };
 
-export default function Header({ cartCount, notifCount, onNavigateToProfile, onNavigateToCart }: HeaderProps) {
+export default function Header({
+  cartCount,
+  notifCount,
+  onNavigateToSubscription,
+  onNavigateToCart,
+  onNavigateToNotifications,
+}: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur">
       <div className="flex items-center justify-between gap-3">
@@ -38,6 +45,7 @@ export default function Header({ cartCount, notifCount, onNavigateToProfile, onN
           <button
             type="button"
             aria-label="Notifications"
+            onClick={onNavigateToNotifications}
             className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 active:scale-95"
           >
             <BellIcon className="h-5 w-5" />
@@ -49,11 +57,11 @@ export default function Header({ cartCount, notifCount, onNavigateToProfile, onN
           </button>
           <button
             type="button"
-            aria-label="Profile"
-            onClick={onNavigateToProfile}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 active:scale-95"
+            aria-label="Subscription"
+            onClick={onNavigateToSubscription}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-50 text-violet-600 transition hover:bg-violet-100 active:scale-95"
           >
-            <UserIcon className="h-5 w-5" />
+            <CrownIcon className="h-5 w-5" />
           </button>
         </div>
       </div>

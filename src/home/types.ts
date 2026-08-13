@@ -8,7 +8,6 @@ export interface Product {
   author: string;
   price: number;
   mrp: number;
-  educoins: number;
   rating: number;
   ratingCount: number;
   image: string;

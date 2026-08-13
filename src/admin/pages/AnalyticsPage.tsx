@@ -32,8 +32,6 @@ type AnalyticsData = {
   paymentSuccessRate: number;
   failedPayments: number;
   topProducts: { id: string; title: string; reviewCount: number; rating: string | null }[];
-  coinsIssued: number;
-  coinsRedeemed: number;
   activeSubscriptionPlans: number;
   averageReviewRating: number;
   reviewsInRange: number;
@@ -51,10 +49,8 @@ const ANALYTICS_TABS = [
   { key: "products", label: "Products" },
   { key: "revenue", label: "Revenue" },
   { key: "customers", label: "Customers" },
-  { key: "rewards", label: "Rewards" },
   { key: "subscriptions", label: "Subscriptions" },
   { key: "courses", label: "Courses" },
-  { key: "community", label: "Community" },
   { key: "exports", label: "Exports" },
 ];
 
@@ -70,10 +66,8 @@ export default function AnalyticsPage() {
         {tab === "products" && <ProductsTab notify={notify} />}
         {tab === "revenue" && <RevenueTab notify={notify} />}
         {tab === "customers" && <CustomersTab notify={notify} />}
-        {tab === "rewards" && <RewardsTab notify={notify} />}
         {tab === "subscriptions" && <SubscriptionsTab notify={notify} />}
         {tab === "courses" && <CoursesTab notify={notify} />}
-        {tab === "community" && <CommunityTab notify={notify} />}
         {tab === "exports" && <ExportsTab notify={notify} />}
       </div>
     </div>
@@ -166,10 +160,8 @@ function OverviewTab({ notify: _notify }: { notify: ReturnType<typeof useToast>[
         </div>
       </SectionCard>
 
-      <SectionCard title="Rewards & subscriptions">
+      <SectionCard title="Subscriptions & reviews">
         <div className="grid grid-cols-2 gap-2">
-          <StatCard label="Coins issued" value={data.coinsIssued} />
-          <StatCard label="Coins redeemed" value={data.coinsRedeemed} />
           <StatCard label="Active subs" value={data.activeSubscriptionPlans} />
           <StatCard label="Avg rating" value={`${data.averageReviewRating.toFixed(1)} ⭐`} />
         </div>
@@ -276,36 +268,6 @@ function CustomersTab({ notify: _notify }: { notify: ReturnType<typeof useToast>
 }
 
 /* ------------------------------------------------------------------ */
-/* Rewards tab                                                         */
-/* ------------------------------------------------------------------ */
-
-function RewardsTab({ notify: _notify }: { notify: ReturnType<typeof useToast>["notify"] }) {
-  const [range, setRange] = useState("30d");
-  const { data, error, reload } = useAnalytics(range);
-
-  if (error) return <ErrorState message={error} onRetry={reload} />;
-  if (!data) return <LoadingState label="Loading rewards analytics…" />;
-
-  return (
-    <div className="space-y-3">
-      <DateRangeSelector range={range} onRange={setRange} />
-
-      <SectionCard title="Coin economy">
-        <div className="grid grid-cols-2 gap-2">
-          <StatCard label="Coins issued" value={data.coinsIssued} tone="ok" />
-          <StatCard label="Coins redeemed" value={data.coinsRedeemed} tone="warn" />
-          <StatCard
-            label="Net coin liability"
-            value={data.coinsIssued - data.coinsRedeemed}
-            tone={(data.coinsIssued - data.coinsRedeemed) < 0 ? "danger" : undefined}
-          />
-        </div>
-      </SectionCard>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /* Subscriptions tab                                                   */
 /* ------------------------------------------------------------------ */
 
@@ -347,36 +309,6 @@ function CoursesTab({ notify: _notify }: { notify: ReturnType<typeof useToast>["
       <SectionCard title="Course engagement">
         <KeyValue label="Total reviews" value={data.reviewsInRange} />
         <KeyValue label="Average rating" value={`${data.averageReviewRating.toFixed(1)} ⭐`} />
-      </SectionCard>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Community tab                                                       */
-/* ------------------------------------------------------------------ */
-
-function CommunityTab({ notify: _notify }: { notify: ReturnType<typeof useToast>["notify"] }) {
-  return (
-    <div className="space-y-3">
-      <SectionCard title="Community engagement" description="Community metrics are sourced from moderation and post/comment data.">
-        <KeyValue label="Reported content" value="See moderation reports tab" />
-        <KeyValue label="Active community users" value="Data available via customers + community tables" />
-      </SectionCard>
-
-      <SectionCard title="Quick links">
-        <Link
-          href="/admin/moderation"
-          className="block rounded-lg border border-slate-200 p-3 text-sm font-medium text-slate-700 active:bg-slate-50"
-        >
-          Open moderation dashboard →
-        </Link>
-        <Link
-          href="/admin/reviews"
-          className="mt-2 block rounded-lg border border-slate-200 p-3 text-sm font-medium text-slate-700 active:bg-slate-50"
-        >
-          Open reviews →
-        </Link>
       </SectionCard>
     </div>
   );

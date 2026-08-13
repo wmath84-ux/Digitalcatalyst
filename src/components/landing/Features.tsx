@@ -16,21 +16,15 @@ const features = [
     gradient: "from-cyan-500 to-blue-500",
   },
   {
-    icon: "🤖",
-    title: "Smart AI Mentor — Gemini Flash",
-    desc: "Integrated with Google Gemini Flash for the fastest responses possible — get 24/7 personalized guidance, doubt-solving, and study plans from your AI mentor.",
+    icon: "🗓️",
+    title: "My Day Planner",
+    desc: "Keep tasks, schedules, reminders, and quick notes in one focused planner so every study day stays organized.",
     gradient: "from-fuchsia-500 to-pink-500",
-  },
-  {
-    icon: "🪙",
-    title: "EduCoin Reward Economy",
-    desc: "Earn virtual EduCoins for daily engagement, quizzes, and streaks — then spend them to unlock premium notes, courses, and perks.",
-    gradient: "from-amber-400 to-orange-500",
   },
   {
     icon: "🛒",
     title: "Seamless E-Commerce",
-    desc: "A secure, frictionless checkout experience for every digital asset — from single notes to full course bundles — powered by your EduCoin wallet.",
+    desc: "A secure, frictionless checkout experience for every digital asset — from single notes to full course bundles.",
     gradient: "from-emerald-400 to-teal-500",
   },
   {
@@ -60,8 +54,8 @@ export default function Features() {
             Everything you need to <span className="gradient-text">learn faster</span>
           </h2>
           <p className="mt-4 text-slate-400">
-            Eduvora blends immersive design with real utility — six pillars built to keep
-            you engaged, rewarded, and always progressing.
+            Eduvora blends immersive design with real utility — built to keep
+            you engaged and always progressing.
           </p>
         </motion.div>
 
