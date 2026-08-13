@@ -1,4 +1,4 @@
-import { applicationDefault, cert, getApp, getApps, initializeApp, type App } from 'firebase-admin/app';
+import { applicationDefault, cert, getApp, getApps, initializeApp, type App, type ServiceAccount } from 'firebase-admin/app';
 import { getAuth, type DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 
@@ -13,25 +13,95 @@ export type VercelResponse = {
   json: (body: unknown) => void;
 };
 
-const readServiceAccount = () => {
-  const raw = String(process.env.FIREBASE_SERVICE_ACCOUNT || '').trim();
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Record<string, string>;
-    if (parsed.private_key) parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
-    return parsed;
-  } catch {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT must be a valid service-account JSON string.');
+type ServiceAccountRecord = Record<string, unknown> & {
+  project_id?: string;
+  projectId?: string;
+  client_email?: string;
+  clientEmail?: string;
+  private_key?: string;
+  privateKey?: string;
+};
+
+const configurationError = (message: string, cause?: unknown) => {
+  const error = new Error(message) as Error & { statusCode: number; cause?: unknown; code: string };
+  error.name = 'FirebaseAdminConfigurationError';
+  error.code = 'firebase_admin_not_configured';
+  error.statusCode = 503;
+  if (cause !== undefined) error.cause = cause;
+  return error;
+};
+
+const normalizePrivateKey = (value: unknown) =>
+  String(value || '').trim().replace(/\\n/g, '\n');
+
+const parseServiceAccountValue = (rawValue: string): ServiceAccountRecord => {
+  let value: unknown = rawValue.trim();
+  let lastError: unknown;
+
+  // Vercel accepts both plain JSON and base64 values. Supporting both avoids
+  // brittle newline escaping when a PEM key is pasted into the dashboard.
+  const candidates = [String(value)];
+  if (!String(value).startsWith('{') && !String(value).startsWith('"{')) {
+    try {
+      candidates.push(Buffer.from(String(value), 'base64').toString('utf8'));
+    } catch {
+      // JSON parsing below will produce the actionable configuration error.
+    }
   }
+
+  for (const candidate of candidates) {
+    try {
+      value = JSON.parse(candidate);
+      // Some deployment tools wrap the complete JSON object in a JSON string.
+      if (typeof value === 'string') value = JSON.parse(value);
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return value as ServiceAccountRecord;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw configurationError('FIREBASE_SERVICE_ACCOUNT is not valid JSON or base64-encoded JSON.', lastError);
+};
+
+const serviceAccountFromIndividualVariables = (): ServiceAccountRecord | null => {
+  const projectId = String(process.env.FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || '').trim();
+  const clientEmail = String(process.env.FIREBASE_CLIENT_EMAIL || '').trim();
+  const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+  if (!projectId && !clientEmail && !privateKey) return null;
+  if (!projectId || !clientEmail || !privateKey) {
+    throw configurationError('FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY must all be configured together.');
+  }
+  return { project_id: projectId, client_email: clientEmail, private_key: privateKey };
+};
+
+const readServiceAccount = (): ServiceAccountRecord | null => {
+  const raw = String(process.env.FIREBASE_SERVICE_ACCOUNT || '').trim();
+  const parsed = raw ? parseServiceAccountValue(raw) : serviceAccountFromIndividualVariables();
+  if (!parsed) return null;
+
+  const projectId = String(parsed.project_id || parsed.projectId || '').trim();
+  const clientEmail = String(parsed.client_email || parsed.clientEmail || '').trim();
+  const privateKey = normalizePrivateKey(parsed.private_key || parsed.privateKey);
+  if (!projectId || !clientEmail || !privateKey) {
+    throw configurationError('The Firebase service account must include project_id, client_email, and private_key.');
+  }
+
+  return { ...parsed, project_id: projectId, client_email: clientEmail, private_key: privateKey };
 };
 
 export const getFirebaseAdminApp = (): App => {
   if (getApps().length) return getApp();
   const serviceAccount = readServiceAccount();
-  return initializeApp({
-    credential: serviceAccount ? cert(serviceAccount) : applicationDefault(),
-    projectId: serviceAccount?.project_id || 'my-website-761e9',
-  });
+  try {
+    return initializeApp({
+      credential: serviceAccount ? cert(serviceAccount as ServiceAccount) : applicationDefault(),
+      projectId: serviceAccount?.project_id || process.env.FIREBASE_PROJECT_ID || 'my-website-761e9',
+    });
+  } catch (error) {
+    throw configurationError('Firebase Admin credentials are invalid.', error);
+  }
 };
 
 export const adminDb = () => getFirestore(getFirebaseAdminApp());
@@ -47,12 +117,43 @@ export async function requireFirebaseUser(request: VercelRequest): Promise<Decod
   if (!match) throw Object.assign(new Error('Authentication required.'), { statusCode: 401 });
   try {
     return await getAuth(getFirebaseAdminApp()).verifyIdToken(match[1], true);
-  } catch {
+  } catch (error) {
+    // Do not misreport a deployment credential failure as an expired user
+    // session. It is recoverable by the operator, not by logging in again.
+    if (isCredentialFailure(error) || (error instanceof Error && 'statusCode' in error && Number((error as { statusCode?: unknown }).statusCode) === 503)) {
+      throw configurationError('Firebase Admin credentials are unavailable.', error);
+    }
     throw Object.assign(new Error('Your session is invalid or expired. Please log in again.'), { statusCode: 401 });
   }
 }
 
+const isCredentialFailure = (error: unknown) => {
+  if (!(error instanceof Error)) return false;
+  if (error.name === 'FirebaseAdminConfigurationError') return true;
+  const text = `${error.name} ${error.message}`.toLowerCase();
+  return [
+    'could not load the default credentials',
+    'default credentials were not found',
+    'metadata.google.internal',
+    'invalid pem',
+    'no start line',
+    'decoder routines',
+    'credential implementation provided to initializeapp',
+  ].some((fragment) => text.includes(fragment));
+};
+
 export const errorResponse = (response: VercelResponse, error: unknown, fallback: string) => {
+  // Keep detailed errors in server logs while returning a stable, actionable
+  // JSON response. This also prevents Vercel's generic HTML 500 page from
+  // turning into the unhelpful client message "Server returned 500".
+  console.error(`[api] ${fallback}`, error);
+  if (isCredentialFailure(error)) {
+    return response.status(503).json({
+      ok: false,
+      code: 'firebase_admin_not_configured',
+      error: 'Secure pricing is temporarily unavailable. Please try again shortly.',
+    });
+  }
   const statusCode = typeof error === 'object' && error && 'statusCode' in error
     ? Number((error as { statusCode?: unknown }).statusCode) || 500
     : 500;

@@ -23,7 +23,7 @@ Configure these server-only deployment variables:
 
 - `RAZORPAY_KEY_ID`
 - `RAZORPAY_KEY_SECRET`
-- `FIREBASE_SERVICE_ACCOUNT` (complete service-account JSON)
+- `FIREBASE_SERVICE_ACCOUNT` (complete service-account JSON or base64-encoded JSON), or all three of `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`
 
 Free products use the same authenticated server flow but skip Razorpay. EduCoin redemption is intentionally unavailable until wallet deduction is implemented as an atomic server transaction.
 
