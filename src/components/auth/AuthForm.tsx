@@ -25,6 +25,7 @@ export default function AuthForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [signupNotice, setSignupNotice] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
@@ -32,6 +33,7 @@ export default function AuthForm() {
 
   const clearMessages = () => {
     setError(null);
+    setSignupNotice(null);
     setSuccess(null);
   };
 
@@ -74,6 +76,12 @@ export default function AuthForm() {
         : await login(normalizedEmail, password);
 
       if (!result.success) {
+        if (mode === "login" && result.code === "auth/user-not-found") {
+          setMode("signup");
+          setPassword("");
+          setSignupNotice("इस email का account नहीं मिला। नए users को पहले Sign Up करना होगा — हमने Sign Up form खोल दिया है।");
+          return;
+        }
         setError(result.message);
         return;
       }
@@ -281,8 +289,16 @@ export default function AuthForm() {
 
         {error && (
           <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-            {error}
+            <p>{error}</p>
+            {mode === "login" && (
+              <button type="button" onClick={() => { setMode("signup"); setPassword(""); setError(null); setSignupNotice("नए user हैं? पहले Sign Up करके अपना account बनाएं।"); }} className="mt-2 font-black text-white underline underline-offset-2">New user? Sign Up करें</button>
+            )}
           </div>
+        )}
+        {signupNotice && (
+          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} role="status" className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-sm font-semibold leading-5 text-cyan-100">
+            {signupNotice}
+          </motion.div>
         )}
         {success && (
           <div role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
