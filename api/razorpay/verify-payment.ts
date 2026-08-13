@@ -29,18 +29,58 @@
 //      entitlement ids so the success page can render the receipt.
 
 import crypto from "crypto";
+import { Timestamp, type Firestore } from "firebase-admin/firestore";
 import {
   adminDb,
   errorResponse,
   requireFirebaseUser,
   type VercelRequest,
   type VercelResponse,
-} from "../_lib/firebaseAdmin";
-import { loadServerQuoteForUser } from "../_lib/quotes";
-import { grantEntitlementsFromQuote, grantSubscriptionFromQuote } from "../_lib/entitlements";
+} from "../_lib/firebaseAdmin.js";
+import { loadServerQuoteForUser } from "../_lib/quotes.js";
+import { grantEntitlementsFromQuote, grantSubscriptionFromQuote } from "../_lib/entitlements.js";
+import { pushToUser } from "../_lib/pushNotify.js";
 
 const cleanRazorpayId = (value: unknown) =>
   String(value || "").trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 100);
+
+// Instant unlock fan-out: the moment verification succeeds the buyer gets a
+// cross-device bell entry AND a system push on every subscribed device —
+// neither waits for the cron scheduler. Best-effort: a push failure must
+// never fail payment verification. The bell doc id is per-order, so retries
+// and replays never duplicate it.
+async function announceUnlock(
+  db: Firestore,
+  uid: string,
+  quote: { purchaseKind?: string; verifiedLineItems?: Array<{ title?: unknown }> },
+  orderId: string,
+) {
+  const titles = (quote.verifiedLineItems || [])
+    .map((item) => String(item?.title || "").trim())
+    .filter(Boolean);
+  const isSubscription = quote.purchaseKind === "subscription";
+  const title = isSubscription
+    ? "✅ Subscription activated"
+    : titles.length > 1
+      ? `🔓 ${titles.length} products unlocked`
+      : "🔓 Product unlocked";
+  const shown = titles.slice(0, 2).join(" · ");
+  const body = shown
+    ? shown + (titles.length > 2 ? ` +${titles.length - 2} more` : "")
+    : "Your purchase is ready.";
+  const docId = `unlock:${orderId}`;
+  await db.collection("users").doc(uid).collection("notifications").doc(docId).set({
+    id: docId,
+    title,
+    body,
+    category: "unlock",
+    read: false,
+    source: "system",
+    createdAt: Timestamp.now(),
+    target: { type: "purchases" },
+  }, { merge: true });
+  await pushToUser(db, uid, { title, body, tag: `unlock-${orderId}`, url: "/#/store/purchases" });
+}
 
 const cleanQuoteId = (value: unknown) =>
   String(value || "").trim().replace(/[^a-zA-Z0-9_:-]/g, "").slice(0, 120);
@@ -220,6 +260,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         paymentId: null,
         source: "free",
       });
+      if (!grant.replayed) {
+        try {
+          await announceUnlock(adminDb(), firebaseUser.uid, quote, orderId);
+        } catch (announceError) {
+          console.warn("[verify-payment] unlock announcement failed (free path)", announceError);
+        }
+      }
       return res.status(200).json({
         ok: true,
         verified: true,
@@ -324,6 +371,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       paymentId,
       source: "razorpay",
     });
+
+    if (!grant.replayed) {
+      try {
+        await announceUnlock(adminDb(), firebaseUser.uid, quote, orderId);
+      } catch (announceError) {
+        console.warn("[verify-payment] unlock announcement failed (paid path)", announceError);
+      }
+    }
 
     return res.status(200).json({
       ok: true,

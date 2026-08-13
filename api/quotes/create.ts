@@ -18,8 +18,8 @@
 // Quote creation is idempotent on `(uid, idempotencyKey)` when the key
 // is supplied: a matching active quote is returned as-is.
 
-import { handleCreateQuote, handleFetchQuote } from "../_lib/quotes";
-import type { VercelRequest, VercelResponse } from "../_lib/firebaseAdmin";
+import { handleCreateQuote, handleFetchQuote } from "../_lib/quotes.js";
+import type { VercelRequest, VercelResponse } from "../_lib/firebaseAdmin.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // GET keeps quote lookup on this same function so the Hobby plan

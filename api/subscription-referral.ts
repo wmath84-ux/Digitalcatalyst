@@ -1,7 +1,7 @@
-import { errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./_lib/firebaseAdmin";
-import { ensureReferralCoupon, loadReferralConfig } from "./_lib/referrals";
-import { loadUserCouponUsageCount } from "./_lib/coupons";
-import { normaliseCouponCode } from "../utils/coupons";
+import { errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./_lib/firebaseAdmin.js";
+import { ensureReferralCoupon, loadReferralConfig } from "./_lib/referrals.js";
+import { loadUserCouponUsageCount } from "./_lib/coupons.js";
+import { normaliseCouponCode } from "../utils/coupons.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });

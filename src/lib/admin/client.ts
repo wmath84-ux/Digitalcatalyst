@@ -24,6 +24,25 @@ async function ensureAdmin() {
   return user;
 }
 
+// Fire-and-forget: ask the server to instantly announce this product change —
+// a create pushes to every subscribed device, an update pushes to the
+// product's buyers when the course tree actually grew. Never blocks or
+// breaks the admin save flow.
+async function notifyProductChange(productId: string, action: "product-created" | "product-updated") {
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+    const token = await user.getIdToken();
+    await fetch("/api/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action, productId }),
+    });
+  } catch (error) {
+    console.warn("[admin] product push announcement skipped", error);
+  }
+}
+
 function productForEditor(raw: any, documentId: string) {
   // Canonical round-trip: the mapping layer reconstructs the full editor
   // form (modules, paid updates, images, pricing) from the Firestore doc.
@@ -38,9 +57,9 @@ async function productsRequest(url: URL, init?: RequestInit) {
     const ref = doc(db, "siteProducts", decodeURIComponent(match[1]));
     if (method === "GET") { const snap = await getDoc(ref); if (!snap.exists()) throw new ApiError("Product not found",404); return { product: productForEditor(snap.data(), snap.id) }; }
     if (method === "DELETE") { await deleteDoc(ref); return { ok: true }; }
-    if (method === "PATCH") { const body = bodyOf(init); await saveProduct(ref, body); return { product: body }; }
+    if (method === "PATCH") { const body = bodyOf(init); await saveProduct(ref, body); void notifyProductChange(ref.id, "product-updated"); return { product: body }; }
   }
-  if (method === "POST") { const body = bodyOf(init); const ref = doc(db, "siteProducts", String(body.id || id())); await saveProduct(ref, body); return { product: { ...body, id: ref.id } }; }
+  if (method === "POST") { const body = bodyOf(init); const ref = doc(db, "siteProducts", String(body.id || id())); await saveProduct(ref, body); void notifyProductChange(ref.id, "product-created"); return { product: { ...body, id: ref.id } }; }
   const snap = await getDocs(collection(db, "siteProducts"));
   let products = snap.docs.map((item) => { const p = productForEditor(item.data(), item.id); return { ...(p || {}), reviewCount: Number(item.data().reviewCount || 0), rating: String(item.data().rating || item.data().manualRating || 0), updatedAt: asDate(item.data().updatedAt), modules: (p && p.modules) || [], images: (p && p.images) || [] }; });
   const q=(url.searchParams.get("q")||"").toLowerCase(); if(q) products=products.filter((p:any)=>`${p.id} ${p.title} ${p.category}`.toLowerCase().includes(q));

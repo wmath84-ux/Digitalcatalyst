@@ -38,7 +38,7 @@
 // `{ ok: true, replayed: true, ... }`.
 
 import { FieldValue, Timestamp, type Firestore, type Transaction } from "firebase-admin/firestore";
-import { adminDb } from "./firebaseAdmin";
+import { adminDb } from "./firebaseAdmin.js";
 import {
   buildEntitlementDocId,
   buildEntitlementRecord,
@@ -46,17 +46,17 @@ import {
   isGrantableLine,
   type EntitlementRecord,
   type ServerPriceQuote,
-} from "../../utils/entitlements";
-import { applyCouponRedemption, loadCouponByCode } from "./coupons";
-import type { CouponDoc } from "../../utils/coupons";
-import { ensureReferralCoupon } from "./referrals";
+} from "../../utils/entitlements.js";
+import { applyCouponRedemption, loadCouponByCode } from "./coupons.js";
+import type { CouponDoc } from "../../utils/coupons.js";
+import { ensureReferralCoupon } from "./referrals.js";
 import {
   collectSubscriptionEntitlementIds,
   loadPlanById,
   writeSubscriptionAfterPayment,
   type BillingCycle,
   type SubscriptionPlanDoc,
-} from "./subscriptions";
+} from "./subscriptions.js";
 
 /** Firestore collection / subcollection names. Kept here for testability. */
 const ENTITLEMENTS_COLLECTION = "entitlements";

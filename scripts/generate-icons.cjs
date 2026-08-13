@@ -86,24 +86,56 @@ const cubic = (x0, y0, x1, y1, x2, y2, x3, y3, steps = 16) => {
 };
 
 // ---------------------------------------------------------------- badge
+// Open-book outline in 192-space, shared by the app icon and the badge so the
+// notification small-icon matches the app icon instead of a plain letter.
+const bookOutlinePaths = () => {
+  const path1 = [
+    ...cubic(40, 58, 40, 48, 48, 40, 58, 40),
+    [96, 40], [96, 152], [58, 152],
+    ...cubic(58, 152, 48, 152, 40, 144, 40, 134),
+    [40, 58],
+  ];
+  const path2 = [
+    ...cubic(152, 58, 152, 48, 144, 40, 134, 40),
+    [96, 40], [96, 152], [134, 152],
+    ...cubic(134, 152, 144, 152, 152, 144, 152, 134),
+    [152, 58],
+  ];
+  return [path1, path2];
+};
+
+const distanceToBookOutline = (px, py, scale, paths) => {
+  let min = Infinity;
+  for (const pts of paths) {
+    for (let i = 0; i < pts.length - 1; i += 1) {
+      const d = segDist(px, py, pts[i][0] * scale, pts[i][1] * scale, pts[i + 1][0] * scale, pts[i + 1][1] * scale);
+      if (d < min) min = d;
+    }
+  }
+  return min;
+};
+
 function makeBadge(size) {
   const buf = Buffer.alloc(size * size * 4);
-  const fill = (x0, y0, x1, y1, r) => {
-    for (let y = 0; y < size; y += 1) {
-      for (let x = 0; x < size; x += 1) {
-        if (!inRounded(x + 0.5, y + 0.5, x0, y0, x1, y1, r)) continue;
-        const i = (y * size + x) * 4;
+  // Android badges are rendered through the alpha channel only, so the glyph
+  // must be white on transparent. Zoom the book mark slightly past its icon
+  // bounds so it stays legible in the status bar, and stroke it much bolder
+  // than the app-icon stroke.
+  const zoom = 1.22;
+  const k = size / 192;
+  const zoomAt = (v) => (96 + (v - 96) * zoom) * k; // 192-space → badge px, zoomed about the centre
+  const scaled = bookOutlinePaths().map((pts) => pts.map(([x, y]) => [zoomAt(x), zoomAt(y)]));
+  const strokeHalf = 8 * k; // ≈16 units wide in 192-space — bold on small screens
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const px = x + 0.5;
+      const py = y + 0.5;
+      const i = (y * size + x) * 4;
+      if (distanceToBookOutline(px, py, 1, scaled) <= strokeHalf) {
         buf[i] = 255; buf[i + 1] = 255; buf[i + 2] = 255; buf[i + 3] = 255;
       }
     }
-  };
-  // A bold, filled "E" (matches the Eduvora book mark) with breathing room.
-  const r = size * 0.07;
-  const s = size / 96; // scale from 96-space
-  fill(26 * s, 20 * s, 38 * s, 78 * s, r); // spine
-  fill(26 * s, 20 * s, 74 * s, 34 * s, r); // top bar
-  fill(26 * s, 42 * s, 64 * s, 56 * s, r); // middle bar
-  fill(26 * s, 64 * s, 74 * s, 78 * s, r); // bottom bar
+  }
   return encodePNG(size, size, buf);
 }
 
@@ -121,31 +153,8 @@ function makeIcon(size) {
   const bx0 = 8 * s; const by0 = 8 * s; const bx1 = 184 * s; const by1 = 184 * s; const br = 44 * s;
 
   // book outline paths in 192-space (stroked white, width 10)
-  const path1 = [
-    ...cubic(40, 58, 40, 48, 48, 40, 58, 40),
-    [96, 40], [96, 152], [58, 152],
-    ...cubic(58, 152, 48, 152, 40, 144, 40, 134),
-    [40, 58],
-  ];
-  const path2 = [
-    ...cubic(152, 58, 152, 48, 144, 40, 134, 40),
-    [96, 40], [96, 152], [134, 152],
-    ...cubic(134, 152, 144, 152, 152, 144, 152, 134),
-    [152, 58],
-  ];
-  const paths = [path1, path2];
+  const paths = bookOutlinePaths();
   const strokeHalf = 5 * s;
-
-  const distToPaths = (px, py) => {
-    let min = Infinity;
-    for (const pts of paths) {
-      for (let i = 0; i < pts.length - 1; i += 1) {
-        const d = segDist(px, py, pts[i][0] * s, pts[i][1] * s, pts[i + 1][0] * s, pts[i + 1][1] * s);
-        if (d < min) min = d;
-      }
-    }
-    return min;
-  };
 
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
@@ -160,7 +169,7 @@ function makeIcon(size) {
       const g = Math.round(GRAD_A[1] + (GRAD_B[1] - GRAD_A[1]) * t);
       const b = Math.round(GRAD_A[2] + (GRAD_B[2] - GRAD_A[2]) * t);
       buf[i] = r; buf[i + 1] = g; buf[i + 2] = b; buf[i + 3] = 255;
-      if (distToPaths(px, py) <= strokeHalf) {
+      if (distanceToBookOutline(px, py, s, paths) <= strokeHalf) {
         buf[i] = 255; buf[i + 1] = 255; buf[i + 2] = 255;
       }
     }

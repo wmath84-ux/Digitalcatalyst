@@ -18,21 +18,21 @@
 // trusted. Every price comes from the loaded Firestore docs.
 
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
-import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./firebaseAdmin";
+import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./firebaseAdmin.js";
 import {
   buildQuote,
   type FirestoreProductDoc,
   type FirestorePurchaseDoc,
   type ServerPriceQuoteRecord,
-} from "../../utils/serverQuotes";
+} from "../../utils/serverQuotes.js";
 import {
   loadCouponByCode,
   loadUserCouponUsageCount,
   loadUserHasPriorPurchases,
-} from "./coupons";
-import { loadSubscriptionSelectionContext } from "./subscriptions";
-import type { CouponDoc } from "../../utils/coupons";
-import type { CheckoutSelection } from "../../src/types/commerce";
+} from "./coupons.js";
+import { loadSubscriptionSelectionContext } from "./subscriptions.js";
+import type { CouponDoc } from "../../utils/coupons.js";
+import type { CheckoutSelection } from "../../src/types/commerce.js";
 
 const QUOTE_TTL_MS = 15 * 60 * 1000;
 const QUOTES_COLLECTION = "_serverQuotes";

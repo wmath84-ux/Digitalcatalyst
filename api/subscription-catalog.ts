@@ -14,13 +14,13 @@ import {
   requireFirebaseUser,
   type VercelRequest,
   type VercelResponse,
-} from "./_lib/firebaseAdmin";
+} from "./_lib/firebaseAdmin.js";
 import {
   loadActiveFeatures,
   loadActivePlans,
   loadPlanModuleUnlocks,
   loadPlanProductUnlocks,
-} from "./_lib/subscriptions";
+} from "./_lib/subscriptions.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });

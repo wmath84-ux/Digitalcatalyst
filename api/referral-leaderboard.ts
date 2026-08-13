@@ -1,5 +1,5 @@
-import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from "./_lib/firebaseAdmin";
-import { referralCodeForUid } from "./_lib/referrals";
+import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from "./_lib/firebaseAdmin.js";
+import { referralCodeForUid } from "./_lib/referrals.js";
 
 type Row = {
   uid: string;

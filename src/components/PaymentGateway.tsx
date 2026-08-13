@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, CreditCard, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import { auth } from "../../firebase";
 import { revealCheckoutChromeOverRazorpay } from "../utils/razorpayCheckoutChrome";
+import { playPaymentSuccessChime, preparePaymentSound } from "../utils/paymentSounds";
 
 export type VerifiedPayment = {
   orderId: string;
@@ -164,6 +165,7 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
       });
       if (!result.verified) throw new Error("Payment could not be verified.");
       setPaymentState("success");
+      playPaymentSuccessChime();
       window.setTimeout(
         () =>
           onPaymentSuccess({
@@ -185,6 +187,7 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
   };
 
   const startPayment = async () => {
+    preparePaymentSound();
     if (paymentState === "creating" || paymentState === "verifying") return;
     setPaymentState("creating");
     setError("");
@@ -205,6 +208,7 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
             quoteId,
           });
           setPaymentState("success");
+          playPaymentSuccessChime();
           window.setTimeout(
             () =>
               onPaymentSuccess({
