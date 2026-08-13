@@ -11,12 +11,21 @@
 // The 3-step state machine is intentionally simple: "review" → "payment"
 // → "success". The user can back out of any step except success (where
 // the buttons navigate to library / source instead).
+//
+// The page uses the same Eduvora header + BottomNav footer as the store,
+// PDP, notifications and leaderboard. Razorpay Standard Checkout is
+// inset between that chrome so header and footer stay visible while
+// the payment iframe is open.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import StepIndicator from "../StepIndicator";
 import PaymentGateway, { type VerifiedPayment } from "../PaymentGateway";
+import Header from "../Header";
+import BottomNav, { type TabKey } from "../BottomNav";
 import { useCheckout } from "../../checkout/CheckoutContext";
+import { useCatalog } from "../../context/CatalogContext";
+import { useCommerce } from "../../context/CommerceContext";
 import CheckoutReviewStep from "./CheckoutReviewStep";
 import CheckoutSuccessStep from "./CheckoutSuccessStep";
 
@@ -38,6 +47,8 @@ export interface CheckoutAppProps {
 
 export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
   const checkout = useCheckout();
+  const { cartIds } = useCommerce();
+  const { purchasedIds } = useCatalog();
   const [step, setStep] = useState<StepId>(1);
   const [transaction, setTransaction] = useState<VerifiedPayment | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -73,6 +84,14 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
     window.location.hash = "#/store/purchases";
   }, []);
 
+  const handleFooterChange = useCallback((tab: TabKey) => {
+    if (tab === "home") window.location.hash = "#/home";
+    else if (tab === "myday") window.location.hash = "#/my-day";
+    else if (tab === "store") window.location.hash = "#/store";
+    else if (tab === "purchases") window.location.hash = "#/store/purchases";
+    else if (tab === "profile") window.location.hash = "#/profile";
+  }, []);
+
   // Derive the PaymentGateway inputs from the canonical context.
   // Part 6: the only thing the server needs is the `quoteId` —
   // prices, kinds, line items, and entitlements are all derived
@@ -86,9 +105,26 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
   const quoteId = quote?.quoteId || "";
 
   return (
-    <div className="min-h-screen bg-slate-50 flex justify-center" data-checkout-app>
-      <div className="w-full max-w-md min-h-screen bg-slate-50 flex flex-col">
-        <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur-md shadow-sm">
+    <div className="min-h-screen bg-slate-100 sm:py-6" data-checkout-app>
+      <div
+        data-checkout-shell
+        className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200"
+      >
+        <Header
+          cartCount={cartIds.size}
+          notifCount={1}
+          onNavigateToSubscription={() => {
+            window.location.hash = "#/subscription";
+          }}
+          onNavigateToCart={() => {
+            window.location.hash = "#/cart";
+          }}
+          onNavigateToNotifications={() => {
+            window.location.hash = "#/notifications";
+          }}
+        />
+
+        <div data-checkout-toolbar className="border-b border-slate-200 bg-white/90 backdrop-blur-md">
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <button
               type="button"
@@ -106,7 +142,7 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
           </div>
         </div>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pt-4 pb-8">
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-4 pt-4 pb-8">
           {step === 1 ? (
             <CheckoutReviewStep onProceed={handleProceedToPayment} onEdit={handleEditSelection} />
           ) : null}
@@ -137,6 +173,8 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
             />
           ) : null}
         </div>
+
+        <BottomNav active={null} onChange={handleFooterChange} purchasesBadge={purchasedIds.size} />
       </div>
     </div>
   );

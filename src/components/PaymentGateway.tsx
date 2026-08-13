@@ -12,9 +12,10 @@
 // never sent to the server (the server computes the amount from
 // `quote.cashPayable`).
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, CreditCard, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import { auth } from "../../firebase";
+import { revealCheckoutChromeOverRazorpay } from "../utils/razorpayCheckoutChrome";
 
 export type VerifiedPayment = {
   orderId: string;
@@ -65,9 +66,15 @@ type RazorpayOptions = {
   handler: (response: RazorpaySuccess) => void;
 };
 
+type RazorpayInstance = {
+  open: () => void;
+  close?: () => void;
+  on: (event: string, callback: (response: { error?: { description?: string } }) => void) => void;
+};
+
 declare global {
   interface Window {
-    Razorpay?: new (options: RazorpayOptions) => { open: () => void; on: (event: string, callback: (response: { error?: { description?: string } }) => void) => void };
+    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
   }
 }
 
@@ -125,6 +132,27 @@ interface VerifyPaymentResponse {
 export default function PaymentGateway({ quoteId, finalPrice, currency, productName, onPaymentSuccess, onGoBack }: PaymentGatewayProps) {
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
   const [error, setError] = useState("");
+  const razorpayRef = useRef<RazorpayInstance | null>(null);
+  const unpinChromeRef = useRef<(() => void) | null>(null);
+
+  const releaseCheckoutChrome = () => {
+    unpinChromeRef.current?.();
+    unpinChromeRef.current = null;
+  };
+
+  const closeRazorpayCheckout = () => {
+    try {
+      razorpayRef.current?.close?.();
+    } catch {
+      // Razorpay may already have torn the modal down.
+    }
+    razorpayRef.current = null;
+    releaseCheckoutChrome();
+  };
+
+  useEffect(() => () => {
+    closeRazorpayCheckout();
+  }, []);
 
   const verifyPayment = async (response: RazorpaySuccess) => {
     setPaymentState("verifying");
@@ -209,17 +237,25 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
         theme: { color: "#4f46e5" },
         modal: {
           ondismiss: () => {
+            razorpayRef.current = null;
+            releaseCheckoutChrome();
             setPaymentState("idle");
             setError("Payment window was closed. No access was granted.");
           },
         },
-        handler: (response) => void verifyPayment(response),
+        handler: (response) => {
+          releaseCheckoutChrome();
+          void verifyPayment(response);
+        },
       });
       checkout.on("payment.failed", (response) => {
+        releaseCheckoutChrome();
         setPaymentState("error");
         setError(response.error?.description || "Payment failed. Please try another method.");
       });
+      razorpayRef.current = checkout;
       checkout.open();
+      unpinChromeRef.current = revealCheckoutChromeOverRazorpay();
     } catch (paymentError) {
       setPaymentState("error");
       setError(paymentError instanceof Error ? paymentError.message : "Could not start secure payment.");

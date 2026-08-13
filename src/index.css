@@ -233,6 +233,25 @@ html, body {
   overscroll-behavior: none;
 }
 
+/* Keep Eduvora header + footer visible while Razorpay Checkout is open. */
+body.eduvora-razorpay-open [data-site-header],
+body.eduvora-razorpay-open [data-site-footer] {
+  z-index: 2147483000 !important;
+  background-color: rgba(255, 255, 255, 0.98);
+}
+
+body.eduvora-razorpay-open .razorpay-container,
+body.eduvora-razorpay-open .razorpay-checkout-frame {
+  top: var(--eduvora-header-h, 64px) !important;
+  height: calc(100dvh - var(--eduvora-header-h, 64px) - var(--eduvora-footer-h, 80px)) !important;
+  max-height: calc(100dvh - var(--eduvora-header-h, 64px) - var(--eduvora-footer-h, 80px)) !important;
+}
+
+body.eduvora-razorpay-open iframe.razorpay-checkout-frame,
+body.eduvora-razorpay-open .razorpay-container iframe {
+  color-scheme: light;
+}
+
 /* AI Chat — keyframe animations */
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(8px); }
