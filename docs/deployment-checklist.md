@@ -43,9 +43,34 @@ Browser mein kholo: `https://eduvora.shop/api/referral-leaderboard`
   Vercel Dashboard → project → **Logs** (ya error page par "check the logs" link) →
   **"Uncaught Exception"** wala block copy karke development ko bhejo. Wahi exact wajah batata hai.
 
-## 4. Notes
+## 4. Time-based push notifications (My Day + Product announcements)
+
+`api/cron/subscription-renewals` ab **3 jobs** chalata hai (sab idempotent — kitni baar bhi call karo safe):
+
+1. Subscription renewal reminders (7d/3d/1d/due/expired)
+2. **My Day reminders/tasks/schedule** — user ke set kiye exact local time par system push
+3. **Product announcements** — naya/free product sabko push; khareede product me naya module/lesson → buyers ko push
+
+Vercel cron is path ko **roz 1 baar** chalata hai (Hobby limit) — wo renewal ke liye kaafi hai,
+lekin **My Day reminders time-sensitive hain**, isliye ek external 1-minute pinger chahiye:
+
+1. `CRON_SECRET` Vercel env mein set karo (Production ✔) + redeploy.
+2. https://cron-job.org (free) par account banao → new cron job:
+   - URL: `https://eduvora.shop/api/cron/subscription-renewals`
+   - Schedule: **every 1 minute**
+   - Header: `Authorization: Bearer <CRON_SECRET ki value>`
+3. Test: pinger ka first run `200 {"ok":true,...}` lautana chahiye.
+
+**Zaroori shartein:**
+- Web push ke liye `WEB_PUSH_VAPID_PUBLIC_KEY` / `WEB_PUSH_VAPID_PRIVATE_KEY` set hone chahiye.
+- User ko app mein notifications **allow** karne honge (login par app khud subscribe karta hai).
+- My Day reminders tabhi fire honge jab user ne is release ke baad **ek baar My Day kholkar koi bhi edit/save** kiya ho — usi save ke saath device ka timezone (`tzOffsetMinutes`) Firestore mein jata hai jisse server sahi local time pe push karta hai.
+- Product announcements ka **pehla run sirf baseline snapshot leta hai** (koi push nahi) — flood avoid karne ke liye.
+
+## 5. Notes
 
 - Local testing (`npm run dev`) mein `/api/*` endpoints **nahi chalte** — ye sirf Vercel
   par live hote hain. Local par API test karne ke liye `vercel dev` use karo (Vercel CLI login chahiye).
 - Hobby plan par 12 serverless functions ki limit hai — abhi exactly 12 hain; naya API
-  endpoint add karne se pehle kisi existing ko merge karna hoga.
+  endpoint add karne se pehle kisi existing ko merge karna hoga (isliye scheduler ko
+  existing cron function mein hi merge kiya gaya hai).

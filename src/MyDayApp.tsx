@@ -109,7 +109,7 @@ export default function App() {
 
   useEffect(() => {
     if (!uid || !hasMyDayAccess || !cloudLoaded) return;
-    void setDoc(doc(db, "users", uid, "myDay", "current"), { tasks, schedule, notes, reminders, updatedAt: serverTimestamp() }, { merge: true });
+    void setDoc(doc(db, "users", uid, "myDay", "current"), { tasks, schedule, notes, reminders, tzOffsetMinutes: new Date().getTimezoneOffset(), updatedAt: serverTimestamp() }, { merge: true });
   }, [cloudLoaded, hasMyDayAccess, notes, reminders, schedule, tasks, uid]);
 
   const handleNavigate = useCallback((id: string) => {

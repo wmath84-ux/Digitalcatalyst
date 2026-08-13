@@ -9,6 +9,7 @@ import {
   mergeSiteNotifications,
   saveSiteNotifications,
   type SiteNotification,
+  type SiteNotificationCategory,
 } from "../../utils/siteNotifications";
 import { useAuth } from "../context/AuthContext";
 import { BellIcon, BookOpenIcon, StoreIcon } from "./icons";
@@ -76,15 +77,23 @@ export default function NotificationsPage({
     });
   }, [user]);
 
-  // Cloud notifications are written by the daily renewal scheduler and are
-  // deduplicated by stage+expiry. They sync across every signed-in device.
+  // Cloud notifications are written by the push scheduler (renewals, My Day
+  // activity reminders, course content announcements) and sync across every
+  // signed-in device. Category/target are stored on each doc — map them
+  // through so a My Day reminder doesn't masquerade as a subscription alert.
   useEffect(() => {
     if (!user) return undefined;
+    const validCategories = new Set<SiteNotificationCategory>(["store", "reading", "course", "unlock", "community", "announcement", "mayday", "subscription"]);
     return onSnapshot(collection(db, "users", user.id, "notifications"), (snapshot) => {
       const cloud: SiteNotification[] = snapshot.docs.map((item) => {
         const data = item.data() || {};
         const createdAt = data.createdAt && typeof data.createdAt.toMillis === "function" ? data.createdAt.toMillis() : Number(data.createdAt || Date.now());
-        return { id: item.id, title: String(data.title || "Subscription update"), body: String(data.body || ""), category: "subscription", createdAt, read: Boolean(data.read), source: "system", target: { type: "subscription" }, remoteNotificationId: item.id };
+        const rawCategory = String(data.category || "");
+        const category = (validCategories.has(rawCategory as SiteNotificationCategory) ? rawCategory : "subscription") as SiteNotificationCategory;
+        const rawTarget = data.target && typeof data.target === "object" && typeof (data.target as { type?: unknown }).type === "string"
+          ? data.target
+          : { type: "subscription" };
+        return { id: item.id, title: String(data.title || "Notification"), body: String(data.body || ""), category, createdAt, read: Boolean(data.read), source: "system", target: rawTarget as SiteNotification["target"], remoteNotificationId: item.id };
       });
       setItems((current) => mergeSiteNotifications(current, cloud));
     });
