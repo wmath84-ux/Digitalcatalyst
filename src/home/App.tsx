@@ -75,7 +75,6 @@ export default function App({
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const contentTopRef = useRef<HTMLDivElement>(null);
-  const touchStartX = useRef<number | null>(null);
 
   const continueProgressRecord = useMemo(() => [...progressRecords]
     .filter((record) => catalogProducts.some((product) => product.id === record.productId))
@@ -110,13 +109,30 @@ export default function App({
     const next = (index + direction + categories.length) % categories.length;
     setActiveCategory(categories[next].id);
   };
-  const handleTouchStart = (event: React.TouchEvent) => { touchStartX.current = event.changedTouches[0]?.clientX ?? null; };
-  const handleTouchEnd = (event: React.TouchEvent) => {
-    if (touchStartX.current == null) return;
-    const delta = (event.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
-    touchStartX.current = null;
-    if (Math.abs(delta) >= 48) switchCategory(delta < 0 ? 1 : -1);
+  // Swipe-to-switch-category is intentionally scoped: only gestures that
+  // start on the filter (CategoryNav) or the product grid switch the filter.
+  // The reviews rail, hero carousel and Continue Learning card keep their own
+  // horizontal scrolling without flipping the category.
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleSwipeStart = (event: React.TouchEvent) => {
+    const touch = event.changedTouches[0];
+    swipeStartRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
   };
+  const handleSwipeEnd = (event: React.TouchEvent) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (start == null) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    // Only a deliberate, mostly-horizontal swipe switches the category — a
+    // vertical or diagonal page scroll must not flip the filter.
+    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+    switchCategory(deltaX < 0 ? 1 : -1);
+  };
+  const categorySwipeHandlers = { onTouchStart: handleSwipeStart, onTouchEnd: handleSwipeEnd };
 
   const categoryFiltered: Product[] = useMemo(() => {
     if (activeCategory === "all") return products;
@@ -174,7 +190,7 @@ export default function App({
           onOpenNotifications={onNavigateToNotifications}
         />
 
-        <main className="flex-1 overflow-y-auto pb-2" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        <main className="flex-1 overflow-y-auto pb-2">
           {isSearching ? (
             <section className="px-5 pt-6">
               <div className="flex items-center justify-between">
@@ -219,11 +235,13 @@ export default function App({
             <>
               <HeroCarousel banners={banners} />
 
-              <CategoryNav
-                categories={categories}
-                activeCategory={activeCategory}
-                onSelect={setActiveCategory}
-              />
+              <div {...categorySwipeHandlers}>
+                <CategoryNav
+                  categories={categories}
+                  activeCategory={activeCategory}
+                  onSelect={setActiveCategory}
+                />
+              </div>
 
               {continueLearningItem && (
                 <ContinueLearning
@@ -236,7 +254,7 @@ export default function App({
                 />
               )}
 
-              <section className="px-5 pt-6">
+              <section className="px-5 pt-6" {...categorySwipeHandlers}>
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-bold text-slate-900">
                     {activeCategory === "all"
