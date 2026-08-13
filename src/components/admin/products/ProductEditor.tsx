@@ -399,12 +399,10 @@ export function ProductEditor({ productId }: { productId?: string }) {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Regular price (₹)">
-                <input className={inputClass} type="number" value={form.regularPrice} onChange={(e) => update("regularPrice", e.target.value)} />
+                <input className={inputClass} type="number" disabled={form.isFree} value={form.isFree ? "0" : form.regularPrice} onChange={(e) => update("regularPrice", e.target.value)} />
               </Field>
               <Field label="Sale price (₹)">
-                <input className={inputClass} type="number" value={form.salePrice ?? ""} onChange={(e) => update("salePrice", e.target.value === "" ? null : e.target.value)} />
-              </Field>
-"salePrice", e.target.value === "" ? null : e.target.value)} />
+                <input className={inputClass} type="number" disabled={form.isFree} value={form.isFree ? "" : (form.salePrice ?? "")} onChange={(e) => update("salePrice", e.target.value === "" ? null : e.target.value)} />
               </Field>
             </div>
             <p className="text-xs text-slate-500">
@@ -418,11 +416,14 @@ export function ProductEditor({ productId }: { productId?: string }) {
               <ToggleSwitch
                 checked={form.isFree}
                 onChange={(v) => {
-                  update("isFree", v);
-                  if (v) {
-                    setForm((prev) => ({ ...prev, isFree: true, regularPrice: "0", salePrice: null, minPayableAmount: "0" }));
-                    setDirty(true);
-                  }
+                  setForm((prev) => ({
+                    ...prev,
+                    isFree: v,
+                    regularPrice: v ? "0" : prev.regularPrice,
+                    salePrice: v ? null : prev.salePrice,
+                    minPayableAmount: v ? "0" : prev.minPayableAmount,
+                  }));
+                  setDirty(true);
                 }}
               />
             </div>
@@ -813,8 +814,5 @@ function PaidUpdatesEditor({
         </div>
       ))}
     </div>
-  );
-}
-div>
   );
 }
