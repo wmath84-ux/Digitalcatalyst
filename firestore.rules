@@ -106,13 +106,13 @@ service cloud.firestore {
           && request.resource.data.uid == uid
           && request.resource.data.endpoint is string
           && request.resource.data.endpoint.size() > 8
-          && request.resource.data.endpoint.size() <= 700
+          && request.resource.data.endpoint.size() <= 2000
           && request.resource.data.p256dh is string
           && request.resource.data.p256dh.size() > 8
-          && request.resource.data.p256dh.size() <= 300
+          && request.resource.data.p256dh.size() <= 500
           && request.resource.data.auth is string
           && request.resource.data.auth.size() > 4
-          && request.resource.data.auth.size() <= 120
+          && request.resource.data.auth.size() <= 200
           && !request.resource.data.keys().hasAny(['email', 'phone', 'apiKey', 'authorization', 'secret', 'rawHtml']);
         allow delete: if isOwner(uid) || isAdmin();
       }
@@ -155,18 +155,23 @@ service cloud.firestore {
     // publish, edit, or delete it. Home/PDP order the approved result by the
     // latest createdAt value on the client, so no composite index is needed.
     match /siteReviews/{reviewId} {
-      allow read: if resource.data.status == 'published';
+      allow read: if resource.data.status == 'published'
+        || (signedIn() && (
+          resource.data.customerId == request.auth.uid
+          || resource.data.userId == request.auth.uid
+          || resource.data.uid == request.auth.uid
+        ));
       allow create: if signedIn()
         && request.resource.data.status == 'pending'
         && request.resource.data.productId is string
         && request.resource.data.productId.size() > 0
-        && request.resource.data.rating is int
+        && request.resource.data.rating is number
         && request.resource.data.rating >= 1
         && request.resource.data.rating <= 5
         && request.resource.data.comment is string
         && request.resource.data.comment.size() > 0
         && request.resource.data.comment.size() <= 2000
-        && request.resource.data.verifiedPurchase == false
+        && request.resource.data.verifiedPurchase is bool
         && (request.resource.data.customerId == request.auth.uid
           || request.resource.data.userId == request.auth.uid
           || request.resource.data.uid == request.auth.uid);

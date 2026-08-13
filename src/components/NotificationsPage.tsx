@@ -13,7 +13,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { BellIcon, BookOpenIcon, StoreIcon } from "./icons";
 import { getRenewalReminder } from "../../utils/subscriptionRenewal";
-import { sendWebPushSelfTest, type WebPushTestResult } from "../../utils/webPush";
+import { ensureSavedWebPushSubscription, sendWebPushSelfTest, type WebPushTestResult } from "../../utils/webPush";
 
 type NotificationsPageProps = {
   cartCount: number;
@@ -58,6 +58,11 @@ export default function NotificationsPage({
   useEffect(() => {
     setItems(loadSiteNotifications(viewerKey));
   }, [viewerKey]);
+
+  useEffect(() => {
+    if (!user) return;
+    void ensureSavedWebPushSubscription(user.id);
+  }, [user]);
 
   // App-open fallback: users still receive the correct one-time reminder
   // even when a scheduled cron or push delivery was delayed.

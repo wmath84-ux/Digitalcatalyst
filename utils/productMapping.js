@@ -606,7 +606,7 @@ export const firestoreResourceToCanonical = (raw) => {
 export const firestoreTreeToCanonicalTree = (tree) => {
   const walk = (m) => {
     if (!isObject(m)) return null;
-    const resources = arr(m.files)
+    const resources = arr(m.files?.length ? m.files : m.resources)
       .map(firestoreResourceToCanonical)
       .filter(Boolean)
       .map((r, index) => ({ ...r, sortOrder: index }));

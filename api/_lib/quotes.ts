@@ -456,7 +456,7 @@ export const handleCreateQuote = async (req: VercelRequest, res: VercelResponse)
 };
 
 /**
- * The handler exposed via `api/quotes/fetch.ts`. Loads a previously
+ * The handler exposed via GET `api/quotes/create.ts`. Loads a previously
  * created quote by `quoteId` and confirms the requesting user owns it.
  * Returns 404 for unknown ids and 403 for cross-user access.
  */

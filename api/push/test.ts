@@ -1,6 +1,16 @@
 import * as webpush from "web-push";
 import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "../_lib/firebaseAdmin";
 
+const clean = (value: unknown, max: number) => String(value || "").trim().slice(0, max);
+
+const hashString = (value: string) => {
+  let hash = 5381;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) + hash + value.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, code: "method_not_allowed", error: "Method not allowed" });
   try {
@@ -11,6 +21,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(503).json({ ok: false, code: "vapid_not_configured", error: "Server Web Push keys are not configured. Add WEB_PUSH_VAPID_PUBLIC_KEY and WEB_PUSH_VAPID_PRIVATE_KEY in Vercel." });
     }
     webpush.setVapidDetails(process.env.WEB_PUSH_SUBJECT || "mailto:admin@eduvora.app", publicKey, privateKey);
+
+    const body = (req.body || {}) as Record<string, unknown>;
+    const liveEndpoint = clean(body.endpoint, 2000);
+    const liveP256dh = clean(body.p256dh, 500);
+    const liveAuth = clean(body.auth, 200);
+    if (liveEndpoint && liveP256dh && liveAuth) {
+      const now = Date.now();
+      await adminDb().collection("users").doc(user.uid).collection("webPushSubscriptions").doc(hashString(liveEndpoint)).set({
+        uid: user.uid,
+        endpoint: liveEndpoint,
+        p256dh: liveP256dh,
+        auth: liveAuth,
+        platform: clean(body.platform, 40) || "unknown",
+        userAgent: clean(body.userAgent, 200),
+        createdAt: now,
+        updatedAt: now,
+        lastSeenAt: now,
+      }, { merge: true });
+    }
+
     const snapshot = await adminDb().collection("users").doc(user.uid).collection("webPushSubscriptions").get();
     if (snapshot.empty) return res.status(404).json({ ok: false, code: "subscription_not_saved", error: "No browser push subscription is saved for this account. Allow notifications and try again." });
 

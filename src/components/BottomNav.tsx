@@ -20,7 +20,7 @@ const TABS: { key: TabKey; label: string; icon: typeof HomeIcon }[] = [
 
 export default function BottomNav({ active, onChange, storeBadge, purchasesBadge }: BottomNavProps) {
   return (
-    <nav className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur">
+    <nav data-site-footer className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur">
       <div className="flex items-stretch justify-between">
         {TABS.map(({ key, label, icon: Icon }) => {
           const isActive = active === key;

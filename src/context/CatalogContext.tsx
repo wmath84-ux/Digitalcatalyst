@@ -108,7 +108,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       return undefined;
     }
     return onSnapshot(collection(db, "users", user.id, "purchases"), (snapshot) => {
-      setPurchasedIds(new Set(snapshot.docs.map((item) => String(item.data().productDocumentId ?? item.id))));
+      const ids = new Set<string>();
+      snapshot.docs.forEach((item) => {
+        const data = item.data() || {};
+        ids.add(String(item.id));
+        if (data.productDocumentId != null) ids.add(String(data.productDocumentId));
+        if (data.productId != null) ids.add(String(data.productId));
+      });
+      setPurchasedIds(ids);
     }, (purchaseError) => {
       console.error("Purchase entitlement sync failed", purchaseError);
       setPurchasedIds(new Set());

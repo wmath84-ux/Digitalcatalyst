@@ -1,4 +1,4 @@
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp, type Transaction } from 'firebase-admin/firestore';
 import { adminDb, parseProductPricePaise } from './firebaseAdmin';
 
 type AccessItem = Record<string, any>;
@@ -29,7 +29,7 @@ export async function grantCourseUpdate(input: { uid: string; email?: string; na
   const entitlementRef = userRef.collection('purchases').doc(`${input.productId}__update__${input.update.id}`);
   const orderRef = db.collection('siteOrders').doc(input.orderId);
   const now = Timestamp.now();
-  await db.runTransaction(async (transaction) => {
+  await db.runTransaction(async (transaction: Transaction) => {
     const existing = await transaction.get(entitlementRef);
     if (!existing.exists) transaction.set(entitlementRef, {
       productId: input.productId,

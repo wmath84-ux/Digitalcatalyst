@@ -37,7 +37,7 @@
 // already exists, and the function short-circuits with
 // `{ ok: true, replayed: true, ... }`.
 
-import { FieldValue, Timestamp, type Firestore } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { adminDb } from "./firebaseAdmin";
 import {
   buildEntitlementDocId,
@@ -266,7 +266,7 @@ export const grantEntitlementsFromQuote = async (
   let replayed = Boolean(isReplay);
   const nowTs = Timestamp.fromMillis(now);
 
-  await db.runTransaction(async (tx) => {
+  await db.runTransaction(async (tx: Transaction) => {
     const intentSnap = await tx.get(intentRef);
     if (intentSnap.exists) {
       const intent = intentSnap.data() as { status?: string } | undefined;
@@ -439,7 +439,7 @@ export const grantEntitlementsFromQuote = async (
   if (quote.couponCode) {
     const coupon = (await loadCouponByCode(quote.couponCode)) as CouponDoc | null;
     if (coupon) {
-      const redemption = await adminDb().runTransaction(async (tx) => {
+      const redemption = await adminDb().runTransaction(async (tx: Transaction) => {
         return applyCouponRedemption(tx, {
           uid: quote.uid,
           coupon,
@@ -564,7 +564,7 @@ export const grantSubscriptionFromQuote = async (
   // product / module / update entitlements; for subscriptions the
   // `subscriptions/{uid}/current` doc is the idempotency key (a
   // re-write overwrites with the same values).
-  const result = await adminDb().runTransaction(async (tx) => {
+  const result = await adminDb().runTransaction(async (tx: Transaction) => {
     // Firestore requires every transaction read before its first write.
     const subscriptionRef = adminDb().collection("users").doc(quote.uid).collection("subscription").doc("current");
     const existingSubscriptionSnapshot = await tx.get(subscriptionRef);

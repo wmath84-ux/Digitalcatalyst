@@ -33,6 +33,7 @@ import type { CheckoutSelection } from "./types/commerce";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
 import type { PaidCourseUpdate } from "./types/course";
 import { isDesktopBrowserLocked, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
+import { ensureSavedWebPushSubscription } from "../utils/webPush";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -256,6 +257,11 @@ function Root() {
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${HOME_HASH}`);
     setHash(HOME_HASH);
   }, [desktopLocked, landingRouteRequested, loading, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    void ensureSavedWebPushSubscription(user.id);
+  }, [user]);
 
   useEffect(() => {
     if (!user) return undefined;

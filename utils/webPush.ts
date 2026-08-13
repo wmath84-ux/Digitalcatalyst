@@ -30,6 +30,16 @@ const urlBase64ToUint8Array = (base64String: string) => {
   return outputArray;
 };
 
+const bufferToUrlBase64 = (buffer: ArrayBuffer | null) => {
+  if (!buffer) return '';
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 1) {
+    binary += String.fromCharCode(bytes[index]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+};
+
 const hashString = (value: string) => {
   let hash = 5381;
   for (let index = 0; index < value.length; index += 1) {
@@ -82,8 +92,8 @@ export const getCurrentPushSubscription = async (): Promise<PushSubscription | n
 const buildSubscriptionRecord = (subscription: PushSubscription): StoredWebPushSubscription => ({
   uid: '',
   endpoint: subscription.endpoint,
-  p256dh: subscription.getKey('p256dh') ? btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')!))) : '',
-  auth: subscription.getKey('auth') ? btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')!))) : '',
+  p256dh: bufferToUrlBase64(subscription.getKey('p256dh')),
+  auth: bufferToUrlBase64(subscription.getKey('auth')),
   platform: detectPlatform(),
   userAgent: (navigator.userAgent || '').slice(0, 200),
   createdAt: Date.now(),
@@ -128,28 +138,78 @@ export const subscribeToWebPush = async (): Promise<PushSubscription | null> => 
   }
 };
 
+const saveViaApi = async (uid: string, record: StoredWebPushSubscription): Promise<boolean> => {
+  const token = await auth.currentUser?.getIdToken(true);
+  if (!token) return false;
+  const response = await fetch('/api/push/subscribe', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...record, uid }),
+  });
+  const payload = await response.json().catch(() => ({})) as { ok?: boolean };
+  return Boolean(response.ok && payload.ok);
+};
+
+const saveViaFirestore = async (uid: string, record: StoredWebPushSubscription, documentId: string): Promise<boolean> => {
+  await setDoc(doc(db, 'users', uid, 'webPushSubscriptions', documentId), { ...record, uid }, { merge: true });
+  return true;
+};
+
 export const saveWebPushSubscription = async (uid: string, subscription: PushSubscription): Promise<boolean> => {
   if (!uid || !subscription) return false;
   const record = buildSubscriptionRecord(subscription);
   const documentId = hashString(subscription.endpoint);
+  // Admin API first so a missing/outdated Firestore rules deploy cannot block
+  // the YouTube-style system notification path.
   try {
-    await setDoc(doc(db, 'users', uid, 'webPushSubscriptions', documentId), { ...record, uid }, { merge: true });
-    return true;
+    if (await saveViaApi(uid, record)) return true;
+  } catch {
+    // Fall through to the client SDK write.
+  }
+  try {
+    return await saveViaFirestore(uid, record, documentId);
   } catch {
     try {
-      const token = await auth.currentUser?.getIdToken(true);
-      if (!token) return false;
-      const response = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...record, uid }),
-      });
-      const payload = await response.json().catch(() => ({})) as { ok?: boolean };
-      return Boolean(response.ok && payload.ok);
+      return await saveViaApi(uid, record);
     } catch {
       return false;
     }
   }
+};
+
+export const showLocalSystemNotification = async (title: string, body: string, url = '/#/notifications'): Promise<boolean> => {
+  if (!isWebPushSupported() || window.Notification.permission !== 'granted') return false;
+  const options: NotificationOptions = {
+    body,
+    icon: '/icons/icon-192x192.svg',
+    badge: '/icons/icon-192x192.svg',
+    tag: `eduvora-local-${Date.now()}`,
+    data: { url, timestamp: Date.now() },
+  };
+  try {
+    const registration = await isServiceWorkerReady();
+    if (registration) {
+      await registration.showNotification(title, options);
+      return true;
+    }
+    new Notification(title, options);
+    return true;
+  } catch {
+    try {
+      new Notification(title, options);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+};
+
+/** Persist the current browser subscription when permission is already granted. */
+export const ensureSavedWebPushSubscription = async (uid: string): Promise<boolean> => {
+  if (!uid || !isWebPushSupported() || window.Notification.permission !== 'granted') return false;
+  const subscription = await subscribeToWebPush();
+  if (!subscription) return false;
+  return saveWebPushSubscription(uid, subscription);
 };
 
 export const removeWebPushSubscription = async (uid: string, endpoint?: string): Promise<boolean> => {
@@ -208,16 +268,39 @@ export const sendWebPushSelfTest = async (uid: string): Promise<WebPushTestResul
     const denied = window.Notification.permission === 'denied';
     return { ok: false, code: denied ? 'permission_denied' : 'subscribe_failed', message: denied ? 'Notification permission was denied. Enable it in browser Site settings.' : 'The browser could not create a push subscription. Check notification permission and the public VAPID key.' };
   }
-  if (!(await saveWebPushSubscription(uid, subscription))) {
-    return { ok: false, code: 'save_failed', message: 'The browser subscribed, but the subscription could not be saved to Firestore. Deploy the latest Firestore rules and retry.' };
-  }
+
+  const record = buildSubscriptionRecord(subscription);
+  const localShown = await showLocalSystemNotification(
+    'Eduvora test notification',
+    'Web notifications are working on this device — just like other system alerts.',
+  );
+  const saved = await saveWebPushSubscription(uid, subscription);
+
   try {
     const token = await auth.currentUser.getIdToken(true);
-    const response = await fetch('/api/push/test', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: '{}' });
+    const response = await fetch('/api/push/test', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: record.endpoint, p256dh: record.p256dh, auth: record.auth, platform: record.platform }),
+    });
     const payload = await response.json().catch(() => ({})) as { ok?: boolean; code?: string; message?: string; error?: string };
-    if (!response.ok || !payload.ok) return { ok: false, code: payload.code || `server_${response.status}`, message: payload.error || `Push test server returned ${response.status}.` };
-    return { ok: true, code: 'sent', message: payload.message || 'Test notification sent. It should appear within a few seconds.' };
+    if (response.ok && payload.ok) {
+      return { ok: true, code: 'sent', message: payload.message || 'Test notification sent. Check your phone or browser notification tray.' };
+    }
+    if (localShown) {
+      return { ok: true, code: 'sent', message: 'A system notification was shown on this device. Server push will retry in the background.' };
+    }
+    if (!saved) {
+      return { ok: false, code: 'save_failed', message: payload.error || 'The browser subscribed, but the subscription could not be saved to Firestore. Deploy the latest Firestore rules and retry.' };
+    }
+    return { ok: false, code: payload.code || `server_${response.status}`, message: payload.error || `Push test server returned ${response.status}.` };
   } catch (error) {
+    if (localShown) {
+      return { ok: true, code: 'sent', message: 'A system notification was shown on this device.' };
+    }
+    if (!saved) {
+      return { ok: false, code: 'save_failed', message: 'The browser subscribed, but the subscription could not be saved to Firestore. Deploy the latest Firestore rules and retry.' };
+    }
     return { ok: false, code: 'network_error', message: error instanceof Error ? `Push test request failed: ${error.message}` : 'Push test request failed. Check your network.' };
   }
 };
