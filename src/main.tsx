@@ -406,7 +406,21 @@ function Root() {
     window.location.hash = `${PRODUCT_HASH}${encodeURIComponent(product.id)}?section=reviews`;
   };
 
-  const navigateTdow.location.hash = STORE_HASH;
+  const navigateToCourse = (course: { id: string; title: string }) => {
+    sessionStorage.setItem("selectedCourse", JSON.stringify({ courseId: course.id, title: course.title }));
+    window.location.hash = `${COURSE_HASH}${encodeURIComponent(course.id)}`;
+  };
+
+  const navigateToCheckout = (finalPrice: number, checkoutCatalogProduct = selectedCatalogProduct) => {
+    if (!user) {
+      sessionStorage.setItem("pendingCheckoutPrice", String(finalPrice));
+      redirectToAuth(window.location.hash || PRODUCT_HASH);
+      return;
+    }
+
+    if (!checkoutCatalogProduct) {
+      showShoppingToast("This product is no longer available");
+      window.location.hash = STORE_HASH;
       return;
     }
 
@@ -672,29 +686,6 @@ function Root() {
       }}
       onNavigateToPurchases={() => {
         window.location.hash = `${STORE_HASH}/purchases`;
-      }}
-      onNavigateToFavorites={() => {
-        window.location.hash = FAVORITES_HASH;
-      }}
-      onNavigateToNotifications={() => {
-        window.location.hash = NOTIFICATIONS_HASH;
-      }}
-    />
-  );
-}
-
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <AuthProvider>
-      <CatalogProvider>
-        <CommerceProvider>
-          <Root />
-        </CommerceProvider>
-      </CatalogProvider>
-    </AuthProvider>
-  </StrictMode>,
-);
-on.hash = `${STORE_HASH}/purchases`;
       }}
       onNavigateToFavorites={() => {
         window.location.hash = FAVORITES_HASH;

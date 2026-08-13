@@ -19,6 +19,13 @@ test("desktop browser stays on landing and never opens the learner app", () => {
   assert.match(main, /if \(desktopLocked && !hash\.startsWith\(ADMIN_HASH\)/);
 });
 
+test("main routing helpers stay intact so the production build can parse", () => {
+  assert.match(main, /const navigateToCourse = /);
+  assert.match(main, /const navigateToCheckout = /);
+  assert.doesNotMatch(main, /navigateTdow/);
+  assert.equal((main.match(/createRoot\(/g) || []).length, 1);
+});
+
 test("admin remains exempt and still sees landing", () => {
   assert.match(main, /user\.role === "admin"/);
   assert.match(main, /if \(!hash \|\| hash\.startsWith\(LANDING_HASH\)\) return <LandingApp/);
