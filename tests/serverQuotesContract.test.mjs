@@ -30,7 +30,6 @@ const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const helperSource = readSource("api/_lib/quotes.ts");
 const createSource = readSource("api/quotes/create.ts");
-const fetchSource = readSource("api/quotes/fetch.ts");
 const engineSource = readSource("utils/serverQuotes.js");
 
 // ---------------------------------------------------------------------------
@@ -94,11 +93,11 @@ test("api/_lib/quotes.ts: every handler calls requireFirebaseUser before doing a
   assert.match(handleFetchMatch[0], /const firebaseUser = await requireFirebaseUser\(req\);/);
 });
 
-test("api/quotes/create.ts and fetch.ts: both endpoints call the right handler with no auth bypass", () => {
+test("api/quotes/create.ts routes POST create and GET fetch through the same Hobby-safe function", () => {
   assert.match(createSource, /handleCreateQuote/);
-  assert.match(fetchSource, /handleFetchQuote/);
+  assert.match(createSource, /handleFetchQuote/);
+  assert.match(createSource, /req\.method === "GET"/);
   assert.doesNotMatch(createSource, /requireFirebaseUser/); // delegated
-  assert.doesNotMatch(fetchSource, /requireFirebaseUser/);
 });
 
 // ---------------------------------------------------------------------------
