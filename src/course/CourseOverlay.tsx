@@ -13,9 +13,19 @@
 // If one overlay is already open and the user taps another button,
 // the SAME overlay stays open and its content swaps in place (with a
 // short slide-in animation) rather than closing and reopening.
+//
+// Layout notes (important):
+//   - The dock is ALWAYS the top-most interactive layer (z-50) and is
+//     rendered in normal flow so it can never scroll away.
+//   - The sheet is `pointer-events-none` + `invisible` while closed so
+//     the off-screen (translated) sheet cannot swallow taps meant for
+//     the dock underneath it.
+//   - Portrait  → dock pinned to the bottom edge, sheet slides up.
+//   - Landscape → dock pinned to the right edge as a vertical rail,
+//     sheet slides in from the right.
 
-import { useMemo, useState, type ReactNode } from "react";
-import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, NotebookPen, PlayCircle, RefreshCw, ShoppingBag } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, NotebookPen, PlayCircle, RefreshCw, ShoppingBag, X } from "lucide-react";
 import type { CourseFile, CourseModule, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 
@@ -87,82 +97,122 @@ interface CourseOverlayProps {
   noteResourceTitle?: string | null;
 }
 
-const TABS: Array<{ key: DockTab; label: string; icon: (active: boolean) => ReactNode }> = [
-  { key: "modules", label: "Module", icon: () => <BookOpen size={17} /> },
-  { key: "resources", label: "Resource", icon: () => <FileText size={17} /> },
-  { key: "notes", label: "Note", icon: () => <NotebookPen size={17} /> },
-  { key: "paid", label: "Paid", icon: () => <ShoppingBag size={17} /> },
+const TABS: Array<{ key: DockTab; label: string; heading: string; icon: (active: boolean) => ReactNode }> = [
+  { key: "modules", label: "Module", heading: "Modules", icon: () => <BookOpen size={18} /> },
+  { key: "resources", label: "Resource", heading: "Resources", icon: () => <FileText size={18} /> },
+  { key: "notes", label: "Note", heading: "Notes", icon: () => <NotebookPen size={18} /> },
+  { key: "paid", label: "Paid", heading: "Paid content", icon: () => <ShoppingBag size={18} /> },
 ];
 
 export default function CourseOverlay(props: CourseOverlayProps) {
   const { orientation, tab, open } = props;
-  const activeIndex = TABS.findIndex((item) => item.key === tab);
+  const activeIndex = Math.max(0, TABS.findIndex((item) => item.key === tab));
   const landscape = orientation === "landscape";
-  const notesHeight = landscape ? "50vw" : "50dvh";
-  const defaultHeight = landscape ? "min(72vw, 380px)" : "72dvh";
 
+  // Notes get exactly half the screen so the keyboard + list both fit.
+  // Every other tab gets a taller sheet so long module trees breathe.
+  const notesHeight = landscape ? "52vw" : "50dvh";
+  const defaultHeight = landscape ? "min(78vw, 460px)" : "72dvh";
   const sheetHeight = tab === "notes" ? notesHeight : defaultHeight;
 
   const flatModules = useMemo(() => flattenModules(props.modules), [props.modules]);
 
+  // Escape closes the sheet.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") props.onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, props]);
+
   return (
     <>
+      {/* ── Scrim: closes the sheet when the content behind it is tapped ── */}
+      <div
+        onClick={props.onClose}
+        aria-hidden={!open}
+        className={`absolute z-30 bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${
+          landscape ? "bottom-0 left-0 right-16 top-0" : "inset-x-0 bottom-16 top-0"
+        } ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
+        data-course-overlay-scrim
+      />
+
       {/* ── Overlay sheet ─────────────────────────────────────────────── */}
       <div
-        className={`absolute z-40 overflow-hidden border-white/10 bg-[#11111d] shadow-2xl transition-all duration-300 ${
+        className={`absolute z-40 flex flex-col overflow-hidden border-white/10 bg-[#11111d] shadow-[0_-18px_50px_rgba(0,0,0,0.55)] transition-[transform,opacity] duration-300 ease-out ${
           landscape
             ? "bottom-0 right-16 top-0 border-l"
-            : "bottom-16 inset-x-0 rounded-t-3xl border-t"
-        } ${open ? (landscape ? "translate-x-0" : "translate-y-0") : landscape ? "translate-x-full" : "translate-y-full"}`}
+            : "inset-x-0 bottom-16 rounded-t-3xl border-t"
+        } ${open
+          ? "pointer-events-auto translate-x-0 translate-y-0 opacity-100"
+          : `pointer-events-none invisible opacity-0 ${landscape ? "translate-x-full" : "translate-y-full"}`
+        }`}
         style={{ [landscape ? "width" : "height"]: sheetHeight }}
         data-course-overlay
         data-open={open ? "true" : "false"}
         data-orientation={orientation}
       >
-        <div className="flex h-full flex-col">
-          <div className="flex shrink-0 items-center justify-between border-b border-white/10 bg-[#10101a] px-4 py-3">
-            <p className="text-xs font-black uppercase tracking-wider text-white/50" data-course-overlay-title>
-              {TABS[activeIndex].label}s
-            </p>
-            <button onClick={props.onClose} className="grid h-8 w-8 place-items-center rounded-lg bg-white/5 text-white/50" aria-label="Close overlay" data-course-overlay-close>
-              <ChevronDown size={16} className={landscape ? "-rotate-90" : ""} />
-            </button>
-          </div>
-          <div key={tab} className="min-h-0 flex-1 overflow-hidden animate-course-overlay-in" data-course-overlay-tab={tab}>
-            {tab === "notes" ? (
-              <NotesPanel
-                notes={props.notes}
-                draft={props.noteDraft}
-                setDraft={props.onNoteDraft}
-                onSave={props.onSaveNote}
-                onEdit={props.onEditNote}
-                onDelete={props.onDeleteNote}
-                productTitle={props.productTitle}
-                moduleTitle={props.noteModuleTitle}
-                resourceTitle={props.noteResourceTitle}
-              />
-            ) : tab === "paid" ? (
-              <PaidList {...props} />
-            ) : (
-              <ContentList {...props} flatModules={flatModules} mode={tab} />
-            )}
-          </div>
+        {/* Grab handle (portrait only) */}
+        {!landscape ? (
+          <button
+            type="button"
+            onClick={props.onClose}
+            aria-label="Collapse panel"
+            className="mx-auto mt-2 h-1.5 w-11 shrink-0 rounded-full bg-white/25"
+          />
+        ) : null}
+
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+          <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-white/55" data-course-overlay-title>
+            {TABS[activeIndex].heading}
+          </p>
+          <button
+            onClick={props.onClose}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/5 text-white/55 transition hover:bg-white/10 hover:text-white"
+            aria-label="Close overlay"
+            data-course-overlay-close
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Content swaps in place — the sheet itself never closes. */}
+        <div key={tab} className="min-h-0 flex-1 overflow-hidden animate-course-overlay-in" data-course-overlay-tab={tab}>
+          {tab === "notes" ? (
+            <NotesPanel
+              notes={props.notes}
+              draft={props.noteDraft}
+              setDraft={props.onNoteDraft}
+              onSave={props.onSaveNote}
+              onEdit={props.onEditNote}
+              onDelete={props.onDeleteNote}
+              productTitle={props.productTitle}
+              moduleTitle={props.noteModuleTitle}
+              resourceTitle={props.noteResourceTitle}
+            />
+          ) : tab === "paid" ? (
+            <PaidList {...props} />
+          ) : (
+            <ContentList {...props} flatModules={flatModules} mode={tab} />
+          )}
         </div>
       </div>
 
-      {/* ── Dock ──────────────────────────────────────────────────────── */}
+      {/* ── Dock: always the top-most interactive layer ───────────────── */}
       <div
-        className={`z-30 shrink-0 border-white/10 bg-[#10101a] ${landscape ? "flex w-16 flex-col border-l" : "h-16 border-t"}`}
+        className={`relative z-50 shrink-0 border-white/10 bg-[#10101a]/95 backdrop-blur ${landscape ? "flex w-16 flex-col border-l" : "h-16 border-t"}`}
+        style={landscape ? undefined : { paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         data-course-dock
         data-orientation={orientation}
       >
         <div className={`relative ${landscape ? "flex flex-1 flex-col" : "flex h-full"}`}>
           <span
-            className={`absolute transition-transform duration-300 ease-out ${landscape ? "left-1.5 right-1.5 top-0 h-1/4" : "bottom-1.5 left-0 top-1.5 w-1/4"}`}
+            className={`pointer-events-none absolute transition-transform duration-300 ease-out ${landscape ? "left-1.5 right-1.5 top-0 h-1/4" : "bottom-1.5 left-0 top-1.5 w-1/4"}`}
             style={{ transform: landscape ? `translateY(${activeIndex * 100}%)` : `translateX(${activeIndex * 100}%)` }}
             data-course-dock-indicator
+            data-index={activeIndex}
           >
-            <span className={`block h-full rounded-xl bg-violet-500/90 ${landscape ? "my-1.5" : "mx-1.5"}`} />
+            <span className={`block h-full rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-600/30 ${landscape ? "my-1.5" : "mx-1.5"}`} />
           </span>
           {TABS.map(({ key, label, icon }) => {
             const active = key === tab;
@@ -171,9 +221,10 @@ export default function CourseOverlay(props: CourseOverlayProps) {
                 key={key}
                 type="button"
                 onClick={() => props.onTabChange(key)}
-                className={`relative z-10 flex items-center justify-center gap-1.5 text-[10px] font-black transition-colors ${
-                  landscape ? "flex-1 flex-col" : "flex-1 flex-col py-1"
-                } ${active ? "text-white" : "text-white/40 hover:text-white/80"}`}
+                aria-pressed={active}
+                className={`relative z-10 flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-black transition-colors ${
+                  active ? "text-white" : "text-white/45 hover:text-white/85"
+                }`}
                 data-course-dock-tab
                 data-tab={key}
                 data-active={active ? "true" : "false"}
@@ -201,12 +252,20 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
     return true;
   });
 
+  // Keep the module holding the open file expanded by default.
+  useEffect(() => {
+    if (mode !== "modules" || !props.selectedFileId) return;
+    const owner = visible.find(({ module }) => moduleFiles(module).some((file) => file.id === props.selectedFileId));
+    if (owner) setExpanded((current) => (current.has(String(owner.module.id)) ? current : new Set(current).add(String(owner.module.id))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, props.selectedFileId]);
+
   if (visible.length === 0) {
     return <p className="grid h-full place-items-center px-6 text-center text-xs text-white/35">No {mode === "resources" ? "files" : "modules"} to show yet.</p>;
   }
 
   return (
-    <div className="h-full overflow-y-auto p-3" data-course-overlay-list data-mode={mode}>
+    <div className="h-full overflow-y-auto overscroll-contain p-3 pb-6" data-course-overlay-list data-mode={mode}>
       {visible.map(({ module, depth }) => {
         const files = moduleFiles(module).filter(isVisibleFile);
         const moduleId = String(module.id);
@@ -215,28 +274,38 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
         const paidNotOwned = module.accessLevel === "paidUpdate" && Boolean(module.paidUpdateId) && !props.ownedUpdateIds.has(String(module.paidUpdateId));
         const locked = !accessible || paidNotOwned;
         const open = mode === "modules" && expanded.has(moduleId);
+        const holdsSelected = files.some((file) => file.id === props.selectedFileId);
 
         // In resources mode, files are listed directly (no expand/collapse).
         const rowFiles = mode === "resources" ? files : open ? files : [];
 
         return (
-          <div key={moduleId} className={depth ? "ml-3 border-l border-white/10 pl-2" : "mb-1"}>
+          <div key={moduleId} className={depth ? "ml-3 border-l border-white/10 pl-2" : "mb-1.5"}>
             <button
               type="button"
               onClick={() => {
-                if (mode === "modules") setExpanded((current) => { const next = new Set(current); next.has(moduleId) ? next.delete(moduleId) : next.add(moduleId); return next; });
+                if (mode === "modules") setExpanded((current) => { const next = new Set(current); if (next.has(moduleId)) next.delete(moduleId); else next.add(moduleId); return next; });
               }}
               disabled={mode === "resources"}
-              className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left ${mode === "resources" ? "cursor-default" : ""} ${locked ? "bg-amber-400/5" : "hover:bg-white/5"}`}
+              className={`flex w-full items-center gap-2.5 rounded-2xl px-3 py-3 text-left transition ${mode === "resources" ? "cursor-default" : ""} ${
+                locked ? "bg-amber-400/[0.07] ring-1 ring-inset ring-amber-400/15" : holdsSelected ? "bg-violet-500/10 ring-1 ring-inset ring-violet-400/25" : "hover:bg-white/5"
+              }`}
               data-course-overlay-module
               data-module-id={moduleId}
               data-locked={locked ? "true" : "false"}
               data-preview={preview ? "true" : "false"}
             >
               {mode === "modules" ? (
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/5 text-[10px] font-black text-white/45">{depth + 1}</span>
-              ) : null}
-              <span className="min-w-0 flex-1 truncate text-xs font-black">{module.title}</span>
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white/[0.07] text-[10px] font-black text-white/50">{depth + 1}</span>
+              ) : (
+                <FileText size={14} className="shrink-0 text-white/30" />
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-black">{module.title}</span>
+                <span className="mt-0.5 block text-[10px] font-bold text-white/30">
+                  {files.length} {files.length === 1 ? "file" : "files"}
+                </span>
+              </span>
               {preview ? <Eye size={13} className="shrink-0 text-sky-300" /> : null}
               {locked && !preview ? <LockKeyhole size={13} className="shrink-0 text-amber-400" /> : null}
               {mode === "modules" && files.length > 0 ? (
@@ -246,7 +315,7 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
 
             {/* Locked paid module buy CTA */}
             {locked && paidNotOwned ? (
-              <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 p-2 ring-1 ring-amber-400/20">
+              <div className="mx-2 mt-1 mb-1 flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 p-2 ring-1 ring-amber-400/20">
                 <p className="text-[10px] font-bold text-amber-200">Paid module</p>
                 <button
                   type="button"
@@ -260,7 +329,7 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
             ) : null}
 
             {rowFiles.length > 0 && (
-              <div className="space-y-1 pb-2">
+              <div className="space-y-1 py-1 pl-2">
                 {rowFiles.map((file) => {
                   const Icon = fileIcon(file);
                   const fileLocked = locked || (file.accessLevel === "paidUpdate" && !props.ownedUpdateIds.has(updateKey(file)));
@@ -269,8 +338,8 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
                       key={file.id}
                       disabled={fileLocked}
                       onClick={() => props.onSelectFile(file)}
-                      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[11px] transition ${
-                        props.selectedFileId === file.id ? "bg-violet-500 text-white" : fileLocked ? "cursor-not-allowed bg-amber-400/5 text-white/35" : "text-white/65 hover:bg-white/5 hover:text-white"
+                      className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[11px] font-bold transition ${
+                        props.selectedFileId === file.id ? "bg-violet-500 text-white shadow-lg shadow-violet-600/25" : fileLocked ? "cursor-not-allowed bg-amber-400/5 text-white/35" : "text-white/70 hover:bg-white/5 hover:text-white"
                       }`}
                       data-course-overlay-file
                       data-file-id={file.id}
@@ -278,7 +347,8 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
                     >
                       <Icon size={15} className="shrink-0" />
                       <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                      {fileLocked ? <LockKeyhole size={12} className="text-amber-400" /> : null}
+                      <span className="shrink-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider opacity-70">{file.type}</span>
+                      {fileLocked ? <LockKeyhole size={12} className="shrink-0 text-amber-400" /> : null}
                     </button>
                   );
                 })}
@@ -306,19 +376,19 @@ function PaidList(props: CourseOverlayProps) {
   const showUpdates = props.updates.length > 0;
 
   return (
-    <div className="h-full overflow-y-auto p-3" data-course-overlay-paid>
+    <div className="h-full overflow-y-auto overscroll-contain p-3 pb-6" data-course-overlay-paid>
       {showUpdates && (
         <div className="mb-3 space-y-2">
           {props.updates.map((update) => (
-            <div key={update.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div key={update.id} className="rounded-2xl border border-white/10 bg-white/5 p-3">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-black">{update.title}</p>
                   <p className="mt-1 text-[10px] leading-4 text-white/45">{update.contentNames.slice(0, 3).join(" · ")}</p>
                 </div>
                 <span className="shrink-0 text-xs font-black text-amber-300">₹{update.price.toLocaleString("en-IN")}</span>
               </div>
-              <button onClick={() => props.onBuyUpdate(update)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-400 py-2 text-[11px] font-black text-slate-950" data-course-overlay-buy-update={update.id}>
+              <button onClick={() => props.onBuyUpdate(update)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-amber-400 py-2.5 text-[11px] font-black text-slate-950" data-course-overlay-buy-update={update.id}>
                 <ShoppingBag size={13} /> Buy this update
               </button>
             </div>
@@ -333,7 +403,7 @@ function PaidList(props: CourseOverlayProps) {
       ) : (
         <div className="space-y-2">
           {paidModules.map((module) => (
-            <div key={module.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+            <div key={module.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
               <div className="flex min-w-0 items-center gap-2">
                 <RefreshCw size={15} className="shrink-0 text-amber-300" />
                 <div className="min-w-0">
@@ -343,7 +413,7 @@ function PaidList(props: CourseOverlayProps) {
               </div>
               <button
                 onClick={() => props.onBuyModule({ id: module.id, paidUpdateId: module.paidUpdateId, paidUpdateTitle: module.paidUpdateTitle, paidUpdatePrice: module.paidUpdatePrice })}
-                className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-400 px-2.5 py-1.5 text-[10px] font-black text-slate-950"
+                className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-400 px-3 py-1.5 text-[10px] font-black text-slate-950"
                 data-course-overlay-buy-module={module.id}
               >
                 <ShoppingBag size={11} /> Buy

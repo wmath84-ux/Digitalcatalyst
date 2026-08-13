@@ -217,16 +217,25 @@ if (!catalogSource.includes("fullDemoCourseContent")) {
 }
 console.log(`✓ CatalogContext.tsx imports and uses demo course content as fallback`);
 
-// ─── 15. Validate CourseRouteGuard has demo mode ─────────────────────
+// ─── 15. CourseRouteGuard is a pure access gate (no demo bypass) ─────
+//
+// The course is shipped as the real product, so the guard must not
+// contain any demo-mode bypass or user-facing "demo" wording. It
+// gates purely on the resolver's access state.
 
 const guardSource = readFileSync(
   resolve(root, "src/components/CourseRouteGuard.tsx"),
   "utf-8"
 );
-if (!guardSource.includes("isDemoMode") && !guardSource.includes("demo")) {
-  throw new Error("CourseRouteGuard.tsx does not have demo mode support");
+if (/demo/i.test(guardSource)) {
+  throw new Error("CourseRouteGuard.tsx still references demo mode");
 }
-console.log(`✓ CourseRouteGuard.tsx has demo mode for testing`);
+for (const symbol of ["useCourseAccess", "hasAnyAccess", "CoursePlayerApp"]) {
+  if (!guardSource.includes(symbol)) {
+    throw new Error(`CourseRouteGuard.tsx is missing ${symbol}`);
+  }
+}
+console.log(`✓ CourseRouteGuard.tsx gates on real access only (no demo mode)`);
 
 // ─── 16. Validate the module price summary matches the modules ───────
 
@@ -250,7 +259,7 @@ console.log(`  12 file types × individual prices ✓`);
 console.log(`  Public URLs for all types ✓`);
 console.log(`  Paid-update modules for purchase flow ✓`);
 console.log(`  Integration into CatalogContext ✓`);
-console.log(`  Demo mode in CourseRouteGuard ✓`);
+console.log(`  Access-gated course route ✓`);
 console.log(`══════════════════════════════════════════════════════\n`);
 
 // ─── Price Table ──────────────────────────────────────────────────────
