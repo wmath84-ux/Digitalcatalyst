@@ -7,6 +7,7 @@ import HomeApp from "./home/App";
 import PdpApp from "./PdpApp";
 import CheckoutApp from "./components/checkout/CheckoutApp";
 import MyDayApp from "./MyDayApp";
+import LeaderboardApp from "./LeaderboardApp";
 import ProfileApp from "./profile/App";
 import CourseRouteGuard from "./components/CourseRouteGuard";
 import CartWishlistApp from "./CartWishlistApp";
@@ -41,6 +42,7 @@ const STORE_HASH = "#/store";
 const PRODUCT_HASH = "#/product/";
 const CHECKOUT_HASH = "#/checkout";
 const MY_DAY_HASH = "#/my-day";
+const LEADERBOARD_HASH = "#/leaderboard";
 const PROFILE_HASH = "#/profile";
 const COURSE_HASH = "#/course/";
 const CART_HASH = "#/cart";
@@ -536,6 +538,7 @@ function Root() {
   }
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
   if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
+  if (hash.startsWith(LEADERBOARD_HASH)) return <LeaderboardApp />;
   if (hash.startsWith(PRODUCT_HASH)) {
     return (
       <PdpWithOwnership

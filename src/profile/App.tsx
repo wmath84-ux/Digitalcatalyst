@@ -53,6 +53,7 @@ export default function ProfileApp() {
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
   const [preferencesSaving, setPreferencesSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export default function ProfileApp() {
     const unsubscribeProfile = onSnapshot(doc(db, "users", user.id), (snapshot) => {
       const data = snapshot.data() || {};
       setPreferences({ ...DEFAULT_PREFERENCES, ...(data.preferences || {}) });
+      setReferralCode(String(data.referralCode || ""));
     });
     return () => { unsubscribeProfile(); };
   }, [user]);
@@ -125,7 +127,7 @@ export default function ProfileApp() {
           <button onClick={() => setModal("edit")} className="relative mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/15 py-3 text-sm font-black ring-1 ring-white/30"><Pencil size={15} /> Edit profile</button>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-100"><Crown className="text-violet-600" /></div><span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black uppercase text-emerald-700">{user.subscriptionTier || "basic"}</span></div><p className="mt-4 text-xs font-bold text-slate-400">Membership</p><p className="text-xl font-black capitalize">{user.subscriptionTier === "basic" ? "Basic learner" : `${user.subscriptionTier} membership`}</p><button onClick={() => { window.location.hash = "#/subscription"; }} className="mt-4 flex items-center gap-1 text-xs font-black text-violet-700">Manage membership <ChevronRight size={14} /></button></section>
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-100"><Crown className="text-violet-600" /></div><span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black uppercase text-emerald-700">{user.subscriptionTier || "basic"}</span></div><p className="mt-4 text-xs font-bold text-slate-400">Membership</p><p className="text-xl font-black capitalize">{user.subscriptionTier === "basic" ? "Basic learner" : `${user.subscriptionTier} membership`}</p><button onClick={() => { window.location.hash = "#/subscription"; }} className="mt-4 flex items-center gap-1 text-xs font-black text-violet-700">Manage membership <ChevronRight size={14} /></button>{referralCode && <div className="mt-4 rounded-2xl bg-violet-50 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-violet-500">Your referral code</p><div className="mt-1 flex items-center justify-between gap-2"><code className="min-w-0 truncate text-sm font-black text-violet-900">{referralCode}</code><button onClick={() => void navigator.clipboard?.writeText(referralCode)} className="rounded-lg bg-white px-2 py-1 text-[10px] font-bold text-violet-700">Copy</button></div></div>}</section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-xs font-black uppercase tracking-wider text-slate-400">My library</h3>
           <div className="mt-4 grid grid-cols-3 gap-3">

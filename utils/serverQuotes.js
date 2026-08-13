@@ -853,6 +853,7 @@ export const buildQuote = (input) => {
       purchaseKind: kind,
       userHasPriorPurchases: Boolean(userHasPriorPurchases),
       userUsageCount: Math.max(0, Math.floor(Number(userCouponUsageCount || 0))),
+      userUid: uid,
     };
     const validation = validateCoupon(coupon, orderContext, now);
     if (!validation.ok) {

@@ -222,6 +222,13 @@ export const applyCouponRedemption = async (
     usedCount: FieldValue.increment(1),
     updatedAt: nowTs,
   });
+  if (args.coupon.referralOwnerUid) {
+    tx.set(
+      adminDb().collection("referralProfiles").doc(args.coupon.referralOwnerUid),
+      { usedCount: FieldValue.increment(1), lastUsedAt: nowTs, updatedAt: nowTs },
+      { merge: true },
+    );
+  }
 
   // Stamp the user doc with the last redemption timestamp so the
   // client UI can show "You used this coupon on YYYY-MM-DD" in a

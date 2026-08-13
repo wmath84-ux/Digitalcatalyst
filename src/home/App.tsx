@@ -58,6 +58,7 @@ export default function App({
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const contentTopRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
 
   const continueLearningItem = products[0];
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -76,6 +77,19 @@ export default function App({
   const suggestions = searchResults.slice(0, 5);
 
   const [activeCategory, setActiveCategory] = useState("all");
+
+  const switchCategory = (direction: -1 | 1) => {
+    const index = Math.max(0, categories.findIndex((category) => category.id === activeCategory));
+    const next = (index + direction + categories.length) % categories.length;
+    setActiveCategory(categories[next].id);
+  };
+  const handleTouchStart = (event: React.TouchEvent) => { touchStartX.current = event.changedTouches[0]?.clientX ?? null; };
+  const handleTouchEnd = (event: React.TouchEvent) => {
+    if (touchStartX.current == null) return;
+    const delta = (event.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) >= 48) switchCategory(delta < 0 ? 1 : -1);
+  };
 
   const categoryFiltered: Product[] = useMemo(() => {
     if (activeCategory === "all") return products;
@@ -135,7 +149,7 @@ export default function App({
           onOpenNotifications={onNavigateToNotifications}
         />
 
-        <main className="flex-1 overflow-y-auto pb-2">
+        <main className="flex-1 overflow-y-auto pb-2" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           {isSearching ? (
             <section className="px-5 pt-6">
               <div className="flex items-center justify-between">

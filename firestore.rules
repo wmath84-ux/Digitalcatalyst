@@ -11,7 +11,7 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     function protectedUserFieldsUnchanged() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'purchasedProductIds']);
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'purchasedProductIds', 'referralCode', 'subscriptionPlanId', 'subscriptionTier', 'subscriptionExpiresAt']);
     }
     function communityVerificationAllowedOnCreate() {
       return isAdmin()
@@ -34,6 +34,7 @@ service cloud.firestore {
         && request.resource.data.uid == uid
         && request.resource.data.role == 'user'
         && request.resource.data.status == 'active'
+        && !request.resource.data.keys().hasAny(['referralCode', 'subscriptionPlanId', 'subscriptionTier', 'subscriptionExpiresAt'])
         && (!('purchasedProductIds' in request.resource.data) || request.resource.data.purchasedProductIds == []);
       allow update: if isOwner(uid) && protectedUserFieldsUnchanged();
       allow write: if isAdmin();

@@ -1,6 +1,6 @@
-import { BagIcon, CalendarIcon, HomeIcon, StoreIcon, UserIcon } from "./icons";
+import { BagIcon, CalendarIcon, HomeIcon, StoreIcon, TrophyIcon, UserIcon } from "./icons";
 
-export type TabKey = "home" | "myday" | "store" | "purchases" | "profile";
+export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "leaderboard";
 
 type BottomNavProps = {
   active: TabKey | null;
@@ -15,6 +15,7 @@ const TABS: { key: TabKey; label: string; icon: typeof HomeIcon }[] = [
   { key: "store", label: "Store", icon: StoreIcon },
   { key: "purchases", label: "Purchases", icon: BagIcon },
   { key: "profile", label: "Profile", icon: UserIcon },
+  { key: "leaderboard", label: "Leaders", icon: TrophyIcon },
 ];
 
 export default function BottomNav({ active, onChange, storeBadge, purchasesBadge }: BottomNavProps) {
@@ -28,7 +29,10 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
             <button
               key={key}
               type="button"
-              onClick={() => onChange(key)}
+              onClick={() => {
+                if (key === "leaderboard") window.location.hash = "#/leaderboard";
+                else onChange(key);
+              }}
               className={`relative flex flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-semibold transition ${
                 isActive ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
               }`}

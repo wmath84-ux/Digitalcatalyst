@@ -65,6 +65,8 @@ export default function SubscriptionPage() {
     discountPaise: number;
     label: string;
   } | null>(null);
+  const [appliedReferral, setAppliedReferral] = useState<{ code: string; discountPaise: number; label: string } | null>(null);
+  const [referralError, setReferralError] = useState<string | null>(null);
 
   // Submit / busy state. The "loading" state drives the bottom
   // bar; the actual activation is performed by the Part 5
@@ -168,7 +170,7 @@ export default function SubscriptionPage() {
     [selectedFeatureRecords, includedFeatureIds],
   );
   const subtotalPaise = selectedPlanPricePaise + featuresTotalPaise;
-  const couponDiscountPaise = appliedCoupon?.discountPaise || 0;
+  const couponDiscountPaise = appliedReferral?.discountPaise || appliedCoupon?.discountPaise || 0;
   // Server-validated floor: minimum payable = plan's minimum
   // payable paise (admin-set), default 0.
   const minPayablePaise = plan?.minPayablePaise || 0;
@@ -205,6 +207,8 @@ export default function SubscriptionPage() {
           requestedEduCoins: 0,
         });
         setCouponStatus("idle");
+        setAppliedReferral(null);
+        setReferralError(null);
         setAppliedCoupon({
           code,
           discountPaise,
@@ -229,6 +233,37 @@ export default function SubscriptionPage() {
     setCouponStatus("idle");
   }, []);
 
+  const handleApplyReferral = useCallback(async (rawCode: string): Promise<PromoResult> => {
+    const code = rawCode.trim().toUpperCase();
+    if (!code) return { valid: false, message: "Enter a referral code." };
+    setReferralError(null);
+    try {
+      const firebaseUser = await import("../../../firebase").then((module) => module.auth.currentUser);
+      if (!firebaseUser) throw new Error("Please sign in to apply a referral code.");
+      const token = await firebaseUser.getIdToken(true);
+      const response = await fetch("/api/subscription-referral", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ referralCode: code }),
+      });
+      const data = await response.json().catch(() => ({})) as { ok?: boolean; code?: string; discountPaise?: number; error?: string };
+      if (!response.ok || !data.ok) throw new Error(data.error || "Referral code is invalid.");
+      const discountPaise = Math.max(0, Number(data.discountPaise || 0));
+      setAppliedCoupon(null);
+      setAppliedReferral({ code: data.code || code, discountPaise, label: `₹${Math.round(discountPaise / 100)} referral discount` });
+      return { valid: true, message: "Referral code applied." };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Referral code is invalid.";
+      setReferralError(message);
+      return { valid: false, message };
+    }
+  }, []);
+
+  const handleRemoveReferral = useCallback(() => {
+    setAppliedReferral(null);
+    setReferralError(null);
+  }, []);
+
   const handleSubscribe = useCallback(async () => {
     if (!user) {
       window.location.hash = `#/auth?mode=login&return=${encodeURIComponent("#/subscription")}`;
@@ -251,7 +286,7 @@ export default function SubscriptionPage() {
           subscriptionPlanId: plan.id,
           billingCycle: cycle,
           featureIds: selectedFeatureIds,
-          couponCode: appliedCoupon?.code || null,
+          couponCode: appliedReferral?.code || appliedCoupon?.code || null,
           requestedEduCoins: 0,
           returnRoute: "#/subscription",
         },
@@ -268,7 +303,7 @@ export default function SubscriptionPage() {
       );
       setIsSubmitting(false);
     }
-  }, [user, plan, cycle, selectedFeatureIds, selectedCourseIds, appliedCoupon]);
+  }, [user, plan, cycle, selectedFeatureIds, selectedCourseIds, appliedCoupon, appliedReferral]);
 
   // ---------- Render ----------
   if (catalogLoading) {
@@ -373,6 +408,17 @@ export default function SubscriptionPage() {
             onRemove={handleRemoveCoupon}
             disabled={isSubmitting}
           />
+          <PromoCodeInput
+            kind="referral"
+            label="Have a referral code? Get the current referral discount."
+            placeholder="Enter referral code"
+            appliedCode={appliedReferral?.code ?? null}
+            appliedMessage={appliedReferral?.label ?? null}
+            errorMessage={referralError}
+            onApply={handleApplyReferral}
+            onRemove={handleRemoveReferral}
+            disabled={isSubmitting}
+          />
         </div>
 
         {/* Order summary */}
@@ -384,7 +430,7 @@ export default function SubscriptionPage() {
           featuresCount={selectedFeatureIds.filter((id) => !includedFeatureIds.has(id)).length}
           includedFeatureCount={includedFeatureIds.size}
           couponDiscountPaise={couponDiscountPaise}
-          couponCode={appliedCoupon?.code ?? null}
+          couponCode={appliedReferral?.code ?? appliedCoupon?.code ?? null}
           minPayablePaise={minPayablePaise}
           totalPaise={totalPaise}
         />

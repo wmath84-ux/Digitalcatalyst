@@ -26,6 +26,7 @@ export interface CouponDoc {
   firstPurchaseOnly: boolean;
   allowedPurchaseKinds: string[];
   description: string | null;
+  referralOwnerUid: string | null;
 }
 
 /** Context the validator needs to decide eligibility + discount. */
@@ -38,6 +39,7 @@ export interface CouponOrderContext {
   purchaseKind: string | null;
   userHasPriorPurchases: boolean;
   userUsageCount: number;
+  userUid?: string;
 }
 
 /** Result of `validateCoupon`. */

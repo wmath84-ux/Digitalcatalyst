@@ -49,6 +49,7 @@ import {
 } from "../../utils/entitlements";
 import { applyCouponRedemption, loadCouponByCode } from "./coupons";
 import type { CouponDoc } from "../../utils/coupons";
+import { ensureReferralCoupon } from "./referrals";
 import {
   collectSubscriptionEntitlementIds,
   loadPlanById,
@@ -603,6 +604,15 @@ export const grantSubscriptionFromQuote = async (
     });
     return sub;
   });
+  // Every successfully activated subscriber receives one stable referral
+  // identity. The helper is idempotent, so renewals preserve usage counts.
+  try {
+    await ensureReferralCoupon({ uid: quote.uid });
+  } catch (error) {
+    // Referral provisioning is recoverable and must never turn an already
+    // verified subscription payment into a client-visible failure.
+    console.error("Referral provisioning failed", error);
+  }
   return {
     ok: true,
     plan,
