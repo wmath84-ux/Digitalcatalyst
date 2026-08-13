@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import {
   ArrowUpRight,
@@ -35,14 +35,16 @@ import { useCourseAccess } from "./hooks/useCourseAccess";
 import { useHomepageProductReviews, usePublishedProductReviews, type PublishedProductReview } from "./hooks/useProductReviews";
 import { reviews as fallbackReviews } from "./home/data/mockData";
 import { useAuth } from "./context/AuthContext";
-import { db } from "../firebase";
+import { auth, db } from "../firebase";
+import PromoCodeInput, { type PromoResult } from "./subscription/components/PromoCodeInput";
+import { playSfxCopy, playSfxError, playSfxSuccess } from "./utils/sfx";
 
 interface ProductDetailProps {
   product: Product | null;
   products?: Product[];
   cartIds?: Set<string>;
   favoriteIds?: Set<string>;
-  onCheckout: (finalPrice: number) => void;
+  onCheckout: (finalPrice: number, couponCode?: string | null) => void;
   onCheckoutSelection?: (selection: CheckoutSelection, finalPrice: number) => void;
   onBack: () => void;
   onAddToCart?: (id: string) => void;
@@ -151,7 +153,11 @@ function PremiumProductContent({
   const [activeTab, setActiveTab] = useState<DetailTab>("Description");
   const [expandedModule, setExpandedModule] = useState<string | null>(product.canonicalModules?.[0]?.id || null);
   const [shareOpen, setShareOpen] = useState(false);
+  const shareRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  const [couponStatus, setCouponStatus] = useState<"idle" | "applying" | "error">("idle");
+  const [couponErrorMessage, setCouponErrorMessage] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPaise: number; label: string } | null>(null);
   const [reviewComposerOpen, setReviewComposerOpen] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
@@ -165,6 +171,34 @@ function PremiumProductContent({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [product.id]);
+
+  // Close the share menu when the user taps/clicks outside it, or scrolls
+  // anywhere outside the menu (page scroll, any scroll container, or touch drag).
+  useEffect(() => {
+    if (!shareOpen) return;
+    const closeOnOutsidePointer = (event: Event) => {
+      const target = event.target as Node | null;
+      if (target && shareRef.current && !shareRef.current.contains(target)) setShareOpen(false);
+    };
+    const closeOnOutsideScroll = (event: Event) => {
+      const target = event.target as Node | null;
+      if (target && shareRef.current && !shareRef.current.contains(target)) setShareOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("mousedown", closeOnOutsidePointer);
+    document.addEventListener("touchstart", closeOnOutsidePointer, { passive: true });
+    document.addEventListener("scroll", closeOnOutsideScroll, { capture: true, passive: true });
+    window.addEventListener("touchmove", closeOnOutsideScroll, { passive: true });
+    window.addEventListener("wheel", closeOnOutsideScroll, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("mousedown", closeOnOutsidePointer);
+      document.removeEventListener("touchstart", closeOnOutsidePointer);
+      document.removeEventListener("scroll", closeOnOutsideScroll, { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchmove", closeOnOutsideScroll);
+      window.removeEventListener("wheel", closeOnOutsideScroll);
+    };
+  }, [shareOpen]);
 
   const ownedKeys = purchasedIds || new Set<string>();
   const isProductOwned = ownedKeys.has(product.id)
@@ -189,8 +223,9 @@ function PremiumProductContent({
   const inCart = cartIds.has(product.id);
 
   const handlePreview = (selection: CheckoutSelection, summary: ReturnType<typeof computeSummary>) => {
-    if (onCheckoutSelection) onCheckoutSelection(selection, summary.effectiveSubtotal);
-    else if (selection.purchaseKind === "full_product") onCheckout(product.price);
+    const withCoupon = appliedCoupon?.code ? { ...selection, couponCode: appliedCoupon.code } : selection;
+    if (onCheckoutSelection) onCheckoutSelection(withCoupon, summary.effectiveSubtotal);
+    else if (selection.purchaseKind === "full_product") onCheckout(product.price, appliedCoupon?.code || null);
   };
 
   const copyLink = async () => {
@@ -210,6 +245,7 @@ function PremiumProductContent({
         document.body.removeChild(input);
       }
       setCopied(true);
+      playSfxCopy();
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       setCopied(false);
@@ -242,8 +278,75 @@ function PremiumProductContent({
 
   const primaryAction = () => {
     if (isProductOwned && onOpenCourse) onOpenCourse(product);
-    else onCheckout(product.price);
+    else onCheckout(product.price, appliedCoupon?.code || null);
   };
+
+  // Coupon handling — mirrors the subscription page. The code is validated
+  // server-side via /api/product-coupon (same Part 7 coupon engine + Part 4
+  // quote engine the real checkout uses), so the buyer sees "Verified savings"
+  // before entering checkout. The applied code is carried into checkout.
+  const handleApplyCoupon = useCallback(
+    async (rawCode: string): Promise<PromoResult> => {
+      if (isProductOwned) {
+        return { valid: false, message: "You already own this product." };
+      }
+      const code = rawCode.trim().toUpperCase();
+      if (!code) return { valid: false, message: "Enter a coupon code." };
+      setCouponStatus("applying");
+      setCouponErrorMessage(null);
+      try {
+        const firebaseUser = auth.currentUser;
+        if (!firebaseUser) return { valid: false, message: "Please sign in to apply a coupon." };
+        const token = await firebaseUser.getIdToken(true);
+        const response = await fetch("/api/product-coupon", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            purchaseKind: "full_product",
+            productIds: [product.documentId || product.id],
+            moduleIds: [],
+            resourceIds: [],
+            updateId: null,
+            subscriptionPlanId: null,
+            billingCycle: null,
+            featureIds: [],
+            couponCode: code,
+            requestedEduCoins: 0,
+            returnRoute: null,
+          }),
+        });
+        const data = await response.json().catch(() => ({})) as { ok?: boolean; discountPaise?: number; cashPayable?: number; error?: string };
+        if (!response.ok || !data.ok) {
+          const message = data.error || "This coupon could not be applied.";
+          setCouponStatus("error");
+          setCouponErrorMessage(message);
+          return { valid: false, message };
+        }
+        const discountPaise = Math.max(0, Math.round(Number(data.discountPaise || 0)));
+        setCouponStatus("idle");
+        playSfxSuccess();
+        setAppliedCoupon({
+          code,
+          discountPaise,
+          label: discountPaise > 0 ? `Verified savings · ₹${Math.round(discountPaise / 100)} off` : "Coupon applied (no additional savings).",
+        });
+        return { valid: true, message: "Coupon applied." };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "This coupon could not be applied.";
+        setCouponStatus("error");
+        setCouponErrorMessage(message);
+        playSfxError();
+        return { valid: false, message };
+      }
+    },
+    [isProductOwned, product.documentId, product.id],
+  );
+
+  const handleRemoveCoupon = useCallback(() => {
+    setAppliedCoupon(null);
+    setCouponErrorMessage(null);
+    setCouponStatus("idle");
+  }, []);
 
   const submitReview = async () => {
     if (!user) {
@@ -284,9 +387,11 @@ function PremiumProductContent({
       }
       setReviewComment("");
       setReviewComposerOpen(false);
+      playSfxSuccess();
       setReviewNotice("Review submitted. It is saved online and will appear after moderation.");
     } catch (error) {
       console.error("Review submission failed", error);
+      playSfxError();
       setReviewNotice("Review could not be submitted. Please try again.");
     } finally {
       setReviewSubmitting(false);
@@ -384,7 +489,7 @@ function PremiumProductContent({
                 </button>
               </div>
               <div className="relative mt-3 flex justify-end">
-                <div className="relative">
+                <div ref={shareRef} className="relative">
                   <button type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-sm"><Share2 className="h-4 w-4" /></button>
                   <div data-product-share className="absolute right-0 top-12 z-50 w-60 rounded-2xl border border-zinc-100 bg-white p-3 shadow-2xl" hidden={!shareOpen}>
                     <p className="pb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Share this product</p>
@@ -398,6 +503,21 @@ function PremiumProductContent({
                 </div>
               </div>
             </div>
+
+            {!isProductOwned && !product.isFree && (
+              <div className="rounded-2xl border border-zinc-100 bg-white p-4">
+                <PromoCodeInput
+                  kind="coupon"
+                  label="Have a coupon? Enter the code below."
+                  placeholder="Enter coupon code"
+                  appliedCode={appliedCoupon?.code ?? null}
+                  appliedMessage={appliedCoupon?.label ?? null}
+                  errorMessage={couponStatus === "error" ? couponErrorMessage : null}
+                  onApply={handleApplyCoupon}
+                  onRemove={handleRemoveCoupon}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-3 gap-2">
               <Trust icon={ShieldCheck} label="Secure checkout" />

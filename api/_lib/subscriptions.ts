@@ -54,6 +54,47 @@ const MODULE_UNLOCKS_COLLECTION = "subscriptionPlanModuleUnlocks";
 const USER_SUBS_COLLECTION = "users";
 const USER_SUBS_DOC = "subscription";
 
+/**
+ * Built-in default plans, seeded when no active plan exists yet. Their ids
+ * ("basic" / "premium" / "pro") match the client fallback catalog
+ * (`src/subscription/data/fallbackCatalog.ts`) so that a freshly deployed
+ * project still completes checkout instead of failing with
+ * "This plan is no longer available".
+ *
+ * Plan base price is not charged (see `buildSubscriptionLineItems`); these
+ * rupee values only drive the displayed cycle price. The payable total is
+ * always the selected features + bonus products.
+ */
+const DEFAULT_SUBSCRIPTION_PLANS: Array<Record<string, unknown>> = [
+  { id: "basic", name: "Basic", description: "Flexible subscription access with optional My Day cloud saving.", monthlyPrice: 199, yearlyPrice: 1990, allowedCycles: ["monthly", "yearly"], active: true, badge: null, sortOrder: 0 },
+  { id: "premium", name: "Premium", description: "Premium subscription access with selectable My Day cloud saving.", monthlyPrice: 499, yearlyPrice: 4990, allowedCycles: ["monthly", "yearly"], active: true, badge: "POPULAR", sortOrder: 1 },
+  { id: "pro", name: "Pro", description: "Pro subscription access with selectable products and My Day cloud saving.", monthlyPrice: 999, yearlyPrice: 9990, allowedCycles: ["monthly", "yearly"], active: true, badge: null, sortOrder: 2 },
+];
+
+/**
+ * Idempotently seed the default plan catalog when no active plan is
+ * configured. This makes the subscription flow self-healing: a project that
+ * was never seeded (or where every plan was left inactive) still resolves the
+ * client's fallback plan ids instead of refusing the quote.
+ */
+export const ensureDefaultSubscriptionPlans = async (db: Firestore): Promise<void> => {
+  try {
+    const active = await db.collection(PLANS_COLLECTION).where("active", "==", true).limit(1).get();
+    if (!active.empty) return;
+    await Promise.all(
+      DEFAULT_SUBSCRIPTION_PLANS.map((plan) =>
+        db.collection(PLANS_COLLECTION).doc(String(plan.id)).set(
+          { ...plan, updatedAt: Timestamp.now() },
+          { merge: true },
+        ),
+      ),
+    );
+  } catch (error) {
+    // Seeding is best-effort — never let a seed failure break a catalog read.
+    console.warn("[subscriptions] default plan seeding skipped", error);
+  }
+};
+
 /** Load a single plan by id (returns null when missing / inactive). */
 export const loadPlanById = async (
   planId: string,
@@ -61,7 +102,14 @@ export const loadPlanById = async (
 ): Promise<SubscriptionPlanDoc | null> => {
   if (!planId) return null;
   const db = options.db ?? adminDb();
-  const snap = await db.collection(PLANS_COLLECTION).doc(planId).get();
+  let snap = await db.collection(PLANS_COLLECTION).doc(planId).get();
+  // Self-heal: when the requested plan is missing, seed the defaults so the
+  // client fallback ids ("basic" / "premium" / "pro") resolve instead of
+  // rejecting the quote with "This plan is no longer available".
+  if (!snap.exists) {
+    await ensureDefaultSubscriptionPlans(db);
+    snap = await db.collection(PLANS_COLLECTION).doc(planId).get();
+  }
   if (!snap.exists) return null;
   const plan = normalisePlanDoc(snap.data() || {}, snap.id);
   if (!plan) return null;
@@ -73,6 +121,7 @@ export const loadActivePlans = async (
   options: { db?: Firestore } = {},
 ): Promise<SubscriptionPlanDoc[]> => {
   const db = options.db ?? adminDb();
+  await ensureDefaultSubscriptionPlans(db);
   const snap = await db.collection(PLANS_COLLECTION).where("active", "==", true).get();
   const plans: SubscriptionPlanDoc[] = [];
   for (const doc of snap.docs) {

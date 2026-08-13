@@ -13,6 +13,7 @@ import type { Product } from "./types";
 import { useCatalog } from "../context/CatalogContext";
 import { useHomepageProductReviews } from "../hooks/useProductReviews";
 import { useAuth } from "../context/AuthContext";
+import { ensureSavedWebPushSubscription, subscribeToWebPush } from "../../utils/webPush";
 
 interface AppProps {
   onNavigateToStore: () => void;
@@ -60,6 +61,17 @@ export default function App({
   const userName = user?.name?.split(" ")[0] || "Learner";
   const [progressRecords, setProgressRecords] = useState<Array<{ productId: string; completedFileIds: string[]; updatedAt: number }>>([]);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Ask for notification permission the moment a user lands on Home (app open).
+  // Signed-in users are also subscribed + saved so purchase unlocks, renewals and
+  // announcements reach this device as system notifications.
+  useEffect(() => {
+    if (user) {
+      void ensureSavedWebPushSubscription(user.id);
+    } else {
+      void subscribeToWebPush();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) { setProgressRecords([]); return undefined; }
@@ -135,7 +147,10 @@ export default function App({
   const categorySwipeHandlers = { onTouchStart: handleSwipeStart, onTouchEnd: handleSwipeEnd };
 
   const categoryFiltered: Product[] = useMemo(() => {
-    if (activeCategory === "all") return products;
+    if (activeCategory === "all") {
+      // "Trending Now" — show only the top 4 products, ranked by rating.
+      return [...products].sort((a, b) => b.rating - a.rating).slice(0, 4);
+    }
     return products.filter((p) => p.category === activeCategory);
   }, [activeCategory, products]);
 

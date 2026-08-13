@@ -204,9 +204,21 @@ export const showLocalSystemNotification = async (title: string, body: string, u
   }
 };
 
-/** Persist the current browser subscription when permission is already granted. */
+/**
+ * Ensure this device is subscribed and saved for the signed-in user.
+ *
+ * Previously this short-circuited when permission was still `default`
+ * (i.e. the user had never been asked). On a fresh Android install that
+ * meant the browser was never prompted, never subscribed, and never saved —
+ * so purchase unlocks, renewals and admin announcements could never reach
+ * the device as system notifications. `subscribeToWebPush()` already owns the
+ * permission flow (it prompts only when permission is `default` and bails
+ * immediately when it is `denied`), so we let it decide instead of
+ * pre-filtering on `granted`.
+ */
 export const ensureSavedWebPushSubscription = async (uid: string): Promise<boolean> => {
-  if (!uid || !isWebPushSupported() || window.Notification.permission !== 'granted') return false;
+  if (!uid || !isWebPushSupported()) return false;
+  if (window.Notification.permission === 'denied') return false;
   const subscription = await subscribeToWebPush();
   if (!subscription) return false;
   return saveWebPushSubscription(uid, subscription);

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { ArrowLeft, BookOpen, CheckCircle2, FileText, Menu, NotebookPen, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import CourseSidebar from "./course/CourseSidebar";
 import NotesPanel from "./course/NotesPanel";
@@ -177,9 +178,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
   const markComplete = async () => {
     if (!user || !selectedFile || !progressRef) return;
+    playSfxComplete();
     await setDoc(progressRef, { productId: product.id, completedFileIds: arrayUnion(selectedFile.id), lastOpenedFileId: selectedFile.id, lastOpenedAt: serverTimestamp(), accessSource: resolution.hasFullProductAccess ? "full_product" : (resolution.ownedModuleIds.size > 0 ? "module_purchase" : (resolution.subscriptionGrantedModuleIds.size > 0 ? "subscription" : "locked")), updatedAt: serverTimestamp() }, { merge: true });
   };
 
+  // Notes write directly to Firestore on every add / edit / delete. We also
+  // update local state optimistically so the UI reflects the change instantly
+  // and rapid successive edits can't be clobbered by a stale snapshot closure
+  // (the Firestore listener then reconciles the same values).
   const saveNote = async () => {
     if (!user || !progressRef || !noteDraft.trim()) return;
     const trimmed = noteDraft.trim();
@@ -188,18 +194,23 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
       { id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, text: trimmed, createdAt: Date.now(), moduleId: selectedFileModuleId || undefined, resourceId: selectedFile?.id || undefined },
       ...notes,
     ];
+    setNotes(next);
+    playSfxAdd();
     await setDoc(progressRef, { productId: product.id, notes: next, updatedAt: serverTimestamp() }, { merge: true });
   };
 
   const editNote = async (id: string, nextText: string) => {
     if (!user || !progressRef) return;
     const next = notes.map((note) => note.id === id ? { ...note, text: nextText, updatedAt: Date.now() } : note);
+    setNotes(next);
     await setDoc(progressRef, { productId: product.id, notes: next, updatedAt: serverTimestamp() }, { merge: true });
   };
 
   const deleteNote = async (id: string) => {
     if (!user || !progressRef) return;
     const next = notes.filter((note) => note.id !== id);
+    setNotes(next);
+    playSfxRemove();
     await setDoc(progressRef, { productId: product.id, notes: next, updatedAt: serverTimestamp() }, { merge: true });
   };
 
