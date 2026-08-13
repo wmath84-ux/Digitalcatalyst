@@ -109,7 +109,17 @@ const authErrorMessage = (error: unknown): string => {
     "auth/unauthorized-domain": "यह domain Firebase Authentication में authorized नहीं है।",
     "auth/operation-not-allowed": "यह sign-in provider Firebase Console में enabled नहीं है।",
     "auth/configuration-not-found": "Firebase Authentication provider configured नहीं है।",
+    "auth/missing-or-invalid-nonce": "Login session expire हो गई। कृपया फिर से Google से साइन इन करें।",
+    "auth/no-auth-event": "Login session expire हो गई। कृपया फिर से Google से साइन इन करें।",
+    "auth/argument-error": "Login session reset हो गई। कृपया फिर से Google से साइन इन करें।",
   };
+
+  const raw = typeof error === "object" && error && "message" in error
+    ? String((error as { message?: unknown }).message || "")
+    : String(error || "");
+  if (/missing initial state/i.test(raw)) {
+    return "Google login session reset हो गई। कृपया फिर से Google से साइन इन करें।";
+  }
 
   return messages[code] || "Authentication पूरा नहीं हो सका। कृपया फिर कोशिश करें।";
 };
@@ -238,16 +248,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [commitFirebaseUser]);
 
-  // Consume any pending Google redirect result (mobile `signInWithRedirect`).
-  // onAuthStateChanged already restores the session; this clears the pending
-  // credential so subsequent sign-ins behave correctly.
+  // Consume any leftover redirect result. Missing sessionStorage state is
+  // expected after a partitioned-browser bounce — ignore it so login UI works.
   useEffect(() => {
     getRedirectResult(auth)
       .then((result) => {
         if (result?.user) return commitFirebaseUser(result.user);
         return undefined;
       })
-      .catch((error) => console.warn("Google redirect sign-in failed", authErrorMessage(error)));
+      .catch((error) => {
+        const raw = typeof error === "object" && error && "message" in error
+          ? String((error as { message?: unknown }).message || "")
+          : "";
+        if (/missing initial state/i.test(raw)) return;
+        console.warn("Google redirect sign-in failed", authErrorMessage(error));
+      });
   }, [commitFirebaseUser]);
 
   useEffect(() => {
@@ -335,13 +350,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAdminSession();
     try {
       await setPersistence(auth, browserSessionPersistence);
-      if (isMobileOrStandalone()) {
-        // Redirect flow: on return, onAuthStateChanged restores the session and
-        // AdminLoginApp finalizes the admin session from the email + role.
+      // Always prefer popup. Redirect + partitioned sessionStorage causes
+      // "missing initial state" and login never completes.
+      let credential;
+      try {
+        credential = await signInWithPopup(auth, googleProvider);
+      } catch (popupError) {
+        const popupCode = authErrorCode(popupError);
+        if (popupCode !== "auth/popup-blocked" && popupCode !== "auth/cancelled-popup-request") {
+          throw popupError;
+        }
+        if (!isMobileOrStandalone()) throw popupError;
         await signInWithRedirect(auth, googleProvider);
         return { success: true, message: "Google sign-in started." };
       }
-      const credential = await signInWithPopup(auth, googleProvider);
       const profileSnapshot = await getDoc(doc(db, "users", credential.user.uid));
       if (!profileSnapshot.exists() || profileSnapshot.data().role !== "admin" || normalizeEmail(credential.user.email) !== APPROVED_ADMIN_EMAIL) {
         await signOut(auth);
@@ -362,13 +384,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAdminSession();
     try {
       await setPersistence(auth, browserLocalPersistence);
-      if (isMobileOrStandalone()) {
-        // Redirect flow: the page navigates to Google and back; the result is
-        // picked up by onAuthStateChanged + getRedirectResult on return.
+      let credential;
+      try {
+        credential = await signInWithPopup(auth, googleProvider);
+      } catch (popupError) {
+        const popupCode = authErrorCode(popupError);
+        if (popupCode !== "auth/popup-blocked" && popupCode !== "auth/cancelled-popup-request") {
+          throw popupError;
+        }
+        if (!isMobileOrStandalone()) throw popupError;
         await signInWithRedirect(auth, googleProvider);
-        return { success: true, message: "Google login successful." };
+        return { success: true, message: "Google login started." };
       }
-      const credential = await signInWithPopup(auth, googleProvider);
       await commitFirebaseUser(credential.user);
       return { success: true, message: "Google login successful." };
     } catch (error) {

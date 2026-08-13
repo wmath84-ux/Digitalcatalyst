@@ -2,7 +2,12 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAuth } from 'firebase/auth';
+import {
+  getAuth,
+  initializeAuth,
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+} from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: "AIzaSyD0F0vSGMNnUc8Oac96jDQuYLcyLcyyFuE",
@@ -28,4 +33,20 @@ try {
 
 export const db = app ? getFirestore(app) : {} as any;
 export const storage = app ? getStorage(app) : {} as any;
-export const auth = app ? getAuth(app) : {} as any;
+
+function getFirebaseAuth() {
+  if (!app) return {} as any;
+  try {
+    // Popup + local persistence avoids the "missing initial state" crash
+    // that signInWithRedirect hits when sessionStorage is partitioned
+    // (Safari, in-app browsers, PWA standalone, some Chrome profiles).
+    return initializeAuth(app, {
+      persistence: browserLocalPersistence,
+      popupRedirectResolver: browserPopupRedirectResolver,
+    });
+  } catch {
+    return getAuth(app);
+  }
+}
+
+export const auth = getFirebaseAuth();
