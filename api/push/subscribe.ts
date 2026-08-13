@@ -7,9 +7,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const user = await requireFirebaseUser(req);
     const body = (req.body || {}) as Record<string, unknown>;
-    const endpoint = clean(body.endpoint, 700);
-    const p256dh = clean(body.p256dh, 300);
-    const auth = clean(body.auth, 120);
+    const endpoint = clean(body.endpoint, 2000);
+    const p256dh = clean(body.p256dh, 500);
+    const auth = clean(body.auth, 200);
     if (!endpoint || !p256dh || !auth) {
       return res.status(400).json({ ok: false, code: "invalid_subscription", error: "Push subscription keys are incomplete." });
     }

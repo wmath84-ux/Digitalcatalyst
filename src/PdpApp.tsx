@@ -9,13 +9,15 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Copy,
   Expand,
   Globe,
   Heart,
-  Link2,
+  MessageCircle,
   PackageOpen,
   PlayCircle,
   RotateCcw,
+  Send,
   Share2,
   ShieldCheck,
   ShoppingBag,
@@ -150,7 +152,10 @@ function PremiumProductContent({
     return () => window.cancelAnimationFrame(frame);
   }, [product.id]);
 
-  const isProductOwned = purchasedIds ? purchasedIds.has(product.id) : resolution.hasFullProductAccess;
+  const ownedKeys = purchasedIds || new Set<string>();
+  const isProductOwned = ownedKeys.has(product.id)
+    || Boolean(product.documentId && ownedKeys.has(product.documentId))
+    || resolution.hasFullProductAccess;
   const updates = ownedUpdateIds || resolution.ownedUpdateIds;
   const availablePaidUpdates = (product.paidUpdates || []).filter((update) => update.active && update.visibility !== "hidden" && !updates.has(update.id));
   const ownedModuleIds = resolution.ownedModuleIds;
@@ -161,8 +166,11 @@ function PremiumProductContent({
   const discount = product.originalPrice > product.price && product.originalPrice > 0
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
-  const modules = product.canonicalModules || [];
-  const resourceCount = modules.reduce((sum, module) => sum + (module.resources?.length || 0), 0);
+  const modules = useMemo(() => collectCurriculumModules(product), [product]);
+  const resourceCount = countCurriculumResources(modules);
+  const productShareUrl = typeof window === "undefined"
+    ? ""
+    : `${window.location.origin}${window.location.pathname}#/product/${encodeURIComponent(product.id)}`;
   const favorite = favoriteIds.has(product.id);
   const inCart = cartIds.has(product.id);
 
@@ -171,10 +179,51 @@ function PremiumProductContent({
     else if (selection.purchaseKind === "full_product") onCheckout(product.price);
   };
 
-  const copyLink = () => {
-    void navigator.clipboard?.writeText(window.location.href).catch(() => undefined);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+  const copyLink = async () => {
+    const url = productShareUrl || window.location.href;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const input = document.createElement("textarea");
+        input.value = url;
+        input.setAttribute("readonly", "");
+        input.style.position = "fixed";
+        input.style.left = "-9999px";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const shareNative = async () => {
+    const url = productShareUrl || window.location.href;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: product.title, text: product.description || product.title, url });
+        setShareOpen(false);
+        return;
+      } catch (error) {
+        if ((error as { name?: string }).name === "AbortError") return;
+      }
+    }
+    await copyLink();
+  };
+
+  const shareTo = (target: "whatsapp" | "telegram") => {
+    const url = encodeURIComponent(productShareUrl || window.location.href);
+    const text = encodeURIComponent(`${product.title} — ${product.description || "Learn on Eduvora"}`);
+    const href = target === "whatsapp"
+      ? `https://wa.me/?text=${text}%20${url}`
+      : `https://t.me/share/url?url=${url}&text=${text}`;
+    window.open(href, "_blank", "noopener,noreferrer");
+    setShareOpen(false);
   };
 
   const primaryAction = () => {
@@ -187,10 +236,6 @@ function PremiumProductContent({
       window.location.hash = `#/auth?mode=login&return=${encodeURIComponent(window.location.hash)}`;
       return;
     }
-    if (!isProductOwned) {
-      setReviewNotice("Only learners who own this product can submit a review.");
-      return;
-    }
     const comment = reviewComment.trim();
     if (comment.length < 10) {
       setReviewNotice("Please write at least 10 characters.");
@@ -198,21 +243,34 @@ function PremiumProductContent({
     }
     setReviewSubmitting(true);
     setReviewNotice("");
+    const payload = {
+      productId: product.id,
+      productTitle: product.title,
+      customerId: user.id,
+      userId: user.id,
+      uid: user.id,
+      customerName: user.name,
+      rating: Math.round(Number(reviewRating)) || 5,
+      comment,
+      verifiedPurchase: Boolean(isProductOwned),
+    };
     try {
-      await addDoc(collection(db, "siteReviews"), {
-        productId: product.id,
-        productTitle: product.title,
-        customerId: user.id,
-        customerName: user.name,
-        rating: reviewRating,
-        comment,
-        verifiedPurchase: false,
-        status: "pending",
-        createdAt: serverTimestamp(),
-      });
+      try {
+        await addDoc(collection(db, "siteReviews"), { ...payload, status: "pending", createdAt: serverTimestamp() });
+      } catch {
+        const token = await import("../firebase").then((module) => module.auth.currentUser?.getIdToken(true));
+        if (!token) throw new Error("Login is required.");
+        const response = await fetch("/api/reviews/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(() => ({})) as { ok?: boolean; error?: string };
+        if (!response.ok || !data.ok) throw new Error(data.error || "Review could not be saved.");
+      }
       setReviewComment("");
       setReviewComposerOpen(false);
-      setReviewNotice("Review submitted. It will appear after moderation.");
+      setReviewNotice("Review submitted. It is saved online and will appear after moderation.");
     } catch (error) {
       console.error("Review submission failed", error);
       setReviewNotice("Review could not be submitted. Please try again.");
@@ -313,13 +371,16 @@ function PremiumProductContent({
               </div>
               <div className="relative mt-3 flex justify-end">
                 <div className="relative">
-                  <button onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-sm"><Share2 className="h-4 w-4" /></button>
-                  {shareOpen && (
-                    <div className="absolute right-0 top-12 z-20 w-56 rounded-2xl border border-zinc-100 bg-white p-3 shadow-2xl">
-                      <p className="pb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Share this product</p>
-                      <button onClick={copyLink} className="flex w-full items-center justify-between rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-600"><span className="flex items-center gap-2"><Link2 className="h-3.5 w-3.5" /> Copy product link</span>{copied && <Check className="h-3.5 w-3.5 text-emerald-500" />}</button>
+                  <button type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-sm"><Share2 className="h-4 w-4" /></button>
+                  <div data-product-share className="absolute right-0 top-12 z-20 w-60 rounded-2xl border border-zinc-100 bg-white p-3 shadow-2xl" hidden={!shareOpen}>
+                    <p className="pb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Share this product</p>
+                    <div className="space-y-1.5">
+                      <button type="button" onClick={() => void shareNative()} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><Share2 className="h-3.5 w-3.5" /> Share via device</button>
+                      <button type="button" onClick={() => shareTo("whatsapp")} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</button>
+                      <button type="button" onClick={() => shareTo("telegram")} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><Send className="h-3.5 w-3.5" /> Telegram</button>
+                      <button type="button" onClick={() => void copyLink()} className="flex w-full items-center justify-between rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><span className="flex items-center gap-2"><Copy className="h-3.5 w-3.5" /> Copy product link</span>{copied && <Check className="h-3.5 w-3.5 text-emerald-500" />}</button>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -358,11 +419,11 @@ function PremiumProductContent({
               />
             </section>
 
-          <DetailsCard product={product} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
+          <DetailsCard product={product} modules={modules} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
           <ReviewsCard
             product={product}
             reviews={productReviews}
-            canReview={Boolean(user && isProductOwned)}
+            canReview={Boolean(user)}
             composerOpen={reviewComposerOpen}
             rating={reviewRating}
             comment={reviewComment}
@@ -402,6 +463,37 @@ function DetailsCard({ product, tab, onTab, expandedModule, onExpandModule }: { 
   );
 }
 
+function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, depth = 0 }: { module: CurriculumModule; index: number; expandedModule: string | null; onExpandModule: (id: string | null) => void; depth?: number }) {
+  const open = expandedModule === module.id;
+  const childModules = module.modules || [];
+  const resources = module.resources || [];
+  return (
+    <div className="overflow-hidden rounded-2xl border border-zinc-100" style={{ marginLeft: depth ? depth * 12 : 0 }}>
+      <button type="button" onClick={() => onExpandModule(open ? null : module.id)} className="flex w-full items-center gap-3 bg-zinc-50/60 px-3 py-3 text-left">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">{index + 1}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-800">{module.title}</span>
+        <span className="text-[10px] text-zinc-400">{resources.length} resources{childModules.length ? ` · ${childModules.length} modules` : ""}</span>
+        <ChevronDown className={`h-4 w-4 text-zinc-400 transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="space-y-2 px-4 py-3">
+          {resources.map((resource) => (
+            <div key={resource.id} className="flex items-center gap-2 text-xs text-zinc-500">
+              <PlayCircle className="h-4 w-4 text-zinc-300" />
+              <span className="min-w-0 flex-1 truncate">{resource.name}</span>
+              <span className="uppercase text-[9px] text-zinc-400">{resource.type}</span>
+            </div>
+          ))}
+          {childModules.map((child, childIndex) => (
+            <CurriculumModuleRow key={child.id || `${module.id}-${childIndex}`} module={child} index={childIndex} expandedModule={expandedModule} onExpandModule={onExpandModule} depth={depth + 1} />
+          ))}
+          {resources.length === 0 && childModules.length === 0 ? <p className="text-xs text-zinc-400">Module details will appear here when published.</p> : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReviewsCard({ product, reviews, canReview, composerOpen, rating, comment, submitting, notice, onToggleComposer, onRating, onComment, onSubmit }: {
   product: Product;
   reviews: PublishedProductReview[];
@@ -436,7 +528,7 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
               <textarea value={comment} onChange={(event) => onComment(event.target.value.slice(0, 2000))} rows={4} placeholder="Share your experience with this product…" className="mt-3 w-full resize-none rounded-xl border border-zinc-200 bg-white p-3 text-sm outline-none focus:border-zinc-400" />
               <button disabled={submitting} onClick={onSubmit} className="mt-3 w-full rounded-xl bg-zinc-900 py-3 text-sm font-bold text-white disabled:opacity-60">{submitting ? "Submitting…" : "Submit for review"}</button>
             </>
-          ) : <p className="text-xs leading-relaxed text-zinc-500">Sign in and purchase this product to submit a genuine learner review.</p>}
+          ) : <p className="text-xs leading-relaxed text-zinc-500">Sign in to submit a genuine learner review. It is saved online in Firestore.</p>}
         </div>
       )}
       {notice && <p className="mt-3 rounded-xl bg-indigo-50 p-3 text-xs font-medium text-indigo-700">{notice}</p>}
@@ -476,4 +568,39 @@ function Trust({ icon: Icon, label }: { icon: typeof ShieldCheck; label: string 
 function Fact({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-zinc-50 p-3"><p className="text-[10px] uppercase tracking-wide text-zinc-400">{label}</p><p className="mt-1 truncate text-xs font-semibold text-zinc-800">{value}</p></div>; }
 function EmptyDetail({ text }: { text: string }) { return <div className="flex flex-col items-center rounded-2xl bg-zinc-50 py-8 text-center"><PackageOpen className="h-7 w-7 text-zinc-300" /><p className="mt-2 px-5 text-xs text-zinc-400">{text}</p></div>; }
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "DC"; }
+
+type CurriculumModule = {
+  id: string;
+  title: string;
+  resources?: Array<{ id: string; name: string; type: string }>;
+  modules?: CurriculumModule[];
+};
+
+const asCurriculumModule = (raw: unknown): CurriculumModule | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const module = raw as Record<string, unknown>;
+  const id = String(module.id || module.title || "");
+  const title = String(module.title || "Untitled module");
+  if (!id && !title) return null;
+  const resourceSource = Array.isArray(module.resources) ? module.resources : Array.isArray(module.files) ? module.files : [];
+  const resources = resourceSource.map((item, index) => {
+    const resource = (item || {}) as Record<string, unknown>;
+    return {
+      id: String(resource.id || `${id}-r-${index}`),
+      name: String(resource.name || resource.title || "Resource"),
+      type: String(resource.type || "file"),
+    };
+  });
+  const modules = (Array.isArray(module.modules) ? module.modules : []).map(asCurriculumModule).filter((item): item is CurriculumModule => Boolean(item));
+  return { id: id || title, title, resources, modules };
+};
+
+export const collectCurriculumModules = (product: Product): CurriculumModule[] => {
+  const canonical = (product.canonicalModules || []).map(asCurriculumModule).filter((item): item is CurriculumModule => Boolean(item));
+  if (canonical.length > 0) return canonical;
+  return (product.courseContent || []).map(asCurriculumModule).filter((item): item is CurriculumModule => Boolean(item));
+};
+
+export const countCurriculumResources = (modules: CurriculumModule[]): number =>
+  modules.reduce((sum, module) => sum + (module.resources?.length || 0) + countCurriculumResources(module.modules || []), 0);
 function MissingProduct({ onBack }: { onBack: () => void }) { return <div className="grid min-h-[70vh] place-items-center bg-slate-50 px-6 text-center"><div><ShoppingBag className="mx-auto h-12 w-12 text-slate-300" /><h1 className="mt-4 text-2xl font-black text-slate-900">Product not found</h1><p className="mt-2 text-sm text-slate-500">It may have been hidden or removed from the live catalog.</p><button onClick={onBack} className="mt-6 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white">Back to store</button></div></div>; }

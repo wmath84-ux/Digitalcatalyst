@@ -13,7 +13,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { BellIcon, BookOpenIcon, StoreIcon } from "./icons";
 import { getRenewalReminder } from "../../utils/subscriptionRenewal";
-import { sendWebPushSelfTest, type WebPushTestResult } from "../../utils/webPush";
+import { ensureSavedWebPushSubscription, sendWebPushSelfTest, type WebPushTestResult } from "../../utils/webPush";
 
 type NotificationsPageProps = {
   cartCount: number;

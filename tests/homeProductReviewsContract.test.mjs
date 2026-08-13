@@ -40,8 +40,8 @@ test("PDP renders the same product-specific written review cards", () => {
 test("owned learners can submit pending reviews for admin moderation", () => {
   assert.match(pdp, /addDoc\(collection\(db, "siteReviews"\)/);
   assert.match(pdp, /status: "pending"/);
-  assert.match(pdp, /Only learners who own this product/);
-  assert.match(pdp, /Review submitted\. It will appear after moderation/);
+  assert.match(pdp, /canReview=\{Boolean\(user\)\}/);
+  assert.match(pdp, /Review submitted\. It is saved online and will appear after moderation/);
 });
 
 test("Firestore exposes only published reviews and keeps moderation admin-controlled", () => {
