@@ -41,6 +41,8 @@ import type {
   CheckoutSelection,
 } from "@/types/commerce";
 import type { Product } from "@/data/products";
+import ModuleSelectTrigger from "./ModuleSelectTrigger";
+import ModuleSelectModal from "./ModuleSelectModal";
 import {
   buildCheckoutSelection,
   computeSummary,
@@ -50,6 +52,7 @@ import {
   getIsModuleOwned,
   getIsResourceOwned,
   getModuleEffectivePrice,
+  getModuleFallbackPrice,
   getPurchasableModules,
   getPurchasableResources,
   getResourceEffectivePrice,
@@ -167,11 +170,12 @@ export default function PdpPurchaseBuilder({
     [isProductOwned, purchasableModules, purchasableResources, availableUpdates],
   );
 
-  // Default mode: prefer full_product if available, else selected_modules, else paid_update.
+  // Default mode: prefer module picker so the PDP matches the subscription
+  // feature-select flow. Fall back to full course when no modules exist.
   const [mode, setMode] = useState<PdpPurchaseMode>(() => {
     if (isProductOwned && availableModes.includes("paid_update")) return "paid_update";
-    if (availableModes.includes("full_product")) return "full_product";
     if (availableModes.includes("selected_modules")) return "selected_modules";
+    if (availableModes.includes("full_product")) return "full_product";
     if (availableModes.includes("selected_resources")) return "selected_resources";
     if (availableModes.includes("paid_update")) return "paid_update";
     return "free_entitlement";
@@ -190,6 +194,8 @@ export default function PdpPurchaseBuilder({
   const [selectedUpdateId, setSelectedUpdateId] = useState<string | null>(null);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(() => new Set());
   const [previewNotice, setPreviewNotice] = useState<string | null>(null);
+  const [moduleModalOpen, setModuleModalOpen] = useState(false);
+  const fallbackModulePrice = useMemo(() => getModuleFallbackPrice(product, modules), [product, modules]);
 
   const ownershipState = useMemo(
     () => ({
@@ -333,22 +339,40 @@ export default function PdpPurchaseBuilder({
 
   // ---- Render helpers ----
 
+  const modulePicker = (
+    <>
+      <ModuleSelectTrigger
+        totalModules={purchasableModules.length}
+        selectedCount={selectedModuleIds.size}
+        selectedTotal={purchasableModules.filter((module) => selectedModuleIds.has(module.id)).reduce((sum, module) => sum + (getModuleEffectivePrice(module, fallbackModulePrice) || 0), 0)}
+        onOpen={() => setModuleModalOpen(true)}
+      />
+      <ModuleSelectModal
+        open={moduleModalOpen}
+        modules={purchasableModules}
+        selectedIds={Array.from(selectedModuleIds)}
+        ownedIds={new Set(purchasableModules.filter((module) => getIsModuleOwned(module, ownershipState)).map((module) => module.id))}
+        fallbackPrice={fallbackModulePrice}
+        onClose={() => setModuleModalOpen(false)}
+        onChangeSelected={(ids) => {
+          setSelectedModuleIds(new Set(ids));
+          setPreviewNotice(null);
+        }}
+      />
+    </>
+  );
+
   if (availableModes.length === 0) {
     return (
-      <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
-        <div className="flex items-start gap-2">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <div>
-            <p className="font-black">This course has nothing to buy yet.</p>
-            <p className="mt-1 text-xs text-amber-700/80">Come back later — the admin is still setting it up.</p>
-          </div>
-        </div>
+      <div className="space-y-4" data-pdp-purchase-builder>
+        {modulePicker}
       </div>
     );
   }
 
   return (
     <div className="space-y-4" data-pdp-purchase-builder>
+      {modulePicker}
       <ModeSwitcher modes={availableModes} mode={mode} onChange={setMode} />
 
       {mode === "full_product" && (
@@ -359,13 +383,14 @@ export default function PdpPurchaseBuilder({
         />
       )}
 
-      {mode === "selected_modules" && (
+      {mode === "selected_modules" && purchasableModules.length > 0 && (
         <ModuleSelector
           modules={purchasableModules}
           allModules={modules}
           selectedIds={selectedModuleIds}
           expandedIds={expandedModules}
           ownershipState={ownershipState}
+          fallbackPrice={fallbackModulePrice}
           onToggle={toggleModule}
           onExpand={expandModule}
         />
@@ -516,6 +541,7 @@ function ModuleSelector({
   selectedIds,
   expandedIds,
   ownershipState,
+  fallbackPrice = 0,
   onToggle,
   onExpand,
 }: {
@@ -524,18 +550,19 @@ function ModuleSelector({
   selectedIds: Set<string>;
   expandedIds: Set<string>;
   ownershipState: ModuleSelectorOwnership;
+  fallbackPrice?: number;
   onToggle: (id: string) => void;
   onExpand: (id: string) => void;
 }) {
   if (modules.length === 0) {
     return (
       <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
-        No modules are sold individually for this course.
+        No modules have been published for this course yet.
       </div>
     );
   }
   const allFlat = allModules.flatMap((m) => [m, ...(m.modules || [])]);
-  const selectedTotal = modules.filter((module) => selectedIds.has(module.id)).reduce((sum, module) => sum + (getModuleEffectivePrice(module) || 0), 0);
+  const selectedTotal = modules.filter((module) => selectedIds.has(module.id)).reduce((sum, module) => sum + (getModuleEffectivePrice(module, fallbackPrice) || 0), 0);
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between rounded-2xl bg-violet-50 px-3 py-2.5 ring-1 ring-violet-100">
@@ -546,7 +573,7 @@ function ModuleSelector({
         const isSelected = selectedIds.has(m.id);
         const isExpanded = expandedIds.has(m.id);
         const isOwned = getIsModuleOwned(m, ownershipState);
-        const price = getModuleEffectivePrice(m);
+        const price = getModuleEffectivePrice(m, fallbackPrice);
         const regular = m.cashPrice;
         const sale = m.salePrice;
         const depIds = m.requiredPreviousModuleIds || [];

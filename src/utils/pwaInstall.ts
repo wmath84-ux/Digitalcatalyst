@@ -45,6 +45,14 @@ export function isMobileScreenSize(): boolean {
   return window.innerWidth <= MOBILE_BREAKPOINT;
 }
 
+/**
+ * Wide desktop browser (not the installed PWA). The learner app stays closed
+ * here — landing is the only public surface until the PWA is installed.
+ */
+export function isDesktopBrowserLocked(): boolean {
+  return !isMobileScreenSize() && !isPwaInstalled();
+}
+
 /** Navigate from the landing page into the main home app. */
 export const OPEN_APP_EVENT = "eduvora-open-app";
 

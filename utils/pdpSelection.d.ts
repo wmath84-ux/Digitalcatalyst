@@ -64,7 +64,8 @@ export declare const getVisibleModules: (modules: unknown) => CanonicalCourseMod
 export declare const getPurchasableModules: (modules: unknown) => CanonicalCourseModule[];
 export declare const getBundleModules: (modules: unknown) => CanonicalCourseModule[];
 
-export declare const getModuleEffectivePrice: (module: unknown) => number | null;
+export declare const getModuleEffectivePrice: (module: unknown, fallbackPrice?: unknown) => number | null;
+export declare const getModuleFallbackPrice: (product: unknown, modules: unknown) => number;
 export declare const getModuleDependencies: (module: unknown) => string[];
 export declare const getUnsatisfiedDependencies: (
   module: unknown,

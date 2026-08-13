@@ -453,6 +453,26 @@ export function CheckoutProvider({
   // -----------------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
+    const waitForAuth = async () => {
+      if (typeof auth === "undefined" || typeof auth.onAuthStateChanged !== "function") return auth?.currentUser || null;
+      if (auth.currentUser) return auth.currentUser;
+      return new Promise<typeof auth.currentUser>((resolve) => {
+        let settled = false;
+        const finish = (user: typeof auth.currentUser) => {
+          if (settled) return;
+          settled = true;
+          resolve(user);
+        };
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+          unsubscribe();
+          finish(user);
+        });
+        setTimeout(() => {
+          unsubscribe();
+          finish(auth.currentUser);
+        }, 4000);
+      });
+    };
     const run = async () => {
       const stored = storageRef.current ? readFromSessionStorage() : null;
       if (!stored) {
@@ -462,7 +482,8 @@ export function CheckoutProvider({
         }
         return;
       }
-      const authUser = typeof auth !== "undefined" ? auth.currentUser : null;
+      const authUser = await waitForAuth();
+      if (cancelled) return;
       const derivedBuyer: CheckoutBuyer = stored.buyer.uid
         ? stored.buyer
         : (authUser

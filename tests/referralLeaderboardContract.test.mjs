@@ -51,6 +51,14 @@ test("verified subscription provisioning generates a stable unique referral", ()
   assert.match(referrals, /collection\("users"\).*referralCode/s);
 });
 
+test("leaderboard falls back to the public cache when the API is unavailable", () => {
+  assert.match(leaderboard, /publicLeaderboard/);
+  assert.match(leaderboard, /Could not open leaderboard/);
+  const api = fs.readFileSync("api/referral-leaderboard.ts", "utf8");
+  assert.match(api, /publicLeaderboard/);
+  assert.match(api, /subscriptionPlanId/);
+});
+
 test("users cannot forge their referral or subscription identity", () => {
   assert.match(rules, /'referralCode', 'subscriptionPlanId', 'subscriptionTier', 'subscriptionExpiresAt'/);
 });

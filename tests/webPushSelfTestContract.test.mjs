@@ -18,6 +18,7 @@ test("client diagnoses every browser-side push prerequisite", () => {
   assert.match(client, /Promise\.race/);
   assert.match(client, /getIdToken\(true\)/);
   assert.match(client, /\/api\/push\/test/);
+  assert.match(client, /\/api\/push\/subscribe/);
 });
 
 test("test endpoint is authenticated and can only target current user's stored devices", () => {

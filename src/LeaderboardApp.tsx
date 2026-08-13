@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
 import { Crown, LoaderCircle, Trophy } from "lucide-react";
 import Header from "./components/Header";
 import BottomNav from "./components/BottomNav";
 import { useCatalog } from "./context/CatalogContext";
 import { useCommerce } from "./context/CommerceContext";
+import { db } from "../firebase";
 
 type Row = { uid: string; name: string; photoURL: string | null; planId: string; referralCode: string; usedCount: number; available: boolean };
 
@@ -14,11 +16,38 @@ export default function LeaderboardApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   useEffect(() => {
-    void fetch("/api/referral-leaderboard").then(async (response) => {
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.error || "Could not load leaderboard.");
-      setRows(data.subscribers || []);
-    }).catch((reason) => setError(reason instanceof Error ? reason.message : "Could not load leaderboard.")).finally(() => setLoading(false));
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const response = await fetch("/api/referral-leaderboard");
+        const data = await response.json().catch(() => ({})) as { ok?: boolean; subscribers?: Row[]; error?: string };
+        if (response.ok && data.ok) {
+          if (!cancelled) setRows(Array.isArray(data.subscribers) ? data.subscribers : []);
+          return;
+        }
+        throw new Error(data.error || "Could not open leaderboard.");
+      } catch {
+        try {
+          const cached = await getDoc(doc(db, "publicLeaderboard", "referrals"));
+          const subscribers = cached.exists() ? (cached.data()?.subscribers || []) : [];
+          if (Array.isArray(subscribers) && subscribers.length >= 0 && cached.exists()) {
+            if (!cancelled) setRows(subscribers as Row[]);
+            return;
+          }
+        } catch {
+          // Both the live API and the public cache are unavailable.
+        }
+        if (!cancelled) setError("Could not open leaderboard. Please try again shortly.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
   return <div className="min-h-screen bg-slate-100 sm:py-6"><div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
     <Header cartCount={cartIds.size} notifCount={1} onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }} onNavigateToCart={() => { window.location.hash = "#/cart"; }} onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }} />

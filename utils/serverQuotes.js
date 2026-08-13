@@ -151,7 +151,9 @@ export const isModulePurchasable = (m) => {
   if (!isObject(m)) return false;
   if (!isModuleVisible(m)) return false;
   if (m.accessLevel === "paid_update") return false;
-  return m.individuallyPurchasable === true;
+  // Every visible course module can be bought a la carte. Admin can still
+  // hide a module or mark it as a paid update to keep it out of the picker.
+  return true;
 };
 
 export const isResourcePurchasable = (r) => {
@@ -186,7 +188,8 @@ export const flattenResources = (modules) => {
   const out = [];
   const visit = (m) => {
     if (!isObject(m)) return;
-    arr(m.resources).forEach((r) => {
+    const resources = arr(m.resources).length ? arr(m.resources) : arr(m.files);
+    resources.forEach((r) => {
       if (isObject(r)) out.push(r);
     });
     arr(m.modules).forEach(visit);
@@ -372,10 +375,11 @@ export const fullProductLineFromDoc = (productDoc) => {
  * Build a `selected_modules` line item from a canonical module record.
  * Returns null when the module is not individually purchasable.
  */
-export const moduleLineFromRecord = (productId, productTitle, module) => {
+export const moduleLineFromRecord = (productId, productTitle, module, fallbackPaise = 0) => {
   if (!isObject(module)) return null;
   if (!isModulePurchasable(module)) return null;
-  const regularPaise = paiseFromRupeeString(module.cashPrice);
+  const hasOwnPrice = module.cashPrice !== null && module.cashPrice !== undefined && module.cashPrice !== "";
+  const regularPaise = hasOwnPrice ? paiseFromRupeeString(module.cashPrice) : Math.max(0, Math.round(Number(fallbackPaise || 0)));
   if (regularPaise < 0) return null;
   const salePaise = paiseFromRupeeString(module.salePrice);
   return {
@@ -462,6 +466,13 @@ const parseDateMaybe = (value) => {
 // ---------------------------------------------------------------------------
 // Top-level quote builder
 // ---------------------------------------------------------------------------
+
+const courseTreeFromDoc = (doc) => {
+  if (!isObject(doc)) return [];
+  if (arr(doc.courseContent).length) return doc.courseContent;
+  if (isObject(doc.adminProduct) && arr(doc.adminProduct.modules).length) return doc.adminProduct.modules;
+  return [];
+};
 
 const PURCHASE_KINDS = new Set([
   "full_product",
@@ -644,9 +655,12 @@ export const buildQuote = (input) => {
     if (!doc || !isProductLive(doc)) {
       return { ok: false, status: 404, reason: `Product ${productId} is not available.` };
     }
-    const flat = flattenModules(doc.courseContent);
+    const flat = flattenModules(courseTreeFromDoc(doc));
     const byId = new Map(flat.map((m) => [String(m.id), m]));
     const ownership = ownershipByProduct.get(productId);
+    const visibleCount = flat.filter(isModulePurchasable).length;
+    const productPaise = paiseFromPriceFields(doc) || paiseRegularFromFields(doc);
+    const fallbackPaise = visibleCount > 0 ? Math.round(productPaise / visibleCount) : productPaise;
     // Verify all selected ids resolve.
     for (const id of moduleIds) {
       const m = byId.get(id);
@@ -665,7 +679,7 @@ export const buildQuote = (input) => {
     }
     for (const id of moduleIds) {
       const m = byId.get(id);
-      const line = moduleLineFromRecord(productId, doc.title, m);
+      const line = moduleLineFromRecord(productId, doc.title, m, fallbackPaise);
       if (!line) {
         return { ok: false, status: 400, reason: `Module ${id} is not individually purchasable.` };
       }
@@ -692,8 +706,8 @@ export const buildQuote = (input) => {
     if (!doc || !isProductLive(doc)) {
       return { ok: false, status: 404, reason: `Product ${productId} is not available.` };
     }
-    const flat = flattenModules(doc.courseContent);
-    const allResources = flattenResources(doc.courseContent);
+    const flat = flattenModules(courseTreeFromDoc(doc));
+    const allResources = flattenResources(courseTreeFromDoc(doc));
     const byId = new Map(allResources.map((r) => [String(r.id), r]));
     const byModule = new Map();
     for (const m of flat) {
@@ -747,8 +761,8 @@ export const buildQuote = (input) => {
     if (!line) {
       return { ok: false, status: 404, reason: "Course update is no longer available." };
     }
-    const updateModules = flattenModules(doc.courseContent || []);
-    const updateResources = flattenResources(doc.courseContent || []);
+    const updateModules = flattenModules(courseTreeFromDoc(doc));
+    const updateResources = flattenResources(courseTreeFromDoc(doc));
     const detailItems = [
       ...line.includedModuleIds.map((id) => updateModules.find((module) => String(module.id) === id)?.title || `Module ${id}`),
       ...line.includedResourceIds.map((id) => updateResources.find((resource) => String(resource.id) === id)?.name || `Resource ${id}`),

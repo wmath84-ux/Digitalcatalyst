@@ -345,9 +345,8 @@ function PremiumProductContent({
             </section>
           )}
 
-          {(modules.length > 0 || availablePaidUpdates.length > 0) && (
-            <section id="pdp-purchase-options" className="scroll-mt-32">
-              <div className="mb-3 px-1"><h2 className="text-lg font-bold text-zinc-900">Choose your access</h2><p className="text-xs text-zinc-500">Buy the full product, selected modules, resources, or available updates.</p></div>
+          <section id="pdp-purchase-options" className="scroll-mt-32">
+              <div className="mb-3 px-1"><h2 className="text-lg font-bold text-zinc-900">Select course modules</h2><p className="text-xs text-zinc-500">Same as subscription extras: tick the modules you need, see the price beside each one, then checkout.</p></div>
               <PdpPurchaseBuilder
                 product={product}
                 isProductOwned={isProductOwned}
@@ -358,7 +357,6 @@ function PremiumProductContent({
                 onPreview={handlePreview}
               />
             </section>
-          )}
 
           <DetailsCard product={product} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
           <ReviewsCard

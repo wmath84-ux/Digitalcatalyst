@@ -26,6 +26,6 @@ test("ambiguous credential errors offer a clear signup action", () => {
 });
 
 test("learner/admin landing behavior remains intact", () => {
-  assert.match(main, /user\.role !== "admin" && landingRouteRequested/);
+  assert.match(main, /user\.role !== "admin" && landingRouteRequested && !desktopLocked/);
   assert.match(main, /user\.role === "admin"/);
 });

@@ -6,7 +6,7 @@ import {
   DESKTOP_MAINTENANCE_EVENT,
   PWA_INSTALL_OPEN_EVENT,
   OPEN_APP_EVENT,
-  isMobileScreenSize,
+  isDesktopBrowserLocked,
   isInstallPromptReady,
   isPwaInstalled,
   openInstallPanel,
@@ -45,11 +45,7 @@ export default function LandingOverlays() {
      * - Desktop-sized screen → show the "Under Preparation" notification.
      */
     const handleOpenApp = () => {
-      if (isMobileScreenSize()) {
-        // The animated exit is driven by LandingApp; we just ensure navigation
-        // happens if LandingApp hasn't mounted its listener yet.
-        // LandingApp's own handler takes priority because it manages isExiting.
-      } else {
+      if (isDesktopBrowserLocked()) {
         showDesktopMaintenanceNotice();
       }
     };
@@ -100,7 +96,7 @@ export default function LandingOverlays() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-white">Under Preparation</p>
                   <p className="mt-0.5 text-xs leading-relaxed text-slate-300">
-                    The desktop interface is currently under preparation. Please use the mobile app or install the PWA for the complete Eduvora experience.
+                    The desktop interface is currently under preparation. Install PWA app to use it. Please use the mobile app or install the PWA for the complete Eduvora experience.
                   </p>
                   <button
                     type="button"

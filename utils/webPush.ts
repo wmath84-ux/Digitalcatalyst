@@ -136,7 +136,19 @@ export const saveWebPushSubscription = async (uid: string, subscription: PushSub
     await setDoc(doc(db, 'users', uid, 'webPushSubscriptions', documentId), { ...record, uid }, { merge: true });
     return true;
   } catch {
-    return false;
+    try {
+      const token = await auth.currentUser?.getIdToken(true);
+      if (!token) return false;
+      const response = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...record, uid }),
+      });
+      const payload = await response.json().catch(() => ({})) as { ok?: boolean };
+      return Boolean(response.ok && payload.ok);
+    } catch {
+      return false;
+    }
   }
 };
 

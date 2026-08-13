@@ -7,9 +7,23 @@ const html = fs.readFileSync("index.html", "utf8");
 const manifest = JSON.parse(fs.readFileSync("public/manifest.webmanifest", "utf8"));
 
 test("signed-in learners skip landing and open Home", () => {
-  assert.match(main, /user\.role !== "admin" && landingRouteRequested/);
+  assert.match(main, /user\.role !== "admin" && landingRouteRequested && !desktopLocked/);
   assert.match(main, /history\.replaceState[\s\S]*HOME_HASH/);
   assert.match(main, /setHash\(HOME_HASH\)/);
+});
+
+test("desktop browser stays on landing and never opens the learner app", () => {
+  assert.match(main, /isDesktopBrowserLocked/);
+  assert.match(main, /desktopLocked/);
+  assert.match(main, /showDesktopMaintenanceNotice/);
+  assert.match(main, /if \(desktopLocked && !hash\.startsWith\(ADMIN_HASH\)/);
+});
+
+test("main routing helpers stay intact so the production build can parse", () => {
+  assert.match(main, /const navigateToCourse = /);
+  assert.match(main, /const navigateToCheckout = /);
+  assert.doesNotMatch(main, /navigateTdow/);
+  assert.equal((main.match(/createRoot\(/g) || []).length, 1);
 });
 
 test("admin remains exempt and still sees landing", () => {

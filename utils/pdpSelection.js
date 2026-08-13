@@ -85,7 +85,8 @@ export const getAvailableModes = ({ isProductOwned, hasAnyPurchasableModule, has
  *   - accessLevel === "paid_update"     → drop (it appears in the paid-updates list)
  *   - `individuallyPurchasable`         → keep
  *   - accessLevel === "purchasable"     → keep
- *   - accessLevel === "included"        → keep (shown under Full Course only)
+ *   - accessLevel === "included"        → keep (shown under Full Course and
+ *                                         selectable a la carte on the PDP)
  */
 export const getVisibleModules = (modules) => {
   return arr(modules).filter((m) => {
@@ -99,12 +100,12 @@ export const getVisibleModules = (modules) => {
 };
 
 /**
- * Modules the user can pick a la carte. "Include in bundle" modules appear
- * under Full Course details (always included) and are NOT individually
- * purchasable in the selector.
+ * Modules the user can pick a la carte. Every visible course module is
+ * selectable so a learner can buy only the parts they need — matching the
+ * subscription feature picker. Nested modules are flattened first.
  */
 export const getPurchasableModules = (modules) => {
-  return getVisibleModules(modules).filter((m) => m.individuallyPurchasable === true);
+  return getVisibleModules(flattenModules(modules));
 };
 
 /**
@@ -123,13 +124,24 @@ export const getBundleModules = (modules) => {
  * Negative or NaN values are treated as invalid → returns null so the UI
  * can hide the price chip rather than display `-₹10`.
  */
-export const getModuleEffectivePrice = (module) => {
+export const getModuleEffectivePrice = (module, fallbackPrice = null) => {
   if (!isObject(module)) return null;
   const cash = numOrNull(module.cashPrice);
-  if (cash === null || cash < 0) return null;
+  if (cash === null || cash < 0) {
+    const fallback = numOrNull(fallbackPrice);
+    return fallback === null || fallback < 0 ? null : fallback;
+  }
   const sale = numOrNull(module.salePrice);
   if (sale === null || sale < 0) return cash;
   return Math.min(sale, cash);
+};
+
+/** Share of the product price used when a module has no cash price of its own. */
+export const getModuleFallbackPrice = (product, modules) => {
+  const visible = getPurchasableModules(modules);
+  const productPrice = numOrNull(product?.price) ?? numOrNull(product?.originalPrice);
+  if (productPrice === null || productPrice < 0 || visible.length === 0) return 0;
+  return Math.max(0, Math.round(productPrice / visible.length));
 };
 
 /**
@@ -273,8 +285,8 @@ export const getAvailablePaidUpdates = (paidUpdates, ownedUpdateIds) => {
  * payload with the cleaned ids, or `{ ok: false, reason }`.
  *
  *   - mode === "selected_modules":
- *       * every selected id must be a known module id,
- *       * every module must be `individuallyPurchasable`,
+ *       * every selected id must be a known visible module id,
+ *       * hidden / paid-update modules are refused,
  *       * the user must already own any module that is `includeInBundle`
  *         (you can't double-buy the bundle),
  *       * dependencies must be a subset of the selection or already-owned
@@ -291,7 +303,7 @@ export const validateSelection = ({ mode, selectedIds, modules, isProductOwned, 
   }
   if (mode === "selected_modules") {
     const purchasable = getPurchasableModules(modules);
-    const byId = new Map(arr(modules).filter(isObject).map((m) => [m.id, m]));
+    const byId = new Map(flattenModules(modules).filter(isObject).map((m) => [m.id, m]));
     const purchasableIds = new Set(purchasable.map((m) => m.id));
     const out = [];
     for (const id of idList) {
@@ -486,7 +498,7 @@ export const buildCheckoutSelection = ({ product, mode, selectedIds, paidUpdateI
  * state. Used by the summary panel.
  */
 export const buildLineItems = ({ product, mode, selectedIds, modules, paidUpdates, isProductOwned, ownedUpdateIds, ownedModuleIds }) => {
-  const byId = new Map(arr(modules).filter(isObject).map((m) => [m.id, m]));
+  const byId = new Map(flattenModules(modules).filter(isObject).map((m) => [m.id, m]));
   const productId = str(product?.id);
   const productTitle = str(product?.title);
   const idList = (selectedIds instanceof Set ? Array.from(selectedIds) : arr(selectedIds)).map(String);
@@ -536,10 +548,11 @@ export const buildLineItems = ({ product, mode, selectedIds, modules, paidUpdate
     }];
   }
   if (mode === "selected_modules") {
+    const fallback = getModuleFallbackPrice(product, modules);
     return idList.map((id) => {
       const m = byId.get(id);
       if (!m) return null;
-      const regular = numOrNull(m.cashPrice) || 0;
+      const regular = numOrNull(m.cashPrice) ?? fallback;
       const sale = numOrNull(m.salePrice);
       const effective = sale === null ? regular : Math.min(sale, regular);
       return {
