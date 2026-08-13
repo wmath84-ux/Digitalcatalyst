@@ -353,19 +353,30 @@ export const paidUpdateLineFromProduct = (update) => {
 export const fullProductLineFromDoc = (productDoc) => {
   if (!isObject(productDoc)) return null;
   if (!isProductLive(productDoc)) return null;
+  if (productDoc.isFree === true) {
+    return {
+      productId: String(productDoc.id),
+      title: String(productDoc.title || "Digital product"),
+      parentTitle: "",
+      regularPaise: 0,
+      salePaise: null,
+      effectivePaise: 0,
+      minPayablePaise: 0,
+    };
+  }
   const regularPaise = paiseRegularFromFields(productDoc);
   const salePaise = paiseFromPriceFields(productDoc);
-  // The doc's `price` field is the "current" price. The "regular" field is
-  // `regularPrice` (admin form) which equals `price` when no sale is set.
-  // We reconcile: effective = the actual selling price (sale when valid,
-  // otherwise regular).
-  const effectivePaise = salePaise > 0 ? salePaise : regularPaise;
+  // Honour an explicit ₹0 sale (free-during-sale) instead of falling back
+  // to the regular price. paiseFromPriceFields already prefers salePrice
+  // when it is present and parseable, including 0.
+  const saleIsExplicit = productDoc.salePrice !== undefined && productDoc.salePrice !== null && productDoc.salePrice !== "";
+  const effectivePaise = saleIsExplicit ? salePaise : regularPaise;
   return {
     productId: String(productDoc.id),
     title: String(productDoc.title || "Digital product"),
     parentTitle: "",
     regularPaise,
-    salePaise: salePaise > 0 && salePaise < regularPaise ? salePaise : null,
+    salePaise: saleIsExplicit && salePaise < regularPaise ? salePaise : null,
     effectivePaise,
     minPayablePaise: paiseMinPayableFromFields(productDoc),
   };
@@ -944,6 +955,7 @@ export const buildQuote = (input) => {
     couponCode,
     couponType,
     couponValue,
+    couponIsReferral: Boolean(coupon && coupon.referralOwnerUid),
     // Part 9 — subscription metadata. `null` for non-subscription
     // purchase kinds.
     subscriptionPlanId: kind === "subscription" || kind === "subscription_features"

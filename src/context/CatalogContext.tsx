@@ -29,6 +29,7 @@ const mapCategory = (data: DocumentData): Product["category"] => {
 };
 
 const mapProduct = (documentId: string, data: DocumentData): Product => {
+  const isFree = data.isFree === true;
   const salePrice = data.salePrice === undefined || data.salePrice === null || data.salePrice === ""
     ? numericPrice(data.price)
     : numericPrice(data.salePrice);
@@ -66,8 +67,9 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     tags: tags.map((tag) => tag.toUpperCase()),
     rating: Number.isFinite(rating) ? rating : 0,
     reviews: Number(data.reviewCount ?? data.ratingCount ?? 0) || 0,
-    originalPrice: Math.max(regularPrice, salePrice),
-    price: salePrice,
+    originalPrice: isFree ? 0 : Math.max(regularPrice, salePrice),
+    price: isFree ? 0 : salePrice,
+    isFree,
     description: String(data.description || ""),
     paymentLink: String(data.paymentLink || ""),
     courseContent: catalogProjection.courseContent as Product["courseContent"],

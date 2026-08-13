@@ -399,10 +399,10 @@ export function ProductEditor({ productId }: { productId?: string }) {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Regular price (₹)">
-                <input className={inputClass} type="number" value={form.regularPrice} onChange={(e) => update("regularPrice", e.target.value)} />
+                <input className={inputClass} type="number" disabled={form.isFree} value={form.isFree ? "0" : form.regularPrice} onChange={(e) => update("regularPrice", e.target.value)} />
               </Field>
               <Field label="Sale price (₹)">
-                <input className={inputClass} type="number" value={form.salePrice ?? ""} onChange={(e) => update("salePrice", e.target.value === "" ? null : e.target.value)} />
+                <input className={inputClass} type="number" disabled={form.isFree} value={form.isFree ? "" : (form.salePrice ?? "")} onChange={(e) => update("salePrice", e.target.value === "" ? null : e.target.value)} />
               </Field>
             </div>
             <p className="text-xs text-slate-500">
@@ -413,8 +413,23 @@ export function ProductEditor({ productId }: { productId?: string }) {
             </p>
             <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
               <span className="text-sm font-medium text-slate-700">Free product</span>
-              <ToggleSwitch checked={form.isFree} onChange={(v) => update("isFree", v)} />
+              <ToggleSwitch
+                checked={form.isFree}
+                onChange={(v) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    isFree: v,
+                    regularPrice: v ? "0" : prev.regularPrice,
+                    salePrice: v ? null : prev.salePrice,
+                    minPayableAmount: v ? "0" : prev.minPayableAmount,
+                  }));
+                  setDirty(true);
+                }}
+              />
             </div>
+            {form.isFree ? (
+              <p className="text-xs text-emerald-700">Free products checkout at ₹0. Regular / sale prices are ignored until this toggle is turned off.</p>
+            ) : null}
             <Field label="Minimum payable amount (₹)" hint="Floor after coupon discount">
               <input className={inputClass} type="number" value={form.minPayableAmount} onChange={(e) => update("minPayableAmount", e.target.value)} />
             </Field>

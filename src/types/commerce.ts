@@ -200,6 +200,7 @@ export interface ServerPriceQuote {
   couponCode?: string | null;
   couponType?: "percent" | "flat" | null;
   couponValue?: number | null;
+  couponIsReferral?: boolean;
   /**
    * Part 9 — subscription metadata. `null` for non-subscription
    * purchase kinds. The server is the sole authority on these

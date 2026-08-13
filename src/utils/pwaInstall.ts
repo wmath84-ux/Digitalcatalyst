@@ -53,6 +53,20 @@ export function isDesktopBrowserLocked(): boolean {
   return !isMobileScreenSize() && !isPwaInstalled();
 }
 
+/**
+ * Mobile browser that has not installed the PWA. Landing is the default
+ * entry for these users regardless of login. Installed mobile PWAs never
+ * see landing.
+ */
+export function isMobileBrowserWithoutPwa(): boolean {
+  return isMobileScreenSize() && !isPwaInstalled();
+}
+
+/** Installed mobile PWA — skip landing and open the app shell. */
+export function isInstalledMobilePwa(): boolean {
+  return isMobileScreenSize() && isPwaInstalled();
+}
+
 /** Navigate from the landing page into the main home app. */
 export const OPEN_APP_EVENT = "eduvora-open-app";
 

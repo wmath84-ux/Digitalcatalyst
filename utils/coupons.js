@@ -271,6 +271,9 @@ export const validateCoupon = (coupon, orderContext, now = Date.now()) => {
     return { ok: false, code: "REFERRAL_SELF_USE", reason: "You cannot use your own referral code." };
   }
   if (!isWithinGlobalLimit(coupon)) {
+    if (coupon.referralOwnerUid) {
+      return { ok: false, code: "REFERRAL_ALREADY_USED", reason: "Referral ID already used. Explore leaderboard Unused IDs." };
+    }
     return { ok: false, code: "COUPON_LIMIT_REACHED", reason: "This coupon has reached its global usage limit." };
   }
   if (!isWithinPerUserLimit(coupon, orderContext.userUsageCount)) {

@@ -36,12 +36,9 @@ import { useCheckout } from "../../checkout/CheckoutContext";
 import { useAuth } from "../../context/AuthContext";
 import type { CheckoutLineItem } from "../../types/commerce";
 import CheckoutLineItemCard from "./CheckoutLineItemCard";
+import { formatPaise } from "../../utils/money";
 
-const formatRupee = (value: number): string => {
-  if (!Number.isFinite(value)) return "₹0";
-  if (value === 0) return "Free";
-  return `₹${Math.round(value).toLocaleString("en-IN")}`;
-};
+const formatRupee = formatPaise;
 
 const PURCHASE_TYPE_LABEL: Record<string, string> = {
   full_product: "Full course",
@@ -204,7 +201,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           ) : null}
           {couponDiscount > 0 ? (
             <PriceRow
-              label={`Coupon discount${quote.couponCode ? ` (${quote.couponCode})` : ""}`}
+              label={`${quote.couponIsReferral ? "Referral discount" : "Coupon discount"}${quote.couponCode ? ` (${quote.couponCode})` : ""}`}
               value={-couponDiscount}
               negative
             />

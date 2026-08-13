@@ -89,6 +89,7 @@ export interface ServerPriceQuoteRecord {
   couponCode?: string | null;
   couponType?: "percent" | "flat" | null;
   couponValue?: number | null;
+  couponIsReferral?: boolean;
   // Internal / round-trip-only fields (not part of the Part 1 ServerPriceQuote
   // surface, but the server stores them so the verify-payment step can
   // reconcile the order against the original intent).

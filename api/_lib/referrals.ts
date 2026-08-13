@@ -14,9 +14,8 @@ export const loadReferralConfig = async (): Promise<ReferralConfig> => {
   return {
     enabled: data.enabled !== false,
     discountPaise: Math.max(0, Math.round(Number(data.discountPaise ?? 25000))),
-    maxUsesPerReferrer: Number.isFinite(Number(data.maxUsesPerReferrer)) && Number(data.maxUsesPerReferrer) > 0
-      ? Math.floor(Number(data.maxUsesPerReferrer))
-      : null,
+    // A referral ID can be redeemed exactly once, then it is spent.
+    maxUsesPerReferrer: 1,
   };
 };
 
@@ -36,7 +35,7 @@ export const ensureReferralCoupon = async (input: { uid: string; name?: string; 
       value: config.discountPaise,
       status: config.enabled ? "active" : "inactive",
       perUserLimit: 1,
-      globalLimit: config.maxUsesPerReferrer,
+      globalLimit: 1,
       usedCount,
       allowedPurchaseKinds: ["subscription", "subscription_features"],
       referralOwnerUid: input.uid,

@@ -43,8 +43,7 @@ test('Reading uses the configured AdSense component at safe article positions', 
 test('notification UX covers content, courses, unlocks and Community without historical flooding', () => {
   assert.match(notificationUtility, /ContentNotificationInventory/);
   assert.match(notificationUtility, /New free product available/);
-  assert.match(notificationUtility, /New News update/);
-  assert.match(notificationUtility, /New Blog published/);
+  assert.match(notificationUtility, /isNewsOrBlogNotification/);
   assert.match(notificationUtility, /Your course has new content/);
   assert.match(notificationUtility, /Product unlocked/);
   assert.match(notificationUtility, /New story from someone you follow/);

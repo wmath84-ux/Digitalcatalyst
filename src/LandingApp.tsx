@@ -23,11 +23,9 @@ export default function LandingApp() {
 
   const handleOpenApp = useCallback(() => {
     if (isDesktopBrowserLocked()) {
-      // Desktop browser → keep landing open and show the PWA notice.
       showDesktopMaintenanceNotice();
       return;
     }
-    // Mobile / installed PWA → animate landing out, then navigate
     setIsExiting(true);
     exitTimerRef.current = setTimeout(() => {
       window.location.hash = HOME_HASH;

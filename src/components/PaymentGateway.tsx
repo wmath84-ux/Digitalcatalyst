@@ -17,6 +17,7 @@ import { CheckCircle2, CreditCard, LoaderCircle, ShieldCheck, TriangleAlert } fr
 import { auth } from "../../firebase";
 import { revealCheckoutChromeOverRazorpay } from "../utils/razorpayCheckoutChrome";
 import { playPaymentSuccessChime, preparePaymentSound } from "../utils/paymentSounds";
+import { formatPaise } from "../utils/money";
 
 export type VerifiedPayment = {
   orderId: string;
@@ -135,10 +136,21 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
   const [error, setError] = useState("");
   const razorpayRef = useRef<RazorpayInstance | null>(null);
   const unpinChromeRef = useRef<(() => void) | null>(null);
+  const razorpayHistoryPushedRef = useRef(false);
+  const displayAmount = formatPaise(finalPrice);
 
   const releaseCheckoutChrome = () => {
     unpinChromeRef.current?.();
     unpinChromeRef.current = null;
+  };
+
+  const consumeRazorpayHistory = () => {
+    if (!razorpayHistoryPushedRef.current) return;
+    razorpayHistoryPushedRef.current = false;
+    if (typeof window === "undefined") return;
+    if (window.history.state?.eduvoraRazorpayOpen) {
+      window.history.replaceState({ ...(window.history.state || {}), eduvoraRazorpayOpen: false }, "");
+    }
   };
 
   const closeRazorpayCheckout = () => {
@@ -149,10 +161,28 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
     }
     razorpayRef.current = null;
     releaseCheckoutChrome();
+    consumeRazorpayHistory();
   };
 
-  useEffect(() => () => {
-    closeRazorpayCheckout();
+  useEffect(() => {
+    const onPopState = () => {
+      if (!razorpayRef.current) return;
+      razorpayHistoryPushedRef.current = false;
+      try {
+        razorpayRef.current.close?.();
+      } catch {
+        // Modal may already be gone.
+      }
+      razorpayRef.current = null;
+      releaseCheckoutChrome();
+      setPaymentState("idle");
+      setError("Payment window was closed. No access was granted.");
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      closeRazorpayCheckout();
+    };
   }, []);
 
   const verifyPayment = async (response: RazorpaySuccess) => {
@@ -243,12 +273,14 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
           ondismiss: () => {
             razorpayRef.current = null;
             releaseCheckoutChrome();
+            consumeRazorpayHistory();
             setPaymentState("idle");
             setError("Payment window was closed. No access was granted.");
           },
         },
         handler: (response) => {
           releaseCheckoutChrome();
+          consumeRazorpayHistory();
           void verifyPayment(response);
         },
       });
@@ -258,6 +290,10 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
         setError(response.error?.description || "Payment failed. Please try another method.");
       });
       razorpayRef.current = checkout;
+      if (typeof window !== "undefined" && !window.history.state?.eduvoraRazorpayOpen) {
+        window.history.pushState({ eduvoraRazorpayOpen: true }, "");
+        razorpayHistoryPushedRef.current = true;
+      }
       checkout.open();
       unpinChromeRef.current = revealCheckoutChromeOverRazorpay();
     } catch (paymentError) {
@@ -278,7 +314,7 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
 
       <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 p-5 text-white shadow-lg shadow-indigo-200">
         <p className="text-xs font-bold uppercase tracking-wider text-indigo-200">Amount to pay</p>
-        <p className="mt-1 text-3xl font-extrabold">{finalPrice === 0 ? "Free" : `${currency}${finalPrice.toLocaleString("en-IN")}`}</p>
+        <p className="mt-1 text-3xl font-extrabold">{displayAmount}</p>
         <p className="mt-1 truncate text-xs text-indigo-200">{productName}</p>
         <p className="mt-2 truncate text-[10px] font-mono text-indigo-200/70">quote {quoteId}</p>
       </div>

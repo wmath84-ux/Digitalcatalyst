@@ -123,13 +123,28 @@ export default function PromoCodeInput({
             </button>
           </motion.div>
           {displayError ? (
-            <p
+            <div
               role="alert"
               data-subscription-coupon-error
-              className="mt-1.5 flex items-center gap-1.5 text-[11px] font-bold text-rose-600"
+              className="mt-1.5 flex items-start gap-1.5 text-[11px] font-bold text-rose-600"
             >
-              <XCircle className="h-3.5 w-3.5 shrink-0" /> {displayError}
-            </p>
+              <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                {displayError}
+                {kind === "referral" && /already used/i.test(displayError) ? (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      onClick={() => { window.location.hash = "#/leaderboard"; }}
+                      className="underline decoration-rose-300 underline-offset-2"
+                    >
+                      Open Unused IDs
+                    </button>
+                  </>
+                ) : null}
+              </span>
+            </div>
           ) : null}
         </div>
       )}

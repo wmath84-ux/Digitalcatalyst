@@ -164,10 +164,8 @@ export default function SubscriptionPage() {
     }
   }, [plan, supportedCycles, cycle]);
 
-  const selectedPlanPricePaise = useMemo(() => {
-    if (!plan) return 0;
-    return cycle === "monthly" ? plan.monthlyPricePaise : plan.yearlyPricePaise;
-  }, [plan, cycle]);
+  // Plans have no standalone price. Payable total = selected features + products.
+  const selectedPlanPricePaise = 0;
 
   const selectedFeatureRecords = useMemo(
     () => features.filter((f) => selectedFeatureIds.includes(f.id)),
@@ -439,7 +437,7 @@ export default function SubscriptionPage() {
           />
           <PromoCodeInput
             kind="referral"
-            label="Have a referral code? Get the current referral discount."
+            label="Have a referral code? Get ₹250 off the final price."
             placeholder="Enter referral code"
             appliedCode={appliedReferral?.code ?? null}
             appliedMessage={appliedReferral?.label ?? null}
@@ -462,6 +460,7 @@ export default function SubscriptionPage() {
           productsTotalPaise={productsTotalPaise}
           couponDiscountPaise={couponDiscountPaise}
           couponCode={appliedReferral?.code ?? appliedCoupon?.code ?? null}
+          discountLabel={appliedReferral ? "Referral discount" : "Coupon discount"}
           minPayablePaise={minPayablePaise}
           totalPaise={totalPaise}
         />

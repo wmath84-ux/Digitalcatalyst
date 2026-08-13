@@ -18,6 +18,7 @@ export type Product = {
   reviews: number;
   originalPrice: number;
   price: number;
+  isFree?: boolean;
   description?: string;
   paymentLink?: string;
   /**

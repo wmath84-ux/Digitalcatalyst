@@ -22,3 +22,17 @@ test("Open App on desktop shows the under-preparation PWA notice", () => {
   assert.match(overlays, /Instead of using the website, install the PWA app and use it/);
   assert.match(overlays, /Install PWA/);
 });
+
+test("installed mobile PWA skips landing regardless of login", () => {
+  assert.match(pwa, /export function isInstalledMobilePwa/);
+  assert.match(main, /skipLandingForInstalledMobilePwa/);
+  assert.match(main, /isInstalledMobilePwa/);
+  assert.doesNotMatch(main, /redirectingSignedInUser/);
+});
+
+test("Open App on mobile plays the landing exit transition into the app", () => {
+  assert.match(landing, /setIsExiting\(true\)/);
+  assert.match(landing, /window\.location\.hash = HOME_HASH/);
+  assert.doesNotMatch(landing, /isMobileBrowserWithoutPwa/);
+  assert.doesNotMatch(main, /mobileBrowserLocked/);
+});
