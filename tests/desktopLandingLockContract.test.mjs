@@ -11,7 +11,7 @@ test("desktop browser is locked to landing unless the PWA is installed", () => {
   assert.match(pwa, /export function isDesktopBrowserLocked/);
   assert.match(pwa, /!isMobileScreenSize\(\) && !isPwaInstalled\(\)/);
   assert.match(main, /isDesktopBrowserLocked/);
-  assert.match(main, /\(desktopLocked \|\| mobileBrowserLocked\) && !hash\.startsWith\(ADMIN_HASH\)/);
+  assert.match(main, /desktopLocked && !hash\.startsWith\(ADMIN_HASH\)/);
   assert.match(main, /return <LandingApp \/>/);
 });
 
@@ -30,10 +30,9 @@ test("installed mobile PWA skips landing regardless of login", () => {
   assert.doesNotMatch(main, /redirectingSignedInUser/);
 });
 
-test("mobile browser without PWA stays on landing regardless of login", () => {
-  assert.match(pwa, /export function isMobileBrowserWithoutPwa/);
-  assert.match(main, /mobileBrowserLocked/);
-  assert.match(main, /isMobileBrowserWithoutPwa/);
-  assert.match(landing, /isMobileBrowserWithoutPwa/);
-  assert.match(landing, /openInstallPanel/);
+test("Open App on mobile plays the landing exit transition into the app", () => {
+  assert.match(landing, /setIsExiting\(true\)/);
+  assert.match(landing, /window\.location\.hash = HOME_HASH/);
+  assert.doesNotMatch(landing, /isMobileBrowserWithoutPwa/);
+  assert.doesNotMatch(main, /mobileBrowserLocked/);
 });

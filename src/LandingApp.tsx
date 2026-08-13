@@ -26,11 +26,6 @@ export default function LandingApp() {
       showDesktopMaintenanceNotice();
       return;
     }
-    if (isMobileBrowserWithoutPwa()) {
-      // Mobile browser without the installed app stays on landing.
-      openInstallPanel();
-      return;
-    }
     setIsExiting(true);
     exitTimerRef.current = setTimeout(() => {
       window.location.hash = HOME_HASH;
