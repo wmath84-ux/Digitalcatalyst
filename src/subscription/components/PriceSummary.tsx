@@ -30,7 +30,7 @@ const formatRupee = (paise: number): string =>
 export default function PriceSummary({
   plan,
   cycle,
-  basePricePaise: _basePricePaise,
+  basePricePaise,
   featuresTotalPaise,
   featuresCount,
   includedFeatureCount,
