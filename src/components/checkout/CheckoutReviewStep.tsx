@@ -327,7 +327,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
         <button
           type="button"
           onClick={onProceed}
-          disabled={showLoading || finalTotal > 0 /* free quotes can still go through */}
+          disabled={showLoading}
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-violet-200 transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {showLoading ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <ShoppingBag className="h-5 w-5" />}
@@ -363,7 +363,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           Edit selection <ChevronRight size={14} />
         </button>
         <p className="px-1 text-center text-[10px] font-medium text-slate-400">
-          Quote expires at {new Date(quote.expiresAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · Payment wiring is coming soon.
+          Quote expires at {new Date(quote.expiresAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · Prices are verified server-side before payment.
         </p>
       </div>
     </div>

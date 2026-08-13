@@ -153,10 +153,11 @@ test("isModuleVisible rejects hidden, inactive, and hidden access-level", () => 
   assert.equal(isModuleVisible(buildModule({ accessLevel: "hidden" })), false);
 });
 
-test("isModulePurchasable requires individuallyPurchasable=true and visibility", () => {
-  assert.equal(isModulePurchasable(buildModule()), false); // not individuallyPurchasable
+test("isModulePurchasable allows every visible course module and hides paid updates", () => {
+  assert.equal(isModulePurchasable(buildModule()), true);
   assert.equal(isModulePurchasable(buildModule({ individuallyPurchasable: true, cashPrice: 499 })), true);
   assert.equal(isModulePurchasable(buildModule({ individuallyPurchasable: true, accessLevel: "paid_update" })), false);
+  assert.equal(isModulePurchasable(buildModule({ visibility: "hidden" })), false);
 });
 
 test("isResourcePurchasable requires individuallyPurchasable=true and visibility", () => {
@@ -438,7 +439,7 @@ test("buildQuote: selected_modules returns one line per module with sale applied
   assert.deepEqual(titles, ["Module 1", "Module 1"]); // buildModule default
 });
 
-test("buildQuote: selected_modules rejects a non-purchasable module id", () => {
+test("buildQuote: selected_modules accepts a visible bundle module and prices it from the product when needed", () => {
   const modules = [buildModule({ id: "m_bundle", individuallyPurchasable: false, includeInBundle: true })];
   const products = new Map([["p1", buildProduct({ courseContent: modules })]]);
   const out = buildQuote({
@@ -447,8 +448,10 @@ test("buildQuote: selected_modules rejects a non-purchasable module id", () => {
     purchasesByProduct: new Map([["p1", []]]),
     uid: "u1",
   });
-  assert.equal(out.ok, false);
-  assert.equal(out.status, 400);
+  assert.equal(out.ok, true);
+  assert.equal(out.quote.verifiedLineItems.length, 1);
+  assert.equal(out.quote.verifiedLineItems[0].moduleId, "m_bundle");
+  assert.ok(out.quote.cashPayable > 0);
 });
 
 test("buildQuote: selected_modules rejects a hidden module", () => {

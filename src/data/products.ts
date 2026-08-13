@@ -3,6 +3,8 @@ import type { CanonicalCourseModule, CanonicalPaidUpdate } from "../types/commer
 
 export type Product = {
   id: string;
+  /** Firestore `siteProducts` document id when it differs from the public `id`. */
+  documentId?: string;
   title: string;
   instructor: string;
   image: string;

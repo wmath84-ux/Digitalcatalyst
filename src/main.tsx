@@ -314,7 +314,7 @@ function Root() {
     startCheckout({
       selection: {
         purchaseKind: "paid_update",
-        productIds: [selectedCourseProduct.id],
+        productIds: [selectedCourseProduct.documentId || selectedCourseProduct.id],
         moduleIds: [],
         resourceIds: [],
         updateId: update.id,
@@ -411,7 +411,7 @@ function Root() {
     startCheckout({
       selection: {
         purchaseKind: "full_product",
-        productIds: [checkoutCatalogProduct.id],
+        productIds: [checkoutCatalogProduct.documentId || checkoutCatalogProduct.id],
         moduleIds: [],
         resourceIds: [],
         updateId: null,

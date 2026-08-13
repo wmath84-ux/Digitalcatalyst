@@ -837,8 +837,21 @@ export const firestoreToCatalogProduct = (raw, documentId) => {
     ? numericPriceFromString(raw.price)
     : numericPriceFromString(raw.salePrice);
   const regularPrice = numericPriceFromString(raw.price);
-  const canonical = firestoreTreeToCanonicalTree(raw.courseContent);
-  const paidUpdates = arr(raw.paidUpdates).map(firestorePaidUpdateToCanonical).filter(Boolean);
+  void salePrice;
+  void regularPrice;
+  let canonical = firestoreTreeToCanonicalTree(raw.courseContent);
+  // Older / partial docs keep the editor blob even when `courseContent`
+  // was not written. Fall back so the live PDP still lists modules.
+  if (!canonical.length && isObject(raw.adminProduct) && arr(raw.adminProduct.modules).length) {
+    canonical = editorModulesToCanonicalTree(raw.adminProduct.modules);
+  }
+  let paidUpdates = arr(raw.paidUpdates).map(firestorePaidUpdateToCanonical).filter(Boolean);
+  if (!paidUpdates.length && isObject(raw.adminProduct)) {
+    paidUpdates = arr(raw.adminProduct.paidUpdates).map((update) => firestorePaidUpdateToCanonical({
+      ...update,
+      includedModuleIds: arr(update.includedModuleIds).length ? update.includedModuleIds : arr(update.includedIds),
+    })).filter(Boolean);
+  }
   return {
     documentId,
     canonicalModules: canonical,

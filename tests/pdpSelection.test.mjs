@@ -35,6 +35,7 @@ import {
   getIsResourceOwned,
   getModuleDependencies,
   getModuleEffectivePrice,
+  getModuleFallbackPrice,
   getPurchasableModules,
   getPurchasableResources,
   getResourceEffectivePrice,
@@ -176,15 +177,15 @@ test("Paid-update access-level modules are excluded from module selector", () =>
   assert.equal(purchasable.find((m) => m.id === "m_paid"), undefined);
 });
 
-test("Include-in-bundle modules are not individually purchasable by default", () => {
+test("Every visible course module is selectable, including bundle modules", () => {
   const modules = [
     buildModule({ id: "m1", individuallyPurchasable: false, includeInBundle: true }),
     buildModule({ id: "m2", individuallyPurchasable: false, includeInBundle: true }),
     buildModule({ id: "m_premium", individuallyPurchasable: true, includeInBundle: false, cashPrice: 499 }),
   ];
   const purchasable = getPurchasableModules(modules);
-  assert.equal(purchasable.length, 1);
-  assert.equal(purchasable[0].id, "m_premium");
+  assert.equal(purchasable.length, 3);
+  assert.deepEqual(purchasable.map((module) => module.id), ["m1", "m2", "m_premium"]);
   const bundle = getBundleModules(modules);
   assert.equal(bundle.length, 2);
 });
@@ -203,6 +204,15 @@ test("getModuleEffectivePrice returns the sale price when valid and lower", () =
 
 test("getModuleEffectivePrice returns null when cash price is missing", () => {
   assert.equal(getModuleEffectivePrice(buildModule({ cashPrice: null })), null);
+});
+
+test("getModuleEffectivePrice uses a fallback when the module has no cash price", () => {
+  assert.equal(getModuleEffectivePrice(buildModule({ cashPrice: null }), 250), 250);
+});
+
+test("getModuleFallbackPrice splits the product price across visible modules", () => {
+  const modules = [buildModule({ id: "m1" }), buildModule({ id: "m2" })];
+  assert.equal(getModuleFallbackPrice({ price: 1000 }, modules), 500);
 });
 
 test("getModuleEffectivePrice returns null when cash is negative (invalid)", () => {
@@ -363,8 +373,15 @@ test("getAvailablePaidUpdates filters inactive / hidden / already-owned updates"
 // Validation
 // ---------------------------------------------------------------------------
 
-test("validateSelection: selected_modules rejects a module that is not individually purchasable", () => {
+test("validateSelection: selected_modules accepts a visible bundle module", () => {
   const modules = [buildModule({ id: "m1", individuallyPurchasable: false, includeInBundle: true })];
+  const out = validateSelection({ mode: "selected_modules", selectedIds: new Set(["m1"]), modules, isProductOwned: false, ownedUpdateIds: [], ownedModuleIds: [] });
+  assert.equal(out.ok, true);
+  assert.deepEqual(out.ids, ["m1"]);
+});
+
+test("validateSelection: selected_modules rejects a hidden module", () => {
+  const modules = [buildModule({ id: "m1", visibility: "hidden", individuallyPurchasable: true })];
   const out = validateSelection({ mode: "selected_modules", selectedIds: new Set(["m1"]), modules, isProductOwned: false, ownedUpdateIds: [], ownedModuleIds: [] });
   assert.equal(out.ok, false);
 });

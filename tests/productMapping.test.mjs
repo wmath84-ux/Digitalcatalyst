@@ -623,6 +623,20 @@ test("Full round trip: Editor form → Firestore → Catalog → Editor form los
   assert.equal(premium.resources[0].coinPrice, 50);
 });
 
+test("Catalog projection falls back to adminProduct modules when courseContent is empty", () => {
+  const form = buildForm();
+  const catalog = firestoreToCatalogProduct({
+    id: "prod_blob",
+    title: "Blob only",
+    price: "₹999",
+    courseContent: [],
+    adminProduct: form,
+  }, "prod_blob");
+  assert.ok(catalog.canonicalModules.length >= 2);
+  assert.ok(catalog.canonicalModules.some((module) => module.id === "mod_1"));
+  assert.ok(catalog.canonicalModules.some((module) => module.id === "mod_premium"));
+});
+
 test("Firestore doc without adminProduct blob still round-trips modules from the courseContent tree", () => {
   const form = buildForm();
   const firestoreBody = editorToFirestoreBody(form);

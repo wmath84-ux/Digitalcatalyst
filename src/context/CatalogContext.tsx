@@ -55,6 +55,7 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
 
   return {
     id: String(data.id ?? documentId),
+    documentId,
     title: String(data.title || "Untitled product"),
     instructor: String(data.instructor?.name || data.instructor || data.author || data.brand || "Digital Catalyst"),
     image,

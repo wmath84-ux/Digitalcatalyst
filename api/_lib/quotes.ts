@@ -110,18 +110,48 @@ const resolveProductIdsToLoad = (selection: CheckoutSelection): string[] => {
  * Load the products referenced by the selection. Missing docs are
  * silently dropped — the engine reports them as 404.
  */
+const normalizeProductDoc = (data: Record<string, unknown>, lookupId: string, documentId?: string): FirestoreProductDoc => {
+  const publicId = String(data.id || lookupId);
+  return {
+    ...data,
+    id: lookupId,
+    documentId: documentId || publicId,
+    publicId,
+  } as FirestoreProductDoc;
+};
+
 const loadProducts = async (productIds: string[]): Promise<Map<string, FirestoreProductDoc>> => {
   const db = adminDb();
   const map = new Map<string, FirestoreProductDoc>();
   if (!productIds.length) return map;
   const refs = productIds.map((id) => db.collection("siteProducts").doc(id));
   const snaps = await db.getAll(...refs);
+  const missing: string[] = [];
   for (let i = 0; i < snaps.length; i += 1) {
     const snap = snaps[i];
-    if (!snap.exists) continue;
-    const data = snap.data() || {};
     const id = productIds[i];
-    map.set(id, { ...(data as Record<string, unknown>), id } as FirestoreProductDoc);
+    if (!snap.exists) {
+      missing.push(id);
+      continue;
+    }
+    map.set(id, normalizeProductDoc((snap.data() || {}) as Record<string, unknown>, id, snap.id));
+  }
+  for (const id of missing) {
+    const candidates = [id];
+    if (/^\d+$/.test(id)) candidates.push(String(Number(id)));
+    let found: { id: string; data: () => Record<string, unknown> } | undefined;
+    for (const candidate of candidates) {
+      const byString = await db.collection("siteProducts").where("id", "==", candidate).limit(1).get();
+      found = byString.docs[0];
+      if (found) break;
+      if (/^\d+$/.test(candidate)) {
+        const byNumber = await db.collection("siteProducts").where("id", "==", Number(candidate)).limit(1).get();
+        found = byNumber.docs[0];
+        if (found) break;
+      }
+    }
+    if (!found) continue;
+    map.set(id, normalizeProductDoc((found.data() || {}) as Record<string, unknown>, id, found.id));
   }
   return map;
 };
@@ -401,14 +431,19 @@ export const handleCreateQuote = async (req: VercelRequest, res: VercelResponse)
       },
     };
     const expiresAtTs = Timestamp.fromMillis(quote.expiresAt);
-    await db.collection(QUOTES_COLLECTION).doc(quote.quoteId).set({
+    const persistable = JSON.parse(JSON.stringify({
       ...quoteRecord,
       _metadata: {
         ...quoteRecord._metadata,
-        createdAt: FieldValue.serverTimestamp(),
-        expiresAt: expiresAtTs,
+        createdAt: now,
+        expiresAt: quote.expiresAt,
+        expiresAtTs,
+        serverCreatedAt: "server",
       },
-    }, { merge: false });
+    }));
+    persistable._metadata.createdAt = FieldValue.serverTimestamp();
+    persistable._metadata.expiresAt = expiresAtTs;
+    await db.collection(QUOTES_COLLECTION).doc(quote.quoteId).set(persistable, { merge: false });
     if (idempotencyKey) {
       const idemRef = db.collection(QUOTES_COLLECTION).doc(`idem:${firebaseUser.uid}:${cleanId(idempotencyKey, 80)}`);
       await idemRef.set({ quoteId: quote.quoteId, uid: firebaseUser.uid, idempotencyKey, createdAt: FieldValue.serverTimestamp() }, { merge: false });
