@@ -17,7 +17,6 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
   setPersistence,
-  signInWithCustomToken,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
@@ -76,7 +75,6 @@ interface AuthContextValue {
   signup: (details: SignupDetails) => Promise<AuthResult>;
   loginWithGoogle: () => Promise<AuthResult>;
   loginAdmin: (email: string, password: string) => Promise<AuthResult>;
-  loginAdminWithEmail: (email: string) => Promise<AuthResult>;
   loginAdminWithGoogle: () => Promise<AuthResult>;
   resetPassword: (email: string) => Promise<AuthResult>;
   updateAccount: (details: { name: string; mobile: string; bio: string }) => Promise<AuthResult>;
@@ -333,40 +331,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const loginAdminWithEmail = useCallback(async (email: string): Promise<AuthResult> => {
-    const normalizedEmail = normalizeEmail(email);
-    clearAdminSession();
-    if (normalizedEmail !== APPROVED_ADMIN_EMAIL) {
-      return { success: false, message: "This email is not approved for dashboard access." };
-    }
-    try {
-      await setPersistence(auth, browserSessionPersistence);
-      const response = await fetch("/api/admin/email-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail }),
-      });
-      const payload = await response.json().catch(() => ({})) as { ok?: boolean; token?: string; code?: string; error?: string };
-      if (!response.ok || !payload.ok || !payload.token) {
-        return { success: false, message: payload.error || "Admin sign-in failed. Check that the email is approved and the role is admin." };
-      }
-      const credential = await signInWithCustomToken(auth, payload.token);
-      const profileSnapshot = await getDoc(doc(db, "users", credential.user.uid));
-      if (!profileSnapshot.exists() || profileSnapshot.data().role !== "admin" || normalizeEmail(credential.user.email) !== APPROVED_ADMIN_EMAIL) {
-        await signOut(auth);
-        setUser(null);
-        return { success: false, message: "Dashboard access requires the approved email and an admin role." };
-      }
-      const appUser = await readAppUser(credential.user);
-      setUser(appUser);
-      createAdminSession(appUser.id, appUser.email);
-      return { success: true, message: "Admin login successful." };
-    } catch (error) {
-      clearAdminSession();
-      return { success: false, message: authErrorMessage(error) };
-    }
-  }, []);
-
   const loginAdminWithGoogle = useCallback(async (): Promise<AuthResult> => {
     clearAdminSession();
     try {
@@ -457,14 +421,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signup,
       loginWithGoogle,
       loginAdmin,
-      loginAdminWithEmail,
       loginAdminWithGoogle,
       resetPassword,
       updateAccount,
       logout,
       setUser,
     }),
-    [user, loading, refresh, login, signup, loginWithGoogle, loginAdmin, loginAdminWithEmail, loginAdminWithGoogle, resetPassword, updateAccount, logout],
+    [user, loading, refresh, login, signup, loginWithGoogle, loginAdmin, loginAdminWithGoogle, resetPassword, updateAccount, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -100,7 +100,7 @@ export const parseSelection = (body: unknown): CheckoutSelection | null => {
  * the kind (e.g. paid_update needs the base product AND the updateId).
  * Returned list is de-duped and capped at MAX_PRODUCT_IDS.
  */
-export const resolveProductIdsToLoad = (selection: CheckoutSelection): string[] => {
+const resolveProductIdsToLoad = (selection: CheckoutSelection): string[] => {
   const ids = new Set<string>();
   for (const id of selection.productIds) ids.add(cleanId(id));
   return Array.from(ids).filter(Boolean).slice(0, MAX_PRODUCT_IDS);
@@ -120,7 +120,7 @@ const normalizeProductDoc = (data: Record<string, unknown>, lookupId: string, do
   } as FirestoreProductDoc;
 };
 
-export const loadProducts = async (productIds: string[]): Promise<Map<string, FirestoreProductDoc>> => {
+const loadProducts = async (productIds: string[]): Promise<Map<string, FirestoreProductDoc>> => {
   const db = adminDb();
   const map = new Map<string, FirestoreProductDoc>();
   if (!productIds.length) return map;
@@ -160,7 +160,7 @@ export const loadProducts = async (productIds: string[]): Promise<Map<string, Fi
  * Load the user's purchase docs and per-product update ids. Returns a
  * Map<productId, { purchaseDocs, updateIds }>.
  */
-export const loadEntitlements = async (
+const loadEntitlements = async (
   uid: string,
   productIds: string[],
 ): Promise<Map<string, { purchaseDocs: FirestorePurchaseDoc[]; updateIds: string[] }>> => {

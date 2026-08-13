@@ -282,9 +282,10 @@ function PremiumProductContent({
   };
 
   // Coupon handling — mirrors the subscription page. The code is validated
-  // server-side via /api/product-coupon (same Part 7 coupon engine + Part 4
-  // quote engine the real checkout uses), so the buyer sees "Verified savings"
-  // before entering checkout. The applied code is carried into checkout.
+  // server-side by re-quoting through the existing /api/quotes/create endpoint
+  // (same Part 7 coupon engine + Part 4 quote engine the real checkout uses),
+  // so the buyer sees "Verified savings" before entering checkout. The applied
+  // code is carried into checkout.
   const handleApplyCoupon = useCallback(
     async (rawCode: string): Promise<PromoResult> => {
       if (isProductOwned) {
@@ -298,7 +299,7 @@ function PremiumProductContent({
         const firebaseUser = auth.currentUser;
         if (!firebaseUser) return { valid: false, message: "Please sign in to apply a coupon." };
         const token = await firebaseUser.getIdToken(true);
-        const response = await fetch("/api/product-coupon", {
+        const response = await fetch("/api/quotes/create", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
@@ -315,14 +316,14 @@ function PremiumProductContent({
             returnRoute: null,
           }),
         });
-        const data = await response.json().catch(() => ({})) as { ok?: boolean; discountPaise?: number; cashPayable?: number; error?: string };
+        const data = await response.json().catch(() => ({})) as { ok?: boolean; quote?: { couponDiscount?: number }; error?: string };
         if (!response.ok || !data.ok) {
           const message = data.error || "This coupon could not be applied.";
           setCouponStatus("error");
           setCouponErrorMessage(message);
           return { valid: false, message };
         }
-        const discountPaise = Math.max(0, Math.round(Number(data.discountPaise || 0)));
+        const discountPaise = Math.max(0, Math.round(Number(data.quote?.couponDiscount || 0)));
         setCouponStatus("idle");
         playSfxSuccess();
         setAppliedCoupon({

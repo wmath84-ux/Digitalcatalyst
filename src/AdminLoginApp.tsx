@@ -4,7 +4,7 @@ import { useAuth } from "./context/AuthContext";
 import { APPROVED_ADMIN_EMAIL, createAdminSession } from "./utils/adminSession";
 
 export default function AdminLoginApp() {
-  const { user, loginAdmin, loginAdminWithEmail, loginAdminWithGoogle, resetPassword } = useAuth();
+  const { user, loginAdmin, loginAdminWithGoogle, resetPassword } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -32,18 +32,6 @@ export default function AdminLoginApp() {
     setSubmitting(true);
     try {
       const result = await loginAdmin(email, password);
-      if (!result.success) { setError(result.message); return; }
-      window.location.hash = "#/admin";
-    } finally { setSubmitting(false); }
-  };
-
-  const submitEmailOnly = async () => {
-    setError("");
-    setInfo("");
-    const target = email.trim() || APPROVED_ADMIN_EMAIL;
-    setSubmitting(true);
-    try {
-      const result = await loginAdminWithEmail(target);
       if (!result.success) { setError(result.message); return; }
       window.location.hash = "#/admin";
     } finally { setSubmitting(false); }
@@ -82,7 +70,7 @@ export default function AdminLoginApp() {
       <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-slate-950"><LockKeyhole size={22} /></div>
       <p className="mt-5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300"><ShieldCheck size={13} /> Session-only access</p>
       <h1 className="mt-2 text-2xl font-black">Open dashboard</h1>
-      <p className="mt-2 text-sm leading-6 text-slate-400">Sign in as <span className="text-slate-200">wmath84@gmail.com</span> with an <span className="text-slate-200">admin</span> role. No password needed — use Google or your admin email.</p>
+      <p className="mt-2 text-sm leading-6 text-slate-400">Sign in as <span className="text-slate-200">wmath84@gmail.com</span> with an <span className="text-slate-200">admin</span> role. No password needed — use Google.</p>
 
       <div className="mt-6 space-y-3">
         <button
@@ -102,15 +90,6 @@ export default function AdminLoginApp() {
             </svg>
           )}
           {submitting ? "Connecting…" : "Continue with Google"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => void submitEmailOnly()}
-          disabled={submitting}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3.5 text-sm font-black text-slate-950 disabled:opacity-60"
-        >
-          {submitting ? "Signing in…" : "Login with admin email (no password)"}
         </button>
       </div>
 
