@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import type { Product } from "../types";
+import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
 
 interface HeaderProps {
   userName: string;
@@ -23,6 +24,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications },
   ref,
 ) {
+  const unreadNotificationCount = useUnreadNotificationCount() || 0;
   return (
     <header className="relative rounded-b-[28px] bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 px-5 pb-8 pt-6 text-white shadow-lg shadow-indigo-900/20">
       <div className="flex items-center justify-between">
@@ -40,7 +42,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm transition active:scale-90"
           >
             <span className="text-lg">🔔</span>
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-400 ring-2 ring-indigo-600" />
+            {unreadNotificationCount > 0 && <span aria-label={`${unreadNotificationCount} unread notifications`} className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold ring-2 ring-indigo-600">{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}</span>}
           </button>
           <button
             type="button"

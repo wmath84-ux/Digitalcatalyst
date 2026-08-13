@@ -169,6 +169,7 @@ export default function PdpPurchaseBuilder({
 
   // Default mode: prefer full_product if available, else selected_modules, else paid_update.
   const [mode, setMode] = useState<PdpPurchaseMode>(() => {
+    if (isProductOwned && availableModes.includes("paid_update")) return "paid_update";
     if (availableModes.includes("full_product")) return "full_product";
     if (availableModes.includes("selected_modules")) return "selected_modules";
     if (availableModes.includes("selected_resources")) return "selected_resources";
@@ -180,9 +181,9 @@ export default function PdpPurchaseBuilder({
   // the product has no purchasable modules), fall back to the next best mode.
   useEffect(() => {
     if (!availableModes.includes(mode)) {
-      setMode(availableModes[0] || "free_entitlement");
+      setMode(isProductOwned && availableModes.includes("paid_update") ? "paid_update" : availableModes[0] || "free_entitlement");
     }
-  }, [availableModes, mode]);
+  }, [availableModes, isProductOwned, mode]);
 
   const [selectedModuleIds, setSelectedModuleIds] = useState<Set<string>>(() => new Set());
   const [selectedResourceIds, setSelectedResourceIds] = useState<Set<string>>(() => new Set());
@@ -534,11 +535,13 @@ function ModuleSelector({
     );
   }
   const allFlat = allModules.flatMap((m) => [m, ...(m.modules || [])]);
+  const selectedTotal = modules.filter((module) => selectedIds.has(module.id)).reduce((sum, module) => sum + (getModuleEffectivePrice(module) || 0), 0);
   return (
     <div className="space-y-2">
-      <p className="px-1 text-xs font-black uppercase tracking-wider text-slate-400">
-        Individually purchasable modules
-      </p>
+      <div className="flex items-center justify-between rounded-2xl bg-violet-50 px-3 py-2.5 ring-1 ring-violet-100">
+        <div><p className="text-xs font-black uppercase tracking-wider text-violet-700">Select individual modules</p><p className="text-[10px] text-violet-500">{modules.length} available · {selectedIds.size} selected</p></div>
+        <span className="text-sm font-black text-violet-900">{formatPrice(selectedTotal)}</span>
+      </div>
       {modules.map((m) => {
         const isSelected = selectedIds.has(m.id);
         const isExpanded = expandedIds.has(m.id);
@@ -808,6 +811,7 @@ function PaidUpdateSelector({
               {u.description ? (
                 <p className="mt-1 line-clamp-2 text-xs text-slate-500 sm:text-sm">{u.description}</p>
               ) : null}
+              <p className="mt-1 text-[11px] font-semibold text-violet-600">Includes {u.includedModuleIds.length} module{u.includedModuleIds.length === 1 ? "" : "s"} and {u.includedResourceIds.length} file{u.includedResourceIds.length === 1 ? "" : "s"}</p>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs">
                 <span className="font-black text-slate-900">{formatPrice(u.cashPrice)}</span>
                 {u.publishDate ? (

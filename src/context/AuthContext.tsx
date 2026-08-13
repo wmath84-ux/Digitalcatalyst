@@ -46,6 +46,7 @@ export interface AuthUser {
 export type AuthResult = {
   success: boolean;
   message: string;
+  code?: string;
 };
 
 export type SignupDetails = {
@@ -73,10 +74,13 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const normalizeEmail = (email?: string | null) => String(email || "").trim().toLowerCase();
 
-const authErrorMessage = (error: unknown): string => {
-  const code = typeof error === "object" && error && "code" in error
+const authErrorCode = (error: unknown): string =>
+  typeof error === "object" && error && "code" in error
     ? String((error as { code?: unknown }).code || "")
     : "";
+
+const authErrorMessage = (error: unknown): string => {
+  const code = authErrorCode(error);
 
   const messages: Record<string, string> = {
     "auth/email-already-in-use": "इस ईमेल से अकाउंट पहले से मौजूद है। कृपया Login करें या password reset करें।",
@@ -245,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await commitFirebaseUser(credential.user);
       return { success: true, message: "Login successful." };
     } catch (error) {
-      return { success: false, message: authErrorMessage(error) };
+      return { success: false, message: authErrorMessage(error), code: authErrorCode(error) };
     }
   }, [commitFirebaseUser]);
 

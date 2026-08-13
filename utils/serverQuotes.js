@@ -747,6 +747,12 @@ export const buildQuote = (input) => {
     if (!line) {
       return { ok: false, status: 404, reason: "Course update is no longer available." };
     }
+    const updateModules = flattenModules(doc.courseContent || []);
+    const updateResources = flattenResources(doc.courseContent || []);
+    const detailItems = [
+      ...line.includedModuleIds.map((id) => updateModules.find((module) => String(module.id) === id)?.title || `Module ${id}`),
+      ...line.includedResourceIds.map((id) => updateResources.find((resource) => String(resource.id) === id)?.name || `Resource ${id}`),
+    ];
     rawLines.push({
       kind: "paid_update",
       productId,
@@ -761,6 +767,7 @@ export const buildQuote = (input) => {
       alreadyOwned: false, // guarded above by isProductOwned only
       minPayablePaise: 0,
       parentProductTitle: String(doc.title || ""),
+      detailItems,
     });
   } else if (kind === "subscription" || kind === "subscription_features") {
     // Part 9 — the line items were pre-built by the Part 9 server
@@ -773,12 +780,13 @@ export const buildQuote = (input) => {
     for (const item of subscriptionLineItems) {
       if (!isObject(item)) continue;
       rawLines.push({
-        kind: kind,
+        kind: item.kind || kind,
         productId: item.productId || null,
         moduleId: item.moduleId || null,
         resourceId: item.resourceId || null,
         updateId: item.updateId || null,
         subscriptionPlanId: item.subscriptionPlanId || selection.subscriptionPlanId || null,
+        featureId: item.featureId || null,
         title: item.title || "Subscription item",
         parentTitle: item.parentTitle || "",
         regularPaise: Math.max(0, Math.round(Number(item.regularPrice || 0))),
@@ -853,6 +861,7 @@ export const buildQuote = (input) => {
       purchaseKind: kind,
       userHasPriorPurchases: Boolean(userHasPriorPurchases),
       userUsageCount: Math.max(0, Math.floor(Number(userCouponUsageCount || 0))),
+      userUid: uid,
     };
     const validation = validateCoupon(coupon, orderContext, now);
     if (!validation.ok) {
@@ -885,8 +894,8 @@ export const buildQuote = (input) => {
     moduleId: line.moduleId || null,
     resourceId: line.resourceId || null,
     updateId: line.updateId || null,
-    subscriptionPlanId: null,
-    featureId: null,
+    subscriptionPlanId: line.subscriptionPlanId || null,
+    featureId: line.featureId || null,
     title: line.title,
     parentTitle: line.parentTitle,
     regularPrice: line.regularPaise,
@@ -895,6 +904,7 @@ export const buildQuote = (input) => {
     quantity: line.quantity,
     alreadyOwned: false, // kept lines are by definition not already owned
     entitlementId: line.entitlementId,
+    detailItems: Array.isArray(line.detailItems) ? line.detailItems.map(String) : [],
   }));
 
   const status = cashPayable === 0 ? "active" : "active";

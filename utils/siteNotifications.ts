@@ -1,13 +1,14 @@
-export type SiteNotificationCategory = 'store' | 'reading' | 'course' | 'unlock' | 'community' | 'announcement' | 'mayday';
+export type SiteNotificationCategory = 'store' | 'reading' | 'course' | 'unlock' | 'community' | 'announcement' | 'mayday' | 'subscription';
 
 export type SiteNotificationTarget =
-  | { type: 'product'; productId: number }
+  | { type: 'product'; productId: number | string }
   | { type: 'reading'; listType: 'news' | 'blog'; articleId: string }
   | { type: 'announcement'; announcementId: string }
-  | { type: 'course'; productId: number }
+  | { type: 'course'; productId: number | string }
   | { type: 'purchases' }
   | { type: 'community'; targetPage?: string; targetId?: string }
-  | { type: 'mayday' };
+  | { type: 'mayday' }
+  | { type: 'subscription' };
 
 export interface SiteNotification {
   id: string;
@@ -16,7 +17,7 @@ export interface SiteNotification {
   category: SiteNotificationCategory;
   createdAt: number;
   read: boolean;
-  source: 'content' | 'community';
+  source: 'content' | 'community' | 'system';
   target: SiteNotificationTarget;
   actorAvatar?: string;
   groupCount?: number;
@@ -31,6 +32,7 @@ export interface SiteNotificationPreferences {
   community: boolean;
   announcement: boolean;
   mayday: boolean;
+  subscription: boolean;
   browserAlerts: boolean;
 }
 
@@ -80,6 +82,7 @@ export const DEFAULT_SITE_NOTIFICATION_PREFERENCES: SiteNotificationPreferences 
   community: true,
   announcement: true,
   mayday: true,
+  subscription: true,
   browserAlerts: false,
 };
 
@@ -118,7 +121,11 @@ export const loadSiteNotifications = (viewerKey: string): SiteNotification[] => 
 };
 
 export const saveSiteNotifications = (viewerKey: string, notifications: SiteNotification[]) => {
-  safeWrite(storageKey(NOTIFICATION_STORAGE_PREFIX, viewerKey), trimNotifications(notifications));
+  const next = trimNotifications(notifications);
+  safeWrite(storageKey(NOTIFICATION_STORAGE_PREFIX, viewerKey), next);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('eduvora:notifications-updated', { detail: { viewerKey, notifications: next } }));
+  }
 };
 
 export const loadSiteNotificationPreferences = (viewerKey: string): SiteNotificationPreferences => ({
@@ -242,8 +249,7 @@ export const createContentNotifications = (
 
   Object.entries(current.products).forEach(([id, product]) => {
     const priorProduct = previous.products[id];
-    const productId = Number(id);
-    if (!Number.isFinite(productId)) return;
+    const productId = id;
 
     if (!priorProduct) {
       notifications.push({
@@ -277,7 +283,7 @@ export const createContentNotifications = (
       createdAt: now,
       read: false,
       source: 'content',
-      target: { type: 'course', productId },
+      target: { type: 'product', productId },
     });
   });
 

@@ -113,6 +113,7 @@ export const normaliseCouponDoc = (raw) => {
     firstPurchaseOnly: raw.firstPurchaseOnly === true,
     allowedPurchaseKinds: arr(raw.allowedPurchaseKinds).map((x) => String(x)),
     description: typeof raw.description === "string" ? raw.description : null,
+    referralOwnerUid: typeof raw.referralOwnerUid === "string" ? raw.referralOwnerUid : null,
   };
 };
 
@@ -265,6 +266,9 @@ export const validateCoupon = (coupon, orderContext, now = Date.now()) => {
   }
   if (!isCouponActive(coupon, now)) {
     return { ok: false, code: "COUPON_INACTIVE", reason: "This coupon is no longer active." };
+  }
+  if (coupon.referralOwnerUid && coupon.referralOwnerUid === orderContext.userUid) {
+    return { ok: false, code: "REFERRAL_SELF_USE", reason: "You cannot use your own referral code." };
   }
   if (!isWithinGlobalLimit(coupon)) {
     return { ok: false, code: "COUPON_LIMIT_REACHED", reason: "This coupon has reached its global usage limit." };

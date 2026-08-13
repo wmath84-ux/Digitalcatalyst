@@ -24,10 +24,12 @@ export default function ContinueLearning({
         <span className="text-xs font-semibold text-indigo-600">{Math.round(progress)}% done</span>
       </div>
 
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onClick || onResume}
-        className="mt-3 flex w-full items-center gap-3 rounded-2xl bg-white p-3 text-left shadow-sm shadow-slate-200 ring-1 ring-slate-100 transition active:scale-[0.98]"
+        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") (onClick || onResume)(); }}
+        className="mt-3 flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-white p-3 text-left shadow-sm shadow-slate-200 ring-1 ring-slate-100 transition active:scale-[0.98]"
       >
         <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-slate-100">
           <img src={image} alt={title} className="h-full w-full object-cover" />
@@ -56,7 +58,7 @@ export default function ContinueLearning({
         >
           {isComplete ? "Completed ✓" : "Resume ▶"}
         </button>
-      </button>
+      </div>
     </section>
   );
 }

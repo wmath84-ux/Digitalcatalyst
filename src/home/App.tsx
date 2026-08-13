@@ -1,4 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../../firebase";
 import Header from "./components/Header";
 import HeroCarousel from "./components/HeroCarousel";
 import CategoryNav from "./components/CategoryNav";
@@ -6,14 +8,17 @@ import ProductCard from "./components/ProductCard";
 import ContinueLearning from "./components/ContinueLearning";
 import Reviews from "./components/Reviews";
 import BottomNav, { type TabKey } from "../components/BottomNav";
-import { banners, categories, reviews } from "./data/mockData";
+import { banners, categories, reviews as fallbackReviews } from "./data/mockData";
 import type { Product } from "./types";
 import { useCatalog } from "../context/CatalogContext";
+import { useHomepageProductReviews } from "../hooks/useProductReviews";
 import { useAuth } from "../context/AuthContext";
 
 interface AppProps {
   onNavigateToStore: () => void;
   onNavigateToProduct: (product: Product) => void;
+  onNavigateToProductReview: (product: Product) => void;
+  onNavigateToCourse: (product: Product) => void;
   onNavigateToMyDay: () => void;
   onNavigateToProfile: () => void;
   onNavigateToPurchases?: () => void;
@@ -26,6 +31,8 @@ interface AppProps {
 export default function App({
   onNavigateToStore,
   onNavigateToProduct,
+  onNavigateToProductReview,
+  onNavigateToCourse,
   onNavigateToMyDay,
   onNavigateToProfile,
   onNavigateToPurchases,
@@ -49,13 +56,38 @@ export default function App({
     image: product.image,
     trending: product.tags.includes("TRENDING") || product.rating >= 4.5,
   })), [catalogProducts]);
+  const { reviews: homepageReviews } = useHomepageProductReviews(catalogProducts, fallbackReviews, 6);
   const userName = user?.name?.split(" ")[0] || "Learner";
+  const [progressRecords, setProgressRecords] = useState<Array<{ productId: string; completedFileIds: string[]; updatedAt: number }>>([]);
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    if (!user) { setProgressRecords([]); return undefined; }
+    return onSnapshot(collection(db, "users", user.id, "courseProgress"), (snapshot) => {
+      setProgressRecords(snapshot.docs.map((item) => {
+        const data = item.data() || {};
+        const stamp = data.lastOpenedAt || data.updatedAt;
+        const updatedAt = stamp && typeof stamp.toMillis === "function" ? stamp.toMillis() : Number(stamp || 0);
+        return { productId: String(data.productId || item.id), completedFileIds: Array.isArray(data.completedFileIds) ? data.completedFileIds.map(String) : [], updatedAt };
+      }));
+    }, () => setProgressRecords([]));
+  }, [user]);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const contentTopRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
 
-  const continueLearningItem = products[0];
+  const continueProgressRecord = useMemo(() => [...progressRecords]
+    .filter((record) => catalogProducts.some((product) => product.id === record.productId))
+    .sort((a, b) => b.updatedAt - a.updatedAt)[0] || null, [catalogProducts, progressRecords]);
+  const continueLearningItem = continueProgressRecord ? products.find((product) => product.id === continueProgressRecord.productId) || null : null;
+  const continueProgress = useMemo(() => {
+    if (!continueProgressRecord) return 0;
+    const product = catalogProducts.find((item) => item.id === continueProgressRecord.productId);
+    const countResources = (modules: NonNullable<typeof product>["canonicalModules"] = []): number => (modules || []).reduce((total, module) => total + (module.resources?.length || 0) + countResources(module.modules || []), 0);
+    const total = product ? countResources(product.canonicalModules) : 0;
+    return total > 0 ? Math.min(100, Math.round((continueProgressRecord.completedFileIds.length / total) * 100)) : 0;
+  }, [catalogProducts, continueProgressRecord]);
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const searchResults: Product[] = useMemo(() => {
@@ -73,16 +105,32 @@ export default function App({
 
   const [activeCategory, setActiveCategory] = useState("all");
 
+  const switchCategory = (direction: -1 | 1) => {
+    const index = Math.max(0, categories.findIndex((category) => category.id === activeCategory));
+    const next = (index + direction + categories.length) % categories.length;
+    setActiveCategory(categories[next].id);
+  };
+  const handleTouchStart = (event: React.TouchEvent) => { touchStartX.current = event.changedTouches[0]?.clientX ?? null; };
+  const handleTouchEnd = (event: React.TouchEvent) => {
+    if (touchStartX.current == null) return;
+    const delta = (event.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) >= 48) switchCategory(delta < 0 ? 1 : -1);
+  };
+
   const categoryFiltered: Product[] = useMemo(() => {
     if (activeCategory === "all") return products;
     return products.filter((p) => p.category === activeCategory);
   }, [activeCategory, products]);
 
-  const [continueProgress, setContinueProgress] = useState(42);
-
   const handleSelectSuggestion = (product: Product) => {
     setSearchQuery(product.title);
     searchInputRef.current?.blur();
+  };
+
+  const handleOpenReview = (productId: string) => {
+    const product = products.find((item) => item.id === productId);
+    if (product) onNavigateToProductReview(product);
   };
 
   const handleFooterChange = (tab: TabKey) => {
@@ -126,7 +174,7 @@ export default function App({
           onOpenNotifications={onNavigateToNotifications}
         />
 
-        <main className="flex-1 overflow-y-auto pb-2">
+        <main className="flex-1 overflow-y-auto pb-2" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           {isSearching ? (
             <section className="px-5 pt-6">
               <div className="flex items-center justify-between">
@@ -183,8 +231,8 @@ export default function App({
                   author={continueLearningItem.author}
                   image={continueLearningItem.image}
                   progress={continueProgress}
-                  onResume={() => setContinueProgress((prev) => Math.min(100, prev + 14))}
-                  onClick={onNavigateToPurchases}
+                  onResume={() => onNavigateToCourse(continueLearningItem)}
+                  onClick={() => onNavigateToCourse(continueLearningItem)}
                 />
               )}
 
@@ -223,7 +271,7 @@ export default function App({
                 )}
               </section>
 
-              <Reviews reviews={reviews} />
+              <Reviews reviews={homepageReviews} onOpenReview={handleOpenReview} />
             </>
           )}
         </main>

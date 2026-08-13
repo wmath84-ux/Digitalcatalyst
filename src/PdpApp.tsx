@@ -1,172 +1,481 @@
-import { ArrowLeft, Heart, ShieldCheck, ShoppingBag, Star } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import {
+  ArrowUpRight,
+  BadgeCheck,
+  BarChart3,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Expand,
+  Globe,
+  Heart,
+  Link2,
+  PackageOpen,
+  PlayCircle,
+  RotateCcw,
+  Share2,
+  ShieldCheck,
+  ShoppingBag,
+  ShoppingCart,
+  Star,
+  Zap,
+} from "lucide-react";
+import Header from "./components/Header";
+import BottomNav, { type TabKey } from "./components/BottomNav";
 import type { Product } from "./data/products";
 import type { CheckoutSelection } from "./types/commerce";
 import { computeSummary } from "../utils/pdpSelection";
 import PdpPurchaseBuilder from "./components/pdp/PdpPurchaseBuilder";
 import { useCourseAccess } from "./hooks/useCourseAccess";
+import { useHomepageProductReviews, type PublishedProductReview } from "./hooks/useProductReviews";
+import { reviews as fallbackReviews } from "./home/data/mockData";
+import { useAuth } from "./context/AuthContext";
+import { db } from "../firebase";
 
 interface ProductDetailProps {
   product: Product | null;
+  products?: Product[];
+  cartIds?: Set<string>;
+  favoriteIds?: Set<string>;
   onCheckout: (finalPrice: number) => void;
+  onCheckoutSelection?: (selection: CheckoutSelection, finalPrice: number) => void;
   onBack: () => void;
-  /**
-   * Optional: Part 3 hooks. When `purchasedIds` is supplied the builder
-   * gates the modules/resources by already-owned state and decides which
-   * purchase modes are available. `ownedUpdateIds` is the per-product
-   * list of paid-update ids the user has unlocked.
-   */
+  onAddToCart?: (id: string) => void;
+  onToggleFavorite?: (id: string) => void;
+  onNavigateToProduct?: (product: Product) => void;
+  onOpenCourse?: (product: Product) => void;
+  onNavigateToCart?: () => void;
+  onNavigateToSubscription?: () => void;
+  onNavigateToNotifications?: () => void;
+  onNavigateFooter?: (tab: TabKey) => void;
   purchasedIds?: Set<string>;
   ownedUpdateIds?: Set<string>;
 }
 
-export default function ProductDetail({ product, onCheckout, onBack, purchasedIds, ownedUpdateIds }: ProductDetailProps) {
-  // Part 10 — the canonical course-access resolver. When the
-  // product is `null` we pass `null` and the hook returns the
-  // empty resolution.
+type DetailTab = "Description" | "Curriculum" | "Instructor";
+
+const formatPrice = (price: number) => price === 0 ? "Free" : `₹${price.toLocaleString("en-IN")}`;
+
+/**
+ * Live related-product ranking. It only considers products currently emitted
+ * by CatalogContext, excludes the open product, and gives deterministic
+ * priority to matching subject/category/level/tags. Newly published products
+ * therefore become eligible automatically without a hard-coded PDP list.
+ */
+export const getRelatedProducts = (product: Product, catalog: Product[], limit = 3) => {
+  const tags = new Set(product.tags.map((tag) => tag.toLowerCase()));
+  return catalog
+    .filter((candidate) => candidate.id !== product.id)
+    .map((candidate) => {
+      const sharedTags = candidate.tags.reduce((count, tag) => count + (tags.has(tag.toLowerCase()) ? 1 : 0), 0);
+      const score =
+        (candidate.subject.toLowerCase() === product.subject.toLowerCase() ? 8 : 0)
+        + (candidate.category === product.category ? 5 : 0)
+        + (candidate.classLevel.toLowerCase() === product.classLevel.toLowerCase() ? 3 : 0)
+        + sharedTags * 2;
+      return { candidate, score };
+    })
+    .sort((a, b) => b.score - a.score || b.candidate.rating - a.candidate.rating || a.candidate.title.localeCompare(b.candidate.title))
+    .slice(0, limit)
+    .map(({ candidate }) => candidate);
+};
+
+export default function ProductDetail(props: ProductDetailProps) {
+  return (
+    <div className="min-h-screen bg-slate-100 sm:py-6">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
+        <Header
+          cartCount={props.cartIds?.size || 0}
+          notifCount={1}
+          onNavigateToSubscription={props.onNavigateToSubscription || (() => undefined)}
+          onNavigateToCart={props.onNavigateToCart || (() => undefined)}
+          onNavigateToNotifications={props.onNavigateToNotifications || (() => undefined)}
+        />
+        <main className="min-h-0 flex-1 overflow-y-auto">
+          {props.product ? <PremiumProductContent {...props} product={props.product} /> : <MissingProduct onBack={props.onBack} />}
+        </main>
+        <BottomNav
+          active="store"
+          onChange={props.onNavigateFooter || (() => undefined)}
+          storeBadge={1}
+          purchasesBadge={props.purchasedIds?.size || 0}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PremiumProductContent({
+  product,
+  products = [],
+  cartIds = new Set<string>(),
+  favoriteIds = new Set<string>(),
+  onCheckout,
+  onCheckoutSelection,
+  onBack,
+  onAddToCart,
+  onToggleFavorite,
+  onNavigateToProduct,
+  onOpenCourse,
+  purchasedIds,
+  ownedUpdateIds,
+}: ProductDetailProps & { product: Product }) {
   const { resolution } = useCourseAccess({ product });
+  const { user } = useAuth();
+  const reviewCatalog = useMemo(() => products.length > 0 ? products : [product], [product, products]);
+  const { reviews: homepageReviews } = useHomepageProductReviews(reviewCatalog, fallbackReviews, 6);
+  const productReviews = useMemo(
+    () => homepageReviews.filter((review) => review.productId === product.id),
+    [homepageReviews, product.id],
+  );
+  const [activeImage, setActiveImage] = useState(0);
+  const [activeTab, setActiveTab] = useState<DetailTab>("Description");
+  const [expandedModule, setExpandedModule] = useState<string | null>(product.canonicalModules?.[0]?.id || null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [reviewComposerOpen, setReviewComposerOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewNotice, setReviewNotice] = useState("");
 
-  if (!product) {
-    return (
-      <main className="grid min-h-[100dvh] place-items-center bg-slate-50 px-6 text-center">
-        <div>
-          <ShoppingBag className="mx-auto h-12 w-12 text-slate-300" />
-          <h1 className="mt-4 text-2xl font-black text-slate-900">Product not found</h1>
-          <p className="mt-2 text-sm text-slate-500">It may have been hidden or removed from the live catalog.</p>
-          <button onClick={onBack} className="mt-6 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white">Back to store</button>
-        </div>
-      </main>
-    );
-  }
+  useEffect(() => {
+    if (!window.location.hash.includes("section=reviews")) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("product-reviews")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [product.id]);
 
-  // The resolver is the canonical source of truth. The legacy
-  // `purchasedIds` / `ownedUpdateIds` props from `main.tsx` are
-  // a fallback for tests + non-course routes; in practice the
-  // resolver subscribes to the same data.
   const isProductOwned = purchasedIds ? purchasedIds.has(product.id) : resolution.hasFullProductAccess;
   const updates = ownedUpdateIds || resolution.ownedUpdateIds;
+  const availablePaidUpdates = (product.paidUpdates || []).filter((update) => update.active && update.visibility !== "hidden" && !updates.has(update.id));
   const ownedModuleIds = resolution.ownedModuleIds;
   const ownedResourceIds = resolution.ownedResourceIds;
-
+  const gallery = product.images?.length ? product.images : [product.image];
+  const selectedImage = gallery[Math.min(activeImage, gallery.length - 1)] || product.image;
+  const related = useMemo(() => getRelatedProducts(product, products), [product, products]);
   const discount = product.originalPrice > product.price && product.originalPrice > 0
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
+  const modules = product.canonicalModules || [];
+  const resourceCount = modules.reduce((sum, module) => sum + (module.resources?.length || 0), 0);
+  const favorite = favoriteIds.has(product.id);
+  const inCart = cartIds.has(product.id);
 
-  const handlePreview = (selection: CheckoutSelection) => {
-    // For backward compatibility, keep the legacy `onCheckout` wired up for
-    // the simple full-product path. The actual full-product price is
-    // `product.price` (which CatalogContext already applied sale-fallback
-    // for). The new builder does NOT call `onCheckout` — it stores the
-    // canonical selection in `sessionStorage["pdpPreviewSelection"]` via
-    // its own default handler.
-    if (selection.purchaseKind === "full_product") {
-      onCheckout(product.price);
+  const handlePreview = (selection: CheckoutSelection, summary: ReturnType<typeof computeSummary>) => {
+    if (onCheckoutSelection) onCheckoutSelection(selection, summary.effectiveSubtotal);
+    else if (selection.purchaseKind === "full_product") onCheckout(product.price);
+  };
+
+  const copyLink = () => {
+    void navigator.clipboard?.writeText(window.location.href).catch(() => undefined);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
+
+  const primaryAction = () => {
+    if (isProductOwned && onOpenCourse) onOpenCourse(product);
+    else onCheckout(product.price);
+  };
+
+  const submitReview = async () => {
+    if (!user) {
+      window.location.hash = `#/auth?mode=login&return=${encodeURIComponent(window.location.hash)}`;
+      return;
+    }
+    if (!isProductOwned) {
+      setReviewNotice("Only learners who own this product can submit a review.");
+      return;
+    }
+    const comment = reviewComment.trim();
+    if (comment.length < 10) {
+      setReviewNotice("Please write at least 10 characters.");
+      return;
+    }
+    setReviewSubmitting(true);
+    setReviewNotice("");
+    try {
+      await addDoc(collection(db, "siteReviews"), {
+        productId: product.id,
+        productTitle: product.title,
+        customerId: user.id,
+        customerName: user.name,
+        rating: reviewRating,
+        comment,
+        verifiedPurchase: false,
+        status: "pending",
+        createdAt: serverTimestamp(),
+      });
+      setReviewComment("");
+      setReviewComposerOpen(false);
+      setReviewNotice("Review submitted. It will appear after moderation.");
+    } catch (error) {
+      console.error("Review submission failed", error);
+      setReviewNotice("Review could not be submitted. Please try again.");
+    } finally {
+      setReviewSubmitting(false);
     }
   };
 
+  const highlights = [
+    modules.length > 0 ? `${modules.length} structured module${modules.length === 1 ? "" : "s"}` : null,
+    resourceCount > 0 ? `${resourceCount} downloadable or streaming resource${resourceCount === 1 ? "" : "s"}` : null,
+    "Access from your purchases library",
+    "Available on mobile and desktop",
+    "Account-linked secure delivery",
+    product.paidUpdates?.length ? `${product.paidUpdates.length} published course update${product.paidUpdates.length === 1 ? "" : "s"}` : null,
+  ].filter((item): item is string => Boolean(item));
+
   return (
-    <div className="min-h-[100dvh] bg-slate-50 text-slate-950">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
-          <button onClick={onBack} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200" aria-label="Back to store"><ArrowLeft size={18} /></button>
-          <div className="min-w-0"><p className="text-xs font-bold uppercase tracking-wider text-violet-600">Digital Catalyst</p><p className="truncate text-sm font-black">Product details</p></div>
-          <button className="ml-auto grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-500" aria-label="Save product"><Heart size={18} /></button>
-        </div>
-      </header>
+    <div className="relative bg-[#F8F9FA] pb-5 text-zinc-900">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-24 left-1/4 h-64 w-64 rounded-full bg-gradient-to-br from-zinc-200/60 to-transparent blur-3xl" />
+        <div className="absolute top-1/3 -right-24 h-64 w-64 rounded-full bg-gradient-to-bl from-amber-100/50 to-transparent blur-3xl" />
+      </div>
 
-      <main className="mx-auto grid max-w-6xl gap-8 px-4 py-6 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 lg:py-12">
-        <section>
-          <div className="aspect-[16/10] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <img src={product.image} alt={product.title} className="h-full w-full object-cover" />
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            <Trust label="Secure checkout" />
-            <Trust label="Instant access" />
-            <Trust label="Lifetime library" />
-          </div>
-          <div className="mt-6 space-y-3 text-sm text-slate-600 lg:hidden">
-            <ProductSummary product={product} discount={discount} />
-            <ProductDescription product={product} />
-          </div>
-        </section>
+      <div className="relative">
+        <nav className="flex flex-wrap items-center gap-1.5 px-4 pt-4 text-[11px] text-zinc-500">
+          <button onClick={onBack} className="transition hover:text-zinc-900">Store</button>
+          <ChevronRight className="h-3 w-3 text-zinc-300" />
+          <span>{product.category}</span>
+          <ChevronRight className="h-3 w-3 text-zinc-300" />
+          <span className="max-w-[190px] truncate font-medium text-zinc-900">{product.title}</span>
+        </nav>
 
-        <section className="self-start space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700">{product.category}</span>
-            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{product.classLevel}</span>
-            {product.tags.slice(0, 2).map((tag) => <span key={tag} className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700">{tag}</span>)}
-          </div>
-          <h1 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl">{product.title}</h1>
-          <p className="text-sm font-semibold text-slate-500">Created by {product.instructor}</p>
-          <div className="flex items-center gap-2">
-            <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
-            <span className="font-black">{product.rating.toFixed(1)}</span>
-            <span className="text-sm text-slate-500">({product.reviews} verified reviews)</span>
-          </div>
-          <p className="text-base leading-7 text-slate-600 hidden lg:block">{product.description || `Get complete access to this ${product.category.toLowerCase()} resource, designed for focused learning and practical progress.`}</p>
+        <div className="space-y-6 px-4 pb-8 pt-4">
+          <section className="flex flex-col gap-3">
+            <div className="group relative overflow-hidden rounded-3xl border border-white/60 bg-gradient-to-br from-zinc-100 via-white to-zinc-200 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.25)]">
+              <img src={selectedImage} alt={product.title} className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105" />
+              <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[10px] font-medium text-white backdrop-blur-md">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
+              </div>
+              <div className="absolute right-3 top-3 flex gap-2">
+                <button onClick={() => onToggleFavorite?.(product.id)} aria-label="Save product" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/85 text-zinc-700 shadow-md backdrop-blur-md transition active:scale-95">
+                  <Heart className={`h-4 w-4 ${favorite ? "fill-rose-500 text-rose-500" : ""}`} />
+                </button>
+                <a href={selectedImage} target="_blank" rel="noreferrer" aria-label="Open image" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/85 text-zinc-700 shadow-md backdrop-blur-md">
+                  <Expand className="h-4 w-4" />
+                </a>
+              </div>
+              <div className="absolute bottom-3 right-3 rounded-full bg-black/50 px-3 py-1 text-[10px] font-medium text-white backdrop-blur-md">{activeImage + 1} / {gallery.length}</div>
+            </div>
+            {gallery.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {gallery.map((image, index) => (
+                  <button key={`${image}-${index}`} onClick={() => setActiveImage(index)} className={`h-16 min-w-16 flex-1 overflow-hidden rounded-xl border-2 shadow-sm transition ${activeImage === index ? "border-zinc-900" : "border-transparent opacity-70"}`}>
+                    <img src={image} alt={`${product.title} ${index + 1}`} className="h-full w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
 
-          {/* Part 3: purchase builder. Renders the mode switcher, the module /
-              resource selector, the dynamic summary, and the CTA. Falls back
-              to the simple full-product CTA when no canonical modules or
-              resources are present (so legacy products without admin-defined
-              modules still work). */}
-          {product.canonicalModules && product.canonicalModules.length > 0 ? (
-            <PdpPurchaseBuilder
-              product={product}
-              isProductOwned={isProductOwned}
-              ownedUpdateIds={updates}
-              ownedModuleIds={ownedModuleIds}
-              ownedResourceIds={ownedResourceIds}
-              returnRoute={`#/product/${encodeURIComponent(product.id)}`}
-              onPreview={handlePreview}
-            />
-          ) : (
-            <LegacyCheckoutCard product={product} discount={discount} onCheckout={onCheckout} isProductOwned={isProductOwned} />
+          <section className="flex flex-col gap-5">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">{product.category}</span>
+                {product.tags.slice(0, 2).map((tag) => <span key={tag} className="rounded-full bg-orange-50 px-2.5 py-1 text-[10px] font-semibold text-orange-600">{tag}</span>)}
+                <span className="text-[11px] text-zinc-400">by <span className="font-medium text-zinc-600">{product.instructor}</span></span>
+              </div>
+              <h1 className="text-2xl font-bold leading-tight tracking-tight text-zinc-900">{product.title}</h1>
+              <p className="text-sm leading-relaxed text-zinc-500">{product.description || `A focused ${product.category.toLowerCase()} resource for practical learning and measurable progress.`}</p>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <RatingStars rating={product.rating} />
+                <span className="font-semibold text-zinc-800">{product.rating.toFixed(1)}</span>
+                <a href="#product-reviews" className="text-zinc-400 underline underline-offset-2">({product.reviews.toLocaleString("en-IN")} ratings)</a>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-zinc-100 bg-zinc-50/70 p-3 text-[11px] text-zinc-600">
+              <Meta icon={Clock} text={product.classLevel} />
+              <Meta icon={BarChart3} text={product.subject} />
+              <Meta icon={Globe} text={product.category} />
+              <Meta icon={BadgeCheck} text={`${modules.length} modules`} />
+            </div>
+
+            <div className="relative overflow-hidden rounded-3xl border border-zinc-200/80 bg-white/80 p-5 shadow-[0_10px_50px_-15px_rgba(0,0,0,0.15)] backdrop-blur-xl">
+              <div className="relative flex flex-wrap items-end gap-2">
+                <span className="text-4xl font-extrabold tracking-tight text-zinc-900">{isProductOwned ? "Owned" : formatPrice(product.price)}</span>
+                {!isProductOwned && product.originalPrice > product.price && <span className="mb-1 text-base text-zinc-400 line-through">{formatPrice(product.originalPrice)}</span>}
+                {!isProductOwned && discount > 0 && <span className="mb-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">-{discount}%</span>}
+              </div>
+              <div className="relative mt-5 flex gap-3">
+                <button onClick={primaryAction} className="group flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-zinc-700 via-zinc-900 to-black px-4 py-3.5 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] active:scale-[0.98]">
+                  <Zap className="h-4 w-4 fill-white" /> {isProductOwned ? "Open Now" : "Buy Now"}
+                </button>
+                <button disabled={isProductOwned || inCart} onClick={() => onAddToCart?.(product.id)} className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-zinc-300 bg-gradient-to-b from-white via-zinc-50 to-zinc-200 px-3 py-3.5 text-sm font-bold text-zinc-900 shadow-sm disabled:opacity-60">
+                  <ShoppingCart className="h-4 w-4" /> {isProductOwned ? "Purchased" : inCart ? "In Cart" : "Add to Cart"}
+                </button>
+              </div>
+              <div className="relative mt-3 flex justify-end">
+                <div className="relative">
+                  <button onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-sm"><Share2 className="h-4 w-4" /></button>
+                  {shareOpen && (
+                    <div className="absolute right-0 top-12 z-20 w-56 rounded-2xl border border-zinc-100 bg-white p-3 shadow-2xl">
+                      <p className="pb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Share this product</p>
+                      <button onClick={copyLink} className="flex w-full items-center justify-between rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-600"><span className="flex items-center gap-2"><Link2 className="h-3.5 w-3.5" /> Copy product link</span>{copied && <Check className="h-3.5 w-3.5 text-emerald-500" />}</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <Trust icon={ShieldCheck} label="Secure checkout" />
+              <Trust icon={Zap} label="Instant access" />
+              <Trust icon={RotateCcw} label="Lifetime library" />
+            </div>
+
+            <div className="rounded-2xl border border-zinc-100 bg-white p-5">
+              <p className="mb-3 text-sm font-semibold text-zinc-900">What's included</p>
+              <ul className="space-y-2.5">
+                {highlights.map((highlight) => <li key={highlight} className="flex items-start gap-2 text-sm text-zinc-600"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{highlight}</li>)}
+              </ul>
+            </div>
+          </section>
+
+          {isProductOwned && availablePaidUpdates.length > 0 && (
+            <section className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 shadow-sm">
+              <div className="flex items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-500 text-white"><Zap size={20} /></span><div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-wider text-amber-700">Course upgrade available</p><h2 className="mt-0.5 text-base font-black text-zinc-900">{availablePaidUpdates[0].title}</h2><p className="mt-1 text-xs leading-5 text-zinc-600">New modules or files were added after your original purchase. Review exactly what is new before upgrading.</p></div></div>
+              <button onClick={() => document.getElementById("pdp-purchase-options")?.scrollIntoView({ behavior: "smooth", block: "start" })} className="mt-4 w-full rounded-2xl bg-zinc-900 py-3 text-sm font-black text-white">View upgrade · {formatPrice(availablePaidUpdates[0].cashPrice)}</button>
+            </section>
           )}
 
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-slate-400"><ShieldCheck size={14} /> Authentication required before checkout</p>
-        </section>
-      </main>
-    </div>
-  );
-}
+          {(modules.length > 0 || availablePaidUpdates.length > 0) && (
+            <section id="pdp-purchase-options" className="scroll-mt-32">
+              <div className="mb-3 px-1"><h2 className="text-lg font-bold text-zinc-900">Choose your access</h2><p className="text-xs text-zinc-500">Buy the full product, selected modules, resources, or available updates.</p></div>
+              <PdpPurchaseBuilder
+                product={product}
+                isProductOwned={isProductOwned}
+                ownedUpdateIds={updates}
+                ownedModuleIds={ownedModuleIds}
+                ownedResourceIds={ownedResourceIds}
+                returnRoute={`#/product/${encodeURIComponent(product.id)}`}
+                onPreview={handlePreview}
+              />
+            </section>
+          )}
 
-function ProductSummary({ product, discount }: { product: Product; discount: number }) {
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-end gap-3">
-        <span className="text-3xl font-black sm:text-4xl">{product.price === 0 ? "Free" : `₹${product.price.toLocaleString("en-IN")}`}</span>
-        {product.originalPrice > product.price && <span className="pb-1 text-base text-slate-400 line-through">₹{product.originalPrice.toLocaleString("en-IN")}</span>}
-        {discount > 0 && <span className="mb-1 rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">SAVE {discount}%</span>}
+          <DetailsCard product={product} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
+          <ReviewsCard
+            product={product}
+            reviews={productReviews}
+            canReview={Boolean(user && isProductOwned)}
+            composerOpen={reviewComposerOpen}
+            rating={reviewRating}
+            comment={reviewComment}
+            submitting={reviewSubmitting}
+            notice={reviewNotice}
+            onToggleComposer={() => setReviewComposerOpen((open) => !open)}
+            onRating={setReviewRating}
+            onComment={setReviewComment}
+            onSubmit={() => void submitReview()}
+          />
+          {related.length > 0 && <RelatedProducts products={related} onNavigate={onNavigateToProduct} />}
+        </div>
       </div>
     </div>
   );
 }
 
-function ProductDescription({ product }: { product: Product }) {
+function DetailsCard({ product, tab, onTab, expandedModule, onExpandModule }: { product: Product; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void }) {
+  const modules = product.canonicalModules || [];
+  const tabs: DetailTab[] = ["Description", "Curriculum", "Instructor"];
   return (
-    <p className="text-sm leading-6 text-slate-600">{product.description || `Get complete access to this ${product.category.toLowerCase()} resource, designed for focused learning and practical progress.`}</p>
-  );
-}
-
-function LegacyCheckoutCard({ product, discount, onCheckout, isProductOwned }: { product: Product; discount: number; onCheckout: (price: number) => void; isProductOwned: boolean }) {
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-wrap items-end gap-3">
-        <span className="text-4xl font-black">{isProductOwned ? "Owned" : product.price === 0 ? "Free" : `₹${product.price.toLocaleString("en-IN")}`}</span>
-        {product.originalPrice > product.price && <span className="pb-1 text-lg text-slate-400 line-through">₹{product.originalPrice.toLocaleString("en-IN")}</span>}
-        {discount > 0 && <span className="mb-1 rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">SAVE {discount}%</span>}
+    <section className="rounded-3xl border border-zinc-100 bg-white p-4 shadow-sm">
+      <div className="mb-5 flex gap-1 overflow-x-auto rounded-2xl bg-zinc-100/70 p-1.5">
+        {tabs.map((item) => <button key={item} onClick={() => onTab(item)} className={`flex-1 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition ${tab === item ? "bg-white text-zinc-900 shadow" : "text-zinc-500"}`}>{item}</button>)}
       </div>
-      <ul className="mt-5 space-y-3 text-sm font-semibold text-slate-600">
-        {["Access from your purchases library", "Available on mobile and desktop", "Account-linked secure delivery"].map((item) => <li key={item} className="flex items-center gap-2"><span className="grid h-5 w-5 place-items-center rounded-full bg-emerald-100 text-emerald-700"><ShieldCheck size={13} /></span>{item}</li>)}
-      </ul>
-      <button onClick={() => onCheckout(product.price)} className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-violet-200 transition hover:brightness-110 active:scale-[0.99]"><ShoppingBag size={19} />{isProductOwned ? "Open owned course" : product.price === 0 ? "Get instant access" : "Continue to secure checkout"}</button>
-    </div>
+      {tab === "Description" && (
+        <div className="space-y-4"><p className="text-sm leading-relaxed text-zinc-600">{product.description || `Complete information for ${product.title}.`}</p><div className="grid grid-cols-2 gap-3"><Fact label="Format" value={product.category} /><Fact label="Level" value={product.classLevel} /><Fact label="Subject" value={product.subject} /><Fact label="Access" value="Purchases library" /></div></div>
+      )}
+      {tab === "Curriculum" && (
+        modules.length === 0 ? <EmptyDetail text="No curriculum has been published for this product yet." /> : <div className="space-y-2">{modules.map((module, index) => {
+          const open = expandedModule === module.id;
+          return <div key={module.id} className="overflow-hidden rounded-2xl border border-zinc-100"><button onClick={() => onExpandModule(open ? null : module.id)} className="flex w-full items-center gap-3 bg-zinc-50/60 px-3 py-3 text-left"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">{index + 1}</span><span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-800">{module.title}</span><span className="text-[10px] text-zinc-400">{module.resources?.length || 0} resources</span><ChevronDown className={`h-4 w-4 text-zinc-400 transition ${open ? "rotate-180" : ""}`} /></button>{open && <div className="space-y-2 px-4 py-3">{module.resources?.length ? module.resources.map((resource) => <div key={resource.id} className="flex items-center gap-2 text-xs text-zinc-500"><PlayCircle className="h-4 w-4 text-zinc-300" /><span className="min-w-0 flex-1 truncate">{resource.name}</span><span className="uppercase text-[9px] text-zinc-400">{resource.type}</span></div>) : <p className="text-xs text-zinc-400">Module details will appear here when published.</p>}</div>}</div>;
+        })}</div>
+      )}
+      {tab === "Instructor" && <div className="flex items-start gap-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-700 via-zinc-500 to-zinc-800 text-lg font-bold text-white shadow-lg">{initials(product.instructor)}</div><div><p className="font-bold text-zinc-900">{product.instructor}</p><p className="text-xs text-zinc-500">Creator of {product.title}</p><p className="mt-2 text-sm leading-relaxed text-zinc-500">Instructor information is synced from this live product's catalog record.</p></div></div>}
+    </section>
   );
 }
 
-function Trust({ label }: { label: string }) {
-  return <div className="rounded-2xl border border-slate-200 bg-white px-2 py-3 text-center text-[11px] font-black text-slate-600"><ShieldCheck className="mx-auto mb-1 h-4 w-4 text-emerald-600" />{label}</div>;
+function ReviewsCard({ product, reviews, canReview, composerOpen, rating, comment, submitting, notice, onToggleComposer, onRating, onComment, onSubmit }: {
+  product: Product;
+  reviews: PublishedProductReview[];
+  canReview: boolean;
+  composerOpen: boolean;
+  rating: number;
+  comment: string;
+  submitting: boolean;
+  notice: string;
+  onToggleComposer: () => void;
+  onRating: (rating: number) => void;
+  onComment: (comment: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <section id="product-reviews" className="scroll-mt-36 rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-bold text-zinc-900">Ratings & Reviews</h2>
+        <button onClick={onToggleComposer} className="rounded-full bg-zinc-900 px-3 py-2 text-[11px] font-semibold text-white">{composerOpen ? "Cancel" : canReview ? "Write a review" : "Review eligibility"}</button>
+      </div>
+      <div className="mt-5 flex items-center gap-5 rounded-2xl bg-zinc-50/70 p-5">
+        <div className="text-center"><span className="text-4xl font-extrabold text-zinc-900">{product.rating.toFixed(1)}</span><RatingStars rating={product.rating} className="mt-1" /></div>
+        <div className="h-14 w-px bg-zinc-200" />
+        <div><p className="text-sm font-semibold text-zinc-700">{product.reviews.toLocaleString("en-IN")} rating{product.reviews === 1 ? "" : "s"}</p><p className="mt-1 text-xs text-zinc-400">Live aggregate from the product catalog</p></div>
+      </div>
+      {composerOpen && (
+        <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+          {canReview ? (
+            <>
+              <p className="text-xs font-semibold text-zinc-700">Your rating</p>
+              <div className="mt-2 flex gap-1">{[1, 2, 3, 4, 5].map((value) => <button key={value} onClick={() => onRating(value)} aria-label={`${value} stars`}><Star className={`h-6 w-6 ${value <= rating ? "fill-amber-400 text-amber-400" : "text-zinc-300"}`} /></button>)}</div>
+              <textarea value={comment} onChange={(event) => onComment(event.target.value.slice(0, 2000))} rows={4} placeholder="Share your experience with this product…" className="mt-3 w-full resize-none rounded-xl border border-zinc-200 bg-white p-3 text-sm outline-none focus:border-zinc-400" />
+              <button disabled={submitting} onClick={onSubmit} className="mt-3 w-full rounded-xl bg-zinc-900 py-3 text-sm font-bold text-white disabled:opacity-60">{submitting ? "Submitting…" : "Submit for review"}</button>
+            </>
+          ) : <p className="text-xs leading-relaxed text-zinc-500">Sign in and purchase this product to submit a genuine learner review.</p>}
+        </div>
+      )}
+      {notice && <p className="mt-3 rounded-xl bg-indigo-50 p-3 text-xs font-medium text-indigo-700">{notice}</p>}
+      {reviews.length > 0 ? (
+        <div className="mt-4 space-y-3">
+          {reviews.map((review) => (
+            <article key={review.id} className="rounded-2xl border border-zinc-100 bg-zinc-50/40 p-4">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>{review.initials}</div>
+                <div className="min-w-0 flex-1"><p className="flex items-center gap-1 text-sm font-semibold text-zinc-800"><span className="truncate">{review.name}</span>{review.verifiedPurchase && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}</p><p className="text-[11px] text-zinc-400">{review.date}</p></div>
+                <RatingStars rating={review.rating} />
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-zinc-600">“{review.comment}”</p>
+            </article>
+          ))}
+        </div>
+      ) : <p className="mt-4 text-center text-xs text-zinc-400">Published written reviews will appear here when available.</p>}
+    </section>
+  );
 }
 
-// Re-export the summary helper used by tests / future parts.
-export { computeSummary };
+function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavigate?: (product: Product) => void }) {
+  return (
+    <section className="rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm">
+      <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-bold text-zinc-900">You may also like</h2><p className="text-[10px] text-zinc-400">Matched from the live catalog</p></div><ArrowUpRight className="h-4 w-4 text-zinc-400" /></div>
+      <div className="space-y-3">{products.map((item) => <button key={item.id} onClick={() => onNavigate?.(item)} className="group flex w-full overflow-hidden rounded-2xl border border-zinc-100 bg-white text-left transition hover:shadow-lg"><img src={item.image} alt={item.title} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-zinc-800">{item.title}</span><span className="flex items-center gap-1 text-xs text-zinc-500"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-zinc-900">{formatPrice(item.price)}</span></span></button>)}</div>
+    </section>
+  );
+}
+
+function RatingStars({ rating, className = "" }: { rating: number; className?: string }) {
+  return <span className={`flex items-center gap-0.5 ${className}`}>{Array.from({ length: 5 }).map((_, index) => <Star key={index} className={`h-3.5 w-3.5 ${rating >= index + 0.5 ? "fill-amber-400 text-amber-400" : "text-zinc-300"}`} />)}</span>;
+}
+
+function Meta({ icon: Icon, text }: { icon: typeof Clock; text: string }) { return <div className="flex min-w-0 items-center gap-2"><Icon className="h-4 w-4 shrink-0 text-zinc-400" /><span className="truncate">{text}</span></div>; }
+function Trust({ icon: Icon, label }: { icon: typeof ShieldCheck; label: string }) { return <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-zinc-100 bg-white px-1 py-3 text-center shadow-sm"><Icon className="h-4 w-4 text-zinc-700" /><span className="text-[9px] font-medium text-zinc-500">{label}</span></div>; }
+function Fact({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-zinc-50 p-3"><p className="text-[10px] uppercase tracking-wide text-zinc-400">{label}</p><p className="mt-1 truncate text-xs font-semibold text-zinc-800">{value}</p></div>; }
+function EmptyDetail({ text }: { text: string }) { return <div className="flex flex-col items-center rounded-2xl bg-zinc-50 py-8 text-center"><PackageOpen className="h-7 w-7 text-zinc-300" /><p className="mt-2 px-5 text-xs text-zinc-400">{text}</p></div>; }
+function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "DC"; }
+function MissingProduct({ onBack }: { onBack: () => void }) { return <div className="grid min-h-[70vh] place-items-center bg-slate-50 px-6 text-center"><div><ShoppingBag className="mx-auto h-12 w-12 text-slate-300" /><h1 className="mt-4 text-2xl font-black text-slate-900">Product not found</h1><p className="mt-2 text-sm text-slate-500">It may have been hidden or removed from the live catalog.</p><button onClick={onBack} className="mt-6 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white">Back to store</button></div></div>; }

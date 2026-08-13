@@ -49,6 +49,7 @@ import {
 } from "../../utils/entitlements";
 import { applyCouponRedemption, loadCouponByCode } from "./coupons";
 import type { CouponDoc } from "../../utils/coupons";
+import { ensureReferralCoupon } from "./referrals";
 import {
   collectSubscriptionEntitlementIds,
   loadPlanById,
@@ -544,9 +545,14 @@ export const grantSubscriptionFromQuote = async (
   const moduleUnlocks = (quote.verifiedLineItems || [])
     .filter((line) => line.kind === "subscription_features" && line.productId && line.moduleId)
     .map((line) => ({ planId: plan.id, productId: String(line.productId), moduleId: String(line.moduleId), active: true }));
+  const effectivePlan: SubscriptionPlanDoc = {
+    ...plan,
+    includedProductIds: Array.from(new Set([...(plan.includedProductIds || []), ...productUnlocks.map((unlock) => unlock.productId)])),
+    includedModuleKeys: Array.from(new Set([...(plan.includedModuleKeys || []), ...moduleUnlocks.map((unlock) => `${unlock.productId}:${unlock.moduleId}`)])),
+  };
   // Subscription-specific entitlement ids.
   const subscriptionEntitlementIds = collectSubscriptionEntitlementIds({
-    plan,
+    plan: effectivePlan,
     cycle,
     selectedFeatureIds: uniqueFeatures,
     productUnlocks: productUnlocks as never,
@@ -559,11 +565,15 @@ export const grantSubscriptionFromQuote = async (
   // `subscriptions/{uid}/current` doc is the idempotency key (a
   // re-write overwrites with the same values).
   const result = await adminDb().runTransaction(async (tx) => {
-    // 1. Per-feature / per-unlock entitlements.
-    for (const entId of subscriptionEntitlementIds) {
-      const ref = adminDb().collection("entitlements").doc(`${quote.uid}__${entId}`);
-      const existing = await tx.get(ref);
-      if (existing.exists) continue;
+    // Firestore requires every transaction read before its first write.
+    const subscriptionRef = adminDb().collection("users").doc(quote.uid).collection("subscription").doc("current");
+    const existingSubscriptionSnapshot = await tx.get(subscriptionRef);
+    // 1. Per-feature / per-unlock entitlements. Read every target first.
+    const entitlementEntries = subscriptionEntitlementIds.map((entId) => ({ entId, ref: adminDb().collection("entitlements").doc(`${quote.uid}__${entId}`) }));
+    const existingEntitlements = await Promise.all(entitlementEntries.map((entry) => tx.get(entry.ref)));
+    for (let index = 0; index < entitlementEntries.length; index += 1) {
+      const { entId, ref } = entitlementEntries[index];
+      if (existingEntitlements[index].exists) continue;
       tx.set(
         ref,
         {
@@ -590,7 +600,7 @@ export const grantSubscriptionFromQuote = async (
     // 2. The subscription record.
     const sub = await writeSubscriptionAfterPayment(tx, {
       uid: quote.uid,
-      plan,
+      plan: effectivePlan,
       cycle,
       selectedFeatureIds: uniqueFeatures,
       orderId,
@@ -600,9 +610,19 @@ export const grantSubscriptionFromQuote = async (
       couponCode: quote.couponCode || null,
       requestedEduCoins: Number(quote.eduCoinsReserved || 0),
       now,
+      existingSubscription: { exists: existingSubscriptionSnapshot.exists, data: existingSubscriptionSnapshot.data() || {} },
     });
     return sub;
   });
+  // Every successfully activated subscriber receives one stable referral
+  // identity. The helper is idempotent, so renewals preserve usage counts.
+  try {
+    await ensureReferralCoupon({ uid: quote.uid });
+  } catch (error) {
+    // Referral provisioning is recoverable and must never turn an already
+    // verified subscription payment into a client-visible failure.
+    console.error("Referral provisioning failed", error);
+  }
   return {
     ok: true,
     plan,

@@ -1,4 +1,5 @@
 import { BellIcon, BookIcon, CartIcon, CrownIcon } from "./icons";
+import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
 
 type HeaderProps = {
   cartCount: number;
@@ -10,11 +11,12 @@ type HeaderProps = {
 
 export default function Header({
   cartCount,
-  notifCount,
   onNavigateToSubscription,
   onNavigateToCart,
   onNavigateToNotifications,
 }: HeaderProps) {
+  const liveNotificationCount = useUnreadNotificationCount();
+  const displayedNotificationCount = liveNotificationCount ?? 0;
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur">
       <div className="flex items-center justify-between gap-3">
@@ -49,9 +51,9 @@ export default function Header({
             className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 active:scale-95"
           >
             <BellIcon className="h-5 w-5" />
-            {notifCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
-                {notifCount}
+            {displayedNotificationCount > 0 && (
+              <span aria-label={`${displayedNotificationCount} unread notifications`} className="absolute -top-0.5 -right-0.5 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-indigo-600 px-1 text-[9px] font-bold text-white">
+                {displayedNotificationCount > 99 ? "99+" : displayedNotificationCount}
               </span>
             )}
           </button>

@@ -131,6 +131,8 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
   const moduleLines = lineItemsForDisplay.filter((line) => line.kind === "selected_modules");
   const resourceLines = lineItemsForDisplay.filter((line) => line.kind === "selected_resources");
   const updateLines = lineItemsForDisplay.filter((line) => line.kind === "paid_update");
+  const subscriptionPlanLines = lineItemsForDisplay.filter((line) => line.kind === "subscription");
+  const subscriptionAddonLines = lineItemsForDisplay.filter((line) => line.kind === "subscription_features");
   const productLines = lineItemsForDisplay.filter((line) => line.kind === "full_product" || line.kind === "cart_bundle" || line.kind === "free_entitlement");
 
   return (
@@ -248,11 +250,26 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
             />
           ) : null}
           {kind === "paid_update" ? (
-            <SelectionList
-              title={`Update contents (${updateLines.length})`}
-              emptyLabel="No update contents recorded."
-              lines={updateLines}
-            />
+            <div className="space-y-3">
+              <SelectionList
+                title="Upgrade package"
+                emptyLabel="No update package recorded."
+                lines={updateLines}
+              />
+              {updateLines.flatMap((line) => line.detailItems || []).length > 0 ? (
+                <div className="rounded-2xl bg-violet-50 p-3 ring-1 ring-violet-100">
+                  <p className="text-xs font-black uppercase tracking-wider text-violet-700">New content included</p>
+                  <ul className="mt-2 space-y-1.5">{updateLines.flatMap((line) => line.detailItems || []).map((item) => <li key={item} className="flex items-center gap-2 text-xs font-semibold text-violet-900"><BadgeCheck size={12} className="shrink-0" />{item}</li>)}</ul>
+                  <p className="mt-2 text-[10px] text-violet-600">Your existing course stays owned; this checkout adds only the listed upgrade content.</p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {kind === "subscription" || kind === "subscription_features" ? (
+            <div className="space-y-3">
+              <SelectionList title="Subscription plan" emptyLabel="Plan details unavailable." lines={subscriptionPlanLines} />
+              <SelectionList title={`Included add-ons & products (${subscriptionAddonLines.length})`} emptyLabel="No optional add-ons selected." lines={subscriptionAddonLines} />
+            </div>
           ) : null}
           {kind === "cart_bundle" ? (
             <SelectionList

@@ -11,7 +11,7 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     function protectedUserFieldsUnchanged() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'purchasedProductIds']);
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'purchasedProductIds', 'referralCode', 'subscriptionPlanId', 'subscriptionTier', 'subscriptionExpiresAt']);
     }
     function communityVerificationAllowedOnCreate() {
       return isAdmin()
@@ -34,6 +34,7 @@ service cloud.firestore {
         && request.resource.data.uid == uid
         && request.resource.data.role == 'user'
         && request.resource.data.status == 'active'
+        && !request.resource.data.keys().hasAny(['referralCode', 'subscriptionPlanId', 'subscriptionTier', 'subscriptionExpiresAt'])
         && (!('purchasedProductIds' in request.resource.data) || request.resource.data.purchasedProductIds == []);
       allow update: if isOwner(uid) && protectedUserFieldsUnchanged();
       allow write: if isAdmin();
@@ -52,6 +53,24 @@ service cloud.firestore {
         allow update, delete: if isAdmin();
       }
 
+      match /subscription/{documentId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow update: if documentId == 'current' && isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['renewalReminderOptOut']);
+        allow create, delete: if isAdmin();
+      }
+
+      match /myDay/{documentId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && documentId == 'current'
+          && exists(/databases/$(database)/documents/users/$(uid)/subscription/current)
+          && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.status == 'active'
+          && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.expiresAt > request.time
+          && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.features.hasAny(['my-day']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
       match /courseProgress/{productId} {
         allow read: if isOwner(uid) || isAdmin();
         allow create, update: if isOwner(uid)
@@ -67,6 +86,13 @@ service cloud.firestore {
           && request.resource.data.uid == uid
           && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds']);
         allow delete: if sessionId == 'current' && isOwner(uid);
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow update: if isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+        allow create, delete: if isAdmin();
       }
 
       match /webPushSubscriptions/{subscriptionId} {
@@ -122,6 +148,29 @@ service cloud.firestore {
     match /siteProducts/{productId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // Public surfaces may query moderation-approved reviews only. Signed-in
+    // learners can submit a pending review for themselves; only an admin can
+    // publish, edit, or delete it. Home/PDP order the approved result by the
+    // latest createdAt value on the client, so no composite index is needed.
+    match /siteReviews/{reviewId} {
+      allow read: if resource.data.status == 'published';
+      allow create: if signedIn()
+        && request.resource.data.status == 'pending'
+        && request.resource.data.productId is string
+        && request.resource.data.productId.size() > 0
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() > 0
+        && request.resource.data.comment.size() <= 2000
+        && request.resource.data.verifiedPurchase == false
+        && (request.resource.data.customerId == request.auth.uid
+          || request.resource.data.userId == request.auth.uid
+          || request.resource.data.uid == request.auth.uid);
+      allow update, delete: if isAdmin();
     }
 
     match /siteOrders/{orderId} {

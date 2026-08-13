@@ -33,7 +33,14 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     ? numericPrice(data.price)
     : numericPrice(data.salePrice);
   const regularPrice = numericPrice(data.price);
-  const image = String(data.productImages?.card || data.images?.[0] || data.image || "/images/hero-main.jpg");
+  const configuredImages = [
+    ...(Array.isArray(data.images) ? data.images : []),
+    data.productImages?.card,
+    data.image,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter((value, index, list) => Boolean(value) && list.indexOf(value) === index);
+  const image = configuredImages[0] || "/images/hero-main.jpg";
   const rating = Number(data.manualRating ?? data.rating ?? data.calculatedRating ?? 0);
   const tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
 
@@ -51,6 +58,7 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     title: String(data.title || "Untitled product"),
     instructor: String(data.instructor?.name || data.instructor || data.author || data.brand || "Digital Catalyst"),
     image,
+    images: configuredImages.length > 0 ? configuredImages : [image],
     category: mapCategory(data),
     classLevel: String(data.dimensions || data.level || "Lifetime access"),
     subject: String(data.subject || data.category || "Digital learning"),

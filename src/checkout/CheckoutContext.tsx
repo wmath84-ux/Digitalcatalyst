@@ -186,7 +186,7 @@ export function CheckoutProvider({
     abortRef.current = controller;
     const body: Record<string, unknown> = { selection: record.selection };
     if (record.idempotencyKey) body.idempotencyKey = record.idempotencyKey;
-    const response = await fetchImpl("/api/quotes/create", {
+    const requestQuote = () => fetchImpl("/api/quotes/create", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -195,15 +195,38 @@ export function CheckoutProvider({
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-    let payload: { ok?: boolean; quote?: ServerPriceQuote; error?: string } = {};
+
+    // A serverless cold start or transient gateway failure should not strand
+    // the buyer on the recovery screen. Retry once; validation and auth
+    // failures are intentionally never retried.
+    let response = await requestQuote();
+    if ([500, 502, 503, 504].includes(response.status)) {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      response = await requestQuote();
+    }
+
+    let payload: { ok?: boolean; quote?: ServerPriceQuote; error?: string; code?: string } = {};
     try {
       payload = await response.json();
     } catch {
-      // ignore: server may have returned empty body
+      // Vercel may return an empty/plain-text gateway response. The status
+      // mapping below still gives the buyer an actionable message.
     }
     if (!response.ok || !payload.ok || !payload.quote) {
-      const code = response.status === 401 ? "auth_required" : response.status === 404 ? "not_found" : response.status === 403 ? "forbidden" : "server_error";
-      throw makeError(payload.error || `Server returned ${response.status}.`, code, response.status);
+      const code = payload.code
+        || (response.status === 401
+          ? "auth_required"
+          : response.status === 404
+            ? "not_found"
+            : response.status === 403
+              ? "forbidden"
+              : response.status === 503
+                ? "service_unavailable"
+                : "server_error");
+      const fallbackMessage = response.status >= 500
+        ? "Secure pricing is temporarily unavailable. Please try again shortly."
+        : `The pricing service returned ${response.status}.`;
+      throw makeError(payload.error || fallbackMessage, code, response.status);
     }
     return payload.quote;
   }, []);

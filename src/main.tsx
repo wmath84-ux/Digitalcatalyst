@@ -1,5 +1,7 @@
 import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
 import "./index.css";
 import "./landing.css";
 import StoreApp from "./App";
@@ -7,6 +9,7 @@ import HomeApp from "./home/App";
 import PdpApp from "./PdpApp";
 import CheckoutApp from "./components/checkout/CheckoutApp";
 import MyDayApp from "./MyDayApp";
+import LeaderboardApp from "./LeaderboardApp";
 import ProfileApp from "./profile/App";
 import CourseRouteGuard from "./components/CourseRouteGuard";
 import CartWishlistApp from "./CartWishlistApp";
@@ -23,6 +26,8 @@ import { CheckoutProvider } from "./checkout/CheckoutContext";
 import { clearAdminSession, hasAdminSession } from "./utils/adminSession";
 import { useOwnedUpdateIds } from "./hooks/useOwnedUpdates";
 import { type CheckoutReturnRoute } from "./checkout/types";
+import { buildContentNotificationInventory, createContentNotifications, loadContentNotificationBaseline, loadSiteNotifications, mergeSiteNotifications, saveContentNotificationBaseline, saveSiteNotifications, type SiteNotification } from "../utils/siteNotifications";
+import { getRenewalReminder } from "../utils/subscriptionRenewal";
 import { buildCheckoutSessionRecord, writeToSessionStorage as writeCheckoutToStorage } from "../utils/checkoutSession";
 import type { CheckoutSelection } from "./types/commerce";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
@@ -41,6 +46,7 @@ const STORE_HASH = "#/store";
 const PRODUCT_HASH = "#/product/";
 const CHECKOUT_HASH = "#/checkout";
 const MY_DAY_HASH = "#/my-day";
+const LEADERBOARD_HASH = "#/leaderboard";
 const PROFILE_HASH = "#/profile";
 const COURSE_HASH = "#/course/";
 const CART_HASH = "#/cart";
@@ -65,11 +71,60 @@ function InvalidCheckout({ onBack }: { onBack: () => void }) {
  * the two PdpApp call-sites (PDP route + course route when not yet owned)
  * stay identical and the PDP doesn't have to know about Firestore.
  */
-function PdpWithOwnership({ product, onCheckout, onBack }: { product: import("./data/products").Product | null; onCheckout: (price: number) => void; onBack: () => void }) {
-  const purchasedIds = useCatalog().purchasedIds;
+function PdpWithOwnership({
+  product,
+  onCheckout,
+  onCheckoutSelection,
+  onBack,
+  cartIds,
+  favoriteIds,
+  onAddToCart,
+  onToggleFavorite,
+  onNavigateToProduct,
+  onOpenCourse,
+  onNavigateToCart,
+  onNavigateToSubscription,
+  onNavigateToNotifications,
+  onNavigateFooter,
+}: {
+  product: import("./data/products").Product | null;
+  onCheckout: (price: number) => void;
+  onCheckoutSelection: (selection: CheckoutSelection, price: number) => void;
+  onBack: () => void;
+  cartIds: Set<string>;
+  favoriteIds: Set<string>;
+  onAddToCart: (id: string) => void;
+  onToggleFavorite: (id: string) => void;
+  onNavigateToProduct: (product: import("./data/products").Product) => void;
+  onOpenCourse: (product: import("./data/products").Product) => void;
+  onNavigateToCart: () => void;
+  onNavigateToSubscription: () => void;
+  onNavigateToNotifications: () => void;
+  onNavigateFooter: (tab: import("./components/BottomNav").TabKey) => void;
+}) {
+  const { products, purchasedIds } = useCatalog();
   const ownedUpdateIds = useOwnedUpdateIds(product?.id || null);
-  if (!product) return <PdpApp product={null} onCheckout={onCheckout} onBack={onBack} />;
-  return <PdpApp product={product} onCheckout={onCheckout} onBack={onBack} purchasedIds={purchasedIds} ownedUpdateIds={ownedUpdateIds} />;
+  return (
+    <PdpApp
+      product={product}
+      products={products}
+      cartIds={cartIds}
+      favoriteIds={favoriteIds}
+      onCheckout={onCheckout}
+      onCheckoutSelection={onCheckoutSelection}
+      onBack={onBack}
+      onAddToCart={onAddToCart}
+      onToggleFavorite={onToggleFavorite}
+      onNavigateToProduct={onNavigateToProduct}
+      onOpenCourse={onOpenCourse}
+      onNavigateToCart={onNavigateToCart}
+      onNavigateToSubscription={onNavigateToSubscription}
+      onNavigateToNotifications={onNavigateToNotifications}
+      onNavigateFooter={onNavigateFooter}
+      purchasedIds={purchasedIds}
+      ownedUpdateIds={ownedUpdateIds}
+    />
+  );
 }
 
 const AUTH_REQUIRED_PREFIXES = [
@@ -120,13 +175,28 @@ const startCheckout = ({
   window.location.hash = CHECKOUT_HASH;
 };
 
+function AppLaunchSplash({ label = "Preparing your learning space…" }: { label?: string }) {
+  return (
+    <main className="app-boot-splash" role="status" aria-live="polite" aria-label="Loading Eduvora">
+      <div className="app-boot-content">
+        <img className="app-boot-icon" src="/icons/icon-192x192.svg" alt="Eduvora" />
+        <p className="app-boot-title">Eduvora</p>
+        <p className="app-boot-label">{label}</p>
+        <div className="app-boot-track" aria-hidden="true"><div className="app-boot-bar" /></div>
+      </div>
+    </main>
+  );
+}
+
 function Root() {
   const { user, loading, logout } = useAuth();
-  const { products: catalogProducts, purchasedIds } = useCatalog();
+  const { products: catalogProducts, purchasedIds, loading: catalogLoading } = useCatalog();
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const landingRouteRequested = !hash || hash.startsWith(LANDING_HASH);
+  const redirectingSignedInUser = Boolean(user && user.role !== "admin" && landingRouteRequested);
 
   const shoppingProducts: CartProduct[] = useMemo(() => catalogProducts.map((product) => ({
     id: product.id,
@@ -164,6 +234,33 @@ function Root() {
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
+
+  useEffect(() => {
+    if (loading || !user || user.role === "admin" || !landingRouteRequested) return;
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${HOME_HASH}`);
+    setHash(HOME_HASH);
+  }, [landingRouteRequested, loading, user]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    return onSnapshot(doc(db, "users", user.id, "subscription", "current"), (snapshot) => {
+      const reminder = getRenewalReminder(snapshot.data() || null);
+      if (!reminder) return;
+      const incoming: SiteNotification = { ...reminder, category: "subscription", read: false, source: "system" };
+      saveSiteNotifications(user.id, mergeSiteNotifications(loadSiteNotifications(user.id), [incoming]));
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || catalogProducts.length === 0) return;
+    const current = buildContentNotificationInventory({ products: catalogProducts, articles: [], announcements: [], purchasedProductIds: Array.from(purchasedIds) });
+    const previous = loadContentNotificationBaseline(user.id);
+    if (previous) {
+      const incoming = createContentNotifications(previous, current);
+      if (incoming.length > 0) saveSiteNotifications(user.id, mergeSiteNotifications(loadSiteNotifications(user.id), incoming));
+    }
+    saveContentNotificationBaseline(user.id, current);
+  }, [catalogProducts, purchasedIds, user]);
 
   useEffect(() => {
     if (loading || user || !requiresAuthentication(hash)) return;
@@ -288,6 +385,11 @@ function Root() {
     window.location.hash = `${PRODUCT_HASH}${encodeURIComponent(product.id)}`;
   };
 
+  const navigateToProductReview = (product: NavigableProduct) => {
+    sessionStorage.setItem("selectedProduct", JSON.stringify(product));
+    window.location.hash = `${PRODUCT_HASH}${encodeURIComponent(product.id)}?section=reviews`;
+  };
+
   const navigateToCourse = (course: { id: string; title: string }) => {
     sessionStorage.setItem("selectedCourse", JSON.stringify({ courseId: course.id, title: course.title }));
     window.location.hash = `${COURSE_HASH}${encodeURIComponent(course.id)}`;
@@ -333,9 +435,39 @@ function Root() {
     });
   };
 
+  const navigatePdpSelectionToCheckout = (selection: CheckoutSelection, finalPrice: number) => {
+    if (!user) {
+      sessionStorage.setItem("pendingCheckoutPrice", String(finalPrice));
+      redirectToAuth(window.location.hash || PRODUCT_HASH);
+      return;
+    }
+    if (!selectedCatalogProduct) {
+      showShoppingToast("This product is no longer available");
+      window.location.hash = STORE_HASH;
+      return;
+    }
+    startCheckout({
+      selection,
+      buyer: {
+        uid: String(user.id),
+        name: user.name,
+        email: user.email,
+        mobile: null,
+        coins: user.coins,
+        emailVerified: false,
+      },
+      returnRoute: { hash: `${PRODUCT_HASH}${encodeURIComponent(selectedCatalogProduct.id)}` },
+      idempotencyKey: `${selection.purchaseKind}:${selectedCatalogProduct.id}:${user.id}:${Date.now()}`,
+    });
+  };
+
   const cartProducts = shoppingProducts.filter((product) => cartIds.has(product.id));
   const favoriteProducts = shoppingProducts.filter((product) => favoriteIds.has(product.id));
   const protectedRoutePending = requiresAuthentication(hash) && (loading || !user);
+
+  if (loading || redirectingSignedInUser || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH))) {
+    return <AppLaunchSplash label={redirectingSignedInUser ? "Opening your dashboard…" : "Preparing your learning space…"} />;
+  }
 
   if (protectedRoutePending) {
     return (
@@ -360,6 +492,8 @@ function Root() {
           window.location.hash = STORE_HASH;
         }}
         onNavigateToProduct={navigateToProduct}
+        onNavigateToProductReview={navigateToProductReview}
+        onNavigateToCourse={navigateToCourse}
         onNavigateToMyDay={() => {
           window.location.hash = MY_DAY_HASH;
         }}
@@ -455,7 +589,33 @@ function Root() {
   }
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
   if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
-  if (hash.startsWith(PRODUCT_HASH)) return <PdpWithOwnership product={selectedCatalogProduct} onCheckout={navigateToCheckout} onBack={() => { window.location.hash = STORE_HASH; }} />;
+  if (hash.startsWith(LEADERBOARD_HASH)) return <LeaderboardApp />;
+  if (hash.startsWith(PRODUCT_HASH)) {
+    return (
+      <PdpWithOwnership
+        product={selectedCatalogProduct}
+        onCheckout={navigateToCheckout}
+        onCheckoutSelection={navigatePdpSelectionToCheckout}
+        onBack={() => { window.location.hash = STORE_HASH; }}
+        cartIds={cartIds}
+        favoriteIds={favoriteIds}
+        onAddToCart={handleAddToCart}
+        onToggleFavorite={handleToggleFavorite}
+        onNavigateToProduct={navigateToProduct}
+        onOpenCourse={navigateToCourse}
+        onNavigateToCart={() => { window.location.hash = CART_HASH; }}
+        onNavigateToSubscription={() => { window.location.hash = SUBSCRIPTION_HASH; }}
+        onNavigateToNotifications={() => { window.location.hash = NOTIFICATIONS_HASH; }}
+        onNavigateFooter={(tab) => {
+          if (tab === "home") window.location.hash = HOME_HASH;
+          else if (tab === "myday") window.location.hash = MY_DAY_HASH;
+          else if (tab === "store") window.location.hash = STORE_HASH;
+          else if (tab === "purchases") window.location.hash = `${STORE_HASH}/purchases`;
+          else if (tab === "profile") window.location.hash = PROFILE_HASH;
+        }}
+      />
+    );
+  }
   if (hash.startsWith(STORE_HASH)) {
     return (
       <StoreApp
@@ -496,6 +656,8 @@ function Root() {
         window.location.hash = STORE_HASH;
       }}
       onNavigateToProduct={navigateToProduct}
+      onNavigateToProductReview={navigateToProductReview}
+      onNavigateToCourse={navigateToCourse}
       onNavigateToMyDay={() => {
         window.location.hash = MY_DAY_HASH;
       }}

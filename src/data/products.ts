@@ -6,6 +6,8 @@ export type Product = {
   title: string;
   instructor: string;
   image: string;
+  /** Ordered live gallery images configured in the product editor. */
+  images?: string[];
   category: "Notes" | "Course" | "PDF" | "E-book" | "Live";
   classLevel: string;
   subject: string;

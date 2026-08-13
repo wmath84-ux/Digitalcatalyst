@@ -11,7 +11,9 @@
 // of that is gone. Subscriptions are now paid via the same
 // quote-driven flow as products / modules / updates.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../../firebase";
 import { ChevronLeft, HelpCircle, LoaderCircle } from "lucide-react";
 import StackedCards from "./StackedCards";
 import PlanOverview from "./PlanOverview";
@@ -26,6 +28,7 @@ import HelpModal from "./HelpModal";
 import { SHOWCASE_CARDS } from "../data/showcase";
 import { FALLBACK_SUBSCRIPTION_CATALOG } from "../data/fallbackCatalog";
 import { useAuth } from "../../context/AuthContext";
+import { useCatalog } from "../../context/CatalogContext";
 import {
   startCheckout,
   type SubscriptionCatalog,
@@ -37,6 +40,8 @@ export type BillingCycle = "monthly" | "yearly";
 
 export default function SubscriptionPage() {
   const { user } = useAuth();
+  const { products: availableProducts } = useCatalog();
+  const renewalLoadedRef = useRef(false);
 
   // ---------- Server-driven state ----------
   const [catalog, setCatalog] = useState<SubscriptionCatalog | null>(null);
@@ -65,6 +70,8 @@ export default function SubscriptionPage() {
     discountPaise: number;
     label: string;
   } | null>(null);
+  const [appliedReferral, setAppliedReferral] = useState<{ code: string; discountPaise: number; label: string } | null>(null);
+  const [referralError, setReferralError] = useState<string | null>(null);
 
   // Submit / busy state. The "loading" state drives the bottom
   // bar; the actual activation is performed by the Part 5
@@ -117,9 +124,31 @@ export default function SubscriptionPage() {
     };
   }, []);
 
+  // Renewal checkout restores the user's current plan, cycle, features and
+  // bonus products so they review the exact package before paying again.
+  useEffect(() => {
+    if (!user || !catalog || renewalLoadedRef.current) return;
+    renewalLoadedRef.current = true;
+    void getDoc(doc(db, "users", user.id, "subscription", "current")).then((snapshot) => {
+      const data = snapshot.data() || {};
+      if (!snapshot.exists()) return;
+      if (catalog.plans.some((plan) => plan.id === String(data.planId || ""))) setSelectedPlanId(String(data.planId));
+      if (data.cycle === "monthly" || data.cycle === "yearly") setCycle(data.cycle);
+      const activeFeatureIds = new Set(catalog.features.map((feature) => feature.id));
+      setSelectedFeatureIds((Array.isArray(data.features) ? data.features.map(String) : []).filter((id) => activeFeatureIds.has(id)));
+      const liveProductIds = new Set(availableProducts.map((product) => product.id));
+      setSelectedCourseIds((Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : []).filter((id) => liveProductIds.has(id)));
+    });
+  }, [availableProducts, catalog, user]);
+
   // ---------- Derived ----------
   const plans: SubscriptionPlanDoc[] = catalog?.plans || [];
   const features: SubscriptionFeatureDoc[] = catalog?.features || [];
+  useEffect(() => {
+    if (features.some((feature) => feature.id === "my-day")) {
+      setSelectedFeatureIds((current) => current.length === 0 ? ["my-day"] : current);
+    }
+  }, [features]);
   const plan = useMemo(
     () => plans.find((p) => p.id === selectedPlanId) || null,
     [plans, selectedPlanId],
@@ -167,8 +196,10 @@ export default function SubscriptionPage() {
         .reduce((sum, f) => sum + (f.pricePaise || 0), 0),
     [selectedFeatureRecords, includedFeatureIds],
   );
-  const subtotalPaise = selectedPlanPricePaise + featuresTotalPaise;
-  const couponDiscountPaise = appliedCoupon?.discountPaise || 0;
+  const selectedProductRecords = useMemo(() => availableProducts.filter((product) => selectedCourseIds.includes(product.id)), [availableProducts, selectedCourseIds]);
+  const productsTotalPaise = useMemo(() => selectedProductRecords.reduce((sum, product) => sum + Math.max(0, Math.round(product.price * 100)), 0), [selectedProductRecords]);
+  const subtotalPaise = selectedPlanPricePaise + featuresTotalPaise + productsTotalPaise;
+  const couponDiscountPaise = appliedReferral?.discountPaise || appliedCoupon?.discountPaise || 0;
   // Server-validated floor: minimum payable = plan's minimum
   // payable paise (admin-set), default 0.
   const minPayablePaise = plan?.minPayablePaise || 0;
@@ -205,6 +236,8 @@ export default function SubscriptionPage() {
           requestedEduCoins: 0,
         });
         setCouponStatus("idle");
+        setAppliedReferral(null);
+        setReferralError(null);
         setAppliedCoupon({
           code,
           discountPaise,
@@ -229,6 +262,37 @@ export default function SubscriptionPage() {
     setCouponStatus("idle");
   }, []);
 
+  const handleApplyReferral = useCallback(async (rawCode: string): Promise<PromoResult> => {
+    const code = rawCode.trim().toUpperCase();
+    if (!code) return { valid: false, message: "Enter a referral code." };
+    setReferralError(null);
+    try {
+      const firebaseUser = await import("../../../firebase").then((module) => module.auth.currentUser);
+      if (!firebaseUser) throw new Error("Please sign in to apply a referral code.");
+      const token = await firebaseUser.getIdToken(true);
+      const response = await fetch("/api/subscription-referral", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ referralCode: code }),
+      });
+      const data = await response.json().catch(() => ({})) as { ok?: boolean; code?: string; discountPaise?: number; error?: string };
+      if (!response.ok || !data.ok) throw new Error(data.error || "Referral code is invalid.");
+      const discountPaise = Math.max(0, Number(data.discountPaise || 0));
+      setAppliedCoupon(null);
+      setAppliedReferral({ code: data.code || code, discountPaise, label: `₹${Math.round(discountPaise / 100)} referral discount` });
+      return { valid: true, message: "Referral code applied." };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Referral code is invalid.";
+      setReferralError(message);
+      return { valid: false, message };
+    }
+  }, []);
+
+  const handleRemoveReferral = useCallback(() => {
+    setAppliedReferral(null);
+    setReferralError(null);
+  }, []);
+
   const handleSubscribe = useCallback(async () => {
     if (!user) {
       window.location.hash = `#/auth?mode=login&return=${encodeURIComponent("#/subscription")}`;
@@ -251,7 +315,7 @@ export default function SubscriptionPage() {
           subscriptionPlanId: plan.id,
           billingCycle: cycle,
           featureIds: selectedFeatureIds,
-          couponCode: appliedCoupon?.code || null,
+          couponCode: appliedReferral?.code || appliedCoupon?.code || null,
           requestedEduCoins: 0,
           returnRoute: "#/subscription",
         },
@@ -268,7 +332,7 @@ export default function SubscriptionPage() {
       );
       setIsSubmitting(false);
     }
-  }, [user, plan, cycle, selectedFeatureIds, selectedCourseIds, appliedCoupon]);
+  }, [user, plan, cycle, selectedFeatureIds, selectedCourseIds, appliedCoupon, appliedReferral]);
 
   // ---------- Render ----------
   if (catalogLoading) {
@@ -350,7 +414,7 @@ export default function SubscriptionPage() {
         <CourseSelectTrigger
           selectedIds={selectedCourseIds}
           onOpen={() => setCourseModalOpen(true)}
-          catalog={catalog}
+          products={availableProducts}
         />
 
         {/* Feature selector trigger */}
@@ -373,6 +437,17 @@ export default function SubscriptionPage() {
             onRemove={handleRemoveCoupon}
             disabled={isSubmitting}
           />
+          <PromoCodeInput
+            kind="referral"
+            label="Have a referral code? Get the current referral discount."
+            placeholder="Enter referral code"
+            appliedCode={appliedReferral?.code ?? null}
+            appliedMessage={appliedReferral?.label ?? null}
+            errorMessage={referralError}
+            onApply={handleApplyReferral}
+            onRemove={handleRemoveReferral}
+            disabled={isSubmitting}
+          />
         </div>
 
         {/* Order summary */}
@@ -383,16 +458,16 @@ export default function SubscriptionPage() {
           featuresTotalPaise={featuresTotalPaise}
           featuresCount={selectedFeatureIds.filter((id) => !includedFeatureIds.has(id)).length}
           includedFeatureCount={includedFeatureIds.size}
+          productsCount={selectedProductRecords.length}
+          productsTotalPaise={productsTotalPaise}
           couponDiscountPaise={couponDiscountPaise}
-          couponCode={appliedCoupon?.code ?? null}
+          couponCode={appliedReferral?.code ?? appliedCoupon?.code ?? null}
           minPayablePaise={minPayablePaise}
           totalPaise={totalPaise}
         />
 
         <p className="px-5 pt-5 text-center text-[11px] leading-relaxed text-slate-400">
-          By subscribing you agree to the Terms of Service. Your subscription
-          renews automatically{" "}
-          {cycle === "monthly" ? "every month" : "every year"} until cancelled.
+          By subscribing you agree to the Terms of Service. Access lasts for the selected {cycle === "monthly" ? "monthly" : "yearly"} period. We send limited renewal reminders; every renewal requires your confirmation.
         </p>
         {submitError ? (
           <p
@@ -422,7 +497,7 @@ export default function SubscriptionPage() {
         selected={selectedCourseIds}
         onClose={() => setCourseModalOpen(false)}
         onChangeSelected={setSelectedCourseIds}
-        catalog={catalog}
+        products={availableProducts}
       />
 
       <FeatureSelectModal

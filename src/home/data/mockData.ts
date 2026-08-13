@@ -94,4 +94,15 @@ export const reviews: Review[] = [
       "Loved the e-book formatting and the ability to resume right where I left off. Highly recommend this app!",
     course: "Design Thinking Handbook",
   },
+  {
+    id: "r6",
+    name: "Aditya Singh",
+    avatarColor: "bg-violet-500",
+    initials: "AS",
+    rating: 5,
+    date: "2 months ago",
+    comment:
+      "The lessons are structured beautifully and the purchase library makes it easy to return to exactly what I was studying.",
+    course: "Digital Learning Library",
+  },
 ];
