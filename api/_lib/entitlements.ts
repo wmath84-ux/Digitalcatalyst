@@ -565,11 +565,15 @@ export const grantSubscriptionFromQuote = async (
   // `subscriptions/{uid}/current` doc is the idempotency key (a
   // re-write overwrites with the same values).
   const result = await adminDb().runTransaction(async (tx) => {
-    // 1. Per-feature / per-unlock entitlements.
-    for (const entId of subscriptionEntitlementIds) {
-      const ref = adminDb().collection("entitlements").doc(`${quote.uid}__${entId}`);
-      const existing = await tx.get(ref);
-      if (existing.exists) continue;
+    // Firestore requires every transaction read before its first write.
+    const subscriptionRef = adminDb().collection("users").doc(quote.uid).collection("subscription").doc("current");
+    const existingSubscriptionSnapshot = await tx.get(subscriptionRef);
+    // 1. Per-feature / per-unlock entitlements. Read every target first.
+    const entitlementEntries = subscriptionEntitlementIds.map((entId) => ({ entId, ref: adminDb().collection("entitlements").doc(`${quote.uid}__${entId}`) }));
+    const existingEntitlements = await Promise.all(entitlementEntries.map((entry) => tx.get(entry.ref)));
+    for (let index = 0; index < entitlementEntries.length; index += 1) {
+      const { entId, ref } = entitlementEntries[index];
+      if (existingEntitlements[index].exists) continue;
       tx.set(
         ref,
         {
@@ -606,6 +610,7 @@ export const grantSubscriptionFromQuote = async (
       couponCode: quote.couponCode || null,
       requestedEduCoins: Number(quote.eduCoinsReserved || 0),
       now,
+      existingSubscription: { exists: existingSubscriptionSnapshot.exists, data: existingSubscriptionSnapshot.data() || {} },
     });
     return sub;
   });

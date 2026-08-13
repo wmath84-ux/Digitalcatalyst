@@ -55,7 +55,9 @@ service cloud.firestore {
 
       match /subscription/{documentId} {
         allow read: if isOwner(uid) || isAdmin();
-        allow write: if isAdmin();
+        allow update: if documentId == 'current' && isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['renewalReminderOptOut']);
+        allow create, delete: if isAdmin();
       }
 
       match /myDay/{documentId} {
@@ -84,6 +86,13 @@ service cloud.firestore {
           && request.resource.data.uid == uid
           && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds']);
         allow delete: if sessionId == 'current' && isOwner(uid);
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow update: if isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+        allow create, delete: if isAdmin();
       }
 
       match /webPushSubscriptions/{subscriptionId} {

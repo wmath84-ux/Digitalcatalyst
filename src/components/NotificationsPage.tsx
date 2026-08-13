@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
+import { collection, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
+import { db } from "../../firebase";
 import Header from "./Header";
 import BottomNav, { type TabKey } from "./BottomNav";
 import {
   loadSiteNotifications,
+  mergeSiteNotifications,
   saveSiteNotifications,
   type SiteNotification,
 } from "../../utils/siteNotifications";
 import { useAuth } from "../context/AuthContext";
 import { BellIcon, BookOpenIcon, StoreIcon } from "./icons";
+import { getRenewalReminder } from "../../utils/subscriptionRenewal";
 
 type NotificationsPageProps = {
   cartCount: number;
@@ -23,6 +27,7 @@ const CATEGORY_ICON: Record<string, typeof BellIcon> = {
   unlock: BookOpenIcon,
   announcement: BellIcon,
   mayday: BellIcon,
+  subscription: BellIcon,
 };
 
 function timeAgo(ts: number): string {
@@ -50,19 +55,52 @@ export default function NotificationsPage({
     setItems(loadSiteNotifications(viewerKey));
   }, [viewerKey]);
 
+  // App-open fallback: users still receive the correct one-time reminder
+  // even when a scheduled cron or push delivery was delayed.
+  useEffect(() => {
+    if (!user) return undefined;
+    return onSnapshot(doc(db, "users", user.id, "subscription", "current"), (snapshot) => {
+      const reminder = getRenewalReminder(snapshot.data() || null);
+      if (!reminder) return;
+      const incoming: SiteNotification = { ...reminder, category: "subscription", read: false, source: "system" };
+      setItems((current) => mergeSiteNotifications(current, [incoming]));
+    });
+  }, [user]);
+
+  // Cloud notifications are written by the daily renewal scheduler and are
+  // deduplicated by stage+expiry. They sync across every signed-in device.
+  useEffect(() => {
+    if (!user) return undefined;
+    return onSnapshot(collection(db, "users", user.id, "notifications"), (snapshot) => {
+      const cloud: SiteNotification[] = snapshot.docs.map((item) => {
+        const data = item.data() || {};
+        const createdAt = data.createdAt && typeof data.createdAt.toMillis === "function" ? data.createdAt.toMillis() : Number(data.createdAt || Date.now());
+        return { id: item.id, title: String(data.title || "Subscription update"), body: String(data.body || ""), category: "subscription", createdAt, read: Boolean(data.read), source: "system", target: { type: "subscription" }, remoteNotificationId: item.id };
+      });
+      setItems((current) => mergeSiteNotifications(current, cloud));
+    });
+  }, [user]);
+
   useEffect(() => {
     saveSiteNotifications(viewerKey, items);
   }, [items, viewerKey]);
 
   const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
+  const markAllRead = () => {
+    const remoteIds = items.filter((item) => !item.read && item.remoteNotificationId).map((item) => item.remoteNotificationId!);
+    setItems((current) => current.map((item) => ({ ...item, read: true })));
+    if (user) remoteIds.forEach((id) => void updateDoc(doc(db, "users", user.id, "notifications", id), { read: true, readAt: serverTimestamp() }));
+  };
 
   const openNotification = (notification: SiteNotification) => {
     setItems((prev) => prev.map((item) => (item.id === notification.id ? { ...item, read: true } : item)));
+    if (user && notification.remoteNotificationId) void updateDoc(doc(db, "users", user.id, "notifications", notification.remoteNotificationId), { read: true, readAt: serverTimestamp() });
     const target = notification.target;
     if (target.type === "product") window.location.hash = `#/product/${encodeURIComponent(String(target.productId))}`;
     else if (target.type === "course") window.location.hash = `#/course/${encodeURIComponent(String(target.productId))}`;
     else if (target.type === "purchases") window.location.hash = "#/store/purchases";
     else if (target.type === "mayday") window.location.hash = "#/my-day";
+    else if (target.type === "subscription") window.location.hash = "#/subscription";
     else window.location.hash = "#/store";
   };
 
@@ -88,7 +126,7 @@ export default function NotificationsPage({
             {unread > 0 && (
               <button
                 type="button"
-                onClick={() => setItems((prev) => prev.map((item) => ({ ...item, read: true })))}
+                onClick={markAllRead}
                 className="text-xs font-bold text-indigo-600"
               >
                 Mark all read

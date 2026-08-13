@@ -11,7 +11,9 @@
 // of that is gone. Subscriptions are now paid via the same
 // quote-driven flow as products / modules / updates.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../../../firebase";
 import { ChevronLeft, HelpCircle, LoaderCircle } from "lucide-react";
 import StackedCards from "./StackedCards";
 import PlanOverview from "./PlanOverview";
@@ -39,6 +41,7 @@ export type BillingCycle = "monthly" | "yearly";
 export default function SubscriptionPage() {
   const { user } = useAuth();
   const { products: availableProducts } = useCatalog();
+  const renewalLoadedRef = useRef(false);
 
   // ---------- Server-driven state ----------
   const [catalog, setCatalog] = useState<SubscriptionCatalog | null>(null);
@@ -120,6 +123,23 @@ export default function SubscriptionPage() {
       cancelled = true;
     };
   }, []);
+
+  // Renewal checkout restores the user's current plan, cycle, features and
+  // bonus products so they review the exact package before paying again.
+  useEffect(() => {
+    if (!user || !catalog || renewalLoadedRef.current) return;
+    renewalLoadedRef.current = true;
+    void getDoc(doc(db, "users", user.id, "subscription", "current")).then((snapshot) => {
+      const data = snapshot.data() || {};
+      if (!snapshot.exists()) return;
+      if (catalog.plans.some((plan) => plan.id === String(data.planId || ""))) setSelectedPlanId(String(data.planId));
+      if (data.cycle === "monthly" || data.cycle === "yearly") setCycle(data.cycle);
+      const activeFeatureIds = new Set(catalog.features.map((feature) => feature.id));
+      setSelectedFeatureIds((Array.isArray(data.features) ? data.features.map(String) : []).filter((id) => activeFeatureIds.has(id)));
+      const liveProductIds = new Set(availableProducts.map((product) => product.id));
+      setSelectedCourseIds((Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : []).filter((id) => liveProductIds.has(id)));
+    });
+  }, [availableProducts, catalog, user]);
 
   // ---------- Derived ----------
   const plans: SubscriptionPlanDoc[] = catalog?.plans || [];
@@ -447,9 +467,7 @@ export default function SubscriptionPage() {
         />
 
         <p className="px-5 pt-5 text-center text-[11px] leading-relaxed text-slate-400">
-          By subscribing you agree to the Terms of Service. Your subscription
-          renews automatically{" "}
-          {cycle === "monthly" ? "every month" : "every year"} until cancelled.
+          By subscribing you agree to the Terms of Service. Access lasts for the selected {cycle === "monthly" ? "monthly" : "yearly"} period. We send limited renewal reminders; every renewal requires your confirmation.
         </p>
         {submitError ? (
           <p

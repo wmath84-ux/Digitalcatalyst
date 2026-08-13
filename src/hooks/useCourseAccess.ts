@@ -76,6 +76,12 @@ const EMPTY_PLAN: SubscriptionPlanContext = {
   resourceIds: [],
 };
 
+const timestampMillis = (value: unknown) => {
+  if (value && typeof value === "object" && "toMillis" in value && typeof (value as { toMillis?: unknown }).toMillis === "function") return (value as { toMillis: () => number }).toMillis();
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? number : 0;
+};
+
 interface UseCourseAccessArgs {
   /** The product to resolve access for. Required. */
   product: unknown | null;
@@ -188,8 +194,8 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
           planId: data.planId ? String(data.planId) : undefined,
           cycle: data.cycle === "yearly" ? "yearly" : "monthly",
           status: data.status ? String(data.status) : undefined,
-          expiresAt: Number(data.expiresAt || 0),
-          activatedAt: Number(data.activatedAt || 0),
+          expiresAt: timestampMillis(data.expiresAt),
+          activatedAt: timestampMillis(data.activatedAt),
           autoRenew: Boolean(data.autoRenew),
           includedProductIds: Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : [],
           includedModuleKeys: Array.isArray(data.includedModuleKeys) ? data.includedModuleKeys.map(String) : [],

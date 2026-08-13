@@ -19,6 +19,7 @@
 
 import { Timestamp, type Firestore } from "firebase-admin/firestore";
 import { adminDb, parseProductPricePaise } from "./firebaseAdmin";
+import { getRenewalBaseTime } from "../../utils/subscriptionRenewal";
 import {
   buildSubscriptionLineItems,
   computeCycleExpiresAt,
@@ -269,10 +270,22 @@ export const writeSubscriptionAfterPayment = async (
     couponCode: string | null;
     requestedEduCoins: number;
     now: number;
+    existingSubscription?: { exists: boolean; data: Record<string, unknown> };
   },
 ): Promise<SubscriptionRecord> => {
-  const expiresAt = computeCycleExpiresAt(args.plan, args.cycle, args.now);
   const nowTs = Timestamp.fromMillis(args.now);
+  const subRef = adminDb()
+    .collection(USER_SUBS_COLLECTION)
+    .doc(args.uid)
+    .collection(USER_SUBS_DOC)
+    .doc("current");
+  const previous = args.existingSubscription || (() => { throw new Error("Existing subscription snapshot is required before transaction writes."); })();
+  const previousData = previous.data || {};
+  const renewalBase = getRenewalBaseTime(previousData.expiresAt, args.now);
+  // Trials apply only to first activation, never to a renewal.
+  const renewalPlan = previous.exists ? { ...args.plan, trialDays: 0 } : args.plan;
+  const expiresAt = computeCycleExpiresAt(renewalPlan, args.cycle, renewalBase);
+  const renewalCount = Math.max(0, Number(previousData.renewalCount || 0)) + (previous.exists ? 1 : 0);
   const record: SubscriptionRecord = {
     uid: args.uid,
     planId: args.plan.id,
@@ -283,7 +296,9 @@ export const writeSubscriptionAfterPayment = async (
     status: "active",
     activatedAt: args.now,
     expiresAt,
-    autoRenew: Boolean(args.plan.autoRenewByDefault),
+    // Razorpay is currently an order flow, not a recurring mandate. Renewal
+    // is explicit and user-confirmed; reminders never imply an auto-charge.
+    autoRenew: false,
     orderId: args.orderId,
     paymentId: args.paymentId,
     amountPaise: Math.max(0, Math.round(Number(args.amountPaise || 0))),
@@ -291,12 +306,7 @@ export const writeSubscriptionAfterPayment = async (
     couponCode: args.couponCode || null,
     requestedEduCoins: Math.max(0, Math.floor(Number(args.requestedEduCoins || 0))),
   };
-  const subRef = adminDb()
-    .collection(USER_SUBS_COLLECTION)
-    .doc(args.uid)
-    .collection(USER_SUBS_DOC)
-    .doc("current");
-  tx.set(subRef, { ...record, activatedAt: nowTs, expiresAt: Timestamp.fromMillis(expiresAt) }, { merge: false });
+  tx.set(subRef, { ...record, activatedAt: nowTs, renewedAt: previous.exists ? nowTs : null, renewalCount, expiresAt: Timestamp.fromMillis(expiresAt), renewalReminderOptOut: Boolean(previousData.renewalReminderOptOut) }, { merge: false });
 
   // Mirror the high-value fields on the user doc for legacy readers.
   const userRef = adminDb().collection(USER_SUBS_COLLECTION).doc(args.uid);
@@ -308,7 +318,8 @@ export const writeSubscriptionAfterPayment = async (
       subscriptionTier: args.plan.id,
       subscriptionFeatures: args.selectedFeatureIds.slice(),
       subscriptionExpiresAt: Timestamp.fromMillis(expiresAt),
-      subscriptionAutoRenew: Boolean(args.plan.autoRenewByDefault),
+      subscriptionAutoRenew: false,
+      subscriptionRenewalCount: renewalCount,
       subscriptionActivatedAt: nowTs,
       updatedAt: nowTs,
     },

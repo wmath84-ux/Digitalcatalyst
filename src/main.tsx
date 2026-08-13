@@ -1,5 +1,7 @@
 import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
 import "./index.css";
 import "./landing.css";
 import StoreApp from "./App";
@@ -24,7 +26,8 @@ import { CheckoutProvider } from "./checkout/CheckoutContext";
 import { clearAdminSession, hasAdminSession } from "./utils/adminSession";
 import { useOwnedUpdateIds } from "./hooks/useOwnedUpdates";
 import { type CheckoutReturnRoute } from "./checkout/types";
-import { buildContentNotificationInventory, createContentNotifications, loadContentNotificationBaseline, loadSiteNotifications, mergeSiteNotifications, saveContentNotificationBaseline, saveSiteNotifications } from "../utils/siteNotifications";
+import { buildContentNotificationInventory, createContentNotifications, loadContentNotificationBaseline, loadSiteNotifications, mergeSiteNotifications, saveContentNotificationBaseline, saveSiteNotifications, type SiteNotification } from "../utils/siteNotifications";
+import { getRenewalReminder } from "../utils/subscriptionRenewal";
 import { buildCheckoutSessionRecord, writeToSessionStorage as writeCheckoutToStorage } from "../utils/checkoutSession";
 import type { CheckoutSelection } from "./types/commerce";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
@@ -216,6 +219,16 @@ function Root() {
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    return onSnapshot(doc(db, "users", user.id, "subscription", "current"), (snapshot) => {
+      const reminder = getRenewalReminder(snapshot.data() || null);
+      if (!reminder) return;
+      const incoming: SiteNotification = { ...reminder, category: "subscription", read: false, source: "system" };
+      saveSiteNotifications(user.id, mergeSiteNotifications(loadSiteNotifications(user.id), [incoming]));
+    });
+  }, [user]);
 
   useEffect(() => {
     if (!user || catalogProducts.length === 0) return;
