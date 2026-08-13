@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "./utils/cn";
+import StoreHeader from "./components/Header";
 import GreetingHeader from "./components/myday/GreetingHeader";
 import TaskList from "./components/myday/TaskList";
 import TaskModal from "./components/myday/TaskModal";
@@ -25,6 +26,7 @@ import Toast from "./components/ui/Toast";
 import type { ToastMessage } from "./components/ui/Toast";
 import { initialNotes, initialReminders, initialSchedule, initialTasks } from "./data/sampleData";
 import type { NoteColor, QuickNote, Reminder, ScheduleEvent, Task, TaskStatus } from "./types";
+import { useCommerce } from "./context/CommerceContext";
 
 const NOTE_COLORS: NoteColor[] = ["amber", "sky", "rose", "emerald", "violet"];
 type DaySection = "overview" | "tasks" | "schedule" | "reminders" | "notes";
@@ -50,6 +52,7 @@ const CREATE_OPTIONS: { id: DaySection; label: string; hint: string; icon: typeo
 ];
 
 export default function App() {
+  const { cartIds } = useCommerce();
   const [tasks, setTasks] = useState<Task[]>(() => loadFromStorage("myday_tasks", initialTasks));
   const [schedule, setSchedule] = useState<ScheduleEvent[]>(() => loadFromStorage("myday_schedule", initialSchedule));
   const [notes, setNotes] = useState<QuickNote[]>(() => loadFromStorage("myday_notes", initialNotes));
@@ -288,7 +291,17 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50/80">
       <div className="mx-auto flex min-h-screen max-w-md flex-col bg-slate-50/80 lg:max-w-7xl">
-        <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/80 backdrop-blur-xl">
+        <StoreHeader
+          cartCount={cartIds.size}
+          notifCount={1}
+          onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
+          onNavigateToCart={() => { window.location.hash = "#/cart"; }}
+          onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
+        />
+
+        {/* The My Day toolbar remains independently sticky directly below
+            the 68px store header, so neither header covers the other. */}
+        <header className="sticky top-[68px] z-20 border-b border-slate-100 bg-white/90 backdrop-blur-xl">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2.5 lg:hidden">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200">
