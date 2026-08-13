@@ -19,6 +19,8 @@ import {
   setPersistence,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   updateProfile,
   type User as FirebaseUser,
@@ -28,6 +30,15 @@ import { auth, db } from "../../firebase";
 import { APPROVED_ADMIN_EMAIL, clearAdminSession, createAdminSession } from "../utils/adminSession";
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
+
+// On phones and installed PWAs, `signInWithPopup` opens the Google account
+// chooser inside a full Chrome tab (blue header + three-dot menu with
+// "Desktop site"). Firebase recommends `signInWithRedirect` there instead —
+// the account chooser stays in the current window and returns automatically.
+const isMobileOrStandalone = () =>
+  typeof window !== "undefined" &&
+  (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    window.matchMedia("(display-mode: standalone)").matches);
 
 export interface AuthUser {
   id: string;
@@ -64,6 +75,7 @@ interface AuthContextValue {
   signup: (details: SignupDetails) => Promise<AuthResult>;
   loginWithGoogle: () => Promise<AuthResult>;
   loginAdmin: (email: string, password: string) => Promise<AuthResult>;
+  loginAdminWithGoogle: () => Promise<AuthResult>;
   resetPassword: (email: string) => Promise<AuthResult>;
   updateAccount: (details: { name: string; mobile: string; bio: string }) => Promise<AuthResult>;
   logout: () => Promise<void>;
@@ -226,6 +238,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [commitFirebaseUser]);
 
+  // Consume any pending Google redirect result (mobile `signInWithRedirect`).
+  // onAuthStateChanged already restores the session; this clears the pending
+  // credential so subsequent sign-ins behave correctly.
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) return commitFirebaseUser(result.user);
+        return undefined;
+      })
+      .catch((error) => console.warn("Google redirect sign-in failed", authErrorMessage(error)));
+  }, [commitFirebaseUser]);
+
   useEffect(() => {
     if (!user || !auth.currentUser || auth.currentUser.uid !== user.id) return undefined;
     return onSnapshot(doc(db, "users", user.id), (snapshot) => {
@@ -307,10 +331,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const loginAdminWithGoogle = useCallback(async (): Promise<AuthResult> => {
+    clearAdminSession();
+    try {
+      await setPersistence(auth, browserSessionPersistence);
+      if (isMobileOrStandalone()) {
+        // Redirect flow: on return, onAuthStateChanged restores the session and
+        // AdminLoginApp finalizes the admin session from the email + role.
+        await signInWithRedirect(auth, googleProvider);
+        return { success: true, message: "Google sign-in started." };
+      }
+      const credential = await signInWithPopup(auth, googleProvider);
+      const profileSnapshot = await getDoc(doc(db, "users", credential.user.uid));
+      if (!profileSnapshot.exists() || profileSnapshot.data().role !== "admin" || normalizeEmail(credential.user.email) !== APPROVED_ADMIN_EMAIL) {
+        await signOut(auth);
+        setUser(null);
+        return { success: false, message: "This Google account is not the approved admin (wmath84@gmail.com) with role = admin." };
+      }
+      const appUser = await readAppUser(credential.user);
+      setUser(appUser);
+      createAdminSession(appUser.id, appUser.email);
+      return { success: true, message: "Admin login successful." };
+    } catch (error) {
+      clearAdminSession();
+      return { success: false, message: authErrorMessage(error) };
+    }
+  }, []);
+
   const loginWithGoogle = useCallback(async (): Promise<AuthResult> => {
     clearAdminSession();
     try {
       await setPersistence(auth, browserLocalPersistence);
+      if (isMobileOrStandalone()) {
+        // Redirect flow: the page navigates to Google and back; the result is
+        // picked up by onAuthStateChanged + getRedirectResult on return.
+        await signInWithRedirect(auth, googleProvider);
+        return { success: true, message: "Google login successful." };
+      }
       const credential = await signInWithPopup(auth, googleProvider);
       await commitFirebaseUser(credential.user);
       return { success: true, message: "Google login successful." };
@@ -364,12 +421,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signup,
       loginWithGoogle,
       loginAdmin,
+      loginAdminWithGoogle,
       resetPassword,
       updateAccount,
       logout,
       setUser,
     }),
-    [user, loading, refresh, login, signup, loginWithGoogle, loginAdmin, resetPassword, updateAccount, logout],
+    [user, loading, refresh, login, signup, loginWithGoogle, loginAdmin, loginAdminWithGoogle, resetPassword, updateAccount, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

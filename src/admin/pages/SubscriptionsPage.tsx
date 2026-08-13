@@ -26,7 +26,7 @@ type FeatureRow = {
   active: boolean;
 };
 
-const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }], accessTier: "basic", cta: "Subscribe", featured: false, active: false };
+const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }], accessTier: "basic", cta: "Subscribe", featured: false, active: true };
 const EMPTY_FEATURE: Partial<FeatureRow> = { id: "my-day", key: "my-day", name: "My Day cloud saving", description: "Securely save and sync tasks, schedules, reminders and notes.", individualPrice: "149", active: true };
 
 export default function SubscriptionsPage() {

@@ -101,6 +101,85 @@ const modules = FILE_TYPES.map((entry, index) => ({
   ],
 }));
 
+// ---------------------------------------------------------------------------
+// Paid-update modules — locked behind a paid "upgrade" so, after a user buys
+// the (free) base product, the PDP shows the "Course upgrade available"
+// banner + a "View upgrade" button listing exactly which NEW modules are in
+// the package. These module ids are referenced by `paidUpdates[].includedIds`.
+// ---------------------------------------------------------------------------
+const UPGRADE_MODULES = [
+  {
+    id: "upg_quiz",
+    title: "Premium · Interactive Quiz (Google Form)",
+    description: "Unlocked via the paid upgrade — a Google Form quiz. REPLACE with a form shared as “Anyone with the link”.",
+    sortOrder: 100,
+    visibility: "visible",
+    active: true,
+    accessLevel: "paid_update",
+    individuallyPurchasable: false,
+    cashPrice: 99,
+    salePrice: null,
+    coinPrice: null,
+    includeInBundle: false,
+    previewAvailable: false,
+    requiredPreviousModuleIds: [],
+    entitlementId: "upg_quiz",
+    badge: "UPGRADE",
+    parentModuleId: null,
+    resources: [
+      {
+        id: id("res", "upg_quiz"),
+        name: "Interactive Quiz (Google Form)",
+        type: "gform",
+        url: "https://docs.google.com/forms/d/e/PASTE_YOUR_FORM_ID/viewform",
+        provider: "public",
+        sortOrder: 0,
+        visibility: "visible",
+        accessLevel: "paid_update",
+        paidUpdateId: "upd_2026_edition",
+        cashPrice: 99,
+        coinPrice: null,
+      },
+    ],
+  },
+  {
+    id: "upg_mindmap",
+    title: "Premium · Advanced Mind Map (Whimsical)",
+    description: "Unlocked via the paid upgrade — a Whimsical mind map. REPLACE with a board shared publicly.",
+    sortOrder: 101,
+    visibility: "visible",
+    active: true,
+    accessLevel: "paid_update",
+    individuallyPurchasable: false,
+    cashPrice: 149,
+    salePrice: null,
+    coinPrice: null,
+    includeInBundle: false,
+    previewAvailable: false,
+    requiredPreviousModuleIds: [],
+    entitlementId: "upg_mindmap",
+    badge: "UPGRADE",
+    parentModuleId: null,
+    resources: [
+      {
+        id: id("res", "upg_mindmap"),
+        name: "Advanced Mind Map (Whimsical)",
+        type: "whimsical",
+        url: "https://whimsical.com/embed/PASTE_YOUR_BOARD_ID",
+        provider: "Whimsical",
+        sortOrder: 0,
+        visibility: "visible",
+        accessLevel: "paid_update",
+        paidUpdateId: "upd_2026_edition",
+        cashPrice: 149,
+        coinPrice: null,
+      },
+    ],
+  },
+];
+
+const allModules = [...modules, ...UPGRADE_MODULES];
+
 const form = {
   id: PRODUCT_ID,
   title: "🎯 Scratch — All File Types",
@@ -134,8 +213,21 @@ const form = {
   availabilityDate: null,
   saleStart: null,
   saleEnd: null,
-  modules,
-  paidUpdates: [],
+  modules: allModules,
+  paidUpdates: [
+    {
+      id: "upd_2026_edition",
+      title: "2026 Edition — 2 new modules",
+      description: "Interactive Google Form quiz + advanced Whimsical mind map, added after the original release.",
+      includedIds: ["upg_quiz", "upg_mindmap"],
+      cashPrice: 199,
+      coinPrice: 0,
+      active: true,
+      publishDate: null,
+      visibility: "visible",
+      sortOrder: 0,
+    },
+  ],
   status: "published",
 };
 
@@ -194,7 +286,7 @@ const db = getFirestore(app);
 
 await db.collection("siteProducts").doc(PRODUCT_ID).set({ ...docBody, updatedAt: Timestamp.now() }, { merge: true });
 console.log(`✅ Product written: siteProducts/${PRODUCT_ID} ("${form.title}")`);
-console.log(`   ${FILE_TYPES.length} file-type modules, ${FILE_TYPES.length} resources.`);
+console.log(`   ${FILE_TYPES.length} file-type modules (+ ${UPGRADE_MODULES.length} paid-update modules), ${allModules.length} resources.`);
 
 if (GRANT_UID) {
   const entRef = db.collection("entitlements").doc(`${GRANT_UID}__${PRODUCT_ID}`);
@@ -229,4 +321,5 @@ if (GRANT_UID) {
 }
 
 console.log("\nNext: open the app, sign in, and open the product. Each module = one file type.");
+console.log("After purchasing (free) the base product, the PDP shows a “Course upgrade available” banner listing the 2 paid-update modules.");
 console.log("Modules whose name shows “REPLACE URL” need a real Google/Whimsical link shared as “Anyone with the link”.");

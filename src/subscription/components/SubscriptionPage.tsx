@@ -29,6 +29,7 @@ import { SHOWCASE_CARDS } from "../data/showcase";
 import { FALLBACK_SUBSCRIPTION_CATALOG } from "../data/fallbackCatalog";
 import { useAuth } from "../../context/AuthContext";
 import { useCatalog } from "../../context/CatalogContext";
+import { playSfxError, playSfxSuccess } from "../../utils/sfx";
 import {
   startCheckout,
   type SubscriptionCatalog,
@@ -236,6 +237,7 @@ export default function SubscriptionPage() {
         setCouponStatus("idle");
         setAppliedReferral(null);
         setReferralError(null);
+        playSfxSuccess();
         setAppliedCoupon({
           code,
           discountPaise,
@@ -247,6 +249,7 @@ export default function SubscriptionPage() {
           error instanceof Error ? error.message : "This coupon could not be applied.";
         setCouponStatus("error");
         setCouponErrorMessage(message);
+        playSfxError();
         return { valid: false, message };
       }
     },
@@ -277,11 +280,13 @@ export default function SubscriptionPage() {
       if (!response.ok || !data.ok) throw new Error(data.error || "Referral code is invalid.");
       const discountPaise = Math.max(0, Number(data.discountPaise || 0));
       setAppliedCoupon(null);
+      playSfxSuccess();
       setAppliedReferral({ code: data.code || code, discountPaise, label: `₹${Math.round(discountPaise / 100)} referral discount` });
       return { valid: true, message: "Referral code applied." };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Referral code is invalid.";
       setReferralError(message);
+      playSfxError();
       return { valid: false, message };
     }
   }, []);

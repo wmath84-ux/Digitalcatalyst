@@ -14,7 +14,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { BellIcon, BookOpenIcon, StoreIcon } from "./icons";
 import { getRenewalReminder } from "../../utils/subscriptionRenewal";
-import { ensureSavedWebPushSubscription } from "../../utils/webPush";
+import { ensureSavedWebPushSubscription, isWebPushSupported } from "../../utils/webPush";
 
 type NotificationsPageProps = {
   cartCount: number;
@@ -53,6 +53,9 @@ export default function NotificationsPage({
   const { user } = useAuth();
   const viewerKey = user?.id || "guest";
   const [items, setItems] = useState<SiteNotification[]>(() => loadSiteNotifications(viewerKey));
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">(() =>
+    typeof window !== "undefined" && isWebPushSupported() ? window.Notification.permission : "unsupported"
+  );
 
   useEffect(() => {
     setItems(loadSiteNotifications(viewerKey));
@@ -60,8 +63,16 @@ export default function NotificationsPage({
 
   useEffect(() => {
     if (!user) return;
-    void ensureSavedWebPushSubscription(user.id);
+    void ensureSavedWebPushSubscription(user.id).then(() => {
+      if (typeof window !== "undefined" && isWebPushSupported()) setPushPermission(window.Notification.permission);
+    });
   }, [user]);
+
+  const enableNotifications = async () => {
+    if (!user) return;
+    await ensureSavedWebPushSubscription(user.id);
+    if (typeof window !== "undefined" && isWebPushSupported()) setPushPermission(window.Notification.permission);
+  };
 
   // App-open fallback: users still receive the correct one-time reminder
   // even when a scheduled cron or push delivery was delayed.
@@ -149,6 +160,28 @@ export default function NotificationsPage({
               </button>
             )}
           </div>
+
+          {pushPermission === "default" && (
+            <div className="mx-4 mt-1 flex items-center justify-between gap-3 rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-100">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-900">Get alerts on your phone</p>
+                <p className="mt-0.5 text-xs text-slate-500">Allow notifications to receive purchase unlocks and reminders as system alerts.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void enableNotifications()}
+                className="shrink-0 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white"
+              >
+                Enable
+              </button>
+            </div>
+          )}
+          {pushPermission === "denied" && (
+            <div className="mx-4 mt-1 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-100">
+              <p className="text-sm font-bold text-slate-900">Notifications are blocked</p>
+              <p className="mt-0.5 text-xs text-slate-500">Enable them in your browser's site settings (usually under App info → Notifications) to receive system alerts.</p>
+            </div>
+          )}
 
           {items.length === 0 ? (
             <div className="flex flex-col items-center gap-3 px-6 pb-10 pt-16 text-center">

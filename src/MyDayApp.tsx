@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import {
@@ -30,6 +30,7 @@ import { initialNotes, initialReminders, initialSchedule, initialTasks } from ".
 import type { NoteColor, QuickNote, Reminder, ScheduleEvent, Task, TaskStatus } from "./types";
 import { useCommerce } from "./context/CommerceContext";
 import { useMyDayAccess } from "./hooks/useMyDayAccess";
+import { playSfxAdd, playSfxComplete, playSfxRemove, playSfxSuccess, playSfxToggle } from "./utils/sfx";
 
 const NOTE_COLORS: NoteColor[] = ["amber", "sky", "rose", "emerald", "violet"];
 type DaySection = "overview" | "tasks" | "schedule" | "reminders" | "notes";
@@ -66,6 +67,11 @@ export default function App() {
   const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
   const [activeSection, setActiveSection] = useState<DaySection>("overview");
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const createMenuRef = useRef<HTMLDivElement>(null);
+  // Set true once the user mutates My Day locally (add/edit/delete/toggle).
+  // Prevents the in-flight cloud load from clobbering a change the user made
+  // before the initial Firestore read finished.
+  const mutatedRef = useRef(false);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({
@@ -91,17 +97,45 @@ export default function App() {
     return false;
   }, [hasMyDayAccess]);
 
+  // Write the current My Day arrays to Firestore. Used as write-through on
+  // deletes (and any mutation) so a removal is persisted to the cloud
+  // immediately — not just reflected in local state. Best-effort: a failed
+  // write must never block the UI.
+  const persistMyDay = useCallback(
+    (next: Partial<{ tasks: Task[]; schedule: ScheduleEvent[]; notes: QuickNote[]; reminders: Reminder[] }>) => {
+      mutatedRef.current = true;
+      if (!uid || !hasMyDayAccess) return;
+      void setDoc(
+        doc(db, "users", uid, "myDay", "current"),
+        {
+          ...(next.tasks ? { tasks: next.tasks } : {}),
+          ...(next.schedule ? { schedule: next.schedule } : {}),
+          ...(next.notes ? { notes: next.notes } : {}),
+          ...(next.reminders ? { reminders: next.reminders } : {}),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    },
+    [hasMyDayAccess, uid],
+  );
+
   useEffect(() => {
     if (!uid || !hasMyDayAccess) { setCloudLoaded(false); return undefined; }
     let cancelled = false;
     void getDoc(doc(db, "users", uid, "myDay", "current")).then((snapshot) => {
       if (cancelled) return;
       const data = snapshot.data() || {};
-      if (!snapshot.exists()) { setTasks([]); setSchedule([]); setNotes([]); setReminders([]); }
-      if (Array.isArray(data.tasks)) setTasks(data.tasks as Task[]);
-      if (Array.isArray(data.schedule)) setSchedule(data.schedule as ScheduleEvent[]);
-      if (Array.isArray(data.notes)) setNotes(data.notes as QuickNote[]);
-      if (Array.isArray(data.reminders)) setReminders(data.reminders as Reminder[]);
+      // If the user already made a change (e.g. deleted an item) while the
+      // read was in flight, keep their local state — do not resurrect a
+      // just-deleted item from the older cloud snapshot.
+      if (!mutatedRef.current) {
+        if (!snapshot.exists()) { setTasks([]); setSchedule([]); setNotes([]); setReminders([]); }
+        if (Array.isArray(data.tasks)) setTasks(data.tasks as Task[]);
+        if (Array.isArray(data.schedule)) setSchedule(data.schedule as ScheduleEvent[]);
+        if (Array.isArray(data.notes)) setNotes(data.notes as QuickNote[]);
+        if (Array.isArray(data.reminders)) setReminders(data.reminders as Reminder[]);
+      }
       setCloudLoaded(true);
     }).catch(() => setCloudLoaded(false));
     return () => { cancelled = true; };
@@ -111,6 +145,35 @@ export default function App() {
     if (!uid || !hasMyDayAccess || !cloudLoaded) return;
     void setDoc(doc(db, "users", uid, "myDay", "current"), { tasks, schedule, notes, reminders, tzOffsetMinutes: new Date().getTimezoneOffset(), updatedAt: serverTimestamp() }, { merge: true });
   }, [cloudLoaded, hasMyDayAccess, notes, reminders, schedule, tasks, uid]);
+
+  // Close the "Add to your day" menu when the user taps/clicks outside it, or
+  // scrolls anywhere outside the menu (page scroll, a scroll container, or a
+  // touch drag). Selecting an option already closes it via handleNavigate.
+  useEffect(() => {
+    if (!createMenuOpen) return;
+    const closeOnOutsidePointer = (event: Event) => {
+      const target = event.target as Node | null;
+      if (target && createMenuRef.current && !createMenuRef.current.contains(target)) setCreateMenuOpen(false);
+    };
+    const closeOnOutsideScroll = (event: Event) => {
+      const target = event.target as Node | null;
+      if (target && createMenuRef.current && !createMenuRef.current.contains(target)) setCreateMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("mousedown", closeOnOutsidePointer);
+    document.addEventListener("touchstart", closeOnOutsidePointer, { passive: true });
+    document.addEventListener("scroll", closeOnOutsideScroll, { capture: true, passive: true });
+    window.addEventListener("touchmove", closeOnOutsideScroll, { passive: true });
+    window.addEventListener("wheel", closeOnOutsideScroll, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("mousedown", closeOnOutsidePointer);
+      document.removeEventListener("touchstart", closeOnOutsidePointer);
+      document.removeEventListener("scroll", closeOnOutsideScroll, { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchmove", closeOnOutsideScroll);
+      window.removeEventListener("wheel", closeOnOutsideScroll);
+    };
+  }, [createMenuOpen]);
 
   const handleNavigate = useCallback((id: string) => {
     if (id === "home") {
@@ -131,7 +194,8 @@ export default function App() {
       prev.map((t) => {
         if (t.id !== id) return t;
         const newStatus: TaskStatus = t.status === "completed" ? "pending" : "completed";
-        if (newStatus === "completed") addToast("Task completed");
+        if (newStatus === "completed") { playSfxComplete(); addToast("Task completed"); }
+        else playSfxToggle();
         return { ...t, status: newStatus };
       }),
     );
@@ -144,7 +208,8 @@ export default function App() {
         const cycle: TaskStatus[] = ["pending", "in-progress", "completed"];
         const idx = cycle.indexOf(t.status);
         const next = cycle[(idx + 1) % cycle.length];
-        if (next === "completed" && t.status !== "completed") addToast("Task completed");
+        if (next === "completed" && t.status !== "completed") { playSfxComplete(); addToast("Task completed"); }
+        else playSfxToggle();
         return { ...t, status: next };
       }),
     );
@@ -152,11 +217,14 @@ export default function App() {
 
   const handleDeleteTask = useCallback((id: string) => {
     showConfirm("Delete Task", "Are you sure you want to delete this task? This action cannot be undone.", () => {
-      setTasks((prev) => prev.filter((t) => t.id !== id));
+      const next = tasks.filter((t) => t.id !== id);
+      setTasks(next);
+      persistMyDay({ tasks: next });
+      playSfxRemove();
       addToast("Task deleted", "info");
       setConfirmOpen(false);
     });
-  }, [addToast, showConfirm]);
+  }, [addToast, persistMyDay, showConfirm, tasks]);
 
   const openAddTask = useCallback(() => {
     setEditingTask(null);
@@ -176,6 +244,7 @@ export default function App() {
       return [task, ...prev];
     });
     setTaskModalOpen(false);
+    playSfxSuccess();
     addToast(editingTask ? "Task updated successfully" : "New task created");
   }, [addToast, canSaveMyDay, editingTask]);
 
@@ -197,16 +266,20 @@ export default function App() {
       return [...prev, event];
     });
     setScheduleModalOpen(false);
+    playSfxSuccess();
     addToast(editingEvent ? "Event updated" : "Event added to schedule");
   }, [addToast, canSaveMyDay, editingEvent]);
 
   const handleDeleteEvent = useCallback((id: string) => {
     showConfirm("Delete Event", "Remove this event from your schedule?", () => {
-      setSchedule((prev) => prev.filter((e) => e.id !== id));
+      const next = schedule.filter((e) => e.id !== id);
+      setSchedule(next);
+      persistMyDay({ schedule: next });
+      playSfxRemove();
       addToast("Event removed", "info");
       setConfirmOpen(false);
     });
-  }, [addToast, showConfirm]);
+  }, [addToast, persistMyDay, schedule, showConfirm]);
 
   const handleAddNote = useCallback((text: string) => {
     if (!canSaveMyDay()) return;
@@ -217,6 +290,7 @@ export default function App() {
       color: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)],
     };
     setNotes((prev) => [note, ...prev]);
+    playSfxAdd();
     addToast("Note saved");
   }, [addToast, canSaveMyDay]);
 
@@ -227,32 +301,41 @@ export default function App() {
   }, [addToast, canSaveMyDay]);
 
   const handleDeleteNote = useCallback((id: string) => {
-    setNotes((prev) => prev.filter((n) => n.id !== id));
+    const next = notes.filter((n) => n.id !== id);
+    setNotes(next);
+    persistMyDay({ notes: next });
+    playSfxRemove();
     addToast("Note deleted", "info");
-  }, [addToast]);
+  }, [addToast, notes, persistMyDay]);
 
   const handleAddReminder = useCallback((reminder: Reminder) => {
     if (!canSaveMyDay()) return;
     setReminders((prev) => [...prev, reminder]);
+    playSfxAdd();
     addToast("Reminder set");
   }, [addToast, canSaveMyDay]);
 
   const handleEditReminder = useCallback((reminder: Reminder) => {
     setReminders((prev) => prev.map((r) => (r.id === reminder.id ? reminder : r)));
+    playSfxSuccess();
     addToast("Reminder updated");
   }, [addToast]);
 
   const handleToggleReminder = useCallback((id: string) => {
     setReminders((prev) => prev.map((r) => (r.id !== id ? r : { ...r, done: !r.done })));
+    playSfxToggle();
   }, []);
 
   const handleDeleteReminder = useCallback((id: string) => {
     showConfirm("Delete Reminder", "Remove this reminder?", () => {
-      setReminders((prev) => prev.filter((r) => r.id !== id));
+      const next = reminders.filter((r) => r.id !== id);
+      setReminders(next);
+      persistMyDay({ reminders: next });
+      playSfxRemove();
       addToast("Reminder deleted", "info");
       setConfirmOpen(false);
     });
-  }, [addToast, showConfirm]);
+  }, [addToast, persistMyDay, reminders, showConfirm]);
 
   const completedCount = useMemo(() => tasks.filter((t) => t.status === "completed").length, [tasks]);
 
@@ -311,6 +394,7 @@ export default function App() {
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
 
+    playSfxSuccess();
     addToast("Report downloaded");
   }, [schedule, reminders, completedCount, tasks, notes, addToast]);
 
@@ -444,7 +528,7 @@ export default function App() {
                   streak={12}
                 />
 
-                <div className="relative flex flex-col items-center pb-8">
+                <div ref={createMenuRef} className="relative flex flex-col items-center pb-8">
                   <button
                     type="button"
                     aria-label="Create item"

@@ -23,6 +23,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
+import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
 
 type Modal = "edit" | "settings" | null;
 type Preferences = {
@@ -101,6 +102,33 @@ export default function ProfileApp() {
     }
   };
 
+  // The "Push notifications" switch must actually register/remove this device,
+  // otherwise the preference is cosmetic and system notifications never arrive.
+  const handlePushToggle = async (checked: boolean) => {
+    setPreferencesSaving(true);
+    try {
+      if (checked) {
+        const enabled = await ensureSavedWebPushSubscription(user.id);
+        const permission = typeof window !== "undefined" ? window.Notification.permission : "denied";
+        if (!enabled || permission !== "granted") {
+          setMessage("Notifications are blocked in your browser. Enable them in the browser's site settings, then try again.");
+          setPreferences((current) => ({ ...current, push: false }));
+          await setDoc(doc(db, "users", user.id), { preferences: { ...preferences, push: false }, updatedAt: serverTimestamp() }, { merge: true });
+          return;
+        }
+      } else {
+        await removeWebPushSubscription(user.id);
+      }
+      await setDoc(doc(db, "users", user.id), { preferences: { ...preferences, push: checked }, updatedAt: serverTimestamp() }, { merge: true });
+      setPreferences((current) => ({ ...current, push: checked }));
+    } catch (error) {
+      console.error("Push preference change failed", error);
+      setMessage("Could not update push notifications.");
+    } finally {
+      setPreferencesSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 sm:py-6">
       <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
@@ -155,7 +183,7 @@ export default function ProfileApp() {
         <BottomNav active="profile" onChange={handleFooterChange} purchasesBadge={ownedCount} />
 
         {modal === "edit" && <EditModal user={user} onClose={() => setModal(null)} onSave={async (details) => { const result = await updateAccount(details); setMessage(result.message); if (result.success) setModal(null); return result.success; }} />}
-      {modal === "settings" && <BaseModal title="Preferences" onClose={() => setModal(null)}><div className="space-y-2"><PreferenceRow icon={<Bell />} label="Push notifications" checked={preferences.push} onChange={(checked) => void savePreferences({ ...preferences, push: checked })} /><PreferenceRow icon={<Sparkles />} label="Email updates" checked={preferences.email} onChange={(checked) => void savePreferences({ ...preferences, email: checked })} /><PreferenceRow icon={<Bell />} label="Promotions" checked={preferences.promotions} onChange={(checked) => void savePreferences({ ...preferences, promotions: checked })} /><PreferenceRow icon={<UserRound />} label="Public profile" checked={preferences.profileVisible} onChange={(checked) => void savePreferences({ ...preferences, profileVisible: checked })} /><PreferenceRow icon={<Lock />} label="Share learning activity" checked={preferences.shareActivity} onChange={(checked) => void savePreferences({ ...preferences, shareActivity: checked })} /></div></BaseModal>}
+      {modal === "settings" && <BaseModal title="Preferences" onClose={() => setModal(null)}><div className="space-y-2"><PreferenceRow icon={<Bell />} label="Push notifications" checked={preferences.push} onChange={(checked) => void handlePushToggle(checked)} /><PreferenceRow icon={<Sparkles />} label="Email updates" checked={preferences.email} onChange={(checked) => void savePreferences({ ...preferences, email: checked })} /><PreferenceRow icon={<Bell />} label="Promotions" checked={preferences.promotions} onChange={(checked) => void savePreferences({ ...preferences, promotions: checked })} /><PreferenceRow icon={<UserRound />} label="Public profile" checked={preferences.profileVisible} onChange={(checked) => void savePreferences({ ...preferences, profileVisible: checked })} /><PreferenceRow icon={<Lock />} label="Share learning activity" checked={preferences.shareActivity} onChange={(checked) => void savePreferences({ ...preferences, shareActivity: checked })} /></div></BaseModal>}
       </div>
     </div>
   );

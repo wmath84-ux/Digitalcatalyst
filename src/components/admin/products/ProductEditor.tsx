@@ -267,9 +267,6 @@ export function ProductEditor({ productId }: { productId?: string }) {
             <Field label="Short description" required hint="Shown on cards & search results.">
               <textarea className={textareaClass} value={form.shortDescription} onChange={(e) => update("shortDescription", e.target.value)} />
             </Field>
-            <Field label="Long description">
-              <textarea className={textareaClass} value={form.longDescription} onChange={(e) => update("longDescription", e.target.value)} />
-            </Field>
             <Field label="Instructor / author">
               <input className={inputClass} value={form.instructor} onChange={(e) => update("instructor", e.target.value)} />
             </Field>
@@ -277,22 +274,15 @@ export function ProductEditor({ productId }: { productId?: string }) {
               <Field label="Category">
                 <input className={inputClass} value={form.category} onChange={(e) => update("category", e.target.value)} />
               </Field>
-              <Field label="Product type">
-                <input className={inputClass} value={form.productType} onChange={(e) => update("productType", e.target.value)} />
-              </Field>
               <Field label="Class / level">
                 <input className={inputClass} value={form.classLevel} onChange={(e) => update("classLevel", e.target.value)} />
               </Field>
               <Field label="Subject">
                 <input className={inputClass} value={form.subject} onChange={(e) => update("subject", e.target.value)} />
               </Field>
-
             </div>
             <Field label="Tags" hint="Comma separated">
               <input className={inputClass} value={form.tags.join(", ")} onChange={(e) => update("tags", csvToList(e.target.value))} />
-            </Field>
-            <Field label="Feature bullets" hint="Comma separated">
-              <input className={inputClass} value={form.features.join(", ")} onChange={(e) => update("features", csvToList(e.target.value))} />
             </Field>
             <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
               <span className="text-sm font-medium text-slate-700">Visible to users</span>

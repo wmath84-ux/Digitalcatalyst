@@ -35,6 +35,7 @@ import type { PaidCourseUpdate } from "./types/course";
 import { isDesktopBrowserLocked, isInstalledMobilePwa, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
 import { disablePageZoom } from "./utils/disablePageZoom";
 import { ensureSavedWebPushSubscription } from "../utils/webPush";
+import { playSfxAdd, playSfxError, playSfxRemove } from "./utils/sfx";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -95,7 +96,7 @@ function PdpWithOwnership({
   onNavigateFooter,
 }: {
   product: import("./data/products").Product | null;
-  onCheckout: (price: number) => void;
+  onCheckout: (price: number, couponCode?: string | null) => void;
   onCheckoutSelection: (selection: CheckoutSelection, price: number) => void;
   onBack: () => void;
   cartIds: Set<string>;
@@ -324,27 +325,27 @@ function Root() {
     if (!user) { redirectToAuth(window.location.hash || STORE_HASH); return; }
     const product = shoppingProducts.find((item) => item.id === id);
     void addToCart(id)
-      .then(() => showShoppingToast(`${product ? product.title.slice(0, 28) + "…" : "Item"} added to cart`))
-      .catch(() => showShoppingToast("Could not update cart"));
+      .then(() => { playSfxAdd(); showShoppingToast(`${product ? product.title.slice(0, 28) + "…" : "Item"} added to cart`); })
+      .catch(() => { playSfxError(); showShoppingToast("Could not update cart"); });
   };
 
   const handleRemoveFromCart = (id: string) => {
-    void removeFromCart(id).then(() => showShoppingToast("Removed from cart")).catch(() => showShoppingToast("Could not update cart"));
+    void removeFromCart(id).then(() => { playSfxRemove(); showShoppingToast("Removed from cart"); }).catch(() => { playSfxError(); showShoppingToast("Could not update cart"); });
   };
 
   const handleClearCart = () => {
-    void clearCart().then(() => showShoppingToast("Cart cleared")).catch(() => showShoppingToast("Could not clear cart"));
+    void clearCart().then(() => { playSfxRemove(); showShoppingToast("Cart cleared"); }).catch(() => { playSfxError(); showShoppingToast("Could not clear cart"); });
   };
 
   const handleToggleFavorite = (id: string) => {
     if (!user) { redirectToAuth(window.location.hash || STORE_HASH); return; }
     void toggleFavorite(id)
-      .then((added) => showShoppingToast(added ? "Added to favorites" : "Removed from favorites"))
-      .catch(() => showShoppingToast("Could not update favorites"));
+      .then((added) => { if (added) playSfxAdd(); else playSfxRemove(); showShoppingToast(added ? "Added to favorites" : "Removed from favorites"); })
+      .catch(() => { playSfxError(); showShoppingToast("Could not update favorites"); });
   };
 
   const handleRemoveFromFavorites = (id: string) => {
-    void toggleFavorite(id).then(() => showShoppingToast("Removed from favorites")).catch(() => showShoppingToast("Could not update favorites"));
+    void toggleFavorite(id).then(() => { playSfxRemove(); showShoppingToast("Removed from favorites"); }).catch(() => { playSfxError(); showShoppingToast("Could not update favorites"); });
   };
 
   const handlePurchaseUpdate = (update: PaidCourseUpdate) => {
@@ -433,7 +434,8 @@ function Root() {
     window.location.hash = `${COURSE_HASH}${encodeURIComponent(course.id)}`;
   };
 
-  const navigateToCheckout = (finalPrice: number, checkoutCatalogProduct = selectedCatalogProduct) => {
+  const navigateToCheckout = (finalPrice: number, couponCode: string | null = null) => {
+    const checkoutCatalogProduct = selectedCatalogProduct;
     if (!user) {
       sessionStorage.setItem("pendingCheckoutPrice", String(finalPrice));
       redirectToAuth(window.location.hash || PRODUCT_HASH);
@@ -456,7 +458,7 @@ function Root() {
         subscriptionPlanId: null,
         billingCycle: null,
         featureIds: [],
-        couponCode: null,
+        couponCode: couponCode || null,
         requestedEduCoins: 0,
         returnRoute: null,
       },
@@ -623,7 +625,7 @@ function Root() {
     return (
       <CourseRouteGuard
         product={selectedCourseProduct}
-        onCheckout={(price) => navigateToCheckout(price, selectedCourseProduct)}
+        onCheckout={(price) => navigateToCheckout(price)}
         onBack={() => { window.location.hash = STORE_HASH; }}
         onPurchaseUpdate={handlePurchaseUpdate}
       />
