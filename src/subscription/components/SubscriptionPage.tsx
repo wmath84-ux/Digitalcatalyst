@@ -24,6 +24,7 @@ import PriceSummary from "./PriceSummary";
 import SubscribeBar from "./SubscribeBar";
 import HelpModal from "./HelpModal";
 import { SHOWCASE_CARDS } from "../data/showcase";
+import { FALLBACK_SUBSCRIPTION_CATALOG } from "../data/fallbackCatalog";
 import { useAuth } from "../../context/AuthContext";
 import {
   startCheckout,
@@ -41,6 +42,7 @@ export default function SubscriptionPage() {
   const [catalog, setCatalog] = useState<SubscriptionCatalog | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [catalogLoading, setCatalogLoading] = useState<boolean>(true);
+  const [usingFallback, setUsingFallback] = useState<boolean>(false);
 
   // ---------- Selection state ----------
   const [cycle, setCycle] = useState<BillingCycle>("yearly");
@@ -80,15 +82,31 @@ export default function SubscriptionPage() {
       try {
         const next = await loadSubscriptionCatalog();
         if (cancelled) return;
-        setCatalog(next);
-        // Pre-select the first plan (canonical default).
         if (next.plans.length > 0) {
+          setCatalog(next);
+          // Pre-select the first plan (canonical default).
           setSelectedPlanId((current) => current || next.plans[0].id);
+        } else {
+          // Server is reachable but no active plans are configured
+          // yet. Use defaults so the page still opens with content.
+          setCatalog(FALLBACK_SUBSCRIPTION_CATALOG);
+          setUsingFallback(true);
+          setSelectedPlanId(
+            (current) => current || FALLBACK_SUBSCRIPTION_CATALOG.plans[0]?.id || null,
+          );
         }
       } catch (error) {
         if (cancelled) return;
-        setCatalogError(
-          error instanceof Error ? error.message : "Could not load subscription plans.",
+        // The live catalog is unavailable (server unreachable,
+        // collection not seeded, or missing service account). Fall
+        // back to built-in defaults so the page still opens. The
+        // checkout flow re-verifies everything server-side, so the
+        // displayed defaults never become the source of truth.
+        console.warn("Subscription catalog unavailable, using fallback.", error);
+        setCatalog(FALLBACK_SUBSCRIPTION_CATALOG);
+        setUsingFallback(true);
+        setSelectedPlanId(
+          (current) => current || FALLBACK_SUBSCRIPTION_CATALOG.plans[0]?.id || null,
         );
       } finally {
         if (!cancelled) setCatalogLoading(false);
@@ -302,6 +320,15 @@ export default function SubscriptionPage() {
       </div>
 
       <div className="flex-1 pb-4">
+        {usingFallback && (
+          <div className="mx-5 mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-800">
+            <span aria-hidden="true">⚠️</span>
+            <span>
+              Showing default plans because the live catalog isn&apos;t available
+              yet. Final pricing is always confirmed at checkout.
+            </span>
+          </div>
+        )}
         <StackedCards cards={SHOWCASE_CARDS} />
 
         {/* Plan + cycle card */}

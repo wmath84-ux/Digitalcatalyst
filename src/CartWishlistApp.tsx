@@ -1,3 +1,4 @@
+import Header from "./components/Header";
 import BottomNav from "./cartWishlist/components/BottomNav";
 import Toast from "./cartWishlist/components/Toast";
 import CartPage from "./cartWishlist/pages/CartPage";
@@ -17,6 +18,8 @@ interface CartWishlistAppProps {
   onAddToCart: (id: string) => void;
   onCheckout: () => void;
   onNavigate: (tab: TabKey) => void;
+  onNavigateToSubscription: () => void;
+  onNavigateToNotifications: () => void;
   onRequireAuth: () => boolean;
 }
 
@@ -33,41 +36,50 @@ export default function CartWishlistApp({
   onAddToCart,
   onCheckout,
   onNavigate,
+  onNavigateToSubscription,
+  onNavigateToNotifications,
   onRequireAuth,
 }: CartWishlistAppProps) {
   return (
-    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-slate-50 font-[system-ui]">
-      <div className="relative flex flex-1 flex-col overflow-hidden bg-slate-50">
-        <Toast message={toast} />
-        {activeTab === "favorites" && (
-          <FavoritesPage
-            favoriteProducts={favoriteProducts}
-            cartIds={cartIds}
-            onRemove={onRemoveFromFavorites}
-            onAddToCart={onAddToCart}
-            onNavigate={onNavigate}
-          />
-        )}
-        {activeTab === "cart" && (
-          <CartPage
-            cartProducts={cartProducts}
-            onRemove={onRemoveFromCart}
-            onClearAll={onClearCart}
-            onCheckout={onCheckout}
-            onNavigate={onNavigate}
-            onRequireAuth={onRequireAuth}
-          />
-        )}
-      </div>
+    <div className="min-h-screen bg-slate-100 sm:py-6">
+      <div className="relative mx-auto flex h-[100dvh] w-full max-w-md flex-col overflow-hidden bg-white shadow-xl shadow-slate-200 sm:h-[calc(100vh-3rem)] sm:rounded-[2rem] sm:border sm:border-slate-200">
+        <Header
+          cartCount={cartIds.size}
+          notifCount={1}
+          onNavigateToSubscription={onNavigateToSubscription}
+          onNavigateToCart={() => onNavigate("cart")}
+          onNavigateToNotifications={onNavigateToNotifications}
+        />
 
-      <BottomNav
-        active={activeTab}
-        onChange={onNavigate}
-        favoritesCount={favoriteIds.size}
-        cartCount={cartIds.size}
-      />
-      <div className="flex shrink-0 justify-center bg-white pb-1.5 pt-0.5">
-        <div className="h-1 w-32 rounded-full bg-slate-300" />
+        <div className="relative flex flex-1 flex-col overflow-hidden bg-slate-50">
+          <Toast message={toast} />
+          {activeTab === "favorites" && (
+            <FavoritesPage
+              favoriteProducts={favoriteProducts}
+              cartIds={cartIds}
+              onRemove={onRemoveFromFavorites}
+              onAddToCart={onAddToCart}
+              onNavigate={onNavigate}
+            />
+          )}
+          {activeTab === "cart" && (
+            <CartPage
+              cartProducts={cartProducts}
+              onRemove={onRemoveFromCart}
+              onClearAll={onClearCart}
+              onCheckout={onCheckout}
+              onNavigate={onNavigate}
+              onRequireAuth={onRequireAuth}
+            />
+          )}
+        </div>
+
+        <BottomNav
+          active={activeTab}
+          onChange={onNavigate}
+          favoritesCount={favoriteIds.size}
+          cartCount={cartIds.size}
+        />
       </div>
     </div>
   );

@@ -16,56 +16,52 @@ export default function BottomNav({
   cartCount,
 }: BottomNavProps) {
   const items: { key: TabKey; label: string; icon: ReactNode; badge?: number }[] = [
-    { key: "home", label: "Discover", icon: <Home size={20} strokeWidth={2.2} /> },
+    { key: "home", label: "Discover", icon: <Home className="h-5 w-5" strokeWidth={2.2} /> },
     {
       key: "favorites",
       label: "Favorites",
-      icon: <Heart size={20} strokeWidth={2.2} />,
+      icon: <Heart className="h-5 w-5" strokeWidth={2.2} />,
       badge: favoritesCount,
     },
     {
       key: "cart",
       label: "Cart",
-      icon: <ShoppingBag size={20} strokeWidth={2.2} />,
+      icon: <ShoppingBag className="h-5 w-5" strokeWidth={2.2} />,
       badge: cartCount,
     },
   ];
 
   return (
-    <div className="relative z-30 border-t border-slate-100 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-1.5 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-md items-center justify-around px-6">
-        {items.map((item) => {
-          const isActive = active === item.key;
+    <nav className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur">
+      <div className="flex items-stretch justify-between">
+        {items.map(({ key, label, icon, badge }) => {
+          const isActive = active === key;
           return (
             <button
-              key={item.key}
-              onClick={() => onChange(item.key)}
-              className="relative flex flex-col items-center gap-0.5 py-1.5 transition-all active:scale-90"
-              style={{ flex: "0 0 auto", minWidth: "72px" }}
+              key={key}
+              type="button"
+              onClick={() => onChange(key)}
+              className={`relative flex flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-semibold transition ${
+                isActive ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
+              }`}
             >
-              <div
-                className={`relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-300 ${
-                  isActive ? "bg-indigo-50 text-indigo-600" : "text-slate-400"
+              <span
+                className={`relative flex h-9 w-14 items-center justify-center rounded-full transition ${
+                  isActive ? "bg-indigo-100" : ""
                 }`}
               >
-                {item.icon}
-                {!!item.badge && item.badge > 0 && (
-                  <span className="@container absolute -right-0.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-sm">
-                    {item.badge > 9 ? "9+" : item.badge}
+                {icon}
+                {!!badge && badge > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
+                    {badge > 9 ? "9+" : badge}
                   </span>
                 )}
-              </div>
-              <span
-                className={`text-[10px] font-semibold transition-colors ${
-                  isActive ? "text-indigo-600" : "text-slate-400"
-                }`}
-              >
-                {item.label}
               </span>
+              {label}
             </button>
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }

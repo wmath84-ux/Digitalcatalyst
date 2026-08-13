@@ -90,6 +90,7 @@ const iconFor = (file: CourseFile) => {
   if (file.type === "youtube" || file.type === "video") return PlayCircle;
   if (file.type === "pdf") return FileText;
   if (file.type === "sheet") return FileSpreadsheet;
+  if (file.type === "slides") return FileText;
   if (file.type === "google_form") return FormInput;
   if (file.type === "embed" || file.type === "mindmap") return Link2;
   return File;
@@ -169,7 +170,7 @@ function ModuleGroup({ module, index, depth, inheritedLocked, openModules, toggl
   const open = openModules.has(module.id);
   const state = computeLockState(module, props.accessibleModuleIds, props.previewModuleIds, props.moduleAccessSources, props.unmetDependencies, props.ownedUpdateIds, props.moduleTitleById);
   const moduleLocked = inheritedLocked || state.locked;
-  const visibleFiles = moduleFiles(module).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId) && (props.mode === "curriculum" ? isLesson(file) : ["pdf", "doc", "sheet", "google_form", "ebook", "image", "embed", "mindmap"].includes(file.type)));
+  const visibleFiles = moduleFiles(module).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId) && (props.mode === "curriculum" ? isLesson(file) : ["pdf", "doc", "sheet", "slides", "google_form", "ebook", "image", "embed", "mindmap"].includes(file.type)));
   const hasChildren = visibleFiles.length > 0 || (module.modules || []).length > 0;
 
   return (

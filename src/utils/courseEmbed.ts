@@ -66,7 +66,19 @@ export const getCourseEmbed = (file: CourseFile): { url: string; kind: "youtube"
   if (google?.kind === "presentation") return { url: `https://docs.google.com/presentation/d/${google.id}/embed?start=false&loop=false&delayms=3000`, kind: "slides" };
   if (google?.kind === "drive") return { url: `https://drive.google.com/file/d/${google.id}/preview`, kind: file.type === "pdf" ? "pdf" : "drive" };
   if (file.type === "pdf" && raw) return { url: raw, kind: "pdf" };
-  if ((file.type === "doc" || file.type === "sheet" || file.type === "ebook") && raw) return { url: `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(raw)}`, kind: file.type === "sheet" ? "sheet" : "doc" };
+  if (file.type === "ebook" && raw) {
+    // PDF e-books render natively (Chrome's built-in PDF viewer);
+    // EPUB / other formats fall back to the Google Docs viewer.
+    return /\.pdf(?:[?#]|$)/i.test(raw)
+      ? { url: raw, kind: "pdf" }
+      : { url: `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(raw)}`, kind: "doc" };
+  }
+  if (file.type === "slides" && raw) {
+    // A first-class "slides" file whose URL isn't a Google
+    // presentation (handled above) renders directly in the frame.
+    return { url: raw, kind: "slides" };
+  }
+  if ((file.type === "doc" || file.type === "sheet") && raw) return { url: `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(raw)}`, kind: file.type === "sheet" ? "sheet" : "doc" };
   if (file.type === "embed" && raw) return { url: raw, kind: "embed" };
   return raw ? { url: raw, kind: "direct" } : { url: "", kind: "none" };
 };

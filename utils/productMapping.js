@@ -62,6 +62,7 @@ const normResourceType = (v) => {
     s === "audio_url" || s === "audio" ||
     s === "image_url" || s === "image" ||
     s === "gdrive" || s === "pdf" || s === "gdoc" || s === "gsheet" ||
+    s === "gslides" || s === "slides" ||
     s === "gform" || s === "google_form" ||
     s === "ebook" ||
     s === "github_pages" || s === "whimsical" || s === "iframe" ||
@@ -74,7 +75,7 @@ const normResourceType = (v) => {
 // Resource type helpers
 // ---------------------------------------------------------------------------
 
-// Map the 14 editor resource types to the 11 canonical player types.
+// Map the editor resource types to the canonical player types.
 const RESOURCE_TYPE_ALIASES = {
   video_url: "video",
   audio_url: "audio",
@@ -82,6 +83,7 @@ const RESOURCE_TYPE_ALIASES = {
   gdrive: "embed",
   gdoc: "doc",
   gsheet: "sheet",
+  gslides: "slides",
   gform: "google_form",
   github_pages: "embed",
   whimsical: "mindmap",
@@ -94,10 +96,10 @@ const toPlayerResourceType = (raw) => toCanonicalResourceType(raw);
 
 // URL validation (mirrors utils/courseContent.ts).
 const VALID_URL_TYPES = new Set([
-  "youtube", "video", "audio", "pdf", "doc", "sheet", "image",
+  "youtube", "video", "audio", "pdf", "doc", "sheet", "slides", "image",
   "google_form", "ebook", "embed", "mindmap", "iframe",
   "video_url", "audio_url", "image_url", "gdrive", "gdoc", "gsheet",
-  "gform", "github_pages", "whimsical",
+  "gslides", "gform", "github_pages", "whimsical",
 ]);
 
 const isValidHttpsUrl = (value) => {
@@ -110,7 +112,10 @@ const isValidHttpsUrl = (value) => {
   try {
     const url = new URL(text);
     if (url.protocol !== "https:") return false;
-    if (/(?:firebasestorage\.googleapis\.com|storage\.googleapis\.com)$/i.test(url.hostname)) return false;
+    // Block Firebase / GCS storage buckets, but do NOT block legitimate
+    // public Google media hosts such as `commondatastorage.googleapis.com`
+    // (the hostname boundary before "storage" must be a dot or the start).
+    if (/(?:^|\.)(?:firebasestorage\.googleapis\.com|storage\.googleapis\.com)$/i.test(url.hostname)) return false;
     return true;
   } catch {
     return false;
@@ -123,6 +128,36 @@ const pickValidUrl = (...candidates) => {
     if (isValidHttpsUrl(c)) return String(c);
   }
   return "";
+};
+
+/**
+ * Extract the 11-char YouTube video id from any supported URL form:
+ *   - https://www.youtube.com/watch?v=<id>
+ *   - https://youtu.be/<id>
+ *   - https://www.youtube.com/shorts/<id>
+ *   - https://www.youtube.com/embed/<id>
+ *   - a bare 11-char id
+ * Returns "" when the value is not a recognisable YouTube id.
+ * Mirrors `extractYouTubeId` in `src/utils/courseEmbed.ts` so the two
+ * layers never disagree on the id.
+ */
+const extractYoutubeVideoId = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  // A bare 11-char id is accepted directly.
+  if (/^[a-zA-Z0-9_-]{11}$/.test(text)) return text;
+  try {
+    const url = new URL(text);
+    if (url.hostname.includes("youtu.be")) {
+      return url.pathname.split("/").filter(Boolean)[0] || "";
+    }
+    if (url.pathname.startsWith("/shorts/") || url.pathname.startsWith("/embed/")) {
+      return url.pathname.split("/")[2] || "";
+    }
+    return url.searchParams.get("v") || "";
+  } catch {
+    return "";
+  }
 };
 
 // ---------------------------------------------------------------------------
@@ -161,6 +196,8 @@ export const editorResourceToCanonical = (raw) => {
     paidUpdateId: raw.paidUpdateId === null || raw.paidUpdateId === undefined || raw.paidUpdateId === ""
       ? null
       : str(raw.paidUpdateId),
+    // Carry the bare id so URL-less YouTube records survive the round trip.
+    youtubeVideoId: type === "youtube" ? youtubeVideoId || undefined : undefined,
   };
 };
 
@@ -425,13 +462,14 @@ export const firestoreResourceToEditor = (raw) => {
 
 const fromPlayerResourceType = (type) => {
   // Editor types are: youtube, video_url, audio_url, image_url, gdrive, pdf,
-  // gdoc, gsheet, gform, ebook, github_pages, whimsical, iframe.
+  // gdoc, gsheet, gslides, gform, ebook, github_pages, whimsical, iframe.
   switch (type) {
     case "video": return "video_url";
     case "audio": return "audio_url";
     case "image": return "image_url";
     case "doc": return "gdoc";
     case "sheet": return "gsheet";
+    case "slides": return "gslides";
     case "google_form": return "gform";
     case "mindmap": return "whimsical";
     case "embed": return "iframe";
@@ -557,6 +595,7 @@ export const firestoreResourceToCanonical = (raw) => {
     paidUpdateId: raw.paidUpdateId === null || raw.paidUpdateId === undefined || raw.paidUpdateId === ""
       ? null
       : str(raw.paidUpdateId),
+    youtubeVideoId: type === "youtube" ? youtubeVideoId || undefined : undefined,
   };
 };
 
@@ -651,7 +690,7 @@ export const canonicalResourceToLegacyFile = (r) => {
     url: r.url ? str(r.url) : undefined,
     embedUrl: r.url ? str(r.url) : undefined,
     youtubeUrl: r.type === "youtube" ? str(r.url) : undefined,
-    youtubeVideoId: r.type === "youtube" ? str(r.url).split("v=").pop() || undefined : undefined,
+    youtubeVideoId: r.type === "youtube" ? (r.youtubeVideoId || extractYoutubeVideoId(r.url)) || undefined : undefined,
     provider: str(r.provider),
     accessLevel: r.accessLevel === "paid_update" ? "paidUpdate" : r.accessLevel === "hidden" ? "hidden" : "included",
     paidUpdateId: r.paidUpdateId || undefined,

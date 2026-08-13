@@ -396,6 +396,12 @@ function Root() {
         onAddToCart={handleAddToCart}
         onCheckout={handleCartCheckout}
         onNavigate={handleShoppingNavigation}
+        onNavigateToSubscription={() => {
+          window.location.hash = SUBSCRIPTION_HASH;
+        }}
+        onNavigateToNotifications={() => {
+          window.location.hash = NOTIFICATIONS_HASH;
+        }}
         onRequireAuth={() => {
           if (user) return true;
           redirectToAuth(CART_HASH);

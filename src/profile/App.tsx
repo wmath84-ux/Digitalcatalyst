@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import {
-  ArrowLeft,
   Bell,
   Boxes,
   ChevronRight,
@@ -18,6 +17,8 @@ import {
   X,
 } from "lucide-react";
 import { db } from "../../firebase";
+import Header from "../components/Header";
+import BottomNav, { type TabKey } from "../components/BottomNav";
 import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
@@ -52,6 +53,7 @@ export default function ProfileApp() {
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
   const [preferencesSaving, setPreferencesSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (!user) return undefined;
@@ -65,6 +67,16 @@ export default function ProfileApp() {
   const purchasedProducts = useMemo(() => products.filter((product) => purchasedIds.has(product.id)), [products, purchasedIds]);
   const initials = user?.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
   const memberSince = user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-IN", { month: "long", year: "numeric" }) : "Recently";
+  // Purchased count used by both the library stat and the footer badge.
+  const ownedCount = signedIn ? Math.max(purchasedIds.size, canonicalOwnedIds.length) : purchasedIds.size;
+
+  const handleFooterChange = (tab: TabKey) => {
+    if (tab === "home") window.location.hash = "#/home";
+    else if (tab === "myday") window.location.hash = "#/my-day";
+    else if (tab === "store") window.location.hash = "#/store";
+    else if (tab === "purchases") window.location.hash = "#/store/purchases";
+    else if (tab === "profile") mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   if (!user) return null;
 
@@ -82,17 +94,26 @@ export default function ProfileApp() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-slate-100 pb-10 text-slate-900">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-3xl items-center gap-3 px-4">
-          <button onClick={() => { window.location.hash = "#/store"; }} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200" aria-label="Back to store"><ArrowLeft size={18} /></button>
-          <div><p className="text-xs font-bold uppercase tracking-wider text-violet-600">My account</p><h1 className="text-sm font-black">Profile & library</h1></div>
-          {preferencesSaving && <LoaderCircle className="ml-auto h-4 w-4 animate-spin text-violet-600" />}
-        </div>
-      </header>
+    <div className="min-h-screen bg-slate-100 text-slate-900 sm:py-6">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
+        <Header
+          cartCount={cartIds.size}
+          notifCount={1}
+          onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
+          onNavigateToCart={() => { window.location.hash = "#/cart"; }}
+          onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
+        />
 
-      <main className="mx-auto max-w-3xl space-y-5 px-4 py-6">
-        {message && <div className="rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">{message}</div>}
+        <main ref={mainRef} className="flex-1 overflow-y-auto px-4 py-6">
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-violet-600">My account</p>
+                <h1 className="text-lg font-black">Profile & library</h1>
+              </div>
+              {preferencesSaving && <LoaderCircle className="h-4 w-4 animate-spin text-violet-600" />}
+            </div>
+            {message && <div className="rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">{message}</div>}
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-6 text-white shadow-xl shadow-violet-200">
           <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" />
           <div className="relative flex items-center gap-4">
@@ -107,26 +128,25 @@ export default function ProfileApp() {
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-100"><Crown className="text-violet-600" /></div><span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black uppercase text-emerald-700">{user.subscriptionTier || "basic"}</span></div><p className="mt-4 text-xs font-bold text-slate-400">Membership</p><p className="text-xl font-black capitalize">{user.subscriptionTier === "basic" ? "Basic learner" : `${user.subscriptionTier} membership`}</p><button onClick={() => { window.location.hash = "#/subscription"; }} className="mt-4 flex items-center gap-1 text-xs font-black text-violet-700">Manage membership <ChevronRight size={14} /></button></section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-xs font-black uppercase tracking-wider text-slate-400">My library</h3>
-          {(() => {
-            const ownedCount = signedIn ? Math.max(purchasedIds.size, canonicalOwnedIds.length) : purchasedIds.size;
-            return (
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                <LibraryStat icon={<ShoppingBag />} value={ownedCount} label="Purchased" onClick={() => { window.location.hash = "#/store/purchases"; }} />
-                <LibraryStat icon={<Heart />} value={favoriteIds.size} label="Favorites" onClick={() => { window.location.hash = "#/favorites"; }} />
-                <LibraryStat icon={<Boxes />} value={cartIds.size} label="In cart" onClick={() => { window.location.hash = "#/cart"; }} />
-              </div>
-            );
-          })()}
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <LibraryStat icon={<ShoppingBag />} value={ownedCount} label="Purchased" onClick={() => { window.location.hash = "#/store/purchases"; }} />
+            <LibraryStat icon={<Heart />} value={favoriteIds.size} label="Favorites" onClick={() => { window.location.hash = "#/favorites"; }} />
+            <LibraryStat icon={<Boxes />} value={cartIds.size} label="In cart" onClick={() => { window.location.hash = "#/cart"; }} />
+          </div>
           {purchasedProducts.length > 0 && <div className="mt-5 space-y-2">{purchasedProducts.slice(0, 3).map((product) => <button key={product.id} onClick={() => { window.location.hash = `#/course/${encodeURIComponent(product.id)}`; }} className="flex w-full items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left"><img src={product.image} alt="" className="h-12 w-16 rounded-lg object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-black">{product.title}</span><span className="text-xs text-slate-400">Owned · Open course</span></span><ChevronRight size={16} className="text-slate-300" /></button>)}</div>}
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Preferences</h3><p className="mt-1 text-xs text-slate-400">Saved securely to your account</p></div><button onClick={() => setModal("settings")} className="grid h-10 w-10 place-items-center rounded-xl bg-violet-50 text-violet-600"><Bell size={18} /></button></div></section>
 
         <button onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-50 py-4 text-sm font-black text-rose-600 ring-1 ring-rose-100"><LogOut size={17} /> Log out</button>
-      </main>
+          </div>
+        </main>
 
-      {modal === "edit" && <EditModal user={user} onClose={() => setModal(null)} onSave={async (details) => { const result = await updateAccount(details); setMessage(result.message); if (result.success) setModal(null); return result.success; }} />}
+        <BottomNav active="profile" onChange={handleFooterChange} purchasesBadge={ownedCount} />
+
+        {modal === "edit" && <EditModal user={user} onClose={() => setModal(null)} onSave={async (details) => { const result = await updateAccount(details); setMessage(result.message); if (result.success) setModal(null); return result.success; }} />}
       {modal === "settings" && <BaseModal title="Preferences" onClose={() => setModal(null)}><div className="space-y-2"><PreferenceRow icon={<Bell />} label="Push notifications" checked={preferences.push} onChange={(checked) => void savePreferences({ ...preferences, push: checked })} /><PreferenceRow icon={<Sparkles />} label="Email updates" checked={preferences.email} onChange={(checked) => void savePreferences({ ...preferences, email: checked })} /><PreferenceRow icon={<Bell />} label="Promotions" checked={preferences.promotions} onChange={(checked) => void savePreferences({ ...preferences, promotions: checked })} /><PreferenceRow icon={<UserRound />} label="Public profile" checked={preferences.profileVisible} onChange={(checked) => void savePreferences({ ...preferences, profileVisible: checked })} /><PreferenceRow icon={<Lock />} label="Share learning activity" checked={preferences.shareActivity} onChange={(checked) => void savePreferences({ ...preferences, shareActivity: checked })} /></div></BaseModal>}
+      </div>
     </div>
   );
 }
