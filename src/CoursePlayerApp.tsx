@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { ArrowLeft, BookOpen, CheckCircle2, FileText, Menu, NotebookPen, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
-import CourseSidebar from "./course/CourseSidebar";
-import NotesPanel from "./course/NotesPanel";
 import ResourceViewer from "./course/ResourceViewer";
+import CourseOverlay, { type DockTab } from "./course/CourseOverlay";
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
-
-type Tab = "curriculum" | "resources" | "notes";
 
 interface CoursePlayerProps {
   product: Product;
@@ -41,14 +38,11 @@ const filesInModule = (module: CourseModule): CourseFile[] => [
 const allFiles = (modules: CourseModule[]): CourseFile[] => modules.flatMap((module) => [...filesInModule(module), ...allFiles(module.modules || [])]);
 
 /**
- * Part 10 + Part 11: find the first file the user can actually
- * open. The access source is determined by the resolver
- * (`useCourseAccess`) so per-module ownership, paid updates,
- * subscription grants, and preview flags all participate.
- *
- * `inheritedLocked` is set when a parent module was already
- * locked (e.g. a paid-update module whose update the user
- * does not own). Nested modules inherit the lock.
+ * Find the first file the user can actually open. The access source
+ * is determined by the resolver (`useCourseAccess`) so per-module
+ * ownership, paid updates, subscription grants, and preview flags
+ * all participate. `inheritedLocked` is set when a parent module was
+ * already locked.
  */
 const firstAccessibleFile = (
   modules: CourseModule[],
@@ -73,11 +67,6 @@ const firstAccessibleFile = (
 
 const collectUpdates = (modules: CourseModule[]) => {
   const map = new Map<string, PaidCourseUpdate>();
-  const visit = (module: CourseModule) => {
-    if (module.accessLevel === "paidUpdate") add(module, module.title);
-    (module.files || []).forEach((file) => { if (file.accessLevel === "paidUpdate") add(file, file.name); });
-    (module.modules || []).forEach(visit);
-  };
   const add = (item: CourseModule | CourseFile, contentName: string) => {
     const id = accessId(item);
     const current = map.get(id) || { id, title: item.paidUpdateTitle || "Course update", price: numericPrice(item.paidUpdatePrice), coinPrice: Number(item.paidUpdateCoinPrice || 0), contentNames: [] };
@@ -85,6 +74,11 @@ const collectUpdates = (modules: CourseModule[]) => {
     current.price = Math.max(current.price, numericPrice(item.paidUpdatePrice));
     current.coinPrice = Math.max(current.coinPrice, Number(item.paidUpdateCoinPrice || 0));
     map.set(id, current);
+  };
+  const visit = (module: CourseModule) => {
+    if (module.accessLevel === "paidUpdate") add(module, module.title);
+    (module.files || []).forEach((file) => { if (file.accessLevel === "paidUpdate") add(file, file.name); });
+    (module.modules || []).forEach(visit);
   };
   modules.forEach(visit);
   return Array.from(map.values());
@@ -104,30 +98,39 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   const { user } = useAuth();
   const modules = product.courseContent || [];
   const files = useMemo(() => allFiles(modules).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
-  // Part 10 — the single source of truth for access. The
-  // resolver is consumed here so per-module ownership, paid
-  // updates, subscription grants, and preview flags all
-  // participate in the lock state.
   const { resolution, hasActiveSubscription } = useCourseAccess({ product });
   const [selectedFile, setSelectedFile] = useState<CourseFile | null>(null);
-  const [tab, setTab] = useState<Tab>("curriculum");
-  const [panelOpen, setPanelOpen] = useState(true);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState<CoursePlayerNote[]>([]);
   const [noteDraft, setNoteDraft] = useState("");
   const [lastOpenedFileId, setLastOpenedFileId] = useState<string | null>(null);
+  // Bottom dock state — the single overlay is reused across the four toggles.
+  const [dockTab, setDockTab] = useState<DockTab>("modules");
+  const [dockOpen, setDockOpen] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(false);
   const ownedUpdateIds = resolution.ownedUpdateIds;
   const updates = useMemo(() => collectUpdates(modules).filter((update) => !ownedUpdateIds.has(update.id)), [modules, ownedUpdateIds]);
   const moduleTitleById = useMemo(() => collectModuleTitleById(modules), [modules]);
 
-  // Find the parent module of a given file. Used to tag new
-  // notes with the module / resource the user is currently
-  // viewing.
+  // Detect orientation for the landscape layout (header left, toggles right,
+  // content rotated to fill the space).
+  useEffect(() => {
+    const media = window.matchMedia("(orientation: landscape)");
+    const update = () => setIsLandscape(media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    window.addEventListener("resize", update);
+    return () => {
+      media.removeEventListener?.("change", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  // Find the parent module of the currently selected file (note tagging).
   const selectedFileModuleId = useMemo(() => {
     if (!selectedFile) return null;
     const visit = (node: CourseModule): string | null => {
-      const files = filesInModule(node);
-      if (files.some((f) => f.id === selectedFile.id)) return String(node.id);
+      if (filesInModule(node).some((f) => f.id === selectedFile.id)) return String(node.id);
       for (const child of node.modules || []) {
         const inner = visit(child);
         if (inner) return inner;
@@ -143,9 +146,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
   const progressRef = useMemo(() => (user ? doc(db, "users", user.id, "courseProgress", product.id) : null), [product.id, user]);
 
-  // Subscribe to the progress doc; persists last opened file,
-  // completed files, notes, and the user's last known access
-  // source. Multi-device sync is automatic via Firestore.
   useEffect(() => {
     if (!user || !progressRef) return undefined;
     const unsubscribeProgress = onSnapshot(progressRef, (snapshot) => {
@@ -157,9 +157,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     return () => { unsubscribeProgress(); };
   }, [progressRef, user]);
 
-  // When the resolver / files change, pick the first
-  // accessible file unless the user already had a selection
-  // OR the persisted "lastOpenedFileId" is still available.
   useEffect(() => {
     if (selectedFile || files.length === 0) return;
     const first = firstAccessibleFile(modules, resolution.accessibleModuleIds);
@@ -167,7 +164,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   }, [files, resolution.accessibleModuleIds, selectedFile, modules]);
 
   // Resume the last opened file when the Firestore listener
-  // delivers the id. Part 11 spec — "Resume last file".
+  // delivers the id.
   useEffect(() => {
     if (!lastOpenedFileId || selectedFile) return;
     const match = files.find((file) => file.id === lastOpenedFileId);
@@ -182,10 +179,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     await setDoc(progressRef, { productId: product.id, completedFileIds: arrayUnion(selectedFile.id), lastOpenedFileId: selectedFile.id, lastOpenedAt: serverTimestamp(), accessSource: resolution.hasFullProductAccess ? "full_product" : (resolution.ownedModuleIds.size > 0 ? "module_purchase" : (resolution.subscriptionGrantedModuleIds.size > 0 ? "subscription" : "locked")), updatedAt: serverTimestamp() }, { merge: true });
   };
 
-  // Notes write directly to Firestore on every add / edit / delete. We also
-  // update local state optimistically so the UI reflects the change instantly
-  // and rapid successive edits can't be clobbered by a stale snapshot closure
-  // (the Firestore listener then reconciles the same values).
   const saveNote = async () => {
     if (!user || !progressRef || !noteDraft.trim()) return;
     const trimmed = noteDraft.trim();
@@ -216,6 +209,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
   const selectFile = (file: CourseFile) => {
     setSelectedFile(file);
+    // Close the overlay so the user sees the freshly opened content.
+    setDockOpen(false);
     if (window.innerWidth < 768) document.getElementById("course-viewer")?.scrollIntoView({ behavior: "smooth" });
     if (user && progressRef) {
       void setDoc(progressRef, { productId: product.id, lastOpenedFileId: file.id, lastOpenedAt: serverTimestamp() }, { merge: true });
@@ -228,8 +223,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     onPurchaseUpdate(update);
   };
 
-  // Total files exclude preview-only modules (their completion
-  // does not count toward progress).
+  const handleDockTabChange = (next: DockTab) => {
+    if (next === dockTab) {
+      setDockOpen((open) => !open);
+    } else {
+      setDockTab(next);
+      setDockOpen(true);
+    }
+  };
+
   const totalEligibleFiles = useMemo(() => {
     const inaccessibleModuleIds = resolution.lockedModuleIds;
     return files.filter((file) => {
@@ -250,8 +252,89 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
   const progress = totalEligibleFiles.length ? Math.round((completedIds.size / totalEligibleFiles.length) * 100) : 0;
 
+  const markCompleteBar = selectedFile ? (
+    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-white/10 bg-[#10101a] px-4 py-2.5" data-course-mark-complete-bar>
+      <div className="min-w-0">
+        <p className="truncate text-xs font-black" data-course-selected-name>{selectedFile.name}</p>
+        <p className="text-[10px] text-white/35">Progress is saved to your Firebase account</p>
+      </div>
+      <button
+        disabled={completedIds.has(selectedFile.id)}
+        onClick={() => void markComplete()}
+        className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-[11px] font-black text-slate-950 disabled:bg-emerald-500/15 disabled:text-emerald-300"
+        data-course-mark-complete
+        data-completed={completedIds.has(selectedFile.id) ? "true" : "false"}
+      >
+        <CheckCircle2 size={14} />
+        {completedIds.has(selectedFile.id) ? "Completed" : "Mark complete"}
+      </button>
+    </div>
+  ) : null;
+
+  const overlay = (
+    <CourseOverlay
+      orientation={isLandscape ? "landscape" : "portrait"}
+      tab={dockTab}
+      onTabChange={handleDockTabChange}
+      open={dockOpen}
+      onToggle={() => setDockOpen((open) => !open)}
+      onClose={() => setDockOpen(false)}
+      modules={modules}
+      selectedFileId={selectedFile?.id}
+      ownedUpdateIds={ownedUpdateIds}
+      accessibleModuleIds={resolution.accessibleModuleIds}
+      previewModuleIds={resolution.previewModuleIds}
+      updates={updates}
+      moduleTitleById={moduleTitleById}
+      onSelectFile={selectFile}
+      onBuyModule={handleBuyModule}
+      onBuyUpdate={onPurchaseUpdate}
+      notes={notes}
+      noteDraft={noteDraft}
+      onNoteDraft={setNoteDraft}
+      onSaveNote={() => void saveNote()}
+      onEditNote={(id, text) => void editNote(id, text)}
+      onDeleteNote={(id) => void deleteNote(id)}
+      productTitle={product.title}
+      noteModuleTitle={selectedFileModuleId ? moduleTitleById[selectedFileModuleId] || null : null}
+      noteResourceTitle={selectedFile?.name || null}
+    />
+  );
+
+  // ── Landscape: header left (vertical), content rotated, toggles right ──
+  if (isLandscape) {
+    return (
+      <div className="relative flex h-[100dvh] w-full flex-row overflow-hidden bg-[#090912] text-white" data-course-player data-orientation="landscape">
+        {/* Left vertical header */}
+        <header className="flex w-16 shrink-0 flex-col items-center gap-3 border-r border-white/10 bg-[#10101a] py-3" data-course-landscape-header>
+          <button onClick={onBack} className="grid h-10 w-10 place-items-center rounded-xl bg-white/5 text-white/70" aria-label="Back" data-course-back><ArrowLeft size={18} /></button>
+          <div className="flex min-h-0 flex-1 items-center justify-center">
+            <span className="line-clamp-1 max-h-full text-xs font-black [writing-mode:vertical-rl] rotate-180" data-course-product-title>{product.title}</span>
+          </div>
+          <div className="flex flex-col items-center gap-2" data-course-progress-summary>
+            <div className="relative h-24 w-1.5 overflow-hidden rounded-full bg-white/10" data-course-progress-bar>
+              <div className="absolute bottom-0 w-full bg-gradient-to-t from-violet-500 to-cyan-400" style={{ height: `${progress}%` }} data-course-progress-fill data-progress-value={progress} />
+            </div>
+            <span className="text-[9px] font-bold text-white/40" data-course-progress-label>{progress}%</span>
+          </div>
+        </header>
+
+        {/* Rotated content area */}
+        <div className="relative min-w-0 flex-1 overflow-hidden">
+          <div className="absolute left-1/2 top-1/2 flex flex-col" style={{ width: "100dvh", height: "calc(100vw - 8rem)", transform: "translate(-50%, -50%) rotate(90deg)" }}>
+            <div className="min-h-0 flex-1"><ResourceViewer file={selectedFile} /></div>
+            {markCompleteBar}
+          </div>
+        </div>
+
+        {overlay}
+      </div>
+    );
+  }
+
+  // ── Portrait: header top, content full-bleed, dock bottom ──
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[#090912] text-white" data-course-player>
+    <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-[#090912] text-white" data-course-player data-orientation="portrait">
       <header className="flex h-16 shrink-0 items-center gap-3 border-b border-white/10 bg-[#10101a] px-3 sm:px-5">
         <button onClick={onBack} className="grid h-10 w-10 place-items-center rounded-xl bg-white/5 text-white/70" aria-label="Back" data-course-back><ArrowLeft size={18} /></button>
         <div className="min-w-0 flex-1">
@@ -269,81 +352,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
             ) : null}
           </div>
         </div>
-        <button onClick={() => setPanelOpen((value) => !value)} className="hidden h-10 items-center gap-2 rounded-xl bg-white/5 px-3 text-xs font-bold text-white/70 md:flex" data-course-toggle-panel>{panelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}{panelOpen ? "Hide panel" : "Course panel"}</button>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <section id="course-viewer" className="flex min-h-[42dvh] min-w-0 flex-1 flex-col md:min-h-0">
-          <div className="min-h-0 flex-1"><ResourceViewer file={selectedFile} /></div>
-          {selectedFile && (
-            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-white/10 bg-[#10101a] px-4 py-3" data-course-mark-complete-bar>
-              <div className="min-w-0">
-                <p className="truncate text-xs font-black" data-course-selected-name>{selectedFile.name}</p>
-                <p className="text-[10px] text-white/35">Progress is saved to your Firebase account</p>
-              </div>
-              <button
-                disabled={completedIds.has(selectedFile.id)}
-                onClick={() => void markComplete()}
-                className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-[11px] font-black text-slate-950 disabled:bg-emerald-500/15 disabled:text-emerald-300"
-                data-course-mark-complete
-                data-completed={completedIds.has(selectedFile.id) ? "true" : "false"}
-              >
-                <CheckCircle2 size={14} />
-                {completedIds.has(selectedFile.id) ? "Completed" : "Mark complete"}
-              </button>
-            </div>
-          )}
-        </section>
+      <section id="course-viewer" className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1"><ResourceViewer file={selectedFile} /></div>
+        {markCompleteBar}
+      </section>
 
-        <aside className={`${panelOpen ? "h-[58dvh] md:h-auto md:w-[390px]" : "h-0 md:h-auto md:w-0"} flex min-h-0 shrink-0 flex-col overflow-hidden border-l border-white/10 bg-[#11111d] transition-[width] duration-300`} data-course-side-panel>
-          <div className="flex shrink-0 border-b border-white/10 bg-[#10101a] p-2">
-            <TabButton active={tab === "curriculum"} onClick={() => setTab("curriculum")} icon={<BookOpen size={14} />} label="Modules" dataAttr="data-course-tab-curriculum" />
-            <TabButton active={tab === "resources"} onClick={() => setTab("resources")} icon={<FileText size={14} />} label="Resources" dataAttr="data-course-tab-resources" />
-            <TabButton active={tab === "notes"} onClick={() => setTab("notes")} icon={<NotebookPen size={14} />} label="Notes" dataAttr="data-course-tab-notes" />
-          </div>
-          <div className="min-h-0 flex-1" data-course-tab-panel data-active-tab={tab}>
-            {tab === "notes" ? (
-              <NotesPanel
-                notes={notes}
-                draft={noteDraft}
-                setDraft={setNoteDraft}
-                onSave={() => void saveNote()}
-                onEdit={(id, text) => void editNote(id, text)}
-                onDelete={(id) => void deleteNote(id)}
-                productTitle={product.title}
-                moduleTitle={selectedFileModuleId ? moduleTitleById[selectedFileModuleId] || null : null}
-                resourceTitle={selectedFile?.name || null}
-              />
-            ) : (
-              <CourseSidebar
-                modules={modules}
-                selectedId={selectedFile?.id}
-                ownedUpdateIds={ownedUpdateIds}
-                mode={tab}
-                updates={updates}
-                accessibleModuleIds={resolution.accessibleModuleIds}
-                previewModuleIds={resolution.previewModuleIds}
-                moduleAccessSources={resolution.moduleAccessSources}
-                unmetDependencies={resolution.unmetDependencies}
-                moduleTitleById={moduleTitleById}
-                onBuyModule={handleBuyModule}
-                onSelect={selectFile}
-                onBuyUpdate={onPurchaseUpdate}
-              />
-            )}
-          </div>
-        </aside>
-      </div>
-
-      {!panelOpen && <button onClick={() => setPanelOpen(true)} className="fixed bottom-5 right-5 z-30 hidden items-center gap-2 rounded-full bg-violet-600 px-4 py-3 text-xs font-black shadow-xl md:flex"><Menu size={16} /> Modules & resources</button>}
+      {overlay}
     </div>
-  );
-}
-
-function TabButton({ active, onClick, icon, label, dataAttr }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; dataAttr?: string }) {
-  return (
-    <button onClick={onClick} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-[11px] font-black ${active ? "bg-violet-500 text-white" : "text-white/40 hover:text-white"}`} data-active={active ? "true" : "false"} {...(dataAttr ? { [dataAttr]: "true" } : {})}>
-      {icon}{label}
-    </button>
   );
 }

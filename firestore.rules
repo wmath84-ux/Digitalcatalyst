@@ -150,10 +150,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Public surfaces may query moderation-approved reviews only. Signed-in
-    // learners can submit a pending review for themselves; only an admin can
-    // publish, edit, or delete it. Home/PDP order the approved result by the
-    // latest createdAt value on the client, so no composite index is needed.
+    // Public surfaces may read published reviews only. Signed-in learners can
+    // publish a review for themselves (it becomes visible immediately and is
+    // counted in the live rating aggregate); only an admin can edit or delete
+    // a review. Home/PDP order the published result by the latest createdAt
+    // value on the client, so no composite index is needed.
     match /siteReviews/{reviewId} {
       allow read: if resource.data.status == 'published'
         || (signedIn() && (
@@ -162,7 +163,7 @@ service cloud.firestore {
           || resource.data.uid == request.auth.uid
         ));
       allow create: if signedIn()
-        && request.resource.data.status == 'pending'
+        && request.resource.data.status in ['pending', 'published']
         && request.resource.data.productId is string
         && request.resource.data.productId.size() > 0
         && request.resource.data.rating is number

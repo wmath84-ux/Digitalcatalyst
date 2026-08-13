@@ -19,6 +19,8 @@ export type Product = {
   originalPrice: number;
   price: number;
   isFree?: boolean;
+  /** Curated "What's included" bullets configured in the product editor. */
+  features?: string[];
   description?: string;
   paymentLink?: string;
   /**
