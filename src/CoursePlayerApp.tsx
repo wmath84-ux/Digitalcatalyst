@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { ArrowLeft, BookOpen, Bot, CheckCircle2, FileText, Menu, NotebookPen, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, FileText, Menu, NotebookPen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { db } from "../firebase";
-import AiQuestion from "./course/AiQuestion";
 import CourseSidebar from "./course/CourseSidebar";
 import NotesPanel from "./course/NotesPanel";
 import ResourceViewer from "./course/ResourceViewer";
@@ -11,7 +10,7 @@ import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } fro
 import { useAuth } from "./context/AuthContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
 
-type Tab = "curriculum" | "resources" | "notes" | "ai";
+type Tab = "curriculum" | "resources" | "notes";
 
 interface CoursePlayerProps {
   product: Product;
@@ -115,7 +114,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState<CoursePlayerNote[]>([]);
   const [noteDraft, setNoteDraft] = useState("");
-  const [aiDraft, setAiDraft] = useState("");
   const [lastOpenedFileId, setLastOpenedFileId] = useState<string | null>(null);
   const ownedUpdateIds = resolution.ownedUpdateIds;
   const updates = useMemo(() => collectUpdates(modules).filter((update) => !ownedUpdateIds.has(update.id)), [modules, ownedUpdateIds]);
@@ -213,13 +211,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     }
   };
 
-  const openCommunityAi = () => {
-    const prompt = aiDraft.trim() || `Help me understand ${selectedFile?.name || product.title}.`;
-    sessionStorage.setItem("aiInitialPrompt", prompt);
-    sessionStorage.setItem("aiCourseContext", JSON.stringify({ productId: product.id, courseTitle: product.title, fileId: selectedFile?.id || "", fileName: selectedFile?.name || "" }));
-    window.location.hash = "#/ai-chat";
-  };
-
   const handleBuyModule = (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => {
     if (!module.paidUpdateId) return;
     const update = updates.find((u) => u.id === module.paidUpdateId) || { id: module.paidUpdateId, title: module.paidUpdateTitle || "Course update", price: numericPrice(module.paidUpdatePrice), coinPrice: 0, contentNames: [] } as PaidCourseUpdate;
@@ -298,7 +289,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
             <TabButton active={tab === "curriculum"} onClick={() => setTab("curriculum")} icon={<BookOpen size={14} />} label="Modules" dataAttr="data-course-tab-curriculum" />
             <TabButton active={tab === "resources"} onClick={() => setTab("resources")} icon={<FileText size={14} />} label="Resources" dataAttr="data-course-tab-resources" />
             <TabButton active={tab === "notes"} onClick={() => setTab("notes")} icon={<NotebookPen size={14} />} label="Notes" dataAttr="data-course-tab-notes" />
-            <TabButton active={tab === "ai"} onClick={() => setTab("ai")} icon={<Bot size={14} />} label="AI Q&A" dataAttr="data-course-tab-ai" />
           </div>
           <div className="min-h-0 flex-1" data-course-tab-panel data-active-tab={tab}>
             {tab === "notes" ? (
@@ -313,8 +303,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
                 moduleTitle={selectedFileModuleId ? moduleTitleById[selectedFileModuleId] || null : null}
                 resourceTitle={selectedFile?.name || null}
               />
-            ) : tab === "ai" ? (
-              <AiQuestion draft={aiDraft} setDraft={setAiDraft} fileName={selectedFile?.name} onOpen={openCommunityAi} />
             ) : (
               <CourseSidebar
                 modules={modules}

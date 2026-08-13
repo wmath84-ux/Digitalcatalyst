@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AdminLink as Link } from "@/lib/admin/router";
-import { DangerButton, ErrorState, Field, KeyValue, LoadingState, Pill, PrimaryButton, SecondaryButton, SectionCard, Sheet, inputClass, textareaClass } from "@/components/admin/ui";
+import { DangerButton, ErrorState, KeyValue, LoadingState, Pill, PrimaryButton, SectionCard } from "@/components/admin/ui";
 import { useConfirm, useToast } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
 
@@ -14,7 +14,6 @@ type Customer = {
   provider: string | null;
   role: string;
   status: string;
-  coinBalance: number;
   subscriptionId: string | null;
   purchaseCount: number;
   wishlist: string[] | null;
@@ -31,11 +30,6 @@ export default function CustomerDetailPage({ uid }: { uid: string }) {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [coinSheetOpen, setCoinSheetOpen] = useState(false);
-  const [coinAmount, setCoinAmount] = useState("");
-  const [coinType, setCoinType] = useState<"earn" | "spend">("earn");
-  const [coinReason, setCoinReason] = useState("");
-  const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
   const { notify } = useToast();
 
@@ -78,34 +72,6 @@ export default function CustomerDetailPage({ uid }: { uid: string }) {
     }
   }
 
-  async function submitCoinAdjustment() {
-    const amount = Number(coinAmount);
-    if (!amount || amount <= 0) {
-      notify("error", "Enter a positive amount.");
-      return;
-    }
-    if (!coinReason.trim()) {
-      notify("error", "A reason is mandatory for coin adjustments.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const res = await adminFetch<{ customer: Customer }>(`/api/admin/customers/${uid}/coins`, {
-        method: "POST",
-        body: JSON.stringify({ amount, type: coinType, reason: coinReason }),
-      });
-      setCustomer(res.customer);
-      notify("success", "Coin balance adjusted.");
-      setCoinSheetOpen(false);
-      setCoinAmount("");
-      setCoinReason("");
-    } catch (err) {
-      notify("error", err instanceof Error ? err.message : "Failed to adjust coins.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (error) return <ErrorState message={error} />;
   if (!customer) return <LoadingState label="Loading customer…" />;
 
@@ -128,8 +94,7 @@ export default function CustomerDetailPage({ uid }: { uid: string }) {
         </div>
       </SectionCard>
 
-      <SectionCard title="Wallet & subscription" action={<SecondaryButton onClick={() => setCoinSheetOpen(true)}>Adjust coins</SecondaryButton>}>
-        <KeyValue label="Coin balance" value={customer.coinBalance} />
+      <SectionCard title="Library & subscription">
         <KeyValue label="Subscription" value={customer.subscriptionId || "None"} />
         <KeyValue label="Wishlist items" value={customer.wishlist?.length ?? 0} />
         <KeyValue label="Cart items" value={customer.cart?.length ?? 0} />
@@ -183,30 +148,6 @@ export default function CustomerDetailPage({ uid }: { uid: string }) {
           Legacy identity cleanup (restricted)
         </DangerButton>
       </SectionCard>
-
-      <Sheet
-        open={coinSheetOpen}
-        onClose={() => setCoinSheetOpen(false)}
-        title="Manual coin adjustment"
-        footer={
-          <PrimaryButton className="w-full" loading={saving} onClick={submitCoinAdjustment}>
-            Apply adjustment
-          </PrimaryButton>
-        }
-      >
-        <div className="space-y-3">
-          <div className="flex rounded-lg bg-slate-100 p-1">
-            <button type="button" onClick={() => setCoinType("earn")} className={`h-9 flex-1 rounded-md text-sm font-medium ${coinType === "earn" ? "bg-white shadow-sm" : "text-slate-500"}`}>Add coins</button>
-            <button type="button" onClick={() => setCoinType("spend")} className={`h-9 flex-1 rounded-md text-sm font-medium ${coinType === "spend" ? "bg-white shadow-sm" : "text-slate-500"}`}>Deduct coins</button>
-          </div>
-          <Field label="Amount" required>
-            <input className={inputClass} type="number" value={coinAmount} onChange={(e) => setCoinAmount(e.target.value)} />
-          </Field>
-          <Field label="Reason" required hint="Mandatory for audit log">
-            <textarea className={textareaClass} value={coinReason} onChange={(e) => setCoinReason(e.target.value)} />
-          </Field>
-        </div>
-      </Sheet>
     </div>
   );
 }

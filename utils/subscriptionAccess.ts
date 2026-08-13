@@ -10,7 +10,7 @@ export const SUBSCRIPTION_BILLING_CYCLES: SubscriptionBillingCycle[] = ['once', 
  * feature is unlockable on its own, addable later during an upgrade, and
  * locked again as soon as the subscription expires.
  */
-export type SubscriptionFeatureKey = 'aiMentor' | 'community' | 'educoins' | 'coinDiscounts' | 'mayday' | 'contentAccess';
+export type SubscriptionFeatureKey = 'mayday' | 'contentAccess';
 
 export interface SubscriptionFeature {
   key: SubscriptionFeatureKey;
@@ -22,49 +22,15 @@ export interface SubscriptionFeature {
 }
 
 export const ALL_SUBSCRIPTION_FEATURE_KEYS: SubscriptionFeatureKey[] = [
-  'aiMentor',
-  'community',
-  'educoins',
-  'coinDiscounts',
   'mayday',
   'contentAccess',
 ];
 
 export const SUBSCRIPTION_FEATURES: SubscriptionFeature[] = [
   {
-    key: 'aiMentor',
-    name: 'AI Mentor',
-    icon: '🧠',
-    monthlyPrice: 0,
-    badge: 'Best for doubts',
-    description: 'Real-time AI study partner inside every course and the community. Ask doubts, get lesson summaries, and prepare better while you study.',
-  },
-  {
-    key: 'community',
-    name: 'Learning Community',
-    icon: '💬',
-    monthlyPrice: 0,
-    description: 'Join serious learners. Share progress, ask questions, follow creators, and stay motivated in a focused study space.',
-  },
-  {
-    key: 'educoins',
-    name: 'EduCoins & Rewards',
-    icon: '🪙',
-    monthlyPrice: 0,
-    badge: 'Study & earn',
-    description: 'Earn EduCoins for every serious study action, unlock streaks, badges, milestone rewards, and grow your learning wallet.',
-  },
-  {
-    key: 'coinDiscounts',
-    name: 'EduCoin Discounts',
-    icon: '🏷️',
-    monthlyPrice: 0,
-    description: 'Spend your EduCoins to get discounts on paid products, modules, and your subscription itself.',
-  },
-  {
     key: 'mayday',
     name: 'MyDay Pro',
-    icon: '🚨',
+    icon: '🗓️',
     monthlyPrice: 0,
     description: 'Premium planner: weekly streaks, milestone tracking, and deeper progress insights inside MyDay.',
   },
@@ -189,10 +155,9 @@ export const hasSubscriptionFeature = (user: unknown, key: SubscriptionFeatureKe
 
 export const isSubscriptionActive = (user: unknown): boolean => getUserSubscriptionTier(user) !== 'normal';
 
-export const canEarnEduCoins = (user: unknown): boolean => hasSubscriptionFeature(user, 'educoins');
+export const canEarnEduCoins = (_user: unknown): boolean => false;
 
-export const canSpendEduCoins = (user: unknown): boolean =>
-  hasSubscriptionFeature(user, 'educoins') || hasSubscriptionFeature(user, 'coinDiscounts');
+export const canSpendEduCoins = (_user: unknown): boolean => false;
 
 export interface MembershipMessage {
   eyebrow: string;
@@ -295,7 +260,7 @@ Upgrade to Eduvora Plus+ and start building your learning wallet.`,
 export const DEFAULT_SUBSCRIPTION_PAGE_CONTENT: SubscriptionPageContent = {
   eyebrow: 'Premium learning access',
   title: 'Eduvora Plus+ · Sab Kuch, Ek Saath',
-  subtitle: 'AI Mentor, Community, EduCoins, Streaks, Rewards aur MyDay — ek hi subscription mein. Padho pyaar se, results apne aap aayenge.',
+  subtitle: 'Premium courses aur MyDay planner — ek hi subscription mein. Padho pyaar se, results apne aap aayenge.',
   monthlyLabel: 'Monthly',
   yearlyLabel: 'Yearly',
   yearlyBadge: 'Save',
@@ -320,17 +285,12 @@ export const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionPlanConfig[] = [
     yearlyPrice: 0,
     oncePrice: 0,
     coinPrice: 0,
-    description: 'Har serious learner ke liye. AI Mentor, Community, EduCoins, Streaks, Rewards aur MyDay — sab kuch ek hi plan mein.',
+    description: 'Har serious learner ke liye. Premium courses aur MyDay planner — sab kuch ek hi plan mein.',
     audienceLabel: 'Har serious learner ke liye',
     benefits: [
-      'Real-time AI Mentor inside course player — har doubt ka turant jawab',
-      'AI Mentor inside Community — better discussions aur better learning',
-      'EduCoins har serious study action par',
-      'Streaks, badges aur rewards — roz padho, roz jeeto',
-      'EduCoins se discounts pao paid modules par',
-      'MyDay feature — emergency mein instant study support',
-      'Full Community access — serious learners ka apna ghar',
+      'MyDay planner — tasks, schedule, reminders aur notes ek jagah',
       'Selected premium courses/content unlock',
+      'Secure checkout and lifetime library access',
     ],
     unlockProductIds: [2],
     badge: 'Sabse Popular',
@@ -481,13 +441,7 @@ export const getUserSubscriptionTier = (user: unknown): SubscriptionTier => {
 
 export const hasPremiumMembership = (user: unknown): boolean => getSubscriptionTierRank(getUserSubscriptionTier(user)) > 0;
 
-export const getUserEduCoinMultiplier = (user: unknown): number => {
-  const tier = getUserSubscriptionTier(user);
-  if (tier === 'normal') return 0;
-  if (!hasSubscriptionFeature(user, 'educoins')) return 0;
-  const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
-  return clampMultiplier(record.eduCoinMultiplier, tier === 'elite' ? 2 : 1);
-};
+export const getUserEduCoinMultiplier = (_user: unknown): number => 0;
 
 export const normalizeMembershipMessage = (value: unknown, fallback: MembershipMessage): MembershipMessage => {
   const record = (value && typeof value === 'object' ? value : {}) as Partial<MembershipMessage>;

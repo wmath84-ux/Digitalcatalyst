@@ -32,7 +32,6 @@ import {
   ShoppingBag,
   Sparkles,
   Star,
-  Tag,
   Unlock,
 } from "lucide-react";
 import type {
@@ -407,7 +406,7 @@ export default function PdpPurchaseBuilder({
 // ===========================================================================
 
 function ModeSwitcher({ modes, mode, onChange }: { modes: PdpPurchaseMode[]; mode: PdpPurchaseMode; onChange: (m: PdpPurchaseMode) => void }) {
-  const labels: Record<PdpPurchaseMode, { short: string; long: string; icon: typeof Tag }> = {
+  const labels: Record<PdpPurchaseMode, { short: string; long: string; icon: typeof Package }> = {
     full_product: { short: "Full course", long: "Full course", icon: Package },
     selected_modules: { short: "Modules", long: "Choose modules", icon: PackageOpen },
     selected_resources: { short: "Resources", long: "Resources", icon: Unlock },
@@ -610,11 +609,7 @@ function ModuleSelector({
                   ) : (
                     <span className="text-slate-400">Bundle only</span>
                   )}
-                  {m.coinPrice && m.coinPrice > 0 ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-bold text-amber-700">
-                      <Tag size={10} /> {m.coinPrice} coins
-                    </span>
-                  ) : null}
+
                 </div>
                 {deps.length > 0 ? (
                   <p className="mt-2 text-[11px] text-slate-500">
@@ -757,11 +752,7 @@ function ResourceSelector({
                 ) : (
                   <span className="text-slate-400">No price</span>
                 )}
-                {r.coinPrice && r.coinPrice > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-bold text-amber-700">
-                    <Tag size={10} /> {r.coinPrice} coins
-                  </span>
-                ) : null}
+
               </div>
             </div>
           </article>
@@ -817,11 +808,6 @@ function PaidUpdateSelector({
               ) : null}
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs">
                 <span className="font-black text-slate-900">{formatPrice(u.cashPrice)}</span>
-                {u.coinPrice > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-bold text-amber-700">
-                    <Tag size={10} /> {u.coinPrice} coins
-                  </span>
-                ) : null}
                 {u.publishDate ? (
                   <span className="text-slate-400">Published {new Date(u.publishDate).toLocaleDateString("en-IN")}</span>
                 ) : null}

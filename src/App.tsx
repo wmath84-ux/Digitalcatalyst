@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import Header from "./components/Header";
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import StorePage from "./components/StorePage";
-import { HomeTab, MyDayTab, PurchasesTab } from "./components/OtherTabs";
+import { PurchasesTab } from "./components/OtherTabs";
 import type { Product } from "./data/products";
 import { useCatalog } from "./context/CatalogContext";
 
@@ -10,8 +10,10 @@ type AppProps = {
   onNavigateToProduct: (product: Product) => void;
   onNavigateToMyDay: () => void;
   onNavigateToProfile: () => void;
+  onNavigateToHome: () => void;
   onNavigateToCourse: (course: { id: string; title: string }) => void;
-  onNavigateToCommunity: () => void;
+  onNavigateToSubscription: () => void;
+  onNavigateToNotifications: () => void;
   cartIds: Set<string>;
   favoriteIds: Set<string>;
   toast: string | null;
@@ -24,8 +26,10 @@ export default function App({
   onNavigateToProduct,
   onNavigateToMyDay,
   onNavigateToProfile,
+  onNavigateToHome,
   onNavigateToCourse,
-  onNavigateToCommunity,
+  onNavigateToSubscription,
+  onNavigateToNotifications,
   cartIds,
   favoriteIds,
   toast,
@@ -38,7 +42,6 @@ export default function App({
     window.location.hash.startsWith("#/store/purchases") ? "purchases" : "store"
   );
   const cartCount = cartIds.size;
-
   const purchasesBadge = useMemo(() => purchased.size, [purchased]);
 
   return (
@@ -47,13 +50,12 @@ export default function App({
         <Header
           cartCount={cartCount}
           notifCount={1}
-          onNavigateToProfile={onNavigateToProfile}
+          onNavigateToSubscription={onNavigateToSubscription}
           onNavigateToCart={onNavigateToCart}
+          onNavigateToNotifications={onNavigateToNotifications}
         />
 
         <main className="flex-1 overflow-y-auto">
-          {activeTab === "home" && <HomeTab />}
-          {activeTab === "myday" && <MyDayTab />}
           {activeTab === "store" && (
             <StorePage
               wishlist={favoriteIds}
@@ -76,10 +78,11 @@ export default function App({
         )}
 
         <BottomNav
-          active={activeTab}
+          active={activeTab === "purchases" ? "purchases" : "store"}
           onChange={(tab) => {
-            if (tab === "myday") onNavigateToMyDay();
-            else if (tab === "community") onNavigateToCommunity();
+            if (tab === "home") onNavigateToHome();
+            else if (tab === "myday") onNavigateToMyDay();
+            else if (tab === "profile") onNavigateToProfile();
             else setActiveTab(tab);
           }}
           storeBadge={1}

@@ -121,7 +121,6 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
   const regularSubtotal = quote.regularSubtotal || 0;
   const saleDiscount = quote.saleDiscount || 0;
   const couponDiscount = quote.couponDiscount || 0;
-  const eduCoinDiscount = quote.eduCoinDiscount || 0;
   const cashPayable = quote.cashPayable || 0;
   const minimumPayable = quote.minimumPayable || 0;
   const finalTotal = Math.max(cashPayable, minimumPayable);
@@ -207,7 +206,6 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
               negative
             />
           ) : null}
-          <PriceRow label="EduCoin discount" value={-eduCoinDiscount} negative muted note="(EduCoin is coming soon)" />
           {minimumPayable > 0 ? (
             <PriceRow label="Minimum payable" value={minimumPayable} muted />
           ) : null}

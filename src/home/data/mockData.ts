@@ -47,7 +47,7 @@ export const reviews: Review[] = [
     rating: 5,
     date: "2 days ago",
     comment:
-      "The video lectures are crystal clear and the EduCoins reward system keeps me motivated to finish every module!",
+      "The video lectures are crystal clear and the daily study plan keeps me motivated to finish every module!",
     course: "Complete Physics Mastery",
   },
   {

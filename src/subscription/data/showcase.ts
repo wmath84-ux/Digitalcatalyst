@@ -31,8 +31,8 @@ export const SHOWCASE_CARDS: ShowcaseCard[] = [
   {
     id: "s4",
     image: "/images/showcase-4.jpg",
-    eyebrow: "COMMUNITY",
-    title: "Join 2M+ Learners",
-    subtitle: "Live mentorship, peer groups, and weekly challenges.",
+    eyebrow: "PLANNER",
+    title: "Stay On Track",
+    subtitle: "Tasks, reminders, and a daily schedule built for serious study.",
   },
 ];

@@ -1,4 +1,4 @@
-import { Bell, CalendarClock, ClipboardList, Coins, LayoutGrid, NotebookPen, Settings } from "lucide-react";
+import { Bell, CalendarClock, ClipboardList, Home, LayoutGrid, NotebookPen } from "lucide-react";
 import { cn } from "../../utils/cn";
 
 interface SideNavProps {
@@ -12,7 +12,7 @@ const items = [
   { id: "schedule", label: "Schedule", icon: CalendarClock },
   { id: "notes", label: "Notes", icon: NotebookPen },
   { id: "reminders", label: "Reminders", icon: Bell },
-  { id: "rewards", label: "Rewards", icon: Coins },
+  { id: "home", label: "Home", icon: Home },
 ];
 
 export default function SideNav({ active, onNavigate }: SideNavProps) {
@@ -23,8 +23,8 @@ export default function SideNav({ active, onNavigate }: SideNavProps) {
           <LayoutGrid className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-sm font-extrabold text-slate-900 tracking-tight">EduSpace</p>
-          <p className="text-[11px] text-slate-400 font-medium">My Day Dashboard</p>
+          <p className="text-sm font-extrabold tracking-tight text-slate-900">Eduvora Tasker</p>
+          <p className="text-[11px] font-medium text-slate-400">My Day Dashboard</p>
         </div>
       </div>
 
@@ -49,13 +49,6 @@ export default function SideNav({ active, onNavigate }: SideNavProps) {
           );
         })}
       </nav>
-
-      <div className="mt-3 border-t border-slate-100 pt-3">
-        <button className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700">
-          <Settings className="h-[18px] w-[18px]" />
-          Settings
-        </button>
-      </div>
     </aside>
   );
 }

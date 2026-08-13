@@ -14,7 +14,6 @@ type CustomerRow = {
   provider: string | null;
   role: string;
   status: string;
-  coinBalance: number;
   subscriptionId: string | null;
   purchaseCount: number;
   joinedAt: string;
@@ -78,10 +77,7 @@ export default function CustomersPage() {
                   <Pill tone={c.status === "active" ? "success" : "danger"}>{c.status}</Pill>
                 </div>
                 <p className="text-xs text-slate-500">{c.email} · {c.mobile || "no phone"}</p>
-                <div className="mt-1 flex items-center justify-between text-xs text-slate-600">
-                  <span>{c.provider} · {c.purchaseCount} purchase(s)</span>
-                  <span>{c.coinBalance} coins</span>
-                </div>
+                <p className="mt-1 text-xs text-slate-600">{c.provider} · {c.purchaseCount} purchase(s)</p>
               </RecordCard>
             </Link>
           ))}

@@ -4,7 +4,6 @@ export async function exportAdminCsv(type: string) {
   let rows: Record<string, unknown>[] = [];
   if (type === "orders") rows = (await adminFetch<{ orders: Record<string, unknown>[] }>("/api/admin/orders")).orders;
   else if (type === "customers") rows = (await adminFetch<{ customers: Record<string, unknown>[] }>("/api/admin/customers")).customers;
-  else if (type === "rewards") rows = (await adminFetch<{ transactions: Record<string, unknown>[] }>("/api/admin/rewards/transactions")).transactions;
   else if (type === "products") rows = (await adminFetch<{ products: Record<string, unknown>[] }>("/api/admin/products")).products;
   if (!rows.length) return;
   const keys = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));

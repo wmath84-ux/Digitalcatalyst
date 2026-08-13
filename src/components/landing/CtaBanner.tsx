@@ -23,8 +23,8 @@ export default function CtaBanner() {
           Step into your <span className="gradient-text">personalized learning universe</span>
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-slate-400">
-          One click takes you to your dashboard — libraries, lectures, your AI mentor, and your
-          EduCoin wallet, all in one place.
+          One click takes you to your dashboard — libraries, lectures, and your
+          daily study planner, all in one place.
         </p>
 
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">

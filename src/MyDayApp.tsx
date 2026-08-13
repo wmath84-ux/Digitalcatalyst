@@ -1,5 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Download, LayoutGrid, Search, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Bell,
+  CalendarClock,
+  ClipboardList,
+  Download,
+  LayoutGrid,
+  NotebookPen,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
 import { cn } from "./utils/cn";
 import GreetingHeader from "./components/myday/GreetingHeader";
 import TaskList from "./components/myday/TaskList";
@@ -8,7 +18,6 @@ import Timeline from "./components/myday/Timeline";
 import ScheduleModal from "./components/myday/ScheduleModal";
 import QuickNotes from "./components/myday/QuickNotes";
 import Reminders from "./components/myday/Reminders";
-import EduCoins from "./components/myday/EduCoins";
 import SideNav from "./components/myday/SideNav";
 import BottomNav from "./components/myday/BottomNav";
 import ConfirmDialog from "./components/ui/ConfirmDialog";
@@ -17,8 +26,8 @@ import type { ToastMessage } from "./components/ui/Toast";
 import { initialNotes, initialReminders, initialSchedule, initialTasks } from "./data/sampleData";
 import type { NoteColor, QuickNote, Reminder, ScheduleEvent, Task, TaskStatus } from "./types";
 
-// ─── Helpers ──────────────────────────────────────────────────
 const NOTE_COLORS: NoteColor[] = ["amber", "sky", "rose", "emerald", "violet"];
+type DaySection = "overview" | "tasks" | "schedule" | "reminders" | "notes";
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
@@ -33,27 +42,26 @@ function persist<T>(key: string, value: T) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
-const COINS_PER_TASK = 15;
-const COINS_PER_NOTE = 2;
-const COINS_PER_REMINDER = 5;
+const CREATE_OPTIONS: { id: DaySection; label: string; hint: string; icon: typeof ClipboardList }[] = [
+  { id: "tasks", label: "Today Task", hint: "Plan what you need to finish today", icon: ClipboardList },
+  { id: "schedule", label: "Daily Schedule", hint: "Block time for classes and study", icon: CalendarClock },
+  { id: "reminders", label: "Reminder", hint: "Get pinged at the right moment", icon: Bell },
+  { id: "notes", label: "Quick Note", hint: "Capture a thought in seconds", icon: NotebookPen },
+];
 
-// ─── Component ────────────────────────────────────────────────
 export default function App() {
-  // ── Core state ──────────────────────────────────────────────
   const [tasks, setTasks] = useState<Task[]>(() => loadFromStorage("myday_tasks", initialTasks));
   const [schedule, setSchedule] = useState<ScheduleEvent[]>(() => loadFromStorage("myday_schedule", initialSchedule));
   const [notes, setNotes] = useState<QuickNote[]>(() => loadFromStorage("myday_notes", initialNotes));
   const [reminders, setReminders] = useState<Reminder[]>(() => loadFromStorage("myday_reminders", initialReminders));
-  const [bonusCoins, setBonusCoins] = useState<number>(() => loadFromStorage("myday_bonus_coins", 0));
 
-  // ── UI state ────────────────────────────────────────────────
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
-  const [activeSection, setActiveSection] = useState("overview");
+  const [activeSection, setActiveSection] = useState<DaySection>("overview");
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
 
-  // ── Confirm dialog state ────────────────────────────────────
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({
     title: "",
@@ -61,7 +69,6 @@ export default function App() {
     onConfirm: () => {},
   });
 
-  // ── Toast state ─────────────────────────────────────────────
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const addToast = useCallback((text: string, type: ToastMessage["type"] = "success") => {
@@ -73,65 +80,31 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // ── Persist to localStorage ─────────────────────────────────
   useEffect(() => { persist("myday_tasks", tasks); }, [tasks]);
   useEffect(() => { persist("myday_schedule", schedule); }, [schedule]);
   useEffect(() => { persist("myday_notes", notes); }, [notes]);
   useEffect(() => { persist("myday_reminders", reminders); }, [reminders]);
-  useEffect(() => { persist("myday_bonus_coins", bonusCoins); }, [bonusCoins]);
-
-  // ── Scroll spy ──────────────────────────────────────────────
-  const sectionRefs: Record<string, React.RefObject<HTMLDivElement | null>> = {
-    overview: useRef<HTMLDivElement>(null),
-    tasks: useRef<HTMLDivElement>(null),
-    schedule: useRef<HTMLDivElement>(null),
-    notes: useRef<HTMLDivElement>(null),
-    reminders: useRef<HTMLDivElement>(null),
-    rewards: useRef<HTMLDivElement>(null),
-  };
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
-          }
-        });
-      },
-      { rootMargin: "-30% 0px -60% 0px", threshold: 0 },
-    );
-    Object.values(sectionRefs).forEach((ref) => {
-      if (ref.current) observer.observe(ref.current);
-    });
-    return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleNavigate = useCallback((id: string) => {
-    const ref = sectionRefs[id];
-    ref?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (id === "home") {
+      window.location.hash = "#/home";
+      return;
+    }
+    setCreateMenuOpen(false);
+    setActiveSection(id as DaySection);
   }, []);
 
-  // ── Confirm wrapper ─────────────────────────────────────────
   const showConfirm = useCallback((title: string, message: string, onConfirm: () => void) => {
     setConfirmConfig({ title, message, onConfirm });
     setConfirmOpen(true);
   }, []);
 
-  // ═══════════════════════════════════════════════════════════
-  // TASK HANDLERS
-  // ═══════════════════════════════════════════════════════════
   const handleToggleTask = useCallback((id: string) => {
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id !== id) return t;
         const newStatus: TaskStatus = t.status === "completed" ? "pending" : "completed";
-        if (newStatus === "completed") {
-          setBonusCoins((c) => c + COINS_PER_TASK);
-          addToast(`+${COINS_PER_TASK} EduCoins earned! 🎉`);
-        }
+        if (newStatus === "completed") addToast("Task completed");
         return { ...t, status: newStatus };
       }),
     );
@@ -144,10 +117,7 @@ export default function App() {
         const cycle: TaskStatus[] = ["pending", "in-progress", "completed"];
         const idx = cycle.indexOf(t.status);
         const next = cycle[(idx + 1) % cycle.length];
-        if (next === "completed" && t.status !== "completed") {
-          setBonusCoins((c) => c + COINS_PER_TASK);
-          addToast(`+${COINS_PER_TASK} EduCoins earned! 🎉`);
-        }
+        if (next === "completed" && t.status !== "completed") addToast("Task completed");
         return { ...t, status: next };
       }),
     );
@@ -175,16 +145,12 @@ export default function App() {
     setTasks((prev) => {
       const exists = prev.some((t) => t.id === task.id);
       if (exists) return prev.map((t) => (t.id === task.id ? task : t));
-      setBonusCoins((c) => c + COINS_PER_TASK);
       return [task, ...prev];
     });
     setTaskModalOpen(false);
-    addToast(editingTask ? "Task updated successfully" : "New task created! 🎯");
+    addToast(editingTask ? "Task updated successfully" : "New task created");
   }, [addToast, editingTask]);
 
-  // ═══════════════════════════════════════════════════════════
-  // SCHEDULE HANDLERS
-  // ═══════════════════════════════════════════════════════════
   const openAddEvent = useCallback(() => {
     setEditingEvent(null);
     setScheduleModalOpen(true);
@@ -202,7 +168,7 @@ export default function App() {
       return [...prev, event];
     });
     setScheduleModalOpen(false);
-    addToast(editingEvent ? "Event updated" : "Event added to schedule! 📅");
+    addToast(editingEvent ? "Event updated" : "Event added to schedule");
   }, [addToast, editingEvent]);
 
   const handleDeleteEvent = useCallback((id: string) => {
@@ -213,9 +179,6 @@ export default function App() {
     });
   }, [addToast, showConfirm]);
 
-  // ═══════════════════════════════════════════════════════════
-  // NOTE HANDLERS
-  // ═══════════════════════════════════════════════════════════
   const handleAddNote = useCallback((text: string) => {
     const note: QuickNote = {
       id: crypto.randomUUID(),
@@ -224,14 +187,11 @@ export default function App() {
       color: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)],
     };
     setNotes((prev) => [note, ...prev]);
-    setBonusCoins((c) => c + COINS_PER_NOTE);
-    addToast("Note saved ✏️");
+    addToast("Note saved");
   }, [addToast]);
 
   const handleEditNote = useCallback((id: string, text: string) => {
-    setNotes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, text } : n)),
-    );
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, text } : n)));
     addToast("Note updated");
   }, [addToast]);
 
@@ -240,34 +200,19 @@ export default function App() {
     addToast("Note deleted", "info");
   }, [addToast]);
 
-  // ═══════════════════════════════════════════════════════════
-  // REMINDER HANDLERS
-  // ═══════════════════════════════════════════════════════════
   const handleAddReminder = useCallback((reminder: Reminder) => {
     setReminders((prev) => [...prev, reminder]);
-    setBonusCoins((c) => c + COINS_PER_REMINDER);
-    addToast("Reminder set! ⏰");
+    addToast("Reminder set");
   }, [addToast]);
 
   const handleEditReminder = useCallback((reminder: Reminder) => {
-    setReminders((prev) =>
-      prev.map((r) => (r.id === reminder.id ? reminder : r)),
-    );
+    setReminders((prev) => prev.map((r) => (r.id === reminder.id ? reminder : r)));
     addToast("Reminder updated");
   }, [addToast]);
 
   const handleToggleReminder = useCallback((id: string) => {
-    setReminders((prev) =>
-      prev.map((r) => {
-        if (r.id !== id) return r;
-        if (!r.done) {
-          setBonusCoins((c) => c + COINS_PER_REMINDER);
-          addToast(`+${COINS_PER_REMINDER} EduCoins! Reminder completed ✅`);
-        }
-        return { ...r, done: !r.done };
-      }),
-    );
-  }, [addToast]);
+    setReminders((prev) => prev.map((r) => (r.id !== id ? r : { ...r, done: !r.done })));
+  }, []);
 
   const handleDeleteReminder = useCallback((id: string) => {
     showConfirm("Delete Reminder", "Remove this reminder?", () => {
@@ -277,15 +222,7 @@ export default function App() {
     });
   }, [addToast, showConfirm]);
 
-  // ═══════════════════════════════════════════════════════════
-  // COMPUTED
-  // ═══════════════════════════════════════════════════════════
   const completedCount = useMemo(() => tasks.filter((t) => t.status === "completed").length, [tasks]);
-  const totalCoins = useMemo(() => 2480 + bonusCoins, [bonusCoins]);
-  const earnedToday = useMemo(() => {
-    const taskCoins = completedCount * COINS_PER_TASK;
-    return taskCoins + bonusCoins;
-  }, [completedCount, bonusCoins]);
 
   const handleDownloadReport = useCallback(() => {
     const date = new Date();
@@ -306,8 +243,6 @@ export default function App() {
       "",
       "SUMMARY",
       `- Tasks completed: ${completedCount}/${tasks.length}`,
-      `- EduCoins total: ${totalCoins}`,
-      `- EduCoins earned today: ${earnedToday}`,
       `- Notes count: ${notes.length}`,
       `- Pending reminders: ${reminders.filter((r) => !r.done).length}`,
       `- Schedule events: ${schedule.length}`,
@@ -345,199 +280,215 @@ export default function App() {
     URL.revokeObjectURL(url);
 
     addToast("Report downloaded");
-  }, [schedule, reminders, completedCount, tasks, totalCoins, earnedToday, notes, addToast]);
+  }, [schedule, reminders, completedCount, tasks, notes, addToast]);
 
-  // ── Global search ───────────────────────────────────────────
   const [globalSearch, setGlobalSearch] = useState("");
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50/80 pb-24 lg:pb-8">
-      {/* ═══════ Top Bar ═══════ */}
-      <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          {/* Logo (mobile) */}
-          <div className="flex items-center gap-2.5 lg:hidden">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200">
-              <LayoutGrid className="h-[18px] w-[18px]" />
-            </div>
-            <div>
-              <span className="text-sm font-extrabold text-slate-900 tracking-tight">EduSpace</span>
-              <p className="text-[10px] text-slate-400 font-medium -mt-0.5">My Day</p>
-            </div>
-          </div>
-
-          {/* Title (desktop) */}
-          <h1 className="hidden text-lg font-bold text-slate-900 lg:block">My Day</h1>
-
-          {/* Search + Actions */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Mobile search button */}
-            <button
-              onClick={() => setShowMobileSearch((s) => !s)}
-              aria-label="Search"
-              className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-xl transition sm:hidden",
-                showMobileSearch || globalSearch
-                  ? "bg-indigo-100 text-indigo-600"
-                  : "bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
-              )}
-            >
-              <Search className="h-[18px] w-[18px]" />
-            </button>
-            {/* Desktop search */}
-            <div className="hidden items-center gap-2 rounded-xl bg-slate-100 px-3.5 py-2.5 sm:flex transition-all focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100 focus-within:shadow-sm">
-              <Search className="h-4 w-4 text-slate-400 shrink-0" />
-              <input
-                value={globalSearch}
-                onChange={(e) => setGlobalSearch(e.target.value)}
-                placeholder="Search tasks, notes..."
-                className="w-40 bg-transparent text-sm text-slate-600 outline-none placeholder:text-slate-400 lg:w-56"
-              />
-              {globalSearch && (
-                <button
-                  onClick={() => setGlobalSearch("")}
-                  className="shrink-0 rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-            <button
-              onClick={handleDownloadReport}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-2.5 text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-800 sm:px-3"
-              aria-label="Download report"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden text-xs font-semibold sm:inline">Report</span>
-            </button>
-            <button
-              aria-label="Notifications"
-              className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
-            >
-              <Bell className="h-[18px] w-[18px]" />
-              {reminders.filter((r) => !r.done).length > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white ring-2 ring-white">
-                  {reminders.filter((r) => !r.done).length}
-                </span>
-              )}
-            </button>
-            <div className="h-9 w-9 overflow-hidden rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 ring-2 ring-white shadow-md">
-              <div className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
-                AV
+    <div className="min-h-screen bg-slate-50/80">
+      <div className="mx-auto flex min-h-screen max-w-md flex-col bg-slate-50/80 lg:max-w-7xl">
+        <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/80 backdrop-blur-xl">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-2.5 lg:hidden">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200">
+                <LayoutGrid className="h-[18px] w-[18px]" />
+              </div>
+              <div>
+                <span className="text-sm font-extrabold tracking-tight text-slate-900">Eduvora Tasker</span>
+                <p className="-mt-0.5 text-[10px] font-medium text-slate-400">My Day</p>
               </div>
             </div>
+
+            <h1 className="hidden text-lg font-bold text-slate-900 lg:block">My Day</h1>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={() => setShowMobileSearch((s) => !s)}
+                aria-label="Search"
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-xl transition sm:hidden",
+                  showMobileSearch || globalSearch
+                    ? "bg-indigo-100 text-indigo-600"
+                    : "bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
+                )}
+              >
+                <Search className="h-[18px] w-[18px]" />
+              </button>
+              <div className="hidden items-center gap-2 rounded-xl bg-slate-100 px-3.5 py-2.5 transition-all focus-within:bg-white focus-within:shadow-sm focus-within:ring-2 focus-within:ring-indigo-100 sm:flex">
+                <Search className="h-4 w-4 shrink-0 text-slate-400" />
+                <input
+                  value={globalSearch}
+                  onChange={(e) => setGlobalSearch(e.target.value)}
+                  placeholder="Search tasks, notes..."
+                  className="w-40 bg-transparent text-sm text-slate-600 outline-none placeholder:text-slate-400 lg:w-56"
+                />
+                {globalSearch && (
+                  <button
+                    onClick={() => setGlobalSearch("")}
+                    className="shrink-0 rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={handleDownloadReport}
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-2.5 text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-800 sm:px-3"
+                aria-label="Download report"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden text-xs font-semibold sm:inline">Report</span>
+              </button>
+              <button
+                aria-label="Notifications"
+                onClick={() => { window.location.hash = "#/notifications"; }}
+                className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+              >
+                <Bell className="h-[18px] w-[18px]" />
+                {reminders.filter((r) => !r.done).length > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white ring-2 ring-white">
+                    {reminders.filter((r) => !r.done).length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                aria-label="Profile"
+                onClick={() => { window.location.hash = "#/profile"; }}
+                className="h-9 w-9 overflow-hidden rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 shadow-md ring-2 ring-white"
+              >
+                <div className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
+                  AV
+                </div>
+              </button>
+            </div>
           </div>
+
+          {showMobileSearch && (
+            <div className="animate-slideUp px-4 pb-3 sm:hidden">
+              <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/50 px-3.5 py-2.5 ring-2 ring-indigo-100">
+                <Search className="h-4 w-4 shrink-0 text-indigo-500" />
+                <input
+                  autoFocus
+                  value={globalSearch}
+                  onChange={(e) => setGlobalSearch(e.target.value)}
+                  placeholder="Search tasks, notes..."
+                  className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                />
+                {globalSearch && (
+                  <button
+                    onClick={() => { setGlobalSearch(""); setShowMobileSearch(false); }}
+                    className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-white hover:text-slate-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </header>
+
+        <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 pt-6 sm:px-6 lg:px-8">
+          <SideNav active={activeSection} onNavigate={handleNavigate} />
+
+          <main className="min-w-0 flex-1 pb-6">
+            {activeSection === "overview" && (
+              <section className="space-y-8">
+                <GreetingHeader
+                  name="Aarav"
+                  completed={completedCount}
+                  total={tasks.length}
+                  streak={12}
+                />
+
+                <div className="relative flex flex-col items-center pb-8">
+                  <button
+                    type="button"
+                    aria-label="Create item"
+                    onClick={() => setCreateMenuOpen((open) => !open)}
+                    className={cn(
+                      "flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-300/60 transition active:scale-95",
+                      createMenuOpen && "rotate-45",
+                    )}
+                  >
+                    <Plus className="h-10 w-10" strokeWidth={2.5} />
+                  </button>
+                  <p className="mt-3 text-sm font-semibold text-slate-500">Add to your day</p>
+
+                  {createMenuOpen && (
+                    <div className="absolute bottom-[7.5rem] z-20 w-full max-w-sm rounded-3xl border border-slate-100 bg-white p-2 shadow-2xl shadow-slate-300/70">
+                      {CREATE_OPTIONS.map((option) => {
+                        const Icon = option.icon;
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => handleNavigate(option.id)}
+                            className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                          >
+                            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                              <Icon className="h-5 w-5" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-bold text-slate-900">{option.label}</span>
+                              <span className="block text-xs text-slate-400">{option.hint}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {activeSection === "tasks" && (
+              <TaskList
+                tasks={tasks}
+                onToggle={handleToggleTask}
+                onCycleStatus={handleCycleStatus}
+                onEdit={openEditTask}
+                onDelete={handleDeleteTask}
+                onAdd={openAddTask}
+                globalSearch={globalSearch}
+              />
+            )}
+
+            {activeSection === "schedule" && (
+              <Timeline
+                events={schedule}
+                onAdd={openAddEvent}
+                onEdit={openEditEvent}
+                onDelete={handleDeleteEvent}
+              />
+            )}
+
+            {activeSection === "reminders" && (
+              <Reminders
+                reminders={reminders}
+                onAdd={handleAddReminder}
+                onEdit={handleEditReminder}
+                onToggle={handleToggleReminder}
+                onDelete={handleDeleteReminder}
+              />
+            )}
+
+            {activeSection === "notes" && (
+              <QuickNotes
+                notes={notes}
+                onAdd={handleAddNote}
+                onEdit={handleEditNote}
+                onDelete={handleDeleteNote}
+                globalSearch={globalSearch}
+              />
+            )}
+          </main>
         </div>
 
-        {/* Mobile search bar (expandable) */}
-        {showMobileSearch && (
-          <div className="px-4 pb-3 sm:hidden animate-slideUp">
-            <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/50 px-3.5 py-2.5 ring-2 ring-indigo-100">
-              <Search className="h-4 w-4 text-indigo-500 shrink-0" />
-              <input
-                autoFocus
-                value={globalSearch}
-                onChange={(e) => setGlobalSearch(e.target.value)}
-                placeholder="Search tasks, notes..."
-                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-              />
-              {globalSearch && (
-                <button
-                  onClick={() => { setGlobalSearch(""); setShowMobileSearch(false); }}
-                  className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-white hover:text-slate-600"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-      </header>
-
-      {/* ═══════ Main Layout ═══════ */}
-      <div className="mx-auto flex max-w-7xl gap-6 px-4 pt-6 sm:px-6 lg:px-8">
-        <SideNav active={activeSection} onNavigate={handleNavigate} />
-
-        <main className="min-w-0 flex-1 space-y-6">
-          {/* ── Overview / Greeting ── */}
-          <section id="overview" ref={sectionRefs.overview} className="scroll-mt-20">
-            <GreetingHeader
-              name="Aarav"
-              completed={completedCount}
-              total={tasks.length}
-              streak={12}
-              coins={totalCoins}
-            />
-          </section>
-
-          {/* ── Main grid ── */}
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-            {/* Left column */}
-            <div className="space-y-6 xl:col-span-2">
-              <section id="tasks" ref={sectionRefs.tasks} className="scroll-mt-20">
-                <TaskList
-                  tasks={tasks}
-                  onToggle={handleToggleTask}
-                  onCycleStatus={handleCycleStatus}
-                  onEdit={openEditTask}
-                  onDelete={handleDeleteTask}
-                  onAdd={openAddTask}
-                  globalSearch={globalSearch}
-                />
-              </section>
-
-              <section id="schedule" ref={sectionRefs.schedule} className="scroll-mt-20">
-                <Timeline
-                  events={schedule}
-                  onAdd={openAddEvent}
-                  onEdit={openEditEvent}
-                  onDelete={handleDeleteEvent}
-                />
-              </section>
-            </div>
-
-            {/* Right column */}
-            <div className="space-y-6">
-              <section id="rewards" ref={sectionRefs.rewards} className="scroll-mt-20">
-                <EduCoins
-                  totalCoins={totalCoins}
-                  earnedToday={earnedToday}
-                  streak={12}
-                  tasksCompleted={completedCount}
-                  totalTasks={tasks.length}
-                  weeklyActivity={[60, 75, 45, 90, 65, 30, 20]}
-                />
-              </section>
-
-              <section id="notes" ref={sectionRefs.notes} className="scroll-mt-20">
-                <QuickNotes
-                  notes={notes}
-                  onAdd={handleAddNote}
-                  onEdit={handleEditNote}
-                  onDelete={handleDeleteNote}
-                  globalSearch={globalSearch}
-                />
-              </section>
-
-              <section id="reminders" ref={sectionRefs.reminders} className="scroll-mt-20">
-                <Reminders
-                  reminders={reminders}
-                  onAdd={handleAddReminder}
-                  onEdit={handleEditReminder}
-                  onToggle={handleToggleReminder}
-                  onDelete={handleDeleteReminder}
-                />
-              </section>
-            </div>
-          </div>
-        </main>
+        <BottomNav active={activeSection} onNavigate={handleNavigate} />
       </div>
 
-      {/* ═══════ Bottom Nav (mobile) ═══════ */}
-      <BottomNav active={activeSection} onNavigate={handleNavigate} />
-
-      {/* ═══════ Modals ═══════ */}
       <TaskModal
         open={taskModalOpen}
         initialTask={editingTask}

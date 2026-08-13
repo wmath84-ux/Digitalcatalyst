@@ -279,32 +279,10 @@ export function ProductEditor({ productId }: { productId?: string }) {
               <Field label="Subject">
                 <input className={inputClass} value={form.subject} onChange={(e) => update("subject", e.target.value)} />
               </Field>
-              <Field label="SKU">
-                <input className={inputClass} value={form.sku} onChange={(e) => update("sku", e.target.value)} />
-              </Field>
-              <Field label="Estimated duration">
-                <input className={inputClass} value={form.estimatedDuration} onChange={(e) => update("estimatedDuration", e.target.value)} placeholder="e.g. 12 hours" />
-              </Field>
-              <Field label="Language">
-                <input className={inputClass} value={form.language} onChange={(e) => update("language", e.target.value)} />
-              </Field>
-              <Field label="Manual rating override" hint="0-5, blank = calculated">
-                <input
-                  className={inputClass}
-                  type="number"
-                  min={0}
-                  max={5}
-                  step={0.1}
-                  value={form.manualRating ?? ""}
-                  onChange={(e) => update("manualRating", e.target.value === "" ? null : e.target.value)}
-                />
-              </Field>
+
             </div>
             <Field label="Tags" hint="Comma separated">
               <input className={inputClass} value={form.tags.join(", ")} onChange={(e) => update("tags", csvToList(e.target.value))} />
-            </Field>
-            <Field label="Search keywords" hint="Comma separated">
-              <input className={inputClass} value={form.searchKeywords.join(", ")} onChange={(e) => update("searchKeywords", csvToList(e.target.value))} />
             </Field>
             <Field label="Feature bullets" hint="Comma separated">
               <input className={inputClass} value={form.features.join(", ")} onChange={(e) => update("features", csvToList(e.target.value))} />
@@ -430,14 +408,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
               <span className="text-sm font-medium text-slate-700">Free product</span>
               <ToggleSwitch checked={form.isFree} onChange={(v) => update("isFree", v)} />
             </div>
-            <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
-              <span className="text-sm font-medium text-slate-700">Allow full purchase with EduCoins</span>
-              <ToggleSwitch checked={form.coinPurchaseEnabled} onChange={(v) => update("coinPurchaseEnabled", v)} />
-            </div>
-            <Field label="Full-course EduCoin price">
-              <input className={inputClass} type="number" value={form.coinPrice} onChange={(e) => update("coinPrice", Number(e.target.value))} />
-            </Field>
-            <Field label="Minimum payable amount (₹)" hint="Floor after coupon/coin discount">
+            <Field label="Minimum payable amount (₹)" hint="Floor after coupon discount">
               <input className={inputClass} type="number" value={form.minPayableAmount} onChange={(e) => update("minPayableAmount", e.target.value)} />
             </Field>
             <Field label="Eligible coupon IDs" hint="Comma separated">
@@ -627,12 +598,7 @@ function ModulesEditor({
                 <Field label="Sale price (₹)">
                   <input className={inputClass} type="number" value={m.salePrice ?? ""} onChange={(e) => updateModule(m.id, { salePrice: e.target.value === "" ? null : Number(e.target.value) })} />
                 </Field>
-                <Field label="EduCoin price">
-                  <input className={inputClass} type="number" value={m.coinPrice ?? ""} onChange={(e) => updateModule(m.id, { coinPrice: e.target.value === "" ? null : Number(e.target.value) })} />
-                </Field>
-                <Field label="Entitlement ID">
-                  <input className={inputClass} value={m.entitlementId} onChange={(e) => updateModule(m.id, { entitlementId: e.target.value })} />
-                </Field>
+
               </div>
               <Field label="Required previous module IDs" hint="Comma separated">
                 <input className={inputClass} value={m.requiredPreviousModuleIds.join(", ")} onChange={(e) => updateModule(m.id, { requiredPreviousModuleIds: csvToList(e.target.value) })} />
@@ -742,10 +708,7 @@ function ResourcesEditor({
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input className={inputClass + " h-9"} type="number" placeholder="Cash price" value={r.cashPrice ?? ""} onChange={(e) => updateResource(r.id, { cashPrice: e.target.value === "" ? null : Number(e.target.value) })} />
-            <input className={inputClass + " h-9"} type="number" placeholder="Coin price" value={r.coinPrice ?? ""} onChange={(e) => updateResource(r.id, { coinPrice: e.target.value === "" ? null : Number(e.target.value) })} />
-          </div>
+          <input className={inputClass + " h-9"} type="number" placeholder="Cash price" value={r.cashPrice ?? ""} onChange={(e) => updateResource(r.id, { cashPrice: e.target.value === "" ? null : Number(e.target.value) })} />
           <button type="button" className="text-xs text-red-600" onClick={() => removeResource(r.id)}>Remove resource</button>
         </div>
       ))}
@@ -807,9 +770,6 @@ function PaidUpdatesEditor({
           <div className="grid grid-cols-2 gap-3">
             <Field label="Cash price (₹)">
               <input className={inputClass} type="number" value={u.cashPrice} onChange={(e) => updateOne(u.id, { cashPrice: Number(e.target.value) })} />
-            </Field>
-            <Field label="EduCoin price">
-              <input className={inputClass} type="number" value={u.coinPrice} onChange={(e) => updateOne(u.id, { coinPrice: Number(e.target.value) })} />
             </Field>
             <Field label="Publish date">
               <input className={inputClass} type="date" value={u.publishDate?.slice(0, 10) ?? ""} onChange={(e) => updateOne(u.id, { publishDate: e.target.value || null })} />

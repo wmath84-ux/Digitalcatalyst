@@ -191,3 +191,20 @@ export function WalletIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function CrownIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M3 8 7.5 13 12 5l4.5 8L21 8v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8Z" />
+      <path d="M5 19h14" />
+    </svg>
+  );
+}
+
+export function PlusIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}

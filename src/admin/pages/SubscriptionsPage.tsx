@@ -203,7 +203,7 @@ export default function SubscriptionsPage() {
       <Sheet open={!!editingFeature} onClose={() => setEditingFeature(null)} title={editingFeature?.id ? "Edit feature" : "Add feature"} footer={<PrimaryButton className="w-full" loading={saving} onClick={saveFeature}>Save feature</PrimaryButton>}>
         {editingFeature && (
           <div className="space-y-3">
-            <Field label="Feature key" required hint="e.g. ai_tutor"><input className={inputClass} value={editingFeature.key ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, key: e.target.value })} /></Field>
+            <Field label="Feature key" required hint="e.g. mayday"><input className={inputClass} value={editingFeature.key ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, key: e.target.value })} /></Field>
             <Field label="Name" required><input className={inputClass} value={editingFeature.name ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, name: e.target.value })} /></Field>
             <Field label="Description"><textarea className={textareaClass} value={editingFeature.description ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, description: e.target.value })} /></Field>
             <Field label="Individual price (₹)"><input className={inputClass} type="number" value={editingFeature.individualPrice ?? "0"} onChange={(e) => setEditingFeature({ ...editingFeature, individualPrice: e.target.value })} /></Field>

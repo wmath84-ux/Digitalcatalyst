@@ -13,7 +13,6 @@ type OrderDetail = {
   purchaseKind: string;
   items: { id: string; kind: string; refId: string; title: string; price: number }[] | null;
   couponCode: string | null;
-  coinsUsed: number;
   discountAmount: string;
   cashPaid: string;
   finalAmount: string;
@@ -73,7 +72,6 @@ export default function OrderDetailPage({ id }: { id: string }) {
 
       <SectionCard title="Payment breakdown">
         <KeyValue label="Coupon" value={order.couponCode || "—"} />
-        <KeyValue label="EduCoins used" value={order.coinsUsed} />
         <KeyValue label="Discount" value={`₹${Number(order.discountAmount).toLocaleString("en-IN")}`} />
         <KeyValue label="Cash paid" value={`₹${Number(order.cashPaid).toLocaleString("en-IN")}`} />
         <KeyValue label="Final amount" value={`₹${Number(order.finalAmount).toLocaleString("en-IN")}`} />

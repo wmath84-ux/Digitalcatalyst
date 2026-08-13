@@ -79,10 +79,6 @@ export default function ProductCard({
           </div>
           <span className="text-[10px] font-bold text-emerald-600">{discount}% off</span>
         </div>
-
-        <div className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-600 ring-1 ring-amber-200">
-          <span>🪙</span> +{product.educoins} EduCoins
-        </div>
       </div>
     </div>
   );

@@ -1,9 +1,9 @@
 import { BagIcon, CalendarIcon, HomeIcon, StoreIcon, UserIcon } from "./icons";
 
-export type TabKey = "home" | "myday" | "store" | "purchases" | "community";
+export type TabKey = "home" | "myday" | "store" | "purchases" | "profile";
 
 type BottomNavProps = {
-  active: TabKey;
+  active: TabKey | null;
   onChange: (tab: TabKey) => void;
   storeBadge?: number;
   purchasesBadge?: number;
@@ -14,7 +14,7 @@ const TABS: { key: TabKey; label: string; icon: typeof HomeIcon }[] = [
   { key: "myday", label: "My Day", icon: CalendarIcon },
   { key: "store", label: "Store", icon: StoreIcon },
   { key: "purchases", label: "Purchases", icon: BagIcon },
-  { key: "community", label: "Community", icon: UserIcon },
+  { key: "profile", label: "Profile", icon: UserIcon },
 ];
 
 export default function BottomNav({ active, onChange, storeBadge, purchasesBadge }: BottomNavProps) {

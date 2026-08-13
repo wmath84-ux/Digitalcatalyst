@@ -1,35 +1,7 @@
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
-import { BagIcon, CalendarIcon, HeartIcon, HomeIcon, WalletIcon } from "./icons";
-
-export function HomeTab() {
-  return (
-    <div className="flex flex-col items-center gap-3 px-6 pb-10 pt-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
-        <HomeIcon className="h-7 w-7" />
-      </div>
-      <h2 className="text-xl font-extrabold text-slate-900">Welcome back 👋</h2>
-      <p className="max-w-xs text-sm text-slate-500">
-        Your personalized dashboard, continue-learning shortcuts, and daily streaks will show up here.
-      </p>
-    </div>
-  );
-}
-
-export function MyDayTab() {
-  return (
-    <div className="flex flex-col items-center gap-3 px-6 pb-10 pt-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
-        <CalendarIcon className="h-7 w-7" />
-      </div>
-      <h2 className="text-xl font-extrabold text-slate-900">Nothing planned yet</h2>
-      <p className="max-w-xs text-sm text-slate-500">
-        Add notes or courses to your study plan and they'll show up here as daily tasks.
-      </p>
-    </div>
-  );
-}
+import { BagIcon } from "./icons";
 
 export function PurchasesTab({
   purchased,
@@ -39,11 +11,6 @@ export function PurchasesTab({
   onOpenCourse: (course: { id: string; title: string }) => void;
 }) {
   const { products } = useCatalog();
-  // Part 10 — also surface products the user owns via the
-  // canonical entitlements collection. The Purchases
-  // library shows every product the user has any access to
-  // (full product + subscription + module / resource
-  // ownership falls back to the underlying product).
   const { ownedProductIds: canonicalOwnedIds, signedIn } = useOwnedProducts();
   const ownedSet = new Set<string>(signedIn ? canonicalOwnedIds : []);
   for (const id of purchased) ownedSet.add(id);
@@ -82,24 +49,6 @@ export function PurchasesTab({
           </span>
         </div>
       ))}
-    </div>
-  );
-}
-
-export function WalletTab({ wishlistCount }: { wishlistCount: number }) {
-  return (
-    <div className="flex flex-col items-center gap-3 px-6 pb-10 pt-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
-        <WalletIcon className="h-7 w-7" />
-      </div>
-      <h2 className="text-xl font-extrabold text-slate-900">₹0.00 balance</h2>
-      <p className="max-w-xs text-sm text-slate-500">
-        Coupons, referral rewards, and refunds will be credited to your Eduvora wallet.
-      </p>
-      <div className="mt-4 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-500 shadow-sm">
-        <HeartIcon className="h-4 w-4 text-rose-400" />
-        {wishlistCount} item{wishlistCount === 1 ? "" : "s"} saved to wishlist
-      </div>
     </div>
   );
 }

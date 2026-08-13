@@ -769,8 +769,6 @@ function PlayerTab({
     ["markCompleteLabel", "Mark complete label"],
     ["completedLabel", "Completed label"],
     ["notesPlaceholder", "Notes placeholder"],
-    ["aiQnaHeading", "AI Q&A heading"],
-    ["aiQnaHelper", "AI Q&A helper"],
     ["paidUpdateHeading", "Paid update heading"],
     ["buyUpdateLabel", "Buy update label"],
   ];
