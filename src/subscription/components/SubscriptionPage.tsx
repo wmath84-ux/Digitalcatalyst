@@ -124,6 +124,11 @@ export default function SubscriptionPage() {
   // ---------- Derived ----------
   const plans: SubscriptionPlanDoc[] = catalog?.plans || [];
   const features: SubscriptionFeatureDoc[] = catalog?.features || [];
+  useEffect(() => {
+    if (features.some((feature) => feature.id === "my-day")) {
+      setSelectedFeatureIds((current) => current.length === 0 ? ["my-day"] : current);
+    }
+  }, [features]);
   const plan = useMemo(
     () => plans.find((p) => p.id === selectedPlanId) || null,
     [plans, selectedPlanId],

@@ -169,6 +169,7 @@ export default function PdpPurchaseBuilder({
 
   // Default mode: prefer full_product if available, else selected_modules, else paid_update.
   const [mode, setMode] = useState<PdpPurchaseMode>(() => {
+    if (isProductOwned && availableModes.includes("paid_update")) return "paid_update";
     if (availableModes.includes("full_product")) return "full_product";
     if (availableModes.includes("selected_modules")) return "selected_modules";
     if (availableModes.includes("selected_resources")) return "selected_resources";
@@ -180,9 +181,9 @@ export default function PdpPurchaseBuilder({
   // the product has no purchasable modules), fall back to the next best mode.
   useEffect(() => {
     if (!availableModes.includes(mode)) {
-      setMode(availableModes[0] || "free_entitlement");
+      setMode(isProductOwned && availableModes.includes("paid_update") ? "paid_update" : availableModes[0] || "free_entitlement");
     }
-  }, [availableModes, mode]);
+  }, [availableModes, isProductOwned, mode]);
 
   const [selectedModuleIds, setSelectedModuleIds] = useState<Set<string>>(() => new Set());
   const [selectedResourceIds, setSelectedResourceIds] = useState<Set<string>>(() => new Set());
@@ -810,6 +811,7 @@ function PaidUpdateSelector({
               {u.description ? (
                 <p className="mt-1 line-clamp-2 text-xs text-slate-500 sm:text-sm">{u.description}</p>
               ) : null}
+              <p className="mt-1 text-[11px] font-semibold text-violet-600">Includes {u.includedModuleIds.length} module{u.includedModuleIds.length === 1 ? "" : "s"} and {u.includedResourceIds.length} file{u.includedResourceIds.length === 1 ? "" : "s"}</p>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs">
                 <span className="font-black text-slate-900">{formatPrice(u.cashPrice)}</span>
                 {u.publishDate ? (

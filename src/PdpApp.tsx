@@ -152,6 +152,7 @@ function PremiumProductContent({
 
   const isProductOwned = purchasedIds ? purchasedIds.has(product.id) : resolution.hasFullProductAccess;
   const updates = ownedUpdateIds || resolution.ownedUpdateIds;
+  const availablePaidUpdates = (product.paidUpdates || []).filter((update) => update.active && update.visibility !== "hidden" && !updates.has(update.id));
   const ownedModuleIds = resolution.ownedModuleIds;
   const ownedResourceIds = resolution.ownedResourceIds;
   const gallery = product.images?.length ? product.images : [product.image];
@@ -337,8 +338,15 @@ function PremiumProductContent({
             </div>
           </section>
 
-          {modules.length > 0 && (
-            <section>
+          {isProductOwned && availablePaidUpdates.length > 0 && (
+            <section className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 shadow-sm">
+              <div className="flex items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-500 text-white"><Zap size={20} /></span><div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-wider text-amber-700">Course upgrade available</p><h2 className="mt-0.5 text-base font-black text-zinc-900">{availablePaidUpdates[0].title}</h2><p className="mt-1 text-xs leading-5 text-zinc-600">New modules or files were added after your original purchase. Review exactly what is new before upgrading.</p></div></div>
+              <button onClick={() => document.getElementById("pdp-purchase-options")?.scrollIntoView({ behavior: "smooth", block: "start" })} className="mt-4 w-full rounded-2xl bg-zinc-900 py-3 text-sm font-black text-white">View upgrade · {formatPrice(availablePaidUpdates[0].cashPrice)}</button>
+            </section>
+          )}
+
+          {(modules.length > 0 || availablePaidUpdates.length > 0) && (
+            <section id="pdp-purchase-options" className="scroll-mt-32">
               <div className="mb-3 px-1"><h2 className="text-lg font-bold text-zinc-900">Choose your access</h2><p className="text-xs text-zinc-500">Buy the full product, selected modules, resources, or available updates.</p></div>
               <PdpPurchaseBuilder
                 product={product}

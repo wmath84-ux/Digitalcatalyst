@@ -24,6 +24,7 @@ import { CheckoutProvider } from "./checkout/CheckoutContext";
 import { clearAdminSession, hasAdminSession } from "./utils/adminSession";
 import { useOwnedUpdateIds } from "./hooks/useOwnedUpdates";
 import { type CheckoutReturnRoute } from "./checkout/types";
+import { buildContentNotificationInventory, createContentNotifications, loadContentNotificationBaseline, loadSiteNotifications, mergeSiteNotifications, saveContentNotificationBaseline, saveSiteNotifications } from "../utils/siteNotifications";
 import { buildCheckoutSessionRecord, writeToSessionStorage as writeCheckoutToStorage } from "../utils/checkoutSession";
 import type { CheckoutSelection } from "./types/commerce";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
@@ -215,6 +216,17 @@ function Root() {
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
+
+  useEffect(() => {
+    if (!user || catalogProducts.length === 0) return;
+    const current = buildContentNotificationInventory({ products: catalogProducts, articles: [], announcements: [], purchasedProductIds: Array.from(purchasedIds) });
+    const previous = loadContentNotificationBaseline(user.id);
+    if (previous) {
+      const incoming = createContentNotifications(previous, current);
+      if (incoming.length > 0) saveSiteNotifications(user.id, mergeSiteNotifications(loadSiteNotifications(user.id), incoming));
+    }
+    saveContentNotificationBaseline(user.id, current);
+  }, [catalogProducts, purchasedIds, user]);
 
   useEffect(() => {
     if (loading || user || !requiresAuthentication(hash)) return;

@@ -146,6 +146,8 @@ export interface CheckoutLineItem {
   quantity: number;
   alreadyOwned: boolean;
   entitlementId: string;
+  /** Server-resolved module/resource titles included in a paid update. */
+  detailItems?: string[];
 }
 
 export interface CheckoutSelection {

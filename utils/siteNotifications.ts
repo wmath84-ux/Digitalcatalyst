@@ -1,10 +1,10 @@
 export type SiteNotificationCategory = 'store' | 'reading' | 'course' | 'unlock' | 'community' | 'announcement' | 'mayday';
 
 export type SiteNotificationTarget =
-  | { type: 'product'; productId: number }
+  | { type: 'product'; productId: number | string }
   | { type: 'reading'; listType: 'news' | 'blog'; articleId: string }
   | { type: 'announcement'; announcementId: string }
-  | { type: 'course'; productId: number }
+  | { type: 'course'; productId: number | string }
   | { type: 'purchases' }
   | { type: 'community'; targetPage?: string; targetId?: string }
   | { type: 'mayday' };
@@ -242,8 +242,7 @@ export const createContentNotifications = (
 
   Object.entries(current.products).forEach(([id, product]) => {
     const priorProduct = previous.products[id];
-    const productId = Number(id);
-    if (!Number.isFinite(productId)) return;
+    const productId = id;
 
     if (!priorProduct) {
       notifications.push({
@@ -277,7 +276,7 @@ export const createContentNotifications = (
       createdAt: now,
       read: false,
       source: 'content',
-      target: { type: 'course', productId },
+      target: { type: 'product', productId },
     });
   });
 
