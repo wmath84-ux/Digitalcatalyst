@@ -181,8 +181,8 @@ export const showLocalSystemNotification = async (title: string, body: string, u
   if (!isWebPushSupported() || window.Notification.permission !== 'granted') return false;
   const options: NotificationOptions = {
     body,
-    icon: '/icons/icon-192x192.svg',
-    badge: '/icons/icon-192x192.svg',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/badge-96x96.png',
     tag: `eduvora-local-${Date.now()}`,
     data: { url, timestamp: Date.now() },
   };

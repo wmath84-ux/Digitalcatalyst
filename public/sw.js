@@ -34,8 +34,8 @@ self.addEventListener('push', event => {
   const title = data.title || 'Eduvora update';
   const body = data.body || '';
   const tag = data.tag || data.notificationId || 'eduvora-push';
-  const icon = data.icon || '/icons/icon-192x192.svg';
-  const badge = data.badge || '/icons/icon-192x192.svg';
+  const icon = data.icon || '/icons/icon-192x192.png';
+  const badge = data.badge || '/icons/badge-96x96.png';
   const targetUrl = data.url || (data.notificationId ? `/?siteNotification=${encodeURIComponent(data.notificationId)}` : '/');
   const target = data.target || null;
 
