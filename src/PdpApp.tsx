@@ -541,6 +541,68 @@ function PremiumProductContent({
             </section>
           )}
 
+          {/* Demo Course Player button — opens the course player with all file types */}
+          {(product.courseContent || []).length > 0 && (
+            <section className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-cyan-50 p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-500 text-white"><PlayCircle size={20} /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-black uppercase tracking-wider text-violet-700">Demo Course Player</p>
+                  <h2 className="mt-0.5 text-base font-black text-zinc-900">Test All 12 File Types</h2>
+                  <p className="mt-1 text-xs leading-5 text-zinc-600">
+                    Open the Course Player in demo mode to test every supported file type: YouTube, Video, Audio, PDF, Doc, Sheet, Slides, E-book, Image, Google Form, Embed, and Mindmap — each with its own price.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => {
+                    try { localStorage.setItem("dc_demo_mode", "true"); } catch {}
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("demo", "true");
+                    window.location.replace(url.toString());
+                  }}
+                  className="flex-1 rounded-2xl bg-zinc-900 py-3 text-sm font-black text-white"
+                >
+                  Open Demo Player
+                </button>
+                <button
+                  onClick={() => {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("demo", "true");
+                    try { localStorage.setItem("dc_demo_mode", "true"); } catch {}
+                    window.location.hash = `#/course/${encodeURIComponent(product.id)}`;
+                    window.location.replace(`${window.location.origin}${window.location.pathname}#/course/${encodeURIComponent(product.id)}?demo=true`);
+                  }}
+                  className="flex-1 rounded-2xl border border-zinc-300 bg-white py-3 text-sm font-bold text-zinc-900"
+                >
+                  Direct Course Link
+                </button>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-1.5">
+                {[
+                  { type: "YouTube", price: "₹49" },
+                  { type: "Video", price: "₹99" },
+                  { type: "Audio", price: "₹29" },
+                  { type: "PDF", price: "₹39" },
+                  { type: "Doc", price: "₹59" },
+                  { type: "Sheet", price: "₹59" },
+                  { type: "Slides", price: "₹69" },
+                  { type: "E-book", price: "₹149" },
+                  { type: "Image", price: "₹19" },
+                  { type: "Form", price: "₹9" },
+                  { type: "Embed", price: "₹79" },
+                  { type: "Mindmap", price: "₹89" },
+                ].map(({ type, price }) => (
+                  <div key={type} className="rounded-lg bg-white/70 px-2 py-1.5 text-center">
+                    <p className="text-[10px] font-black text-violet-600">{type}</p>
+                    <p className="text-[9px] font-bold text-zinc-500">{price}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section id="pdp-purchase-options" className="scroll-mt-32">
               <div className="mb-3 px-1"><h2 className="text-lg font-bold text-zinc-900">Select course modules</h2><p className="text-xs text-zinc-500">Same as subscription extras: tick the modules you need, see the price beside each one, then checkout.</p></div>
               <PdpPurchaseBuilder
