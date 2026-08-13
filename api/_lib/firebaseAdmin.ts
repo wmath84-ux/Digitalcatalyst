@@ -34,16 +34,68 @@ const configurationError = (message: string, cause?: unknown) => {
 const normalizePrivateKey = (value: unknown) =>
   String(value || '').trim().replace(/\\n/g, '\n');
 
+// Escape raw control characters (newlines, tabs, carriage returns) that
+// appear *inside* JSON string literals. A service-account paste whose
+// `private_key` was re-saved by a text editor can contain real line breaks
+// inside the string, which strict JSON.parse rejects. Characters outside
+// string literals keep the JSON structure untouched, so this repair is safe
+// to use as a fallback parse candidate.
+const escapeControlCharsInJsonStrings = (input: string): string => {
+  let inString = false;
+  let escaped = false;
+  let out = '';
+  for (const ch of input) {
+    if (escaped) {
+      out += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      out += ch;
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      out += ch;
+      continue;
+    }
+    if (inString && ch === '\n') {
+      out += '\\n';
+      continue;
+    }
+    if (inString && ch === '\r') {
+      out += '\\r';
+      continue;
+    }
+    if (inString && ch === '\t') {
+      out += '\\t';
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+};
+
 const parseServiceAccountValue = (rawValue: string): ServiceAccountRecord => {
-  let value: unknown = rawValue.trim();
+  const raw = rawValue.trim().replace(/^\uFEFF/, '');
+  let value: unknown = raw;
   let lastError: unknown;
 
   // Vercel accepts both plain JSON and base64 values. Supporting both avoids
   // brittle newline escaping when a PEM key is pasted into the dashboard.
-  const candidates = [String(value)];
-  if (!String(value).startsWith('{') && !String(value).startsWith('"{')) {
+  const candidates = [raw];
+  // Some pastes arrive wrapped in an extra pair of quotes; try unwrapped.
+  if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
+    candidates.push(raw.slice(1, -1));
+  }
+  // If the paste contains real line breaks inside the PEM string, repair
+  // them so JSON.parse accepts the document.
+  const repaired = escapeControlCharsInJsonStrings(raw);
+  if (repaired !== raw) candidates.push(repaired);
+  if (!raw.startsWith('{') && !raw.startsWith('"{')) {
     try {
-      candidates.push(Buffer.from(String(value), 'base64').toString('utf8'));
+      candidates.push(Buffer.from(raw, 'base64').toString('utf8'));
     } catch {
       // JSON parsing below will produce the actionable configuration error.
     }
