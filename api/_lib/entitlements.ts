@@ -37,7 +37,7 @@
 // already exists, and the function short-circuits with
 // `{ ok: true, replayed: true, ... }`.
 
-import { FieldValue, Timestamp, type Firestore, type Transaction } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type DocumentReference, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { adminDb } from "./firebaseAdmin.js";
 import {
   buildEntitlementDocId,
@@ -267,6 +267,14 @@ export const grantEntitlementsFromQuote = async (
   const nowTs = Timestamp.fromMillis(now);
 
   await db.runTransaction(async (tx: Transaction) => {
+    // Firestore requires every transaction read to happen before the
+    // first transaction write. Build the full read-set up front, then
+    // perform every write in a second pass. Do not interleave reads
+    // and writes — doing so throws:
+    //   "Firestore transactions require all reads to be executed
+    //    before all writes."
+
+    // --- READ PHASE -------------------------------------------------
     const intentSnap = await tx.get(intentRef);
     if (intentSnap.exists) {
       const intent = intentSnap.data() as { status?: string } | undefined;
@@ -276,16 +284,104 @@ export const grantEntitlementsFromQuote = async (
     }
 
     // 1. Canonical entitlements — one doc per (uid, entitlementId).
+    type EntitlementWrite = { ref: DocumentReference; data: Record<string, unknown> };
+    const entitlementWrites: EntitlementWrite[] = [];
+    const entitlementTargets: Array<{ record: EntitlementRecord; docId: string; ref: DocumentReference }> = [];
     for (const record of records) {
       const docId = buildEntitlementDocId(quote.uid, record.entitlementId);
       if (!docId) continue;
       const ref = db.collection(ENTITLEMENTS_COLLECTION).doc(docId);
-      const existing = await tx.get(ref);
-      if (existing.exists) {
-        // Idempotent: keep the existing record; do not overwrite.
-        continue;
+      entitlementTargets.push({ record, docId, ref });
+    }
+    const entitlementSnaps = entitlementTargets.length
+      ? await Promise.all(entitlementTargets.map((target) => tx.get(target.ref)))
+      : [];
+    for (let index = 0; index < entitlementTargets.length; index += 1) {
+      if (entitlementSnaps[index].exists) continue; // idempotent
+      const { record, ref } = entitlementTargets[index];
+      entitlementWrites.push({ ref, data: { ...record, unlockedAt: nowTs } });
+    }
+
+    // 4. Legacy `users/{uid}/purchases/{productId}` + update docs.
+    type LegacyPurchaseWrite = { ref: DocumentReference; data: Record<string, unknown> };
+    const legacyPurchaseTargets: Array<{ ref: DocumentReference; kind: string; record: EntitlementRecord }> = [];
+    for (const record of records) {
+      if (!record.productId) continue;
+      if (record.kind === "full_product") {
+        legacyPurchaseTargets.push({
+          ref: userRef.collection(PURCHASES_SUBCOLLECTION).doc(record.productId),
+          kind: "full_product",
+          record,
+        });
+      } else if (record.kind === "paid_update" && record.updateId) {
+        legacyPurchaseTargets.push({
+          ref: userRef
+            .collection(PURCHASES_SUBCOLLECTION)
+            .doc(updatePurchaseDocId(record.productId, record.updateId)),
+          kind: "paid_update",
+          record,
+        });
       }
-      tx.set(ref, { ...record, unlockedAt: nowTs });
+    }
+    const legacyPurchaseSnaps = legacyPurchaseTargets.length
+      ? await Promise.all(legacyPurchaseTargets.map((target) => tx.get(target.ref)))
+      : [];
+    const legacyPurchaseWrites: LegacyPurchaseWrite[] = [];
+    for (let index = 0; index < legacyPurchaseTargets.length; index += 1) {
+      if (legacyPurchaseSnaps[index].exists) continue; // idempotent
+      const { ref, kind, record } = legacyPurchaseTargets[index];
+      const paise = Math.max(0, Math.round(Number(record.amount || 0)));
+      if (kind === "full_product") {
+        legacyPurchaseWrites.push({
+          ref,
+          data: {
+            productId: Number.isFinite(Number(record.productId))
+              ? Number(record.productId)
+              : record.productId,
+            productDocumentId: record.productId,
+            title: record.title || "Digital product",
+            quantity: 1,
+            total: `₹${(paise / 100).toFixed(2)}`,
+            amountPaise: paise,
+            currency: "INR",
+            status: "Verified",
+            source,
+            orderId,
+            paymentId: paymentId || "",
+            unlockedAt: nowTs,
+          },
+        });
+      } else if (kind === "paid_update") {
+        legacyPurchaseWrites.push({
+          ref,
+          data: {
+            productId: record.productId,
+            productDocumentId: record.productId,
+            updateId: record.updateId,
+            title: record.title || "Course update",
+            contentNames: [],
+            amountPaise: paise,
+            total: `₹${(paise / 100).toFixed(2)}`,
+            status: "Verified",
+            source,
+            orderId,
+            paymentId: paymentId || "",
+            unlockedAt: nowTs,
+          },
+        });
+      }
+    }
+
+    // 5. siteOrders/{orderId} — idempotent.
+    const orderSnap = await tx.get(orderRef);
+
+    // 7. Quote → consumed.
+    const quoteRef = db.collection("_serverQuotes").doc(quote.quoteId);
+    const quoteSnap = await tx.get(quoteRef);
+
+    // --- WRITE PHASE ------------------------------------------------
+    for (const write of entitlementWrites) {
+      tx.set(write.ref, write.data);
     }
 
     // 2. Legacy `purchasedProductIds` array on the user doc.
@@ -310,68 +406,10 @@ export const grantEntitlementsFromQuote = async (
       tx.set(userRef, updateMerge, { merge: true });
     }
 
-    // 4. Legacy `users/{uid}/purchases/{productId}` + update docs.
-    for (const record of records) {
-      if (!record.productId) continue;
-      if (record.kind === "full_product") {
-        const ref = userRef.collection(PURCHASES_SUBCOLLECTION).doc(record.productId);
-        const existing = await tx.get(ref);
-        if (existing.exists) continue; // idempotent
-        const paise = Math.max(0, Math.round(Number(record.amount || 0)));
-        tx.set(ref, {
-          productId: Number.isFinite(Number(record.productId))
-            ? Number(record.productId)
-            : record.productId,
-          productDocumentId: record.productId,
-          title: record.title || "Digital product",
-          quantity: 1,
-          total: `₹${(paise / 100).toFixed(2)}`,
-          amountPaise: paise,
-          currency: "INR",
-          status: "Verified",
-          source,
-          orderId,
-          paymentId: paymentId || "",
-          unlockedAt: nowTs,
-        });
-      } else if (record.kind === "paid_update" && record.updateId) {
-        const ref = userRef
-          .collection(PURCHASES_SUBCOLLECTION)
-          .doc(updatePurchaseDocId(record.productId, record.updateId));
-        const existing = await tx.get(ref);
-        if (existing.exists) continue;
-        const paise = Math.max(0, Math.round(Number(record.amount || 0)));
-        tx.set(ref, {
-          productId: record.productId,
-          productDocumentId: record.productId,
-          updateId: record.updateId,
-          title: record.title || "Course update",
-          contentNames: [],
-          amountPaise: paise,
-          total: `₹${(paise / 100).toFixed(2)}`,
-          status: "Verified",
-          source,
-          orderId,
-          paymentId: paymentId || "",
-          unlockedAt: nowTs,
-        });
-      } else if (record.kind === "module" && record.moduleId) {
-        // Modules don't have a legacy writer — they only exist in
-        // the canonical `entitlements` collection. PDP / Course
-        // Player should read module ownership from
-        // `computeOwnedEntitlementIds` (Part 4 helpers) or from the
-        // canonical collection in a follow-up.
-      } else if (record.kind === "resource" && record.resourceId) {
-        // Same note as modules — no legacy writer.
-      } else if (record.kind === "free") {
-        // Free entitlements are tracked only in the canonical
-        // collection.
-      }
+    for (const write of legacyPurchaseWrites) {
+      tx.set(write.ref, write.data);
     }
 
-    // 5. siteOrders/{orderId} — idempotent (set with merge; but only
-    //    set the immutable fields if the doc doesn't already exist).
-    const orderSnap = await tx.get(orderRef);
     if (!orderSnap.exists) {
       const order = buildSiteOrder({
         uid: quote.uid,
@@ -400,10 +438,6 @@ export const grantEntitlementsFromQuote = async (
       { merge: true },
     );
 
-    // 7. Quote → consumed (only if still active; never overwrite a
-    //    consumed record's consumedAt).
-    const quoteRef = db.collection("_serverQuotes").doc(quote.quoteId);
-    const quoteSnap = await tx.get(quoteRef);
     if (quoteSnap.exists) {
       const current = quoteSnap.data() as { status?: string; consumedAt?: unknown } | undefined;
       if (!current || current.status === "active") {
@@ -413,11 +447,6 @@ export const grantEntitlementsFromQuote = async (
           consumedOrderId: orderId,
           consumedPaymentId: paymentId || null,
         });
-      } else if (current.status === "consumed") {
-        // Replay: do not re-stamp consumedAt. The verify-payment
-        // caller is expected to have already loaded the original
-        // paymentId / orderId via the consumedOrderId/consumedPaymentId
-        // fields.
       }
     }
   });
