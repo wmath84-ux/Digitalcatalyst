@@ -337,6 +337,11 @@ function Root() {
     window.location.hash = `${PRODUCT_HASH}${encodeURIComponent(product.id)}`;
   };
 
+  const navigateToProductReview = (product: NavigableProduct) => {
+    sessionStorage.setItem("selectedProduct", JSON.stringify(product));
+    window.location.hash = `${PRODUCT_HASH}${encodeURIComponent(product.id)}?section=reviews`;
+  };
+
   const navigateToCourse = (course: { id: string; title: string }) => {
     sessionStorage.setItem("selectedCourse", JSON.stringify({ courseId: course.id, title: course.title }));
     window.location.hash = `${COURSE_HASH}${encodeURIComponent(course.id)}`;
@@ -435,6 +440,7 @@ function Root() {
           window.location.hash = STORE_HASH;
         }}
         onNavigateToProduct={navigateToProduct}
+        onNavigateToProductReview={navigateToProductReview}
         onNavigateToMyDay={() => {
           window.location.hash = MY_DAY_HASH;
         }}
@@ -596,6 +602,7 @@ function Root() {
         window.location.hash = STORE_HASH;
       }}
       onNavigateToProduct={navigateToProduct}
+      onNavigateToProductReview={navigateToProductReview}
       onNavigateToMyDay={() => {
         window.location.hash = MY_DAY_HASH;
       }}

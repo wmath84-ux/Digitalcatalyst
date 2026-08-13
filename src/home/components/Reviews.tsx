@@ -1,31 +1,43 @@
-import type { Review } from "../types";
+import { BadgeCheck } from "lucide-react";
+import type { PublishedProductReview } from "../../hooks/useProductReviews";
 
 interface ReviewsProps {
-  reviews: Review[];
+  reviews: PublishedProductReview[];
+  onOpenReview: (productId: string) => void;
 }
 
-export default function Reviews({ reviews }: ReviewsProps) {
+export default function Reviews({ reviews, onOpenReview }: ReviewsProps) {
+  const average = reviews.length
+    ? reviews.reduce((total, review) => total + review.rating, 0) / reviews.length
+    : 0;
+
+  if (reviews.length === 0) return null;
+
   return (
     <section className="mt-7 pb-4">
       <div className="flex items-center justify-between px-5">
         <h2 className="text-base font-bold text-slate-900">Loved by Learners</h2>
-        <span className="text-xs font-semibold text-slate-400">4.8 ★ average</span>
+        <span className="text-xs font-semibold text-slate-400">{average.toFixed(1)} ★ average</span>
       </div>
 
       <div className="mt-3 flex gap-3 overflow-x-auto px-5 pb-2 no-scrollbar snap-x-mandatory">
         {reviews.map((review) => (
-          <article
+          <button
+            type="button"
             key={review.id}
-            className="w-64 flex-shrink-0 snap-center-item rounded-2xl bg-white p-4 shadow-sm shadow-slate-200 ring-1 ring-slate-100"
+            onClick={() => onOpenReview(review.productId)}
+            aria-label={`Open reviews for ${review.productTitle}`}
+            className="w-64 flex-shrink-0 snap-center-item rounded-2xl bg-white p-4 text-left shadow-sm shadow-slate-200 ring-1 ring-slate-100 transition hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
           >
             <div className="flex items-center gap-2.5">
-              <div
-                className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}
-              >
+              <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>
                 {review.initials}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-slate-800">{review.name}</p>
+                <p className="flex items-center gap-1 truncate text-sm font-semibold text-slate-800">
+                  <span className="truncate">{review.name}</span>
+                  {review.verifiedPurchase && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}
+                </p>
                 <p className="text-[11px] text-slate-400">{review.date}</p>
               </div>
             </div>
@@ -35,14 +47,9 @@ export default function Reviews({ reviews }: ReviewsProps) {
               <span className="text-slate-200">{"★".repeat(5 - review.rating)}</span>
             </div>
 
-            <p className="mt-2 line-clamp-4 text-[12.5px] leading-relaxed text-slate-600">
-              “{review.comment}”
-            </p>
-
-            <p className="mt-2 truncate text-[11px] font-semibold text-indigo-500">
-              {review.course}
-            </p>
-          </article>
+            <p className="mt-2 line-clamp-4 text-[12.5px] leading-relaxed text-slate-600">“{review.comment}”</p>
+            <p className="mt-2 truncate text-[11px] font-semibold text-indigo-500">{review.productTitle}</p>
+          </button>
         ))}
       </div>
     </section>

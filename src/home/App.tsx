@@ -6,14 +6,16 @@ import ProductCard from "./components/ProductCard";
 import ContinueLearning from "./components/ContinueLearning";
 import Reviews from "./components/Reviews";
 import BottomNav, { type TabKey } from "../components/BottomNav";
-import { banners, categories, reviews } from "./data/mockData";
+import { banners, categories, reviews as fallbackReviews } from "./data/mockData";
 import type { Product } from "./types";
 import { useCatalog } from "../context/CatalogContext";
+import { useHomepageProductReviews } from "../hooks/useProductReviews";
 import { useAuth } from "../context/AuthContext";
 
 interface AppProps {
   onNavigateToStore: () => void;
   onNavigateToProduct: (product: Product) => void;
+  onNavigateToProductReview: (product: Product) => void;
   onNavigateToMyDay: () => void;
   onNavigateToProfile: () => void;
   onNavigateToPurchases?: () => void;
@@ -26,6 +28,7 @@ interface AppProps {
 export default function App({
   onNavigateToStore,
   onNavigateToProduct,
+  onNavigateToProductReview,
   onNavigateToMyDay,
   onNavigateToProfile,
   onNavigateToPurchases,
@@ -49,6 +52,7 @@ export default function App({
     image: product.image,
     trending: product.tags.includes("TRENDING") || product.rating >= 4.5,
   })), [catalogProducts]);
+  const { reviews: homepageReviews } = useHomepageProductReviews(catalogProducts, fallbackReviews, 6);
   const userName = user?.name?.split(" ")[0] || "Learner";
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -83,6 +87,11 @@ export default function App({
   const handleSelectSuggestion = (product: Product) => {
     setSearchQuery(product.title);
     searchInputRef.current?.blur();
+  };
+
+  const handleOpenReview = (productId: string) => {
+    const product = products.find((item) => item.id === productId);
+    if (product) onNavigateToProductReview(product);
   };
 
   const handleFooterChange = (tab: TabKey) => {
@@ -223,7 +232,7 @@ export default function App({
                 )}
               </section>
 
-              <Reviews reviews={reviews} />
+              <Reviews reviews={homepageReviews} onOpenReview={handleOpenReview} />
             </>
           )}
         </main>

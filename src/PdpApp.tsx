@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import {
   ArrowUpRight,
   BadgeCheck,
@@ -29,6 +30,10 @@ import type { CheckoutSelection } from "./types/commerce";
 import { computeSummary } from "../utils/pdpSelection";
 import PdpPurchaseBuilder from "./components/pdp/PdpPurchaseBuilder";
 import { useCourseAccess } from "./hooks/useCourseAccess";
+import { useHomepageProductReviews, type PublishedProductReview } from "./hooks/useProductReviews";
+import { reviews as fallbackReviews } from "./home/data/mockData";
+import { useAuth } from "./context/AuthContext";
+import { db } from "../firebase";
 
 interface ProductDetailProps {
   product: Product | null;
@@ -119,11 +124,31 @@ function PremiumProductContent({
   ownedUpdateIds,
 }: ProductDetailProps & { product: Product }) {
   const { resolution } = useCourseAccess({ product });
+  const { user } = useAuth();
+  const reviewCatalog = useMemo(() => products.length > 0 ? products : [product], [product, products]);
+  const { reviews: homepageReviews } = useHomepageProductReviews(reviewCatalog, fallbackReviews, 6);
+  const productReviews = useMemo(
+    () => homepageReviews.filter((review) => review.productId === product.id),
+    [homepageReviews, product.id],
+  );
   const [activeImage, setActiveImage] = useState(0);
   const [activeTab, setActiveTab] = useState<DetailTab>("Description");
   const [expandedModule, setExpandedModule] = useState<string | null>(product.canonicalModules?.[0]?.id || null);
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [reviewComposerOpen, setReviewComposerOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewNotice, setReviewNotice] = useState("");
+
+  useEffect(() => {
+    if (!window.location.hash.includes("section=reviews")) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("product-reviews")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [product.id]);
 
   const isProductOwned = purchasedIds ? purchasedIds.has(product.id) : resolution.hasFullProductAccess;
   const updates = ownedUpdateIds || resolution.ownedUpdateIds;
@@ -154,6 +179,45 @@ function PremiumProductContent({
   const primaryAction = () => {
     if (isProductOwned && onOpenCourse) onOpenCourse(product);
     else onCheckout(product.price);
+  };
+
+  const submitReview = async () => {
+    if (!user) {
+      window.location.hash = `#/auth?mode=login&return=${encodeURIComponent(window.location.hash)}`;
+      return;
+    }
+    if (!isProductOwned) {
+      setReviewNotice("Only learners who own this product can submit a review.");
+      return;
+    }
+    const comment = reviewComment.trim();
+    if (comment.length < 10) {
+      setReviewNotice("Please write at least 10 characters.");
+      return;
+    }
+    setReviewSubmitting(true);
+    setReviewNotice("");
+    try {
+      await addDoc(collection(db, "siteReviews"), {
+        productId: product.id,
+        productTitle: product.title,
+        customerId: user.id,
+        customerName: user.name,
+        rating: reviewRating,
+        comment,
+        verifiedPurchase: false,
+        status: "pending",
+        createdAt: serverTimestamp(),
+      });
+      setReviewComment("");
+      setReviewComposerOpen(false);
+      setReviewNotice("Review submitted. It will appear after moderation.");
+    } catch (error) {
+      console.error("Review submission failed", error);
+      setReviewNotice("Review could not be submitted. Please try again.");
+    } finally {
+      setReviewSubmitting(false);
+    }
   };
 
   const highlights = [
@@ -289,7 +353,20 @@ function PremiumProductContent({
           )}
 
           <DetailsCard product={product} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
-          <ReviewsCard product={product} />
+          <ReviewsCard
+            product={product}
+            reviews={productReviews}
+            canReview={Boolean(user && isProductOwned)}
+            composerOpen={reviewComposerOpen}
+            rating={reviewRating}
+            comment={reviewComment}
+            submitting={reviewSubmitting}
+            notice={reviewNotice}
+            onToggleComposer={() => setReviewComposerOpen((open) => !open)}
+            onRating={setReviewRating}
+            onComment={setReviewComment}
+            onSubmit={() => void submitReview()}
+          />
           {related.length > 0 && <RelatedProducts products={related} onNavigate={onNavigateToProduct} />}
         </div>
       </div>
@@ -319,12 +396,58 @@ function DetailsCard({ product, tab, onTab, expandedModule, onExpandModule }: { 
   );
 }
 
-function ReviewsCard({ product }: { product: Product }) {
+function ReviewsCard({ product, reviews, canReview, composerOpen, rating, comment, submitting, notice, onToggleComposer, onRating, onComment, onSubmit }: {
+  product: Product;
+  reviews: PublishedProductReview[];
+  canReview: boolean;
+  composerOpen: boolean;
+  rating: number;
+  comment: string;
+  submitting: boolean;
+  notice: string;
+  onToggleComposer: () => void;
+  onRating: (rating: number) => void;
+  onComment: (comment: string) => void;
+  onSubmit: () => void;
+}) {
   return (
-    <section id="product-reviews" className="rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-bold text-zinc-900">Ratings & Reviews</h2>
-      <div className="mt-5 flex items-center gap-5 rounded-2xl bg-zinc-50/70 p-5"><div className="text-center"><span className="text-4xl font-extrabold text-zinc-900">{product.rating.toFixed(1)}</span><RatingStars rating={product.rating} className="mt-1" /></div><div className="h-14 w-px bg-zinc-200" /><div><p className="text-sm font-semibold text-zinc-700">{product.reviews.toLocaleString("en-IN")} rating{product.reviews === 1 ? "" : "s"}</p><p className="mt-1 text-xs text-zinc-400">Live aggregate from the product catalog</p></div></div>
-      <p className="mt-4 text-center text-xs text-zinc-400">Published written reviews will appear here when available.</p>
+    <section id="product-reviews" className="scroll-mt-36 rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-bold text-zinc-900">Ratings & Reviews</h2>
+        <button onClick={onToggleComposer} className="rounded-full bg-zinc-900 px-3 py-2 text-[11px] font-semibold text-white">{composerOpen ? "Cancel" : canReview ? "Write a review" : "Review eligibility"}</button>
+      </div>
+      <div className="mt-5 flex items-center gap-5 rounded-2xl bg-zinc-50/70 p-5">
+        <div className="text-center"><span className="text-4xl font-extrabold text-zinc-900">{product.rating.toFixed(1)}</span><RatingStars rating={product.rating} className="mt-1" /></div>
+        <div className="h-14 w-px bg-zinc-200" />
+        <div><p className="text-sm font-semibold text-zinc-700">{product.reviews.toLocaleString("en-IN")} rating{product.reviews === 1 ? "" : "s"}</p><p className="mt-1 text-xs text-zinc-400">Live aggregate from the product catalog</p></div>
+      </div>
+      {composerOpen && (
+        <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+          {canReview ? (
+            <>
+              <p className="text-xs font-semibold text-zinc-700">Your rating</p>
+              <div className="mt-2 flex gap-1">{[1, 2, 3, 4, 5].map((value) => <button key={value} onClick={() => onRating(value)} aria-label={`${value} stars`}><Star className={`h-6 w-6 ${value <= rating ? "fill-amber-400 text-amber-400" : "text-zinc-300"}`} /></button>)}</div>
+              <textarea value={comment} onChange={(event) => onComment(event.target.value.slice(0, 2000))} rows={4} placeholder="Share your experience with this product…" className="mt-3 w-full resize-none rounded-xl border border-zinc-200 bg-white p-3 text-sm outline-none focus:border-zinc-400" />
+              <button disabled={submitting} onClick={onSubmit} className="mt-3 w-full rounded-xl bg-zinc-900 py-3 text-sm font-bold text-white disabled:opacity-60">{submitting ? "Submitting…" : "Submit for review"}</button>
+            </>
+          ) : <p className="text-xs leading-relaxed text-zinc-500">Sign in and purchase this product to submit a genuine learner review.</p>}
+        </div>
+      )}
+      {notice && <p className="mt-3 rounded-xl bg-indigo-50 p-3 text-xs font-medium text-indigo-700">{notice}</p>}
+      {reviews.length > 0 ? (
+        <div className="mt-4 space-y-3">
+          {reviews.map((review) => (
+            <article key={review.id} className="rounded-2xl border border-zinc-100 bg-zinc-50/40 p-4">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>{review.initials}</div>
+                <div className="min-w-0 flex-1"><p className="flex items-center gap-1 text-sm font-semibold text-zinc-800"><span className="truncate">{review.name}</span>{review.verifiedPurchase && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}</p><p className="text-[11px] text-zinc-400">{review.date}</p></div>
+                <RatingStars rating={review.rating} />
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-zinc-600">“{review.comment}”</p>
+            </article>
+          ))}
+        </div>
+      ) : <p className="mt-4 text-center text-xs text-zinc-400">Published written reviews will appear here when available.</p>}
     </section>
   );
 }
