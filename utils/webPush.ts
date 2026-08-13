@@ -1,5 +1,5 @@
 import { collection, deleteDoc, doc, getDocs, query, setDoc, where } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 
 export const WEB_PUSH_VAPID_PUBLIC_KEY =
   (typeof import.meta !== 'undefined' && String(import.meta.env?.VITE_WEB_PUSH_VAPID_PUBLIC_KEY || '').trim())
@@ -58,7 +58,10 @@ export const isWebPushSupported = () =>
 export const isServiceWorkerReady = async () => {
   if (!('serviceWorker' in navigator)) return null;
   try {
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 5000)),
+    ]);
     return registration || null;
   } catch {
     return null;
@@ -164,5 +167,45 @@ export const loadStoredPushSubscriptions = async (uid: string): Promise<StoredWe
     return snapshot.docs.map(item => item.data() as StoredWebPushSubscription);
   } catch {
     return [];
+  }
+};
+
+export type WebPushTestResult = { ok: boolean; code: string; message: string };
+
+/** End-to-end self-test: browser support → permission → service worker →
+ * PushManager subscription → Firestore persistence → authenticated server send. */
+export const sendWebPushSelfTest = async (uid: string): Promise<WebPushTestResult> => {
+  if (!uid || !auth.currentUser || auth.currentUser.uid !== uid) {
+    return { ok: false, code: 'login_required', message: 'Please sign in before testing notifications.' };
+  }
+  if (!isWebPushSupported()) {
+    return { ok: false, code: 'browser_unsupported', message: 'This browser or in-app webview does not support Web Push. Try installed Chrome, Edge, or the Eduvora PWA.' };
+  }
+  if (!window.isSecureContext) {
+    return { ok: false, code: 'https_required', message: 'Web Push requires HTTPS or localhost. Open the secure deployed app and retry.' };
+  }
+  if (window.Notification.permission === 'denied') {
+    return { ok: false, code: 'permission_denied', message: 'Notification permission is blocked. Enable it in browser Site settings, then retry.' };
+  }
+  const registration = await isServiceWorkerReady();
+  if (!registration) {
+    return { ok: false, code: 'service_worker_unavailable', message: 'The app service worker is not ready. Reload the installed app and try again.' };
+  }
+  const subscription = await subscribeToWebPush();
+  if (!subscription) {
+    const denied = window.Notification.permission === 'denied';
+    return { ok: false, code: denied ? 'permission_denied' : 'subscribe_failed', message: denied ? 'Notification permission was denied. Enable it in browser Site settings.' : 'The browser could not create a push subscription. Check notification permission and the public VAPID key.' };
+  }
+  if (!(await saveWebPushSubscription(uid, subscription))) {
+    return { ok: false, code: 'save_failed', message: 'The browser subscribed, but the subscription could not be saved to Firestore. Deploy the latest Firestore rules and retry.' };
+  }
+  try {
+    const token = await auth.currentUser.getIdToken(true);
+    const response = await fetch('/api/push/test', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: '{}' });
+    const payload = await response.json().catch(() => ({})) as { ok?: boolean; code?: string; message?: string; error?: string };
+    if (!response.ok || !payload.ok) return { ok: false, code: payload.code || `server_${response.status}`, message: payload.error || `Push test server returned ${response.status}.` };
+    return { ok: true, code: 'sent', message: payload.message || 'Test notification sent. It should appear within a few seconds.' };
+  } catch (error) {
+    return { ok: false, code: 'network_error', message: error instanceof Error ? `Push test request failed: ${error.message}` : 'Push test request failed. Check your network.' };
   }
 };
