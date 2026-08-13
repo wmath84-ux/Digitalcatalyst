@@ -34,6 +34,13 @@ test("curriculum lists nested modules and falls back to courseContent", () => {
   assert.match(mapping, /m\.files\?\.length \? m\.files : m\.resources/);
 });
 
+test("product ratings paginate six at a time with a load more control", () => {
+  assert.match(pdp, /const REVIEW_PAGE_SIZE = 6/);
+  assert.match(pdp, /data-load-more-reviews/);
+  assert.match(pdp, /setVisibleCount\(\(count\) => count \+ REVIEW_PAGE_SIZE\)/);
+  assert.match(pdp, /usePublishedProductReviews/);
+});
+
 test("signed-in learners can save product ratings to Firestore", () => {
   assert.match(pdp, /canReview=\{Boolean\(user\)\}/);
   assert.match(pdp, /collection\(db, "siteReviews"\)/);

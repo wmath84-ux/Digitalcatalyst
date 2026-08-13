@@ -139,7 +139,11 @@ export function usePublishedProductReviews(products: Product[]) {
   }, []);
 
   const reviews = useMemo(() => {
-    const productsById = new Map(products.map((product) => [product.id, product]));
+    const productsById = new Map<string, Product>();
+    for (const product of products) {
+      productsById.set(product.id, product);
+      if (product.documentId) productsById.set(product.documentId, product);
+    }
     return rawReviews
       .map((review, index) => mapReview(review.id, review.data, productsById, index))
       .filter((review): review is PublishedProductReview => Boolean(review))

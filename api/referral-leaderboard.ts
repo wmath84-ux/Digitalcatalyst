@@ -44,19 +44,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     const db = adminDb();
-    let docs: Array<{ id: string; data: () => Record<string, unknown> }> = [];
+    type LeaderboardDoc = { id: string; data: () => Record<string, unknown> };
+    let docs: LeaderboardDoc[] = [];
     try {
       const byPlan = await db.collection("users").where("subscriptionPlanId", ">", "").limit(200).get();
       docs = byPlan.docs;
     } catch {
       const recent = await db.collection("users").limit(200).get();
-      docs = recent.docs.filter((doc) => isSubscriber((doc.data() || {}) as Record<string, unknown>));
+      docs = recent.docs.filter((doc: LeaderboardDoc) => isSubscriber((doc.data() || {}) as Record<string, unknown>));
     }
     if (!docs.length) {
       const recent = await db.collection("users").limit(200).get();
-      docs = recent.docs.filter((doc) => isSubscriber((doc.data() || {}) as Record<string, unknown>));
+      docs = recent.docs.filter((doc: LeaderboardDoc) => isSubscriber((doc.data() || {}) as Record<string, unknown>));
     }
-    const rows = await Promise.all(docs.map((doc) => toRow(doc.id, (doc.data() || {}) as Record<string, unknown>)));
+    const rows = await Promise.all(docs.map((doc: LeaderboardDoc) => toRow(doc.id, (doc.data() || {}) as Record<string, unknown>)));
     rows.sort((a, b) => b.usedCount - a.usedCount || a.name.localeCompare(b.name));
     try {
       await db.collection(PUBLIC_COLLECTION).doc(PUBLIC_DOC).set({

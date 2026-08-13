@@ -33,8 +33,10 @@ test("review cards navigate to that product's PDP review section", () => {
 
 test("PDP renders the same product-specific written review cards", () => {
   assert.match(pdp, /homepageReviews\.filter\(\(review\) => review\.productId === product\.id\)/);
-  assert.match(pdp, /reviews\.map\(\(review\)/);
+  assert.match(pdp, /visibleReviews\.map\(\(review\)/);
   assert.match(pdp, /review\.comment/);
+  assert.match(pdp, /data-load-more-reviews/);
+  assert.match(pdp, /REVIEW_PAGE_SIZE/);
 });
 
 test("owned learners can submit pending reviews for admin moderation", () => {

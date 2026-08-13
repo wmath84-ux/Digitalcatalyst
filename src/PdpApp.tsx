@@ -32,7 +32,7 @@ import type { CheckoutSelection } from "./types/commerce";
 import { computeSummary } from "../utils/pdpSelection";
 import PdpPurchaseBuilder from "./components/pdp/PdpPurchaseBuilder";
 import { useCourseAccess } from "./hooks/useCourseAccess";
-import { useHomepageProductReviews, type PublishedProductReview } from "./hooks/useProductReviews";
+import { useHomepageProductReviews, usePublishedProductReviews, type PublishedProductReview } from "./hooks/useProductReviews";
 import { reviews as fallbackReviews } from "./home/data/mockData";
 import { useAuth } from "./context/AuthContext";
 import { db } from "../firebase";
@@ -58,6 +58,13 @@ interface ProductDetailProps {
 }
 
 type DetailTab = "Description" | "Curriculum" | "Instructor";
+
+type CurriculumModule = {
+  id: string;
+  title: string;
+  resources?: Array<{ id: string; name: string; type: string }>;
+  modules?: CurriculumModule[];
+};
 
 const formatPrice = (price: number) => price === 0 ? "Free" : `₹${price.toLocaleString("en-IN")}`;
 
@@ -129,9 +136,16 @@ function PremiumProductContent({
   const { user } = useAuth();
   const reviewCatalog = useMemo(() => products.length > 0 ? products : [product], [product, products]);
   const { reviews: homepageReviews } = useHomepageProductReviews(reviewCatalog, fallbackReviews, 6);
+  const { reviews: liveProductReviews } = usePublishedProductReviews(reviewCatalog);
   const productReviews = useMemo(
-    () => homepageReviews.filter((review) => review.productId === product.id),
-    [homepageReviews, product.id],
+    () => {
+      const fromHome = homepageReviews.filter((review) => review.productId === product.id);
+      const live = liveProductReviews.filter((review) => review.productId === product.id || review.productId === product.documentId);
+      const byId = new Map<string, PublishedProductReview>();
+      for (const review of [...live, ...fromHome]) byId.set(review.id, review);
+      return Array.from(byId.values()).sort((a, b) => b.createdAtMs - a.createdAtMs);
+    },
+    [homepageReviews, liveProductReviews, product.documentId, product.id],
   );
   const [activeImage, setActiveImage] = useState(0);
   const [activeTab, setActiveTab] = useState<DetailTab>("Description");
@@ -441,8 +455,7 @@ function PremiumProductContent({
   );
 }
 
-function DetailsCard({ product, tab, onTab, expandedModule, onExpandModule }: { product: Product; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void }) {
-  const modules = product.canonicalModules || [];
+function DetailsCard({ product, modules, tab, onTab, expandedModule, onExpandModule }: { product: Product; modules: CurriculumModule[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void }) {
   const tabs: DetailTab[] = ["Description", "Curriculum", "Instructor"];
   return (
     <section className="rounded-3xl border border-zinc-100 bg-white p-4 shadow-sm">
@@ -453,10 +466,9 @@ function DetailsCard({ product, tab, onTab, expandedModule, onExpandModule }: { 
         <div className="space-y-4"><p className="text-sm leading-relaxed text-zinc-600">{product.description || `Complete information for ${product.title}.`}</p><div className="grid grid-cols-2 gap-3"><Fact label="Format" value={product.category} /><Fact label="Level" value={product.classLevel} /><Fact label="Subject" value={product.subject} /><Fact label="Access" value="Purchases library" /></div></div>
       )}
       {tab === "Curriculum" && (
-        modules.length === 0 ? <EmptyDetail text="No curriculum has been published for this product yet." /> : <div className="space-y-2">{modules.map((module, index) => {
-          const open = expandedModule === module.id;
-          return <div key={module.id} className="overflow-hidden rounded-2xl border border-zinc-100"><button onClick={() => onExpandModule(open ? null : module.id)} className="flex w-full items-center gap-3 bg-zinc-50/60 px-3 py-3 text-left"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">{index + 1}</span><span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-800">{module.title}</span><span className="text-[10px] text-zinc-400">{module.resources?.length || 0} resources</span><ChevronDown className={`h-4 w-4 text-zinc-400 transition ${open ? "rotate-180" : ""}`} /></button>{open && <div className="space-y-2 px-4 py-3">{module.resources?.length ? module.resources.map((resource) => <div key={resource.id} className="flex items-center gap-2 text-xs text-zinc-500"><PlayCircle className="h-4 w-4 text-zinc-300" /><span className="min-w-0 flex-1 truncate">{resource.name}</span><span className="uppercase text-[9px] text-zinc-400">{resource.type}</span></div>) : <p className="text-xs text-zinc-400">Module details will appear here when published.</p>}</div>}</div>;
-        })}</div>
+        modules.length === 0 ? <EmptyDetail text="No curriculum has been published for this product yet." /> : <div className="space-y-2">{modules.map((module, index) => (
+          <CurriculumModuleRow key={module.id || `${module.title}-${index}`} module={module} index={index} expandedModule={expandedModule} onExpandModule={onExpandModule} />
+        ))}</div>
       )}
       {tab === "Instructor" && <div className="flex items-start gap-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-700 via-zinc-500 to-zinc-800 text-lg font-bold text-white shadow-lg">{initials(product.instructor)}</div><div><p className="font-bold text-zinc-900">{product.instructor}</p><p className="text-xs text-zinc-500">Creator of {product.title}</p><p className="mt-2 text-sm leading-relaxed text-zinc-500">Instructor information is synced from this live product's catalog record.</p></div></div>}
     </section>
@@ -494,6 +506,8 @@ function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, de
   );
 }
 
+const REVIEW_PAGE_SIZE = 6;
+
 function ReviewsCard({ product, reviews, canReview, composerOpen, rating, comment, submitting, notice, onToggleComposer, onRating, onComment, onSubmit }: {
   product: Product;
   reviews: PublishedProductReview[];
@@ -508,6 +522,12 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
   onComment: (comment: string) => void;
   onSubmit: () => void;
 }) {
+  const [visibleCount, setVisibleCount] = useState(REVIEW_PAGE_SIZE);
+  useEffect(() => {
+    setVisibleCount(REVIEW_PAGE_SIZE);
+  }, [product.id]);
+  const visibleReviews = reviews.slice(0, visibleCount);
+  const remaining = Math.max(0, reviews.length - visibleCount);
   return (
     <section id="product-reviews" className="scroll-mt-36 rounded-3xl border border-zinc-100 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
@@ -534,16 +554,26 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
       {notice && <p className="mt-3 rounded-xl bg-indigo-50 p-3 text-xs font-medium text-indigo-700">{notice}</p>}
       {reviews.length > 0 ? (
         <div className="mt-4 space-y-3">
-          {reviews.map((review) => (
+          {visibleReviews.map((review) => (
             <article key={review.id} className="rounded-2xl border border-zinc-100 bg-zinc-50/40 p-4">
               <div className="flex items-center gap-3">
                 <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>{review.initials}</div>
-                <div className="min-w-0 flex-1"><p className="flex items-center gap-1 text-sm font-semibold text-zinc-800"><span className="truncate">{review.name}</span>{review.verifiedPurchase && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}</p><p className="text-[11px] text-zinc-400">{review.date}</p></div>
+                       <div className="min-w-0 flex-1"><p className="flex items-center gap-1 text-sm font-semibold text-zinc-800"><span className="truncate">{review.name}</span>{review.verifiedPurchase && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}</p><p className="text-[11px] text-zinc-400">{review.date}</p></div>
                 <RatingStars rating={review.rating} />
               </div>
               <p className="mt-3 text-sm leading-relaxed text-zinc-600">“{review.comment}”</p>
             </article>
           ))}
+          {remaining > 0 ? (
+            <button
+              type="button"
+              data-load-more-reviews
+              onClick={() => setVisibleCount((count) => count + REVIEW_PAGE_SIZE)}
+              className="w-full rounded-2xl border border-zinc-200 bg-white py-3 text-sm font-bold text-zinc-800 shadow-sm"
+            >
+              Load more · {Math.min(REVIEW_PAGE_SIZE, remaining)} of {remaining} remaining
+            </button>
+          ) : null}
         </div>
       ) : <p className="mt-4 text-center text-xs text-zinc-400">Published written reviews will appear here when available.</p>}
     </section>
@@ -568,13 +598,6 @@ function Trust({ icon: Icon, label }: { icon: typeof ShieldCheck; label: string 
 function Fact({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-zinc-50 p-3"><p className="text-[10px] uppercase tracking-wide text-zinc-400">{label}</p><p className="mt-1 truncate text-xs font-semibold text-zinc-800">{value}</p></div>; }
 function EmptyDetail({ text }: { text: string }) { return <div className="flex flex-col items-center rounded-2xl bg-zinc-50 py-8 text-center"><PackageOpen className="h-7 w-7 text-zinc-300" /><p className="mt-2 px-5 text-xs text-zinc-400">{text}</p></div>; }
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "DC"; }
-
-type CurriculumModule = {
-  id: string;
-  title: string;
-  resources?: Array<{ id: string; name: string; type: string }>;
-  modules?: CurriculumModule[];
-};
 
 const asCurriculumModule = (raw: unknown): CurriculumModule | null => {
   if (!raw || typeof raw !== "object") return null;
