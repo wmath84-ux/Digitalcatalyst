@@ -432,12 +432,17 @@ export const editorPaidUpdateToFirestore = (raw, allFlatModules) => {
  */
 export const firestoreResourceToEditor = (raw) => {
   if (!isObject(raw)) return null;
+  // Prefer any usable HTTPS URL slot (url → embedUrl → youtubeUrl) so
+  // resources stored with only a `youtubeUrl` / `embedUrl` still come back
+  // into the editor with a working link. Falls back to the raw string so a
+  // bad URL is preserved for the admin to fix rather than silently dropped.
+  const url = pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl) || str(raw.url);
   return {
     id: str(raw.id),
     name: str(raw.name, "Untitled resource"),
     // Editor only knows the 14-type enum; map back from the 11-type alias.
     type: fromPlayerResourceType(normResourceType(raw.type)),
-    url: str(raw.url),
+    url,
     provider: str(raw.provider),
     sortOrder: num(raw.sortOrder),
     visibility: normVisibility(raw.visibility),
@@ -496,7 +501,9 @@ const flattenFirestoreModules = (tree) => {
 export const firestoreModulesToEditorFlat = (tree) => {
   const flat = flattenFirestoreModules(tree);
   return flat.map((m) => {
-    const resources = arr(m.files)
+    // Read resources from either `files` (editor-written) or `resources`
+    // (legacy/demo) so every module's files survive the round trip.
+    const resources = arr(m.files?.length ? m.files : m.resources)
       .map(firestoreResourceToEditor)
       .filter(Boolean)
       .map((r, index) => ({ ...r, sortOrder: index }));
@@ -509,9 +516,12 @@ export const firestoreModulesToEditorFlat = (tree) => {
       active: bool(m.active, true),
       accessLevel: normAccessLevel(m.accessLevel),
       individuallyPurchasable: bool(m.individuallyPurchasable),
-      cashPrice: numOrNull(m.cashPrice),
+      // Legacy/demo modules carry `paidUpdatePrice`/`paidUpdateCoinPrice`
+      // instead of `cashPrice`/`coinPrice`; surface those so prices are not
+      // silently dropped when the admin reloads such a course.
+      cashPrice: numOrNull(m.cashPrice) ?? numOrNull(m.paidUpdatePrice),
       salePrice: numOrNull(m.salePrice),
-      coinPrice: numOrNull(m.coinPrice),
+      coinPrice: numOrNull(m.coinPrice) ?? numOrNull(m.paidUpdateCoinPrice),
       includeInBundle: bool(m.includeInBundle, true),
       previewAvailable: bool(m.previewAvailable),
       requiredPreviousModuleIds: arr(m.requiredPreviousModuleIds).map(String),

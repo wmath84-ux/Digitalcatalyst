@@ -39,16 +39,17 @@ test("PDP renders the same product-specific written review cards", () => {
   assert.match(pdp, /REVIEW_PAGE_SIZE/);
 });
 
-test("owned learners can submit pending reviews for admin moderation", () => {
+test("signed-in learners publish reviews immediately for the live rail", () => {
   assert.match(pdp, /addDoc\(collection\(db, "siteReviews"\)/);
-  assert.match(pdp, /status: "pending"/);
+  assert.match(pdp, /status: "published"/);
   assert.match(pdp, /canReview=\{Boolean\(user\)\}/);
-  assert.match(pdp, /Review submitted\. It is saved online and will appear after moderation/);
+  assert.match(pdp, /Review added\. Your rating now counts toward this product/);
+  assert.match(pdp, /setLocalReviews/);
 });
 
-test("Firestore exposes only published reviews and keeps moderation admin-controlled", () => {
+test("Firestore exposes published reviews and keeps moderation admin-controlled", () => {
   assert.match(rules, /match \/siteReviews\/\{reviewId\}/);
   assert.match(rules, /allow read: if resource\.data\.status == 'published'/);
-  assert.match(rules, /request\.resource\.data\.status == 'pending'/);
+  assert.match(rules, /request\.resource\.data\.status in \['pending', 'published'\]/);
   assert.match(rules, /allow update, delete: if isAdmin\(\)/);
 });

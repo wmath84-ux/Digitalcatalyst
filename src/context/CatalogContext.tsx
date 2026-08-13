@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { collection, onSnapshot, type DocumentData } from "firebase/firestore";
+import { collection, onSnapshot, query, where, type DocumentData } from "firebase/firestore";
 import { db } from "../../firebase";
 import type { Product } from "../data/products";
 import { firestoreToCatalogProduct } from "../../utils/productMapping";
@@ -45,6 +45,9 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
   const image = configuredImages[0] || "/images/hero-main.jpg";
   const rating = Number(data.manualRating ?? data.rating ?? data.calculatedRating ?? 0);
   const tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
+  const features = Array.isArray(data.features)
+    ? data.features.map((value) => String(value).trim()).filter(Boolean)
+    : [];
 
   // Round-trip-safe Part 1 mapping: every commerce/access field on modules,
   // resources, and paid updates is preserved end-to-end.
@@ -69,6 +72,7 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     rating: Number.isFinite(rating) ? rating : 0,
     reviews: Number(data.reviewCount ?? data.ratingCount ?? 0) || 0,
     originalPrice: isFree ? 0 : Math.max(regularPrice, salePrice),
+    features: features.length > 0 ? features : undefined,
     price: isFree ? 0 : salePrice,
     isFree,
     description: String(data.description || ""),
@@ -87,7 +91,8 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
 
 export function CatalogProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [baseProducts, setBaseProducts] = useState<Product[]>([]);
+  const [ratingAggregates, setRatingAggregates] = useState<Map<string, { sum: number; count: number }>>(new Map());
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,17 +104,51 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         .filter((item) => item.data.isVisible !== false)
         .map((item) => mapProduct(item.id, item.data))
         .sort((a, b) => a.title.localeCompare(b.title));
-      setProducts(next);
+      setBaseProducts(next);
       setError(null);
       setLoading(false);
     }, (snapshotError) => {
       console.error("Catalog sync failed", snapshotError);
-      setProducts([]);
+      setBaseProducts([]);
       setError("The live catalog could not be loaded. Please try again shortly.");
       setLoading(false);
     });
     return unsubscribe;
   }, []);
+
+  // Live rating aggregate: once a learner publishes a review, the product's
+  // average rating and review count are recomputed from approved reviews and
+  // reflected everywhere that reads `product.rating` / `product.reviews`.
+  useEffect(() => {
+    const published = query(collection(db, "siteReviews"), where("status", "==", "published"));
+    return onSnapshot(published, (snapshot) => {
+      const aggregates = new Map<string, { sum: number; count: number }>();
+      snapshot.docs.forEach((item) => {
+        const data = item.data() || {};
+        const productId = String(data.productId || data.productDocumentId || "").trim();
+        const rating = Number(data.rating || 0);
+        if (!productId || !Number.isFinite(rating) || rating <= 0) return;
+        const current = aggregates.get(productId) || { sum: 0, count: 0 };
+        current.sum += rating;
+        current.count += 1;
+        aggregates.set(productId, current);
+      });
+      setRatingAggregates(aggregates);
+    }, (reviewsError) => {
+      console.error("Review aggregate sync failed", reviewsError);
+      setRatingAggregates(new Map());
+    });
+  }, []);
+
+  const products = useMemo(
+    () => baseProducts.map((product) => {
+      const aggregate = ratingAggregates.get(product.id) || ratingAggregates.get(product.documentId || "");
+      if (!aggregate || aggregate.count === 0) return product;
+      const average = Math.round((aggregate.sum / aggregate.count) * 10) / 10;
+      return { ...product, rating: average, reviews: aggregate.count };
+    }),
+    [baseProducts, ratingAggregates],
+  );
 
   useEffect(() => {
     if (!user) {

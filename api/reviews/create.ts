@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       rating,
       comment,
       verifiedPurchase: Boolean(body.verifiedPurchase),
-      status: "pending",
+      status: "published",
       createdAt: Date.now(),
       source: "api",
     });

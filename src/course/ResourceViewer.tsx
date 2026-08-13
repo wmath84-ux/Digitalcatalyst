@@ -29,6 +29,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Download, ExternalLink, FileQuestion, Maximize2, RefreshCw } from "lucide-react";
 import type { CourseFile } from "../types/course";
 import ImageViewer from "./ImageViewer";
+import AudioPlayer from "./AudioPlayer";
 import { getCourseDownload, getCourseEmbed } from "../utils/courseEmbed";
 
 const SUPPORTED_KINDS = new Set([
@@ -86,9 +87,7 @@ export default function ResourceViewer({ file }: ResourceViewerProps) {
             data-course-viewer-video
           />
         ) : isAudio ? (
-          <div className="grid h-full place-items-center bg-gradient-to-br from-slate-950 to-violet-950 p-8">
-            <audio src={embed.url} controls preload="metadata" className="w-full max-w-xl" data-course-viewer-audio />
-          </div>
+          <AudioPlayer url={embed.url} name={file.name} />
         ) : !embed.url ? (
           <MissingEmbedState file={file} download={download} />
         ) : (
@@ -101,12 +100,31 @@ export default function ResourceViewer({ file }: ResourceViewerProps) {
 
 function ViewerHeader({ file, embed, download }: { file: CourseFile; embed: { url: string; kind: string }; download: { url: string; label: string; downloadable: boolean } }) {
   const kindLabel = embed.kind === "none" ? "No preview" : embed.kind === "direct" ? file.type : embed.kind;
+  const isMedia = embed.kind === "youtube" || file.type === "video" || file.type === "audio";
+  const toggleFullscreen = () => {
+    const root = document.querySelector("[data-course-viewer]");
+    if (!root) return;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void root.requestFullscreen?.();
+  };
   return (
     <div className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-slate-950 px-4 py-3 text-white">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-black" title={file.name}>{file.name}</p>
         <p className="text-[10px] font-bold uppercase tracking-wider text-white/40" data-course-viewer-kind>{kindLabel} preview</p>
       </div>
+      {isMedia ? (
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/10 text-white/80 hover:bg-white/15"
+          aria-label="Toggle fullscreen"
+          title="Fullscreen"
+          data-course-viewer-fullscreen
+        >
+          <Maximize2 size={15} />
+        </button>
+      ) : null}
       {download.url ? (
         <a
           href={download.url}

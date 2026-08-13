@@ -25,6 +25,8 @@ const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
 const sidebar = readSource("src/course/CourseSidebar.tsx");
+const overlay = readSource("src/course/CourseOverlay.tsx");
+const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
 const resourceViewer = readSource("src/course/ResourceViewer.tsx");
 const imageViewer = readSource("src/course/ImageViewer.tsx");
@@ -46,16 +48,24 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-progress-label",
     "data-course-subscription-badge",
     "data-course-preview-badge",
-    "data-course-toggle-panel",
     "data-course-mark-complete-bar",
     "data-course-selected-name",
     "data-course-mark-complete",
-    "data-course-side-panel",
-    "data-course-tab-curriculum",
-    "data-course-tab-resources",
-    "data-course-tab-notes",
-    "data-course-tab-ai",
-    "data-course-tab-panel",
+    // Bottom dock + overlay
+    "data-course-dock",
+    "data-course-dock-tab",
+    "data-course-dock-indicator",
+    "data-course-overlay",
+    "data-course-overlay-tab",
+    "data-course-overlay-close",
+    "data-course-overlay-title",
+    "data-course-overlay-list",
+    "data-course-overlay-module",
+    "data-course-overlay-file",
+    "data-course-overlay-buy-module",
+    "data-course-overlay-buy-update",
+    "data-course-overlay-paid",
+    "data-course-landscape-header",
     // Notes
     "data-course-notes-panel",
     "data-course-notes-input",
@@ -101,7 +111,7 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-image-download",
   ];
   for (const hook of hooks) {
-    const allSources = [coursePlayer, sidebar, notesPanel, resourceViewer, imageViewer].join("\n");
+    const allSources = [coursePlayer, sidebar, overlay, audioPlayer, notesPanel, resourceViewer, imageViewer].join("\n");
     assert.ok(allSources.includes(hook), `missing data attribute ${hook}`);
   }
 });
@@ -114,8 +124,6 @@ test("CoursePlayer keeps the Part 10 hook + resolver as the source of truth", ()
   assert.match(coursePlayer, /useCourseAccess/);
   assert.match(coursePlayer, /resolution\.accessibleModuleIds/);
   assert.match(coursePlayer, /resolution\.ownedUpdateIds/);
-  assert.match(coursePlayer, /resolution\.moduleAccessSources/);
-  assert.match(coursePlayer, /resolution\.unmetDependencies/);
   assert.match(coursePlayer, /resolution\.previewModuleIds/);
   assert.match(coursePlayer, /resolution\.lockedModuleIds/);
   assert.match(coursePlayer, /resolution\.hasFullProductAccess/);

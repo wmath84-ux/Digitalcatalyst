@@ -284,6 +284,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
             <Field label="Tags" hint="Comma separated">
               <input className={inputClass} value={form.tags.join(", ")} onChange={(e) => update("tags", csvToList(e.target.value))} />
             </Field>
+            <FeaturesEditor features={form.features} onChange={(features) => update("features", features)} />
             <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
               <span className="text-sm font-medium text-slate-700">Visible to users</span>
               <ToggleSwitch checked={form.visibility === "visible"} onChange={(v) => update("visibility", v ? "visible" : "hidden")} />
@@ -509,6 +510,43 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: b
     >
       <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
     </button>
+  );
+}
+
+function FeaturesEditor({ features, onChange }: { features: string[]; onChange: (features: string[]) => void }) {
+  function updateFeature(index: number, value: string) {
+    onChange(features.map((feature, i) => (i === index ? value : feature)));
+  }
+  function addFeature() {
+    onChange([...features, ""]);
+  }
+  function removeFeature(index: number) {
+    onChange(features.filter((_, i) => i !== index));
+  }
+  return (
+    <div className="rounded-lg border border-slate-200 p-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">What's included</p>
+          <p className="text-[11px] text-slate-500">Bullets shown on the product detail page. Leave empty to auto-generate from modules.</p>
+        </div>
+        <SecondaryButton className="h-8 px-2 text-xs" onClick={addFeature}>+ Add</SecondaryButton>
+      </div>
+      {features.length === 0 && <p className="mt-2 text-xs text-slate-400">No custom bullets yet.</p>}
+      <div className="mt-2 space-y-2">
+        {features.map((feature, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <input
+              className={inputClass + " h-9 flex-1"}
+              placeholder={`e.g. ${index + 1}-day access to all lessons`}
+              value={feature}
+              onChange={(e) => updateFeature(index, e.target.value)}
+            />
+            <button type="button" className="h-8 w-8 rounded-md border border-red-200 text-xs text-red-600 active:bg-red-50" onClick={() => removeFeature(index)}>✕</button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

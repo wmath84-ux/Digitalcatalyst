@@ -139,15 +139,18 @@ function PremiumProductContent({
   const reviewCatalog = useMemo(() => products.length > 0 ? products : [product], [product, products]);
   const { reviews: homepageReviews } = useHomepageProductReviews(reviewCatalog, fallbackReviews, 6);
   const { reviews: liveProductReviews } = usePublishedProductReviews(reviewCatalog);
+  const [localReviews, setLocalReviews] = useState<PublishedProductReview[]>([]);
   const productReviews = useMemo(
     () => {
       const fromHome = homepageReviews.filter((review) => review.productId === product.id);
       const live = liveProductReviews.filter((review) => review.productId === product.id || review.productId === product.documentId);
       const byId = new Map<string, PublishedProductReview>();
-      for (const review of [...live, ...fromHome]) byId.set(review.id, review);
+      // Locally-added reviews are seeded first so a just-submitted review is
+      // guaranteed to appear at the top, then replaced by its synced twin.
+      for (const review of [...localReviews, ...live, ...fromHome]) byId.set(review.id, review);
       return Array.from(byId.values()).sort((a, b) => b.createdAtMs - a.createdAtMs);
     },
-    [homepageReviews, liveProductReviews, product.documentId, product.id],
+    [homepageReviews, liveProductReviews, localReviews, product.documentId, product.id],
   );
   const [activeImage, setActiveImage] = useState(0);
   const [activeTab, setActiveTab] = useState<DetailTab>("Description");
@@ -210,7 +213,7 @@ function PremiumProductContent({
   const ownedResourceIds = resolution.ownedResourceIds;
   const gallery = product.images?.length ? product.images : [product.image];
   const selectedImage = gallery[Math.min(activeImage, gallery.length - 1)] || product.image;
-  const related = useMemo(() => getRelatedProducts(product, products), [product, products]);
+  const related = useMemo(() => getRelatedProducts(product, products, 6), [product, products]);
   const discount = product.originalPrice > product.price && product.originalPrice > 0
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
@@ -373,8 +376,10 @@ function PremiumProductContent({
       verifiedPurchase: Boolean(isProductOwned),
     };
     try {
+      let createdId = "";
       try {
-        await addDoc(collection(db, "siteReviews"), { ...payload, status: "pending", createdAt: serverTimestamp() });
+        const ref = await addDoc(collection(db, "siteReviews"), { ...payload, status: "published", createdAt: serverTimestamp() });
+        createdId = ref.id;
       } catch {
         const token = await import("../firebase").then((module) => module.auth.currentUser?.getIdToken(true));
         if (!token) throw new Error("Login is required.");
@@ -383,13 +388,31 @@ function PremiumProductContent({
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload),
         });
-        const data = await response.json().catch(() => ({})) as { ok?: boolean; error?: string };
+        const data = await response.json().catch(() => ({})) as { ok?: boolean; error?: string; id?: string };
         if (!response.ok || !data.ok) throw new Error(data.error || "Review could not be saved.");
+        createdId = data.id || "";
       }
+      // Show the review immediately at the top before the live snapshot syncs.
+      const reviewId = createdId || `local-${Date.now()}`;
+      const optimisticReview: PublishedProductReview = {
+        id: reviewId,
+        productId: product.id,
+        productTitle: product.title,
+        name: user.name || "Learner",
+        initials: initials(user.name || "Learner"),
+        avatarColor: "bg-indigo-500",
+        rating: payload.rating,
+        comment,
+        createdAtMs: Date.now(),
+        date: "Just now",
+        verifiedPurchase: payload.verifiedPurchase,
+        source: "live",
+      };
+      setLocalReviews((existing) => [optimisticReview, ...existing.filter((review) => review.id !== reviewId)]);
       setReviewComment("");
       setReviewComposerOpen(false);
       playSfxSuccess();
-      setReviewNotice("Review submitted. It is saved online and will appear after moderation.");
+      setReviewNotice("Review added. Your rating now counts toward this product.");
     } catch (error) {
       console.error("Review submission failed", error);
       playSfxError();
@@ -399,7 +422,7 @@ function PremiumProductContent({
     }
   };
 
-  const highlights = [
+  const autoHighlights = [
     modules.length > 0 ? `${modules.length} structured module${modules.length === 1 ? "" : "s"}` : null,
     resourceCount > 0 ? `${resourceCount} downloadable or streaming resource${resourceCount === 1 ? "" : "s"}` : null,
     "Access from your purchases library",
@@ -407,6 +430,10 @@ function PremiumProductContent({
     "Account-linked secure delivery",
     product.paidUpdates?.length ? `${product.paidUpdates.length} published course update${product.paidUpdates.length === 1 ? "" : "s"}` : null,
   ].filter((item): item is string => Boolean(item));
+  // "What's included" is curated in the product editor. When the merchant has
+  // configured custom bullets, those are shown verbatim; otherwise we fall back
+  // to the modules/resources summary so the section never shows unrelated text.
+  const highlights = product.features?.length ? product.features : autoHighlights;
 
   return (
     <div className="relative bg-[#F8F9FA] pb-5 text-zinc-900">
@@ -526,80 +553,20 @@ function PremiumProductContent({
               <Trust icon={RotateCcw} label="Lifetime library" />
             </div>
 
-            <div className="rounded-2xl border border-zinc-100 bg-white p-5">
-              <p className="mb-3 text-sm font-semibold text-zinc-900">What's included</p>
-              <ul className="space-y-2.5">
-                {highlights.map((highlight) => <li key={highlight} className="flex items-start gap-2 text-sm text-zinc-600"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{highlight}</li>)}
-              </ul>
-            </div>
+            {highlights.length > 0 && (
+              <div className="rounded-2xl border border-zinc-100 bg-white p-5">
+                <p className="mb-3 text-sm font-semibold text-zinc-900">What's included</p>
+                <ul className="space-y-2.5">
+                  {highlights.map((highlight) => <li key={highlight} className="flex items-start gap-2 text-sm text-zinc-600"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{highlight}</li>)}
+                </ul>
+              </div>
+            )}
           </section>
 
           {isProductOwned && availablePaidUpdates.length > 0 && (
             <section className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 shadow-sm">
               <div className="flex items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-500 text-white"><Zap size={20} /></span><div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-wider text-amber-700">Course upgrade available</p><h2 className="mt-0.5 text-base font-black text-zinc-900">{availablePaidUpdates[0].title}</h2><p className="mt-1 text-xs leading-5 text-zinc-600">New modules or files were added after your original purchase. Review exactly what is new before upgrading.</p></div></div>
               <button onClick={() => document.getElementById("pdp-purchase-options")?.scrollIntoView({ behavior: "smooth", block: "start" })} className="mt-4 w-full rounded-2xl bg-zinc-900 py-3 text-sm font-black text-white">View upgrade · {formatPrice(availablePaidUpdates[0].cashPrice)}</button>
-            </section>
-          )}
-
-          {/* Demo Course Player button — opens the course player with all file types */}
-          {(product.courseContent || []).length > 0 && (
-            <section className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-cyan-50 p-4 shadow-sm">
-              <div className="flex items-start gap-3">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-500 text-white"><PlayCircle size={20} /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-black uppercase tracking-wider text-violet-700">Demo Course Player</p>
-                  <h2 className="mt-0.5 text-base font-black text-zinc-900">Test All 12 File Types</h2>
-                  <p className="mt-1 text-xs leading-5 text-zinc-600">
-                    Open the Course Player in demo mode to test every supported file type: YouTube, Video, Audio, PDF, Doc, Sheet, Slides, E-book, Image, Google Form, Embed, and Mindmap — each with its own price.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => {
-                    try { localStorage.setItem("dc_demo_mode", "true"); } catch {}
-                    const url = new URL(window.location.href);
-                    url.searchParams.set("demo", "true");
-                    window.location.replace(url.toString());
-                  }}
-                  className="flex-1 rounded-2xl bg-zinc-900 py-3 text-sm font-black text-white"
-                >
-                  Open Demo Player
-                </button>
-                <button
-                  onClick={() => {
-                    const url = new URL(window.location.href);
-                    url.searchParams.set("demo", "true");
-                    try { localStorage.setItem("dc_demo_mode", "true"); } catch {}
-                    window.location.hash = `#/course/${encodeURIComponent(product.id)}`;
-                    window.location.replace(`${window.location.origin}${window.location.pathname}#/course/${encodeURIComponent(product.id)}?demo=true`);
-                  }}
-                  className="flex-1 rounded-2xl border border-zinc-300 bg-white py-3 text-sm font-bold text-zinc-900"
-                >
-                  Direct Course Link
-                </button>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-1.5">
-                {[
-                  { type: "YouTube", price: "₹49" },
-                  { type: "Video", price: "₹99" },
-                  { type: "Audio", price: "₹29" },
-                  { type: "PDF", price: "₹39" },
-                  { type: "Doc", price: "₹59" },
-                  { type: "Sheet", price: "₹59" },
-                  { type: "Slides", price: "₹69" },
-                  { type: "E-book", price: "₹149" },
-                  { type: "Image", price: "₹19" },
-                  { type: "Form", price: "₹9" },
-                  { type: "Embed", price: "₹79" },
-                  { type: "Mindmap", price: "₹89" },
-                ].map(({ type, price }) => (
-                  <div key={type} className="rounded-lg bg-white/70 px-2 py-1.5 text-center">
-                    <p className="text-[10px] font-black text-violet-600">{type}</p>
-                    <p className="text-[9px] font-bold text-zinc-500">{price}</p>
-                  </div>
-                ))}
-              </div>
             </section>
           )}
 

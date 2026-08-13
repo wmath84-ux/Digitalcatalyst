@@ -36,6 +36,8 @@ const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
 const sidebar = readSource("src/course/CourseSidebar.tsx");
+const overlay = readSource("src/course/CourseOverlay.tsx");
+const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
 const resourceViewer = readSource("src/course/ResourceViewer.tsx");
 const imageViewer = readSource("src/course/ImageViewer.tsx");
@@ -85,11 +87,13 @@ test("ResourceViewer exposes a retry button when the embed fails", () => {
   assert.match(resourceViewer, /Retry/);
 });
 
-test("ResourceViewer handles direct video and audio with native elements", () => {
+test("ResourceViewer handles direct video natively and audio with the custom player", () => {
   assert.match(resourceViewer, /data-course-viewer-video/);
-  assert.match(resourceViewer, /data-course-viewer-audio/);
   assert.match(resourceViewer, /<video\s+src=\{embed\.url\}/);
-  assert.match(resourceViewer, /<audio\s+src=\{embed\.url\}/);
+  assert.match(resourceViewer, /<AudioPlayer url=\{embed\.url\} name=\{file\.name\} \/>/);
+  assert.match(audioPlayer, /data-course-viewer-audio/);
+  assert.match(audioPlayer, /<audio/);
+  assert.match(audioPlayer, /src=\{url\}/);
 });
 
 test("ResourceViewer uses a sandboxed iframe with fullscreen / clipboard permissions", () => {
@@ -175,10 +179,12 @@ test("NotesPanel shows the active product / module / resource context", () => {
   assert.match(notesPanel, /\{moduleTitle \? \` · \$\{moduleTitle\}\` : ""\}/);
 });
 
-test("CoursePlayer wires NotesPanel into the notes tab", () => {
-  assert.match(coursePlayer, /<NotesPanel/);
-  assert.match(coursePlayer, /onEdit=\{\(id, text\) => void editNote\(id, text\)\}/);
-  assert.match(coursePlayer, /onDelete=\{\(id\) => void deleteNote\(id\)\}/);
+test("CourseOverlay wires NotesPanel into the notes tab", () => {
+  assert.match(overlay, /<NotesPanel/);
+  assert.match(overlay, /onEdit=\{props\.onEditNote\}/);
+  assert.match(overlay, /onDelete=\{props\.onDeleteNote\}/);
+  assert.match(coursePlayer, /onEditNote=\{\(id, text\) => void editNote\(id, text\)\}/);
+  assert.match(coursePlayer, /onDeleteNote=\{\(id\) => void deleteNote\(id\)\}/);
   assert.match(coursePlayer, /const editNote = async/);
   assert.match(coursePlayer, /const deleteNote = async/);
 });
@@ -266,17 +272,81 @@ test("CourseSidebar marks preview-only modules with the preview icon", () => {
   assert.match(sidebar, /<Eye size=\{13\} className="text-sky-300"/);
 });
 
-test("CoursePlayer wires the resolver's accessible/locked/unmet state into CourseSidebar", () => {
+test("CoursePlayer wires the resolver's accessible/owned state into CourseOverlay", () => {
   assert.match(coursePlayer, /accessibleModuleIds=\{resolution\.accessibleModuleIds\}/);
   assert.match(coursePlayer, /previewModuleIds=\{resolution\.previewModuleIds\}/);
-  assert.match(coursePlayer, /moduleAccessSources=\{resolution\.moduleAccessSources\}/);
-  assert.match(coursePlayer, /unmetDependencies=\{resolution\.unmetDependencies\}/);
+  assert.match(coursePlayer, /ownedUpdateIds=\{ownedUpdateIds\}/);
   assert.match(coursePlayer, /onBuyModule=\{handleBuyModule\}/);
 });
 
 test("CoursePlayer routes a single module's 'buy' click back to the parent's onPurchaseUpdate", () => {
   assert.match(coursePlayer, /const handleBuyModule = \(module: \{ id: string; paidUpdateId\?: string; paidUpdateTitle\?: string; paidUpdatePrice\?: string \}\) =>/);
   assert.match(coursePlayer, /onPurchaseUpdate\(update\);/);
+});
+
+// ---------------------------------------------------------------------------
+// Bottom dock + overlay (redesign)
+// ---------------------------------------------------------------------------
+
+test("CoursePlayer replaces the side panel with a four-toggle bottom dock", () => {
+  for (const tab of ["modules", "resources", "notes", "paid"]) {
+    assert.match(overlay, new RegExp(`key: "${tab}"`), `missing dock tab ${tab}`);
+  }
+  assert.match(overlay, /data-course-dock/);
+  assert.match(overlay, /data-course-dock-tab/);
+  assert.match(overlay, /data-course-dock-indicator/);
+  assert.match(coursePlayer, /data-course-player/);
+  assert.doesNotMatch(coursePlayer, /data-course-side-panel/);
+});
+
+test("CourseOverlay reuses a single sheet whose content swaps per tab", () => {
+  assert.match(overlay, /data-course-overlay/);
+  assert.match(overlay, /data-course-overlay-tab=\{tab\}/);
+  assert.match(overlay, /key=\{tab\}/);
+});
+
+test("Modules overlay lists available modules, Resources lists only files", () => {
+  assert.match(overlay, /data-course-overlay-list/);
+  assert.match(overlay, /data-mode=\{mode\}/);
+  assert.match(overlay, /data-course-overlay-module/);
+  assert.match(overlay, /data-course-overlay-file/);
+  assert.match(overlay, /mode === "resources"/);
+});
+
+test("Paid overlay lists only paid modules with a buy CTA", () => {
+  assert.match(overlay, /data-course-overlay-paid/);
+  assert.match(overlay, /accessLevel === "paidUpdate"/);
+  assert.match(overlay, /data-course-overlay-buy-module/);
+  assert.match(overlay, /data-course-overlay-buy-update/);
+});
+
+test("Notes overlay is half the screen", () => {
+  assert.match(overlay, /50dvh/);
+  assert.match(overlay, /tab === "notes"/);
+});
+
+test("Custom AudioPlayer replaces the native audio element with a transport", () => {
+  assert.match(audioPlayer, /data-course-audio-player/);
+  assert.match(audioPlayer, /data-course-audio-play/);
+  assert.match(audioPlayer, /data-course-audio-seek/);
+  assert.match(audioPlayer, /data-course-audio-current/);
+  assert.match(audioPlayer, /data-course-audio-duration/);
+  assert.match(audioPlayer, /data-course-audio-loop/);
+  assert.match(audioPlayer, /data-course-audio-mute/);
+  assert.match(resourceViewer, /<AudioPlayer/);
+});
+
+test("CoursePlayer rotates content into a landscape layout with vertical header + toggles", () => {
+  assert.match(coursePlayer, /matchMedia\("\(orientation: landscape\)"\)/);
+  assert.match(coursePlayer, /rotate\(90deg\)/);
+  assert.match(coursePlayer, /data-orientation="landscape"/);
+  assert.match(coursePlayer, /data-course-landscape-header/);
+  assert.match(overlay, /orientation === "landscape"/);
+});
+
+test("ResourceViewer offers a fullscreen toggle for media", () => {
+  assert.match(resourceViewer, /data-course-viewer-fullscreen/);
+  assert.match(resourceViewer, /requestFullscreen/);
 });
 
 // ---------------------------------------------------------------------------
