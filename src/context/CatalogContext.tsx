@@ -3,6 +3,7 @@ import { collection, onSnapshot, type DocumentData } from "firebase/firestore";
 import { db } from "../../firebase";
 import type { Product } from "../data/products";
 import { firestoreToCatalogProduct } from "../../utils/productMapping";
+import { fullDemoCourseContent } from "../data/demoCourseContent";
 
 import { useAuth } from "./AuthContext";
 
@@ -72,9 +73,15 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     isFree,
     description: String(data.description || ""),
     paymentLink: String(data.paymentLink || ""),
-    courseContent: catalogProjection.courseContent as Product["courseContent"],
-    canonicalModules: catalogProjection.canonicalModules,
-    paidUpdates: catalogProjection.paidUpdates,
+    courseContent: (catalogProjection.courseContent as Product["courseContent"])?.length
+      ? catalogProjection.courseContent as Product["courseContent"]
+      : fullDemoCourseContent,
+    canonicalModules: catalogProjection.canonicalModules?.length
+      ? catalogProjection.canonicalModules
+      : undefined,
+    paidUpdates: catalogProjection.paidUpdates?.length
+      ? catalogProjection.paidUpdates
+      : undefined,
   };
 };
 
