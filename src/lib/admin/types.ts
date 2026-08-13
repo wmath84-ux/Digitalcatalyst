@@ -20,6 +20,7 @@ export type ProductResource = {
     | "pdf"
     | "gdoc"
     | "gsheet"
+    | "gslides"
     | "gform"
     | "ebook"
     | "github_pages"

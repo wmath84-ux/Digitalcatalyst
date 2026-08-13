@@ -56,6 +56,7 @@ export type ResourceType =
   | "pdf"
   | "doc"
   | "sheet"
+  | "slides"
   | "image"
   | "google_form"
   | "ebook"
@@ -84,6 +85,8 @@ export interface CanonicalCourseResource {
   coinPrice: number | null;
   entitlementId: string;
   paidUpdateId: string | null;
+  /** Bare 11-char id for YouTube resources that were saved without a URL. */
+  youtubeVideoId?: string;
 }
 
 export interface CanonicalCourseModule {

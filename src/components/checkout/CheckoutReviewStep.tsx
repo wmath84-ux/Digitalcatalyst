@@ -72,6 +72,7 @@ const RESOURCE_TYPE_LABEL: Record<string, string> = {
   pdf: "PDF",
   doc: "Google Doc",
   sheet: "Google Sheet",
+  slides: "Google Slides",
   image: "Image",
   google_form: "Google Form",
   ebook: "E-book",

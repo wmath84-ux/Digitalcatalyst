@@ -1,5 +1,5 @@
 export type CourseAccessLevel = "included" | "paidUpdate" | "hidden";
-export type CourseFileType = "youtube" | "video" | "audio" | "pdf" | "doc" | "sheet" | "ebook" | "image" | "google_form" | "embed" | "mindmap";
+export type CourseFileType = "youtube" | "video" | "audio" | "pdf" | "doc" | "sheet" | "slides" | "ebook" | "image" | "google_form" | "embed" | "mindmap";
 
 /**
  * Part 11 — single note shape. Stored on

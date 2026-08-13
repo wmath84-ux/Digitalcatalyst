@@ -120,6 +120,7 @@ const RESOURCE_TYPES = [
   "pdf",
   "gdoc",
   "gsheet",
+  "gslides",
   "gform",
   "ebook",
   "github_pages",
