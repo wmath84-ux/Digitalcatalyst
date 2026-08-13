@@ -10,12 +10,16 @@ export const createAdminSession = (uid: string, email: string) => {
     createdAt: Date.now(),
     nonce: crypto.randomUUID(),
   };
-  sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
+  try {
+    sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
+  } catch {
+    try { localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session)); } catch { /* no-op */ }
+  }
 };
 
 export const readAdminSession = (): AdminSession | null => {
   try {
-    const raw = sessionStorage.getItem(ADMIN_SESSION_KEY);
+    const raw = sessionStorage.getItem(ADMIN_SESSION_KEY) || localStorage.getItem(ADMIN_SESSION_KEY);
     if (!raw) return null;
     const session = JSON.parse(raw) as Partial<AdminSession>;
     if (!session.uid || session.email !== APPROVED_ADMIN_EMAIL || !session.createdAt || !session.nonce) return null;

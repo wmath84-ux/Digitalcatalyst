@@ -349,30 +349,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginAdminWithGoogle = useCallback(async (): Promise<AuthResult> => {
     clearAdminSession();
     try {
-      await setPersistence(auth, browserSessionPersistence);
-      // Always prefer popup. Redirect + partitioned sessionStorage causes
-      // "missing initial state" and login never completes.
-      let credential;
-      try {
-        credential = await signInWithPopup(auth, googleProvider);
-      } catch (popupError) {
-        const popupCode = authErrorCode(popupError);
-        if (popupCode !== "auth/popup-blocked" && popupCode !== "auth/cancelled-popup-request") {
-          throw popupError;
-        }
-        if (!isMobileOrStandalone()) throw popupError;
-        await signInWithRedirect(auth, googleProvider);
-        return { success: true, message: "Google sign-in started." };
-      }
-      const profileSnapshot = await getDoc(doc(db, "users", credential.user.uid));
-      if (!profileSnapshot.exists() || profileSnapshot.data().role !== "admin" || normalizeEmail(credential.user.email) !== APPROVED_ADMIN_EMAIL) {
+      await setPersistence(auth, browserLocalPersistence);
+      // Admin Google login is popup-only. Redirect cannot finish the
+      // approved-email + role check on the same page, and partitioned
+      // sessionStorage caused "missing initial state".
+      const credential = await signInWithPopup(auth, googleProvider);
+      const signedInEmail = normalizeEmail(credential.user.email);
+      if (signedInEmail !== APPROVED_ADMIN_EMAIL) {
         await signOut(auth);
         setUser(null);
-        return { success: false, message: "This Google account is not the approved admin (wmath84@gmail.com) with role = admin." };
+        return { success: false, message: "This Google account is not the approved admin (wmath84@gmail.com)." };
       }
+
+      const profileRef = doc(db, "users", credential.user.uid);
+      await setDoc(profileRef, {
+        email: signedInEmail,
+        role: "admin",
+        status: "active",
+        authProvider: "google",
+        providerIds: getProviderIds(credential.user),
+        emailVerified: credential.user.emailVerified,
+        lastLoginAt: serverTimestamp(),
+        ...(credential.user.displayName ? { name: credential.user.displayName } : {}),
+        ...(credential.user.photoURL ? { photoURL: credential.user.photoURL } : {}),
+      }, { merge: true });
+
       const appUser = await readAppUser(credential.user);
-      setUser(appUser);
-      createAdminSession(appUser.id, appUser.email);
+      setUser({ ...appUser, role: "admin" });
+      createAdminSession(appUser.id, signedInEmail);
       return { success: true, message: "Admin login successful." };
     } catch (error) {
       clearAdminSession();

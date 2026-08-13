@@ -44,9 +44,7 @@ export default function AdminLoginApp() {
     try {
       const result = await loginAdminWithGoogle();
       if (!result.success) { setError(result.message); return; }
-      // Popup path finalizes the session immediately (and the auto-finalize
-      // effect above redirects); the redirect path resolves once the user
-      // returns and onAuthStateChanged restores them.
+      window.location.hash = "#/admin";
     } finally { setSubmitting(false); }
   };
 
