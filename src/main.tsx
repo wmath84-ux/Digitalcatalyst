@@ -175,13 +175,28 @@ const startCheckout = ({
   window.location.hash = CHECKOUT_HASH;
 };
 
+function AppLaunchSplash({ label = "Preparing your learning space…" }: { label?: string }) {
+  return (
+    <main className="app-boot-splash" role="status" aria-live="polite" aria-label="Loading Eduvora">
+      <div className="app-boot-content">
+        <img className="app-boot-icon" src="/icons/icon-192x192.svg" alt="Eduvora" />
+        <p className="app-boot-title">Eduvora</p>
+        <p className="app-boot-label">{label}</p>
+        <div className="app-boot-track" aria-hidden="true"><div className="app-boot-bar" /></div>
+      </div>
+    </main>
+  );
+}
+
 function Root() {
   const { user, loading, logout } = useAuth();
-  const { products: catalogProducts, purchasedIds } = useCatalog();
+  const { products: catalogProducts, purchasedIds, loading: catalogLoading } = useCatalog();
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const landingRouteRequested = !hash || hash.startsWith(LANDING_HASH);
+  const redirectingSignedInUser = Boolean(user && user.role !== "admin" && landingRouteRequested);
 
   const shoppingProducts: CartProduct[] = useMemo(() => catalogProducts.map((product) => ({
     id: product.id,
@@ -219,6 +234,12 @@ function Root() {
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
+
+  useEffect(() => {
+    if (loading || !user || user.role === "admin" || !landingRouteRequested) return;
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${HOME_HASH}`);
+    setHash(HOME_HASH);
+  }, [landingRouteRequested, loading, user]);
 
   useEffect(() => {
     if (!user) return undefined;
@@ -443,6 +464,10 @@ function Root() {
   const cartProducts = shoppingProducts.filter((product) => cartIds.has(product.id));
   const favoriteProducts = shoppingProducts.filter((product) => favoriteIds.has(product.id));
   const protectedRoutePending = requiresAuthentication(hash) && (loading || !user);
+
+  if (loading || redirectingSignedInUser || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH))) {
+    return <AppLaunchSplash label={redirectingSignedInUser ? "Opening your dashboard…" : "Preparing your learning space…"} />;
+  }
 
   if (protectedRoutePending) {
     return (
