@@ -27,7 +27,7 @@ type FeatureRow = {
 };
 
 const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }], accessTier: "basic", cta: "Subscribe", featured: false, active: false };
-const EMPTY_FEATURE: Partial<FeatureRow> = { key: "", name: "", description: "", individualPrice: "0", active: true };
+const EMPTY_FEATURE: Partial<FeatureRow> = { id: "my-day", key: "my-day", name: "My Day cloud saving", description: "Securely save and sync tasks, schedules, reminders and notes.", individualPrice: "149", active: true };
 
 export default function SubscriptionsPage() {
   const [tab, setTab] = useState("plans");
@@ -49,7 +49,7 @@ export default function SubscriptionsPage() {
         adminFetch<{ settings: { enabled?: boolean; discountPaise?: number; maxUsesPerReferrer?: number | null } }>("/api/admin/subscriptions/referrals"),
       ]);
       setPlans(p.plans);
-      setFeatures(f.features);
+      setFeatures(f.features.filter((feature) => feature.id === "my-day"));
       setReferralSettings({ enabled: r.settings.enabled !== false, discountPaise: Number(r.settings.discountPaise ?? 25000), maxUsesPerReferrer: r.settings.maxUsesPerReferrer ?? null });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load subscriptions.");
@@ -150,7 +150,7 @@ export default function SubscriptionsPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs text-slate-500">{features.length} feature(s)</p>
-            <PrimaryButton onClick={() => setEditingFeature(EMPTY_FEATURE)}>+ Add feature</PrimaryButton>
+            <PrimaryButton onClick={() => setEditingFeature(EMPTY_FEATURE)}>Configure My Day</PrimaryButton>
           </div>
           {features.length === 0 ? <EmptyState title="No features yet" /> : (
             <div className="space-y-2">
@@ -228,7 +228,7 @@ export default function SubscriptionsPage() {
       <Sheet open={!!editingFeature} onClose={() => setEditingFeature(null)} title={editingFeature?.id ? "Edit feature" : "Add feature"} footer={<PrimaryButton className="w-full" loading={saving} onClick={saveFeature}>Save feature</PrimaryButton>}>
         {editingFeature && (
           <div className="space-y-3">
-            <Field label="Feature key" required hint="e.g. mayday"><input className={inputClass} value={editingFeature.key ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, key: e.target.value })} /></Field>
+            <Field label="Feature key" required hint="Fixed system entitlement"><input className={inputClass} value="my-day" disabled /></Field>
             <Field label="Name" required><input className={inputClass} value={editingFeature.name ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, name: e.target.value })} /></Field>
             <Field label="Description"><textarea className={textareaClass} value={editingFeature.description ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, description: e.target.value })} /></Field>
             <Field label="Individual price (₹)"><input className={inputClass} type="number" value={editingFeature.individualPrice ?? "0"} onChange={(e) => setEditingFeature({ ...editingFeature, individualPrice: e.target.value })} /></Field>

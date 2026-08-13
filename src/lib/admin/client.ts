@@ -93,6 +93,39 @@ async function genericCollection(name: string, key: string, init?: RequestInit) 
   await setDoc(ref,{...body,id:recordId,updatedAt:serverTimestamp()},{merge:true}); return {[key.replace(/s$/,"")]:{...body,id:recordId}};
 }
 
+async function subscriptionPlansRequest(init?: RequestInit) {
+  const method = init?.method || "GET";
+  if (method === "GET") {
+    const snap = await getDocs(collection(db, "subscriptionPlans"));
+    return { plans: snap.docs.map((item) => {
+      const data = item.data() || {};
+      return { id: item.id, name: data.name || "Plan", description: data.description || "", billingCycles: [
+        { cycle: "monthly", label: "Monthly", price: money(data.monthlyPrice ?? data.priceMonthly ?? 0) },
+        { cycle: "yearly", label: "Yearly", price: money(data.yearlyPrice ?? data.priceYearly ?? 0) },
+      ], accessTier: data.accessTier || item.id, badge: data.badge || null, cta: data.cta || "Subscribe", featured: Boolean(data.featured), active: data.active !== false };
+    }) };
+  }
+  const body = bodyOf(init); const recordId = String(body.id || id()); const ref = doc(db, "subscriptionPlans", recordId);
+  if (body.delete) { await deleteDoc(ref); return { ok: true }; }
+  const cycles = Array.isArray(body.billingCycles) ? body.billingCycles : [];
+  const monthly = cycles.find((cycle: any) => cycle.cycle === "monthly")?.price ?? 0;
+  const yearly = cycles.find((cycle: any) => cycle.cycle === "yearly")?.price ?? 0;
+  await setDoc(ref, { id: recordId, name: body.name, description: body.description || "", monthlyPrice: Number(monthly), yearlyPrice: Number(yearly), allowedCycles: ["monthly", "yearly"], accessTier: body.accessTier || "basic", badge: body.badge || null, cta: body.cta || "Subscribe", featured: Boolean(body.featured), active: body.active !== false, includedFeatureIds: [], updatedAt: serverTimestamp() }, { merge: true });
+  return { plan: { ...body, id: recordId } };
+}
+
+async function subscriptionFeaturesRequest(init?: RequestInit) {
+  const method = init?.method || "GET";
+  if (method === "GET") {
+    const snap = await getDocs(collection(db, "subscriptionFeatures"));
+    return { features: snap.docs.map((item) => { const data = item.data() || {}; return { id: item.id, key: data.key || item.id, name: data.name || "Feature", description: data.description || "", individualPrice: String(money(data.price ?? data.individualPrice ?? 0)), active: data.active !== false }; }) };
+  }
+  const body = bodyOf(init); const recordId = String(body.id || body.key || id()); const ref = doc(db, "subscriptionFeatures", recordId);
+  if (body.delete) { await deleteDoc(ref); return { ok: true }; }
+  await setDoc(ref, { id: recordId, key: body.key || recordId, name: body.name, description: body.description || "", price: Number(body.individualPrice || 0), icon: recordId === "my-day" ? "calendar" : "sparkles", included: false, active: body.active !== false, updatedAt: serverTimestamp() }, { merge: true });
+  return { feature: { ...body, id: recordId } };
+}
+
 async function customersRequest(url: URL, init?: RequestInit) {
   const parts=url.pathname.split("/").filter(Boolean); const uid=parts[3];
   if(uid){const ref=doc(db,"users",uid); const snap=await getDoc(ref); if(!snap.exists())throw new ApiError("Customer not found",404); let data=snap.data();
@@ -118,8 +151,8 @@ export async function adminFetch<T=unknown>(input:string,init?:RequestInit):Prom
   else if(p.startsWith("/api/admin/products"))result=await productsRequest(url,init);
   else if(p.startsWith("/api/admin/customers"))result=await customersRequest(url,init);
   else if(p.startsWith("/api/admin/orders"))result=await ordersRequest(url);
-  else if(p==="/api/admin/subscriptions/plans")result=await genericCollection("subscriptionPlans","plans",init);
-  else if(p==="/api/admin/subscriptions/features")result=await genericCollection("subscriptionFeatures","features",init);
+  else if(p==="/api/admin/subscriptions/plans")result=await subscriptionPlansRequest(init);
+  else if(p==="/api/admin/subscriptions/features")result=await subscriptionFeaturesRequest(init);
   else if(p==="/api/admin/subscriptions/referrals")result=await settingsRequest("referralProgram","settings",init);
   else if(p==="/api/admin/coupons")result=await genericCollection("siteCoupons","coupons",init);
   else if(p==="/api/admin/reviews")result=await genericCollection("siteReviews","reviews",init);

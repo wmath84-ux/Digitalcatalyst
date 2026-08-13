@@ -534,11 +534,13 @@ function ModuleSelector({
     );
   }
   const allFlat = allModules.flatMap((m) => [m, ...(m.modules || [])]);
+  const selectedTotal = modules.filter((module) => selectedIds.has(module.id)).reduce((sum, module) => sum + (getModuleEffectivePrice(module) || 0), 0);
   return (
     <div className="space-y-2">
-      <p className="px-1 text-xs font-black uppercase tracking-wider text-slate-400">
-        Individually purchasable modules
-      </p>
+      <div className="flex items-center justify-between rounded-2xl bg-violet-50 px-3 py-2.5 ring-1 ring-violet-100">
+        <div><p className="text-xs font-black uppercase tracking-wider text-violet-700">Select individual modules</p><p className="text-[10px] text-violet-500">{modules.length} available · {selectedIds.size} selected</p></div>
+        <span className="text-sm font-black text-violet-900">{formatPrice(selectedTotal)}</span>
+      </div>
       {modules.map((m) => {
         const isSelected = selectedIds.has(m.id);
         const isExpanded = expandedIds.has(m.id);

@@ -177,6 +177,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
       if (moduleIds.has(m.id)) issues.push(`Duplicate module ID: ${m.id}`);
       moduleIds.add(m.id);
       if (m.individuallyPurchasable && (m.cashPrice == null || m.cashPrice < 0)) issues.push(`Module "${m.title}" needs a valid cash price.`);
+      if (m.salePrice != null && (m.cashPrice == null || m.salePrice < 0 || m.salePrice > m.cashPrice)) issues.push(`Module "${m.title}" sale price must be between ₹0 and its cash price.`);
     }
     for (const u of form.paidUpdates) {
       if (u.cashPrice < 0) issues.push(`Paid update "${u.title}" needs a valid price.`);
@@ -572,7 +573,7 @@ function ModulesEditor({
               </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Access level">
-                  <select className={selectClass} value={m.accessLevel} onChange={(e) => updateModule(m.id, { accessLevel: e.target.value as ProductModule["accessLevel"] })}>
+                  <select className={selectClass} value={m.accessLevel} onChange={(e) => { const accessLevel = e.target.value as ProductModule["accessLevel"]; updateModule(m.id, { accessLevel, individuallyPurchasable: accessLevel === "purchasable" ? true : m.individuallyPurchasable }); }}>
                     <option value="included">Included</option>
                     <option value="purchasable">Individually purchasable</option>
                     <option value="paid_update">Paid update</option>
