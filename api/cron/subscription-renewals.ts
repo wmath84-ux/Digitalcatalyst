@@ -146,7 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             read: false,
             source: "system",
             createdAt: Timestamp.fromMillis(item.dueAt),
-            target: { type: "myday" },
+            target: { type: "mayday" },
           }, { merge: true });
           pushed += await sendPush(db, uid, item.title, item.body, { tag: `myday-${item.kind}`, url: "/#/my-day" });
         }

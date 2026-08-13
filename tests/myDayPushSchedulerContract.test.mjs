@@ -100,6 +100,22 @@ test("cron endpoint schedules renewals, My Day pushes and content announcements"
   assert.match(cron, /diffProductInventory/);
   assert.match(cron, /New free product available/);
   assert.match(cron, /Your course has new content/);
+  // Bell routing contract: the page opens 'mayday' targets on #/my-day, so the
+  // server-written doc must use the exact same target type.
+  assert.match(cron, /target: \{ type: "mayday" \}/);
+  assert.match(cron, /category: "mayday"/);
+});
+
+test("dedupe keys survive Firestore dot-path restrictions", () => {
+  const data = {
+    reminders: [{ id: "my.reminder/[1]*~`", text: "x", time: "10:00", done: false }],
+    tasks: [],
+    schedule: [],
+  };
+  const due = collectDueMyDayItems(data, NOW, IST);
+  assert.equal(due.length, 1);
+  assert.doesNotMatch(due[0].key, /[.\\/[\]*~`]/, "key must be safe inside a dot-path update");
+  assert.match(due[0].key, /^reminder:[A-Za-z0-9_:-]+:\d{4}-\d{2}-\d{2}$/);
 });
 
 test("My Day saves the device timezone so server push fires at the right local time", () => {

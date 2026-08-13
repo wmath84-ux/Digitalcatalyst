@@ -31,7 +31,7 @@ export const localDateKey = (nowMs, tzOffsetMinutes) =>
 export const dueEpochMs = (dateKey, clock, tzOffsetMinutes) =>
   Date.parse(`${dateKey}T${pad2(clock.hours)}:${pad2(clock.minutes)}:00.000Z`) + tzOffsetMinutes * 60000;
 
-const sanitizeKeySegment = (value) => String(value || "").replace(/[.\\/[\]*]/g, "_").slice(0, 80);
+const sanitizeKeySegment = (value) => String(value || "").replace(/[.\\/[\]*~`]/g, "_").slice(0, 80);
 
 // Collect every My Day item whose user-set time is due: tasks with a time,
 // schedule events (at their start) and reminders — once per item per local day.
