@@ -82,10 +82,18 @@ export default function SubscriptionPage() {
       try {
         const next = await loadSubscriptionCatalog();
         if (cancelled) return;
-        setCatalog(next);
-        // Pre-select the first plan (canonical default).
         if (next.plans.length > 0) {
+          setCatalog(next);
+          // Pre-select the first plan (canonical default).
           setSelectedPlanId((current) => current || next.plans[0].id);
+        } else {
+          // Server is reachable but no active plans are configured
+          // yet. Use defaults so the page still opens with content.
+          setCatalog(FALLBACK_SUBSCRIPTION_CATALOG);
+          setUsingFallback(true);
+          setSelectedPlanId(
+            (current) => current || FALLBACK_SUBSCRIPTION_CATALOG.plans[0]?.id || null,
+          );
         }
       } catch (error) {
         if (cancelled) return;
@@ -316,8 +324,8 @@ export default function SubscriptionPage() {
           <div className="mx-5 mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-800">
             <span aria-hidden="true">⚠️</span>
             <span>
-              Showing default plans because the live catalog is temporarily
-              unavailable. Final pricing is always confirmed at checkout.
+              Showing default plans because the live catalog isn&apos;t available
+              yet. Final pricing is always confirmed at checkout.
             </span>
           </div>
         )}
