@@ -96,7 +96,7 @@ export default function LandingOverlays() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-white">Under Preparation</p>
                   <p className="mt-0.5 text-xs leading-relaxed text-slate-300">
-                    The desktop interface is currently under preparation. Install PWA app to use it. Please use the mobile app or install the PWA for the complete Eduvora experience.
+                    The desktop website is under preparation. Instead of using the website, install the PWA app and use it for the complete Eduvora experience.
                   </p>
                   <button
                     type="button"

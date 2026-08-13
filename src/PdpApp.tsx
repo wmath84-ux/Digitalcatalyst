@@ -369,7 +369,7 @@ function PremiumProductContent({
               <Meta icon={BadgeCheck} text={`${modules.length} modules`} />
             </div>
 
-            <div className="relative overflow-hidden rounded-3xl border border-zinc-200/80 bg-white/80 p-5 shadow-[0_10px_50px_-15px_rgba(0,0,0,0.15)] backdrop-blur-xl">
+            <div className="relative rounded-3xl border border-zinc-200/80 bg-white/80 p-5 shadow-[0_10px_50px_-15px_rgba(0,0,0,0.15)]">
               <div className="relative flex flex-wrap items-end gap-2">
                 <span className="text-4xl font-extrabold tracking-tight text-zinc-900">{isProductOwned ? "Owned" : formatPrice(product.price)}</span>
                 {!isProductOwned && product.originalPrice > product.price && <span className="mb-1 text-base text-zinc-400 line-through">{formatPrice(product.originalPrice)}</span>}
@@ -386,7 +386,7 @@ function PremiumProductContent({
               <div className="relative mt-3 flex justify-end">
                 <div className="relative">
                   <button type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-sm"><Share2 className="h-4 w-4" /></button>
-                  <div data-product-share className="absolute right-0 top-12 z-20 w-60 rounded-2xl border border-zinc-100 bg-white p-3 shadow-2xl" hidden={!shareOpen}>
+                  <div data-product-share className="absolute right-0 top-12 z-50 w-60 rounded-2xl border border-zinc-100 bg-white p-3 shadow-2xl" hidden={!shareOpen}>
                     <p className="pb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Share this product</p>
                     <div className="space-y-1.5">
                       <button type="button" onClick={() => void shareNative()} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><Share2 className="h-3.5 w-3.5" /> Share via device</button>

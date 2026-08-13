@@ -22,24 +22,31 @@ export default function LeaderboardApp() {
       setError("");
       try {
         const response = await fetch("/api/referral-leaderboard");
-        const data = await response.json().catch(() => ({})) as { ok?: boolean; subscribers?: Row[]; error?: string };
+        const data = await response.json().catch(() => ({})) as { ok?: boolean; subscribers?: Row[]; error?: string; code?: string };
         if (response.ok && data.ok) {
           if (!cancelled) setRows(Array.isArray(data.subscribers) ? data.subscribers : []);
           return;
         }
-        throw new Error(data.error || "Could not open leaderboard.");
-      } catch {
+        // Surface the real server reason instead of a generic message so a
+        // misconfigured deployment (missing Firebase Admin service account) is
+        // diagnosable from the page itself.
+        const reason = data.code === "firebase_admin_not_configured"
+          ? "Leaderboard service is not configured. Add the Firebase service account on the server, then try again."
+          : data.error || "Could not open leaderboard.";
+        throw new Error(reason);
+      } catch (error) {
         try {
           const cached = await getDoc(doc(db, "publicLeaderboard", "referrals"));
           const subscribers = cached.exists() ? (cached.data()?.subscribers || []) : [];
-          if (Array.isArray(subscribers) && subscribers.length >= 0 && cached.exists()) {
+          if (cached.exists() && Array.isArray(subscribers) && subscribers.length > 0) {
             if (!cancelled) setRows(subscribers as Row[]);
             return;
           }
         } catch {
           // Both the live API and the public cache are unavailable.
         }
-        if (!cancelled) setError("Could not open leaderboard. Please try again shortly.");
+        const message = error instanceof Error && error.message ? error.message : "Could not open leaderboard. Please try again shortly.";
+        if (!cancelled) setError(message);
       } finally {
         if (!cancelled) setLoading(false);
       }

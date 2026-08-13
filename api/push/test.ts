@@ -48,8 +48,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       title: "Eduvora test notification",
       body: "Web notifications are working correctly on this device.",
       tag: `push-test-${Date.now()}`,
-      icon: "/icons/icon-192x192.svg",
-      badge: "/icons/icon-192x192.svg",
+      icon: "/icons/icon-192x192.png",
+      badge: "/icons/badge-96x96.png",
       url: "/#/notifications",
     });
     const results: Array<{ id: string; sent: boolean; statusCode?: number; error?: string }> = [];

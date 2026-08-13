@@ -19,6 +19,6 @@ test("Open App on desktop shows the under-preparation PWA notice", () => {
   assert.match(landing, /isDesktopBrowserLocked/);
   assert.match(landing, /showDesktopMaintenanceNotice/);
   assert.match(overlays, /Under Preparation/);
-  assert.match(overlays, /Install PWA app to use it/);
+  assert.match(overlays, /Instead of using the website, install the PWA app and use it/);
   assert.match(overlays, /Install PWA/);
 });
