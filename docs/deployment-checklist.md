@@ -61,6 +61,11 @@ lekin **My Day reminders time-sensitive hain**, isliye ek external 1-minute ping
    - Header: `Authorization: Bearer <CRON_SECRET ki value>`
 3. Test: pinger ka first run `200 {"ok":true,...}` lautana chahiye.
 
+**Instant push (pinger ka wait nahi):** ye events turant push bhejte hain — ghadi/cron par nirbhar nahi:
+- Admin panel mein **product create** → sab subscribed devices ko turant push
+- Admin panel mein **product update** jisme naye module/lesson add hue → us product ke buyers ko turant push
+- **Payment/claim success** (free ya paid) → buyer ko "Product unlocked" turant push + bell entry
+
 **Zaroori shartein:**
 - Web push ke liye `WEB_PUSH_VAPID_PUBLIC_KEY` / `WEB_PUSH_VAPID_PRIVATE_KEY` set hone chahiye.
 - User ko app mein notifications **allow** karne honge (login par app khud subscribe karta hai).
