@@ -6,11 +6,10 @@ const client = fs.readFileSync("utils/webPush.ts", "utf8");
 const endpoint = fs.readFileSync("api/push/test.ts", "utf8");
 const page = fs.readFileSync("src/components/NotificationsPage.tsx", "utf8");
 
-test("Notifications page exposes a visible live test control", () => {
-  assert.match(page, /data-web-push-self-test/);
-  assert.match(page, /Send test notification/);
-  assert.match(page, /sendWebPushSelfTest/);
-  assert.match(page, /Test failed ·/);
+test("Notifications page no longer exposes the live test control", () => {
+  assert.doesNotMatch(page, /data-web-push-self-test/);
+  assert.doesNotMatch(page, /Send test notification/);
+  assert.doesNotMatch(page, /sendWebPushSelfTest/);
 });
 
 test("client diagnoses every browser-side push prerequisite", () => {

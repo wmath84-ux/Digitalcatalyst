@@ -32,7 +32,7 @@ import { buildCheckoutSessionRecord, writeToSessionStorage as writeCheckoutToSto
 import type { CheckoutSelection } from "./types/commerce";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
 import type { PaidCourseUpdate } from "./types/course";
-import { isDesktopBrowserLocked, isInstalledMobilePwa, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
+import { isDesktopBrowserLocked, isInstalledMobilePwa, isMobileBrowserWithoutPwa, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
 import { disablePageZoom } from "./utils/disablePageZoom";
 import { ensureSavedWebPushSubscription } from "../utils/webPush";
 
@@ -202,12 +202,13 @@ function Root() {
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
   const [desktopLocked, setDesktopLocked] = useState(() => isDesktopBrowserLocked());
+  const [mobileBrowserLocked, setMobileBrowserLocked] = useState(() => isMobileBrowserWithoutPwa());
   const [installedMobilePwa, setInstalledMobilePwa] = useState(() => isInstalledMobilePwa());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const landingRouteRequested = !hash || hash.startsWith(LANDING_HASH);
-  // Mobile + installed PWA: never show landing, even if the user is logged out.
-  // Login status is intentionally ignored — install state is the only mobile rule.
-  const skipLandingForInstalledMobilePwa = Boolean(installedMobilePwa && landingRouteRequested && !desktopLocked);
+  // Mobile install state is the only landing rule. Login is ignored.
+  // Installed PWA → never landing. Mobile browser without PWA → always landing.
+  const skipLandingForInstalledMobilePwa = Boolean(installedMobilePwa && landingRouteRequested && !desktopLocked && !mobileBrowserLocked);
 
   const shoppingProducts: CartProduct[] = useMemo(() => catalogProducts.map((product) => ({
     id: product.id,
@@ -243,6 +244,7 @@ function Root() {
   useEffect(() => {
     const syncInstallState = () => {
       setDesktopLocked(isDesktopBrowserLocked());
+      setMobileBrowserLocked(isMobileBrowserWithoutPwa());
       setInstalledMobilePwa(isInstalledMobilePwa());
     };
     const handleHashChange = () => setHash(window.location.hash);
@@ -260,13 +262,13 @@ function Root() {
   }, []);
 
   useEffect(() => {
-    if (!desktopLocked) return;
+    if (!desktopLocked && !mobileBrowserLocked) return;
     if (hash.startsWith(ADMIN_HASH) || hash.startsWith(ADMIN_LOGIN_HASH)) return;
     if (!hash || hash.startsWith(LANDING_HASH)) return;
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${LANDING_HASH}`);
     setHash(LANDING_HASH);
-    showDesktopMaintenanceNotice();
-  }, [desktopLocked, hash]);
+    if (desktopLocked) showDesktopMaintenanceNotice();
+  }, [desktopLocked, hash, mobileBrowserLocked]);
 
   useEffect(() => {
     if (!skipLandingForInstalledMobilePwa) return;
@@ -503,7 +505,7 @@ function Root() {
   const favoriteProducts = shoppingProducts.filter((product) => favoriteIds.has(product.id));
   const protectedRoutePending = requiresAuthentication(hash) && (loading || !user);
 
-  if (desktopLocked && !hash.startsWith(ADMIN_HASH) && !hash.startsWith(ADMIN_LOGIN_HASH)) {
+  if ((desktopLocked || mobileBrowserLocked) && !hash.startsWith(ADMIN_HASH) && !hash.startsWith(ADMIN_LOGIN_HASH)) {
     return <LandingApp />;
   }
 
