@@ -37,6 +37,53 @@ const googleParts = (value: string) => {
   return null;
 };
 
+/**
+ * Google Form → an URL that always stays INSIDE our iframe.
+ *
+ * Two things have to be true, otherwise submitting the form escapes the
+ * Course Player and the learner lands on a bare Google page with no course
+ * header and no mark-complete footer:
+ *
+ *   1. `/viewform` (never `/edit`, never `/formResponse`) — an edit link is
+ *      not viewable by a learner and the response endpoint is a POST target.
+ *   2. `embedded=true` — this is what switches Google Forms into its embedded
+ *      renderer. Without it the page carries `<base target="_top">`, so the
+ *      Submit button asks the BROWSER to replace the whole app (or, in an
+ *      installed PWA, to open a chrome-less window). With it, the submit and
+ *      the "Your response has been recorded" confirmation both render in the
+ *      same frame, so our header and footer never disappear.
+ *
+ * Every existing query parameter is preserved (`usp=sf_link`, prefills, …).
+ */
+export const getGoogleFormEmbedUrl = (value: string) => {
+  const safe = safeUrl(value);
+  if (!safe) return "";
+  let url: URL;
+  try {
+    url = new URL(safe);
+  } catch {
+    return "";
+  }
+  // Short links (forms.gle/abc) can't be rewritten client-side — Google
+  // redirects them to the real /viewform, which already honours the flag we
+  // append here.
+  if (/(^|\.)forms\.gle$/i.test(url.hostname)) {
+    url.searchParams.set("embedded", "true");
+    return url.toString();
+  }
+  // /edit, /edit#responses, /formResponse, /closedform → the viewable form.
+  url.pathname = url.pathname
+    .replace(/\/(edit|formResponse|closedform|viewanalytics|viewscore)\/?$/i, "/viewform")
+    .replace(/\/+$/, "");
+  if (!/\/viewform$/i.test(url.pathname) && /\/forms\//i.test(url.pathname)) {
+    url.pathname = `${url.pathname}/viewform`;
+  }
+  url.searchParams.set("embedded", "true");
+  // A hash such as #responses belongs to the editor, not to the learner view.
+  url.hash = "";
+  return url.toString();
+};
+
 const whimsicalEmbedUrl = (value: string) => {
   const url = safeUrl(value);
   if (!url) return "";
@@ -44,7 +91,41 @@ const whimsicalEmbedUrl = (value: string) => {
   return match?.[1] ? `https://whimsical.com/embed/${match[1]}` : "";
 };
 
-export const getCourseEmbed = (file: CourseFile): { url: string; kind: "youtube" | "pdf" | "doc" | "sheet" | "slides" | "form" | "drive" | "mindmap" | "embed" | "direct" | "none" } => {
+/**
+ * Which rendering the remote host should serve.
+ *
+ *   · "desktop" — the host's full-width page (what a desktop browser gets).
+ *   · "mobile"  — the host's own phone rendering, where text REFLOWS to the
+ *                 frame width instead of being a shrunken desktop page.
+ *
+ * This matters because narrowing an iframe does nothing for Google Docs:
+ * `/preview` is a fixed-width paginated renderer, so a narrow frame just
+ * scales the same desktop page down and the text gets SMALLER, not bigger.
+ * The readable rendering is a different Google endpoint entirely.
+ */
+export type CourseEmbedViewport = "desktop" | "mobile";
+
+export interface CourseEmbedOptions {
+  viewport?: CourseEmbedViewport;
+}
+
+export type CourseEmbedKind = "youtube" | "pdf" | "doc" | "sheet" | "slides" | "form" | "drive" | "mindmap" | "embed" | "direct" | "none";
+
+/** Kinds whose layout the desktop/mobile switch can actually change. */
+export const VIEWPORT_AWARE_KINDS: CourseEmbedKind[] = ["doc", "sheet", "slides", "form", "drive", "pdf", "embed", "mindmap"];
+
+/**
+ * True when the host serves its OWN reflowing mobile rendering for this file,
+ * so the frame should stay full width and simply load that endpoint.
+ *
+ * For everything else (Slides, Drive/PDF, arbitrary embeds) there is no mobile
+ * endpoint, so the only lever left is to hand the host a narrow CSS viewport
+ * and scale the result back up — see `MOBILE_VIEWPORT_WIDTH` in the viewer.
+ */
+export const hasNativeMobileRendering = (kind: CourseEmbedKind) => kind === "doc" || kind === "sheet" || kind === "form";
+
+export const getCourseEmbed = (file: CourseFile, options: CourseEmbedOptions = {}): { url: string; kind: CourseEmbedKind } => {
+  const mobile = options.viewport === "mobile";
   const raw = getCourseFileUrl(file);
   if (file.type === "mindmap" || file.provider === "whimsical_mindmap" || /whimsical\.com/i.test(raw)) {
     const url = whimsicalEmbedUrl(raw);
@@ -55,14 +136,15 @@ export const getCourseEmbed = (file: CourseFile): { url: string; kind: "youtube"
     return id ? { url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?rel=0&modestbranding=1&playsinline=1&controls=1&fs=1`, kind: "youtube" } : { url: "", kind: "none" };
   }
   const google = googleParts(raw);
-  if (file.type === "google_form" || google?.kind === "forms") {
-    if (!raw) return { url: "", kind: "none" };
-    const viewUrl = raw.replace(/\/edit(?:\?.*)?$/i, "/viewform");
-    const separator = viewUrl.includes("?") ? "&" : "?";
-    return { url: viewUrl.includes("embedded=true") ? viewUrl : `${viewUrl}${separator}embedded=true`, kind: "form" };
+  if (file.type === "google_form" || google?.kind === "forms" || /(^|\/\/)forms\.gle\//i.test(raw)) {
+    const url = getGoogleFormEmbedUrl(raw);
+    return url ? { url, kind: "form" } : { url: "", kind: "none" };
   }
-  if (google?.kind === "document") return { url: `https://docs.google.com/document/d/${google.id}/preview`, kind: "doc" };
-  if (google?.kind === "spreadsheets") return { url: `https://docs.google.com/spreadsheets/d/${google.id}/preview?widget=true&headers=false`, kind: "sheet" };
+  // `/preview` is a fixed-width paginated renderer — on a phone it is a
+  // shrunken A4 page. `/mobilebasic` is Google's own reflowing mobile
+  // rendering of the SAME document: real phone-sized text, no zooming.
+  if (google?.kind === "document") return { url: `https://docs.google.com/document/d/${google.id}/${mobile ? "mobilebasic" : "preview"}`, kind: "doc" };
+  if (google?.kind === "spreadsheets") return { url: mobile ? `https://docs.google.com/spreadsheets/d/${google.id}/htmlview` : `https://docs.google.com/spreadsheets/d/${google.id}/preview?widget=true&headers=false`, kind: "sheet" };
   if (google?.kind === "presentation") return { url: `https://docs.google.com/presentation/d/${google.id}/embed?start=false&loop=false&delayms=3000`, kind: "slides" };
   if (google?.kind === "drive") return { url: `https://drive.google.com/file/d/${google.id}/preview`, kind: file.type === "pdf" ? "pdf" : "drive" };
   if (file.type === "pdf" && raw) return { url: raw, kind: "pdf" };
