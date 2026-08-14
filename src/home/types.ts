@@ -11,6 +11,7 @@ export interface Product {
   rating: number;
   ratingCount: number;
   image: string;
+  searchKeywords?: string[];
   trending?: boolean;
 }
 

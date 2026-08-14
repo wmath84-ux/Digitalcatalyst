@@ -14,6 +14,7 @@ export type Product = {
   classLevel: string;
   subject: string;
   tags: string[];
+  searchKeywords?: string[];
   rating: number;
   reviews: number;
   originalPrice: number;
@@ -23,6 +24,10 @@ export type Product = {
   features?: string[];
   description?: string;
   paymentLink?: string;
+  /** Drafts/archived products never enter CatalogContext; exposed for UI clarity. */
+  status?: "draft" | "published" | "archived";
+  /** Visible products may be informational/coming-soon without being purchasable. */
+  availableForSale?: boolean;
   /**
    * Legacy module tree used by the existing Course Player. New consumers
    * should read `canonicalModules` (the round-trip-safe Part 1 shape) and

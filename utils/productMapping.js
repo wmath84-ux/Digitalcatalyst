@@ -140,20 +140,33 @@ const VALID_URL_TYPES = new Set([
 ]);
 
 /**
- * Normalise a pasted resource link to a clean `https://` URL (or "" when it
- * can't be trusted). Links pasted without a scheme — `drive.google.com/file/…`,
- * `docs.google.com/document/…`, `www.example.com/x.pdf` — are treated as https,
- * because admins frequently copy links from a chat / SMS / mobile share sheet
- * where the scheme gets stripped. A bare id / word without a domain (e.g. a raw
- * Google file id) is still rejected here; YouTube bare ids are handled
- * separately by `extractYoutubeVideoId`.
+ * Admins commonly paste the complete iframe snippet copied from YouTube,
+ * Google Docs, Whimsical, etc. instead of pasting only its `src`. The old
+ * mapper rejected every string beginning with "<", so a resource remained in
+ * the editor blob but silently disappeared from `courseContent` and therefore
+ * from the learner player. Extract only an iframe's quoted `src` (never other
+ * HTML), decode the common HTML ampersand entity, and trim punctuation copied
+ * from a share sheet/chat message.
  */
+const unwrapCopiedResourceUrl = (value) => {
+  let text = String(value || "").trim();
+  if (!text) return "";
+  const iframeSource = text.match(/<iframe\b[^>]*?\bsrc\s*=\s*(["'])(.*?)\1/i)?.[2];
+  if (iframeSource) text = iframeSource;
+  // Do not accept arbitrary markup. Only a recognised iframe above may be
+  // unwrapped; SVG/script/HTML content remains invalid.
+  if (text.startsWith("<")) return "";
+  text = text.replace(/&amp;/gi, "&").trim();
+  // Mobile copy/paste often leaves the closing quote from `src="…"` behind.
+  text = text.replace(/^[`"']+|[`"']+$/g, "").trim();
+  return text;
+};
+
 const normalizeHttpsUrl = (value) => {
-  const text = String(value || "").trim();
+  const text = unwrapCopiedResourceUrl(value);
   if (!text) return "";
   if (text.startsWith("data:")) return "";
   if (text.startsWith("javascript:")) return "";
-  if (text.startsWith("<")) return "";
   if (text.startsWith("/")) return "";
   const candidate = /^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`;
   try {
@@ -196,7 +209,7 @@ const pickValidUrl = (...candidates) => {
  * layers never disagree on the id.
  */
 const extractYoutubeVideoId = (value) => {
-  const text = String(value || "").trim();
+  const text = unwrapCopiedResourceUrl(value);
   if (!text) return "";
   // A bare 11-char id is accepted directly.
   if (/^[a-zA-Z0-9_-]{11}$/.test(text)) return text;
@@ -220,6 +233,32 @@ const extractYoutubeVideoId = (value) => {
     return "";
   }
 };
+
+/**
+ * Public URL cleaner shared by the mapper and the Admin Resources UI.
+ * YouTube bare ids become a stable watch URL; iframe snippets and malformed
+ * trailing quotes become a clean HTTPS URL. An empty return value means the
+ * resource is not safe/playable and publishing must be blocked until fixed.
+ */
+export const normalizeResourceUrl = (value, resourceType = "") => {
+  const type = toCanonicalResourceType(resourceType);
+  if (type === "youtube") {
+    const videoId = extractYoutubeVideoId(value);
+    if (videoId) return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+  }
+  return normalizeHttpsUrl(value);
+};
+
+/** Publication status is the single source of truth for store visibility. */
+export const getProductPublicationStatus = (raw) => {
+  if (!isObject(raw)) return "draft";
+  const explicit = str(raw.status || (isObject(raw.adminProduct) ? raw.adminProduct.status : "")).trim().toLowerCase();
+  if (explicit === "published" || explicit === "draft" || explicit === "archived") return explicit;
+  // Legacy products predate `status`; retain their old isVisible behaviour.
+  return raw.isVisible === false ? "draft" : "published";
+};
+
+export const isProductPublished = (raw) => getProductPublicationStatus(raw) === "published";
 
 // ---------------------------------------------------------------------------
 // Editor → Canonical
@@ -435,8 +474,11 @@ export const editorModuleToFirestore = (raw, allFlat) => {
  */
 export const editorModulesToFirestoreTree = (flat) => {
   const list = arr(flat);
+  const moduleIds = new Set(list.map((module) => module && str(module.id)).filter(Boolean));
   const roots = list
-    .filter((m) => !m || !m.parentModuleId)
+    // A deleted/missing parent must not make its child vanish. Promote the
+    // orphan to a root module, matching the canonical-tree mapper.
+    .filter((m) => !m || !m.parentModuleId || !moduleIds.has(str(m.parentModuleId)))
     .sort((a, b) => num(a.sortOrder) - num(b.sortOrder))
     .map((m) => editorModuleToFirestore(m, list))
     .filter(Boolean);
@@ -557,12 +599,18 @@ const fromPlayerResourceType = (type) => {
 
 const flattenFirestoreModules = (tree) => {
   const out = [];
-  const visit = (m) => {
+  const visit = (m, inferredParentModuleId = null) => {
     if (!isObject(m)) return;
-    out.push(m);
-    arr(m.modules).forEach(visit);
+    // Older nested course trees did not repeat parentModuleId on children.
+    // Carry the tree relationship into the flat editor form instead of
+    // accidentally turning every child into a root module after the next save.
+    const explicitParent = m.parentModuleId === null || m.parentModuleId === undefined || m.parentModuleId === ""
+      ? inferredParentModuleId
+      : m.parentModuleId;
+    out.push({ ...m, __inferredParentModuleId: explicitParent });
+    arr(m.modules).forEach((child) => visit(child, str(m.id) || inferredParentModuleId));
   };
-  arr(tree).forEach(visit);
+  arr(tree).forEach((module) => visit(module, null));
   return out;
 };
 
@@ -601,7 +649,7 @@ export const firestoreModulesToEditorFlat = (tree) => {
       entitlementId: str(m.entitlementId, str(m.id)),
       badge: m.badge === null || m.badge === undefined || m.badge === "" ? null : str(m.badge),
       parentModuleId: m.parentModuleId === null || m.parentModuleId === undefined || m.parentModuleId === ""
-        ? null
+        ? (m.__inferredParentModuleId ? str(m.__inferredParentModuleId) : null)
         : str(m.parentModuleId),
       resources,
     };
@@ -714,7 +762,7 @@ export const firestoreTreeToCanonicalTree = (tree) => {
       entitlementId: str(m.entitlementId, str(m.id)),
       badge: m.badge === null || m.badge === undefined || m.badge === "" ? null : str(m.badge),
       parentModuleId: m.parentModuleId === null || m.parentModuleId === undefined || m.parentModuleId === ""
-        ? null
+        ? (m.__inferredParentModuleId ? str(m.__inferredParentModuleId) : null)
         : str(m.parentModuleId),
       resources,
       modules: modules.sort((a, b) => a.sortOrder - b.sortOrder),
@@ -778,7 +826,7 @@ export const canonicalResourceToLegacyFile = (r, paidUpdateIdByContentId) => {
     youtubeUrl: r.type === "youtube" ? str(r.url) : undefined,
     youtubeVideoId: r.type === "youtube" ? (r.youtubeVideoId || extractYoutubeVideoId(r.url)) || undefined : undefined,
     provider: str(r.provider),
-    accessLevel: r.accessLevel === "paid_update" ? "paidUpdate" : r.accessLevel === "hidden" ? "hidden" : "included",
+    accessLevel: r.visibility === "hidden" || r.accessLevel === "hidden" ? "hidden" : r.accessLevel === "paid_update" ? "paidUpdate" : "included",
     paidUpdateId: str(resolvedUpdateId || r.paidUpdateId || "") || undefined,
     paidUpdatePrice: r.cashPrice === null || r.cashPrice === undefined ? undefined : `₹${r.cashPrice}`,
     paidUpdateCoinPrice: numOrNull(r.coinPrice) || 0,
@@ -801,11 +849,11 @@ export const canonicalModuleToLegacy = (m, paidUpdateIdByContentId) => {
     title: str(m.title, "Untitled module"),
     files,
     modules,
-    accessLevel: m.accessLevel === "paid_update" ? "paidUpdate" : m.accessLevel === "hidden" ? "hidden" : "included",
-    paidUpdateId: m.accessLevel === "paid_update" ? str(resolvedUpdateId || m.entitlementId || m.id) : undefined,
-    paidUpdateTitle: m.accessLevel === "paid_update" ? str(m.title) : undefined,
-    paidUpdatePrice: m.accessLevel === "paid_update" && m.cashPrice !== null && m.cashPrice !== undefined ? `₹${m.cashPrice}` : undefined,
-    paidUpdateCoinPrice: m.accessLevel === "paid_update" ? numOrNull(m.coinPrice) || 0 : undefined,
+    accessLevel: m.visibility === "hidden" || m.active === false || m.accessLevel === "hidden" ? "hidden" : m.accessLevel === "paid_update" ? "paidUpdate" : "included",
+    paidUpdateId: m.visibility !== "hidden" && m.active !== false && m.accessLevel === "paid_update" ? str(resolvedUpdateId || m.entitlementId || m.id) : undefined,
+    paidUpdateTitle: m.visibility !== "hidden" && m.active !== false && m.accessLevel === "paid_update" ? str(m.title) : undefined,
+    paidUpdatePrice: m.visibility !== "hidden" && m.active !== false && m.accessLevel === "paid_update" && m.cashPrice !== null && m.cashPrice !== undefined ? `₹${m.cashPrice}` : undefined,
+    paidUpdateCoinPrice: m.visibility !== "hidden" && m.active !== false && m.accessLevel === "paid_update" ? numOrNull(m.coinPrice) || 0 : undefined,
   };
 };
 
@@ -822,7 +870,17 @@ export const canonicalTreeToLegacyTree = (tree, paidUpdateIdByContentId) => arr(
  */
 export const editorToFirestoreBody = (form) => {
   if (!isObject(form)) return null;
-  const flat = arr(form.modules);
+  const flat = arr(form.modules).map((module) => {
+    if (!isObject(module)) return module;
+    return {
+      ...module,
+      resources: arr(module.resources).map((resource) => {
+        if (!isObject(resource)) return resource;
+        const cleanUrl = normalizeResourceUrl(resource.url || resource.embedUrl || resource.youtubeUrl, resource.type);
+        return { ...resource, url: cleanUrl || str(resource.url).trim() };
+      }),
+    };
+  });
   const courseContent = editorModulesToFirestoreTree(flat);
   const paidUpdates = arr(form.paidUpdates)
     .map((u) => editorPaidUpdateToFirestore(u, flat))
@@ -834,9 +892,9 @@ export const editorToFirestoreBody = (form) => {
   return stripUndefinedDeep({
     courseContent,
     paidUpdates,
-    // The form blob is preserved as-is so older code paths that read
-    // `raw.adminProduct` continue to work.
-    adminProduct: form,
+    // Preserve unfinished resources for draft editing, but clean valid pasted
+    // iframe/share URLs so admin reload and player projection agree.
+    adminProduct: { ...form, modules: flat, paidUpdates },
   });
 };
 
@@ -847,72 +905,78 @@ export const editorToFirestoreBody = (form) => {
  */
 export const firestoreToEditorForm = (raw, documentId) => {
   if (!isObject(raw)) return null;
-  // If the doc has the adminProduct blob, prefer its modules/paidUpdates
-  // over the courseContent tree — the blob is the editor's own submission
-  // and round-trips losslessly.
-  let modules = [];
-  let paidUpdates = [];
-  if (raw.adminProduct && isObject(raw.adminProduct)) {
-    modules = arr(raw.adminProduct.modules);
-    paidUpdates = arr(raw.adminProduct.paidUpdates);
-  }
-  if (!modules.length) modules = firestoreModulesToEditorFlat(raw.courseContent);
-  if (!paidUpdates.length) paidUpdates = arr(raw.paidUpdates).map(firestorePaidUpdateToEditor).filter(Boolean);
+  const editor = isObject(raw.adminProduct) ? raw.adminProduct : {};
 
-  // Images: editor stores the rich `images[]` array; Firestore doc stores
-  // a flat `images` string array + `productImages.card`. Reconstruct the
-  // rich array when the rich form is not present.
-  const richImages = (() => {
-    if (isObject(raw.adminProduct) && Array.isArray(raw.adminProduct.images)) return raw.adminProduct.images;
-    return arr(raw.images).map((url, index) => ({
-      id: `img-${index}`,
-      url: str(url),
-      provider: str(url).includes("cloudinary") ? "cloudinary" : "public",
-      sortOrder: index,
-      isPrimary: index === 0,
-    }));
-  })();
+  // Normalise the editor blob too (rather than returning it verbatim). This is
+  // what makes old `resources[]`, nested `files[]`, iframe snippets and legacy
+  // child modules editable in the current Resources tab.
+  let modules = arr(editor.modules).length
+    ? firestoreModulesToEditorFlat(editor.modules)
+    : firestoreModulesToEditorFlat(raw.courseContent);
+  let paidUpdates = arr(editor.paidUpdates).length
+    ? arr(editor.paidUpdates).map(firestorePaidUpdateToEditor).filter(Boolean)
+    : arr(raw.paidUpdates).map(firestorePaidUpdateToEditor).filter(Boolean);
 
-  const isVisible = raw.isVisible !== false;
-  const inStock = raw.inStock !== false;
-  const regularPrice = str(raw.price).replace(/[^0-9.]/g, "") || "0";
-  const salePrice = raw.salePrice ? str(raw.salePrice).replace(/[^0-9.]/g, "") || null : null;
+  const rawImages = Array.isArray(editor.images) && editor.images.length ? editor.images : raw.images;
+  const richImages = arr(rawImages).map((image, index) => {
+    const source = isObject(image) ? image : { url: image };
+    const url = str(source.url).trim();
+    return {
+      id: str(source.id, `img-${index}`),
+      url,
+      provider: str(source.provider, url.includes("cloudinary") ? "cloudinary" : "public"),
+      sortOrder: num(source.sortOrder ?? index),
+      isPrimary: source.isPrimary === true || (!arr(rawImages).some((item) => isObject(item) && item.isPrimary === true) && index === 0),
+    };
+  }).filter((image) => image.url);
+
+  const status = getProductPublicationStatus(raw);
+  // `status` is authoritative. This intentionally repairs documents produced
+  // by the old Create & publish button (`status=published`, visibility=hidden,
+  // isVisible=false), which is the exact reason new products never appeared.
+  const visibility = status === "published" ? "visible" : "hidden";
+  const regularPrice = str(editor.regularPrice ?? raw.price).replace(/[^0-9.]/g, "") || "0";
+  const rawSalePrice = editor.salePrice ?? raw.salePrice;
+  const salePrice = rawSalePrice === null || rawSalePrice === undefined || rawSalePrice === ""
+    ? null
+    : str(rawSalePrice).replace(/[^0-9.]/g, "") || null;
+  const instructorValue = isObject(raw.instructor) ? raw.instructor.name : raw.instructor;
 
   return {
     id: documentId,
-    title: str(raw.title),
-    shortDescription: str(raw.description),
-    longDescription: str(raw.longDescription),
-    instructor: str(raw.instructor, "Digital Catalyst"),
-    category: str(raw.category),
-    productType: isObject(raw.adminProduct) ? str(raw.adminProduct.productType, "course") : "course",
-    classLevel: isObject(raw.adminProduct) ? str(raw.adminProduct.classLevel) : str(raw.dimensions),
-    subject: str(raw.subject),
-    sku: str(raw.sku),
-    tags: arr(raw.tags).map(String),
-    searchKeywords: arr(raw.keywords).map(String),
-    features: arr(raw.features).map(String),
-    estimatedDuration: isObject(raw.adminProduct) ? str(raw.adminProduct.estimatedDuration) : str(raw.dimensions),
-    language: isObject(raw.adminProduct) ? str(raw.adminProduct.language, "English") : "English",
-    manualRating: isObject(raw.adminProduct) ? raw.adminProduct.manualRating ?? null : raw.manualRating ?? null,
-    visibility: isVisible ? "visible" : "hidden",
-    availableForSale: inStock,
+    title: str(editor.title || raw.title),
+    shortDescription: str(editor.shortDescription ?? raw.description),
+    longDescription: str(editor.longDescription ?? raw.longDescription),
+    instructor: str(editor.instructor ?? instructorValue, "Digital Catalyst"),
+    category: str(editor.category ?? raw.category),
+    productType: str(editor.productType ?? raw.productType, "course"),
+    classLevel: str(editor.classLevel ?? raw.classLevel ?? raw.dimensions),
+    subject: str(editor.subject ?? raw.subject),
+    sku: str(editor.sku ?? raw.sku),
+    tags: arr(editor.tags?.length ? editor.tags : raw.tags).map(String),
+    searchKeywords: arr(editor.searchKeywords?.length ? editor.searchKeywords : raw.keywords).map(String),
+    features: arr(editor.features?.length ? editor.features : raw.features).map(String),
+    estimatedDuration: str(editor.estimatedDuration ?? raw.dimensions),
+    language: str(editor.language ?? raw.language, "English"),
+    manualRating: editor.manualRating ?? raw.manualRating ?? null,
+    visibility,
+    availableForSale: editor.availableForSale === undefined ? raw.inStock !== false : Boolean(editor.availableForSale),
     images: richImages,
     regularPrice,
     salePrice,
-    coinPrice: num(raw.coinPrice),
-    coinPurchaseEnabled: isObject(raw.adminProduct)
-      ? Boolean(raw.adminProduct.coinPurchaseEnabled)
-      : Boolean(raw.coinPrice),
-    isFree: isObject(raw.adminProduct) ? Boolean(raw.adminProduct.isFree) : Boolean(raw.isFree),
-    eligibleCouponIds: isObject(raw.adminProduct) ? arr(raw.adminProduct.eligibleCouponIds).map(String) : [],
-    minPayableAmount: isObject(raw.adminProduct) ? str(raw.adminProduct.minPayableAmount, "0") : "0",
-    availabilityDate: isObject(raw.adminProduct) ? raw.adminProduct.availabilityDate ?? null : null,
-    saleStart: isObject(raw.adminProduct) ? raw.adminProduct.saleStart ?? null : null,
-    saleEnd: isObject(raw.adminProduct) ? raw.adminProduct.saleEnd ?? null : null,
+    coinPrice: num(editor.coinPrice ?? raw.coinPrice),
+    coinPurchaseEnabled: editor.coinPurchaseEnabled === undefined
+      ? Boolean(raw.coinPrice)
+      : Boolean(editor.coinPurchaseEnabled),
+    isFree: editor.isFree === undefined ? Boolean(raw.isFree) : Boolean(editor.isFree),
+    eligibleCouponIds: arr(editor.eligibleCouponIds).map(String),
+    minPayableAmount: str(editor.minPayableAmount, "0"),
+    availabilityDate: editor.availabilityDate ?? null,
+    saleStart: editor.saleStart ?? null,
+    saleEnd: editor.saleEnd ?? null,
     modules,
     paidUpdates,
-    status: isVisible ? "published" : "draft",
+    status,
   };
 };
 
@@ -935,12 +999,13 @@ export const firestoreToCatalogProduct = (raw, documentId) => {
   const regularPrice = numericPriceFromString(raw.price);
   void salePrice;
   void regularPrice;
-  let canonical = firestoreTreeToCanonicalTree(raw.courseContent);
-  // Older / partial docs keep the editor blob even when `courseContent`
-  // was not written. Fall back so the live PDP still lists modules.
-  if (!canonical.length && isObject(raw.adminProduct) && arr(raw.adminProduct.modules).length) {
-    canonical = editorModulesToCanonicalTree(raw.adminProduct.modules);
-  }
+  // The editor blob is the merchant's lossless source of truth. Prefer it when
+  // present, then sanitise it for the player. This also repairs already-saved
+  // products whose old mapper dropped iframe snippets from `courseContent`
+  // while keeping them in `adminProduct.modules`.
+  let canonical = isObject(raw.adminProduct) && arr(raw.adminProduct.modules).length
+    ? editorModulesToCanonicalTree(raw.adminProduct.modules)
+    : firestoreTreeToCanonicalTree(raw.courseContent);
   let paidUpdates = arr(raw.paidUpdates).map(firestorePaidUpdateToCanonical).filter(Boolean);
   if (!paidUpdates.length && isObject(raw.adminProduct)) {
     paidUpdates = arr(raw.adminProduct.paidUpdates).map((update) => firestorePaidUpdateToCanonical({
@@ -978,6 +1043,10 @@ const numericPriceFromString = (value) => {
 export const __testHelpers = {
   isValidHttpsUrl,
   pickValidUrl,
+  unwrapCopiedResourceUrl,
+  normalizeResourceUrl,
+  getProductPublicationStatus,
+  isProductPublished,
   toCanonicalResourceType,
   toPlayerResourceType,
   fromPlayerResourceType,

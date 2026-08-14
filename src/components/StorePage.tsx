@@ -39,7 +39,9 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
         !search.trim() ||
         p.title.toLowerCase().includes(search.toLowerCase()) ||
         p.subject.toLowerCase().includes(search.toLowerCase()) ||
-        p.instructor.toLowerCase().includes(search.toLowerCase());
+        p.instructor.toLowerCase().includes(search.toLowerCase()) ||
+        p.tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase())) ||
+        (p.searchKeywords || []).some((keyword) => keyword.toLowerCase().includes(search.toLowerCase()));
 
       const matchesChip =
         activeChip === "All" ||

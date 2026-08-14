@@ -224,6 +224,7 @@ function PremiumProductContent({
     : `${window.location.origin}${window.location.pathname}#/product/${encodeURIComponent(product.id)}`;
   const favorite = favoriteIds.has(product.id);
   const inCart = cartIds.has(product.id);
+  const unavailable = product.availableForSale === false && !isProductOwned;
 
   const handlePreview = (selection: CheckoutSelection, summary: ReturnType<typeof computeSummary>) => {
     const withCoupon = appliedCoupon?.code ? { ...selection, couponCode: appliedCoupon.code } : selection;
@@ -297,7 +298,7 @@ function PremiumProductContent({
 
   const primaryAction = () => {
     if (isProductOwned && onOpenCourse) onOpenCourse(product);
-    else onCheckout(product.price, appliedCoupon?.code || null);
+    else if (!unavailable) onCheckout(product.price, appliedCoupon?.code || null);
   };
 
   // Coupon handling — mirrors the subscription page. The code is validated
@@ -525,11 +526,11 @@ function PremiumProductContent({
                 {!isProductOwned && discount > 0 && <span className="mb-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">-{discount}%</span>}
               </div>
               <div className="relative mt-5 flex gap-3">
-                <button onClick={primaryAction} className="group flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-zinc-700 via-zinc-900 to-black px-4 py-3.5 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] active:scale-[0.98]">
-                  <Zap className="h-4 w-4 fill-white" /> {isProductOwned ? "Open Now" : "Buy Now"}
+                <button disabled={unavailable} onClick={primaryAction} className="group flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-zinc-700 via-zinc-900 to-black px-4 py-3.5 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] disabled:cursor-not-allowed disabled:from-amber-200 disabled:via-amber-200 disabled:to-amber-300 disabled:text-amber-900 disabled:shadow-none active:scale-[0.98]">
+                  <Zap className="h-4 w-4 fill-current" /> {isProductOwned ? "Open Now" : unavailable ? "Coming soon" : "Buy Now"}
                 </button>
-                <button disabled={isProductOwned || inCart} onClick={() => onAddToCart?.(product.id)} className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-zinc-300 bg-gradient-to-b from-white via-zinc-50 to-zinc-200 px-3 py-3.5 text-sm font-bold text-zinc-900 shadow-sm disabled:opacity-60">
-                  <ShoppingCart className="h-4 w-4" /> {isProductOwned ? "Purchased" : inCart ? "In Cart" : "Add to Cart"}
+                <button disabled={isProductOwned || inCart || unavailable} onClick={() => !unavailable && onAddToCart?.(product.id)} className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-zinc-300 bg-gradient-to-b from-white via-zinc-50 to-zinc-200 px-3 py-3.5 text-sm font-bold text-zinc-900 shadow-sm disabled:opacity-60">
+                  <ShoppingCart className="h-4 w-4" /> {isProductOwned ? "Purchased" : unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to Cart"}
                 </button>
               </div>
               <div className="relative mt-3 flex justify-end">
@@ -548,7 +549,13 @@ function PremiumProductContent({
               </div>
             </div>
 
-            {!isProductOwned && !product.isFree && (
+            {unavailable && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                This product is published for preview, but checkout is not enabled yet.
+              </div>
+            )}
+
+            {!isProductOwned && !unavailable && !product.isFree && (
               <div className="rounded-2xl border border-zinc-100 bg-white p-4">
                 <PromoCodeInput
                   kind="coupon"
@@ -586,7 +593,7 @@ function PremiumProductContent({
             </section>
           )}
 
-          {!isProductOwned && (
+          {!isProductOwned && !unavailable && (
             <section id="pdp-purchase-options" className="scroll-mt-32">
               <div className="mb-3 px-1"><h2 className="text-lg font-bold text-zinc-900">Select course modules</h2><p className="text-xs text-zinc-500">Same as subscription extras: tick the modules you need, see the price beside each one, then checkout.</p></div>
               <PdpPurchaseBuilder
@@ -770,18 +777,20 @@ function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice
 const asCurriculumModule = (raw: unknown): CurriculumModule | null => {
   if (!raw || typeof raw !== "object") return null;
   const module = raw as Record<string, unknown>;
+  if (module.visibility === "hidden" || module.active === false || module.accessLevel === "hidden") return null;
   const id = String(module.id || module.title || "");
   const title = String(module.title || "Untitled module");
   if (!id && !title) return null;
   const resourceSource = Array.isArray(module.resources) ? module.resources : Array.isArray(module.files) ? module.files : [];
   const resources = resourceSource.map((item, index) => {
     const resource = (item || {}) as Record<string, unknown>;
+    if (resource.visibility === "hidden" || resource.accessLevel === "hidden") return null;
     return {
       id: String(resource.id || `${id}-r-${index}`),
       name: String(resource.name || resource.title || "Resource"),
       type: String(resource.type || "file"),
     };
-  });
+  }).filter((resource): resource is { id: string; name: string; type: string } => resource !== null);
   const modules = (Array.isArray(module.modules) ? module.modules : []).map(asCurriculumModule).filter((item): item is CurriculumModule => Boolean(item));
   return { id: id || title, title, resources, modules };
 };

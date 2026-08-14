@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { collection, onSnapshot, query, where, type DocumentData } from "firebase/firestore";
 import { db } from "../../firebase";
 import type { Product } from "../data/products";
-import { firestoreToCatalogProduct } from "../../utils/productMapping";
+import { firestoreToCatalogProduct, getProductPublicationStatus, isProductPublished } from "../../utils/productMapping";
 import { fullDemoCourseContent } from "../data/demoCourseContent";
 
 import { useAuth } from "./AuthContext";
@@ -45,6 +45,10 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
   const image = configuredImages[0] || "/images/hero-main.jpg";
   const rating = Number(data.manualRating ?? data.rating ?? data.calculatedRating ?? 0);
   const tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
+  const searchKeywords = [
+    ...(Array.isArray(data.keywords) ? data.keywords : []),
+    ...(Array.isArray(data.adminProduct?.searchKeywords) ? data.adminProduct.searchKeywords : []),
+  ].map(String).filter((value, index, list) => Boolean(value.trim()) && list.indexOf(value) === index);
   const features = Array.isArray(data.features)
     ? data.features.map((value) => String(value).trim()).filter(Boolean)
     : [];
@@ -69,6 +73,7 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     classLevel: String(data.dimensions || data.level || "Lifetime access"),
     subject: String(data.subject || data.category || "Digital learning"),
     tags: tags.map((tag) => tag.toUpperCase()),
+    searchKeywords,
     rating: Number.isFinite(rating) ? rating : 0,
     reviews: Number(data.reviewCount ?? data.ratingCount ?? 0) || 0,
     originalPrice: isFree ? 0 : Math.max(regularPrice, salePrice),
@@ -77,6 +82,11 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     isFree,
     description: String(data.description || ""),
     paymentLink: String(data.paymentLink || ""),
+    status: getProductPublicationStatus(data),
+    // A repaired status/isVisible mismatch may be shown immediately, but keep
+    // checkout disabled until the admin re-saves it (the quote server still
+    // correctly rejects legacy isVisible=false documents).
+    availableForSale: data.isVisible !== false && data.inStock !== false && data.availableForSale !== false,
     courseContent: (catalogProjection.courseContent as Product["courseContent"])?.length
       ? catalogProjection.courseContent as Product["courseContent"]
       : fullDemoCourseContent,
@@ -101,7 +111,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onSnapshot(collection(db, "siteProducts"), (snapshot) => {
       const next = snapshot.docs
         .map((item) => ({ data: item.data(), id: item.id }))
-        .filter((item) => item.data.isVisible !== false)
+        // `status` is authoritative. This repairs old documents created as
+        // status=published + isVisible=false by the broken publish button,
+        // while legacy documents without status still use isVisible.
+        .filter((item) => isProductPublished(item.data))
         .map((item) => mapProduct(item.id, item.data))
         .sort((a, b) => a.title.localeCompare(b.title));
       setBaseProducts(next);
