@@ -24,9 +24,20 @@ test("Course Player theme is scoped and supplies both palette variants", () => {
   }
 });
 
-test("YouTube gets the full viewer height so its settings menu is visible and dismissible", () => {
-  assert.match(resourceViewer, /data-course-youtube-stage=\{embed\.kind === "youtube" \? "expanded"/);
-  assert.match(resourceViewer, /className="h-full min-h-0 w-full bg-black"/);
+test("mobile landscape keeps the left header and right navigation rails", () => {
+  assert.match(coursePlayer, /const useLandscapeRails = isLandscape \|\| immersive/);
+  assert.match(coursePlayer, /orientation=\{useLandscapeRails \? "landscape" : "portrait"\}/);
+  assert.match(coursePlayer, /data-course-mobile-landscape="rails"/);
+  assert.match(coursePlayer, /\{landscapeLayout\(true\)\}/);
+  assert.match(coursePlayer, /data-course-mobile-landscape-header/);
+  assert.match(coursePlayer, /data-course-exit-immersive/);
+});
+
+test("YouTube stays strictly contained in the mobile landscape viewport", () => {
+  assert.match(resourceViewer, /data-course-youtube-stage=\{embed\.kind === "youtube" \? "contained"/);
+  assert.match(resourceViewer, /course-youtube-stage relative h-full min-h-0 w-full min-w-0 overflow-hidden bg-black/);
+  assert.match(resourceViewer, /kind === "youtube" \? "absolute inset-0 bg-black"/);
+  assert.match(styles, /\.course-youtube-stage\s*\{[\s\S]*?contain: size layout paint/);
   assert.doesNotMatch(resourceViewer, /aspect-video max-h-full/);
   assert.match(resourceViewer, /settings \/ quality menus get enough vertical room/);
   assert.match(courseEmbed, /playsinline=1&controls=1&fs=1/);

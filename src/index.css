@@ -357,6 +357,13 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   background-image: radial-gradient(circle at 50% 25%, rgb(124 58 237 / 0.13), transparent 48%);
 }
 
+/* Strict containment prevents a mobile YouTube iframe's intrinsic size from
+   extending below the short landscape viewport or under either side rail. */
+.course-youtube-stage {
+  contain: size layout paint;
+  isolation: isolate;
+}
+
 .course-image-surface {
   background-image: radial-gradient(circle at center, #1e293b, #020617);
 }

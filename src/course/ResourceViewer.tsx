@@ -78,7 +78,7 @@ export default function ResourceViewer({ file }: ResourceViewerProps) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind}>
       <ViewerHeader file={file} embed={embed} download={download} />
-      <div className={`min-h-0 flex-1 overflow-hidden ${isCinematic ? "grid place-items-center bg-black p-0" : "bg-[var(--course-bg)]"}`}>
+      <div className={`relative min-h-0 flex-1 overflow-hidden ${isCinematic ? "bg-black p-0" : "bg-[var(--course-bg)]"}`}>
         {isImage ? (
           <ImageViewer url={embed.url} name={file.name} />
         ) : isVideo ? (
@@ -98,7 +98,7 @@ export default function ResourceViewer({ file }: ResourceViewerProps) {
         ) : !embed.url ? (
           <MissingEmbedState file={file} download={download} />
         ) : isCinematic ? (
-          <div className="h-full min-h-0 w-full bg-black" data-course-youtube-stage={embed.kind === "youtube" ? "expanded" : undefined}>
+          <div className="course-youtube-stage relative h-full min-h-0 w-full min-w-0 overflow-hidden bg-black" data-course-youtube-stage={embed.kind === "youtube" ? "contained" : undefined}>
             <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} />
           </div>
         ) : (
@@ -223,7 +223,7 @@ function EmbedFrame({ url, title, kind, supported }: EmbedFrameProps) {
   }, [url, reloadKey]);
 
   return (
-    <div className="relative h-full w-full" data-course-viewer-embed data-embed-kind={kind}>
+    <div className="relative h-full min-h-0 w-full min-w-0 overflow-hidden" data-course-viewer-embed data-embed-kind={kind}>
       {loading ? (
         <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-[var(--course-loading)] text-[var(--course-text)]">
           <div className="flex flex-col items-center gap-2">
@@ -270,7 +270,7 @@ function EmbedFrame({ url, title, kind, supported }: EmbedFrameProps) {
         key={reloadKey}
         src={url}
         title={title}
-        className="h-full w-full border-0 bg-white"
+        className={`block h-full max-h-full min-h-0 w-full max-w-full min-w-0 border-0 ${kind === "youtube" ? "absolute inset-0 bg-black" : "bg-white"}`}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-read; clipboard-write"
         sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin allow-presentation"
         allowFullScreen

@@ -191,7 +191,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       {/* ── Dock: always the top-most interactive layer ───────────────── */}
       <div
         className={`relative z-50 shrink-0 border-[var(--course-border)] bg-[var(--course-surface-translucent)] backdrop-blur ${landscape ? "flex w-16 flex-col border-l" : "h-16 border-t"}`}
-        style={landscape ? undefined : { paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        style={landscape
+          ? { paddingRight: "env(safe-area-inset-right, 0px)" }
+          : { paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         data-course-dock
         data-orientation={orientation}
       >

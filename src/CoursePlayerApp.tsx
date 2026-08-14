@@ -147,15 +147,23 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   const moduleTitleById = useMemo(() => collectModuleTitleById(modules), [modules]);
 
   // Detect orientation for the landscape layout (header left, toggles right,
-  // content filling the space between the two rails).
+  // content filling the space between the two rails). Comparing the live
+  // viewport as well as matchMedia covers mobile/PWA browsers whose media
+  // query can lag behind the visual viewport during rotation.
   useEffect(() => {
     const media = window.matchMedia("(orientation: landscape)");
-    const update = () => setIsLandscape(media.matches);
+    const update = () => setIsLandscape(media.matches || window.innerWidth > window.innerHeight);
     update();
     media.addEventListener?.("change", update);
+    window.screen.orientation?.addEventListener?.("change", update);
+    window.visualViewport?.addEventListener?.("resize", update);
+    window.addEventListener("orientationchange", update);
     window.addEventListener("resize", update);
     return () => {
       media.removeEventListener?.("change", update);
+      window.screen.orientation?.removeEventListener?.("change", update);
+      window.visualViewport?.removeEventListener?.("resize", update);
+      window.removeEventListener("orientationchange", update);
       window.removeEventListener("resize", update);
     };
   }, []);
@@ -296,6 +304,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
   const progress = totalEligibleFiles.length ? Math.round((completedIds.size / totalEligibleFiles.length) * 100) : 0;
   const isDone = Boolean(selectedFile && completedIds.has(selectedFile.id));
+  // A portrait-locked phone can enter the rotated landscape interface. It
+  // must use the same left header + right dock as a physically rotated phone.
+  const useLandscapeRails = isLandscape || immersive;
   const nextTheme = theme === "dark" ? "light" : "dark";
 
   const themeToggle = (
@@ -320,7 +331,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
         <p className="text-[10px] text-[var(--course-muted)]">Progress is saved to your account</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {!isLandscape ? (
+        {!useLandscapeRails ? (
           <button
             type="button"
             onClick={() => setImmersive(true)}
@@ -348,7 +359,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
   const overlay = (
     <CourseOverlay
-      orientation={isLandscape ? "landscape" : "portrait"}
+      orientation={useLandscapeRails ? "landscape" : "portrait"}
       tab={dockTab}
       onTabChange={handleDockTabChange}
       open={dockOpen}
@@ -371,27 +382,73 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     />
   );
 
-  // ── Immersive: quarter-turn fullscreen for a portrait-locked device ──
-  // The viewer is laid out at (100dvh × 100dvw) then turned a quarter
-  // turn so the content fills the long edge of the screen.
+  // Both physical landscape and the quarter-turned mobile view share this
+  // layout. This keeps the header rail on the left and the four-tab footer
+  // navigation on the right instead of dropping all navigation in fullscreen.
+  const landscapeLayout = (mobileRotated: boolean) => (
+    <>
+      <header
+        className={`sticky left-0 top-0 z-50 flex h-full w-14 shrink-0 flex-col items-center border-r border-[var(--course-border)] bg-[var(--course-surface)] py-2 ${mobileRotated ? "gap-2" : "gap-3"}`}
+        style={{ paddingLeft: mobileRotated ? "0px" : "env(safe-area-inset-left, 0px)" }}
+        data-course-landscape-header
+        data-course-mobile-landscape-header={mobileRotated ? "true" : undefined}
+      >
+        <button onClick={onBack} className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]" aria-label="Back" data-course-back><ArrowLeft size={18} /></button>
+        {!mobileRotated ? themeToggle : null}
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          <span className="line-clamp-1 max-h-full text-xs font-black [writing-mode:vertical-rl] rotate-180" data-course-product-title>{product.title}</span>
+        </div>
+        {!mobileRotated && hasActiveSubscription ? (
+          <span data-course-subscription-badge="active" className="shrink-0 rounded-full bg-violet-500/20 px-1.5 py-2 text-[8px] font-black uppercase tracking-wider text-violet-200 ring-1 ring-violet-400/30 [writing-mode:vertical-rl] rotate-180">Active subscription</span>
+        ) : null}
+        {!mobileRotated && resolution.previewModuleIds.size > 0 ? (
+          <span data-course-preview-badge className="shrink-0 rounded-full bg-sky-500/15 px-1.5 py-2 text-[8px] font-black uppercase tracking-wider text-sky-200 ring-1 ring-sky-400/20 [writing-mode:vertical-rl] rotate-180">Preview mode</span>
+        ) : null}
+        <div className="flex shrink-0 flex-col items-center gap-1.5" data-course-progress-summary>
+          <div className={`relative w-1.5 overflow-hidden rounded-full bg-[var(--course-soft-hover)] ${mobileRotated ? "h-14" : "h-24"}`} data-course-progress-bar>
+            <div className="absolute bottom-0 w-full bg-gradient-to-t from-violet-500 to-cyan-400" style={{ height: `${progress}%` }} data-course-progress-fill data-progress-value={progress} />
+          </div>
+          <span className="text-[9px] font-bold text-[var(--course-muted)]" data-course-progress-label>{progress}%</span>
+        </div>
+        {mobileRotated ? (
+          <button
+            type="button"
+            onClick={() => setImmersive(false)}
+            className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+            aria-label="Exit landscape view"
+            title="Exit landscape view"
+            data-course-exit-immersive
+          >
+            <Minimize2 size={16} />
+          </button>
+        ) : null}
+      </header>
+
+      {/* Content is strictly bounded between both rails, preventing embedded
+          players from extending underneath the right-side navigation. */}
+      <section id="course-viewer" className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden" data-course-landscape-content>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden"><ResourceViewer file={selectedFile} /></div>
+          {markCompleteBar}
+        </div>
+        {overlay}
+      </section>
+    </>
+  );
+
+  // ── Immersive: quarter-turn the complete landscape UI on a portrait-locked
+  // phone. Both side rails rotate with the viewer and remain interactive.
   if (immersive && !isLandscape) {
     return (
-      <div className="course-player-shell fixed inset-0 z-[100] overflow-hidden bg-black" data-course-player data-course-theme={theme} data-orientation="immersive" style={{ colorScheme: theme }}>
+      <div className="fixed inset-0 z-[100] overflow-hidden bg-black" data-course-mobile-landscape-viewport>
         <div
-          className="absolute left-1/2 top-1/2 origin-center"
+          className="absolute left-1/2 top-1/2 origin-center overflow-hidden"
           style={{ width: "100dvh", height: "100dvw", transform: "translate(-50%, -50%) rotate(90deg)" }}
         >
-          <ResourceViewer file={selectedFile} />
+          <div className="course-player-shell flex h-full w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-course-mobile-landscape="rails" data-orientation="immersive" style={{ colorScheme: theme }}>
+            {landscapeLayout(true)}
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setImmersive(false)}
-          className="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-black/60 text-white ring-1 ring-white/20 backdrop-blur"
-          aria-label="Exit fullscreen"
-          data-course-exit-immersive
-        >
-          <Minimize2 size={16} />
-        </button>
       </div>
     );
   }
@@ -400,40 +457,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   if (isLandscape) {
     return (
       <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" style={{ colorScheme: theme }}>
-        {/* Left vertical header — pinned, never scrolls */}
-        <header
-          className="sticky left-0 top-0 z-50 flex h-full w-14 shrink-0 flex-col items-center gap-3 border-r border-[var(--course-border)] bg-[var(--course-surface)] py-3"
-          style={{ paddingLeft: "env(safe-area-inset-left, 0px)" }}
-          data-course-landscape-header
-        >
-          <button onClick={onBack} className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]" aria-label="Back" data-course-back><ArrowLeft size={18} /></button>
-          {themeToggle}
-          <div className="flex min-h-0 flex-1 items-center justify-center">
-            <span className="line-clamp-1 max-h-full text-xs font-black [writing-mode:vertical-rl] rotate-180" data-course-product-title>{product.title}</span>
-          </div>
-          {hasActiveSubscription ? (
-            <span data-course-subscription-badge="active" className="shrink-0 rounded-full bg-violet-500/20 px-1.5 py-2 text-[8px] font-black uppercase tracking-wider text-violet-200 ring-1 ring-violet-400/30 [writing-mode:vertical-rl] rotate-180">Active subscription</span>
-          ) : null}
-          {resolution.previewModuleIds.size > 0 ? (
-            <span data-course-preview-badge className="shrink-0 rounded-full bg-sky-500/15 px-1.5 py-2 text-[8px] font-black uppercase tracking-wider text-sky-200 ring-1 ring-sky-400/20 [writing-mode:vertical-rl] rotate-180">Preview mode</span>
-          ) : null}
-          <div className="flex shrink-0 flex-col items-center gap-2" data-course-progress-summary>
-            <div className="relative h-24 w-1.5 overflow-hidden rounded-full bg-[var(--course-soft-hover)]" data-course-progress-bar>
-              <div className="absolute bottom-0 w-full bg-gradient-to-t from-violet-500 to-cyan-400" style={{ height: `${progress}%` }} data-course-progress-fill data-progress-value={progress} />
-            </div>
-            <span className="text-[9px] font-bold text-[var(--course-muted)]" data-course-progress-label>{progress}%</span>
-          </div>
-        </header>
-
-        {/* Content: fills everything between the two rails. The toggle
-            rail is the last flex child so it pins to the right edge. */}
-        <section id="course-viewer" className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <div className="min-h-0 flex-1 overflow-hidden"><ResourceViewer file={selectedFile} /></div>
-            {markCompleteBar}
-          </div>
-          {overlay}
-        </section>
+        {landscapeLayout(false)}
       </div>
     );
   }
