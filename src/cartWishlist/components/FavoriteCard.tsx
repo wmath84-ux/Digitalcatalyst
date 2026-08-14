@@ -7,6 +7,7 @@ interface FavoriteCardProps {
   inCart: boolean;
   onRemove: (id: string) => void;
   onAddToCart: (id: string) => void;
+  onOpen?: (id: string) => void;
 }
 
 export default function FavoriteCard({
@@ -14,6 +15,7 @@ export default function FavoriteCard({
   inCart,
   onRemove,
   onAddToCart,
+  onOpen,
 }: FavoriteCardProps) {
   const discount = Math.round(
     ((product.originalPrice - product.price) / product.originalPrice) * 100
@@ -22,11 +24,18 @@ export default function FavoriteCard({
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200/70 ring-1 ring-slate-100">
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
-        <img
-          src={product.image}
-          alt={product.title}
-          className="h-full w-full object-cover"
-        />
+        <button
+          type="button"
+          onClick={() => onOpen?.(product.id)}
+          className="h-full w-full"
+          aria-label={`View ${product.title}`}
+        >
+          <img
+            src={product.image}
+            alt={product.title}
+            className="h-full w-full object-cover"
+          />
+        </button>
         <button
           onClick={() => onRemove(product.id)}
           className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/95 shadow-md backdrop-blur transition active:scale-90"
@@ -34,17 +43,19 @@ export default function FavoriteCard({
         >
           <Heart size={16} className="fill-rose-500 text-rose-500" />
         </button>
-        <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-semibold text-white backdrop-blur">
+        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-semibold text-white backdrop-blur">
           {product.hours} • {product.lessons} lessons
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-3">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500">
-          {product.category}
-        </span>
-        <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-slate-900">
-          {product.title}
-        </h3>
+        <button type="button" onClick={() => onOpen?.(product.id)} className="text-left">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500">
+            {product.category}
+          </span>
+          <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-slate-900">
+            {product.title}
+          </h3>
+        </button>
         <p className="text-[11px] text-slate-400">{product.author}</p>
         <div className="flex items-center gap-1 text-[11px] text-slate-500">
           <Star size={12} className="fill-amber-400 text-amber-400" />

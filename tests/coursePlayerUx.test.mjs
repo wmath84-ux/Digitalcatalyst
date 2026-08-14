@@ -157,42 +157,44 @@ test("ImageViewer shows a friendly error when the image fails to load", () => {
 // Notes panel — add / edit / delete + multi-device sync
 // ---------------------------------------------------------------------------
 
-test("NotesPanel supports add, edit, and delete", () => {
+test("NotesPanel supports add, edit, and delete via a single + button", () => {
+  assert.match(notesPanel, /data-course-notes-add/);
   assert.match(notesPanel, /data-course-notes-save/);
   assert.match(notesPanel, /data-course-note-edit/);
   assert.match(notesPanel, /data-course-note-edit-input/);
   assert.match(notesPanel, /data-course-note-edit-save/);
   assert.match(notesPanel, /data-course-note-edit-cancel/);
   assert.match(notesPanel, /data-course-note-delete/);
-  assert.match(notesPanel, /data-course-note-delete-confirm/);
-  assert.match(notesPanel, /data-course-note-delete-confirm-yes/);
 });
 
-test("NotesPanel renders the empty state and the notes list", () => {
+test("NotesPanel renders the empty state and a thin-strip notes list", () => {
   assert.match(notesPanel, /data-course-notes-list/);
   assert.match(notesPanel, /No notes yet/);
   assert.match(notesPanel, /data-course-note/);
+  assert.match(notesPanel, /truncate text-xs/);
 });
 
-test("NotesPanel shows the active product / module / resource context", () => {
-  assert.match(notesPanel, /Context: \{productTitle\}/);
-  assert.match(notesPanel, /\{moduleTitle \? \` · \$\{moduleTitle\}\` : ""\}/);
+test("NotesPanel drops the context box and keeps only the + composer", () => {
+  assert.match(notesPanel, /<Plus size=\{16\} \/>/);
+  assert.doesNotMatch(notesPanel, /Context: \{productTitle\}/);
+  assert.doesNotMatch(notesPanel, /sync across devices/);
 });
 
 test("CourseOverlay wires NotesPanel into the notes tab", () => {
   assert.match(overlay, /<NotesPanel/);
+  assert.match(overlay, /onAdd=\{props\.onAddNote\}/);
   assert.match(overlay, /onEdit=\{props\.onEditNote\}/);
   assert.match(overlay, /onDelete=\{props\.onDeleteNote\}/);
-  assert.match(coursePlayer, /onEditNote=\{\(id, text\) => void editNote\(id, text\)\}/);
-  assert.match(coursePlayer, /onDeleteNote=\{\(id\) => void deleteNote\(id\)\}/);
-  assert.match(coursePlayer, /const editNote = async/);
-  assert.match(coursePlayer, /const deleteNote = async/);
+  assert.match(coursePlayer, /onAddNote=\{\(text\) => saveNote\(text\)\}/);
+  assert.match(coursePlayer, /onEditNote=\{\(id, text\) => editNote\(id, text\)\}/);
+  assert.match(coursePlayer, /onDeleteNote=\{\(id\) => deleteNote\(id\)\}/);
 });
 
-test("CoursePlayer persists notes through the Firestore progress doc (multi-device sync)", () => {
-  assert.match(coursePlayer, /doc\(db, "users", user\.id, "courseProgress", product\.id\)/);
-  assert.match(coursePlayer, /setNotes\(Array\.isArray\(data\.notes\) \? data\.notes : \[\]\)/);
-  assert.match(coursePlayer, /notes: next, updatedAt: serverTimestamp\(\)/);
+test("CoursePlayer persists notes to localStorage (per user + product)", () => {
+  assert.match(coursePlayer, /localStorage\.getItem\(notesStorageKey\(uid, productId\)\)/);
+  assert.match(coursePlayer, /localStorage\.setItem\(notesStorageKey\(uid, productId\), JSON\.stringify\(notes\)\)/);
+  assert.match(coursePlayer, /persistLocalNotes\(user\.id, product\.id, next\)/);
+  assert.match(coursePlayer, /loadLocalNotes\(user\.id, product\.id\)/);
 });
 
 test("CoursePlayerNote type has all the fields the NotesPanel reads", () => {

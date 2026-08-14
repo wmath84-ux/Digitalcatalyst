@@ -11,9 +11,10 @@ interface CartPageProps {
   onCheckout: () => void;
   onNavigate: (tab: TabKey) => void;
   onRequireAuth?: () => boolean;
+  onOpenProduct?: (id: string) => void;
 }
 
-export default function CartPage({ cartProducts, onRemove, onClearAll, onCheckout, onNavigate, onRequireAuth }: CartPageProps) {
+export default function CartPage({ cartProducts, onRemove, onClearAll, onCheckout, onNavigate, onRequireAuth, onOpenProduct }: CartPageProps) {
   const originalTotal = cartProducts.reduce((sum, product) => sum + product.originalPrice, 0);
   const finalTotal = cartProducts.reduce((sum, product) => sum + product.price, 0);
   const savings = Math.max(0, originalTotal - finalTotal);
@@ -31,7 +32,7 @@ export default function CartPage({ cartProducts, onRemove, onClearAll, onCheckou
     <div className="flex h-full flex-col">
       <PageHeader title="My Cart" subtitle={`${cartProducts.length} item${cartProducts.length > 1 ? "s" : ""}`} right={<button onClick={onClearAll} className="flex items-center gap-1 rounded-full bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-500"><Trash2 size={12} /> Clear</button>} />
       <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
-        <div className="flex flex-col gap-2.5">{cartProducts.map((product) => <CartItemCard key={product.id} product={product} onRemove={onRemove} />)}</div>
+        <div className="flex flex-col gap-2.5">{cartProducts.map((product) => <CartItemCard key={product.id} product={product} onRemove={onRemove} onOpen={onOpenProduct} />)}</div>
         <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
           <div className="flex items-center gap-2 pb-3"><ShieldCheck size={16} className="text-indigo-500" /><h3 className="text-sm font-bold text-slate-900">Server-verified price</h3></div>
           <div className="space-y-2 text-[13px]">

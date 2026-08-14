@@ -28,7 +28,9 @@ test("subscription quote preserves feature/product line kinds and IDs for unlock
 test("owned product PDP surfaces a prominent paid upgrade", () => {
   assert.match(pdp, /Course upgrade available/);
   assert.match(pdp, /New modules or files were added after your original purchase/);
-  assert.match(pdp, /View upgrade/);
+  assert.match(pdp, /Buy upgrade/);
+  // When the base course is owned the module picker is hidden; the upgrade is
+  // bought directly from the prominent upgrade card.
   assert.match(builder, /isProductOwned && availableModes\.includes\("paid_update"\)/);
 });
 

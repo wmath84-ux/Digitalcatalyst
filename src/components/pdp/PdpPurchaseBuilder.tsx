@@ -25,7 +25,6 @@ import {
   CircleCheck,
   Eye,
   Info,
-  Lock,
   Package,
   PackageOpen,
   PlayCircle,
@@ -592,18 +591,18 @@ function ModuleSelector({
               <button
                 type="button"
                 role="checkbox"
-                aria-checked={isSelected}
+                aria-checked={isOwned ? "true" : isSelected}
                 disabled={isOwned}
                 onClick={() => onToggle(m.id)}
                 className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 transition ${
                   isOwned
-                    ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300"
+                    ? "cursor-not-allowed border-emerald-500 bg-emerald-500 text-white"
                     : isSelected
                       ? "border-violet-600 bg-violet-600 text-white"
                       : "border-slate-300 bg-white"
                 }`}
               >
-                {isOwned ? <Lock size={12} /> : isSelected ? <Check size={14} /> : null}
+                {isOwned ? <Unlock size={12} /> : isSelected ? <Check size={14} /> : null}
               </button>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -742,18 +741,18 @@ function ResourceSelector({
             <button
               type="button"
               role="checkbox"
-              aria-checked={isSelected}
+              aria-checked={isOwned ? "true" : isSelected}
               disabled={isOwned}
               onClick={() => onToggle(r.id)}
               className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 transition ${
                 isOwned
-                  ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300"
+                  ? "cursor-not-allowed border-emerald-500 bg-emerald-500 text-white"
                   : isSelected
                     ? "border-violet-600 bg-violet-600 text-white"
                     : "border-slate-300 bg-white"
               }`}
             >
-              {isOwned ? <Lock size={12} /> : isSelected ? <Check size={14} /> : null}
+              {isOwned ? <Unlock size={12} /> : isSelected ? <Check size={14} /> : null}
             </button>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
