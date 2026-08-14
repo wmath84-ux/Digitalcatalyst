@@ -29,11 +29,14 @@ test("admin save atomically derives visibility from status", () => {
   assert.match(catalog, /\.filter\(\(item\) => isProductPublished\(item\.data\)\)/);
 });
 
-test("product editor exposes first-class resource URL add, edit, move and delete controls", () => {
-  assert.match(editor, /\{ key: "resources", label: "Resources" \}/);
-  assert.match(editor, /function ResourcesEditor/);
+test("module customization keeps each module and its resource URL controls together", () => {
+  assert.doesNotMatch(editor, /\{ key: "resources", label: "Resources" \}/);
+  assert.match(editor, /\{ key: "modules", label: "Modules & Resources" \}/);
+  assert.doesNotMatch(editor, /function ResourcesEditor/);
+  assert.match(editor, /Modules and their resources/);
+  assert.match(editor, /Resources & URLs/);
   assert.match(editor, /Resource URL \/ YouTube ID \/ iframe code/);
-  assert.match(editor, /\+ Add resource \/ URL/);
+  assert.match(editor, /\+ Add resource/);
   assert.match(editor, /moveResourceToModule/);
   assert.match(editor, /Delete resource/);
   assert.match(editor, /normalizeResourceUrl\(resource\.url, resource\.type\)/);
@@ -50,8 +53,9 @@ test("iframe snippets and pasted YouTube links become player-safe URLs", () => {
   );
 });
 
-test("publish validation takes the admin directly to the failing resource tab", () => {
+test("publish validation takes the admin directly to the combined module editor", () => {
   assert.match(editor, /const blocker = validation\.find\(\(issue\) => issue\.blocking\)/);
   assert.match(editor, /setTab\(blocker\.tab\)/);
+  assert.match(editor, /needs a valid public HTTPS URL[\s\S]*?"modules"/);
   assert.match(editor, /Cannot publish:/);
 });

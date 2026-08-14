@@ -97,8 +97,7 @@ const TABS = [
   { key: "basic", label: "Basic" },
   { key: "images", label: "Images" },
   { key: "pricing", label: "Pricing" },
-  { key: "modules", label: "Modules" },
-  { key: "resources", label: "Resources" },
+  { key: "modules", label: "Modules & Resources" },
   { key: "updates", label: "Paid updates" },
   { key: "review", label: "Review" },
 ];
@@ -189,15 +188,15 @@ export function ProductEditor({ productId }: { productId?: string }) {
       if (m.individuallyPurchasable && (m.cashPrice == null || m.cashPrice < 0)) add(`Module “${m.title}” needs a valid cash price.`, "modules");
       if (m.salePrice != null && (m.cashPrice == null || m.salePrice < 0 || m.salePrice > m.cashPrice)) add(`Module “${m.title}” sale price must be between ₹0 and its cash price.`, "modules");
       for (const r of m.resources || []) {
-        if (!r.id) add(`A resource in “${m.title}” needs an ID.`, "resources");
-        if (resourceIds.has(r.id)) add(`Duplicate resource ID: ${r.id}`, "resources");
+        if (!r.id) add(`A resource in “${m.title}” needs an ID.`, "modules");
+        if (resourceIds.has(r.id)) add(`Duplicate resource ID: ${r.id}`, "modules");
         resourceIds.add(r.id);
-        if (!r.name.trim()) add(`A resource in “${m.title}” needs a name.`, "resources");
-        if (r.accessLevel === "purchasable" && (r.cashPrice == null || r.cashPrice < 0)) add(`Resource “${r.name}” needs a valid cash price.`, "resources");
-        if (r.salePrice != null && (r.cashPrice == null || r.salePrice < 0 || r.salePrice > r.cashPrice)) add(`Resource “${r.name}” sale price must be between ₹0 and its cash price.`, "resources");
+        if (!r.name.trim()) add(`A resource in “${m.title}” needs a name.`, "modules");
+        if (r.accessLevel === "purchasable" && (r.cashPrice == null || r.cashPrice < 0)) add(`Resource “${r.name}” needs a valid cash price.`, "modules");
+        if (r.salePrice != null && (r.cashPrice == null || r.salePrice < 0 || r.salePrice > r.cashPrice)) add(`Resource “${r.name}” sale price must be between ₹0 and its cash price.`, "modules");
         if (!normalizeResourceUrl(r.url, r.type)) {
           const learnerVisible = r.visibility !== "hidden" && r.accessLevel !== "hidden" && m.visibility !== "hidden" && m.accessLevel !== "hidden";
-          add(`“${r.name || "Untitled resource"}” in “${m.title}” needs a valid public HTTPS URL, YouTube link/id, or iframe embed code.`, "resources", learnerVisible);
+          add(`“${r.name || "Untitled resource"}” in “${m.title}” needs a valid public HTTPS URL, YouTube link/id, or iframe embed code.`, "modules", learnerVisible);
         }
       }
     }
@@ -614,14 +613,6 @@ export function ProductEditor({ productId }: { productId?: string }) {
           <ModulesEditor
             modules={form.modules}
             onChange={(modules) => update("modules", modules)}
-            onManageResources={() => setTab("resources")}
-          />
-        )}
-
-        {tab === "resources" && (
-          <ResourcesEditor
-            modules={form.modules}
-            onChange={(modules) => update("modules", modules)}
             paidUpdates={form.paidUpdates}
           />
         )}
@@ -740,23 +731,47 @@ function FeaturesEditor({ features, onChange }: { features: string[]; onChange: 
   );
 }
 
+const RESOURCE_TYPE_LABELS: Record<(typeof RESOURCE_TYPES)[number], string> = {
+  youtube: "YouTube",
+  video_url: "Video URL (MP4/web)",
+  audio_url: "Audio URL",
+  image_url: "Image URL",
+  gdrive: "Google Drive",
+  pdf: "PDF",
+  gdoc: "Google Doc",
+  gsheet: "Google Sheet",
+  gslides: "Google Slides",
+  gform: "Google Form",
+  ebook: "E-book",
+  github_pages: "GitHub Pages",
+  whimsical: "Whimsical",
+  iframe: "Other embed / iframe",
+};
+
+function providerForType(type: ProductResource["type"]) {
+  if (type === "youtube") return "YouTube";
+  if (["gdrive", "gdoc", "gsheet", "gslides", "gform"].includes(type)) return "Google";
+  if (type === "whimsical") return "Whimsical";
+  return "Public URL";
+}
+
 function ModulesEditor({
   modules,
   onChange,
-  onManageResources,
+  paidUpdates,
 }: {
   modules: ProductModule[];
   onChange: (modules: ProductModule[]) => void;
-  onManageResources: () => void;
+  paidUpdates: PaidUpdate[];
 }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(modules[0]?.id || null);
   const resourceCount = modules.reduce((count, module) => count + (module.resources || []).length, 0);
 
   function addModule() {
     const id = genLocalId("mod");
     const next: ProductModule = {
       id,
-      title: "New module",
+      title: `Module ${modules.length + 1}`,
       description: "",
       sortOrder: modules.length,
       visibility: "visible",
@@ -800,157 +815,15 @@ function ModulesEditor({
     const descendants = descendantsOf(id);
     descendants.add(id);
     onChange(modules.filter((module) => !descendants.has(module.id)));
+    if (expanded === id) setExpanded(null);
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-indigo-950">Course structure</p>
-            <p className="mt-0.5 text-[11px] text-indigo-700">{modules.length} module(s) · {resourceCount} resource(s)</p>
-          </div>
-          <SecondaryButton className="bg-white" onClick={onManageResources}>Manage resources →</SecondaryButton>
-        </div>
-      </div>
-
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">Modules</p>
-          <p className="text-[11px] text-slate-500">Create curriculum sections here, then add their URLs in the Resources tab.</p>
-        </div>
-        <PrimaryButton onClick={addModule}>+ Add module</PrimaryButton>
-      </div>
-
-      {modules.length === 0 && (
-        <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center">
-          <p className="text-sm text-slate-500">No modules yet. Add one before adding resources.</p>
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {modules.map((module) => {
-          const descendants = descendantsOf(module.id);
-          return (
-            <div key={module.id} className="rounded-lg border border-slate-200 bg-white">
-              <button type="button" className="flex w-full items-center justify-between p-3 text-left" onClick={() => setExpanded(expanded === module.id ? null : module.id)}>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-900">{module.title || "Untitled module"}</p>
-                  <p className="text-[11px] text-slate-500">{(module.resources || []).length} resource(s) · {module.accessLevel}{module.parentModuleId ? " · nested" : ""}</p>
-                </div>
-                <span className="text-slate-400">{expanded === module.id ? "▲" : "▼"}</span>
-              </button>
-              {expanded === module.id && (
-                <div className="space-y-3 border-t border-slate-100 p-3">
-                  <Field label="Module title" required>
-                    <input className={inputClass} value={module.title} onChange={(event) => updateModule(module.id, { title: event.target.value })} />
-                  </Field>
-                  <Field label="Short description">
-                    <textarea className={textareaClass} value={module.description} onChange={(event) => updateModule(module.id, { description: event.target.value })} />
-                  </Field>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Access level">
-                      <select className={selectClass} value={module.accessLevel} onChange={(event) => {
-                        const accessLevel = event.target.value as ProductModule["accessLevel"];
-                        updateModule(module.id, { accessLevel, individuallyPurchasable: accessLevel === "purchasable" ? true : module.individuallyPurchasable });
-                      }}>
-                        <option value="included">Included</option>
-                        <option value="purchasable">Individually purchasable</option>
-                        <option value="paid_update">Paid update</option>
-                        <option value="hidden">Hidden</option>
-                      </select>
-                    </Field>
-                    <Field label="Parent module">
-                      <select className={selectClass} value={module.parentModuleId ?? ""} onChange={(event) => updateModule(module.id, { parentModuleId: event.target.value || null })}>
-                        <option value="">None (root)</option>
-                        {modules.filter((other) => other.id !== module.id && !descendants.has(other.id)).map((other) => (
-                          <option key={other.id} value={other.id}>{other.title}</option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Sort order">
-                      <input className={inputClass} type="number" value={module.sortOrder} onChange={(event) => updateModule(module.id, { sortOrder: Number(event.target.value) })} />
-                    </Field>
-                    <Field label="Badge">
-                      <input className={inputClass} value={module.badge ?? ""} onChange={(event) => updateModule(module.id, { badge: event.target.value || null })} />
-                    </Field>
-                    <Field label="Cash price (₹)">
-                      <input className={inputClass} type="number" value={module.cashPrice ?? ""} onChange={(event) => updateModule(module.id, { cashPrice: event.target.value === "" ? null : Number(event.target.value) })} />
-                    </Field>
-                    <Field label="Sale price (₹)">
-                      <input className={inputClass} type="number" value={module.salePrice ?? ""} onChange={(event) => updateModule(module.id, { salePrice: event.target.value === "" ? null : Number(event.target.value) })} />
-                    </Field>
-                  </div>
-                  <Field label="Required previous module IDs" hint="Comma separated">
-                    <input className={inputClass} value={module.requiredPreviousModuleIds.join(", ")} onChange={(event) => updateModule(module.id, { requiredPreviousModuleIds: csvToList(event.target.value) })} />
-                  </Field>
-                  <div className="flex flex-wrap gap-4">
-                    <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={module.individuallyPurchasable} onChange={(event) => updateModule(module.id, { individuallyPurchasable: event.target.checked })} />Individually purchasable</label>
-                    <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={module.includeInBundle} onChange={(event) => updateModule(module.id, { includeInBundle: event.target.checked })} />Include in full bundle</label>
-                    <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={module.previewAvailable} onChange={(event) => updateModule(module.id, { previewAvailable: event.target.checked })} />Preview available</label>
-                    <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={module.active} onChange={(event) => updateModule(module.id, { active: event.target.checked })} />Active</label>
-                    <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={module.visibility === "visible"} onChange={(event) => updateModule(module.id, { visibility: event.target.checked ? "visible" : "hidden" })} />Visible</label>
-                  </div>
-                  <SecondaryButton className="w-full" onClick={onManageResources}>Manage this module’s resources ({(module.resources || []).length})</SecondaryButton>
-                  <DangerButton onClick={() => removeModule(module.id)} className="w-full">Delete module{descendants.size ? ` + ${descendants.size} nested` : ""}</DangerButton>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-const RESOURCE_TYPE_LABELS: Record<(typeof RESOURCE_TYPES)[number], string> = {
-  youtube: "YouTube",
-  video_url: "Video URL (MP4/web)",
-  audio_url: "Audio URL",
-  image_url: "Image URL",
-  gdrive: "Google Drive",
-  pdf: "PDF",
-  gdoc: "Google Doc",
-  gsheet: "Google Sheet",
-  gslides: "Google Slides",
-  gform: "Google Form",
-  ebook: "E-book",
-  github_pages: "GitHub Pages",
-  whimsical: "Whimsical",
-  iframe: "Other embed / iframe",
-};
-
-function providerForType(type: ProductResource["type"]) {
-  if (type === "youtube") return "YouTube";
-  if (["gdrive", "gdoc", "gsheet", "gslides", "gform"].includes(type)) return "Google";
-  if (type === "whimsical") return "Whimsical";
-  return "Public URL";
-}
-
-function ResourcesEditor({
-  modules,
-  onChange,
-  paidUpdates,
-}: {
-  modules: ProductModule[];
-  onChange: (modules: ProductModule[]) => void;
-  paidUpdates: PaidUpdate[];
-}) {
-  const [selectedModuleId, setSelectedModuleId] = useState(modules[0]?.id || "");
-  const allResources = modules.flatMap((module) => (module.resources || []).map((resource, index) => ({ resource, module, index })));
-
-  useEffect(() => {
-    if (modules.some((module) => module.id === selectedModuleId)) return;
-    setSelectedModuleId(modules[0]?.id || "");
-  }, [modules, selectedModuleId]);
-
-  function addResource() {
-    if (!selectedModuleId) return;
+  function addResource(moduleId: string) {
     const id = genLocalId("res");
-    const module = modules.find((item) => item.id === selectedModuleId);
+    const module = modules.find((item) => item.id === moduleId);
     const resource: ProductResource = {
       id,
-      name: "New resource",
+      name: `Resource ${(module?.resources.length || 0) + 1}`,
       type: "youtube",
       url: "",
       provider: "YouTube",
@@ -963,9 +836,10 @@ function ResourcesEditor({
       salePrice: null,
       coinPrice: null,
       entitlementId: id,
-      parentModuleId: selectedModuleId,
+      parentModuleId: moduleId,
     };
-    onChange(modules.map((item) => item.id === selectedModuleId ? { ...item, resources: [...(item.resources || []), resource] } : item));
+    onChange(modules.map((item) => item.id === moduleId ? { ...item, resources: [...(item.resources || []), resource] } : item));
+    setExpanded(moduleId);
   }
 
   function updateResource(moduleId: string, resourceId: string, patch: Partial<ProductResource>) {
@@ -989,9 +863,10 @@ function ResourcesEditor({
       if (module.id === toModuleId) return { ...module, resources: [...module.resources, { ...resource, parentModuleId: toModuleId, sortOrder: module.resources.length }] };
       return module;
     }));
+    setExpanded(toModuleId);
   }
 
-  function moveWithinModule(moduleId: string, index: number, direction: -1 | 1) {
+  function moveResourceWithinModule(moduleId: string, index: number, direction: -1 | 1) {
     const nextIndex = index + direction;
     const module = modules.find((item) => item.id === moduleId);
     if (!module || nextIndex < 0 || nextIndex >= module.resources.length) return;
@@ -1000,128 +875,224 @@ function ResourcesEditor({
     onChange(modules.map((item) => item.id === moduleId ? { ...item, resources: resources.map((resource, sortOrder) => ({ ...resource, sortOrder })) } : item));
   }
 
-  if (modules.length === 0) {
-    return <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center"><p className="text-sm font-semibold text-slate-700">Add a module first</p><p className="mt-1 text-xs text-slate-500">Every resource must belong to a course module.</p></div>;
-  }
-
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
-        <p className="text-sm font-semibold text-indigo-950">Resource links & files</p>
-        <p className="mt-1 text-xs leading-5 text-indigo-700">Add, edit, move or delete every learner resource here. Paste a normal URL, YouTube video ID, or the full iframe embed code — it will be cleaned automatically.</p>
+        <p className="text-sm font-semibold text-indigo-950">Modules and their resources</p>
+        <p className="mt-1 text-xs leading-5 text-indigo-700">Everything belonging to a module is now together. Open a module, edit its details, then add or edit its resource URL directly underneath.</p>
+        <p className="mt-2 text-[11px] font-semibold text-indigo-900">{modules.length} module(s) · {resourceCount} resource(s)</p>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-3">
-        <Field label="Add new resource to module">
-          <select className={selectClass} value={selectedModuleId} onChange={(event) => setSelectedModuleId(event.target.value)}>
-            {modules.map((module) => <option key={module.id} value={module.id}>{module.title || "Untitled module"}</option>)}
-          </select>
-        </Field>
-        <PrimaryButton className="mt-2 w-full" onClick={addResource}>+ Add resource / URL</PrimaryButton>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Course content</p>
+          <p className="text-[11px] text-slate-500">Modules appear in this same order in the course structure.</p>
+        </div>
+        <PrimaryButton onClick={addModule}>+ Add module</PrimaryButton>
       </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-slate-900">All resources ({allResources.length})</p>
-        <p className="text-[11px] text-slate-500">Changes save with the product</p>
-      </div>
-
-      {allResources.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No resources yet. Choose a module and tap “Add resource / URL”.</div>
-      ) : (
-        <div className="space-y-3">
-          {allResources.map(({ resource, module, index }) => {
-            const cleanUrl = normalizeResourceUrl(resource.url, resource.type);
-            return (
-              <article key={`${module.id}-${resource.id}-${index}`} className={`space-y-3 rounded-xl border bg-white p-3 ${cleanUrl ? "border-slate-200" : "border-red-300"}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">{resource.name || "Untitled resource"}</p>
-                    <p className="truncate text-[11px] text-slate-500">{module.title} · {RESOURCE_TYPE_LABELS[resource.type] || resource.type}</p>
-                  </div>
-                  <Pill tone={cleanUrl ? "success" : "danger"}>{cleanUrl ? "URL ready" : "Fix URL"}</Pill>
-                </div>
-
-                <Field label="Module">
-                  <select className={selectClass} value={module.id} onChange={(event) => moveResourceToModule(resource.id, module.id, event.target.value)}>
-                    {modules.map((option) => <option key={option.id} value={option.id}>{option.title || "Untitled module"}</option>)}
-                  </select>
-                </Field>
-                <div className="grid grid-cols-2 gap-2">
-                  <Field label="Resource name" required>
-                    <input className={inputClass} value={resource.name} onChange={(event) => updateResource(module.id, resource.id, { name: event.target.value })} />
-                  </Field>
-                  <Field label="Resource type" required>
-                    <select className={selectClass} value={resource.type} onChange={(event) => {
-                      const type = event.target.value as ProductResource["type"];
-                      updateResource(module.id, resource.id, { type, provider: providerForType(type) });
-                    }}>
-                      {RESOURCE_TYPES.map((type) => <option key={type} value={type}>{RESOURCE_TYPE_LABELS[type]}</option>)}
-                    </select>
-                  </Field>
-                </div>
-
-                <Field label="Resource URL / YouTube ID / iframe code" required hint="Public HTTPS URL only. You may paste the complete iframe code; the src URL is extracted on blur/save.">
-                  <textarea
-                    className={textareaClass + ` min-h-[76px] ${cleanUrl ? "border-emerald-300" : "border-red-300"}`}
-                    placeholder={'https://… or <iframe src="https://…"></iframe>'}
-                    value={resource.url}
-                    onChange={(event) => updateResource(module.id, resource.id, { url: event.target.value })}
-                    onBlur={() => {
-                      const normalized = normalizeResourceUrl(resource.url, resource.type);
-                      if (normalized && normalized !== resource.url) updateResource(module.id, resource.id, { url: normalized });
-                    }}
-                  />
-                </Field>
-                {!cleanUrl && <p className="rounded-lg bg-red-50 p-2 text-xs text-red-700">This resource will not appear in the course player until its URL is fixed.</p>}
-                {resource.type === "whimsical" && <p className="text-[11px] text-slate-500">Whimsical → Share → Enable Public Access → Copy URL.</p>}
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Field label="Access">
-                    <select className={selectClass} value={resource.accessLevel} onChange={(event) => updateResource(module.id, resource.id, { accessLevel: event.target.value as ProductResource["accessLevel"] })}>
-                      <option value="included">Included</option>
-                      <option value="purchasable">Purchasable</option>
-                      <option value="paid_update">Paid update</option>
-                      <option value="hidden">Hidden</option>
-                    </select>
-                  </Field>
-                  <Field label="Paid update package">
-                    <select className={selectClass} value={resource.paidUpdateId ?? ""} onChange={(event) => updateResource(module.id, resource.id, { paidUpdateId: event.target.value || null })}>
-                      <option value="">None</option>
-                      {paidUpdates.map((update) => <option key={update.id} value={update.id}>{update.title}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Regular price (₹)">
-                    <input className={inputClass} type="number" min="0" value={resource.cashPrice ?? ""} onChange={(event) => updateResource(module.id, resource.id, { cashPrice: event.target.value === "" ? null : Number(event.target.value) })} />
-                  </Field>
-                  <Field label="Sale price (₹)">
-                    <input className={inputClass} type="number" min="0" value={resource.salePrice ?? ""} onChange={(event) => updateResource(module.id, resource.id, { salePrice: event.target.value === "" ? null : Number(event.target.value) })} />
-                  </Field>
-                  <Field label="EduCoin price">
-                    <input className={inputClass} type="number" min="0" value={resource.coinPrice ?? ""} onChange={(event) => updateResource(module.id, resource.id, { coinPrice: event.target.value === "" ? null : Number(event.target.value) })} />
-                  </Field>
-                  <Field label="Visibility">
-                    <select className={selectClass} value={resource.visibility} onChange={(event) => updateResource(module.id, resource.id, { visibility: event.target.value as ProductResource["visibility"] })}>
-                      <option value="visible">Visible</option>
-                      <option value="hidden">Hidden</option>
-                    </select>
-                  </Field>
-                </div>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input type="checkbox" className="h-5 w-5" checked={Boolean(resource.individuallyPurchasable)} onChange={(event) => updateResource(module.id, resource.id, { individuallyPurchasable: event.target.checked, accessLevel: event.target.checked ? "purchasable" : resource.accessLevel === "purchasable" ? "included" : resource.accessLevel })} />
-                  Learners can purchase this resource separately
-                </label>
-
-                <div className="flex flex-wrap gap-2">
-                  <SecondaryButton className="h-9 px-3 text-xs" disabled={!cleanUrl} onClick={() => cleanUrl && window.open(cleanUrl, "_blank", "noopener,noreferrer")}>Open URL</SecondaryButton>
-                  <SecondaryButton className="h-9 px-3 text-xs" disabled={index === 0} onClick={() => moveWithinModule(module.id, index, -1)}>↑ Move up</SecondaryButton>
-                  <SecondaryButton className="h-9 px-3 text-xs" disabled={index === module.resources.length - 1} onClick={() => moveWithinModule(module.id, index, 1)}>↓ Move down</SecondaryButton>
-                  <button type="button" className="h-9 rounded-lg border border-red-200 px-3 text-xs font-semibold text-red-600" onClick={() => removeResource(module.id, resource.id)}>Delete resource</button>
-                </div>
-              </article>
-            );
-          })}
+      {modules.length === 0 && (
+        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
+          <p className="text-sm font-semibold text-slate-700">No modules yet</p>
+          <p className="mt-1 text-xs text-slate-500">Tap “Add module”, then add its resource name, type and URL inside the same card.</p>
         </div>
       )}
+
+      <div className="space-y-3">
+        {modules.map((module, moduleIndex) => {
+          const descendants = descendantsOf(module.id);
+          const isOpen = expanded === module.id;
+          return (
+            <section key={`${module.id}-${moduleIndex}`} className={`overflow-hidden rounded-xl border bg-white ${isOpen ? "border-indigo-300 shadow-sm" : "border-slate-200"}`}>
+              <button type="button" className="flex w-full items-center gap-3 p-3 text-left" onClick={() => setExpanded(isOpen ? null : module.id)}>
+                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold ${isOpen ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"}`}>{moduleIndex + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-slate-900">{module.title || "Untitled module"}</span>
+                  <span className="block text-[11px] text-slate-500">{(module.resources || []).length} resource(s){module.parentModuleId ? " · nested module" : ""}</span>
+                </span>
+                <span className="text-xs font-semibold text-indigo-600">{isOpen ? "Close ▲" : "Customize ▼"}</span>
+              </button>
+
+              {isOpen && (
+                <div className="space-y-5 border-t border-slate-100 p-3">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-900 text-[11px] font-bold text-white">1</span>
+                      <div><p className="text-sm font-semibold text-slate-900">Module details</p><p className="text-[11px] text-slate-500">Name and describe this section.</p></div>
+                    </div>
+                    <Field label="Module title" required>
+                      <input className={inputClass} value={module.title} onChange={(event) => updateModule(module.id, { title: event.target.value })} />
+                    </Field>
+                    <Field label="Module description">
+                      <textarea className={textareaClass} value={module.description} onChange={(event) => updateModule(module.id, { description: event.target.value })} />
+                    </Field>
+                  </div>
+
+                  <div className="space-y-3 border-t border-slate-200 pt-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="grid h-6 w-6 place-items-center rounded-full bg-indigo-600 text-[11px] font-bold text-white">2</span>
+                        <div><p className="text-sm font-semibold text-slate-900">Resources & URLs</p><p className="text-[11px] text-slate-500">Videos, PDFs, forms and links for this module.</p></div>
+                      </div>
+                      <SecondaryButton className="h-9 shrink-0 border-indigo-200 bg-indigo-50 px-3 text-xs text-indigo-700" onClick={() => addResource(module.id)}>+ Add resource</SecondaryButton>
+                    </div>
+
+                    {(module.resources || []).length === 0 ? (
+                      <button type="button" onClick={() => addResource(module.id)} className="w-full rounded-lg border border-dashed border-indigo-200 bg-indigo-50/50 p-5 text-center text-xs font-semibold text-indigo-700">+ Add the first resource and URL to this module</button>
+                    ) : (
+                      <div className="space-y-3">
+                        {(module.resources || []).map((resource, resourceIndex) => {
+                          const cleanUrl = normalizeResourceUrl(resource.url, resource.type);
+                          return (
+                            <article key={`${module.id}-${resource.id}-${resourceIndex}`} className={`space-y-3 rounded-xl border p-3 ${cleanUrl ? "border-slate-200 bg-slate-50/60" : "border-red-300 bg-red-50/30"}`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Resource {resourceIndex + 1}</p>
+                                <Pill tone={cleanUrl ? "success" : "danger"}>{cleanUrl ? "URL ready" : "URL required"}</Pill>
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <Field label="Resource name" required>
+                                  <input className={inputClass} placeholder="e.g. Chapter 1 video" value={resource.name} onChange={(event) => updateResource(module.id, resource.id, { name: event.target.value })} />
+                                </Field>
+                                <Field label="Resource type" required>
+                                  <select className={selectClass} value={resource.type} onChange={(event) => {
+                                    const type = event.target.value as ProductResource["type"];
+                                    updateResource(module.id, resource.id, { type, provider: providerForType(type) });
+                                  }}>
+                                    {RESOURCE_TYPES.map((type) => <option key={type} value={type}>{RESOURCE_TYPE_LABELS[type]}</option>)}
+                                  </select>
+                                </Field>
+                              </div>
+
+                              <Field label="Resource URL / YouTube ID / iframe code" required hint="Paste the link here. Full iframe embed code is also accepted and cleaned automatically.">
+                                <textarea
+                                  className={textareaClass + ` min-h-[76px] bg-white ${cleanUrl ? "border-emerald-300" : "border-red-300"}`}
+                                  placeholder={'https://… or <iframe src="https://…"></iframe>'}
+                                  value={resource.url}
+                                  onChange={(event) => updateResource(module.id, resource.id, { url: event.target.value })}
+                                  onBlur={() => {
+                                    const normalized = normalizeResourceUrl(resource.url, resource.type);
+                                    if (normalized && normalized !== resource.url) updateResource(module.id, resource.id, { url: normalized });
+                                  }}
+                                />
+                              </Field>
+                              {!cleanUrl && <p className="rounded-lg bg-red-100 p-2 text-xs font-medium text-red-700">Add a valid public URL before publishing. This resource cannot appear in the player yet.</p>}
+                              {resource.type === "whimsical" && <p className="text-[11px] text-slate-500">Whimsical → Share → Enable Public Access → Copy URL.</p>}
+
+                              <details className="rounded-lg border border-slate-200 bg-white p-2">
+                                <summary className="cursor-pointer text-xs font-semibold text-slate-700">Advanced resource settings</summary>
+                                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                  <Field label="Move to module">
+                                    <select className={selectClass} value={module.id} onChange={(event) => moveResourceToModule(resource.id, module.id, event.target.value)}>
+                                      {modules.map((option) => <option key={option.id} value={option.id}>{option.title || "Untitled module"}</option>)}
+                                    </select>
+                                  </Field>
+                                  <Field label="Access">
+                                    <select className={selectClass} value={resource.accessLevel} onChange={(event) => updateResource(module.id, resource.id, { accessLevel: event.target.value as ProductResource["accessLevel"] })}>
+                                      <option value="included">Included</option>
+                                      <option value="purchasable">Purchasable</option>
+                                      <option value="paid_update">Paid update</option>
+                                      <option value="hidden">Hidden</option>
+                                    </select>
+                                  </Field>
+                                  <Field label="Paid update package">
+                                    <select className={selectClass} value={resource.paidUpdateId ?? ""} onChange={(event) => updateResource(module.id, resource.id, { paidUpdateId: event.target.value || null })}>
+                                      <option value="">None</option>
+                                      {paidUpdates.map((update) => <option key={update.id} value={update.id}>{update.title}</option>)}
+                                    </select>
+                                  </Field>
+                                  <Field label="Visibility">
+                                    <select className={selectClass} value={resource.visibility} onChange={(event) => updateResource(module.id, resource.id, { visibility: event.target.value as ProductResource["visibility"] })}>
+                                      <option value="visible">Visible</option>
+                                      <option value="hidden">Hidden</option>
+                                    </select>
+                                  </Field>
+                                  <Field label="Regular price (₹)">
+                                    <input className={inputClass} type="number" min="0" value={resource.cashPrice ?? ""} onChange={(event) => updateResource(module.id, resource.id, { cashPrice: event.target.value === "" ? null : Number(event.target.value) })} />
+                                  </Field>
+                                  <Field label="Sale price (₹)">
+                                    <input className={inputClass} type="number" min="0" value={resource.salePrice ?? ""} onChange={(event) => updateResource(module.id, resource.id, { salePrice: event.target.value === "" ? null : Number(event.target.value) })} />
+                                  </Field>
+                                  <Field label="EduCoin price">
+                                    <input className={inputClass} type="number" min="0" value={resource.coinPrice ?? ""} onChange={(event) => updateResource(module.id, resource.id, { coinPrice: event.target.value === "" ? null : Number(event.target.value) })} />
+                                  </Field>
+                                </div>
+                                <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
+                                  <input type="checkbox" className="h-5 w-5" checked={Boolean(resource.individuallyPurchasable)} onChange={(event) => updateResource(module.id, resource.id, { individuallyPurchasable: event.target.checked, accessLevel: event.target.checked ? "purchasable" : resource.accessLevel === "purchasable" ? "included" : resource.accessLevel })} />
+                                  Learners can purchase this resource separately
+                                </label>
+                              </details>
+
+                              <div className="flex flex-wrap gap-2">
+                                <SecondaryButton className="h-9 px-3 text-xs" disabled={!cleanUrl} onClick={() => cleanUrl && window.open(cleanUrl, "_blank", "noopener,noreferrer")}>Open URL</SecondaryButton>
+                                <SecondaryButton className="h-9 px-3 text-xs" disabled={resourceIndex === 0} onClick={() => moveResourceWithinModule(module.id, resourceIndex, -1)}>↑ Up</SecondaryButton>
+                                <SecondaryButton className="h-9 px-3 text-xs" disabled={resourceIndex === module.resources.length - 1} onClick={() => moveResourceWithinModule(module.id, resourceIndex, 1)}>↓ Down</SecondaryButton>
+                                <button type="button" className="h-9 rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-600" onClick={() => removeResource(module.id, resource.id)}>Delete resource</button>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <details className="border-t border-slate-200 pt-4">
+                    <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-800">
+                      <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-700">3</span>
+                      Advanced module settings
+                    </summary>
+                    <div className="mt-3 space-y-3 rounded-xl bg-slate-50 p-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <Field label="Access level">
+                          <select className={selectClass} value={module.accessLevel} onChange={(event) => {
+                            const accessLevel = event.target.value as ProductModule["accessLevel"];
+                            updateModule(module.id, { accessLevel, individuallyPurchasable: accessLevel === "purchasable" ? true : module.individuallyPurchasable });
+                          }}>
+                            <option value="included">Included</option>
+                            <option value="purchasable">Individually purchasable</option>
+                            <option value="paid_update">Paid update</option>
+                            <option value="hidden">Hidden</option>
+                          </select>
+                        </Field>
+                        <Field label="Parent module">
+                          <select className={selectClass} value={module.parentModuleId ?? ""} onChange={(event) => updateModule(module.id, { parentModuleId: event.target.value || null })}>
+                            <option value="">None (root)</option>
+                            {modules.filter((other) => other.id !== module.id && !descendants.has(other.id)).map((other) => <option key={other.id} value={other.id}>{other.title}</option>)}
+                          </select>
+                        </Field>
+                        <Field label="Sort order">
+                          <input className={inputClass} type="number" value={module.sortOrder} onChange={(event) => updateModule(module.id, { sortOrder: Number(event.target.value) })} />
+                        </Field>
+                        <Field label="Badge">
+                          <input className={inputClass} value={module.badge ?? ""} onChange={(event) => updateModule(module.id, { badge: event.target.value || null })} />
+                        </Field>
+                        <Field label="Cash price (₹)">
+                          <input className={inputClass} type="number" min="0" value={module.cashPrice ?? ""} onChange={(event) => updateModule(module.id, { cashPrice: event.target.value === "" ? null : Number(event.target.value) })} />
+                        </Field>
+                        <Field label="Sale price (₹)">
+                          <input className={inputClass} type="number" min="0" value={module.salePrice ?? ""} onChange={(event) => updateModule(module.id, { salePrice: event.target.value === "" ? null : Number(event.target.value) })} />
+                        </Field>
+                      </div>
+                      <Field label="Required previous module IDs" hint="Comma separated">
+                        <input className={inputClass} value={module.requiredPreviousModuleIds.join(", ")} onChange={(event) => updateModule(module.id, { requiredPreviousModuleIds: csvToList(event.target.value) })} />
+                      </Field>
+                      <div className="flex flex-wrap gap-4">
+                        <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={module.individuallyPurchasable} onChange={(event) => updateModule(module.id, { individuallyPurchasable: event.target.checked })} />Individually purchasable</label>
+                        <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={module.includeInBundle} onChange={(event) => updateModule(module.id, { includeInBundle: event.target.checked })} />Include in full bundle</label>
+                        <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={module.previewAvailable} onChange={(event) => updateModule(module.id, { previewAvailable: event.target.checked })} />Preview available</label>
+                        <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={module.active} onChange={(event) => updateModule(module.id, { active: event.target.checked })} />Active</label>
+                        <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={module.visibility === "visible"} onChange={(event) => updateModule(module.id, { visibility: event.target.checked ? "visible" : "hidden" })} />Visible</label>
+                      </div>
+                    </div>
+                  </details>
+
+                  <DangerButton onClick={() => removeModule(module.id)} className="w-full">Delete this module{descendants.size ? ` and ${descendants.size} nested module(s)` : ""}</DangerButton>
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }
