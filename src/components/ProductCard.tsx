@@ -23,6 +23,7 @@ export default function ProductCard({
   const discount = product.originalPrice > 0
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
+  const unavailable = product.availableForSale === false && !purchased;
 
   return (
     <div
@@ -38,7 +39,12 @@ export default function ProductCard({
               Purchased
             </span>
           )}
-          {!purchased && product.tags.includes("SALE") && (
+          {unavailable && (
+            <span className="rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow">
+              Coming soon
+            </span>
+          )}
+          {!purchased && !unavailable && product.tags.includes("SALE") && (
             <span className="rounded-full bg-teal-400 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-900 shadow">
               Sale
             </span>
@@ -90,19 +96,21 @@ export default function ProductCard({
 
         <button
           type="button"
-          disabled={purchased || inCart}
+          disabled={purchased || inCart || unavailable}
           onClick={(event) => {
             event.stopPropagation();
-            onAddToCart(product.id);
+            if (!unavailable) onAddToCart(product.id);
           }}
           className={`mt-1 flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-extrabold uppercase tracking-wide transition ${
-            purchased || inCart
-              ? "cursor-default bg-emerald-100 text-emerald-700"
-              : "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-200 hover:brightness-110 active:scale-[0.98]"
+            unavailable
+              ? "cursor-default bg-amber-100 text-amber-800"
+              : purchased || inCart
+                ? "cursor-default bg-emerald-100 text-emerald-700"
+                : "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-200 hover:brightness-110 active:scale-[0.98]"
           }`}
         >
-          <span>{purchased ? "Purchased" : inCart ? "In Cart" : "Add to Cart"}</span>
-          <span>₹{product.price}</span>
+          <span>{purchased ? "Purchased" : unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to Cart"}</span>
+          <span>{unavailable ? "Soon" : `₹${product.price}`}</span>
         </button>
       </div>
     </div>

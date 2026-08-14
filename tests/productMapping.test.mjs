@@ -786,3 +786,111 @@ test("catalog bridge stamps paid_update modules with the real update id from the
   assert.ok(paidFile, "paid resource should survive the round trip");
   assert.equal(paidFile.paidUpdateId, "upd_premium", "resource must carry the real update id");
 });
+
+// ---------------------------------------------------------------------------
+// 11. Admin publish/store visibility + pasted embed regressions
+// ---------------------------------------------------------------------------
+
+test("Create & publish mismatch is repaired: published status wins over stale isVisible=false", async () => {
+  const { getProductPublicationStatus, isProductPublished } = await import("../utils/productMapping.js");
+  const raw = {
+    id: "new-product",
+    title: "Published but previously hidden",
+    isVisible: false,
+    adminProduct: { status: "published", visibility: "hidden", modules: [] },
+  };
+  assert.equal(getProductPublicationStatus(raw), "published");
+  assert.equal(isProductPublished(raw), true);
+  const editor = firestoreToEditorForm(raw, "new-product");
+  assert.equal(editor.status, "published");
+  assert.equal(editor.visibility, "visible");
+});
+
+test("draft and archived status remain hidden even when stale isVisible=true", async () => {
+  const { isProductPublished } = await import("../utils/productMapping.js");
+  assert.equal(isProductPublished({ isVisible: true, status: "draft" }), false);
+  assert.equal(isProductPublished({ isVisible: true, adminProduct: { status: "archived" } }), false);
+  assert.equal(isProductPublished({ isVisible: true }), true, "legacy status-less products retain isVisible behaviour");
+});
+
+test("full iframe snippets and chat-copy trailing quotes are normalised into playable URLs", async () => {
+  const { normalizeResourceUrl } = await import("../utils/productMapping.js");
+  const iframe = '<iframe width="560" src="https://www.youtube.com/embed/U657Lyz5o7w?si=hello&amp;autoplay=1" allowfullscreen></iframe>';
+  assert.equal(
+    normalizeResourceUrl(iframe, "youtube"),
+    "https://www.youtube.com/watch?v=U657Lyz5o7w",
+  );
+  assert.equal(
+    normalizeResourceUrl('https://www.youtube.com/embed/U657Lyz5o7w?si=hello"', "youtube"),
+    "https://www.youtube.com/watch?v=U657Lyz5o7w",
+  );
+  assert.equal(normalizeResourceUrl("<svg onload=alert(1)>", "iframe"), "");
+});
+
+test("existing adminProduct iframe resource is editable and immediately restored to catalog player", () => {
+  const raw = {
+    id: "legacy-iframe-product",
+    status: "published",
+    courseContent: [{ id: "m1", title: "Module", files: [], modules: [] }],
+    adminProduct: {
+      status: "published",
+      modules: [{
+        id: "m1",
+        title: "Module",
+        resources: [{
+          id: "r1",
+          name: "Video",
+          type: "youtube",
+          url: '<iframe src="https://www.youtube.com/embed/U657Lyz5o7w"></iframe>',
+        }],
+      }],
+    },
+  };
+  const editor = firestoreToEditorForm(raw, "legacy-iframe-product");
+  assert.equal(editor.modules[0].resources[0].url, "https://www.youtube.com/embed/U657Lyz5o7w");
+  const catalog = firestoreToCatalogProduct(raw, "legacy-iframe-product");
+  assert.equal(catalog.canonicalModules[0].resources.length, 1);
+  assert.equal(catalog.canonicalModules[0].resources[0].youtubeVideoId, "U657Lyz5o7w");
+});
+
+test("legacy nested child modules without parentModuleId remain nested after admin reload", () => {
+  const editor = firestoreToEditorForm({
+    isVisible: true,
+    courseContent: [{
+      id: "parent",
+      title: "Parent",
+      files: [],
+      modules: [{ id: "child", title: "Child", files: [], modules: [] }],
+    }],
+  }, "legacy-tree");
+  assert.equal(editor.modules.find((module) => module.id === "child").parentModuleId, "parent");
+  const tree = editorModulesToFirestoreTree(editor.modules);
+  assert.equal(tree[0].modules[0].id, "child");
+});
+
+test("orphaned modules are promoted to roots instead of disappearing from Firestore", () => {
+  const tree = editorModulesToFirestoreTree([
+    buildBaseModule({ id: "orphan", parentModuleId: "deleted-parent", resources: [] }),
+  ]);
+  assert.equal(tree.length, 1);
+  assert.equal(tree[0].id, "orphan");
+});
+
+test("hidden resources and inactive modules stay hidden in the legacy player bridge", () => {
+  const legacy = canonicalTreeToLegacyTree([{
+    ...editorModuleToCanonical(buildBaseModule({
+      id: "inactive",
+      active: false,
+      resources: [{
+        id: "hidden-resource",
+        name: "Hidden",
+        type: "pdf",
+        url: "https://example.com/private.pdf",
+        visibility: "hidden",
+        accessLevel: "included",
+      }],
+    })),
+  }]);
+  assert.equal(legacy[0].accessLevel, "hidden");
+  assert.equal(legacy[0].files[0].accessLevel, "hidden");
+});

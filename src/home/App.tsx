@@ -63,6 +63,7 @@ export default function App({
     rating: product.rating,
     ratingCount: product.reviews,
     image: product.image,
+    searchKeywords: product.searchKeywords,
     trending: product.tags.includes("TRENDING") || product.rating >= 4.5,
   })), [catalogProducts]);
   const { reviews: homepageReviews } = useHomepageProductReviews(catalogProducts, fallbackReviews, 6);
@@ -130,7 +131,8 @@ export default function App({
         p.title.toLowerCase().includes(normalizedQuery) ||
         p.author.toLowerCase().includes(normalizedQuery) ||
         p.type.toLowerCase().includes(normalizedQuery) ||
-        p.category.toLowerCase().includes(normalizedQuery),
+        p.category.toLowerCase().includes(normalizedQuery) ||
+        (p.searchKeywords || []).some((keyword) => keyword.toLowerCase().includes(normalizedQuery)),
     );
   }, [normalizedQuery, products]);
 

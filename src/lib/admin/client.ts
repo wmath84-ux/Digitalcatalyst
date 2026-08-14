@@ -2,15 +2,14 @@ import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, u
 import { auth, db } from "../../../firebase";
 import { APPROVED_ADMIN_EMAIL, clearAdminSession, hasAdminSession } from "@/utils/adminSession";
 import {
-  editorModulesToFirestoreTree,
-  editorPaidUpdateToFirestore,
   editorToFirestoreBody,
   firestoreModulesToEditorFlat,
   firestoreToEditorForm,
+  isProductPublished,
   stripUndefinedDeep,
 } from "../../../utils/productMapping";
 import { fullDemoCourseContent } from "../../data/demoCourseContent";
-import type { PaidUpdate, ProductModule, ProductResource } from "./types";
+import type { PaidUpdate, ProductModule } from "./types";
 
 export class ApiError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status; } }
 const bodyOf = (init?: RequestInit) => init?.body ? JSON.parse(String(init.body)) as Record<string, any> : {};
@@ -106,9 +105,9 @@ async function productsRequest(url: URL, init?: RequestInit) {
     const ref = doc(db, "siteProducts", decodeURIComponent(match[1]));
     if (method === "GET") { const snap = await getDoc(ref); if (!snap.exists()) throw new ApiError("Product not found",404); return { product: productForEditor(snap.data(), snap.id) }; }
     if (method === "DELETE") { await deleteDoc(ref); return { ok: true }; }
-    if (method === "PATCH") { const body = bodyOf(init); await saveProduct(ref, body); void notifyProductChange(ref.id, "product-updated"); return { product: body }; }
+    if (method === "PATCH") { const body = bodyOf(init); const product = await saveProduct(ref, body); void notifyProductChange(ref.id, "product-updated"); return { product }; }
   }
-  if (method === "POST") { const body = bodyOf(init); const ref = doc(db, "siteProducts", String(body.id || id())); await saveProduct(ref, body); void notifyProductChange(ref.id, "product-created"); return { product: { ...body, id: ref.id } }; }
+  if (method === "POST") { const body = bodyOf(init); const ref = doc(db, "siteProducts", String(body.id || id())); const product = await saveProduct(ref, body); void notifyProductChange(ref.id, "product-created"); return { product }; }
   const snap = await getDocs(collection(db, "siteProducts"));
   let products = snap.docs.map((item) => { const p = productForEditor(item.data(), item.id); return { ...(p || {}), reviewCount: Number(item.data().reviewCount || 0), rating: String(item.data().rating || item.data().manualRating || 0), updatedAt: asDate(item.data().updatedAt), modules: (p && p.modules) || [], images: (p && p.images) || [] }; });
   const q=(url.searchParams.get("q")||"").toLowerCase(); if(q) products=products.filter((p:any)=>`${p.id} ${p.title} ${p.category}`.toLowerCase().includes(q));
@@ -118,12 +117,30 @@ async function productsRequest(url: URL, init?: RequestInit) {
   return { products };
 }
 async function saveProduct(ref: ReturnType<typeof doc>, body: any) {
-  // Part 2 round-trip: use the canonical mapping layer to write the nested
-  // courseContent tree and the paidUpdates catalogue with every
-  // commerce/access field preserved (see utils/productMapping.js).
-  const flatModules: ProductModule[] = body.modules || [];
-  const courseContent = editorModulesToFirestoreTree(flatModules) as unknown[];
-  const paidUpdates = (body.paidUpdates || []).map((u: ProductResource | unknown) => editorPaidUpdateToFirestore(u, flatModules)).filter(Boolean) as unknown[];
+  // Publication status is authoritative. The previous implementation wrote
+  // `status: published` into adminProduct but copied the stale hidden toggle to
+  // `isVisible`, so Create & publish created a document the catalog filtered
+  // out. Keep all representations atomic and impossible to contradict.
+  const requestedStatus = ["draft", "published", "archived"].includes(String(body.status))
+    ? String(body.status) as "draft" | "published" | "archived"
+    : body.visibility === "visible" ? "published" : "draft";
+  const visibility = requestedStatus === "published" ? "visible" : "hidden";
+  const normalizedBody = stripUndefinedDeep({
+    ...body,
+    id: ref.id,
+    status: requestedStatus,
+    visibility,
+    availableForSale: Boolean(body.availableForSale),
+  });
+
+  // One mapper owns both the lossless admin form and the player-ready tree.
+  // It normalises iframe/share URLs, keeps draft-only invalid resources in the
+  // editor, and excludes them from learner content until fixed.
+  const mapped = editorToFirestoreBody(normalizedBody);
+  if (!mapped) throw new ApiError("Product data is invalid.", 400);
+  const courseContent = mapped.courseContent;
+  const paidUpdates = mapped.paidUpdates;
+
   // Images may be missing entirely on a partial payload — never index into it
   // blindly, and never let a blank/undefined url reach the document.
   const imageEntries = (Array.isArray(body.images) ? [...body.images] : [])
@@ -131,40 +148,42 @@ async function saveProduct(ref: ReturnType<typeof doc>, body: any) {
     .sort((a: any, b: any) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
   const urls = imageEntries.map((image: any) => String(image.url).trim());
   const primaryUrl = String(imageEntries.find((image: any) => image.isPrimary)?.url || urls[0] || "").trim();
-  // The `adminProduct` blob is kept for older code paths that read
-  // `raw.adminProduct` (the editor reload and the Firestore-to-Form
-  // mapping both honour it).
-  const adminProductBlob = editorToFirestoreBody(body)?.adminProduct ?? body;
-  // Firestore refuses ANY `undefined` field value and fails the entire write
-  // with "Unsupported field value: undefined (found in document
-  // siteProducts/<id>)". Editor payloads legitimately leave optional fields
-  // unset (no sale price, no subject, a module without a paid update…), so
-  // every value below is normalised to a concrete type and the finished
-  // document is passed through `stripUndefinedDeep` as a final safety net.
-  // `serverTimestamp()` is a FieldValue sentinel and survives the strip.
+
+  // Firestore refuses ANY `undefined` field value and fails the entire write.
+  // Every top-level field consumed by Store, Home, PDP, search, checkout and
+  // admin reload is written from the same normalised form in one setDoc.
   const payload = stripUndefinedDeep({
-    adminProduct: adminProductBlob,
+    adminProduct: mapped.adminProduct,
     id: ref.id,
-    title: str(body.title, "Untitled product"),
-    description: str(body.shortDescription),
-    longDescription: str(body.longDescription),
-    instructor: str(body.instructor, "Digital Catalyst"),
-    category: str(body.category),
-    subject: str(body.subject),
-    tags: strList(body.tags),
-    features: strList(body.features),
+    title: str(normalizedBody.title, "Untitled product"),
+    description: str(normalizedBody.shortDescription),
+    longDescription: str(normalizedBody.longDescription),
+    instructor: str(normalizedBody.instructor, "Digital Catalyst"),
+    category: str(normalizedBody.category),
+    productType: str(normalizedBody.productType, "course"),
+    subject: str(normalizedBody.subject),
+    sku: str(normalizedBody.sku),
+    language: str(normalizedBody.language, "English"),
+    dimensions: str(normalizedBody.classLevel || normalizedBody.estimatedDuration),
+    tags: strList(normalizedBody.tags),
+    keywords: strList(normalizedBody.searchKeywords),
+    features: strList(normalizedBody.features),
     images: urls,
     productImages: { card: primaryUrl },
-    price: Boolean(body.isFree) ? "₹0" : `₹${str(body.regularPrice, "0") || "0"}`,
-    salePrice: Boolean(body.isFree) ? null : (body.salePrice ? `₹${str(body.salePrice)}` : null),
-    isFree: Boolean(body.isFree),
-    isVisible: body.visibility === "visible",
-    inStock: Boolean(body.availableForSale),
+    price: Boolean(normalizedBody.isFree) ? "₹0" : `₹${str(normalizedBody.regularPrice, "0") || "0"}`,
+    salePrice: Boolean(normalizedBody.isFree) ? null : (normalizedBody.salePrice !== null && normalizedBody.salePrice !== "" ? `₹${str(normalizedBody.salePrice)}` : null),
+    coinPrice: Number(normalizedBody.coinPrice || 0),
+    isFree: Boolean(normalizedBody.isFree),
+    manualRating: normalizedBody.manualRating === null || normalizedBody.manualRating === "" ? null : Number(normalizedBody.manualRating),
+    status: requestedStatus,
+    isVisible: requestedStatus === "published",
+    inStock: Boolean(normalizedBody.availableForSale),
     courseContent,
     paidUpdates,
     updatedAt: serverTimestamp(),
   });
   await setDoc(ref, payload, { merge: true });
+  return { ...normalizedBody, ...mapped.adminProduct, id: ref.id, status: requestedStatus, visibility };
 }
 
 async function genericCollection(name: string, key: string, init?: RequestInit) {
@@ -224,7 +243,7 @@ async function ordersRequest(url:URL){const match=url.pathname.match(/\/orders\/
 const SETTINGS_DEFAULTS:Record<string,any>={adminContent:{siteName:"Digital Catalyst",banners:[],categories:[],testimonials:[],storeTitle:"Store",storeSubtitle:"",showWishlist:true,showRatings:true,showSaleBadges:true,emptyStateMessages:{},pdpHelperTexts:{},coursePlayerMessages:{},authLabels:{openDashboardLabel:"Open dashboard"}},referralProgram:{enabled:true,discountPaise:25000,maxUsesPerReferrer:null}};
 async function settingsRequest(documentId:string,key:string,init?:RequestInit){const ref=doc(db,"settings",documentId),defaults=SETTINGS_DEFAULTS[documentId]||{};if((init?.method||"GET")==="GET"){const snap=await getDoc(ref);return {[key]:{...defaults,...(snap.exists()?snap.data():{})}};}const b=bodyOf(init);await setDoc(ref,stripUndefinedDeep({...b,updatedAt:serverTimestamp()}),{merge:true});return {[key]:{...defaults,...b}};}
 
-async function dashboard(){const [p,u,o,r]=await Promise.all([getDocs(collection(db,"siteProducts")),getDocs(collection(db,"users")),getDocs(collection(db,"siteOrders")),getDocs(collection(db,"siteReviews"))]);const orders=o.docs.map(d=>mapOrder({id:d.id,...d.data()}));return {products:{total:p.size,hidden:p.docs.filter(d=>d.data().isVisible===false).length,unavailable:p.docs.filter(d=>d.data().inStock===false).length},users:{total:u.size,active:u.docs.filter(d=>d.data().status!=="blocked").length,blocked:u.docs.filter(d=>d.data().status==="blocked").length},orders:{verified:orders.filter(x=>["verified","access_granted","completed"].includes(x.paymentStatus)).length,pending:orders.filter(x=>x.paymentStatus.includes("pending")).length,failed:orders.filter(x=>x.paymentStatus==="failed").length},revenue:{total:orders.filter(x=>x.paymentStatus!=="failed").reduce((n,x)=>n+Number(x.finalAmount),0)},subscriptions:{active:u.docs.filter(d=>d.data().subscriptionTier&&d.data().subscriptionTier!=="basic").length,expiring:0},reviews:{pending:r.docs.filter(d=>d.data().status==="pending").length},recentOrders:orders.slice(0,5),attentionQueue:[]};}
+async function dashboard(){const [p,u,o,r]=await Promise.all([getDocs(collection(db,"siteProducts")),getDocs(collection(db,"users")),getDocs(collection(db,"siteOrders")),getDocs(collection(db,"siteReviews"))]);const orders=o.docs.map(d=>mapOrder({id:d.id,...d.data()}));return {products:{total:p.size,hidden:p.docs.filter(d=>!isProductPublished(d.data())).length,unavailable:p.docs.filter(d=>d.data().inStock===false).length},users:{total:u.size,active:u.docs.filter(d=>d.data().status!=="blocked").length,blocked:u.docs.filter(d=>d.data().status==="blocked").length},orders:{verified:orders.filter(x=>["verified","access_granted","completed"].includes(x.paymentStatus)).length,pending:orders.filter(x=>x.paymentStatus.includes("pending")).length,failed:orders.filter(x=>x.paymentStatus==="failed").length},revenue:{total:orders.filter(x=>x.paymentStatus!=="failed").reduce((n,x)=>n+Number(x.finalAmount),0)},subscriptions:{active:u.docs.filter(d=>d.data().subscriptionTier&&d.data().subscriptionTier!=="basic").length,expiring:0},reviews:{pending:r.docs.filter(d=>d.data().status==="pending").length},recentOrders:orders.slice(0,5),attentionQueue:[]};}
 
 export async function adminFetch<T=unknown>(input:string,init?:RequestInit):Promise<T>{await ensureAdmin();const url=urlOf(input),p=url.pathname;
   let result:any;

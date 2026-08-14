@@ -291,6 +291,12 @@ export declare const canonicalTreeToLegacyTree: (
  */
 export declare const stripUndefinedDeep: <T>(value: T) => T;
 
+/** Clean a pasted URL, YouTube id, or iframe snippet into a public HTTPS URL. */
+export declare const normalizeResourceUrl: (value: unknown, resourceType?: string) => string;
+/** Resolve the authoritative draft/published/archived state, including legacy docs. */
+export declare const getProductPublicationStatus: (raw: unknown) => "draft" | "published" | "archived";
+export declare const isProductPublished: (raw: unknown) => boolean;
+
 export declare const editorToFirestoreBody: (
   form: unknown,
 ) => {
@@ -310,6 +316,10 @@ export declare const firestoreToCatalogProduct: (
 export declare const __testHelpers: {
   isValidHttpsUrl: (v: unknown) => boolean;
   pickValidUrl: (...candidates: unknown[]) => string;
+  unwrapCopiedResourceUrl: (v: unknown) => string;
+  normalizeResourceUrl: (value: unknown, resourceType?: string) => string;
+  getProductPublicationStatus: (raw: unknown) => "draft" | "published" | "archived";
+  isProductPublished: (raw: unknown) => boolean;
   toCanonicalResourceType: (v: unknown) => ResourceType | string;
   toPlayerResourceType: (v: unknown) => string;
   fromPlayerResourceType: (v: unknown) => EditorResourceType | string;

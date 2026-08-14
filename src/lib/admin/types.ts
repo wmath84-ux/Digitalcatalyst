@@ -31,9 +31,13 @@ export type ProductResource = {
   sortOrder: number;
   visibility: "visible" | "hidden";
   accessLevel: "included" | "purchasable" | "paid_update" | "hidden";
+  individuallyPurchasable?: boolean;
   paidUpdateId: string | null;
   cashPrice: number | null;
+  salePrice?: number | null;
   coinPrice: number | null;
+  entitlementId?: string;
+  parentModuleId?: string | null;
 };
 
 export type ProductModule = {
