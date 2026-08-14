@@ -40,7 +40,7 @@ import { AlertTriangle, Download, ExternalLink, FileQuestion, Maximize2, Refresh
 import type { CourseFile } from "../types/course";
 import ImageViewer from "./ImageViewer";
 import AudioPlayer from "./AudioPlayer";
-import { getCourseDownload, getCourseEmbed } from "../utils/courseEmbed";
+import { getCourseDownload, getCourseEmbed, type CourseDownload } from "../utils/courseEmbed";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
 
 const SUPPORTED_KINDS = new Set([
@@ -69,9 +69,19 @@ interface ResourceViewerProps {
   playback?: CoursePlaybackStore;
   /** Report a new position / zoom / scroll for this file. */
   onPlaybackChange?: (fileId: string, patch: CoursePlaybackPatch) => void;
+  /**
+   * Hides the file's own header (download / open) so the content itself can
+   * use the full stage. The viewer stretches into the freed space.
+   */
+  chromeHidden?: boolean;
+  /**
+   * Embedded documents render at desktop width by default. `false` requests
+   * the host's mobile rendering, which is far easier to read on a phone.
+   */
+  desktopView?: boolean;
 }
 
-export default function ResourceViewer({ file, active = true, playback, onPlaybackChange }: ResourceViewerProps) {
+export default function ResourceViewer({ file, active = true, playback, onPlaybackChange, chromeHidden = false, desktopView = true }: ResourceViewerProps) {
   // No file selected — show the empty state.
   if (!file) {
     return (
@@ -97,10 +107,13 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
   const isCinematic = isVideo || embed.kind === "youtube";
   const entry = playback?.[file.id];
   const report = (patch: CoursePlaybackPatch) => onPlaybackChange?.(file.id, patch);
+  // Only documents care about the desktop/mobile switch.
+  const documentKind = ["doc", "sheet", "slides", "form", "drive", "pdf", "embed", "mindmap"].includes(embed.kind);
+  const mobileDocument = documentKind && !desktopView;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"}>
-      <ViewerHeader file={file} embed={embed} download={download} />
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-chrome-hidden={chromeHidden ? "true" : "false"} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>
+      {chromeHidden ? null : <ViewerHeader file={file} embed={embed} download={download} />}
       <div className={`relative min-h-0 flex-1 overflow-hidden ${isCinematic ? "bg-black p-0" : "bg-[var(--course-bg)]"}`}>
         {isImage ? (
           <ImageViewer
@@ -144,7 +157,7 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
             )}
           </div>
         ) : (
-          <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} />
+          <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} mobileDocument={mobileDocument} />
         )}
       </div>
     </div>
@@ -319,7 +332,7 @@ function YouTubeFrame({ url, title, active, resumeAt, onProgress }: { url: strin
   );
 }
 
-function ViewerHeader({ file, embed, download }: { file: CourseFile; embed: { url: string; kind: string }; download: { url: string; label: string; downloadable: boolean } }) {
+function ViewerHeader({ file, embed, download }: { file: CourseFile; embed: { url: string; kind: string }; download: CourseDownload }) {
   const kindLabel = embed.kind === "none" ? "No preview" : embed.kind === "direct" ? file.type : embed.kind;
   const isMedia = embed.kind === "youtube" || file.type === "video" || file.type === "audio";
   const toggleFullscreen = () => {
@@ -351,7 +364,7 @@ function ViewerHeader({ file, embed, download }: { file: CourseFile; embed: { ur
           href={download.url}
           target="_blank"
           rel="noopener noreferrer"
-          download={download.downloadable ? file.name : undefined}
+          download={download.downloadable ? download.fileName : undefined}
           className="flex items-center gap-1.5 rounded-lg bg-[var(--course-soft)] px-3 py-2 text-xs font-bold hover:bg-[var(--course-soft-hover)]"
           data-course-viewer-download
         >
@@ -375,7 +388,7 @@ function ViewerHeader({ file, embed, download }: { file: CourseFile; embed: { ur
   );
 }
 
-function MissingEmbedState({ file, download }: { file: CourseFile; download: { url: string; label: string; downloadable: boolean } }) {
+function MissingEmbedState({ file, download }: { file: CourseFile; download: CourseDownload }) {
   return (
     <div className="grid h-full place-items-center bg-[var(--course-bg)] p-8 text-center text-[var(--course-text)]" data-course-viewer-missing>
       <div className="max-w-md">
@@ -406,13 +419,41 @@ interface EmbedFrameProps {
   title: string;
   kind: string;
   supported: boolean;
+  /**
+   * Render the document the way a phone would see it. Remote hosts pick
+   * their layout from the iframe's own width, so we give the frame a narrow
+   * CSS viewport and scale it back up to fill the stage. Text ends up
+   * phone-sized and readable instead of a shrunken desktop page.
+   */
+  mobileDocument?: boolean;
 }
 
-function EmbedFrame({ url, title, kind, supported }: EmbedFrameProps) {
+/** CSS pixels a phone browser reports — what the embedded host will see. */
+const MOBILE_VIEWPORT_WIDTH = 420;
+
+function EmbedFrame({ url, title, kind, supported, mobileDocument = false }: EmbedFrameProps) {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stageWidth, setStageWidth] = useState(0);
+
+  // Track the real stage width so the narrow frame can be scaled to fill it.
+  useEffect(() => {
+    if (!mobileDocument) return undefined;
+    const stage = stageRef.current;
+    if (!stage) return undefined;
+    const measure = () => setStageWidth(stage.clientWidth);
+    measure();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    observer?.observe(stage);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [mobileDocument]);
 
   useEffect(() => {
     setLoading(true);
@@ -432,8 +473,25 @@ function EmbedFrame({ url, title, kind, supported }: EmbedFrameProps) {
     };
   }, [url, reloadKey]);
 
+  // Scale the narrow frame up so it still fills the stage edge-to-edge.
+  const mobileScale = mobileDocument && stageWidth > 0 ? Math.max(stageWidth / MOBILE_VIEWPORT_WIDTH, 0.5) : 1;
+  const frameStyle = mobileDocument && stageWidth > 0
+    ? {
+        width: `${MOBILE_VIEWPORT_WIDTH}px`,
+        height: `${100 / mobileScale}%`,
+        transform: `scale(${mobileScale})`,
+        transformOrigin: "top left" as const,
+      }
+    : undefined;
+
   return (
-    <div className="relative h-full min-h-0 w-full min-w-0 overflow-hidden" data-course-viewer-embed data-embed-kind={kind}>
+    <div
+      ref={stageRef}
+      className="relative h-full min-h-0 w-full min-w-0 overflow-hidden"
+      data-course-viewer-embed
+      data-embed-kind={kind}
+      data-viewport-mode={mobileDocument ? "mobile" : "desktop"}
+    >
       {loading ? (
         <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-[var(--course-loading)] text-[var(--course-text)]">
           <div className="flex flex-col items-center gap-2">
@@ -480,7 +538,8 @@ function EmbedFrame({ url, title, kind, supported }: EmbedFrameProps) {
         key={reloadKey}
         src={url}
         title={title}
-        className={`block h-full max-h-full min-h-0 w-full max-w-full min-w-0 border-0 ${kind === "youtube" ? "absolute inset-0 bg-black" : "bg-white"}`}
+        className={`block border-0 ${mobileDocument ? "absolute left-0 top-0 bg-white" : "h-full max-h-full min-h-0 w-full max-w-full min-w-0"} ${kind === "youtube" ? "absolute inset-0 bg-black" : mobileDocument ? "" : "bg-white"}`}
+        style={frameStyle}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-read; clipboard-write"
         sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin allow-presentation"
         allowFullScreen

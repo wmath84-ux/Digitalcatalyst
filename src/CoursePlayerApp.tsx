@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { ArrowLeft, CheckCircle2, Circle, Minimize2, Moon, RotateCw, Sun } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Minimize, Minimize2, Monitor, Moon, RotateCw, SlidersHorizontal, Smartphone, Sun } from "lucide-react";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer from "./course/ResourceViewer";
@@ -10,6 +10,8 @@ import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } fro
 import { useAuth } from "./context/AuthContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
 import { isEmptyRichText, richTextToPlain, sanitizeRichText } from "./utils/richText";
+import { useRotatedScroll } from "./course/useRotatedScroll";
+import { getCourseEmbed } from "./utils/courseEmbed";
 import {
   loadPlaybackStore,
   mergePlaybackEntry,
@@ -133,6 +135,17 @@ const loadCourseTheme = (): CoursePlayerTheme => {
   }
 };
 
+// Documents embed at desktop width by default (that is what Google serves an
+// iframe); the learner's choice is remembered across lessons and visits.
+const desktopViewStorageKey = "dc.coursePlayerDesktopView";
+const loadDesktopViewPreference = (): boolean => {
+  try {
+    return localStorage.getItem(desktopViewStorageKey) !== "mobile";
+  } catch {
+    return true;
+  }
+};
+
 export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: CoursePlayerProps) {
   const { user } = useAuth();
   const modules = product.courseContent || [];
@@ -156,6 +169,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // phone can still watch a video / read a wide sheet edge-to-edge.
   const [immersive, setImmersive] = useState(false);
   const [theme, setTheme] = useState<CoursePlayerTheme>(loadCourseTheme);
+  // ── Chrome visibility ───────────────────────────────────────────────────
+  // Two independent hides, both offered from the single "view options" menu
+  // next to the theme toggle. Hiding either gives the content that much more
+  // room, and the viewer stretches into whatever space is freed.
+  //   · fileBarsHidden   → the resource header (download) + the mark-complete
+  //                        footer that wrap the file itself.
+  //   · playerChromeHidden → the Course Player's own header + bottom dock.
+  const [fileBarsHidden, setFileBarsHidden] = useState(false);
+  const [playerChromeHidden, setPlayerChromeHidden] = useState(false);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  // Desktop request mode for embedded documents — a Google Doc / Sheet /
+  // Slides deck rendered at desktop width is unreadable on a phone, so the
+  // learner can flip the same embed to its mobile rendering.
+  const [desktopView, setDesktopView] = useState<boolean>(loadDesktopViewPreference);
+  const immersiveRootRef = useRef<HTMLDivElement>(null);
   const ownedUpdateIds = resolution.ownedUpdateIds;
   const updates = useMemo(() => collectUpdates(modules).filter((update) => !ownedUpdateIds.has(update.id)), [modules, ownedUpdateIds]);
   const moduleTitleById = useMemo(() => collectModuleTitleById(modules), [modules]);
@@ -196,13 +224,36 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     }
   }, [theme]);
 
-  // Escape leaves immersive mode.
   useEffect(() => {
-    if (!immersive) return undefined;
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setImmersive(false); };
+    try {
+      localStorage.setItem(desktopViewStorageKey, desktopView ? "desktop" : "mobile");
+    } catch {
+      /* private mode / storage disabled — keep the in-memory preference */
+    }
+  }, [desktopView]);
+
+  // The menu is rendered inside the player header, so hiding that header
+  // unmounts it. Clear the flag too, otherwise it stays stale-open and the
+  // next Escape would be swallowed closing a menu nobody can see.
+  useEffect(() => { if (playerChromeHidden) setViewMenuOpen(false); }, [playerChromeHidden]);
+
+  // Escape leaves immersive mode, closes the view menu, and restores any
+  // hidden chrome so the learner can never get stuck in a bare screen.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (viewMenuOpen) { setViewMenuOpen(false); return; }
+      if (immersive) { setImmersive(false); return; }
+      if (playerChromeHidden || fileBarsHidden) { setPlayerChromeHidden(false); setFileBarsHidden(false); }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [immersive]);
+  }, [immersive, viewMenuOpen, playerChromeHidden, fileBarsHidden]);
+
+  // Scrolling inside the quarter-turned immersive view has to be driven
+  // manually, otherwise the browser resolves swipes in screen space and the
+  // rotated lists scroll along the wrong axis.
+  useRotatedScroll(immersiveRootRef, immersive && !isLandscape);
 
   const progressRef = useMemo(() => (user ? doc(db, "users", user.id, "courseProgress", product.id) : null), [product.id, user]);
 
@@ -407,6 +458,115 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   const useLandscapeRails = isLandscape || immersive;
   const nextTheme = theme === "dark" ? "light" : "dark";
 
+  // The desktop/mobile switch only means something for embedded documents —
+  // a video or an image renders identically either way.
+  const selectedEmbedKind = selectedFile ? getCourseEmbed(selectedFile).kind : "none";
+  const showViewportToggle = ["doc", "sheet", "slides", "form", "drive", "pdf", "embed", "mindmap"].includes(selectedEmbedKind);
+
+  // While the player's own header + dock are hidden there has to be a way
+  // back, so a small floating pill sits over the content.
+  const chromeRestoreButton = playerChromeHidden ? (
+    <button
+      type="button"
+      onClick={() => setPlayerChromeHidden(false)}
+      className="absolute right-3 top-3 z-40 flex items-center gap-1.5 rounded-full border border-[var(--course-border)] bg-[var(--course-surface-translucent)] px-3 py-2 text-[10px] font-black text-[var(--course-text)] shadow-2xl backdrop-blur transition hover:bg-[var(--course-soft-hover)]"
+      style={{ top: "calc(0.75rem + env(safe-area-inset-top, 0px))" }}
+      aria-label="Show player bars"
+      title="Show player bars"
+      data-course-chrome-restore
+    >
+      <Minimize size={13} /> Show bars
+    </button>
+  ) : null;
+
+  // ── View options ────────────────────────────────────────────────────────
+  // A single button next to the theme toggle opens a small dropdown with the
+  // two hide switches, so the header only gains one control.
+  const viewOptionsMenu = (
+    <div className="relative shrink-0" data-course-view-options>
+      <button
+        type="button"
+        onClick={() => setViewMenuOpen((open) => !open)}
+        className={`course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl transition ${
+          viewMenuOpen || fileBarsHidden || playerChromeHidden
+            ? "bg-violet-500 text-white"
+            : "bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+        }`}
+        aria-label="View options"
+        title="View options"
+        aria-haspopup="menu"
+        aria-expanded={viewMenuOpen}
+        data-course-view-options-toggle
+        data-open={viewMenuOpen ? "true" : "false"}
+      >
+        <SlidersHorizontal size={17} />
+      </button>
+
+      {viewMenuOpen ? (
+        <>
+          {/* Tapping anywhere else closes the menu. */}
+          <div className="fixed inset-0 z-[60]" onClick={() => setViewMenuOpen(false)} data-course-view-options-scrim />
+          <div
+            role="menu"
+            className="absolute right-0 top-12 z-[61] w-60 overflow-hidden rounded-2xl border border-[var(--course-border)] bg-[var(--course-panel)] p-1.5 shadow-2xl"
+            data-course-view-options-menu
+          >
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={fileBarsHidden}
+              onClick={() => setFileBarsHidden((hidden) => !hidden)}
+              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left transition hover:bg-[var(--course-soft)]"
+              data-course-toggle-file-bars
+              data-hidden={fileBarsHidden ? "true" : "false"}
+            >
+              {fileBarsHidden ? <ChevronsUpDown size={15} className="shrink-0 text-violet-400" /> : <ChevronsDownUp size={15} className="shrink-0 text-[var(--course-muted)]" />}
+              <span className="min-w-0 flex-1">
+                <span className="block text-[11px] font-black">{fileBarsHidden ? "Show file bars" : "Hide file bars"}</span>
+                <span className="block text-[10px] text-[var(--course-muted)]">Download + mark complete</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={playerChromeHidden}
+              onClick={() => setPlayerChromeHidden((hidden) => !hidden)}
+              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left transition hover:bg-[var(--course-soft)]"
+              data-course-toggle-player-chrome
+              data-hidden={playerChromeHidden ? "true" : "false"}
+            >
+              {playerChromeHidden ? <Maximize size={15} className="shrink-0 text-violet-400" /> : <Minimize size={15} className="shrink-0 text-[var(--course-muted)]" />}
+              <span className="min-w-0 flex-1">
+                <span className="block text-[11px] font-black">{playerChromeHidden ? "Show player bars" : "Hide player bars"}</span>
+                <span className="block text-[10px] text-[var(--course-muted)]">Course header + dock</span>
+              </span>
+            </button>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+
+  // Flip an embedded document between its desktop and mobile rendering.
+  const viewportToggle = (
+    <button
+      type="button"
+      onClick={() => setDesktopView((value) => !value)}
+      className={`course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl transition ${
+        desktopView
+          ? "bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+          : "bg-violet-500 text-white"
+      }`}
+      aria-label={desktopView ? "Switch document to mobile view" : "Switch document to desktop view"}
+      title={desktopView ? "Switch to mobile view" : "Switch to desktop view"}
+      aria-pressed={!desktopView}
+      data-course-viewport-toggle
+      data-mode={desktopView ? "desktop" : "mobile"}
+    >
+      {desktopView ? <Smartphone size={17} /> : <Monitor size={17} />}
+    </button>
+  );
+
   const themeToggle = (
     <button
       type="button"
@@ -422,7 +582,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     </button>
   );
 
-  const markCompleteBar = selectedFile ? (
+  const markCompleteBar = selectedFile && !fileBarsHidden ? (
     <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--course-border)] bg-[var(--course-surface)] px-4 py-2.5" data-course-mark-complete-bar>
       <div className="min-w-0">
         <p className="truncate text-xs font-black" data-course-selected-name>{selectedFile.name}</p>
@@ -476,7 +636,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   const viewerStack = (
     <div className="relative h-full min-h-0 w-full min-w-0" data-course-viewer-stack>
       {visitedFiles.length === 0 ? (
-        <ResourceViewer file={null} active playback={playbackRef.current} onPlaybackChange={reportPlayback} />
+        <ResourceViewer file={null} active playback={playbackRef.current} onPlaybackChange={reportPlayback} chromeHidden={fileBarsHidden} desktopView={desktopView} />
       ) : (
         visitedFiles.map((file) => {
           const active = file.id === selectedFile?.id;
@@ -494,6 +654,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
                 active={active}
                 playback={playbackReady ? playbackRef.current : undefined}
                 onPlaybackChange={reportPlayback}
+                chromeHidden={fileBarsHidden}
+                desktopView={desktopView}
               />
             </div>
           );
@@ -532,6 +694,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // navigation on the right instead of dropping all navigation in fullscreen.
   const landscapeLayout = (mobileRotated: boolean) => (
     <>
+      {playerChromeHidden ? null : (
       <header
         className={`sticky left-0 top-0 z-50 flex h-full w-14 shrink-0 flex-col items-center border-r border-[var(--course-border)] bg-[var(--course-surface)] py-2 ${mobileRotated ? "gap-2" : "gap-3"}`}
         style={{ paddingLeft: mobileRotated ? "0px" : "env(safe-area-inset-left, 0px)" }}
@@ -539,6 +702,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
         data-course-mobile-landscape-header={mobileRotated ? "true" : undefined}
       >
         <button onClick={onBack} className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]" aria-label="Back" data-course-back><ArrowLeft size={18} /></button>
+        {viewOptionsMenu}
+        {showViewportToggle ? viewportToggle : null}
         {!mobileRotated ? themeToggle : null}
         <div className="flex min-h-0 flex-1 items-center justify-center">
           <span className="line-clamp-1 max-h-full text-xs font-black [writing-mode:vertical-rl] rotate-180" data-course-product-title>{product.title}</span>
@@ -568,6 +733,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
           </button>
         ) : null}
       </header>
+      )}
 
       {/* Content is strictly bounded between both rails, preventing embedded
           players from extending underneath the right-side navigation. */}
@@ -576,7 +742,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
           <div className="min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
           {markCompleteBar}
         </div>
-        {overlay}
+        {playerChromeHidden ? null : overlay}
+        {chromeRestoreButton}
       </section>
     </>
   );
@@ -587,8 +754,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     return (
       <div className="fixed inset-0 z-[100] overflow-hidden bg-black" data-course-mobile-landscape-viewport>
         <div
-          className="absolute left-1/2 top-1/2 origin-center overflow-hidden"
+          ref={immersiveRootRef}
+          className="course-rotated-surface absolute left-1/2 top-1/2 origin-center overflow-hidden"
           style={{ width: "100dvh", height: "100dvw", transform: "translate(-50%, -50%) rotate(90deg)" }}
+          data-course-rotated-scroll="active"
         >
           <div className="course-player-shell flex h-full w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-course-mobile-landscape="rails" data-orientation="immersive" style={{ colorScheme: theme }}>
             {landscapeLayout(true)}
@@ -610,6 +779,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // ── Portrait: sticky header top, content full-bleed, sticky dock bottom ──
   return (
     <div className="course-player-shell fixed inset-0 flex h-[100dvh] flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="portrait" style={{ colorScheme: theme }}>
+      {playerChromeHidden ? null : (
       <header
         className="sticky top-0 z-50 flex shrink-0 items-center gap-3 border-b border-[var(--course-border)] bg-[var(--course-surface)] px-3 py-2.5 sm:px-5"
         style={{ paddingTop: "calc(0.625rem + env(safe-area-inset-top, 0px))" }}
@@ -631,14 +801,18 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
             ) : null}
           </div>
         </div>
+        {viewOptionsMenu}
+        {showViewportToggle ? viewportToggle : null}
         {themeToggle}
       </header>
+      )}
 
       {/* Everything between the pinned header and the pinned dock. */}
       <section id="course-viewer" className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
         {markCompleteBar}
-        {overlay}
+        {playerChromeHidden ? null : overlay}
+        {chromeRestoreButton}
       </section>
     </div>
   );

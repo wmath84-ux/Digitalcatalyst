@@ -514,3 +514,22 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   border-radius: 0.2rem;
   padding: 0 0.15em;
 }
+
+/* ── Course Player — rotated (immersive) mobile view ─────────────────────
+   The whole player is quarter-turned with rotate(90deg). The browser still
+   resolves touch scrolling in SCREEN space, so native panning would move
+   the rotated lists along the wrong axis (a left/right swipe scrolling what
+   the user sees as vertical, and vice versa). Handing touch handling to the
+   player (`useRotatedScroll`) requires the browser to stop claiming the
+   gesture first. */
+.course-rotated-surface,
+.course-rotated-surface * {
+  touch-action: none;
+  -ms-touch-action: none;
+}
+
+/* Pinch-zoom inside the image viewer manages its own pointers, so it keeps
+   working; text selection is still allowed everywhere else. */
+.course-rotated-surface [data-course-image-viewer] {
+  touch-action: none;
+}

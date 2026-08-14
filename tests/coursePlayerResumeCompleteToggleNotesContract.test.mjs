@@ -83,7 +83,7 @@ test("ResourceViewer accepts the active flag and the playback wiring", () => {
   assert.match(resourceViewer, /active\?: boolean;/);
   assert.match(resourceViewer, /playback\?: CoursePlaybackStore;/);
   assert.match(resourceViewer, /onPlaybackChange\?: \(fileId: string, patch: CoursePlaybackPatch\) => void;/);
-  assert.match(resourceViewer, /function ResourceViewer\(\{ file, active = true, playback, onPlaybackChange \}/);
+  assert.match(resourceViewer, /function ResourceViewer\(\{ file, active = true, playback, onPlaybackChange/);
   assert.match(resourceViewer, /data-active=\{active \? "true" : "false"\}/);
 });
 
