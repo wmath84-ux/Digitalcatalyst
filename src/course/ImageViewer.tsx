@@ -83,7 +83,7 @@ export default function ImageViewer({ url, name }: ImageViewerProps) {
 
   return (
     <div
-      className="relative h-full w-full overflow-hidden bg-[radial-gradient(circle_at_center,#1e293b,#020617)] touch-none"
+      className="relative h-full w-full overflow-hidden course-image-surface bg-[var(--course-bg)] touch-none"
       data-course-image-viewer
       data-pinch-zoom="enabled"
       onWheel={(event) => {
@@ -135,7 +135,7 @@ export default function ImageViewer({ url, name }: ImageViewerProps) {
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[11px] font-black"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[var(--course-soft-hover)] px-3 py-1.5 text-[11px] font-black"
             >
               Open original
             </a>
@@ -154,11 +154,11 @@ export default function ImageViewer({ url, name }: ImageViewerProps) {
           />
         )}
       </div>
-      <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/15 bg-slate-950/85 p-1.5 text-white shadow-2xl backdrop-blur">
+      <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-[var(--course-border)] bg-[var(--course-surface-translucent)] p-1.5 text-[var(--course-text)] shadow-2xl backdrop-blur">
         <button
           type="button"
           onClick={() => applyZoom(scaleRef.current - 0.25)}
-          className="grid h-9 w-9 place-items-center rounded-full hover:bg-white/10"
+          className="grid h-9 w-9 place-items-center rounded-full hover:bg-[var(--course-soft-hover)]"
           aria-label="Zoom out"
           data-course-image-zoom-out
         >
@@ -168,7 +168,7 @@ export default function ImageViewer({ url, name }: ImageViewerProps) {
         <button
           type="button"
           onClick={() => applyZoom(scaleRef.current + 0.25)}
-          className="grid h-9 w-9 place-items-center rounded-full hover:bg-white/10"
+          className="grid h-9 w-9 place-items-center rounded-full hover:bg-[var(--course-soft-hover)]"
           aria-label="Zoom in"
           data-course-image-zoom-in
         >
@@ -177,7 +177,7 @@ export default function ImageViewer({ url, name }: ImageViewerProps) {
         <button
           type="button"
           onClick={() => applyZoom(1)}
-          className="grid h-9 w-9 place-items-center rounded-full hover:bg-white/10"
+          className="grid h-9 w-9 place-items-center rounded-full hover:bg-[var(--course-soft-hover)]"
           aria-label="Reset zoom"
           data-course-image-zoom-reset
         >
@@ -186,7 +186,7 @@ export default function ImageViewer({ url, name }: ImageViewerProps) {
         <button
           type="button"
           onClick={() => applyZoom(1)}
-          className="flex h-9 items-center gap-1.5 rounded-full bg-white/10 px-3 text-[11px] font-black hover:bg-white/15"
+          className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--course-soft-hover)] px-3 text-[11px] font-black hover:bg-[var(--course-strong)]"
           aria-label="Fit to screen"
           data-course-image-zoom-fit
         >
@@ -195,14 +195,14 @@ export default function ImageViewer({ url, name }: ImageViewerProps) {
         <button
           type="button"
           onClick={() => void download()}
-          className="flex h-9 items-center gap-1.5 rounded-full bg-violet-500 px-3 text-xs font-black"
+          className="flex h-9 items-center gap-1.5 rounded-full bg-violet-500 px-3 text-xs font-black text-white"
           aria-label="Download image"
           data-course-image-download
         >
           <Download size={14} /> Download
         </button>
       </div>
-      <p className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/45 px-3 py-1.5 text-[10px] font-bold text-white/60">
+      <p className="pointer-events-none absolute left-3 top-3 rounded-full bg-[var(--course-surface-translucent)] px-3 py-1.5 text-[10px] font-bold text-[var(--course-muted)]">
         Pinch/wheel to zoom · double-click zoom · drag to pan
       </p>
     </div>

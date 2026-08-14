@@ -52,7 +52,7 @@ export const getCourseEmbed = (file: CourseFile): { url: string; kind: "youtube"
   }
   if (file.type === "youtube" || file.youtubeVideoId || /youtu(?:\.be|be\.com)/i.test(raw)) {
     const id = file.youtubeVideoId || extractYouTubeId(raw);
-    return id ? { url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?rel=0&modestbranding=1&playsinline=1`, kind: "youtube" } : { url: "", kind: "none" };
+    return id ? { url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?rel=0&modestbranding=1&playsinline=1&controls=1&fs=1`, kind: "youtube" } : { url: "", kind: "none" };
   }
   const google = googleParts(raw);
   if (file.type === "google_form" || google?.kind === "forms") {

@@ -54,11 +54,11 @@ export default function ResourceViewer({ file }: ResourceViewerProps) {
   // No file selected — show the empty state.
   if (!file) {
     return (
-      <div className="grid h-full min-h-[280px] place-items-center bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 p-8 text-center text-white">
+      <div className="grid h-full min-h-[280px] place-items-center course-viewer-empty-surface bg-[var(--course-bg)] p-8 text-center text-[var(--course-text)]">
         <div data-course-viewer-empty>
-          <FileQuestion className="mx-auto h-12 w-12 text-white/30" />
+          <FileQuestion className="mx-auto h-12 w-12 text-[var(--course-muted)]" />
           <p className="mt-4 font-black">Choose a lesson or resource</p>
-          <p className="mt-1 text-sm text-white/45">Your course content will open here without leaving the app.</p>
+          <p className="mt-1 text-sm text-[var(--course-muted)]">Your course content will open here without leaving the app.</p>
         </div>
       </div>
     );
@@ -70,14 +70,15 @@ export default function ResourceViewer({ file }: ResourceViewerProps) {
   const isImage = file.type === "image" && embed.kind === "direct";
   const isVideo = file.type === "video" && embed.kind === "direct";
   const isAudio = file.type === "audio" && embed.kind === "direct";
-  // Video-shaped content is letterboxed at 16:9 and centred so it never
-  // stretches; document-shaped content fills every available pixel.
+  // YouTube's iframe fills the available stage. YouTube still letterboxes the
+  // video itself, while its settings / quality menus get enough vertical room
+  // to render every option and can be dismissed by tapping the player surface.
   const isCinematic = isVideo || embed.kind === "youtube";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-950" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind}>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind}>
       <ViewerHeader file={file} embed={embed} download={download} />
-      <div className={`min-h-0 flex-1 overflow-hidden ${isCinematic ? "grid place-items-center bg-black p-0" : ""}`}>
+      <div className={`min-h-0 flex-1 overflow-hidden ${isCinematic ? "grid place-items-center bg-black p-0" : "bg-[var(--course-bg)]"}`}>
         {isImage ? (
           <ImageViewer url={embed.url} name={file.name} />
         ) : isVideo ? (
@@ -97,10 +98,8 @@ export default function ResourceViewer({ file }: ResourceViewerProps) {
         ) : !embed.url ? (
           <MissingEmbedState file={file} download={download} />
         ) : isCinematic ? (
-          <div className="flex h-full w-full items-center justify-center">
-            <div className="aspect-video max-h-full w-full max-w-full">
-              <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} />
-            </div>
+          <div className="h-full min-h-0 w-full bg-black" data-course-youtube-stage={embed.kind === "youtube" ? "expanded" : undefined}>
+            <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} />
           </div>
         ) : (
           <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} />
@@ -120,16 +119,16 @@ function ViewerHeader({ file, embed, download }: { file: CourseFile; embed: { ur
     else void root.requestFullscreen?.();
   };
   return (
-    <div className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-white/10 bg-slate-950/95 px-3 py-2.5 text-white backdrop-blur sm:gap-3 sm:px-4">
+    <div className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-[var(--course-border)] bg-[var(--course-surface)] px-3 py-2.5 text-[var(--course-text)] backdrop-blur sm:gap-3 sm:px-4">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-black" title={file.name}>{file.name}</p>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-white/40" data-course-viewer-kind>{kindLabel} preview</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--course-muted)]" data-course-viewer-kind>{kindLabel} preview</p>
       </div>
       {isMedia ? (
         <button
           type="button"
           onClick={toggleFullscreen}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/10 text-white/80 hover:bg-white/15"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
           aria-label="Toggle fullscreen"
           title="Fullscreen"
           data-course-viewer-fullscreen
@@ -143,7 +142,7 @@ function ViewerHeader({ file, embed, download }: { file: CourseFile; embed: { ur
           target="_blank"
           rel="noopener noreferrer"
           download={download.downloadable ? file.name : undefined}
-          className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-bold hover:bg-white/15"
+          className="flex items-center gap-1.5 rounded-lg bg-[var(--course-soft)] px-3 py-2 text-xs font-bold hover:bg-[var(--course-soft-hover)]"
           data-course-viewer-download
         >
           {download.downloadable ? <Download size={14} /> : <ExternalLink size={14} />}
@@ -155,7 +154,7 @@ function ViewerHeader({ file, embed, download }: { file: CourseFile; embed: { ur
           href={embed.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="grid h-9 w-9 place-items-center rounded-lg bg-white/10"
+          className="grid h-9 w-9 place-items-center rounded-lg bg-[var(--course-soft)] hover:bg-[var(--course-soft-hover)]"
           aria-label="Open preview in new tab"
           data-course-viewer-external
         >
@@ -168,11 +167,11 @@ function ViewerHeader({ file, embed, download }: { file: CourseFile; embed: { ur
 
 function MissingEmbedState({ file, download }: { file: CourseFile; download: { url: string; label: string; downloadable: boolean } }) {
   return (
-    <div className="grid h-full place-items-center bg-slate-950 p-8 text-center text-white" data-course-viewer-missing>
+    <div className="grid h-full place-items-center bg-[var(--course-bg)] p-8 text-center text-[var(--course-text)]" data-course-viewer-missing>
       <div className="max-w-md">
         <FileQuestion className="mx-auto h-12 w-12 text-amber-400" />
         <p className="mt-4 font-black">Preview is unavailable</p>
-        <p className="mt-1 text-sm text-white/50">
+        <p className="mt-1 text-sm text-[var(--course-muted)]">
           Add a public HTTPS URL in product management. Google files must be shared as “Anyone with the link”.
         </p>
         {download.url ? (
@@ -180,13 +179,13 @@ function MissingEmbedState({ file, download }: { file: CourseFile; download: { u
             href={download.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2 text-xs font-bold hover:bg-white/15"
+            className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-[var(--course-soft)] px-4 py-2 text-xs font-bold hover:bg-[var(--course-soft-hover)]"
           >
             {download.downloadable ? <Download size={14} /> : <ExternalLink size={14} />}
             {download.label}
           </a>
         ) : null}
-        <p className="mt-4 text-[10px] uppercase tracking-wider text-white/30">File type: {file.type}</p>
+        <p className="mt-4 text-[10px] uppercase tracking-wider text-[var(--course-muted)]">File type: {file.type}</p>
       </div>
     </div>
   );
@@ -226,19 +225,19 @@ function EmbedFrame({ url, title, kind, supported }: EmbedFrameProps) {
   return (
     <div className="relative h-full w-full" data-course-viewer-embed data-embed-kind={kind}>
       {loading ? (
-        <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-slate-950/60 text-white">
+        <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-[var(--course-loading)] text-[var(--course-text)]">
           <div className="flex flex-col items-center gap-2">
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/25 border-t-violet-400" />
-            <p className="text-xs font-semibold text-white/55">Loading preview…</p>
+            <p className="text-xs font-semibold text-[var(--course-muted)]">Loading preview…</p>
           </div>
         </div>
       ) : null}
       {failed ? (
-        <div className="absolute inset-0 z-20 grid place-items-center bg-slate-950 p-8 text-center text-white">
+        <div className="absolute inset-0 z-20 grid place-items-center bg-[var(--course-bg)] p-8 text-center text-[var(--course-text)]">
           <div className="max-w-md">
             <AlertTriangle className="mx-auto h-12 w-12 text-amber-400" />
             <p className="mt-4 font-black">Preview didn’t load</p>
-            <p className="mt-1 text-sm text-white/55">
+            <p className="mt-1 text-sm text-[var(--course-muted)]">
               The host may be blocking the embed. Open the source in a new tab to view it directly.
             </p>
             <div className="mt-5 flex items-center justify-center gap-2">
@@ -257,13 +256,13 @@ function EmbedFrame({ url, title, kind, supported }: EmbedFrameProps) {
                   setLoading(true);
                   setReloadKey((value) => value + 1);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2 text-xs font-bold text-white hover:bg-white/15"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--course-soft)] px-4 py-2 text-xs font-bold text-[var(--course-text)] hover:bg-[var(--course-soft-hover)]"
                 data-course-viewer-retry
               >
                 <RefreshCw size={14} /> Retry
               </button>
             </div>
-            <p className="mt-4 text-[10px] uppercase tracking-wider text-white/30">Source: {new URL(url, "https://x").hostname}</p>
+            <p className="mt-4 text-[10px] uppercase tracking-wider text-[var(--course-muted)]">Source: {new URL(url, "https://x").hostname}</p>
           </div>
         </div>
       ) : null}
@@ -289,7 +288,7 @@ function EmbedFrame({ url, title, kind, supported }: EmbedFrameProps) {
         }}
       />
       {!supported ? (
-        <p className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/65 px-3 py-1 text-[10px] font-bold text-white/70">
+        <p className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/65 px-3 py-1 text-[10px] font-bold text-[var(--course-muted)]">
           {kind} embed
         </p>
       ) : null}

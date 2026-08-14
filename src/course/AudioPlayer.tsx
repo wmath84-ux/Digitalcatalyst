@@ -102,11 +102,11 @@ export default function AudioPlayer({ url, name }: AudioPlayerProps) {
         step={0.1}
         value={Math.min(currentTime, duration || 0)}
         onChange={(event) => seek(Number(event.target.value))}
-        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-violet-400"
+        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[var(--course-soft-hover)] accent-violet-400"
         aria-label="Seek"
         data-course-audio-seek
       />
-      <div className="mt-2 flex items-center justify-between text-[10px] font-bold tabular-nums text-white/40">
+      <div className="mt-2 flex items-center justify-between text-[10px] font-bold tabular-nums text-[var(--course-muted)]">
         <span data-course-audio-current>{formatTime(currentTime)}</span>
         <span data-course-audio-duration>{formatTime(duration)}</span>
       </div>
@@ -119,7 +119,7 @@ export default function AudioPlayer({ url, name }: AudioPlayerProps) {
         type="button"
         onClick={() => setLoop((value) => !value)}
         aria-label="Toggle loop"
-        className={`grid h-10 w-10 place-items-center rounded-full transition ${loop ? "bg-violet-500 text-white" : "bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"}`}
+        className={`grid h-10 w-10 place-items-center rounded-full transition ${loop ? "bg-violet-500 text-white" : "bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"}`}
         data-course-audio-loop
         data-active={loop ? "true" : "false"}
       >
@@ -129,7 +129,7 @@ export default function AudioPlayer({ url, name }: AudioPlayerProps) {
         type="button"
         onClick={restart}
         aria-label="Restart"
-        className="grid h-10 w-10 place-items-center rounded-full bg-white/5 text-white/55 transition hover:bg-white/10 hover:text-white"
+        className="grid h-10 w-10 place-items-center rounded-full bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
         data-course-audio-restart
       >
         <RotateCcw size={16} />
@@ -153,7 +153,7 @@ export default function AudioPlayer({ url, name }: AudioPlayerProps) {
           setMuted(audio.muted);
         }}
         aria-label="Toggle mute"
-        className="grid h-10 w-10 place-items-center rounded-full bg-white/5 text-white/55 transition hover:bg-white/10 hover:text-white"
+        className="grid h-10 w-10 place-items-center rounded-full bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
         data-course-audio-mute
         data-muted={muted ? "true" : "false"}
       >
@@ -163,27 +163,27 @@ export default function AudioPlayer({ url, name }: AudioPlayerProps) {
   );
 
   return (
-    <div className="grid h-full place-items-center bg-gradient-to-br from-slate-950 via-violet-950/40 to-slate-950 p-3 sm:p-6" data-course-viewer-audio data-orientation={landscape ? "landscape" : "portrait"}>
+    <div className="grid h-full place-items-center course-audio-surface bg-[var(--course-bg)] p-3 sm:p-6" data-course-viewer-audio data-orientation={landscape ? "landscape" : "portrait"}>
       {landscape ? (
-        <div className="flex w-full max-w-3xl items-center gap-4 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl backdrop-blur" data-course-audio-player>
+        <div className="flex w-full max-w-3xl items-center gap-4 rounded-3xl border border-[var(--course-border)] bg-[var(--course-soft)] p-4 shadow-2xl backdrop-blur" data-course-audio-player>
           <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg shadow-violet-500/30">
             {equalizer}
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
-            <p className="truncate text-sm font-black text-white" title={name}>{name}</p>
+            <p className="truncate text-sm font-black text-[var(--course-text)]" title={name}>{name}</p>
             <div className="mt-1.5">{seekBar}</div>
           </div>
           {transport}
         </div>
       ) : (
-        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl backdrop-blur" data-course-audio-player>
+        <div className="w-full max-w-md rounded-3xl border border-[var(--course-border)] bg-[var(--course-soft)] p-6 shadow-2xl backdrop-blur" data-course-audio-player>
           {/* Artwork / equalizer */}
           <div className="mx-auto grid h-24 w-24 place-items-center rounded-3xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg shadow-violet-500/30">
             {equalizer}
           </div>
 
-          <p className="mt-5 truncate text-center text-sm font-black text-white" title={name}>{name}</p>
-          <p className="mt-1 text-center text-[10px] font-bold uppercase tracking-wider text-white/35">Now playing</p>
+          <p className="mt-5 truncate text-center text-sm font-black text-[var(--course-text)]" title={name}>{name}</p>
+          <p className="mt-1 text-center text-[10px] font-bold uppercase tracking-wider text-[var(--course-muted)]">Now playing</p>
 
           {/* Seek bar */}
           <div className="mt-5">{seekBar}</div>

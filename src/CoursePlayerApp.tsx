@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { ArrowLeft, CheckCircle2, Minimize2, RotateCw } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Minimize2, Moon, RotateCw, Sun } from "lucide-react";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer from "./course/ResourceViewer";
@@ -115,6 +115,16 @@ const persistLocalNotes = (uid: string, productId: string, notes: CoursePlayerNo
   }
 };
 
+type CoursePlayerTheme = "dark" | "light";
+const courseThemeStorageKey = "dc.coursePlayerTheme";
+const loadCourseTheme = (): CoursePlayerTheme => {
+  try {
+    return localStorage.getItem(courseThemeStorageKey) === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+};
+
 export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: CoursePlayerProps) {
   const { user } = useAuth();
   const modules = product.courseContent || [];
@@ -131,6 +141,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // Immersive mode: rotates the viewer a quarter-turn so a portrait-locked
   // phone can still watch a video / read a wide sheet edge-to-edge.
   const [immersive, setImmersive] = useState(false);
+  const [theme, setTheme] = useState<CoursePlayerTheme>(loadCourseTheme);
   const ownedUpdateIds = resolution.ownedUpdateIds;
   const updates = useMemo(() => collectUpdates(modules).filter((update) => !ownedUpdateIds.has(update.id)), [modules, ownedUpdateIds]);
   const moduleTitleById = useMemo(() => collectModuleTitleById(modules), [modules]);
@@ -152,6 +163,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // The rotated immersive view only makes sense on a portrait viewport —
   // once the device is physically turned, drop back to the rail layout.
   useEffect(() => { if (isLandscape) setImmersive(false); }, [isLandscape]);
+
+  // The preference is scoped to the Course Player and restored on the next
+  // visit without changing the theme of the rest of the application.
+  useEffect(() => {
+    try {
+      localStorage.setItem(courseThemeStorageKey, theme);
+    } catch {
+      /* private mode / storage disabled — keep the in-memory preference */
+    }
+  }, [theme]);
 
   // Escape leaves immersive mode.
   useEffect(() => {
@@ -275,19 +296,35 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
   const progress = totalEligibleFiles.length ? Math.round((completedIds.size / totalEligibleFiles.length) * 100) : 0;
   const isDone = Boolean(selectedFile && completedIds.has(selectedFile.id));
+  const nextTheme = theme === "dark" ? "light" : "dark";
+
+  const themeToggle = (
+    <button
+      type="button"
+      onClick={() => setTheme(nextTheme)}
+      className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+      aria-label={`Switch to ${nextTheme} theme`}
+      title={`Switch to ${nextTheme} theme`}
+      aria-pressed={theme === "dark"}
+      data-course-theme-toggle
+      data-theme={theme}
+    >
+      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  );
 
   const markCompleteBar = selectedFile ? (
-    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-white/10 bg-[#10101a] px-4 py-2.5" data-course-mark-complete-bar>
+    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--course-border)] bg-[var(--course-surface)] px-4 py-2.5" data-course-mark-complete-bar>
       <div className="min-w-0">
         <p className="truncate text-xs font-black" data-course-selected-name>{selectedFile.name}</p>
-        <p className="text-[10px] text-white/35">Progress is saved to your account</p>
+        <p className="text-[10px] text-[var(--course-muted)]">Progress is saved to your account</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {!isLandscape ? (
           <button
             type="button"
             onClick={() => setImmersive(true)}
-            className="grid h-9 w-9 place-items-center rounded-xl bg-white/[0.07] text-white/70 transition hover:bg-white/15 hover:text-white"
+            className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
             aria-label="Rotate to fullscreen"
             title="Rotate to fullscreen"
             data-course-rotate-fullscreen
@@ -339,7 +376,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // turn so the content fills the long edge of the screen.
   if (immersive && !isLandscape) {
     return (
-      <div className="fixed inset-0 z-[100] overflow-hidden bg-black" data-course-player data-orientation="immersive">
+      <div className="course-player-shell fixed inset-0 z-[100] overflow-hidden bg-black" data-course-player data-course-theme={theme} data-orientation="immersive" style={{ colorScheme: theme }}>
         <div
           className="absolute left-1/2 top-1/2 origin-center"
           style={{ width: "100dvh", height: "100dvw", transform: "translate(-50%, -50%) rotate(90deg)" }}
@@ -362,14 +399,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // ── Landscape: header rail left, content centre, toggle rail right ──
   if (isLandscape) {
     return (
-      <div className="fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[#090912] text-white" data-course-player data-orientation="landscape">
+      <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" style={{ colorScheme: theme }}>
         {/* Left vertical header — pinned, never scrolls */}
         <header
-          className="sticky left-0 top-0 z-50 flex h-full w-14 shrink-0 flex-col items-center gap-3 border-r border-white/10 bg-[#10101a] py-3"
+          className="sticky left-0 top-0 z-50 flex h-full w-14 shrink-0 flex-col items-center gap-3 border-r border-[var(--course-border)] bg-[var(--course-surface)] py-3"
           style={{ paddingLeft: "env(safe-area-inset-left, 0px)" }}
           data-course-landscape-header
         >
-          <button onClick={onBack} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white" aria-label="Back" data-course-back><ArrowLeft size={18} /></button>
+          <button onClick={onBack} className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]" aria-label="Back" data-course-back><ArrowLeft size={18} /></button>
+          {themeToggle}
           <div className="flex min-h-0 flex-1 items-center justify-center">
             <span className="line-clamp-1 max-h-full text-xs font-black [writing-mode:vertical-rl] rotate-180" data-course-product-title>{product.title}</span>
           </div>
@@ -380,10 +418,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
             <span data-course-preview-badge className="shrink-0 rounded-full bg-sky-500/15 px-1.5 py-2 text-[8px] font-black uppercase tracking-wider text-sky-200 ring-1 ring-sky-400/20 [writing-mode:vertical-rl] rotate-180">Preview mode</span>
           ) : null}
           <div className="flex shrink-0 flex-col items-center gap-2" data-course-progress-summary>
-            <div className="relative h-24 w-1.5 overflow-hidden rounded-full bg-white/10" data-course-progress-bar>
+            <div className="relative h-24 w-1.5 overflow-hidden rounded-full bg-[var(--course-soft-hover)]" data-course-progress-bar>
               <div className="absolute bottom-0 w-full bg-gradient-to-t from-violet-500 to-cyan-400" style={{ height: `${progress}%` }} data-course-progress-fill data-progress-value={progress} />
             </div>
-            <span className="text-[9px] font-bold text-white/40" data-course-progress-label>{progress}%</span>
+            <span className="text-[9px] font-bold text-[var(--course-muted)]" data-course-progress-label>{progress}%</span>
           </div>
         </header>
 
@@ -402,20 +440,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
   // ── Portrait: sticky header top, content full-bleed, sticky dock bottom ──
   return (
-    <div className="fixed inset-0 flex h-[100dvh] flex-col overflow-hidden bg-[#090912] text-white" data-course-player data-orientation="portrait">
+    <div className="course-player-shell fixed inset-0 flex h-[100dvh] flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="portrait" style={{ colorScheme: theme }}>
       <header
-        className="sticky top-0 z-50 flex shrink-0 items-center gap-3 border-b border-white/10 bg-[#10101a] px-3 py-2.5 sm:px-5"
+        className="sticky top-0 z-50 flex shrink-0 items-center gap-3 border-b border-[var(--course-border)] bg-[var(--course-surface)] px-3 py-2.5 sm:px-5"
         style={{ paddingTop: "calc(0.625rem + env(safe-area-inset-top, 0px))" }}
         data-course-header
       >
-        <button onClick={onBack} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white" aria-label="Back" data-course-back><ArrowLeft size={18} /></button>
+        <button onClick={onBack} className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]" aria-label="Back" data-course-back><ArrowLeft size={18} /></button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-black sm:text-base" data-course-product-title>{product.title}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1" data-course-progress-summary>
-            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/10" data-course-progress-bar>
+            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-[var(--course-soft-hover)]" data-course-progress-bar>
               <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-400 transition-[width] duration-500" style={{ width: `${progress}%` }} data-course-progress-fill data-progress-value={progress} />
             </div>
-            <span className="text-[10px] font-bold text-white/40" data-course-progress-label>{progress}% complete</span>
+            <span className="text-[10px] font-bold text-[var(--course-muted)]" data-course-progress-label>{progress}% complete</span>
             {hasActiveSubscription ? (
               <span data-course-subscription-badge="active" className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-violet-200 ring-1 ring-violet-400/30">Active subscription</span>
             ) : null}
@@ -424,6 +462,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
             ) : null}
           </div>
         </div>
+        {themeToggle}
       </header>
 
       {/* Everything between the pinned header and the pinned dock. */}

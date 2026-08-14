@@ -56,8 +56,8 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete }: NotesPane
   return (
     <div className="flex h-full flex-col overflow-hidden" data-course-notes-panel>
       {/* Header: title + the single "+" button */}
-      <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2">
-        <p className="text-[11px] font-black uppercase tracking-[0.14em] text-white/55" data-course-notes-title>
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--course-border)] px-4 py-2">
+        <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[var(--course-muted)]" data-course-notes-title>
           Notes
         </p>
         <button
@@ -74,14 +74,14 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete }: NotesPane
 
       {/* Composer (only while adding a new note) */}
       {composing ? (
-        <div className="shrink-0 border-b border-white/10 p-3" data-course-notes-composer>
+        <div className="shrink-0 border-b border-[var(--course-border)] p-3" data-course-notes-composer>
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             rows={3}
             autoFocus
             placeholder="Write your note…"
-            className="w-full rounded-lg border border-white/10 bg-white/5 p-2.5 text-sm text-white outline-none placeholder:text-white/25 focus:border-violet-400"
+            className="w-full rounded-lg border border-[var(--course-border)] bg-[var(--course-soft)] p-2.5 text-sm text-[var(--course-text)] outline-none placeholder:text-[var(--course-muted)] focus:border-violet-400"
             data-course-notes-input
           />
           <div className="mt-2 flex items-center gap-2">
@@ -97,7 +97,7 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete }: NotesPane
             <button
               type="button"
               onClick={() => { setComposing(false); setDraft(""); }}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/10 py-2 text-[11px] font-black text-white/70"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[var(--course-soft-hover)] py-2 text-[11px] font-black text-[var(--course-muted)]"
               data-course-notes-cancel
             >
               <X size={13} /> Cancel
@@ -109,20 +109,20 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete }: NotesPane
       {/* Note list — thin strips */}
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {notes.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-white/15 p-4 text-center text-xs font-semibold text-white/40">
+          <p className="rounded-lg border border-dashed border-[var(--course-border)] p-4 text-center text-xs font-semibold text-[var(--course-muted)]">
             No notes yet — tap + to add one.
           </p>
         ) : (
           <ul className="space-y-1.5" data-course-notes-list>
             {notes.map((note) =>
               editingId === note.id ? (
-                <li key={note.id} className="rounded-lg border border-violet-400/50 bg-white/5 p-2" data-course-note data-note-id={note.id}>
+                <li key={note.id} className="rounded-lg border border-violet-400/50 bg-[var(--course-soft)] p-2" data-course-note data-note-id={note.id}>
                   <textarea
                     value={editDraft}
                     onChange={(event) => setEditDraft(event.target.value)}
                     rows={2}
                     autoFocus
-                    className="w-full rounded-md border border-white/10 bg-white/5 p-2 text-xs text-white outline-none"
+                    className="w-full rounded-md border border-[var(--course-border)] bg-[var(--course-soft)] p-2 text-xs text-[var(--course-text)] outline-none"
                     data-course-note-edit-input
                   />
                   <div className="mt-1.5 flex items-center gap-1.5">
@@ -138,7 +138,7 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete }: NotesPane
                     <button
                       type="button"
                       onClick={() => { setEditingId(null); setEditDraft(""); }}
-                      className="flex flex-1 items-center justify-center gap-1 rounded-md bg-white/10 py-1.5 text-[10px] font-black text-white/70"
+                      className="flex flex-1 items-center justify-center gap-1 rounded-md bg-[var(--course-soft-hover)] py-1.5 text-[10px] font-black text-[var(--course-muted)]"
                       data-course-note-edit-cancel
                     >
                       <X size={11} /> Cancel
@@ -148,15 +148,15 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete }: NotesPane
               ) : (
                 <li
                   key={note.id}
-                  className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 py-1.5 pl-2.5 pr-1.5"
+                  className="flex items-center gap-1.5 rounded-md border border-[var(--course-border)] bg-[var(--course-soft)] py-1.5 pl-2.5 pr-1.5"
                   data-course-note
                   data-note-id={note.id}
                 >
-                  <span className="min-w-0 flex-1 truncate text-xs text-white/80" title={note.text}>{note.text}</span>
+                  <span className="min-w-0 flex-1 truncate text-xs text-[var(--course-muted)]" title={note.text}>{note.text}</span>
                   <button
                     type="button"
                     onClick={() => startEdit(note)}
-                    className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white"
+                    className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
                     aria-label="Edit note"
                     data-course-note-edit
                   >

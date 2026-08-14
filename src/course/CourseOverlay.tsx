@@ -134,7 +134,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
 
       {/* ── Overlay sheet ─────────────────────────────────────────────── */}
       <div
-        className={`absolute z-40 flex flex-col overflow-hidden border-white/10 bg-[#11111d] shadow-[0_-18px_50px_rgba(0,0,0,0.55)] transition-[transform,opacity] duration-300 ease-out ${
+        className={`absolute z-40 flex flex-col overflow-hidden border-[var(--course-border)] bg-[var(--course-panel)] shadow-[0_-18px_50px_rgba(0,0,0,0.55)] transition-[transform,opacity] duration-300 ease-out ${
           landscape
             ? "bottom-0 right-16 top-0 border-l"
             : "inset-x-0 bottom-16 rounded-t-3xl border-t"
@@ -153,17 +153,17 @@ export default function CourseOverlay(props: CourseOverlayProps) {
             type="button"
             onClick={props.onClose}
             aria-label="Collapse panel"
-            className="mx-auto mt-2 h-1.5 w-11 shrink-0 rounded-full bg-white/25"
+            className="mx-auto mt-2 h-1.5 w-11 shrink-0 rounded-full bg-[var(--course-strong)]"
           />
         ) : null}
 
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-          <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-white/55" data-course-overlay-title>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--course-border)] px-4 py-3">
+          <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-[var(--course-muted)]" data-course-overlay-title>
             {TABS[activeIndex].heading}
           </p>
           <button
             onClick={props.onClose}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/5 text-white/55 transition hover:bg-white/10 hover:text-white"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
             aria-label="Close overlay"
             data-course-overlay-close
           >
@@ -190,7 +190,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
 
       {/* ── Dock: always the top-most interactive layer ───────────────── */}
       <div
-        className={`relative z-50 shrink-0 border-white/10 bg-[#10101a]/95 backdrop-blur ${landscape ? "flex w-16 flex-col border-l" : "h-16 border-t"}`}
+        className={`relative z-50 shrink-0 border-[var(--course-border)] bg-[var(--course-surface-translucent)] backdrop-blur ${landscape ? "flex w-16 flex-col border-l" : "h-16 border-t"}`}
         style={landscape ? undefined : { paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         data-course-dock
         data-orientation={orientation}
@@ -213,7 +213,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
                 onClick={() => props.onTabChange(key)}
                 aria-pressed={active}
                 className={`relative z-10 flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-black transition-colors ${
-                  active ? "text-white" : "text-white/45 hover:text-white/85"
+                  active ? "text-white" : "text-[var(--course-muted)] hover:text-[var(--course-text)]"
                 }`}
                 data-course-dock-tab
                 data-tab={key}
@@ -251,7 +251,7 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
   }, [mode, props.selectedFileId]);
 
   if (visible.length === 0) {
-    return <p className="grid h-full place-items-center px-6 text-center text-xs text-white/35">No {mode === "resources" ? "files" : "modules"} to show yet.</p>;
+    return <p className="grid h-full place-items-center px-6 text-center text-xs text-[var(--course-muted)]">No {mode === "resources" ? "files" : "modules"} to show yet.</p>;
   }
 
   return (
@@ -270,7 +270,7 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
         const rowFiles = mode === "resources" ? files : open ? files : [];
 
         return (
-          <div key={moduleId} className={depth ? "ml-3 border-l border-white/10 pl-2" : "mb-1.5"}>
+          <div key={moduleId} className={depth ? "ml-3 border-l border-[var(--course-border)] pl-2" : "mb-1.5"}>
             <button
               type="button"
               onClick={() => {
@@ -278,7 +278,7 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
               }}
               disabled={mode === "resources"}
               className={`flex w-full items-center gap-2.5 rounded-2xl px-3 py-3 text-left transition ${mode === "resources" ? "cursor-default" : ""} ${
-                locked ? "bg-amber-400/[0.07] ring-1 ring-inset ring-amber-400/15" : holdsSelected ? "bg-violet-500/10 ring-1 ring-inset ring-violet-400/25" : "hover:bg-white/5"
+                locked ? "bg-amber-400/[0.07] ring-1 ring-inset ring-amber-400/15" : holdsSelected ? "bg-violet-500/10 ring-1 ring-inset ring-violet-400/25" : "hover:bg-[var(--course-soft)]"
               }`}
               data-course-overlay-module
               data-module-id={moduleId}
@@ -286,20 +286,20 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
               data-preview={preview ? "true" : "false"}
             >
               {mode === "modules" ? (
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white/[0.07] text-[10px] font-black text-white/50">{depth + 1}</span>
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[10px] font-black text-[var(--course-muted)]">{depth + 1}</span>
               ) : (
-                <FileText size={14} className="shrink-0 text-white/30" />
+                <FileText size={14} className="shrink-0 text-[var(--course-muted)]" />
               )}
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-xs font-black">{module.title}</span>
-                <span className="mt-0.5 block text-[10px] font-bold text-white/30">
+                <span className="mt-0.5 block text-[10px] font-bold text-[var(--course-muted)]">
                   {files.length} {files.length === 1 ? "file" : "files"}
                 </span>
               </span>
               {preview ? <Eye size={13} className="shrink-0 text-sky-300" /> : null}
               {locked && !preview ? <LockKeyhole size={13} className="shrink-0 text-amber-400" /> : null}
               {mode === "modules" && files.length > 0 ? (
-                open ? <ChevronDown size={15} className="shrink-0 text-white/40" /> : <ChevronRight size={15} className="shrink-0 text-white/40" />
+                open ? <ChevronDown size={15} className="shrink-0 text-[var(--course-muted)]" /> : <ChevronRight size={15} className="shrink-0 text-[var(--course-muted)]" />
               ) : null}
             </button>
 
@@ -329,7 +329,7 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
                       disabled={fileLocked}
                       onClick={() => props.onSelectFile(file)}
                       className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[11px] font-bold transition ${
-                        props.selectedFileId === file.id ? "bg-violet-500 text-white shadow-lg shadow-violet-600/25" : fileLocked ? "cursor-not-allowed bg-amber-400/5 text-white/35" : "text-white/70 hover:bg-white/5 hover:text-white"
+                        props.selectedFileId === file.id ? "bg-violet-500 text-white shadow-lg shadow-violet-600/25" : fileLocked ? "cursor-not-allowed bg-amber-400/5 text-[var(--course-muted)]" : "text-[var(--course-muted)] hover:bg-[var(--course-soft)] hover:text-[var(--course-text)]"
                       }`}
                       data-course-overlay-file
                       data-file-id={file.id}
@@ -337,7 +337,7 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
                     >
                       <Icon size={15} className="shrink-0" />
                       <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                      <span className="shrink-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider opacity-70">{file.type}</span>
+                      <span className="shrink-0 rounded-md bg-[var(--course-soft-hover)] px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider opacity-70">{file.type}</span>
                       {fileLocked ? <LockKeyhole size={12} className="shrink-0 text-amber-400" /> : null}
                     </button>
                   );
@@ -360,15 +360,15 @@ function PaidList(props: CourseOverlayProps) {
   return (
     <div className="h-full overflow-y-auto overscroll-contain p-3 pb-6" data-course-overlay-paid>
       {props.updates.length === 0 ? (
-        <p className="grid h-40 place-items-center px-6 text-center text-xs text-white/35">No paid content for this course.</p>
+        <p className="grid h-40 place-items-center px-6 text-center text-xs text-[var(--course-muted)]">No paid content for this course.</p>
       ) : (
         <div className="space-y-2">
           {props.updates.map((update) => (
-            <div key={update.id} className="rounded-2xl border border-white/10 bg-white/5 p-3">
+            <div key={update.id} className="rounded-2xl border border-[var(--course-border)] bg-[var(--course-soft)] p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-black">{update.title}</p>
-                  <p className="mt-1 text-[10px] leading-4 text-white/45">{update.contentNames.slice(0, 3).join(" · ")}</p>
+                  <p className="mt-1 text-[10px] leading-4 text-[var(--course-muted)]">{update.contentNames.slice(0, 3).join(" · ")}</p>
                 </div>
                 <span className="shrink-0 text-xs font-black text-amber-300">₹{update.price.toLocaleString("en-IN")}</span>
               </div>

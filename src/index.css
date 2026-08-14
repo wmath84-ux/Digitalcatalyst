@@ -313,3 +313,76 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 .animate-course-overlay-in {
   animation: course-overlay-in 0.22s ease both;
 }
+
+/* Course Player — scoped light/dark palette. The variables inherit through
+   the viewer, overlay, notes and media tools without changing the site theme. */
+.course-player-shell {
+  --course-bg: #090912;
+  --course-surface: #10101a;
+  --course-surface-translucent: rgb(16 16 26 / 0.95);
+  --course-panel: #11111d;
+  --course-text: #ffffff;
+  --course-muted: rgb(255 255 255 / 0.52);
+  --course-border: rgb(255 255 255 / 0.1);
+  --course-soft: rgb(255 255 255 / 0.055);
+  --course-soft-hover: rgb(255 255 255 / 0.11);
+  --course-strong: rgb(255 255 255 / 0.24);
+  --course-loading: rgb(2 6 23 / 0.74);
+  background-color: var(--course-bg);
+  color: var(--course-text);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.course-player-shell[data-course-theme="light"] {
+  --course-bg: #f1f5f9;
+  --course-surface: #ffffff;
+  --course-surface-translucent: rgb(255 255 255 / 0.94);
+  --course-panel: #ffffff;
+  --course-text: #0f172a;
+  --course-muted: #64748b;
+  --course-border: rgb(15 23 42 / 0.12);
+  --course-soft: rgb(15 23 42 / 0.055);
+  --course-soft-hover: rgb(15 23 42 / 0.1);
+  --course-strong: rgb(15 23 42 / 0.2);
+  --course-loading: rgb(248 250 252 / 0.82);
+}
+
+.course-viewer-empty-surface,
+.course-audio-surface {
+  background-image: radial-gradient(circle at 50% 25%, rgb(124 58 237 / 0.2), transparent 44%);
+}
+
+.course-player-shell[data-course-theme="light"] .course-viewer-empty-surface,
+.course-player-shell[data-course-theme="light"] .course-audio-surface {
+  background-image: radial-gradient(circle at 50% 25%, rgb(124 58 237 / 0.13), transparent 48%);
+}
+
+.course-image-surface {
+  background-image: radial-gradient(circle at center, #1e293b, #020617);
+}
+
+.course-player-shell[data-course-theme="light"] .course-image-surface {
+  background-image: radial-gradient(circle at center, #ffffff, #dbe4f0);
+}
+
+.course-player-shell[data-course-theme="light"] [data-course-subscription-badge] {
+  color: #6d28d9;
+  background-color: rgb(124 58 237 / 0.12);
+}
+
+.course-player-shell[data-course-theme="light"] [data-course-preview-badge] {
+  color: #0369a1;
+  background-color: rgb(14 165 233 / 0.12);
+}
+
+.course-player-shell :is(button, a, textarea):focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .course-player-shell,
+  .course-player-shell * {
+    scroll-behavior: auto !important;
+  }
+}

@@ -30,9 +30,9 @@ Every course in the app now includes a comprehensive demo module system with **a
 ## How Each File Type Works in the Course Player
 
 ### 1. YouTube (`type: "youtube"`)
-- **Embed URL**: `https://www.youtube-nocookie.com/embed/{videoId}?rel=0&modestbranding=1&playsinline=1`
+- **Embed URL**: `https://www.youtube-nocookie.com/embed/{videoId}?rel=0&modestbranding=1&playsinline=1&controls=1&fs=1`
 - **Source**: Any public YouTube video URL or 11-character video ID
-- **Viewer**: Sandboxed iframe with autoplay support
+- **Viewer**: Sandboxed, full-height iframe with native controls. The expanded iframe viewport keeps YouTube's settings/quality menu visible and easy to dismiss on mobile.
 - **Demo URLs**: Khan Academy, 3Blue1Brown educational videos
 
 ### 2. Video (`type: "video"`)
@@ -127,7 +127,8 @@ These modules have `accessLevel: "paidUpdate"` and appear locked in the Course P
 - ✅ Two modes: "Modules" (curriculum) and "Resources" (downloadable)
 
 ### Viewer (ResourceViewer.tsx)
-- ✅ YouTube no-cookie embed
+- ✅ Header light/dark theme toggle, scoped to the Course Player and persisted locally
+- ✅ YouTube no-cookie embed with a full-height mobile player surface for usable settings menus
 - ✅ Native video player with controls
 - ✅ Native audio player with controls
 - ✅ PDF iframe rendering
