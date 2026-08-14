@@ -15,6 +15,14 @@ import { useHomepageProductReviews } from "../hooks/useProductReviews";
 import { useAuth } from "../context/AuthContext";
 import { ensureSavedWebPushSubscription, subscribeToWebPush } from "../../utils/webPush";
 
+/**
+ * Maximum number of courses the home page "Continue Learning" section shows.
+ * The list is built from live Firestore course progress, so any product added
+ * later automatically appears here once the learner opens it — only the two
+ * most recently opened are kept on screen.
+ */
+const CONTINUE_LEARNING_LIMIT = 2;
+
 interface AppProps {
   onNavigateToStore: () => void;
   onNavigateToProduct: (product: Product) => void;
@@ -88,17 +96,31 @@ export default function App({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const contentTopRef = useRef<HTMLDivElement>(null);
 
-  const continueProgressRecord = useMemo(() => [...progressRecords]
-    .filter((record) => catalogProducts.some((product) => product.id === record.productId))
-    .sort((a, b) => b.updatedAt - a.updatedAt)[0] || null, [catalogProducts, progressRecords]);
-  const continueLearningItem = continueProgressRecord ? products.find((product) => product.id === continueProgressRecord.productId) || null : null;
-  const continueProgress = useMemo(() => {
-    if (!continueProgressRecord) return 0;
-    const product = catalogProducts.find((item) => item.id === continueProgressRecord.productId);
-    const countResources = (modules: NonNullable<typeof product>["canonicalModules"] = []): number => (modules || []).reduce((total, module) => total + (module.resources?.length || 0) + countResources(module.modules || []), 0);
-    const total = product ? countResources(product.canonicalModules) : 0;
-    return total > 0 ? Math.min(100, Math.round((continueProgressRecord.completedFileIds.length / total) * 100)) : 0;
-  }, [catalogProducts, continueProgressRecord]);
+  // "Continue Learning" rule (kept data-driven so future products need no code
+  // change): every course the learner has actually opened — i.e. has a real
+  // `users/{uid}/courseProgress` record for — is a candidate, most recently
+  // opened first, and only the newest CONTINUE_LEARNING_LIMIT are rendered.
+  // A product that is removed from the catalog, or a stale progress record for
+  // a product that no longer exists, drops out automatically.
+  const continueLearningEntries = useMemo(() => {
+    const countResources = (modules: (typeof catalogProducts)[number]["canonicalModules"] = []): number =>
+      (modules || []).reduce((total, module) => total + (module.resources?.length || 0) + countResources(module.modules || []), 0);
+
+    return [...progressRecords]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map((record) => {
+        const item = products.find((product) => product.id === record.productId);
+        const catalogProduct = catalogProducts.find((product) => product.id === record.productId);
+        if (!item || !catalogProduct) return null;
+        const totalResources = countResources(catalogProduct.canonicalModules);
+        const progress = totalResources > 0
+          ? Math.min(100, Math.round((record.completedFileIds.length / totalResources) * 100))
+          : 0;
+        return { item, progress };
+      })
+      .filter((entry): entry is { item: Product; progress: number } => entry !== null)
+      .slice(0, CONTINUE_LEARNING_LIMIT);
+  }, [catalogProducts, products, progressRecords]);
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const searchResults: Product[] = useMemo(() => {
@@ -258,14 +280,17 @@ export default function App({
                 />
               </div>
 
-              {continueLearningItem && (
+              {continueLearningEntries.length > 0 && (
                 <ContinueLearning
-                  title={continueLearningItem.title}
-                  author={continueLearningItem.author}
-                  image={continueLearningItem.image}
-                  progress={continueProgress}
-                  onResume={() => onNavigateToCourse(continueLearningItem)}
-                  onClick={() => onNavigateToCourse(continueLearningItem)}
+                  items={continueLearningEntries.map(({ item, progress }) => ({
+                    id: item.id,
+                    title: item.title,
+                    author: item.author,
+                    image: item.image,
+                    progress,
+                    onResume: () => onNavigateToCourse(item),
+                    onOpen: () => onNavigateToCourse(item),
+                  }))}
                 />
               )}
 

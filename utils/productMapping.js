@@ -34,6 +34,43 @@
 
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const isString = (v) => typeof v === "string";
+
+/**
+ * Firestore hard rule: `undefined` is NOT a supported field value. Any object
+ * handed to `setDoc()`/`updateDoc()` that carries an `undefined` anywhere in
+ * its tree fails the whole write with:
+ *
+ *   FirebaseError: Function setDoc() called with invalid data.
+ *     Unsupported field value: undefined (found in document siteProducts/<id>)
+ *
+ * The editor → Firestore mappers below intentionally emit `undefined` for
+ * "not set" optional fields (embedUrl, youtubeVideoId, paidUpdateId, the
+ * embedContent* legacy slots, …), which made every admin product save fail.
+ * `stripUndefinedDeep` removes those keys entirely instead of writing them:
+ * an absent key is exactly the same thing as "no value" to Firestore, and it
+ * keeps the field out of the document rather than storing a bogus null that
+ * downstream `?? fallback` reads would treat as a real value.
+ *
+ * Arrays drop `undefined` entries (Firestore rejects them inside arrays too).
+ * Dates, Timestamps, FieldValue sentinels and other class instances are passed
+ * through untouched so `serverTimestamp()` etc. keep working.
+ */
+export const stripUndefinedDeep = (value) => {
+  if (Array.isArray(value)) {
+    return value.filter((item) => item !== undefined).map((item) => stripUndefinedDeep(item));
+  }
+  if (!isObject(value)) return value;
+  // Never rewrite non-plain objects (Date, Timestamp, FieldValue sentinels,
+  // GeoPoint, DocumentReference…) — they must reach Firestore as-is.
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return value;
+  const out = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (item === undefined) continue;
+    out[key] = stripUndefinedDeep(item);
+  }
+  return out;
+};
 const numOrNull = (v) => {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(typeof v === "string" ? v.replace(/[^0-9.-]/g, "") : v);
@@ -303,7 +340,10 @@ export const editorResourceToFirestore = (raw) => {
     paidUpdatePrice: numOrNull(raw.cashPrice) === null ? undefined : `₹${numOrNull(raw.cashPrice)}`,
     paidUpdateCoinPrice: numOrNull(raw.coinPrice) || 0,
   };
-  return out;
+  // Firestore rejects `undefined` field values outright, so the optional
+  // slots above (embedUrl / youtubeUrl / youtubeVideoId / paidUpdatePrice)
+  // are dropped rather than written when they have no value.
+  return stripUndefinedDeep(out);
 };
 
 /**
@@ -322,7 +362,7 @@ export const editorModuleToFirestore = (raw, allFlat) => {
     .map((c) => editorModuleToFirestore(c, allFlat))
     .filter(Boolean);
 
-  return {
+  const out = {
     id: str(raw.id),
     title: str(raw.title, "Untitled module"),
     description: str(raw.description),
@@ -348,12 +388,14 @@ export const editorModuleToFirestore = (raw, allFlat) => {
       : undefined,
     paidUpdatePrice: numOrNull(raw.cashPrice) === null ? undefined : `₹${numOrNull(raw.cashPrice)}`,
     paidUpdateCoinPrice: numOrNull(raw.coinPrice) || 0,
-    embedContentTypeId: undefined,
-    embedContentTypeLabel: undefined,
-    embedContentUrl: undefined,
     files,
     modules: children,
   };
+  // Same Firestore constraint as resources: `paidUpdateId` / `paidUpdatePrice`
+  // are only present when the module actually is a paid update / priced, and
+  // the legacy `embedContent*` slots are simply omitted when unset instead of
+  // being written as unsupported `undefined` values.
+  return stripUndefinedDeep(out);
 };
 
 /**
@@ -402,7 +444,7 @@ export const editorPaidUpdateToFirestore = (raw, allFlatModules) => {
     }
     // Unknown ids are dropped silently (matches editor behaviour).
   }
-  return {
+  return stripUndefinedDeep({
     id: str(raw.id),
     title: str(raw.title, "Untitled update"),
     description: str(raw.description),
@@ -419,7 +461,7 @@ export const editorPaidUpdateToFirestore = (raw, allFlatModules) => {
       ? null
       : str(raw.publishDate),
     sortOrder: num(raw.sortOrder),
-  };
+  });
 };
 
 // ---------------------------------------------------------------------------
@@ -745,13 +787,16 @@ export const editorToFirestoreBody = (form) => {
     .map((u) => editorPaidUpdateToFirestore(u, flat))
     .filter(Boolean);
   // Convenience flat lists (root + nested) for components that want it.
-  return {
+  // Everything is stripped of `undefined` because this object is written
+  // straight into `siteProducts/{id}` — a single `undefined` anywhere in the
+  // tree makes Firestore reject the whole `setDoc()` call.
+  return stripUndefinedDeep({
     courseContent,
     paidUpdates,
     // The form blob is preserved as-is so older code paths that read
     // `raw.adminProduct` continue to work.
     adminProduct: form,
-  };
+  });
 };
 
 /**
