@@ -40,7 +40,7 @@ import { AlertTriangle, Download, ExternalLink, FileQuestion, Maximize2, Refresh
 import type { CourseFile } from "../types/course";
 import ImageViewer from "./ImageViewer";
 import AudioPlayer from "./AudioPlayer";
-import { getCourseDownload, getCourseEmbed, type CourseDownload } from "../utils/courseEmbed";
+import { getCourseDownload, getCourseEmbed, hasNativeMobileRendering, VIEWPORT_AWARE_KINDS, type CourseDownload } from "../utils/courseEmbed";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
 
 const SUPPORTED_KINDS = new Set([
@@ -95,7 +95,9 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
     );
   }
 
-  const embed = getCourseEmbed(file);
+  // The desktop/mobile choice is resolved BEFORE the URL is built: a phone
+  // rendering is a different endpoint on the host, not a narrower iframe.
+  const embed = getCourseEmbed(file, { viewport: desktopView ? "desktop" : "mobile" });
   const download = getCourseDownload(file);
   const isSupported = SUPPORTED_KINDS.has(embed.kind);
   const isImage = file.type === "image" && embed.kind === "direct";
@@ -108,8 +110,12 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
   const entry = playback?.[file.id];
   const report = (patch: CoursePlaybackPatch) => onPlaybackChange?.(file.id, patch);
   // Only documents care about the desktop/mobile switch.
-  const documentKind = ["doc", "sheet", "slides", "form", "drive", "pdf", "embed", "mindmap"].includes(embed.kind);
-  const mobileDocument = documentKind && !desktopView;
+  const documentKind = VIEWPORT_AWARE_KINDS.includes(embed.kind);
+  // Hosts WITHOUT a mobile endpoint (Slides, Drive, PDFs, generic embeds) are
+  // the only ones that still need the narrow-frame trick. Docs / Sheets /
+  // Forms already loaded their own reflowing mobile page above, so scaling
+  // them a second time would shrink the text we just made readable.
+  const mobileDocument = documentKind && !desktopView && !hasNativeMobileRendering(embed.kind);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-chrome-hidden={chromeHidden ? "true" : "false"} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>

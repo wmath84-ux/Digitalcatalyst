@@ -11,7 +11,8 @@ import { useAuth } from "./context/AuthContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
 import { isEmptyRichText, richTextToPlain, sanitizeRichText } from "./utils/richText";
 import { useRotatedScroll } from "./course/useRotatedScroll";
-import { getCourseEmbed } from "./utils/courseEmbed";
+import { getCourseEmbed, VIEWPORT_AWARE_KINDS } from "./utils/courseEmbed";
+import { applyDocumentViewportMode, isBrowserDesktopSiteMode, resetDocumentViewportMode } from "./utils/documentViewportMode";
 import {
   loadPlaybackStore,
   mergePlaybackEntry,
@@ -135,15 +136,27 @@ const loadCourseTheme = (): CoursePlayerTheme => {
   }
 };
 
-// Documents embed at desktop width by default (that is what Google serves an
-// iframe); the learner's choice is remembered across lessons and visits.
+// ── Desktop site switch ─────────────────────────────────────────────────
+// This is the in-app equivalent of the browser's own "Desktop site" toggle.
+// It matters most for the case it was added for: a learner whose phone
+// browser has desktop-site turned ON gets a ~980px layout viewport, so an
+// embedded Google Doc renders its desktop page and the text becomes tiny.
+// Turning this OFF forces real device-width layout AND loads the host's
+// mobile rendering, which is what makes the text readable again.
+//
+// The choice is remembered across lessons and visits. A first-time visitor
+// on a phone that IS in desktop-site mode starts in the readable mobile
+// rendering, because that is the whole point of the control.
 const desktopViewStorageKey = "dc.coursePlayerDesktopView";
 const loadDesktopViewPreference = (): boolean => {
   try {
-    return localStorage.getItem(desktopViewStorageKey) !== "mobile";
+    const stored = localStorage.getItem(desktopViewStorageKey);
+    if (stored === "mobile") return false;
+    if (stored === "desktop") return true;
   } catch {
-    return true;
+    /* private mode — fall through to the detected default */
   }
+  return !isBrowserDesktopSiteMode();
 };
 
 export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: CoursePlayerProps) {
@@ -224,13 +237,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     }
   }, [theme]);
 
+  // Applying the mode does what the browser's own "Desktop site" switch
+  // would have done: it rewrites the layout viewport, so the app and every
+  // document it embeds stop inheriting a forced ~980px desktop width. The
+  // override is dropped when the player unmounts, leaving the rest of the
+  // site exactly as it was.
   useEffect(() => {
+    applyDocumentViewportMode(desktopView ? "desktop" : "mobile");
     try {
       localStorage.setItem(desktopViewStorageKey, desktopView ? "desktop" : "mobile");
     } catch {
       /* private mode / storage disabled — keep the in-memory preference */
     }
   }, [desktopView]);
+
+  useEffect(() => () => resetDocumentViewportMode(), []);
 
   // The menu is rendered inside the player header, so hiding that header
   // unmounts it. Clear the flag too, otherwise it stays stale-open and the
@@ -461,7 +482,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // The desktop/mobile switch only means something for embedded documents —
   // a video or an image renders identically either way.
   const selectedEmbedKind = selectedFile ? getCourseEmbed(selectedFile).kind : "none";
-  const showViewportToggle = ["doc", "sheet", "slides", "form", "drive", "pdf", "embed", "mindmap"].includes(selectedEmbedKind);
+  const showViewportToggle = VIEWPORT_AWARE_KINDS.includes(selectedEmbedKind);
 
   // While the player's own header + dock are hidden there has to be a way
   // back, so a small floating pill sits over the content.
@@ -506,10 +527,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
         <>
           {/* Tapping anywhere else closes the menu. */}
           <div className="fixed inset-0 z-[60]" onClick={() => setViewMenuOpen(false)} data-course-view-options-scrim />
+          {/* Placement follows the rail the button actually sits on.
+              · Portrait — the header runs across the top, so the menu drops
+                DOWN and aligns its right edge with the button.
+              · Landscape / rotated — the header is a 56px-wide rail pinned to
+                the LEFT edge. `right-0` there anchored a 240px panel to a
+                56px button, pushing ~190px of it off-screen to the left, which
+                is why only a sliver was visible. It has to open SIDEWAYS into
+                the content area instead. */}
           <div
             role="menu"
-            className="absolute right-0 top-12 z-[61] w-60 overflow-hidden rounded-2xl border border-[var(--course-border)] bg-[var(--course-panel)] p-1.5 shadow-2xl"
+            className={`absolute z-[61] w-60 max-w-[min(15rem,calc(100vw-4.5rem))] overflow-hidden rounded-2xl border border-[var(--course-border)] bg-[var(--course-panel)] p-1.5 shadow-2xl ${
+              useLandscapeRails ? "left-full top-0 ml-2" : "right-0 top-12"
+            }`}
             data-course-view-options-menu
+            data-placement={useLandscapeRails ? "side" : "below"}
           >
             <button
               type="button"

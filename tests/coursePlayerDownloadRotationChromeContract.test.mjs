@@ -92,8 +92,10 @@ test("A desktop/mobile switch sits beside the theme toggle", () => {
   assert.match(coursePlayer, /data-course-viewport-toggle/);
   assert.match(coursePlayer, /data-mode=\{desktopView \? "desktop" : "mobile"\}/);
   assert.match(coursePlayer, /<Smartphone size=\{17\} \/> : <Monitor size=\{17\} \/>/);
-  // Only meaningful for documents — a video looks the same either way.
-  assert.match(coursePlayer, /const showViewportToggle = \["doc", "sheet", "slides", "form", "drive", "pdf", "embed", "mindmap"\]/);
+  // Only meaningful for documents — a video looks the same either way. The
+  // list is shared with the viewer so both sides can never drift apart.
+  assert.match(coursePlayer, /const showViewportToggle = VIEWPORT_AWARE_KINDS\.includes\(selectedEmbedKind\)/);
+  assert.match(courseEmbed, /export const VIEWPORT_AWARE_KINDS: CourseEmbedKind\[\] = \["doc", "sheet", "slides", "form", "drive", "pdf", "embed", "mindmap"\]/);
   // The preference is remembered.
   assert.match(coursePlayer, /dc\.coursePlayerDesktopView/);
 });
@@ -106,7 +108,10 @@ test("Mobile view re-renders the embed at phone width", () => {
   assert.match(resourceViewer, /width: `\$\{MOBILE_VIEWPORT_WIDTH\}px`/);
   assert.match(resourceViewer, /transform: `scale\(\$\{mobileScale\}\)`/);
   assert.match(resourceViewer, /transformOrigin: "top left"/);
-  assert.match(resourceViewer, /const mobileDocument = documentKind && !desktopView/);
+  // …but only for hosts without a mobile endpoint of their own. Docs /
+  // Sheets / Forms load their reflowing mobile page instead, so scaling them
+  // again would shrink the very text the switch just made readable.
+  assert.match(resourceViewer, /const mobileDocument = documentKind && !desktopView && !hasNativeMobileRendering\(embed\.kind\)/);
   assert.match(resourceViewer, /data-viewport-mode=\{mobileDocument \? "mobile" : "desktop"\}/);
 });
 
