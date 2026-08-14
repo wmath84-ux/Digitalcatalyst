@@ -1,31 +1,21 @@
 // src/course/useRotatedScroll.ts
 //
-// Course Player — scrolling inside the rotated ("immersive") mobile view.
+// Course Player — natural scrolling inside the CSS-rotated ("immersive")
+// mobile landscape view.
 //
-// The immersive layout quarter-turns the whole player with
-// `transform: rotate(90deg)` so a portrait-locked phone can use the
-// landscape UI. The browser, however, resolves touch scrolling in SCREEN
-// space while the scroll container's own axes have been rotated with it.
-// The result is inverted//swapped scrolling: swiping left-right moved the
-// list that should have responded to the other axis.
+// The complete landscape player is rendered inside a `rotate(90deg)` surface.
+// Browsers normally transform a touch gesture back to the element's local
+// axes. That made a vertically scrollable module/notes list respond to a
+// LEFT/RIGHT screen swipe, which is the opposite of what a learner expects.
 //
-// The fix is to stop the browser from guessing (`touch-action: none` on the
-// rotated subtree) and drive the scroll ourselves, mapping the finger's
-// screen delta back into the element's rotated coordinate space.
+// We disable the browser's transformed-axis panning on that subtree and drive
+// its scroll containers ourselves in SCREEN space:
 //
-// For CSS `rotate(90deg)` (clockwise on screen):
+//   swipe up/down    -> scrollTop
+//   swipe left/right -> scrollLeft (only for a genuinely horizontal scroller)
 //
-//   element (1,0) → screen (0, 1)
-//   element (0,1) → screen (-1, 0)
-//
-// so a screen delta (dsx, dsy) is, in element space, (dsy, -dsx).
-// Content must follow the finger, and scrolling moves opposite to content:
-//
-//   scrollTop  += dsx
-//   scrollLeft -= dsy
-//
-// A horizontal swipe therefore scrolls the rotated content along the axis
-// the user actually sees as vertical, which is the natural gesture.
+// In other words, the visible direction of the finger — not the CSS transform
+// matrix — chooses the scroll axis.
 
 import { useEffect, type RefObject } from "react";
 
@@ -50,9 +40,9 @@ const scrollableAncestor = (start: Element | null, root: HTMLElement): HTMLEleme
 };
 
 /**
- * Drive scrolling manually while `enabled`, translating screen-space touch
- * deltas into the rotated element space so every scrollable region in the
- * immersive view scrolls along the axis the user actually sees.
+ * Drive scrolling manually while `enabled`. Direction locking prevents a
+ * diagonal gesture from moving both axes, and the small slop keeps ordinary
+ * taps on module rows and buttons intact.
  */
 export function useRotatedScroll(rootRef: RefObject<HTMLElement | null>, enabled: boolean) {
   useEffect(() => {
@@ -63,9 +53,8 @@ export function useRotatedScroll(rootRef: RefObject<HTMLElement | null>, enabled
     let lastX = 0;
     let lastY = 0;
     let pointerId: number | null = null;
-    // Text selection / buttons must still work, so we only claim the gesture
-    // once the finger has clearly travelled.
     let claimed = false;
+    let axis: "x" | "y" | null = null;
     const SLOP = 4;
 
     const onPointerDown = (event: PointerEvent) => {
@@ -76,6 +65,7 @@ export function useRotatedScroll(rootRef: RefObject<HTMLElement | null>, enabled
       lastX = event.clientX;
       lastY = event.clientY;
       claimed = false;
+      axis = null;
     };
 
     const onPointerMove = (event: PointerEvent) => {
@@ -84,13 +74,28 @@ export function useRotatedScroll(rootRef: RefObject<HTMLElement | null>, enabled
       const dsy = event.clientY - lastY;
       if (!claimed) {
         if (Math.hypot(dsx, dsy) < SLOP) return;
+        // Prefer the visible gesture direction, but fall back to the only axis
+        // that the target can actually scroll.
+        const wantsY = Math.abs(dsy) >= Math.abs(dsx);
+        axis = wantsY && canScrollVertically(target)
+          ? "y"
+          : !wantsY && canScrollHorizontally(target)
+            ? "x"
+            : canScrollVertically(target)
+              ? "y"
+              : canScrollHorizontally(target)
+                ? "x"
+                : null;
+        if (!axis) return;
         claimed = true;
       }
       lastX = event.clientX;
       lastY = event.clientY;
-      // Screen → rotated element space (see the header comment).
-      if (canScrollVertically(target)) target.scrollTop += dsx;
-      if (canScrollHorizontally(target)) target.scrollLeft -= dsy;
+
+      // Match native touch panning: content follows the finger, therefore the
+      // scroll offset moves in the opposite direction.
+      if (axis === "y") target.scrollTop -= dsy;
+      if (axis === "x") target.scrollLeft -= dsx;
       if (event.cancelable) event.preventDefault();
     };
 
@@ -99,17 +104,33 @@ export function useRotatedScroll(rootRef: RefObject<HTMLElement | null>, enabled
       pointerId = null;
       target = null;
       claimed = false;
+      axis = null;
+    };
+
+    // Trackpads/mice should follow the same visible vertical axis too.
+    const onWheel = (event: WheelEvent) => {
+      const wheelTarget = scrollableAncestor(event.target as Element, root);
+      if (!wheelTarget) return;
+      if (canScrollVertically(wheelTarget) && Math.abs(event.deltaY) >= Math.abs(event.deltaX)) {
+        wheelTarget.scrollTop += event.deltaY;
+        if (event.cancelable) event.preventDefault();
+      } else if (canScrollHorizontally(wheelTarget)) {
+        wheelTarget.scrollLeft += Math.abs(event.deltaX) > 0 ? event.deltaX : event.deltaY;
+        if (event.cancelable) event.preventDefault();
+      }
     };
 
     root.addEventListener("pointerdown", onPointerDown, { passive: true });
     root.addEventListener("pointermove", onPointerMove, { passive: false });
     root.addEventListener("pointerup", onPointerUp, { passive: true });
     root.addEventListener("pointercancel", onPointerUp, { passive: true });
+    root.addEventListener("wheel", onWheel, { passive: false });
     return () => {
       root.removeEventListener("pointerdown", onPointerDown);
       root.removeEventListener("pointermove", onPointerMove);
       root.removeEventListener("pointerup", onPointerUp);
       root.removeEventListener("pointercancel", onPointerUp);
+      root.removeEventListener("wheel", onWheel);
     };
   }, [enabled, rootRef]);
 }

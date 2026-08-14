@@ -314,8 +314,9 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   animation: course-overlay-in 0.22s ease both;
 }
 
-/* Course Player — scoped light/dark palette. The variables inherit through
-   the viewer, overlay, notes and media tools without changing the site theme. */
+/* Course Player — scoped dark / light / pure-white palette. The variables
+   inherit through the viewer, overlay, notes and media tools without changing
+   the site theme. */
 .course-player-shell {
   --course-bg: #090912;
   --course-surface: #10101a;
@@ -347,6 +348,24 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   --course-loading: rgb(248 250 252 / 0.82);
 }
 
+/* Third theme-button state: unlike the soft-light palette above, every Course
+   Player canvas is pure white. This removes the grey surround from Forms,
+   Docs and other white documents while retaining enough contrast for chrome. */
+.course-player-shell[data-course-theme="white"] {
+  --course-bg: #ffffff;
+  --course-surface: #ffffff;
+  --course-surface-translucent: rgb(255 255 255 / 0.97);
+  --course-panel: #ffffff;
+  --course-text: #0f172a;
+  --course-muted: #64748b;
+  --course-border: rgb(15 23 42 / 0.11);
+  --course-soft: rgb(15 23 42 / 0.045);
+  --course-soft-hover: rgb(15 23 42 / 0.085);
+  --course-strong: rgb(15 23 42 / 0.18);
+  --course-loading: rgb(255 255 255 / 0.86);
+  background-color: #ffffff;
+}
+
 .course-viewer-empty-surface,
 .course-audio-surface {
   background-image: radial-gradient(circle at 50% 25%, rgb(124 58 237 / 0.2), transparent 44%);
@@ -355,6 +374,12 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 .course-player-shell[data-course-theme="light"] .course-viewer-empty-surface,
 .course-player-shell[data-course-theme="light"] .course-audio-surface {
   background-image: radial-gradient(circle at 50% 25%, rgb(124 58 237 / 0.13), transparent 48%);
+}
+
+.course-player-shell[data-course-theme="white"] .course-viewer-empty-surface,
+.course-player-shell[data-course-theme="white"] .course-audio-surface {
+  background-image: none;
+  background-color: #ffffff;
 }
 
 /* Strict containment prevents a mobile YouTube iframe's intrinsic size from
@@ -372,12 +397,19 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   background-image: radial-gradient(circle at center, #ffffff, #dbe4f0);
 }
 
-.course-player-shell[data-course-theme="light"] [data-course-subscription-badge] {
+.course-player-shell[data-course-theme="white"] .course-image-surface {
+  background-image: none;
+  background-color: #ffffff;
+}
+
+.course-player-shell[data-course-theme="light"] [data-course-subscription-badge],
+.course-player-shell[data-course-theme="white"] [data-course-subscription-badge] {
   color: #6d28d9;
   background-color: rgb(124 58 237 / 0.12);
 }
 
-.course-player-shell[data-course-theme="light"] [data-course-preview-badge] {
+.course-player-shell[data-course-theme="light"] [data-course-preview-badge],
+.course-player-shell[data-course-theme="white"] [data-course-preview-badge] {
   color: #0369a1;
   background-color: rgb(14 165 233 / 0.12);
 }
@@ -480,7 +512,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   text-decoration: underline;
   overflow-wrap: anywhere;
 }
-.course-player-shell[data-course-theme="light"] .course-rich-surface a { color: #6d28d9; }
+.course-player-shell[data-course-theme="light"] .course-rich-surface a,
+.course-player-shell[data-course-theme="white"] .course-rich-surface a { color: #6d28d9; }
 
 .course-rich-surface table {
   border-collapse: collapse;
@@ -515,13 +548,27 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   padding: 0 0.15em;
 }
 
+/* ── Course Player — physical mobile landscape scrolling ─────────────────
+   Lists, notes and embedded pages follow the visible vertical gesture. The
+   x-axis is not advertised as a pan direction, so Android browsers do not
+   lock an initially diagonal swipe to horizontal navigation. */
+.course-player-shell[data-course-landscape-scroll="vertical"] :is(
+  [data-course-overlay-list],
+  [data-course-overlay-paid],
+  [data-course-notes-panel],
+  [data-course-rich-editor],
+  [data-course-viewer-iframe]
+) {
+  touch-action: pan-y pinch-zoom;
+  -ms-touch-action: pan-y;
+  overscroll-behavior-y: contain;
+}
+
 /* ── Course Player — rotated (immersive) mobile view ─────────────────────
-   The whole player is quarter-turned with rotate(90deg). The browser still
-   resolves touch scrolling in SCREEN space, so native panning would move
-   the rotated lists along the wrong axis (a left/right swipe scrolling what
-   the user sees as vertical, and vice versa). Handing touch handling to the
-   player (`useRotatedScroll`) requires the browser to stop claiming the
-   gesture first. */
+   A CSS transform makes browsers bind a vertical list to a horizontal screen
+   gesture. `useRotatedScroll` handles the subtree in screen space instead, so
+   an up/down finger gesture always changes scrollTop. Native transformed-axis
+   panning must be disabled first or both handlers compete. */
 .course-rotated-surface,
 .course-rotated-surface * {
   touch-action: none;

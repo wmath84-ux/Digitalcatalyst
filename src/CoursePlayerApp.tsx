@@ -126,11 +126,12 @@ const persistLocalNotes = (uid: string, productId: string, notes: CoursePlayerNo
   }
 };
 
-type CoursePlayerTheme = "dark" | "light";
+type CoursePlayerTheme = "dark" | "light" | "white";
 const courseThemeStorageKey = "dc.coursePlayerTheme";
 const loadCourseTheme = (): CoursePlayerTheme => {
   try {
-    return localStorage.getItem(courseThemeStorageKey) === "light" ? "light" : "dark";
+    const stored = localStorage.getItem(courseThemeStorageKey);
+    return stored === "light" || stored === "white" ? stored : "dark";
   } catch {
     return "dark";
   }
@@ -272,8 +273,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   }, [immersive, viewMenuOpen, playerChromeHidden, fileBarsHidden]);
 
   // Scrolling inside the quarter-turned immersive view has to be driven
-  // manually, otherwise the browser resolves swipes in screen space and the
-  // rotated lists scroll along the wrong axis.
+  // manually. Without this, browsers bind scrollTop to a left/right gesture
+  // after the CSS transform; learners must always be able to swipe up/down.
   useRotatedScroll(immersiveRootRef, immersive && !isLandscape);
 
   const progressRef = useMemo(() => (user ? doc(db, "users", user.id, "courseProgress", product.id) : null), [product.id, user]);
@@ -477,7 +478,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // A portrait-locked phone can enter the rotated landscape interface. It
   // must use the same left header + right dock as a physically rotated phone.
   const useLandscapeRails = isLandscape || immersive;
-  const nextTheme = theme === "dark" ? "light" : "dark";
+  // Three deliberate taps/states: dark → soft light → pure white. The third
+  // state is useful for documents because the Course Player canvas itself is
+  // white too, rather than leaving a grey frame around a white page.
+  const nextTheme: CoursePlayerTheme = theme === "dark" ? "light" : theme === "light" ? "white" : "dark";
+  const browserColorScheme = theme === "dark" ? "dark" : "light";
 
   // The desktop/mobile switch only means something for embedded documents —
   // a video or an image renders identically either way.
@@ -606,11 +611,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
       className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
       aria-label={`Switch to ${nextTheme} theme`}
       title={`Switch to ${nextTheme} theme`}
-      aria-pressed={theme === "dark"}
+      aria-pressed={theme !== "dark"}
       data-course-theme-toggle
       data-theme={theme}
+      data-next-theme={nextTheme}
     >
-      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+      {theme === "dark" ? <Sun size={18} /> : theme === "light" ? <Circle size={17} /> : <Moon size={18} />}
     </button>
   );
 
@@ -791,7 +797,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
           style={{ width: "100dvh", height: "100dvw", transform: "translate(-50%, -50%) rotate(90deg)" }}
           data-course-rotated-scroll="active"
         >
-          <div className="course-player-shell flex h-full w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-course-mobile-landscape="rails" data-orientation="immersive" style={{ colorScheme: theme }}>
+          <div className="course-player-shell flex h-full w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-course-mobile-landscape="rails" data-orientation="immersive" style={{ colorScheme: browserColorScheme }}>
             {landscapeLayout(true)}
           </div>
         </div>
@@ -802,7 +808,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // ── Landscape: header rail left, content centre, toggle rail right ──
   if (isLandscape) {
     return (
-      <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" style={{ colorScheme: theme }}>
+      <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" style={{ colorScheme: browserColorScheme }}>
         {landscapeLayout(false)}
       </div>
     );
@@ -810,7 +816,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
   // ── Portrait: sticky header top, content full-bleed, sticky dock bottom ──
   return (
-    <div className="course-player-shell fixed inset-0 flex h-[100dvh] flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="portrait" style={{ colorScheme: theme }}>
+    <div className="course-player-shell fixed inset-0 flex h-[100dvh] flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="portrait" style={{ colorScheme: browserColorScheme }}>
       {playerChromeHidden ? null : (
       <header
         className="sticky top-0 z-50 flex shrink-0 items-center gap-3 border-b border-[var(--course-border)] bg-[var(--course-surface)] px-3 py-2.5 sm:px-5"
