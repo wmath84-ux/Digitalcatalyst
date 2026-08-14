@@ -393,3 +393,143 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Course Player — notes rich-text editor ──────────────────────────────
+   The editor surface is deliberately LARGE (it fills the notes sheet) so
+   long notes are comfortable to read while writing. Saved notes still
+   collapse back to the same thin one-line strip in the list.
+   Pasted content keeps its exact formatting, so the styles below simply
+   make sure that formatting renders correctly inside the panel. */
+.course-rich-surface:empty::before,
+.course-rich-surface[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: var(--course-muted);
+  pointer-events: none;
+}
+
+.course-rich-surface :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0.6em 0 0.3em;
+}
+.course-rich-surface h1 { font-size: 1.5em; }
+.course-rich-surface h2 { font-size: 1.3em; }
+.course-rich-surface h3 { font-size: 1.15em; }
+.course-rich-surface h4,
+.course-rich-surface h5,
+.course-rich-surface h6 { font-size: 1em; }
+
+.course-rich-surface p,
+.course-rich-surface div {
+  margin: 0 0 0.35em;
+}
+
+.course-rich-surface b,
+.course-rich-surface strong { font-weight: 800; }
+.course-rich-surface i,
+.course-rich-surface em { font-style: italic; }
+.course-rich-surface u,
+.course-rich-surface ins { text-decoration: underline; }
+.course-rich-surface s,
+.course-rich-surface del,
+.course-rich-surface strike { text-decoration: line-through; }
+
+.course-rich-surface ul,
+.course-rich-surface ol {
+  margin: 0.35em 0 0.35em 1.35em;
+  padding-left: 0.35em;
+}
+.course-rich-surface ul { list-style: disc; }
+.course-rich-surface ol { list-style: decimal; }
+.course-rich-surface li { margin: 0.15em 0; }
+
+.course-rich-surface blockquote {
+  margin: 0.5em 0;
+  padding: 0.35em 0 0.35em 0.85em;
+  border-left: 3px solid var(--course-strong);
+  color: var(--course-muted);
+}
+
+.course-rich-surface :is(code, kbd, samp) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  background: var(--course-soft-hover);
+  border-radius: 0.35rem;
+  padding: 0.1em 0.35em;
+}
+
+.course-rich-surface pre {
+  margin: 0.5em 0;
+  padding: 0.7em 0.85em;
+  border-radius: 0.6rem;
+  background: var(--course-soft-hover);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  line-height: 1.5;
+  /* Pasted code keeps its indentation and wraps instead of overflowing. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.course-rich-surface pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.course-rich-surface a {
+  color: #a78bfa;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+.course-player-shell[data-course-theme="light"] .course-rich-surface a { color: #6d28d9; }
+
+.course-rich-surface table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  max-width: 100%;
+  display: block;
+  overflow-x: auto;
+}
+.course-rich-surface :is(td, th) {
+  border: 1px solid var(--course-border);
+  padding: 0.35em 0.6em;
+  text-align: left;
+}
+.course-rich-surface th { font-weight: 800; background: var(--course-soft-hover); }
+
+.course-rich-surface img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+
+.course-rich-surface hr {
+  border: 0;
+  border-top: 1px solid var(--course-border);
+  margin: 0.7em 0;
+}
+
+.course-rich-surface mark {
+  background: rgb(250 204 21 / 0.35);
+  color: inherit;
+  border-radius: 0.2rem;
+  padding: 0 0.15em;
+}
+
+/* ── Course Player — rotated (immersive) mobile view ─────────────────────
+   The whole player is quarter-turned with rotate(90deg). The browser still
+   resolves touch scrolling in SCREEN space, so native panning would move
+   the rotated lists along the wrong axis (a left/right swipe scrolling what
+   the user sees as vertical, and vice versa). Handing touch handling to the
+   player (`useRotatedScroll`) requires the browser to stop claiming the
+   gesture first. */
+.course-rotated-surface,
+.course-rotated-surface * {
+  touch-action: none;
+  -ms-touch-action: none;
+}
+
+/* Pinch-zoom inside the image viewer manages its own pointers, so it keeps
+   working; text selection is still allowed everywhere else. */
+.course-rotated-surface [data-course-image-viewer] {
+  touch-action: none;
+}

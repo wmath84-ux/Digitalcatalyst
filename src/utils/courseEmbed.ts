@@ -83,16 +83,68 @@ export const getCourseEmbed = (file: CourseFile): { url: string; kind: "youtube"
   return raw ? { url: raw, kind: "direct" } : { url: "", kind: "none" };
 };
 
-export const getCourseDownload = (file: CourseFile): { url: string; label: string; downloadable: boolean } => {
+/**
+ * Extension carried by the URL itself, e.g. ".../notes.pdf?x=1" → "pdf".
+ * Used so a direct file always downloads under its own real format.
+ */
+const urlExtension = (value: string) => {
+  try {
+    const pathname = new URL(value).pathname;
+    const match = pathname.match(/\.([a-z0-9]{1,8})$/i);
+    return match ? match[1].toLowerCase() : "";
+  } catch {
+    return "";
+  }
+};
+
+/** Strip any existing extension so we never produce "report.pdf.pdf". */
+const baseName = (name: string) => String(name || "file").replace(/\.[a-z0-9]{1,8}$/i, "").trim() || "file";
+
+/** `name` + the correct extension for the format actually being downloaded. */
+export const downloadFileName = (name: string, extension: string) =>
+  extension ? `${baseName(name)}.${extension}` : baseName(name);
+
+export interface CourseDownload {
+  url: string;
+  label: string;
+  downloadable: boolean;
+  /** Real format of the bytes behind `url` (file extension, no dot). */
+  extension: string;
+  /** Suggested filename including that extension. */
+  fileName: string;
+}
+
+/**
+ * Resolve the download for a course file in its EXACT / native format.
+ *
+ * Google files export to their own editable format rather than being
+ * flattened to PDF, so what lands on disk matches what the learner saw:
+ *
+ *   - Google Doc    → .docx
+ *   - Google Sheet  → .xlsx
+ *   - Google Slides → .pptx
+ *   - Drive file    → the stored bytes, untouched
+ *   - Direct file   → the original URL, keeping its own extension
+ *
+ * The filename always carries the matching extension, which also fixes
+ * downloads that previously landed as an extension-less blob.
+ */
+export const getCourseDownload = (file: CourseFile): CourseDownload => {
   const raw = getCourseFileUrl(file);
   const google = googleParts(raw);
-  if (google?.kind === "document") return { url: `https://docs.google.com/document/d/${google.id}/export?format=pdf`, label: "Download PDF", downloadable: true };
-  if (google?.kind === "spreadsheets") return { url: `https://docs.google.com/spreadsheets/d/${google.id}/export?format=xlsx`, label: "Download XLSX", downloadable: true };
-  if (google?.kind === "presentation") return { url: `https://docs.google.com/presentation/d/${google.id}/export/pdf`, label: "Download PDF", downloadable: true };
-  if (google?.kind === "drive") return { url: `https://drive.google.com/uc?export=download&id=${encodeURIComponent(google.id)}`, label: "Download Drive file", downloadable: true };
-  if (file.type === "google_form" || google?.kind === "forms") return { url: raw, label: "Open original form", downloadable: false };
-  if (file.type === "mindmap" || file.type === "embed" || file.type === "youtube") return { url: raw, label: "Open original", downloadable: false };
-  return { url: raw, label: "Download file", downloadable: true };
+  const build = (url: string, label: string, downloadable: boolean, extension: string): CourseDownload =>
+    ({ url, label, downloadable, extension, fileName: downloadFileName(file.name, extension) });
+
+  if (google?.kind === "document") return build(`https://docs.google.com/document/d/${google.id}/export?format=docx`, "Download DOCX", true, "docx");
+  if (google?.kind === "spreadsheets") return build(`https://docs.google.com/spreadsheets/d/${google.id}/export?format=xlsx`, "Download XLSX", true, "xlsx");
+  if (google?.kind === "presentation") return build(`https://docs.google.com/presentation/d/${google.id}/export/pptx`, "Download PPTX", true, "pptx");
+  if (google?.kind === "drive") return build(`https://drive.google.com/uc?export=download&id=${encodeURIComponent(google.id)}`, "Download file", true, urlExtension(raw));
+  if (file.type === "google_form" || google?.kind === "forms") return build(raw, "Open original form", false, "");
+  if (file.type === "mindmap" || file.type === "embed" || file.type === "youtube") return build(raw, "Open original", false, "");
+
+  // Direct file — keep whatever format it already is.
+  const extension = urlExtension(raw) || (file.type === "pdf" ? "pdf" : "");
+  return build(raw, extension ? `Download ${extension.toUpperCase()}` : "Download file", true, extension);
 };
 
 export const isPreviewableCourseFile = (file: CourseFile) => Boolean(getCourseEmbed(file).url);
