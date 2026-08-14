@@ -600,8 +600,12 @@ export const buildQuote = (input) => {
   }
   // Subscription products / modules are optional (the plan can
   // grant a baseline + the buyer can opt-in to extras).
+  const isSubscriptionKind = kind === "subscription" || kind === "subscription_features";
 
-  if (!productMap.size) {
+  // Subscription selections can be feature-only (no products): their line
+  // items arrive pre-built via `subscriptionLineItems`, so an empty product
+  // map is valid there. Every other kind needs at least one product.
+  if (!productMap.size && !isSubscriptionKind) {
     return { ok: false, status: 404, reason: "No products found for this selection." };
   }
 

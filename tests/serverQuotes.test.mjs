@@ -767,3 +767,32 @@ test("the quote record carries the requester's uid (not the client-supplied fina
   assert.equal(out.quote.uid, "u_attacker");
   assert.equal(out.quote.cashPayable, 149900);
 });
+
+test("subscription selection with no products (feature-only) still builds a quote", () => {
+  const out = buildQuote({
+    selection: {
+      purchaseKind: "subscription",
+      productIds: [],
+      moduleIds: [],
+      resourceIds: [],
+      updateId: null,
+      subscriptionPlanId: "plan_basic",
+      billingCycle: "monthly",
+      featureIds: ["f_ai"],
+      couponCode: null,
+      requestedEduCoins: 0,
+      returnRoute: null,
+    },
+    products: new Map(),
+    purchasesByProduct: new Map(),
+    uid: "user1",
+    quoteId: "Q-feature-only",
+    subscriptionLineItems: [
+      { id: "subscription:plan_basic:monthly", kind: "subscription", productId: null, moduleId: null, resourceId: null, updateId: null, subscriptionPlanId: "plan_basic", featureId: null, title: "Basic (Monthly)", parentTitle: "", regularPrice: 0, salePrice: null, effectivePrice: 0, quantity: 1, alreadyOwned: false, entitlementId: "subscription:plan_basic" },
+      { id: "subscription_feature:plan_basic:f_ai", kind: "subscription_features", productId: null, moduleId: null, resourceId: null, updateId: null, subscriptionPlanId: "plan_basic", featureId: "f_ai", title: "AI Assistant", parentTitle: "Basic", regularPrice: 49900, salePrice: null, effectivePrice: 49900, quantity: 1, alreadyOwned: false, entitlementId: "subscription_feature:plan_basic:f_ai" },
+    ],
+  });
+  assert.equal(out.ok, true, out.reason || "");
+  assert.equal(out.quote.cashPayable, 49900);
+  assert.equal(out.quote.verifiedLineItems.length, 2);
+});

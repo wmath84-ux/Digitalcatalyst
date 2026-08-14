@@ -35,6 +35,22 @@ export default function AudioPlayer({ url, name }: AudioPlayerProps) {
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [loop, setLoop] = useState(false);
+  const [landscape, setLandscape] = useState(false);
+
+  // Landscape is a wide, short viewport — the tall stacked card would push the
+  // transport controls off-screen, so we switch to a compact horizontal layout
+  // where the seek bar and transport stay reachable edge-to-edge.
+  useEffect(() => {
+    const media = window.matchMedia("(orientation: landscape)");
+    const update = () => setLandscape(media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    window.addEventListener("resize", update);
+    return () => {
+      media.removeEventListener?.("change", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
 
   // Reset when the track changes.
   useEffect(() => {
@@ -65,92 +81,117 @@ export default function AudioPlayer({ url, name }: AudioPlayerProps) {
     if (!playing) void audio.play();
   };
 
-  return (
-    <div className="grid h-full place-items-center bg-gradient-to-br from-slate-950 via-violet-950/40 to-slate-950 p-6" data-course-viewer-audio>
-      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl backdrop-blur" data-course-audio-player>
-        {/* Artwork / equalizer */}
-        <div className="mx-auto grid h-24 w-24 place-items-center rounded-3xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg shadow-violet-500/30">
-          <div className="flex items-end gap-1">
-            {[0, 1, 2, 3, 4].map((bar) => (
-              <span
-                key={bar}
-                className={`w-1.5 rounded-full bg-white ${playing ? "animate-eq" : ""}`}
-                style={{ height: playing ? undefined : `${8 + (bar % 3) * 4}px`, animationDelay: `${bar * 0.12}s` }}
-              />
-            ))}
-          </div>
-        </div>
+  const equalizer = (
+    <div className="flex items-end gap-1">
+      {[0, 1, 2, 3, 4].map((bar) => (
+        <span
+          key={bar}
+          className={`w-1.5 rounded-full bg-white ${playing ? "animate-eq" : ""}`}
+          style={{ height: playing ? undefined : `${8 + (bar % 3) * 4}px`, animationDelay: `${bar * 0.12}s` }}
+        />
+      ))}
+    </div>
+  );
 
-        <p className="mt-5 truncate text-center text-sm font-black text-white" title={name}>{name}</p>
-        <p className="mt-1 text-center text-[10px] font-bold uppercase tracking-wider text-white/35">Now playing</p>
-
-        {/* Seek bar */}
-        <div className="mt-5">
-          <input
-            type="range"
-            min={0}
-            max={duration || 0}
-            step={0.1}
-            value={Math.min(currentTime, duration || 0)}
-            onChange={(event) => seek(Number(event.target.value))}
-            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-violet-400"
-            aria-label="Seek"
-            data-course-audio-seek
-          />
-          <div className="mt-2 flex items-center justify-between text-[10px] font-bold tabular-nums text-white/40">
-            <span data-course-audio-current>{formatTime(currentTime)}</span>
-            <span data-course-audio-duration>{formatTime(duration)}</span>
-          </div>
-        </div>
-
-        {/* Transport controls */}
-        <div className="mt-4 flex items-center justify-center gap-4">
-          <button
-            type="button"
-            onClick={() => setLoop((value) => !value)}
-            aria-label="Toggle loop"
-            className={`grid h-10 w-10 place-items-center rounded-full transition ${loop ? "bg-violet-500 text-white" : "bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"}`}
-            data-course-audio-loop
-            data-active={loop ? "true" : "false"}
-          >
-            <Repeat size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={restart}
-            aria-label="Restart"
-            className="grid h-10 w-10 place-items-center rounded-full bg-white/5 text-white/55 transition hover:bg-white/10 hover:text-white"
-            data-course-audio-restart
-          >
-            <RotateCcw size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={togglePlay}
-            aria-label={playing ? "Pause" : "Play"}
-            className="grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-lg shadow-violet-500/40 transition active:scale-95"
-            data-course-audio-play
-            data-playing={playing ? "true" : "false"}
-          >
-            {playing ? <Pause size={26} /> : <Play size={26} className="ml-1" />}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const audio = audioRef.current;
-              if (!audio) return;
-              audio.muted = !audio.muted;
-              setMuted(audio.muted);
-            }}
-            aria-label="Toggle mute"
-            className="grid h-10 w-10 place-items-center rounded-full bg-white/5 text-white/55 transition hover:bg-white/10 hover:text-white"
-            data-course-audio-mute
-            data-muted={muted ? "true" : "false"}
-          >
-            {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          </button>
-        </div>
+  const seekBar = (
+    <>
+      <input
+        type="range"
+        min={0}
+        max={duration || 0}
+        step={0.1}
+        value={Math.min(currentTime, duration || 0)}
+        onChange={(event) => seek(Number(event.target.value))}
+        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-violet-400"
+        aria-label="Seek"
+        data-course-audio-seek
+      />
+      <div className="mt-2 flex items-center justify-between text-[10px] font-bold tabular-nums text-white/40">
+        <span data-course-audio-current>{formatTime(currentTime)}</span>
+        <span data-course-audio-duration>{formatTime(duration)}</span>
       </div>
+    </>
+  );
+
+  const transport = (
+    <div className="flex items-center justify-center gap-3 sm:gap-4" data-course-audio-transport>
+      <button
+        type="button"
+        onClick={() => setLoop((value) => !value)}
+        aria-label="Toggle loop"
+        className={`grid h-10 w-10 place-items-center rounded-full transition ${loop ? "bg-violet-500 text-white" : "bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"}`}
+        data-course-audio-loop
+        data-active={loop ? "true" : "false"}
+      >
+        <Repeat size={16} />
+      </button>
+      <button
+        type="button"
+        onClick={restart}
+        aria-label="Restart"
+        className="grid h-10 w-10 place-items-center rounded-full bg-white/5 text-white/55 transition hover:bg-white/10 hover:text-white"
+        data-course-audio-restart
+      >
+        <RotateCcw size={16} />
+      </button>
+      <button
+        type="button"
+        onClick={togglePlay}
+        aria-label={playing ? "Pause" : "Play"}
+        className="grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-lg shadow-violet-500/40 transition active:scale-95"
+        data-course-audio-play
+        data-playing={playing ? "true" : "false"}
+      >
+        {playing ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const audio = audioRef.current;
+          if (!audio) return;
+          audio.muted = !audio.muted;
+          setMuted(audio.muted);
+        }}
+        aria-label="Toggle mute"
+        className="grid h-10 w-10 place-items-center rounded-full bg-white/5 text-white/55 transition hover:bg-white/10 hover:text-white"
+        data-course-audio-mute
+        data-muted={muted ? "true" : "false"}
+      >
+        {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="grid h-full place-items-center bg-gradient-to-br from-slate-950 via-violet-950/40 to-slate-950 p-3 sm:p-6" data-course-viewer-audio data-orientation={landscape ? "landscape" : "portrait"}>
+      {landscape ? (
+        <div className="flex w-full max-w-3xl items-center gap-4 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl backdrop-blur" data-course-audio-player>
+          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg shadow-violet-500/30">
+            {equalizer}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <p className="truncate text-sm font-black text-white" title={name}>{name}</p>
+            <div className="mt-1.5">{seekBar}</div>
+          </div>
+          {transport}
+        </div>
+      ) : (
+        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl backdrop-blur" data-course-audio-player>
+          {/* Artwork / equalizer */}
+          <div className="mx-auto grid h-24 w-24 place-items-center rounded-3xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg shadow-violet-500/30">
+            {equalizer}
+          </div>
+
+          <p className="mt-5 truncate text-center text-sm font-black text-white" title={name}>{name}</p>
+          <p className="mt-1 text-center text-[10px] font-bold uppercase tracking-wider text-white/35">Now playing</p>
+
+          {/* Seek bar */}
+          <div className="mt-5">{seekBar}</div>
+
+          {/* Transport controls */}
+          <div className="mt-4">{transport}</div>
+        </div>
+      )}
 
       <audio
         ref={audioRef}

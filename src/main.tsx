@@ -585,6 +585,10 @@ function Root() {
           redirectToAuth(CART_HASH);
           return false;
         }}
+        onOpenProduct={(id) => {
+          const product = catalogProducts.find((item) => item.id === id);
+          if (product) navigateToProduct({ id: product.id, title: product.title });
+        }}
       />
     );
   }
@@ -621,12 +625,12 @@ function Root() {
     );
   }
   if (hash.startsWith(COURSE_HASH)) {
-    if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = STORE_HASH; }} />;
+    if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;
     return (
       <CourseRouteGuard
         product={selectedCourseProduct}
         onCheckout={(price) => navigateToCheckout(price)}
-        onBack={() => { window.location.hash = STORE_HASH; }}
+        onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }}
         onPurchaseUpdate={handlePurchaseUpdate}
       />
     );

@@ -756,3 +756,33 @@ test("Paid-update module becomes accessLevel=paidUpdate in the legacy bridge", (
   assert.equal(legacy[0].paidUpdateId, "mod_paid_ent");
   assert.equal(legacy[0].paidUpdatePrice, "₹99");
 });
+
+test("catalog bridge stamps paid_update modules with the real update id from the catalogue", () => {
+  // The Course Player's "buy" flow sends `module.paidUpdateId` as the
+  // checkout `updateId`. That id must match a `paidUpdates[].id` in the
+  // Firestore doc — NOT the module's own id/entitlementId. Regression for the
+  // "Course update is no longer available" checkout failure.
+  const form = buildForm({
+    modules: [
+      { id: "mod_1", title: "Intro", resources: [], accessLevel: "included" },
+      {
+        id: "mod_paid", title: "Premium", accessLevel: "paid_update",
+        entitlementId: "mod_paid_ent", cashPrice: 199, salePrice: null, coinPrice: null,
+        resources: [
+          { id: "res_paid", name: "Premium Video", type: "video_url", url: "https://www.w3schools.com/html/mov_bbb.mp4", visibility: "visible", accessLevel: "paid_update" },
+        ],
+      },
+    ],
+    paidUpdates: [
+      { id: "upd_premium", title: "Premium Update", description: "", includedIds: ["mod_paid", "res_paid"], cashPrice: 199, coinPrice: 0, active: true, publishDate: null, visibility: "visible", sortOrder: 0 },
+    ],
+  });
+  const body = editorToFirestoreBody(form);
+  const catalog = firestoreToCatalogProduct(body, "prod_1");
+  const paidModule = catalog.courseContent.find((m) => m.id === "mod_paid");
+  assert.ok(paidModule, "paid module should survive the round trip");
+  assert.equal(paidModule.paidUpdateId, "upd_premium", "module must carry the real update id");
+  const paidFile = paidModule.files.find((f) => f.id === "res_paid");
+  assert.ok(paidFile, "paid resource should survive the round trip");
+  assert.equal(paidFile.paidUpdateId, "upd_premium", "resource must carry the real update id");
+});

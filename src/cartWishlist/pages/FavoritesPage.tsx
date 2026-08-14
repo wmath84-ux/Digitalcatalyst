@@ -9,6 +9,7 @@ interface FavoritesPageProps {
   onRemove: (id: string) => void;
   onAddToCart: (id: string) => void;
   onNavigate: (tab: TabKey) => void;
+  onOpenProduct?: (id: string) => void;
 }
 
 export default function FavoritesPage({
@@ -17,6 +18,7 @@ export default function FavoritesPage({
   onRemove,
   onAddToCart,
   onNavigate,
+  onOpenProduct,
 }: FavoritesPageProps) {
   if (favoriteProducts.length === 0) {
     return (
@@ -51,6 +53,7 @@ export default function FavoritesPage({
               inCart={cartIds.has(product.id)}
               onRemove={onRemove}
               onAddToCart={onAddToCart}
+              onOpen={onOpenProduct}
             />
           ))}
         </div>

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   editorResourceToCanonical,
+  editorResourceToFirestore,
   canonicalResourceToLegacyFile,
   canonicalTreeToLegacyTree,
   firestoreTreeToCanonicalTree,
@@ -122,6 +123,33 @@ test("YouTube bare-id via the youtubeVideoId field still resolves to an embed", 
   const embed = getCourseEmbed(legacy);
   assert.equal(embed.kind, "youtube");
   assert.ok(embed.url.includes("dQw4w9WgXcQ"));
+});
+
+test("YouTube bare id / scheme-less / http links are kept and resolve to an embed", () => {
+  // Admins often paste a bare 11-char id, a link missing its https:// scheme,
+  // or an http:// link. None of these should silently delete the resource and
+  // leave the module showing "0 files".
+  const urls = [
+    "dQw4w9WgXcQ",
+    "youtu.be/dQw4w9WgXcQ",
+    "www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "m.youtube.com/watch?v=dQw4w9WgXcQ",
+    "http://youtube.com/watch?v=dQw4w9WgXcQ",
+  ];
+  for (const url of urls) {
+    const canonical = editorResourceToCanonical(makeResource("youtube", url));
+    assert.ok(canonical, `YouTube "${url}" should not be dropped`);
+    assert.equal(canonical.youtubeVideoId, "dQw4w9WgXcQ", `videoId mismatch for "${url}"`);
+
+    const firestore = editorResourceToFirestore(makeResource("youtube", url));
+    assert.ok(firestore, `Firestore write should keep "${url}"`);
+    assert.equal(firestore.youtubeVideoId, "dQw4w9WgXcQ", `stored videoId mismatch for "${url}"`);
+
+    const legacy = canonicalResourceToLegacyFile(canonical);
+    const embed = getCourseEmbed(legacy);
+    assert.equal(embed.kind, "youtube", `kind mismatch for "${url}"`);
+    assert.ok(embed.url.includes("dQw4w9WgXcQ"), `embed url mismatch for "${url}"`);
+  }
 });
 
 test("gslides resolves to the slides player kind (Google Slides embed)", () => {

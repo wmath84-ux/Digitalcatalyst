@@ -81,14 +81,14 @@ export default function ResourceViewer({ file }: ResourceViewerProps) {
         {isImage ? (
           <ImageViewer url={embed.url} name={file.name} />
         ) : isVideo ? (
-          <div className="flex h-full w-full items-center justify-center">
+          <div className="h-full w-full overflow-hidden bg-black">
             <video
               src={embed.url}
               controls
               playsInline
               preload="metadata"
               controlsList="nodownload"
-              className="max-h-full max-w-full bg-black object-contain"
+              className="h-full w-full bg-black object-contain"
               data-course-viewer-video
             />
           </div>

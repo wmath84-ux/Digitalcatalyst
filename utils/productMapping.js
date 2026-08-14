@@ -139,30 +139,47 @@ const VALID_URL_TYPES = new Set([
   "gslides", "gform", "github_pages", "whimsical",
 ]);
 
-const isValidHttpsUrl = (value) => {
+/**
+ * Normalise a pasted resource link to a clean `https://` URL (or "" when it
+ * can't be trusted). Links pasted without a scheme — `drive.google.com/file/…`,
+ * `docs.google.com/document/…`, `www.example.com/x.pdf` — are treated as https,
+ * because admins frequently copy links from a chat / SMS / mobile share sheet
+ * where the scheme gets stripped. A bare id / word without a domain (e.g. a raw
+ * Google file id) is still rejected here; YouTube bare ids are handled
+ * separately by `extractYoutubeVideoId`.
+ */
+const normalizeHttpsUrl = (value) => {
   const text = String(value || "").trim();
-  if (!text) return false;
-  if (text.startsWith("data:")) return false;
-  if (text.startsWith("javascript:")) return false;
-  if (text.startsWith("<")) return false;
-  if (text.startsWith("/")) return false;
+  if (!text) return "";
+  if (text.startsWith("data:")) return "";
+  if (text.startsWith("javascript:")) return "";
+  if (text.startsWith("<")) return "";
+  if (text.startsWith("/")) return "";
+  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`;
   try {
-    const url = new URL(text);
-    if (url.protocol !== "https:") return false;
+    const url = new URL(candidate);
+    if (url.protocol !== "https:") return "";
+    // A real remote host always carries a dot (youtu.be, drive.google.com…).
+    // This rejects bare ids/words that would otherwise become a bogus https URL.
+    if (!url.hostname.includes(".")) return "";
     // Block Firebase / GCS storage buckets, but do NOT block legitimate
     // public Google media hosts such as `commondatastorage.googleapis.com`
     // (the hostname boundary before "storage" must be a dot or the start).
-    if (/(?:^|\.)(?:firebasestorage\.googleapis\.com|storage\.googleapis\.com)$/i.test(url.hostname)) return false;
-    return true;
+    if (/(?:^|\.)(?:firebasestorage\.googleapis\.com|storage\.googleapis\.com)$/i.test(url.hostname)) return "";
+    return url.toString();
   } catch {
-    return false;
+    return "";
   }
 };
 
-// Pick the best URL slot on a resource for the URL-only rule.
+const isValidHttpsUrl = (value) => Boolean(normalizeHttpsUrl(value));
+
+// Pick the best URL slot on a resource for the URL-only rule. Returns the
+// normalised https URL (so a scheme-less link comes back with https://).
 const pickValidUrl = (...candidates) => {
   for (const c of candidates) {
-    if (isValidHttpsUrl(c)) return String(c);
+    const normalized = normalizeHttpsUrl(c);
+    if (normalized) return normalized;
   }
   return "";
 };
@@ -183,8 +200,15 @@ const extractYoutubeVideoId = (value) => {
   if (!text) return "";
   // A bare 11-char id is accepted directly.
   if (/^[a-zA-Z0-9_-]{11}$/.test(text)) return text;
+  // URLs pasted without a scheme (youtu.be/ID, www.youtube.com/watch?v=ID)
+  // are normalised so the id can still be recovered instead of dropping the
+  // whole resource. This is the common case when an admin pastes a YouTube
+  // link straight from a chat / SMS / the mobile share sheet.
+  const candidate = /^(?:www\.|m\.)?(?:youtube\.com|youtu\.be)\b/i.test(text)
+    ? `https://${text}`
+    : text;
   try {
-    const url = new URL(text);
+    const url = new URL(candidate);
     if (url.hostname.includes("youtu.be")) {
       return url.pathname.split("/").filter(Boolean)[0] || "";
     }
@@ -210,7 +234,12 @@ export const editorResourceToCanonical = (raw) => {
   if (!isObject(raw)) return null;
   const url = pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
   const type = toCanonicalResourceType(raw.type);
-  const youtubeVideoId = str(raw.youtubeVideoId).trim();
+  // YouTube resources are valid via their video id alone, so recover the id
+  // from any pasted form (bare 11-char id, watch?v=, youtu.be, shorts, embed,
+  // or a link missing its https:// scheme) instead of requiring a full https URL.
+  const youtubeVideoId = type === "youtube"
+    ? (str(raw.youtubeVideoId).trim() || extractYoutubeVideoId(raw.url || raw.youtubeUrl || raw.embedUrl))
+    : str(raw.youtubeVideoId).trim();
   // Sanity rule: a YouTube resource may be valid via its videoId alone.
   const hasUsableLink = Boolean(url) || (type === "youtube" && Boolean(youtubeVideoId));
   if (!hasUsableLink) return null; // not a URL-acceptable record
@@ -309,7 +338,9 @@ export const editorResourceToFirestore = (raw) => {
   if (!isObject(raw)) return null;
   const url = pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
   const type = normResourceType(raw.type);
-  const youtubeVideoId = str(raw.youtubeVideoId).trim();
+  const youtubeVideoId = type === "youtube"
+    ? (str(raw.youtubeVideoId).trim() || extractYoutubeVideoId(raw.url || raw.youtubeUrl || raw.embedUrl))
+    : str(raw.youtubeVideoId).trim();
   const hasUsableLink = Boolean(url) || (type === "youtube" && Boolean(youtubeVideoId));
   if (!hasUsableLink) return null;
 
@@ -626,7 +657,9 @@ export const firestoreResourceToCanonical = (raw) => {
   if (!isObject(raw)) return null;
   const url = pickValidUrl(raw.url, raw.embedUrl, raw.youtubeUrl);
   const type = toCanonicalResourceType(raw.type);
-  const youtubeVideoId = str(raw.youtubeVideoId).trim();
+  const youtubeVideoId = type === "youtube"
+    ? (str(raw.youtubeVideoId).trim() || extractYoutubeVideoId(raw.url || raw.youtubeUrl || raw.embedUrl))
+    : str(raw.youtubeVideoId).trim();
   const hasUsableLink = Boolean(url) || (type === "youtube" && Boolean(youtubeVideoId));
   if (!hasUsableLink) return null;
   return {
@@ -733,8 +766,9 @@ export const sanitizeCanonicalCourseContent = (raw) => {
 // work without edits. New code should read the canonical shape directly.
 // ---------------------------------------------------------------------------
 
-export const canonicalResourceToLegacyFile = (r) => {
+export const canonicalResourceToLegacyFile = (r, paidUpdateIdByContentId) => {
   if (!isObject(r)) return null;
+  const resolvedUpdateId = paidUpdateIdByContentId && paidUpdateIdByContentId.get(str(r.id));
   return {
     id: str(r.id),
     name: str(r.name, "Untitled resource"),
@@ -745,30 +779,37 @@ export const canonicalResourceToLegacyFile = (r) => {
     youtubeVideoId: r.type === "youtube" ? (r.youtubeVideoId || extractYoutubeVideoId(r.url)) || undefined : undefined,
     provider: str(r.provider),
     accessLevel: r.accessLevel === "paid_update" ? "paidUpdate" : r.accessLevel === "hidden" ? "hidden" : "included",
-    paidUpdateId: r.paidUpdateId || undefined,
+    paidUpdateId: str(resolvedUpdateId || r.paidUpdateId || "") || undefined,
     paidUpdatePrice: r.cashPrice === null || r.cashPrice === undefined ? undefined : `₹${r.cashPrice}`,
     paidUpdateCoinPrice: numOrNull(r.coinPrice) || 0,
   };
 };
 
-export const canonicalModuleToLegacy = (m) => {
+export const canonicalModuleToLegacy = (m, paidUpdateIdByContentId) => {
   if (!isObject(m)) return null;
-  const files = arr(m.resources).map(canonicalResourceToLegacyFile).filter(Boolean);
-  const modules = arr(m.modules).map(canonicalModuleToLegacy).filter(Boolean);
+  const files = arr(m.resources).map((r) => canonicalResourceToLegacyFile(r, paidUpdateIdByContentId)).filter(Boolean);
+  const modules = arr(m.modules).map((child) => canonicalModuleToLegacy(child, paidUpdateIdByContentId)).filter(Boolean);
+  // The paid update that gates a `paid_update` module lives in the product's
+  // `paidUpdates` catalogue (via `includedModuleIds`), NOT on the module
+  // itself. Resolve the real update id from the catalogue map so the Course
+  // Player's "Buy" flow passes the id the checkout server actually looks up.
+  // Fall back to `entitlementId`/module id so older trees (and the unit tests
+  // that call this bridge without a catalogue) still get a stable value.
+  const resolvedUpdateId = paidUpdateIdByContentId && paidUpdateIdByContentId.get(str(m.id));
   return {
     id: str(m.id),
     title: str(m.title, "Untitled module"),
     files,
     modules,
     accessLevel: m.accessLevel === "paid_update" ? "paidUpdate" : m.accessLevel === "hidden" ? "hidden" : "included",
-    paidUpdateId: m.accessLevel === "paid_update" ? str(m.entitlementId || m.id) : undefined,
+    paidUpdateId: m.accessLevel === "paid_update" ? str(resolvedUpdateId || m.entitlementId || m.id) : undefined,
     paidUpdateTitle: m.accessLevel === "paid_update" ? str(m.title) : undefined,
     paidUpdatePrice: m.accessLevel === "paid_update" && m.cashPrice !== null && m.cashPrice !== undefined ? `₹${m.cashPrice}` : undefined,
     paidUpdateCoinPrice: m.accessLevel === "paid_update" ? numOrNull(m.coinPrice) || 0 : undefined,
   };
 };
 
-export const canonicalTreeToLegacyTree = (tree) => arr(tree).map(canonicalModuleToLegacy).filter(Boolean);
+export const canonicalTreeToLegacyTree = (tree, paidUpdateIdByContentId) => arr(tree).map((m) => canonicalModuleToLegacy(m, paidUpdateIdByContentId)).filter(Boolean);
 
 // ---------------------------------------------------------------------------
 // Full top-level round-trip: editor form ↔ Firestore doc
@@ -907,11 +948,24 @@ export const firestoreToCatalogProduct = (raw, documentId) => {
       includedModuleIds: arr(update.includedModuleIds).length ? update.includedModuleIds : arr(update.includedIds),
     })).filter(Boolean);
   }
+  // Build content-id → paid-update-id (modules + resources) so the legacy
+  // bridge can stamp each `paid_update` module/resource with the id of the
+  // update that actually includes it (instead of its own id, which made the
+  // Course Player's buy flow send an id the checkout server could not find).
+  const paidUpdateIdByContentId = new Map();
+  for (const update of paidUpdates) {
+    for (const moduleId of arr(update.includedModuleIds)) {
+      if (moduleId) paidUpdateIdByContentId.set(String(moduleId), str(update.id));
+    }
+    for (const resourceId of arr(update.includedResourceIds)) {
+      if (resourceId) paidUpdateIdByContentId.set(String(resourceId), str(update.id));
+    }
+  }
   return {
     documentId,
     canonicalModules: canonical,
     paidUpdates,
-    courseContent: canonicalTreeToLegacyTree(canonical), // legacy bridge for Course Player
+    courseContent: canonicalTreeToLegacyTree(canonical, paidUpdateIdByContentId), // legacy bridge for Course Player
   };
 };
 

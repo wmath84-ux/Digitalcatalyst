@@ -94,6 +94,27 @@ const collectModuleTitleById = (modules: CourseModule[]): Record<string, string>
   return map;
 };
 
+// Notes are kept in the user's localStorage (per user + product) so they stay
+// on the device and never collide with Firestore course progress.
+const notesStorageKey = (uid: string, productId: string) => `dc.courseNotes.${uid}.${productId}`;
+const loadLocalNotes = (uid: string, productId: string): CoursePlayerNote[] => {
+  try {
+    const raw = localStorage.getItem(notesStorageKey(uid, productId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+const persistLocalNotes = (uid: string, productId: string, notes: CoursePlayerNote[]) => {
+  try {
+    localStorage.setItem(notesStorageKey(uid, productId), JSON.stringify(notes));
+  } catch {
+    /* storage full / private mode — ignore */
+  }
+};
+
 export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: CoursePlayerProps) {
   const { user } = useAuth();
   const modules = product.courseContent || [];
@@ -102,7 +123,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   const [selectedFile, setSelectedFile] = useState<CourseFile | null>(null);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState<CoursePlayerNote[]>([]);
-  const [noteDraft, setNoteDraft] = useState("");
   const [lastOpenedFileId, setLastOpenedFileId] = useState<string | null>(null);
   // Bottom dock state — the single overlay is reused across the four toggles.
   const [dockTab, setDockTab] = useState<DockTab>("modules");
@@ -141,24 +161,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     return () => window.removeEventListener("keydown", onKey);
   }, [immersive]);
 
-  // Find the parent module of the currently selected file (note tagging).
-  const selectedFileModuleId = useMemo(() => {
-    if (!selectedFile) return null;
-    const visit = (node: CourseModule): string | null => {
-      if (filesInModule(node).some((f) => f.id === selectedFile.id)) return String(node.id);
-      for (const child of node.modules || []) {
-        const inner = visit(child);
-        if (inner) return inner;
-      }
-      return null;
-    };
-    for (const module of modules) {
-      const found = visit(module);
-      if (found) return found;
-    }
-    return null;
-  }, [modules, selectedFile]);
-
   const progressRef = useMemo(() => (user ? doc(db, "users", user.id, "courseProgress", product.id) : null), [product.id, user]);
 
   useEffect(() => {
@@ -166,11 +168,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     const unsubscribeProgress = onSnapshot(progressRef, (snapshot) => {
       const data = snapshot.data() || {};
       setCompletedIds(new Set(Array.isArray(data.completedFileIds) ? data.completedFileIds.map(String) : []));
-      setNotes(Array.isArray(data.notes) ? data.notes : []);
       setLastOpenedFileId(typeof data.lastOpenedFileId === "string" ? data.lastOpenedFileId : null);
     });
     return () => { unsubscribeProgress(); };
   }, [progressRef, user]);
+
+  // Notes live in localStorage (per user + product), not Firestore.
+  useEffect(() => {
+    setNotes(user?.id ? loadLocalNotes(user.id, product.id) : []);
+  }, [user, product.id]);
 
   useEffect(() => {
     if (selectedFile || files.length === 0) return;
@@ -194,32 +200,32 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     await setDoc(progressRef, { productId: product.id, completedFileIds: arrayUnion(selectedFile.id), lastOpenedFileId: selectedFile.id, lastOpenedAt: serverTimestamp(), accessSource: resolution.hasFullProductAccess ? "full_product" : (resolution.ownedModuleIds.size > 0 ? "module_purchase" : (resolution.subscriptionGrantedModuleIds.size > 0 ? "subscription" : "locked")), updatedAt: serverTimestamp() }, { merge: true });
   };
 
-  const saveNote = async () => {
-    if (!user || !progressRef || !noteDraft.trim()) return;
-    const trimmed = noteDraft.trim();
-    setNoteDraft("");
+  const saveNote = (text: string) => {
+    if (!user) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
     const next: CoursePlayerNote[] = [
-      { id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, text: trimmed, createdAt: Date.now(), moduleId: selectedFileModuleId || undefined, resourceId: selectedFile?.id || undefined },
+      { id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, text: trimmed, createdAt: Date.now() },
       ...notes,
     ];
     setNotes(next);
+    persistLocalNotes(user.id, product.id, next);
     playSfxAdd();
-    await setDoc(progressRef, { productId: product.id, notes: next, updatedAt: serverTimestamp() }, { merge: true });
   };
 
-  const editNote = async (id: string, nextText: string) => {
-    if (!user || !progressRef) return;
-    const next = notes.map((note) => note.id === id ? { ...note, text: nextText, updatedAt: Date.now() } : note);
+  const editNote = (id: string, nextText: string) => {
+    if (!user) return;
+    const next = notes.map((note) => note.id === id ? { ...note, text: nextText.trim(), updatedAt: Date.now() } : note);
     setNotes(next);
-    await setDoc(progressRef, { productId: product.id, notes: next, updatedAt: serverTimestamp() }, { merge: true });
+    persistLocalNotes(user.id, product.id, next);
   };
 
-  const deleteNote = async (id: string) => {
-    if (!user || !progressRef) return;
+  const deleteNote = (id: string) => {
+    if (!user) return;
     const next = notes.filter((note) => note.id !== id);
     setNotes(next);
+    persistLocalNotes(user.id, product.id, next);
     playSfxRemove();
-    await setDoc(progressRef, { productId: product.id, notes: next, updatedAt: serverTimestamp() }, { merge: true });
   };
 
   const selectFile = (file: CourseFile) => {
@@ -322,14 +328,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
       onBuyModule={handleBuyModule}
       onBuyUpdate={onPurchaseUpdate}
       notes={notes}
-      noteDraft={noteDraft}
-      onNoteDraft={setNoteDraft}
-      onSaveNote={() => void saveNote()}
-      onEditNote={(id, text) => void editNote(id, text)}
-      onDeleteNote={(id) => void deleteNote(id)}
-      productTitle={product.title}
-      noteModuleTitle={selectedFileModuleId ? moduleTitleById[selectedFileModuleId] || null : null}
-      noteResourceTitle={selectedFile?.name || null}
+      onAddNote={(text) => saveNote(text)}
+      onEditNote={(id, text) => editNote(id, text)}
+      onDeleteNote={(id) => deleteNote(id)}
     />
   );
 

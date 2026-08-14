@@ -29,7 +29,7 @@ import Header from "./components/Header";
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import type { Product } from "./data/products";
 import type { CheckoutSelection } from "./types/commerce";
-import { computeSummary } from "../utils/pdpSelection";
+import { buildCheckoutSelection, computeSummary } from "../utils/pdpSelection";
 import PdpPurchaseBuilder from "./components/pdp/PdpPurchaseBuilder";
 import { useCourseAccess } from "./hooks/useCourseAccess";
 import { useHomepageProductReviews, usePublishedProductReviews, type PublishedProductReview } from "./hooks/useProductReviews";
@@ -228,6 +228,22 @@ function PremiumProductContent({
   const handlePreview = (selection: CheckoutSelection, summary: ReturnType<typeof computeSummary>) => {
     const withCoupon = appliedCoupon?.code ? { ...selection, couponCode: appliedCoupon.code } : selection;
     if (onCheckoutSelection) onCheckoutSelection(withCoupon, summary.effectiveSubtotal);
+    else if (selection.purchaseKind === "full_product") onCheckout(product.price, appliedCoupon?.code || null);
+  };
+
+  // Directly buy the first available paid upgrade — used once the base course
+  // is owned and the "Select course modules" section is no longer shown.
+  const handleBuyUpgrade = () => {
+    const update = availablePaidUpdates[0];
+    if (!update) return;
+    const selection = buildCheckoutSelection({
+      product,
+      mode: "paid_update",
+      selectedIds: new Set([update.id]),
+      paidUpdateId: update.id,
+      returnRoute: `#/product/${encodeURIComponent(product.id)}`,
+    });
+    if (onCheckoutSelection) onCheckoutSelection(selection, Number(update.cashPrice) || 0);
     else if (selection.purchaseKind === "full_product") onCheckout(product.price, appliedCoupon?.code || null);
   };
 
@@ -566,11 +582,12 @@ function PremiumProductContent({
           {isProductOwned && availablePaidUpdates.length > 0 && (
             <section className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 shadow-sm">
               <div className="flex items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-500 text-white"><Zap size={20} /></span><div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-wider text-amber-700">Course upgrade available</p><h2 className="mt-0.5 text-base font-black text-zinc-900">{availablePaidUpdates[0].title}</h2><p className="mt-1 text-xs leading-5 text-zinc-600">New modules or files were added after your original purchase. Review exactly what is new before upgrading.</p></div></div>
-              <button onClick={() => document.getElementById("pdp-purchase-options")?.scrollIntoView({ behavior: "smooth", block: "start" })} className="mt-4 w-full rounded-2xl bg-zinc-900 py-3 text-sm font-black text-white">View upgrade · {formatPrice(availablePaidUpdates[0].cashPrice)}</button>
+              <button onClick={handleBuyUpgrade} className="mt-4 w-full rounded-2xl bg-zinc-900 py-3 text-sm font-black text-white">Buy upgrade · {formatPrice(availablePaidUpdates[0].cashPrice)}</button>
             </section>
           )}
 
-          <section id="pdp-purchase-options" className="scroll-mt-32">
+          {!isProductOwned && (
+            <section id="pdp-purchase-options" className="scroll-mt-32">
               <div className="mb-3 px-1"><h2 className="text-lg font-bold text-zinc-900">Select course modules</h2><p className="text-xs text-zinc-500">Same as subscription extras: tick the modules you need, see the price beside each one, then checkout.</p></div>
               <PdpPurchaseBuilder
                 product={product}
@@ -582,6 +599,7 @@ function PremiumProductContent({
                 onPreview={handlePreview}
               />
             </section>
+          )}
 
           <DetailsCard product={product} modules={modules} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
           <ReviewsCard

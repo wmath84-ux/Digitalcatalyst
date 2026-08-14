@@ -21,6 +21,7 @@ interface CartWishlistAppProps {
   onNavigateToSubscription: () => void;
   onNavigateToNotifications: () => void;
   onRequireAuth: () => boolean;
+  onOpenProduct: (id: string) => void;
 }
 
 export default function CartWishlistApp({
@@ -39,6 +40,7 @@ export default function CartWishlistApp({
   onNavigateToSubscription,
   onNavigateToNotifications,
   onRequireAuth,
+  onOpenProduct,
 }: CartWishlistAppProps) {
   return (
     <div className="min-h-screen bg-slate-100 sm:py-6">
@@ -60,6 +62,7 @@ export default function CartWishlistApp({
               onRemove={onRemoveFromFavorites}
               onAddToCart={onAddToCart}
               onNavigate={onNavigate}
+              onOpenProduct={onOpenProduct}
             />
           )}
           {activeTab === "cart" && (
@@ -70,6 +73,7 @@ export default function CartWishlistApp({
               onCheckout={onCheckout}
               onNavigate={onNavigate}
               onRequireAuth={onRequireAuth}
+              onOpenProduct={onOpenProduct}
             />
           )}
         </div>

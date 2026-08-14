@@ -25,8 +25,8 @@
 //     sheet slides in from the right.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, NotebookPen, PlayCircle, RefreshCw, ShoppingBag, X } from "lucide-react";
-import type { CourseFile, CourseModule, PaidCourseUpdate } from "../types/course";
+import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, NotebookPen, PlayCircle, ShoppingBag, X } from "lucide-react";
+import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 
 export type DockTab = "modules" | "resources" | "notes" | "paid";
@@ -86,15 +86,10 @@ interface CourseOverlayProps {
   onBuyModule: (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => void;
   onBuyUpdate: (update: PaidCourseUpdate) => void;
   // Notes wiring
-  notes: Parameters<typeof NotesPanel>[0]["notes"];
-  noteDraft: string;
-  onNoteDraft: (value: string) => void;
-  onSaveNote: () => void;
+  notes: CoursePlayerNote[];
+  onAddNote: (text: string) => void;
   onEditNote: (id: string, text: string) => void;
   onDeleteNote: (id: string) => void;
-  productTitle: string;
-  noteModuleTitle?: string | null;
-  noteResourceTitle?: string | null;
 }
 
 const TABS: Array<{ key: DockTab; label: string; heading: string; icon: (active: boolean) => ReactNode }> = [
@@ -181,14 +176,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           {tab === "notes" ? (
             <NotesPanel
               notes={props.notes}
-              draft={props.noteDraft}
-              setDraft={props.onNoteDraft}
-              onSave={props.onSaveNote}
+              onAdd={props.onAddNote}
               onEdit={props.onEditNote}
               onDelete={props.onDeleteNote}
-              productTitle={props.productTitle}
-              moduleTitle={props.noteModuleTitle}
-              resourceTitle={props.noteResourceTitle}
             />
           ) : tab === "paid" ? (
             <PaidList {...props} />
@@ -363,22 +353,16 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
 
 // ─── Paid content ───────────────────────────────────────────────────────────
 function PaidList(props: CourseOverlayProps) {
-  const paidModules = props.modules
-    .flatMap((module) => {
-      const collect = (node: CourseModule): CourseModule[] => [
-        ...(node.accessLevel === "paidUpdate" ? [node] : []),
-        ...(node.modules || []).flatMap(collect),
-      ];
-      return collect(module);
-    })
-    .filter((module) => !props.ownedUpdateIds.has(updateKey(module)));
-
-  const showUpdates = props.updates.length > 0;
-
+  // Paid content is presented as a single, consistent list of the purchasable
+  // paid updates. Each update groups its modules/files (a module's paidUpdateId
+  // points at the update that includes it), so listing the same modules again
+  // as separate rows would render the same paid content twice in two styles.
   return (
     <div className="h-full overflow-y-auto overscroll-contain p-3 pb-6" data-course-overlay-paid>
-      {showUpdates && (
-        <div className="mb-3 space-y-2">
+      {props.updates.length === 0 ? (
+        <p className="grid h-40 place-items-center px-6 text-center text-xs text-white/35">No paid content for this course.</p>
+      ) : (
+        <div className="space-y-2">
           {props.updates.map((update) => (
             <div key={update.id} className="rounded-2xl border border-white/10 bg-white/5 p-3">
               <div className="flex items-start justify-between gap-3">
@@ -390,33 +374,6 @@ function PaidList(props: CourseOverlayProps) {
               </div>
               <button onClick={() => props.onBuyUpdate(update)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-amber-400 py-2.5 text-[11px] font-black text-slate-950" data-course-overlay-buy-update={update.id}>
                 <ShoppingBag size={13} /> Buy this update
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {paidModules.length === 0 ? (
-        <p className="grid h-40 place-items-center px-6 text-center text-xs text-white/35">
-          {showUpdates ? "No locked paid modules." : "No paid content for this course."}
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {paidModules.map((module) => (
-            <div key={module.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <RefreshCw size={15} className="shrink-0 text-amber-300" />
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-black">{module.title}</p>
-                  {module.paidUpdatePrice ? <p className="text-[10px] font-bold text-amber-300">₹{Number(String(module.paidUpdatePrice).replace(/[^0-9.-]/g, "")).toLocaleString("en-IN")}</p> : null}
-                </div>
-              </div>
-              <button
-                onClick={() => props.onBuyModule({ id: module.id, paidUpdateId: module.paidUpdateId, paidUpdateTitle: module.paidUpdateTitle, paidUpdatePrice: module.paidUpdatePrice })}
-                className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-400 px-3 py-1.5 text-[10px] font-black text-slate-950"
-                data-course-overlay-buy-module={module.id}
-              >
-                <ShoppingBag size={11} /> Buy
               </button>
             </div>
           ))}

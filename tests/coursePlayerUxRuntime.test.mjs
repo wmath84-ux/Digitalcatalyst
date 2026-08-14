@@ -68,6 +68,8 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-landscape-header",
     // Notes
     "data-course-notes-panel",
+    "data-course-notes-add",
+    "data-course-notes-composer",
     "data-course-notes-input",
     "data-course-notes-save",
     "data-course-notes-list",
@@ -77,8 +79,6 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-note-edit-save",
     "data-course-note-edit-cancel",
     "data-course-note-delete",
-    "data-course-note-delete-confirm",
-    "data-course-note-delete-confirm-yes",
     // Sidebar
     "data-course-sidebar",
     "data-course-module-group",
@@ -135,15 +135,11 @@ test("CoursePlayer keeps the Part 10 hook + resolver as the source of truth", ()
 // Sanity: notes are stored in a single Firestore collection + per-device sync
 // ---------------------------------------------------------------------------
 
-test("All note operations (add / edit / delete) write to the same progress doc", () => {
-  assert.match(coursePlayer, /courseProgress/, "expected 'courseProgress' in source");
-  // The doc is computed once via useMemo so all three writers
-  // hit the same path.
-  const ref = /progressRef = useMemo\(\(\) => \(user \? doc\(db, "users", user\.id, "courseProgress", product\.id\) : null\), \[product\.id, user\]\)/;
-  assert.match(coursePlayer, ref);
-  // Save → notes: next; Edit → notes: next; Delete → notes: next.
-  const save = /await setDoc\(progressRef, \{ productId: product\.id, notes: next, updatedAt: serverTimestamp\(\) \}, \{ merge: true \}\);/;
-  assert.match(coursePlayer, save);
+test("All note operations (add / edit / delete) write to localStorage", () => {
+  assert.match(coursePlayer, /notesStorageKey/, "expected 'notesStorageKey' in source");
+  assert.match(coursePlayer, /localStorage\.getItem\(notesStorageKey\(uid, productId\)\)/);
+  assert.match(coursePlayer, /localStorage\.setItem\(notesStorageKey\(uid, productId\), JSON\.stringify\(notes\)\)/);
+  assert.match(coursePlayer, /persistLocalNotes\(user\.id, product\.id, next\)/);
 });
 
 // ---------------------------------------------------------------------------

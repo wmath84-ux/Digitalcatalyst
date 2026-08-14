@@ -177,12 +177,17 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
       releaseCheckoutChrome();
       setPaymentState("idle");
       setError("Payment window was closed. No access was granted.");
+      // The system/browser back button was pressed while the Razorpay
+      // overlay was open — return to the order summary instead of letting
+      // the back gesture walk the whole history stack and close the app.
+      onGoBack();
     };
     window.addEventListener("popstate", onPopState);
     return () => {
       window.removeEventListener("popstate", onPopState);
       closeRazorpayCheckout();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const verifyPayment = async (response: RazorpaySuccess) => {
@@ -276,6 +281,10 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
             consumeRazorpayHistory();
             setPaymentState("idle");
             setError("Payment window was closed. No access was granted.");
+            // Razorpay closed its own overlay (back gesture / tap-outside) —
+            // return to the order summary so the user isn't left stranded on
+            // the payment step with no way back.
+            onGoBack();
           },
         },
         handler: (response) => {
