@@ -63,10 +63,12 @@ test("Every download carries a filename with the matching extension", () => {
 
 test("The rotated view drives scrolling itself instead of letting the browser guess", () => {
   assert.match(rotatedScroll, /export function useRotatedScroll/);
-  // Screen delta -> rotated element space. For rotate(90deg) a horizontal
-  // screen swipe must move the element's vertical scroll.
-  assert.match(rotatedScroll, /target\.scrollTop \+= dsx/);
-  assert.match(rotatedScroll, /target\.scrollLeft -= dsy/);
+  // The visible finger axis wins: up/down changes scrollTop and left/right is
+  // reserved for a genuinely horizontal scroller. A horizontal swipe must no
+  // longer be required to move a vertical module/notes list.
+  assert.match(rotatedScroll, /target\.scrollTop -= dsy/);
+  assert.match(rotatedScroll, /target\.scrollLeft -= dsx/);
+  assert.match(rotatedScroll, /Math\.abs\(dsy\) >= Math\.abs\(dsx\)/);
   // Only genuinely scrollable ancestors are targeted.
   assert.match(rotatedScroll, /const scrollableAncestor/);
   // A small movement must not steal taps from buttons.

@@ -127,7 +127,8 @@ These modules have `accessLevel: "paidUpdate"` and appear locked in the Course P
 - ✅ Two modes: "Modules" (curriculum) and "Resources" (downloadable)
 
 ### Viewer (ResourceViewer.tsx)
-- ✅ Header light/dark theme toggle, scoped to the Course Player and persisted locally
+- ✅ Header dark → light → pure-white theme cycle, scoped to the Course Player and persisted locally
+- ✅ Mobile landscape module/notes panels scroll with an up/down swipe (physical and CSS-rotated layouts)
 - ✅ Mobile landscape keeps the vertical header on the left and the four-tab navigation rail on the right, including the portrait-locked rotate mode
 - ✅ YouTube no-cookie embed with a strictly contained, full-height mobile player surface for usable settings menus
 - ✅ Native video player with controls
