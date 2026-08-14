@@ -282,6 +282,15 @@ export declare const canonicalTreeToLegacyTree: (
   tree: unknown,
 ) => Record<string, unknown>[];
 
+/**
+ * Recursively remove every `undefined` value from a plain object/array tree.
+ * Firestore rejects `undefined` field values, so anything written with
+ * `setDoc()` / `updateDoc()` must pass through this first. Non-plain objects
+ * (Date, Timestamp, FieldValue sentinels such as `serverTimestamp()`) are
+ * returned untouched.
+ */
+export declare const stripUndefinedDeep: <T>(value: T) => T;
+
 export declare const editorToFirestoreBody: (
   form: unknown,
 ) => {

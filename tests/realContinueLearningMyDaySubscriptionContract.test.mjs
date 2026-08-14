@@ -16,8 +16,38 @@ test("Continue Learning is driven by real Firestore course progress", () => {
   assert.match(home, /collection\(db, "users", user\.id, "courseProgress"\)/);
   assert.match(home, /completedFileIds/);
   assert.match(home, /lastOpenedAt \|\| data\.updatedAt/);
-  assert.match(home, /onNavigateToCourse\(continueLearningItem\)/);
+  assert.match(home, /onNavigateToCourse\(item\)/);
   assert.doesNotMatch(home, /useState\(42\)/);
+});
+
+test("Continue Learning shows at most two courses, most recently opened first", () => {
+  // The cap is a named constant so the rule is explicit and adjustable.
+  assert.match(home, /const CONTINUE_LEARNING_LIMIT = 2;/);
+  assert.match(home, /\.slice\(0, CONTINUE_LEARNING_LIMIT\)/);
+  // Most recently opened first.
+  assert.match(home, /\.sort\(\(a, b\) => b\.updatedAt - a\.updatedAt\)/);
+  // Entries are built from live progress records joined against the live
+  // catalog, so a product added in the future needs no code change and a
+  // stale record for a deleted product is dropped.
+  assert.match(home, /progressRecords/);
+  assert.match(home, /products\.find\(\(product\) => product\.id === record\.productId\)/);
+  assert.match(home, /catalogProducts\.find\(\(product\) => product\.id === record\.productId\)/);
+  assert.match(home, /entry !== null/);
+  // No hard-coded product list drives the section.
+  assert.doesNotMatch(home, /continueLearningItem/);
+});
+
+test("Continue Learning renders every provided course as its own stacked card", () => {
+  const section = fs.readFileSync("src/home/components/ContinueLearning.tsx", "utf8");
+  assert.match(section, /items: ContinueLearningItem\[\]/);
+  assert.match(section, /items\.map\(\(item\) =>/);
+  assert.match(section, /ContinueLearningCard/);
+  // Stacked layout, not a single fixed card.
+  assert.match(section, /space-y-3/);
+  // Renders nothing when the learner has not started anything.
+  assert.match(section, /if \(items\.length === 0\) return null;/);
+  // Per-card progress stays clamped to a sane 0-100 range.
+  assert.match(section, /Math\.max\(0, Math\.min\(100, item\.progress\)\)/);
 });
 
 test("subscription exposes only the paid My Day feature", () => {

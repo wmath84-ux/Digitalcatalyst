@@ -7,6 +7,7 @@ import {
   editorToFirestoreBody,
   firestoreModulesToEditorFlat,
   firestoreToEditorForm,
+  stripUndefinedDeep,
 } from "../../../utils/productMapping";
 import { fullDemoCourseContent } from "../../data/demoCourseContent";
 import type { PaidUpdate, ProductModule, ProductResource } from "./types";
@@ -16,6 +17,10 @@ const bodyOf = (init?: RequestInit) => init?.body ? JSON.parse(String(init.body)
 const urlOf = (input: string) => new URL(input, window.location.origin);
 const asDate = (value: any) => value?.toDate?.()?.toISOString?.() || String(value || new Date().toISOString());
 const money = (value: any) => Number(String(value ?? 0).replace(/[^0-9.-]/g, "")) || 0;
+/** Coerce any editor value to a string so `undefined` never reaches Firestore. */
+const str = (value: any, fallback = "") => (value === null || value === undefined ? fallback : String(value));
+/** Coerce a list field to a clean string array (drops undefined/null/blank entries). */
+const strList = (value: any): string[] => (Array.isArray(value) ? value.filter((item) => item !== null && item !== undefined).map((item) => String(item)) : []);
 const id = () => `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 
 async function ensureAdmin() {
@@ -119,33 +124,47 @@ async function saveProduct(ref: ReturnType<typeof doc>, body: any) {
   const flatModules: ProductModule[] = body.modules || [];
   const courseContent = editorModulesToFirestoreTree(flatModules) as unknown[];
   const paidUpdates = (body.paidUpdates || []).map((u: ProductResource | unknown) => editorPaidUpdateToFirestore(u, flatModules)).filter(Boolean) as unknown[];
-  const urls = (body.images || []).sort((a: any, b: any) => a.sortOrder - b.sortOrder).map((i: any) => i.url);
+  // Images may be missing entirely on a partial payload — never index into it
+  // blindly, and never let a blank/undefined url reach the document.
+  const imageEntries = (Array.isArray(body.images) ? [...body.images] : [])
+    .filter((image: any) => image && typeof image.url === "string" && image.url.trim())
+    .sort((a: any, b: any) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+  const urls = imageEntries.map((image: any) => String(image.url).trim());
+  const primaryUrl = String(imageEntries.find((image: any) => image.isPrimary)?.url || urls[0] || "").trim();
   // The `adminProduct` blob is kept for older code paths that read
   // `raw.adminProduct` (the editor reload and the Firestore-to-Form
   // mapping both honour it).
   const adminProductBlob = editorToFirestoreBody(body)?.adminProduct ?? body;
-  await setDoc(ref, {
+  // Firestore refuses ANY `undefined` field value and fails the entire write
+  // with "Unsupported field value: undefined (found in document
+  // siteProducts/<id>)". Editor payloads legitimately leave optional fields
+  // unset (no sale price, no subject, a module without a paid update…), so
+  // every value below is normalised to a concrete type and the finished
+  // document is passed through `stripUndefinedDeep` as a final safety net.
+  // `serverTimestamp()` is a FieldValue sentinel and survives the strip.
+  const payload = stripUndefinedDeep({
     adminProduct: adminProductBlob,
     id: ref.id,
-    title: body.title,
-    description: body.shortDescription,
-    longDescription: body.longDescription,
-    instructor: body.instructor,
-    category: body.category,
-    subject: body.subject,
-    tags: body.tags || [],
-    features: body.features || [],
+    title: str(body.title, "Untitled product"),
+    description: str(body.shortDescription),
+    longDescription: str(body.longDescription),
+    instructor: str(body.instructor, "Digital Catalyst"),
+    category: str(body.category),
+    subject: str(body.subject),
+    tags: strList(body.tags),
+    features: strList(body.features),
     images: urls,
-    productImages: { card: urls.find((_: any, i: number) => body.images[i]?.isPrimary) || urls[0] || "" },
-    price: Boolean(body.isFree) ? "₹0" : `₹${body.regularPrice || 0}`,
-    salePrice: Boolean(body.isFree) ? null : (body.salePrice ? `₹${body.salePrice}` : null),
+    productImages: { card: primaryUrl },
+    price: Boolean(body.isFree) ? "₹0" : `₹${str(body.regularPrice, "0") || "0"}`,
+    salePrice: Boolean(body.isFree) ? null : (body.salePrice ? `₹${str(body.salePrice)}` : null),
     isFree: Boolean(body.isFree),
     isVisible: body.visibility === "visible",
     inStock: Boolean(body.availableForSale),
     courseContent,
     paidUpdates,
     updatedAt: serverTimestamp(),
-  }, { merge: true });
+  });
+  await setDoc(ref, payload, { merge: true });
 }
 
 async function genericCollection(name: string, key: string, init?: RequestInit) {
@@ -153,7 +172,7 @@ async function genericCollection(name: string, key: string, init?: RequestInit) 
   if(method==="GET"){const snap=await getDocs(col);return {[key]:snap.docs.map(d=>({id:d.id,...d.data()}))};}
   const recordId=String(body.id||id()); const ref=doc(db,name,recordId);
   if(body.delete){await deleteDoc(ref);return {ok:true};}
-  await setDoc(ref,{...body,id:recordId,updatedAt:serverTimestamp()},{merge:true}); return {[key.replace(/s$/,"")]:{...body,id:recordId}};
+  await setDoc(ref,stripUndefinedDeep({...body,id:recordId,updatedAt:serverTimestamp()}),{merge:true}); return {[key.replace(/s$/,"")]:{...body,id:recordId}};
 }
 
 async function subscriptionPlansRequest(init?: RequestInit) {
@@ -173,7 +192,7 @@ async function subscriptionPlansRequest(init?: RequestInit) {
   const cycles = Array.isArray(body.billingCycles) ? body.billingCycles : [];
   const monthly = cycles.find((cycle: any) => cycle.cycle === "monthly")?.price ?? 0;
   const yearly = cycles.find((cycle: any) => cycle.cycle === "yearly")?.price ?? 0;
-  await setDoc(ref, { id: recordId, name: body.name, description: body.description || "", monthlyPrice: Number(monthly), yearlyPrice: Number(yearly), allowedCycles: ["monthly", "yearly"], accessTier: body.accessTier || "basic", badge: body.badge || null, cta: body.cta || "Subscribe", featured: Boolean(body.featured), active: body.active !== false, includedFeatureIds: [], updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(ref, stripUndefinedDeep({ id: recordId, name: str(body.name, "Plan"), description: str(body.description), monthlyPrice: Number(monthly), yearlyPrice: Number(yearly), allowedCycles: ["monthly", "yearly"], accessTier: body.accessTier || "basic", badge: body.badge || null, cta: body.cta || "Subscribe", featured: Boolean(body.featured), active: body.active !== false, includedFeatureIds: [], updatedAt: serverTimestamp() }), { merge: true });
   return { plan: { ...body, id: recordId } };
 }
 
@@ -185,7 +204,7 @@ async function subscriptionFeaturesRequest(init?: RequestInit) {
   }
   const body = bodyOf(init); const recordId = String(body.id || body.key || id()); const ref = doc(db, "subscriptionFeatures", recordId);
   if (body.delete) { await deleteDoc(ref); return { ok: true }; }
-  await setDoc(ref, { id: recordId, key: body.key || recordId, name: body.name, description: body.description || "", price: Number(body.individualPrice || 0), icon: recordId === "my-day" ? "calendar" : "sparkles", included: false, active: body.active !== false, updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(ref, stripUndefinedDeep({ id: recordId, key: str(body.key, recordId), name: str(body.name, "Feature"), description: str(body.description), price: Number(body.individualPrice || 0), icon: recordId === "my-day" ? "calendar" : "sparkles", included: false, active: body.active !== false, updatedAt: serverTimestamp() }), { merge: true });
   return { feature: { ...body, id: recordId } };
 }
 
@@ -203,7 +222,7 @@ const mapOrder=(d:any)=>({id:String(d.id||""),customerId:d.customerUid||"",custo
 async function ordersRequest(url:URL){const match=url.pathname.match(/\/orders\/([^/]+)$/);const snap=await getDocs(collection(db,"siteOrders"));const rows=snap.docs.map(d=>mapOrder({id:d.id,...d.data()}));if(match){const order=rows.find(o=>o.id===decodeURIComponent(match[1]));if(!order)throw new ApiError("Order not found",404);return {order};}let result=rows;const q=(url.searchParams.get("q")||"").toLowerCase();if(q)result=result.filter(o=>`${o.id} ${o.customerName} ${o.customerEmail}`.toLowerCase().includes(q));const status=url.searchParams.get("status");if(status)result=result.filter(o=>o.paymentStatus===status);const kind=url.searchParams.get("kind");if(kind)result=result.filter(o=>o.purchaseKind===kind);return {orders:result};}
 
 const SETTINGS_DEFAULTS:Record<string,any>={adminContent:{siteName:"Digital Catalyst",banners:[],categories:[],testimonials:[],storeTitle:"Store",storeSubtitle:"",showWishlist:true,showRatings:true,showSaleBadges:true,emptyStateMessages:{},pdpHelperTexts:{},coursePlayerMessages:{},authLabels:{openDashboardLabel:"Open dashboard"}},referralProgram:{enabled:true,discountPaise:25000,maxUsesPerReferrer:null}};
-async function settingsRequest(documentId:string,key:string,init?:RequestInit){const ref=doc(db,"settings",documentId),defaults=SETTINGS_DEFAULTS[documentId]||{};if((init?.method||"GET")==="GET"){const snap=await getDoc(ref);return {[key]:{...defaults,...(snap.exists()?snap.data():{})}};}const b=bodyOf(init);await setDoc(ref,{...b,updatedAt:serverTimestamp()},{merge:true});return {[key]:{...defaults,...b}};}
+async function settingsRequest(documentId:string,key:string,init?:RequestInit){const ref=doc(db,"settings",documentId),defaults=SETTINGS_DEFAULTS[documentId]||{};if((init?.method||"GET")==="GET"){const snap=await getDoc(ref);return {[key]:{...defaults,...(snap.exists()?snap.data():{})}};}const b=bodyOf(init);await setDoc(ref,stripUndefinedDeep({...b,updatedAt:serverTimestamp()}),{merge:true});return {[key]:{...defaults,...b}};}
 
 async function dashboard(){const [p,u,o,r]=await Promise.all([getDocs(collection(db,"siteProducts")),getDocs(collection(db,"users")),getDocs(collection(db,"siteOrders")),getDocs(collection(db,"siteReviews"))]);const orders=o.docs.map(d=>mapOrder({id:d.id,...d.data()}));return {products:{total:p.size,hidden:p.docs.filter(d=>d.data().isVisible===false).length,unavailable:p.docs.filter(d=>d.data().inStock===false).length},users:{total:u.size,active:u.docs.filter(d=>d.data().status!=="blocked").length,blocked:u.docs.filter(d=>d.data().status==="blocked").length},orders:{verified:orders.filter(x=>["verified","access_granted","completed"].includes(x.paymentStatus)).length,pending:orders.filter(x=>x.paymentStatus.includes("pending")).length,failed:orders.filter(x=>x.paymentStatus==="failed").length},revenue:{total:orders.filter(x=>x.paymentStatus!=="failed").reduce((n,x)=>n+Number(x.finalAmount),0)},subscriptions:{active:u.docs.filter(d=>d.data().subscriptionTier&&d.data().subscriptionTier!=="basic").length,expiring:0},reviews:{pending:r.docs.filter(d=>d.data().status==="pending").length},recentOrders:orders.slice(0,5),attentionQueue:[]};}
 
