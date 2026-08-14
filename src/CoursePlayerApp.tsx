@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { ArrowLeft, CheckCircle2, Minimize2, Moon, RotateCw, Sun } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import { ArrowLeft, CheckCircle2, Circle, Minimize2, Moon, RotateCw, Sun } from "lucide-react";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer from "./course/ResourceViewer";
@@ -9,6 +9,14 @@ import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
+import { isEmptyRichText, richTextToPlain, sanitizeRichText } from "./utils/richText";
+import {
+  loadPlaybackStore,
+  mergePlaybackEntry,
+  persistPlaybackStore,
+  type CoursePlaybackPatch,
+  type CoursePlaybackStore,
+} from "./course/playbackState";
 
 interface CoursePlayerProps {
   product: Product;
@@ -134,6 +142,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState<CoursePlayerNote[]>([]);
   const [lastOpenedFileId, setLastOpenedFileId] = useState<string | null>(null);
+  // Every file the user has opened this session stays mounted behind the
+  // active one, so switching modules never tears a player down.
+  const [visitedFiles, setVisitedFiles] = useState<CourseFile[]>([]);
+  // Per-file resume state (video/audio seconds, image zoom, document scroll).
+  const playbackRef = useRef<CoursePlaybackStore>({});
+  const [playbackReady, setPlaybackReady] = useState(false);
   // Bottom dock state — the single overlay is reused across the four toggles.
   const [dockTab, setDockTab] = useState<DockTab>("modules");
   const [dockOpen, setDockOpen] = useState(false);
@@ -207,6 +221,40 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     setNotes(user?.id ? loadLocalNotes(user.id, product.id) : []);
   }, [user, product.id]);
 
+  // Restore the saved "where did I leave off" snapshot for this course. It
+  // covers every file type, so a YouTube lesson, an MP4, a podcast, a PDF and
+  // a zoomed diagram all reopen exactly where the learner stopped.
+  useEffect(() => {
+    playbackRef.current = user?.id ? loadPlaybackStore(user.id, product.id) : {};
+    setPlaybackReady(true);
+    return () => { setPlaybackReady(false); };
+  }, [user, product.id]);
+
+  /**
+   * Record the live position of a file. Called continuously by the viewers
+   * (timeupdate / pause / zoom / scroll) and, crucially, right before the
+   * player switches away from a module — that is what makes "come back and
+   * continue from the same second" work.
+   */
+  const reportPlayback = useCallback((fileId: string, patch: CoursePlaybackPatch) => {
+    if (!fileId) return;
+    mergePlaybackEntry(playbackRef.current, fileId, patch);
+    if (user?.id) persistPlaybackStore(user.id, product.id, playbackRef.current);
+  }, [product.id, user]);
+
+  // Flush the snapshot when the tab is hidden / closed so nothing is lost.
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const flush = () => persistPlaybackStore(user.id, product.id, playbackRef.current);
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", flush);
+    return () => {
+      flush();
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", flush);
+    };
+  }, [product.id, user]);
+
   useEffect(() => {
     if (selectedFile || files.length === 0) return;
     const first = firstAccessibleFile(modules, resolution.accessibleModuleIds);
@@ -223,18 +271,48 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     }
   }, [files, lastOpenedFileId, resolution.accessibleModuleIds, selectedFile]);
 
-  const markComplete = async () => {
+  /**
+   * "Mark complete" is a TOGGLE, never a one-way door. Tapping it by mistake
+   * (or while testing) can always be undone by tapping it again, which
+   * removes the file from `completedFileIds` so the progress percentage
+   * stays an honest reflection of what has actually been finished.
+   */
+  const toggleComplete = async () => {
     if (!user || !selectedFile || !progressRef) return;
-    playSfxComplete();
-    await setDoc(progressRef, { productId: product.id, completedFileIds: arrayUnion(selectedFile.id), lastOpenedFileId: selectedFile.id, lastOpenedAt: serverTimestamp(), accessSource: resolution.hasFullProductAccess ? "full_product" : (resolution.ownedModuleIds.size > 0 ? "module_purchase" : (resolution.subscriptionGrantedModuleIds.size > 0 ? "subscription" : "locked")), updatedAt: serverTimestamp() }, { merge: true });
+    const completing = !completedIds.has(selectedFile.id);
+    // Optimistic flip — the Firestore listener confirms it a moment later.
+    setCompletedIds((current) => {
+      const next = new Set(current);
+      if (completing) next.add(selectedFile.id);
+      else next.delete(selectedFile.id);
+      return next;
+    });
+    if (completing) playSfxComplete();
+    else playSfxRemove();
+    await setDoc(progressRef, {
+      productId: product.id,
+      completedFileIds: completing ? arrayUnion(selectedFile.id) : arrayRemove(selectedFile.id),
+      lastOpenedFileId: selectedFile.id,
+      lastOpenedAt: serverTimestamp(),
+      accessSource: resolution.hasFullProductAccess ? "full_product" : (resolution.ownedModuleIds.size > 0 ? "module_purchase" : (resolution.subscriptionGrantedModuleIds.size > 0 ? "subscription" : "locked")),
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
   };
 
-  const saveNote = (text: string) => {
+  // Notes are rich text. The HTML is sanitised on the way in (so a paste from
+  // any site is safe) while keeping the exact formatting, and a plain-text
+  // projection is stored alongside it for the thin saved-note strip.
+  const saveNote = (html: string) => {
     if (!user) return;
-    const trimmed = text.trim();
-    if (!trimmed) return;
+    const safeHtml = sanitizeRichText(html);
+    if (isEmptyRichText(safeHtml)) return;
     const next: CoursePlayerNote[] = [
-      { id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, text: trimmed, createdAt: Date.now() },
+      {
+        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        text: richTextToPlain(safeHtml),
+        html: safeHtml,
+        createdAt: Date.now(),
+      },
       ...notes,
     ];
     setNotes(next);
@@ -242,9 +320,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     playSfxAdd();
   };
 
-  const editNote = (id: string, nextText: string) => {
+  const editNote = (id: string, nextHtml: string) => {
     if (!user) return;
-    const next = notes.map((note) => note.id === id ? { ...note, text: nextText.trim(), updatedAt: Date.now() } : note);
+    const safeHtml = sanitizeRichText(nextHtml);
+    if (isEmptyRichText(safeHtml)) return;
+    const next = notes.map((note) => note.id === id
+      ? { ...note, text: richTextToPlain(safeHtml), html: safeHtml, updatedAt: Date.now() }
+      : note);
     setNotes(next);
     persistLocalNotes(user.id, product.id, next);
   };
@@ -258,6 +340,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   };
 
   const selectFile = (file: CourseFile) => {
+    // Switching modules must PAUSE the outgoing lesson rather than let it keep
+    // playing in the background. `ResourceViewer` does that itself the moment
+    // it stops being the active file (see its `active` prop).
     setSelectedFile(file);
     // Close the overlay so the user sees the freshly opened content.
     setDockOpen(false);
@@ -266,6 +351,19 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
       void setDoc(progressRef, { productId: product.id, lastOpenedFileId: file.id, lastOpenedAt: serverTimestamp() }, { merge: true });
     }
   };
+
+  // Keep every opened file mounted. The active one is visible; the others are
+  // hidden but alive, so a Google Doc keeps its scroll position, a mind map
+  // keeps its pan, and an <iframe> is never reloaded on the way back.
+  useEffect(() => {
+    if (!selectedFile) return;
+    setVisitedFiles((current) => (current.some((file) => file.id === selectedFile.id)
+      ? current.map((file) => (file.id === selectedFile.id ? selectedFile : file))
+      : [...current, selectedFile]));
+  }, [selectedFile]);
+
+  // A different course resets the stack.
+  useEffect(() => { setVisitedFiles([]); }, [product.id]);
 
   const handleBuyModule = (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => {
     if (!module.paidUpdateId) return;
@@ -328,7 +426,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--course-border)] bg-[var(--course-surface)] px-4 py-2.5" data-course-mark-complete-bar>
       <div className="min-w-0">
         <p className="truncate text-xs font-black" data-course-selected-name>{selectedFile.name}</p>
-        <p className="text-[10px] text-[var(--course-muted)]">Progress is saved to your account</p>
+        <p className="text-[10px] text-[var(--course-muted)]">
+          {isDone ? "Tap again to undo · progress is saved to your account" : "Progress is saved to your account"}
+        </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {!useLandscapeRails ? (
@@ -343,19 +443,64 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
             <RotateCw size={15} />
           </button>
         ) : null}
+        {/* Toggle, not a one-way action: an accidental tap is fully reversible
+            so the tracked progress always matches reality. */}
         <button
-          disabled={isDone}
-          onClick={() => void markComplete()}
-          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-[11px] font-black text-slate-950 disabled:bg-emerald-500/15 disabled:text-emerald-300"
+          type="button"
+          onClick={() => void toggleComplete()}
+          aria-pressed={isDone}
+          title={isDone ? "Tap to mark as not complete" : "Mark this lesson complete"}
+          className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-black transition ${
+            isDone
+              ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-inset ring-emerald-400/40 hover:bg-emerald-500/25"
+              : "bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+          }`}
           data-course-mark-complete
           data-completed={isDone ? "true" : "false"}
         >
-          <CheckCircle2 size={14} />
+          {isDone ? <CheckCircle2 size={14} /> : <Circle size={14} />}
           {isDone ? "Completed" : "Mark complete"}
         </button>
       </div>
     </div>
   ) : null;
+
+  // ── Viewer stack ───────────────────────────────────────────────────────
+  // Every file the learner has opened stays mounted. Only the selected one is
+  // visible; the rest are hidden AND paused. That combination is what makes
+  // module switching lossless for every file type:
+  //   · YouTube / video / audio → paused at the exact second, resumed there.
+  //   · PDF / Doc / Sheet / Slides / Form / mind map / embed → the same live
+  //     iframe comes back, so its page, scroll and zoom are untouched.
+  //   · Images → zoom + pan are restored from the snapshot.
+  const viewerStack = (
+    <div className="relative h-full min-h-0 w-full min-w-0" data-course-viewer-stack>
+      {visitedFiles.length === 0 ? (
+        <ResourceViewer file={null} active playback={playbackRef.current} onPlaybackChange={reportPlayback} />
+      ) : (
+        visitedFiles.map((file) => {
+          const active = file.id === selectedFile?.id;
+          return (
+            <div
+              key={file.id}
+              className={`absolute inset-0 min-h-0 min-w-0 overflow-hidden ${active ? "" : "pointer-events-none invisible opacity-0"}`}
+              aria-hidden={!active}
+              data-course-viewer-slot
+              data-file-id={file.id}
+              data-active={active ? "true" : "false"}
+            >
+              <ResourceViewer
+                file={file}
+                active={active}
+                playback={playbackReady ? playbackRef.current : undefined}
+                onPlaybackChange={reportPlayback}
+              />
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
 
   const overlay = (
     <CourseOverlay
@@ -428,7 +573,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
           players from extending underneath the right-side navigation. */}
       <section id="course-viewer" className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden" data-course-landscape-content>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="min-h-0 flex-1 overflow-hidden"><ResourceViewer file={selectedFile} /></div>
+          <div className="min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
           {markCompleteBar}
         </div>
         {overlay}
@@ -491,7 +636,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
       {/* Everything between the pinned header and the pinned dock. */}
       <section id="course-viewer" className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="min-h-0 flex-1 overflow-hidden"><ResourceViewer file={selectedFile} /></div>
+        <div className="min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
         {markCompleteBar}
         {overlay}
       </section>

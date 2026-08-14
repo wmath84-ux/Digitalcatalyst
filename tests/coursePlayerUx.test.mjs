@@ -89,8 +89,8 @@ test("ResourceViewer exposes a retry button when the embed fails", () => {
 
 test("ResourceViewer handles direct video natively and audio with the custom player", () => {
   assert.match(resourceViewer, /data-course-viewer-video/);
-  assert.match(resourceViewer, /<video\s+src=\{embed\.url\}/);
-  assert.match(resourceViewer, /<AudioPlayer url=\{embed\.url\} name=\{file\.name\} \/>/);
+  assert.match(resourceViewer, /<video\s+ref=\{videoRef\}\s+src=\{url\}/);
+  assert.match(resourceViewer, /<AudioPlayer\s+url=\{embed\.url\}\s+name=\{file\.name\}/);
   assert.match(audioPlayer, /data-course-viewer-audio/);
   assert.match(audioPlayer, /<audio/);
   assert.match(audioPlayer, /src=\{url\}/);
@@ -219,7 +219,7 @@ test("CoursePlayer resumes the last opened file when the snapshot delivers it", 
 });
 
 test("CoursePlayer persists completed file ids + access source + preview state", () => {
-  assert.match(coursePlayer, /completedFileIds: arrayUnion\(selectedFile\.id\)/);
+  assert.match(coursePlayer, /completedFileIds: completing \? arrayUnion\(selectedFile\.id\) : arrayRemove\(selectedFile\.id\)/);
   assert.match(coursePlayer, /accessSource: resolution\.hasFullProductAccess/);
   assert.match(coursePlayer, /"full_product"|"module_purchase"|"subscription"|"locked"/);
 });

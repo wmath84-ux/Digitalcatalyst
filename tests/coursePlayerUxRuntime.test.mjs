@@ -158,8 +158,8 @@ test("Last opened file is persisted on every select", () => {
   assert.match(coursePlayer, /setDoc\(progressRef, \{ productId: product\.id, lastOpenedFileId: file\.id, lastOpenedAt: serverTimestamp\(\) \}, \{ merge: true \}\)/);
 });
 
-test("Completed files are persisted via arrayUnion", () => {
-  assert.match(coursePlayer, /completedFileIds: arrayUnion\(selectedFile\.id\)/);
+test("Completed files are persisted via arrayUnion and un-completed via arrayRemove", () => {
+  assert.match(coursePlayer, /completedFileIds: completing \? arrayUnion\(selectedFile\.id\) : arrayRemove\(selectedFile\.id\)/);
 });
 
 // ---------------------------------------------------------------------------

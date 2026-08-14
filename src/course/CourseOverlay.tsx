@@ -103,12 +103,18 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   const { orientation, tab, open } = props;
   const activeIndex = Math.max(0, TABS.findIndex((item) => item.key === tab));
   const landscape = orientation === "landscape";
+  // NotesPanel reports when its big editor is open so the sheet can grow.
+  const [notesEditorOpen, setNotesEditorOpen] = useState(false);
 
-  // Notes get exactly half the screen so the keyboard + list both fit.
-  // Every other tab gets a taller sheet so long module trees breathe.
+  // Notes: the saved list only needs half the screen, but the moment the
+  // editor is open it takes the full sheet so the writing surface is as
+  // large as the notes area allows and long text is easy to read.
   const notesHeight = landscape ? "52vw" : "50dvh";
+  const notesEditorHeight = landscape ? "min(92vw, 620px)" : "88dvh";
   const defaultHeight = landscape ? "min(78vw, 460px)" : "72dvh";
-  const sheetHeight = tab === "notes" ? notesHeight : defaultHeight;
+  const sheetHeight = tab === "notes"
+    ? (notesEditorOpen ? notesEditorHeight : notesHeight)
+    : defaultHeight;
 
   const flatModules = useMemo(() => flattenModules(props.modules), [props.modules]);
 
@@ -179,6 +185,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
               onAdd={props.onAddNote}
               onEdit={props.onEditNote}
               onDelete={props.onDeleteNote}
+              onEditorOpenChange={setNotesEditorOpen}
             />
           ) : tab === "paid" ? (
             <PaidList {...props} />

@@ -8,7 +8,14 @@ export type CourseFileType = "youtube" | "video" | "audio" | "pdf" | "doc" | "sh
  */
 export interface CoursePlayerNote {
   id: string;
+  /** Plain-text projection — used for the thin saved-note strip + search. */
   text: string;
+  /**
+   * Sanitised rich-text HTML. Keeps the exact formatting of anything pasted
+   * into the editor (bold, lists, tables, links, code, colours, emoji).
+   * Legacy notes saved before rich text was added only have `text`.
+   */
+  html?: string;
   createdAt: number;
   /** Epoch ms; set whenever the user edits the note. */
   updatedAt?: number;

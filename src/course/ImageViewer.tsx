@@ -23,6 +23,12 @@ import { Download, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
 interface ImageViewerProps {
   url: string;
   name: string;
+  /** Zoom level to restore when returning to this image. */
+  initialScale?: number;
+  /** Pan offset to restore when returning to this image. */
+  initialOffset?: { x: number; y: number };
+  /** Reports zoom + pan so the Course Player can persist them. */
+  onViewChange?: (scale: number, offset: { x: number; y: number }) => void;
 }
 
 interface PointerPosition {
@@ -33,10 +39,18 @@ interface PointerPosition {
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 5;
 
-export default function ImageViewer({ url, name }: ImageViewerProps) {
-  const [scale, setScale] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const scaleRef = useRef(1);
+export default function ImageViewer({ url, name, initialScale, initialOffset, onViewChange }: ImageViewerProps) {
+  // Restoring zoom + pan is the image equivalent of resuming a video at the
+  // right second: the learner comes back to exactly the view they left.
+  const startScale = Number.isFinite(initialScale) && Number(initialScale) > 0 ? Number(initialScale) : 1;
+  const startOffset = initialOffset && Number.isFinite(initialOffset.x) ? initialOffset : { x: 0, y: 0 };
+  const [scale, setScale] = useState(startScale);
+  const [offset, setOffset] = useState(startOffset);
+  const scaleRef = useRef(startScale);
+  const offsetRef = useRef(startOffset);
+  offsetRef.current = offset;
+  const viewChangeRef = useRef(onViewChange);
+  viewChangeRef.current = onViewChange;
   const pointers = useRef(new Map<number, PointerPosition>());
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const pinch = useRef<{ distance: number; scale: number } | null>(null);
@@ -48,15 +62,24 @@ export default function ImageViewer({ url, name }: ImageViewerProps) {
     const value = clamp(next);
     scaleRef.current = value;
     setScale(value);
-    if (value === 1) setOffset({ x: 0, y: 0 });
+    const nextOffset = value === 1 ? { x: 0, y: 0 } : offsetRef.current;
+    if (value === 1) setOffset(nextOffset);
+    viewChangeRef.current?.(value, nextOffset);
+  };
+
+  const applyOffset = (next: { x: number; y: number }) => {
+    setOffset(next);
+    offsetRef.current = next;
+    viewChangeRef.current?.(scaleRef.current, next);
   };
 
   useEffect(() => {
     // Reset state when the URL changes (Course Player switches file).
-    scaleRef.current = 1;
-    setScale(1);
-    setOffset({ x: 0, y: 0 });
+    scaleRef.current = startScale;
+    setScale(startScale);
+    setOffset(startOffset);
     setLoadError(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 
   const distance = () => {
@@ -109,7 +132,7 @@ export default function ImageViewer({ url, name }: ImageViewerProps) {
           return;
         }
         if (drag.current) {
-          setOffset({
+          applyOffset({
             x: drag.current.ox + (event.clientX - drag.current.x),
             y: drag.current.oy + (event.clientY - drag.current.y),
           });

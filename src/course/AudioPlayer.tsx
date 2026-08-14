@@ -18,6 +18,16 @@ import { Pause, Play, RotateCcw, Volume2, VolumeX, Repeat } from "lucide-react";
 interface AudioPlayerProps {
   url: string;
   name: string;
+  /**
+   * False while the track is mounted but hidden behind another module. An
+   * inactive player pauses immediately and banks its position so returning
+   * to the lesson continues from the same second.
+   */
+  active?: boolean;
+  /** Seconds to resume from when the track mounts. */
+  resumeAt?: number;
+  /** Reports the live position so the Course Player can persist it. */
+  onProgress?: (position: number, duration: number) => void;
 }
 
 const formatTime = (value: number) => {
@@ -28,7 +38,7 @@ const formatTime = (value: number) => {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
-export default function AudioPlayer({ url, name }: AudioPlayerProps) {
+export default function AudioPlayer({ url, name, active = true, resumeAt = 0, onProgress }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -52,12 +62,28 @@ export default function AudioPlayer({ url, name }: AudioPlayerProps) {
     };
   }, []);
 
+  const resumeRef = useRef(resumeAt);
+  const resumeApplied = useRef(false);
+  const progressRef = useRef(onProgress);
+  progressRef.current = onProgress;
+
   // Reset when the track changes.
   useEffect(() => {
     setPlaying(false);
     setCurrentTime(0);
     setDuration(0);
+    resumeApplied.current = false;
   }, [url]);
+
+  // Switching module stops the audio where it is — it must never keep playing
+  // behind another lesson.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || active) return;
+    progressRef.current?.(audio.currentTime || 0, audio.duration || 0);
+    audio.pause();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 
   const togglePlay = () => {
     const audio = audioRef.current;
@@ -199,10 +225,25 @@ export default function AudioPlayer({ url, name }: AudioPlayerProps) {
         preload="metadata"
         loop={loop}
         onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
+        onPause={(event) => {
+          setPlaying(false);
+          progressRef.current?.(event.currentTarget.currentTime, event.currentTarget.duration || 0);
+        }}
         onEnded={() => setPlaying(false)}
-        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)}
-        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onLoadedMetadata={(event) => {
+          const audio = event.currentTarget;
+          setDuration(audio.duration || 0);
+          // Continue from where the learner left off.
+          if (!resumeApplied.current && resumeRef.current > 0) {
+            audio.currentTime = Math.min(resumeRef.current, Math.max(0, (audio.duration || 0) - 1));
+            setCurrentTime(audio.currentTime);
+          }
+          resumeApplied.current = true;
+        }}
+        onTimeUpdate={(event) => {
+          setCurrentTime(event.currentTarget.currentTime);
+          progressRef.current?.(event.currentTarget.currentTime, event.currentTarget.duration || 0);
+        }}
         data-course-audio-element
       />
     </div>
