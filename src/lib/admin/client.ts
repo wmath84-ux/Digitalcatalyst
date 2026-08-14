@@ -38,12 +38,18 @@ async function notifyProductChange(productId: string, action: "product-created" 
   try {
     const user = auth.currentUser;
     if (!user) return;
-    const token = await user.getIdToken();
-    await fetch("/api/push/send", {
+    const token = await user.getIdToken(true);
+    const response = await fetch("/api/push/send", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ action, productId }),
+      // Let delivery finish if the admin navigates away immediately after save.
+      keepalive: true,
     });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      throw new Error(payload.error || `Push endpoint returned ${response.status}`);
+    }
   } catch (error) {
     console.warn("[admin] product push announcement skipped", error);
   }

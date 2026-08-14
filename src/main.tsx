@@ -34,12 +34,27 @@ import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlis
 import type { PaidCourseUpdate } from "./types/course";
 import { isDesktopBrowserLocked, isInstalledMobilePwa, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
 import { disablePageZoom } from "./utils/disablePageZoom";
-import { ensureSavedWebPushSubscription } from "../utils/webPush";
+import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
+import { collectDueMyDayItems, type MyDayDocData } from "../utils/pushScheduler";
 import { playSfxAdd, playSfxError, playSfxRemove } from "./utils/sfx";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+  });
+  // The service worker focuses an already-open PWA window on notification
+  // taps. Finish the job in the page by navigating to the notification URL.
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    const message = event.data || {};
+    if (message.type === "site-notification-open" && message.notificationId) {
+      window.location.hash = NOTIFICATIONS_HASH;
+      return;
+    }
+    if (message.type === "push-open" && typeof message.url === "string") {
+      const hashIndex = message.url.indexOf("#");
+      if (hashIndex >= 0) window.location.hash = message.url.slice(hashIndex);
+      else window.location.assign(message.url);
+    }
   });
 }
 
@@ -278,6 +293,64 @@ function Root() {
   useEffect(() => {
     if (!user) return;
     void ensureSavedWebPushSubscription(user.id);
+
+    // Android/Chrome may refuse a permission prompt started from an effect.
+    // Retry on the user's first real tap, which is a valid browser gesture.
+    // Once granted, this also refreshes the saved endpoint on every login.
+    const subscribeOnGesture = () => {
+      void ensureSavedWebPushSubscription(user.id);
+    };
+    window.addEventListener("pointerdown", subscribeOnGesture, { once: true, capture: true });
+    return () => window.removeEventListener("pointerdown", subscribeOnGesture, { capture: true });
+  }, [user]);
+
+  // Foreground safety net for My Day. Server Web Push is still responsible
+  // when the PWA is closed; while it is open this clock guarantees every due
+  // task, schedule event and reminder becomes an Android/system notification
+  // even if the external minute scheduler is delayed.
+  useEffect(() => {
+    if (!user) return undefined;
+    let current: MyDayDocData | null = null;
+    const pending = new Set<string>();
+    const shownKey = `eduvora.myDaySystemNotifications.v1:${user.id}`;
+    const readShown = (): Record<string, number> => {
+      try { return JSON.parse(localStorage.getItem(shownKey) || "{}"); } catch { return {}; }
+    };
+    const checkDue = () => {
+      if (!current) return;
+      const now = Date.now();
+      const shown = readShown();
+      const due = collectDueMyDayItems(current, now, new Date().getTimezoneOffset());
+      for (const item of due) {
+        if (shown[item.key] || pending.has(item.key)) continue;
+        pending.add(item.key);
+        void showLocalSystemNotification(item.title, item.body, "/#/my-day", `myday-${item.key}`)
+          .then((displayed) => {
+            // Do not dedupe a failed display (for example before permission is
+            // granted); the next tick must be allowed to retry it.
+            if (!displayed) return;
+            const latest = readShown();
+            latest[item.key] = Date.now();
+            try { localStorage.setItem(shownKey, JSON.stringify(latest)); } catch { /* restricted storage */ }
+          })
+          .finally(() => pending.delete(item.key));
+      }
+      const cutoff = now - 2 * 24 * 60 * 60 * 1000;
+      Object.keys(shown).forEach((key) => { if (shown[key] < cutoff) delete shown[key]; });
+      try { localStorage.setItem(shownKey, JSON.stringify(shown)); } catch { /* restricted storage */ }
+    };
+    const unsubscribe = onSnapshot(doc(db, "users", user.id, "myDay", "current"), (snapshot) => {
+      current = snapshot.exists() ? snapshot.data() as MyDayDocData : null;
+      checkDue();
+    });
+    const timer = window.setInterval(checkDue, 15_000);
+    const onVisible = () => { if (document.visibilityState === "visible") checkDue(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      unsubscribe();
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [user]);
 
   useEffect(() => {
@@ -296,7 +369,18 @@ function Root() {
     const previous = loadContentNotificationBaseline(user.id);
     if (previous) {
       const incoming = createContentNotifications(previous, current);
-      if (incoming.length > 0) saveSiteNotifications(user.id, mergeSiteNotifications(loadSiteNotifications(user.id), incoming));
+      if (incoming.length > 0) {
+        saveSiteNotifications(user.id, mergeSiteNotifications(loadSiteNotifications(user.id), incoming));
+        // Foreground fallback: Web Push normally supplies this system alert.
+        // A stable tag lets Android collapse it with the matching server push.
+        incoming.forEach((notification) => {
+          const target = notification.target;
+          const url = target.type === "product"
+            ? `/#/product/${encodeURIComponent(String(target.productId))}`
+            : target.type === "purchases" ? "/#/store/purchases" : "/#/notifications";
+          void showLocalSystemNotification(notification.title, notification.body, url, notification.id);
+        });
+      }
     }
     saveContentNotificationBaseline(user.id, current);
   }, [catalogProducts, purchasedIds, user]);
