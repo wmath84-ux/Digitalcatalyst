@@ -112,6 +112,7 @@ export default function App() {
           ...(next.schedule ? { schedule: next.schedule } : {}),
           ...(next.notes ? { notes: next.notes } : {}),
           ...(next.reminders ? { reminders: next.reminders } : {}),
+          tzOffsetMinutes: new Date().getTimezoneOffset(),
           updatedAt: serverTimestamp(),
         },
         { merge: true },

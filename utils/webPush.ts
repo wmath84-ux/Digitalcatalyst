@@ -177,13 +177,19 @@ export const saveWebPushSubscription = async (uid: string, subscription: PushSub
   }
 };
 
-export const showLocalSystemNotification = async (title: string, body: string, url = '/#/notifications'): Promise<boolean> => {
+export const showLocalSystemNotification = async (
+  title: string,
+  body: string,
+  url = '/#/notifications',
+  tag = `eduvora-local-${Date.now()}`,
+): Promise<boolean> => {
   if (!isWebPushSupported() || window.Notification.permission !== 'granted') return false;
-  const options: NotificationOptions = {
+  const options: NotificationOptions & { renotify?: boolean } = {
     body,
     icon: '/icons/icon-192x192.png',
     badge: '/icons/badge-96x96.png',
-    tag: `eduvora-local-${Date.now()}`,
+    tag,
+    renotify: true,
     data: { url, timestamp: Date.now() },
   };
   try {

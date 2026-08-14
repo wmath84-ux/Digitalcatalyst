@@ -1,4 +1,4 @@
-const CACHE_NAME = 'digital-catalyst-app-shell-v1';
+const CACHE_NAME = 'digital-catalyst-app-shell-v2';
 const APP_SHELL = ['/','/index.html'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
@@ -61,6 +61,11 @@ const routeNotificationClick = async (notification) => {
   const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
   const existingClient = clients.find(client => 'focus' in client);
   if (existingClient) {
+    // Focus alone left users on whatever screen they had open. WindowClient
+    // navigation works even when the page's message listener is still booting.
+    if ('navigate' in existingClient) {
+      try { await existingClient.navigate(targetUrl); } catch { /* message fallback below */ }
+    }
     await existingClient.focus();
     if (notificationId) existingClient.postMessage({ type: 'site-notification-open', notificationId });
     else existingClient.postMessage({ type: 'push-open', url: targetUrl, target: data.target });

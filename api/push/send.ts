@@ -62,11 +62,51 @@ const requireAdminUser = async (req: VercelRequest) => {
 
 const PRODUCT_URL = (productId: string) => `/#/product/${productId}`;
 
+// Ownership has a canonical entitlement record plus a legacy array. Read both
+// so old purchases, string IDs and newer checkout writes all receive updates.
+async function findProductBuyerIds(db: FirebaseFirestore.Firestore, productId: string): Promise<string[]> {
+  const ids = new Set<string>();
+  const keys: Array<string | number> = [productId];
+  if (Number.isFinite(Number(productId))) keys.push(Number(productId));
+  for (const key of keys) {
+    const legacy = await db.collection("users").where("purchasedProductIds", "array-contains", key).get();
+    legacy.docs.forEach((item) => ids.add(item.id));
+    const entitlements = await db.collectionGroup("entitlements").where("productId", "==", key).get();
+    entitlements.docs.forEach((item) => {
+      const uid = item.ref.parent.parent?.id;
+      if (uid) ids.add(uid);
+    });
+  }
+  return Array.from(ids);
+}
+
+async function writeNewProductBellEntries(db: FirebaseFirestore.Firestore, productId: string, entry: ReturnType<typeof buildProductInventoryEntry>) {
+  const users = await db.collection("users").get();
+  const docId = `content:product:${productId}`;
+  // Keep below Firestore's 500-operation batch ceiling and cover every user,
+  // not just the first page of accounts.
+  for (let offset = 0; offset < users.docs.length; offset += 450) {
+    const batch = db.batch();
+    users.docs.slice(offset, offset + 450).forEach((user) => batch.set(user.ref.collection("notifications").doc(docId), {
+      id: docId,
+      title: entry.free ? "New free product available" : "New product added",
+      body: entry.title,
+      category: "store",
+      read: false,
+      source: "system",
+      createdAt: Timestamp.now(),
+      target: { type: "product", productId },
+    }, { merge: true }));
+    await batch.commit();
+  }
+  return users.size;
+}
+
 async function handleProductAction(req: VercelRequest, res: VercelResponse, action: "product-created" | "product-updated") {
   const { db } = await requireAdminUser(req);
-  if (!pushConfigured()) {
-    return res.status(503).json({ ok: false, error: "Web Push VAPID keys are not configured." });
-  }
+  // Bell entries and content baselines must still be written if Web Push is
+  // temporarily misconfigured; delivery resumes as soon as VAPID is restored.
+  const webPushConfigured = pushConfigured();
   const productId = safeText(req.body?.productId, 160);
   if (!productId) return res.status(400).json({ ok: false, error: "Missing productId." });
 
@@ -83,10 +123,13 @@ async function handleProductAction(req: VercelRequest, res: VercelResponse, acti
       tag: `content-product-${productId}`,
       url: PRODUCT_URL(productId),
     };
-    const result = await pushToAllDevices(db, payload);
+    const [result, bellEntries] = await Promise.all([
+      pushToAllDevices(db, payload),
+      writeNewProductBellEntries(db, productId, entry),
+    ]);
     // Mark as announced so the content scheduler does not repeat it.
     await stateRef.set({ products: { [productId]: entry }, updatedAt: Timestamp.now() }, { merge: true });
-    return res.status(200).json({ ok: true, action, ...result });
+    return res.status(200).json({ ok: true, action, webPushConfigured, ...result, bellEntries });
   }
 
   // product-updated: announce only when the course tree actually grew, and
@@ -97,15 +140,15 @@ async function handleProductAction(req: VercelRequest, res: VercelResponse, acti
   let buyersReached = 0;
   let buyerPushes = 0;
   if (grown) {
-    const key = Number.isFinite(Number(productId)) ? Number(productId) : productId;
-    const buyers = await db.collection("users").where("purchasedProductIds", "array-contains", key).limit(500).get();
+    const buyerIds = await findProductBuyerIds(db, productId);
     const parts: string[] = [];
     if (grown.newModules) parts.push(`${grown.newModules} new module${grown.newModules === 1 ? "" : "s"}`);
     if (grown.newLessons) parts.push(`${grown.newLessons} new lesson${grown.newLessons === 1 ? "" : "s"}`);
     const body = `${grown.title}: ${parts.join(" and ")}`;
-    for (const buyer of buyers.docs) {
+    for (const buyerId of buyerIds) {
+      const userRef = db.collection("users").doc(buyerId);
       const docId = `content:course:${productId}:${grown.newModules}m${grown.newLessons}l`;
-      await buyer.ref.collection("notifications").doc(docId).set({
+      await userRef.collection("notifications").doc(docId).set({
         id: docId,
         title: "Your course has new content",
         body,
@@ -116,7 +159,7 @@ async function handleProductAction(req: VercelRequest, res: VercelResponse, acti
         target: { type: "product", productId },
       }, { merge: true });
       buyersReached += 1;
-      buyerPushes += await pushToUser(db, buyer.id, {
+      buyerPushes += await pushToUser(db, buyerId, {
         title: "Your course has new content",
         body,
         tag: `content-course-${productId}`,
@@ -125,7 +168,7 @@ async function handleProductAction(req: VercelRequest, res: VercelResponse, acti
     }
   }
   await stateRef.set({ products: { [productId]: entry }, updatedAt: Timestamp.now() }, { merge: true });
-  return res.status(200).json({ ok: true, action, announced: Boolean(grown), buyersReached, buyerPushes });
+  return res.status(200).json({ ok: true, action, webPushConfigured, announced: Boolean(grown), buyersReached, buyerPushes });
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
