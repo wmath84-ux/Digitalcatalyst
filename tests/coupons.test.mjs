@@ -615,15 +615,26 @@ test("buildCouponRedemptionDocId composes {code}__{orderId}", () => {
   assert.equal(buildCouponRedemptionDocId(null, "O-1"), null);
 });
 
-test("shouldIncrementCouponUsage is true only for pending redemptions of an active, in-limit coupon", () => {
+test("shouldIncrementCouponUsage is true for fresh or pending redemptions of an active, in-limit coupon", () => {
   const coupon = percentCoupon({ globalLimit: 10, usedCount: 5 });
+  const fresh = {}; // no prior redemption doc — the normal verify-payment path
   const pending = { status: "pending" };
   const applied = { status: "applied" };
+  const reverted = { status: "reverted" };
   const expired = percentCoupon({ expiresAt: Date.now() - 1000 });
+  // A FRESH redemption must increment: this is the everyday path
+  // where verify-payment creates the redemption doc in the same
+  // transaction. (The old pending-only rule silently skipped every
+  // real payment, which is how referral usedCount never moved.)
+  assert.equal(shouldIncrementCouponUsage(fresh, coupon), true);
   assert.equal(shouldIncrementCouponUsage(pending, coupon), true);
+  // Terminal statuses never re-increment.
   assert.equal(shouldIncrementCouponUsage(applied, coupon), false);
+  assert.equal(shouldIncrementCouponUsage(reverted, coupon), false);
   assert.equal(shouldIncrementCouponUsage(null, coupon), false);
-  // Coupon past its limit → false.
+  // Coupon past its limit → false (blocks a one-shot referral from
+  // being spent twice by concurrent payments).
+  assert.equal(shouldIncrementCouponUsage(fresh, percentCoupon({ globalLimit: 5, usedCount: 5 })), false);
   assert.equal(shouldIncrementCouponUsage(pending, percentCoupon({ globalLimit: 5, usedCount: 5 })), false);
   // Coupon expired → false.
   assert.equal(shouldIncrementCouponUsage(pending, expired), false);

@@ -185,8 +185,16 @@ export const applyCouponRedemption = async (
   const redemptionId = buildCouponRedemptionDocId(code, args.orderId);
   if (!redemptionId) return { redeemed: false, redemptionId: null };
   const redemptionRef = adminDb().collection(REDEMPTIONS_COLLECTION).doc(redemptionId);
-  const existing = await tx.get(redemptionRef);
+  const couponTxRef = adminDb().collection(COUPONS_COLLECTION).doc(code);
+  // Read BOTH the redemption doc and the coupon doc inside the
+  // transaction: the coupon snapshot loaded outside (by the caller)
+  // may be stale, and for one-shot referral coupons the global-limit
+  // check MUST see the freshest usedCount or two concurrent payments
+  // could both slip past the limit.
+  const [existing, couponSnap] = await Promise.all([tx.get(redemptionRef), tx.get(couponTxRef)]);
   const existingData = existing.exists ? (existing.data() as Partial<CouponRedemptionDoc>) : null;
+  const freshCoupon = couponSnap.exists ? normaliseCouponDoc(couponSnap.data() || {}) : null;
+  const couponForLimit: CouponDoc = freshCoupon || args.coupon;
   // If a redemption doc already exists for this order, treat as
   // replay. The "applied" + "reverted" statuses are terminal; the
   // "pending" status is reserved for the rare case where a
@@ -199,7 +207,7 @@ export const applyCouponRedemption = async (
   if (existing.exists && existingData && existingData.status === "reverted") {
     return { redeemed: false, redemptionId };
   }
-  if (!shouldIncrementCouponUsage(existingData || {}, args.coupon, args.now)) {
+  if (!shouldIncrementCouponUsage(existingData || {}, couponForLimit, args.now)) {
     return { redeemed: false, redemptionId };
   }
 
@@ -216,16 +224,28 @@ export const applyCouponRedemption = async (
   };
   tx.set(redemptionRef, redemptionDoc, { merge: false });
 
-  // Increment usedCount.
-  const couponRef = adminDb().collection(COUPONS_COLLECTION).doc(code);
-  tx.update(couponRef, {
+  // Increment usedCount. A referral coupon is one-shot: the same
+  // write that spends it also flips it to "inactive" so the ID is
+  // discontinued the moment it is used — no later validation path
+  // can accept it again, and the leaderboard stops listing it as
+  // unused.
+  const referralOwnerUid = couponForLimit.referralOwnerUid || args.coupon.referralOwnerUid;
+  tx.update(couponTxRef, {
     usedCount: FieldValue.increment(1),
     updatedAt: nowTs,
+    ...(referralOwnerUid ? { status: "inactive", usedByUid: args.uid, usedAt: nowTs } : {}),
   });
-  if (args.coupon.referralOwnerUid) {
+  if (referralOwnerUid) {
     tx.set(
-      adminDb().collection("referralProfiles").doc(args.coupon.referralOwnerUid),
-      { usedCount: FieldValue.increment(1), lastUsedAt: nowTs, updatedAt: nowTs },
+      adminDb().collection("referralProfiles").doc(referralOwnerUid),
+      { usedCount: FieldValue.increment(1), active: false, lastUsedAt: nowTs, updatedAt: nowTs },
+      { merge: true },
+    );
+    // Stamp the OWNER's user doc so their profile can show the
+    // referral ID crossed out with a clear "Used" badge.
+    tx.set(
+      adminDb().collection(USERS_COLLECTION).doc(referralOwnerUid),
+      { referralUsedCount: FieldValue.increment(1), referralUsedAt: nowTs, updatedAt: nowTs },
       { merge: true },
     );
   }

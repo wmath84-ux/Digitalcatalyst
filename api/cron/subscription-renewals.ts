@@ -28,6 +28,7 @@ import {
   diffProductInventory,
   resolveLookbackMs,
 } from "../../utils/pushScheduler.js";
+import { runReferralRepairOnce } from "../_lib/referrals.js";
 
 const bearer = (req: VercelRequest) => {
   const raw = req.headers?.authorization;
@@ -228,6 +229,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         newProductsAnnounced: announced,
         courseUpdatePushes: coursePushes,
       };
+    }
+
+    // ------------------------------------------------------------------ 4. referral repair (one-time)
+    // Backfill referral usage from before the single-use fix. Runs the
+    // heavy pass exactly once, then costs one doc read per day.
+    try {
+      const repair = await runReferralRepairOnce();
+      summary.referralRepair = repair.ran ? repair.summary : { alreadyCompleted: true };
+    } catch (repairError) {
+      console.warn("[cron] referral usage repair skipped", repairError);
+      summary.referralRepair = { error: true };
     }
 
     // Record the run only after every job finished. If this handler
