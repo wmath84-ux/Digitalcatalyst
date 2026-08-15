@@ -12,7 +12,7 @@
 // quote-driven flow as products / modules / updates.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { ChevronLeft, HelpCircle, LoaderCircle } from "lucide-react";
 import StackedCards from "./StackedCards";
@@ -37,6 +37,13 @@ import {
   sumSelectedFeaturePaise,
 } from "../../../utils/featurePricing";
 import FeaturePricingTiers from "./FeaturePricingTiers";
+import ActiveMemberView from "./ActiveMemberView";
+import { getRenewalReminder } from "../../../utils/subscriptionRenewal";
+import {
+  buildRenewalView,
+  formatExpiryDate,
+  toMillis as renewalToMillis,
+} from "../../../utils/renewalPresentation";
 import {
   startCheckout,
   type SubscriptionCatalog,
@@ -46,10 +53,29 @@ import {
 
 export type BillingCycle = "monthly" | "yearly";
 
+/** Shape of `users/{uid}/subscription/current` that this page reads. */
+type SubscriptionRecordLike = {
+  status?: string;
+  planId?: string;
+  cycle?: string;
+  features?: unknown;
+  includedProductIds?: unknown;
+  expiresAt?: unknown;
+  renewalReminderOptOut?: boolean;
+};
+
 export default function SubscriptionPage() {
   const { user } = useAuth();
   const { products: availableProducts } = useCatalog();
   const renewalLoadedRef = useRef(false);
+
+  // The buyer's live subscription record (null when never subscribed).
+  const [activeSubscription, setActiveSubscription] = useState<SubscriptionRecordLike | null>(null);
+  // When true the member deliberately opened the buy flow (renew or
+  // change plan) and we show the full purchase UI again.
+  const [manageMode, setManageMode] = useState<boolean>(
+    () => typeof window !== "undefined" && /[?&]renew=1/.test(window.location.hash),
+  );
 
   // ---------- Server-driven state ----------
   const [catalog, setCatalog] = useState<SubscriptionCatalog | null>(null);
@@ -132,8 +158,18 @@ export default function SubscriptionPage() {
     };
   }, []);
 
-  // Renewal checkout restores the user's current plan, cycle, features and
-  // bonus products so they review the exact package before paying again.
+  // Live subscription record. Drives the member view: an active
+  // subscriber must never be shown the buy flow again by default.
+  useEffect(() => {
+    if (!user) { setActiveSubscription(null); return undefined; }
+    return onSnapshot(doc(db, "users", user.id, "subscription", "current"), (snapshot) => {
+      setActiveSubscription(snapshot.exists() ? (snapshot.data() as SubscriptionRecordLike) : null);
+    }, () => setActiveSubscription(null));
+  }, [user]);
+
+  // Renewal / change-plan checkout restores the user's current plan, cycle,
+  // features and bonus products so they review the exact package before
+  // paying again.
   useEffect(() => {
     if (!user || !catalog || renewalLoadedRef.current) return;
     renewalLoadedRef.current = true;
@@ -237,6 +273,39 @@ export default function SubscriptionPage() {
     purchaseKind: "subscription",
     payablePaise: Math.max(subtotalPaise, minPayablePaise),
   });
+
+  // ---------- Membership state ----------
+  // An active subscriber sees the member dashboard, never the buy flow,
+  // unless they explicitly chose to renew or change their plan.
+  const subscriptionExpiresAtMs = renewalToMillis(activeSubscription?.expiresAt);
+  const isActiveMember =
+    activeSubscription?.status === "active" && subscriptionExpiresAtMs > Date.now();
+  const showMemberView = isActiveMember && !manageMode;
+
+  const memberRenewalView = useMemo(() => {
+    if (!activeSubscription) return null;
+    const memberPlanName =
+      plans.find((p) => p.id === String(activeSubscription.planId || ""))?.name ||
+      String(activeSubscription.planId || "Subscription");
+    return buildRenewalView(getRenewalReminder(activeSubscription), { planName: memberPlanName });
+  }, [activeSubscription, plans]);
+
+  const memberFeatureIds = useMemo(
+    () => (Array.isArray(activeSubscription?.features) ? activeSubscription.features.map(String) : []),
+    [activeSubscription],
+  );
+  const memberFeatures = useMemo(
+    () => rawFeatures.filter((feature) => memberFeatureIds.includes(feature.id)),
+    [rawFeatures, memberFeatureIds],
+  );
+  const memberProductTitles = useMemo(() => {
+    const ids = new Set(
+      Array.isArray(activeSubscription?.includedProductIds)
+        ? activeSubscription.includedProductIds.map(String)
+        : [],
+    );
+    return availableProducts.filter((product) => ids.has(product.id)).map((product) => product.title);
+  }, [activeSubscription, availableProducts]);
 
   // ---------- Handlers ----------
   const handleApplyCoupon = useCallback(
@@ -420,7 +489,9 @@ export default function SubscriptionPage() {
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <h1 className="text-[15px] font-extrabold tracking-tight text-slate-900">Go Premium</h1>
+        <h1 className="text-[15px] font-extrabold tracking-tight text-slate-900">
+          {showMemberView ? "My membership" : manageMode && isActiveMember ? "Manage plan" : "Go Premium"}
+        </h1>
         <button
           onClick={() => setHelpOpen(true)}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm shadow-slate-200 active:scale-90 transition-transform"
@@ -430,7 +501,50 @@ export default function SubscriptionPage() {
         </button>
       </div>
 
+      {/* An active member gets the membership dashboard, not the buy flow. */}
+      {showMemberView ? (
+        <div className="flex-1">
+          <ActiveMemberView
+            planName={plans.find((p) => p.id === String(activeSubscription?.planId || ""))?.name || String(activeSubscription?.planId || "Your plan")}
+            plan={plans.find((p) => p.id === String(activeSubscription?.planId || "")) || null}
+            cycle={activeSubscription?.cycle === "yearly" ? "yearly" : "monthly"}
+            unlockedFeatures={memberFeatures}
+            unlockedProductTitles={memberProductTitles}
+            expiresAtLabel={formatExpiryDate(subscriptionExpiresAtMs)}
+            renewalView={memberRenewalView}
+            reminderOptOut={Boolean(activeSubscription?.renewalReminderOptOut)}
+            onRenew={() => setManageMode(true)}
+            onChangePlan={() => setManageMode(true)}
+            onToggleReminders={(next) => {
+              if (!user) return;
+              void updateDoc(doc(db, "users", user.id, "subscription", "current"), {
+                renewalReminderOptOut: next,
+              }).catch(() => undefined);
+            }}
+            onOpenFeature={(featureId) => {
+              if (featureId === "my-day") window.location.hash = "#/my-day";
+            }}
+          />
+          <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
+        </div>
+      ) : (
+      <>
       <div className="flex-1 pb-4">
+        {/* Returning member who chose to renew / change plan. */}
+        {isActiveMember && manageMode ? (
+          <div className="mx-5 mt-4 flex items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2.5">
+            <p className="text-[11px] font-semibold leading-relaxed text-violet-900">
+              You already have an active membership. Changes apply from your current expiry date.
+            </p>
+            <button
+              type="button"
+              onClick={() => setManageMode(false)}
+              className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 text-[11px] font-black text-violet-700 ring-1 ring-violet-200"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : null}
         {usingFallback && (
           <div className="mx-5 mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-800">
             <span aria-hidden="true">⚠️</span>
@@ -577,6 +691,8 @@ export default function SubscriptionPage() {
       />
 
       <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
+      </>
+      )}
     </div>
   );
 }

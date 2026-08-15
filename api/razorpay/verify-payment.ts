@@ -52,18 +52,65 @@ const cleanRazorpayId = (value: unknown) =>
 async function announceUnlock(
   db: Firestore,
   uid: string,
-  quote: { purchaseKind?: string; verifiedLineItems?: Array<{ title?: unknown }> },
+  quote: {
+    purchaseKind?: string;
+    verifiedLineItems?: Array<{ title?: unknown }>;
+    subscriptionPlanId?: string | null;
+    subscriptionFeatureIds?: string[] | null;
+    subscriptionExpiresAt?: number | null;
+  },
   orderId: string,
 ) {
   const titles = (quote.verifiedLineItems || [])
     .map((item) => String(item?.title || "").trim())
     .filter(Boolean);
-  const isSubscription = quote.purchaseKind === "subscription";
-  const title = isSubscription
-    ? "✅ Subscription activated"
-    : titles.length > 1
-      ? `🔓 ${titles.length} products unlocked`
-      : "🔓 Product unlocked";
+  const isSubscription =
+    quote.purchaseKind === "subscription" || quote.purchaseKind === "subscription_features";
+
+  // A membership activation deserves a genuine welcome, not a receipt
+  // line. Name the plan, count what was unlocked, and deep-link to the
+  // subscription page (which now renders the member dashboard) rather
+  // than the generic purchases list.
+  if (isSubscription) {
+    const planLabel = (titles[0] || String(quote.subscriptionPlanId || "")).trim();
+    const featureCount = Array.isArray(quote.subscriptionFeatureIds)
+      ? quote.subscriptionFeatureIds.length
+      : 0;
+    const expiryLabel = quote.subscriptionExpiresAt
+      ? new Date(Number(quote.subscriptionExpiresAt)).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "";
+    // Fall back to the legacy copy when the plan has no readable name.
+    const title = planLabel ? `🎉 Welcome to ${planLabel}!` : "✅ Subscription activated";
+    const body = [
+      featureCount > 0
+        ? `${featureCount} feature${featureCount === 1 ? "" : "s"} unlocked and ready to use.`
+        : "Your membership is active and ready to use.",
+      expiryLabel ? `Access valid until ${expiryLabel}.` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const docId = `unlock:${orderId}`;
+    await db.collection("users").doc(uid).collection("notifications").doc(docId).set({
+      id: docId,
+      title,
+      body,
+      category: "subscription",
+      read: false,
+      source: "system",
+      createdAt: Timestamp.now(),
+      target: { type: "subscription" },
+    }, { merge: true });
+    await pushToUser(db, uid, { title, body, tag: `unlock-${orderId}`, url: "/#/subscription" });
+    return;
+  }
+
+  const title = titles.length > 1
+    ? `🔓 ${titles.length} products unlocked`
+    : "🔓 Product unlocked";
   const shown = titles.slice(0, 2).join(" · ");
   const body = shown
     ? shown + (titles.length > 2 ? ` +${titles.length - 2} more` : "")
@@ -107,6 +154,7 @@ interface PaymentIntent {
   subscriptionPlanId?: string | null;
   subscriptionCycle?: "monthly" | "yearly" | null;
   subscriptionExpiresAt?: number | null;
+  subscriptionFeatureIds?: string[] | null;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -202,6 +250,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           subscriptionPlanId: intent.subscriptionPlanId || null,
           subscriptionCycle: intent.subscriptionCycle || null,
           subscriptionExpiresAt: intent.subscriptionExpiresAt || null,
+          subscriptionFeatureIds: Array.isArray(intent.subscriptionFeatureIds) ? intent.subscriptionFeatureIds : null,
         };
 
     // Optional client-supplied quoteId hint must match the intent.

@@ -1,4 +1,4 @@
-import { errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./_lib/firebaseAdmin.js";
+import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./_lib/firebaseAdmin.js";
 import { ensureReferralCoupon, loadReferralConfig } from "./_lib/referrals.js";
 import { loadUserCouponUsageCount } from "./_lib/coupons.js";
 import { normaliseCouponCode } from "../utils/coupons.js";
@@ -10,7 +10,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = req.body || {};
     const code = normaliseCouponCode(body.referralCode);
     if (!code) return res.status(400).json({ ok: false, error: "Enter a referral code." });
-    const db = (await import("./_lib/firebaseAdmin")).adminDb();
+    // Must use the statically-imported binding: a runtime `import()`
+    // without the `.js` extension fails on Vercel's ESM runtime with
+    // "Cannot find module /var/task/api/_lib/firebaseAdmin".
+    const db = adminDb();
     let snap = await db.collection("coupons").doc(code).get();
     let data = snap.data() || {};
     if (!snap.exists || !data.referralOwnerUid) {

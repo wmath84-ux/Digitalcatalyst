@@ -101,6 +101,7 @@ export interface ServerPriceQuoteRecord {
   subscriptionPlanId?: string | null;
   subscriptionCycle?: "monthly" | "yearly" | null;
   subscriptionExpiresAt?: number | null;
+  subscriptionFeatureIds?: string[] | null;
 }
 
 export interface BuildQuoteOk {
@@ -170,6 +171,12 @@ export interface BuildQuoteInput {
    * page + auto-renew use this value.
    */
   subscriptionExpiresAt?: number | null;
+  /**
+   * The exact feature ids the buyer selected. Free / plan-included
+   * features never produce a priced line item, so the grant step
+   * MUST read this list instead of re-deriving it from line items.
+   */
+  subscriptionFeatureIds?: string[] | null;
 }
 
 // Function signatures ---------------------------------------------------------

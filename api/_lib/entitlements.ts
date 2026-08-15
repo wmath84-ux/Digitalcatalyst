@@ -563,7 +563,16 @@ export const grantSubscriptionFromQuote = async (
   const plan = await loadPlanById(quote.subscriptionPlanId);
   if (!plan) return null;
   const cycle: BillingCycle = quote.subscriptionCycle === "yearly" ? "yearly" : "monthly";
-  const selectedFeatureIds = (quote.verifiedLineItems || [])
+  // Prefer the authoritative selection carried on the quote. Free
+  // features (plan-included, or zeroed by a plan-specific override)
+  // produce no priced line item, so deriving the list from
+  // `verifiedLineItems` alone would activate the subscription without
+  // unlocking them. Fall back to the line items only for older quotes
+  // that predate `subscriptionFeatureIds`.
+  const featureIdsFromQuote = Array.isArray(quote.subscriptionFeatureIds)
+    ? quote.subscriptionFeatureIds.map(String).filter(Boolean)
+    : null;
+  const selectedFeatureIds = featureIdsFromQuote ?? (quote.verifiedLineItems || [])
     .filter((line) => line.kind === "subscription_features" && typeof line.featureId === "string")
     .map((line) => String(line.featureId));
   // Dedupe.

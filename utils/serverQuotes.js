@@ -971,6 +971,14 @@ export const buildQuote = (input) => {
     subscriptionExpiresAt: kind === "subscription" || kind === "subscription_features"
       ? Math.max(0, Math.round(Number(subscriptionExpiresAt || 0)))
       : null,
+    // The authoritative list of features the buyer selected. This must
+    // NOT be re-derived from the line items: a feature that is included
+    // with the plan (or free via a plan override) produces no priced
+    // line, so reading the lines back would silently drop it and the
+    // subscription would activate without the feature unlocked.
+    subscriptionFeatureIds: kind === "subscription" || kind === "subscription_features"
+      ? Array.from(new Set((selection.featureIds || []).map(String)))
+      : null,
   };
   return { ok: true, quote };
 };
