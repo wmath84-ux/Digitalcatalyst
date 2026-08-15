@@ -126,12 +126,14 @@ const persistLocalNotes = (uid: string, productId: string, notes: CoursePlayerNo
   }
 };
 
-type CoursePlayerTheme = "dark" | "light" | "white";
+type CoursePlayerTheme = "dark" | "light";
 const courseThemeStorageKey = "dc.coursePlayerTheme";
 const loadCourseTheme = (): CoursePlayerTheme => {
   try {
     const stored = localStorage.getItem(courseThemeStorageKey);
-    return stored === "light" || stored === "white" ? stored : "dark";
+    // The old third "white" theme was removed — anyone who had picked it
+    // simply lands on the light palette instead of jumping back to dark.
+    return stored === "light" || stored === "white" ? "light" : "dark";
   } catch {
     return "dark";
   }
@@ -478,10 +480,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // A portrait-locked phone can enter the rotated landscape interface. It
   // must use the same left header + right dock as a physically rotated phone.
   const useLandscapeRails = isLandscape || immersive;
-  // Three deliberate taps/states: dark → soft light → pure white. The third
-  // state is useful for documents because the Course Player canvas itself is
-  // white too, rather than leaving a grey frame around a white page.
-  const nextTheme: CoursePlayerTheme = theme === "dark" ? "light" : theme === "light" ? "white" : "dark";
+  // Two deliberate states: dark ⇄ light. Every tap simply flips between the
+  // two, so a third tap cycles straight back to the first state.
+  const nextTheme: CoursePlayerTheme = theme === "dark" ? "light" : "dark";
   const browserColorScheme = theme === "dark" ? "dark" : "light";
 
   // The desktop/mobile switch only means something for embedded documents —
@@ -616,7 +617,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
       data-theme={theme}
       data-next-theme={nextTheme}
     >
-      {theme === "dark" ? <Sun size={18} /> : theme === "light" ? <Circle size={17} /> : <Moon size={18} />}
+      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
     </button>
   );
 

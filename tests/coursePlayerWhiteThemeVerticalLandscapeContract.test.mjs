@@ -2,7 +2,7 @@
 // Regression contract for the requested Course Player follow-up:
 //   - Google Forms stay below the Course Player header and above its footer
 //   - mobile landscape lists use visible up/down scrolling, not left/right
-//   - the theme control has a third, fully white Course Player state
+//   - the theme control is a simple dark ⇄ light toggle (no extra state)
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -36,18 +36,18 @@ test("physical mobile landscape explicitly opts scrollable content into vertical
   assert.match(styles, /\[data-course-viewer-iframe\]/);
 });
 
-test("theme button cycles dark to light to white and back to dark", () => {
-  assert.match(coursePlayer, /type CoursePlayerTheme = "dark" \| "light" \| "white"/);
-  assert.match(coursePlayer, /theme === "dark" \? "light" : theme === "light" \? "white" : "dark"/);
-  assert.match(coursePlayer, /stored === "light" \|\| stored === "white"/);
-  assert.match(coursePlayer, /data-next-theme=\{nextTheme\}/);
+test("theme button simply toggles dark and light with no extra state", () => {
+  assert.ok(coursePlayer.includes('type CoursePlayerTheme = "dark" | "light";'), "theme type has only dark + light");
+  assert.ok(coursePlayer.includes('const nextTheme: CoursePlayerTheme = theme === "dark" ? "light" : "dark";'), "next theme is a simple flip");
+  assert.ok(coursePlayer.includes("data-next-theme={nextTheme}"), "theme toggle exposes the next theme");
+  assert.ok(!coursePlayer.includes('theme === "light" ? "white"'), "no white step remains in the cycle");
+  // Anyone who previously picked the removed white theme keeps light, and a
+  // third tap cycles straight back to the first state (dark ⇄ light ⇄ dark).
+  assert.ok(coursePlayer.includes('return stored === "light" || stored === "white" ? "light" : "dark";'), "stored white preference migrates to light");
 });
 
-test("third theme state makes the entire Course Player canvas pure white", () => {
-  assert.match(styles, /\.course-player-shell\[data-course-theme="white"\]\s*\{/);
-  const whiteBlock = styles.match(/\.course-player-shell\[data-course-theme="white"\]\s*\{([\s\S]*?)\}/)?.[1] || "";
-  assert.match(whiteBlock, /--course-bg:\s*#ffffff/);
-  assert.match(whiteBlock, /--course-surface:\s*#ffffff/);
-  assert.match(whiteBlock, /--course-panel:\s*#ffffff/);
-  assert.match(whiteBlock, /background-color:\s*#ffffff/);
+test("no pure-white theme state remains in the Course Player palette", () => {
+  assert.ok(!styles.includes('data-course-theme="white"'), "no white palette block in the stylesheet");
+  assert.ok(!coursePlayer.includes('"dark" | "light" | "white"'), "no three-state theme type");
+  assert.ok(styles.includes('.course-player-shell[data-course-theme="light"]'), "light palette still present");
 });
