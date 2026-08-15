@@ -91,5 +91,27 @@ test("an expired membership is told what it lost, not just that it ended", () =>
   );
   assert.ok(view);
   assert.equal(view.stage, "expired");
+  assert.equal(view.expired, true);
+  assert.equal(view.canRenew, true);
   assert.match(view.body, /restore your selected features and products/);
+});
+
+test("the renew button only becomes active once the subscription has expired", () => {
+  const day = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const before = buildRenewalView(
+    getRenewalReminder({ status: "active", planId: "premium", expiresAt: now + 7 * day, cycle: "monthly" }, now),
+    { planName: "Premium", now },
+  );
+  assert.ok(before);
+  assert.equal(before.expired, false);
+  assert.equal(before.canRenew, false);
+
+  const after = buildRenewalView(
+    getRenewalReminder({ status: "active", planId: "premium", expiresAt: now - 1 * day, cycle: "monthly" }, now),
+    { planName: "Premium", now },
+  );
+  assert.ok(after);
+  assert.equal(after.expired, true);
+  assert.equal(after.canRenew, true);
 });

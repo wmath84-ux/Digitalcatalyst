@@ -10,6 +10,7 @@ export interface RenewalStagePresentation {
   headline: string;
   cta: string;
   dismissible: boolean;
+  canRenew: boolean;
 }
 
 export interface RenewalView {
@@ -21,8 +22,10 @@ export interface RenewalView {
   headline: string;
   body: string;
   cta: string;
+  canRenew: boolean;
   dismissible: boolean;
   expired: boolean;
+  day?: number;
   expiresAt: number;
   daysRemaining: number;
   remainingLabel: string;

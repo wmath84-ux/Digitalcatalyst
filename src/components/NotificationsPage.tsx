@@ -13,7 +13,7 @@ import {
 } from "../../utils/siteNotifications";
 import { useAuth } from "../context/AuthContext";
 import { BellIcon, BookOpenIcon, StoreIcon } from "./icons";
-import { getRenewalReminder } from "../../utils/subscriptionRenewal";
+import { getRenewalNotification } from "../../utils/subscriptionRenewal";
 import { ensureSavedWebPushSubscription, isWebPushSupported } from "../../utils/webPush";
 
 type NotificationsPageProps = {
@@ -74,12 +74,13 @@ export default function NotificationsPage({
     if (typeof window !== "undefined" && isWebPushSupported()) setPushPermission(window.Notification.permission);
   };
 
-  // App-open fallback: users still receive the correct one-time reminder
-  // even when a scheduled cron or push delivery was delayed.
+  // App-open fallback: users still receive the correct reminder even when a
+  // scheduled cron or push delivery was delayed. Post-expiry this respects the
+  // 10-morning window, so it stops nagging after the cadence has closed.
   useEffect(() => {
     if (!user) return undefined;
     return onSnapshot(doc(db, "users", user.id, "subscription", "current"), (snapshot) => {
-      const reminder = getRenewalReminder(snapshot.data() || null);
+      const reminder = getRenewalNotification(snapshot.data() || null);
       if (!reminder) return;
       const incoming: SiteNotification = { ...reminder, category: "subscription", read: false, source: "system" };
       setItems((current) => mergeSiteNotifications(current, [incoming]));

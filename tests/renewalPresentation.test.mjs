@@ -5,7 +5,8 @@
 // `getRenewalReminder` decides WHICH stage fires; `buildRenewalView`
 // decides HOW it reads. These tests walk a subscription across its
 // whole timeline and assert the banner, notification and status card
-// all receive a consistent, escalating message.
+// all receive a consistent, escalating message — and that the renew
+// call-to-action only becomes active once the subscription has expired.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -73,17 +74,23 @@ test("the day-before notice is the highest non-critical urgency", () => {
 });
 
 test("the due-today notice is critical and cannot be dismissed", () => {
-  // The `due` window opens at the moment of expiry and stays open
-  // through the one-day grace period before `expired` takes over.
   const view = viewAt(0);
   assert.equal(view.stage, "due");
   assert.equal(view.tone, "critical");
   assert.equal(view.dismissible, false);
 });
 
-test("the grace day after expiry still reads as due, not expired", () => {
-  assert.equal(viewAt(-0.5).stage, "due");
+test("expiry flips the reminder to the expired stage on the first day", () => {
+  const view = viewAt(-0.5);
+  assert.equal(view.stage, "expired");
+  assert.equal(view.expired, true);
+  assert.equal(view.day, 1);
+});
+
+test("the expired view persists and tracks the day since expiry", () => {
   assert.equal(viewAt(-3).stage, "expired");
+  assert.equal(viewAt(-3).day, 4);
+  assert.equal(viewAt(-20).stage, "expired");
 });
 
 test("an expired subscription reports the expired stage", () => {
@@ -93,6 +100,26 @@ test("an expired subscription reports the expired stage", () => {
   assert.equal(view.tone, "critical");
   assert.equal(view.dismissible, false);
   assert.match(view.cta, /Reactivate/i);
+});
+
+test("the expired-<n> notification stage maps to the same expired treatment", () => {
+  const view = buildRenewalView(
+    { stage: "expired-7", expiresAt: NOW - 7 * DAY_MS, expired: true, day: 7 },
+    { now: NOW, planName: "Premium" },
+  );
+  assert.equal(view.stage, "expired-7");
+  assert.equal(view.expired, true);
+  assert.equal(view.tone, "critical");
+  assert.equal(view.canRenew, true);
+});
+
+test("the renew CTA is inactive before expiry and active only once expired", () => {
+  for (const days of [7, 3, 1.5, 0]) {
+    const view = viewAt(days);
+    assert.equal(view.canRenew, false, `${view.stage} must not show the renew button`);
+  }
+  assert.equal(viewAt(-0.5).canRenew, true);
+  assert.equal(viewAt(-3).canRenew, true);
 });
 
 test("urgency never decreases as expiry approaches", () => {
@@ -119,10 +146,18 @@ test("every stage has presentation tokens defined", () => {
   for (const stage of ["d7", "d3", "d1", "due", "expired"]) {
     const preset = RENEWAL_STAGE_PRESENTATION[stage];
     assert.ok(preset, `missing presentation for ${stage}`);
-    for (const key of ["urgency", "tone", "icon", "label", "headline", "cta"]) {
+    for (const key of ["urgency", "tone", "icon", "label", "headline", "cta", "canRenew"]) {
       assert.ok(preset[key] !== undefined, `${stage} missing ${key}`);
     }
   }
+});
+
+test("only the expired presentation enables the renew button", () => {
+  assert.equal(RENEWAL_STAGE_PRESENTATION.d7.canRenew, false);
+  assert.equal(RENEWAL_STAGE_PRESENTATION.d3.canRenew, false);
+  assert.equal(RENEWAL_STAGE_PRESENTATION.d1.canRenew, false);
+  assert.equal(RENEWAL_STAGE_PRESENTATION.due.canRenew, false);
+  assert.equal(RENEWAL_STAGE_PRESENTATION.expired.canRenew, true);
 });
 
 test("the body always names the plan and the expiry date", () => {
@@ -149,6 +184,7 @@ test("formatRemaining reads naturally at each boundary", () => {
   assert.equal(formatRemaining(NOW + 5 * DAY_MS, NOW), "5 days left");
   assert.equal(formatRemaining(NOW + 1 * DAY_MS, NOW), "1 day left");
   assert.equal(formatRemaining(NOW, NOW), "Expires today");
+  assert.equal(formatRemaining(NOW - 0.5 * DAY_MS, NOW), "Expired today");
   assert.equal(formatRemaining(NOW - 1 * DAY_MS, NOW), "Expired yesterday");
   assert.match(formatRemaining(NOW - 4 * DAY_MS, NOW), /Expired 4 days ago/);
 });
@@ -184,6 +220,7 @@ test("RenewalBanner renders copy from the shared presentation layer", () => {
   assert.match(source, /data-renewal-banner/);
   assert.match(source, /view\.headline/);
   assert.match(source, /view\.cta/);
+  assert.match(source, /view\.canRenew/);
   // Tone styling covers all three semantic tones.
   for (const tone of ["info", "warning", "critical"]) {
     assert.match(source, new RegExp(`\\b${tone}:`), `missing ${tone} tone styles`);
@@ -195,6 +232,7 @@ test("RenewalStatusCard shows the expiry date and reminder toggle", () => {
   assert.match(source, /data-renewal-card/);
   assert.match(source, /data-renewal-expiry/);
   assert.match(source, /data-renewal-reminder-toggle/);
+  assert.match(source, /view\.canRenew/);
 });
 
 test("the preview sandbox drives the real helpers, not a mock", () => {
