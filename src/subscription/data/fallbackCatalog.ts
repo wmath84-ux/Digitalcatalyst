@@ -77,6 +77,10 @@ export const FALLBACK_SUBSCRIPTION_CATALOG: SubscriptionCatalog = {
       sortOrder: 0,
     },
   ],
+  subscriptionProducts: [
+    // Example of a custom subscription product that can have individual pricing
+    // per plan / monthly / yearly + free checkbox.
+  ],
   productUnlocks: [],
   moduleUnlocks: [],
   loadedAt: Date.now(),

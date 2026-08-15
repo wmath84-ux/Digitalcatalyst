@@ -97,6 +97,19 @@ export interface SubscriptionPlanModuleUnlock {
 export interface SubscriptionCatalog {
   plans: SubscriptionPlanDoc[];
   features: SubscriptionFeatureDoc[];
+  /** New: subscription-priced add-on products (courses etc) */
+  subscriptionProducts?: Array<{
+    id: string;
+    productId: string;
+    name: string;
+    pricePaise: number;
+    monthlyPricePaise?: number | null;
+    yearlyPricePaise?: number | null;
+    planPricing?: Record<string, any>;
+    included?: boolean;
+    active: boolean;
+    sortOrder: number;
+  }>;
   productUnlocks: SubscriptionPlanProductUnlock[];
   moduleUnlocks: SubscriptionPlanModuleUnlock[];
   loadedAt: number;

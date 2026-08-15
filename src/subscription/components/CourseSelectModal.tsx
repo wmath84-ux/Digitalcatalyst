@@ -1,6 +1,14 @@
 import { Check, X } from "lucide-react";
 import type { Product } from "../../data/products";
 
+// Support subscription-resolved product pricing from catalog (per-plan / duration / free)
+interface SubscriptionProductRule {
+  productId?: string;
+  id?: string;
+  resolvedPrice?: number;
+  resolvedIncluded?: boolean;
+}
+
 interface Props { open: boolean; selected: string[]; onClose: () => void; onChangeSelected: (ids: string[]) => void; products: Product[]; }
 const price = (value: number) => value === 0 ? "Free" : `₹${value.toLocaleString("en-IN")}`;
 

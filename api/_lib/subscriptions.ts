@@ -49,6 +49,7 @@ import {
 
 const PLANS_COLLECTION = "subscriptionPlans";
 const FEATURES_COLLECTION = "subscriptionFeatures";
+const SUBSCRIPTION_PRODUCTS_COLLECTION = "subscriptionPlanProducts";
 const PRODUCT_UNLOCKS_COLLECTION = "subscriptionPlanProductUnlocks";
 const MODULE_UNLOCKS_COLLECTION = "subscriptionPlanModuleUnlocks";
 const USER_SUBS_COLLECTION = "users";
@@ -171,6 +172,33 @@ export const loadActiveFeatures = async (
   }
   features.sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
   return features;
+};
+
+/** Load subscription products (priced add-on products for subscriptions). */
+export const loadSubscriptionProducts = async (
+  options: { db?: Firestore } = {},
+): Promise<any[]> => {
+  const db = options.db ?? adminDb();
+  const snap = await db.collection(SUBSCRIPTION_PRODUCTS_COLLECTION).get();
+  const products: any[] = [];
+  for (const doc of snap.docs) {
+    const data = doc.data() || {};
+    if (data.active === false) continue;
+    products.push({
+      id: doc.id,
+      productId: String(data.productId || doc.id),
+      name: String(data.name || "Product"),
+      pricePaise: Number(data.price || 0) * 100,
+      monthlyPricePaise: data.monthlyPrice != null ? Number(data.monthlyPrice) * 100 : null,
+      yearlyPricePaise: data.yearlyPrice != null ? Number(data.yearlyPrice) * 100 : null,
+      planPricing: data.planPricing && typeof data.planPricing === "object" ? data.planPricing : {},
+      included: !!data.included,
+      sortOrder: Number(data.sortOrder || 0),
+      active: data.active !== false,
+    });
+  }
+  products.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  return products;
 };
 
 /** Load all product unlocks for a plan. */
@@ -324,6 +352,10 @@ export const loadSubscriptionSelectionContext = async (
   const requestedProductIds = Array.from(new Set((selection.productIds || []).map(String).filter(Boolean)));
   const selectedProductIds = new Set<string>();
   const loadedDocumentIds = new Set<string>();
+
+  // Load subscription product pricing rules so we can apply per-plan / per-cycle / free overrides
+  const subProducts = await loadSubscriptionProducts(options);
+
   for (const requestedProductId of requestedProductIds) {
     const product = await loadSubscriptionProductByAnyId(db, requestedProductId);
     const data = product?.data || {};
@@ -340,8 +372,34 @@ export const loadSubscriptionSelectionContext = async (
     selectedProductIds.add(product.documentId);
     selectedProductIds.add(requestedProductId);
 
-    const effectivePrice = parseProductPricePaise(data);
+    // Resolve pricing from subscriptionPlanProducts if present (new customisation)
+    let effectivePrice = parseProductPricePaise(data);
     const regularPrice = parseProductPricePaise({ ...data, salePrice: null });
+
+    // Find matching subscription product pricing rule
+    const match = subProducts.find((sp: any) =>
+      String(sp.productId) === String(publicProductId) ||
+      String(sp.id) === String(publicProductId) ||
+      String(sp.productId) === String(requestedProductId)
+    );
+
+    if (match) {
+      const resolved = resolveFeaturePrice({
+        id: match.productId || match.id,
+        included: match.included,
+        pricePaise: match.pricePaise || 0,
+        monthlyPricePaise: match.monthlyPricePaise,
+        yearlyPricePaise: match.yearlyPricePaise,
+        planPricing: match.planPricing || {},
+      }, plan.id, cycle);
+
+      if (resolved.included || resolved.pricePaise === 0) {
+        effectivePrice = 0;
+      } else {
+        effectivePrice = resolved.pricePaise;
+      }
+    }
+
     lineItems.push({
       id: `subscription_product:${plan.id}:${publicProductId}`,
       kind: "subscription_features",

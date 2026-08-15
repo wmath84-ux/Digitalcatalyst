@@ -234,6 +234,47 @@ async function subscriptionFeaturesRequest(init?: RequestInit) {
   return { feature: { ...body, id: recordId } };
 }
 
+async function subscriptionPlanProductsRequest(init?: RequestInit) {
+  const method = init?.method || "GET";
+  if (method === "GET") {
+    const snap = await getDocs(collection(db, "subscriptionPlanProducts"));
+    return { products: snap.docs.map((item) => {
+      const data = item.data() || {};
+      return {
+        id: item.id,
+        productId: data.productId || item.id,
+        name: data.name || "Product",
+        individualPrice: String(money(data.price ?? data.individualPrice ?? 0)),
+        monthlyPrice: data.monthlyPrice === undefined || data.monthlyPrice === null ? "" : String(money(data.monthlyPrice)),
+        yearlyPrice: data.yearlyPrice === undefined || data.yearlyPrice === null ? "" : String(money(data.yearlyPrice)),
+        planPricing: data.planPricing && typeof data.planPricing === "object" ? data.planPricing : {},
+        included: data.included === true,
+        active: data.active !== false,
+        sortOrder: Number(data.sortOrder || 0),
+      };
+    }) };
+  }
+  const body = bodyOf(init);
+  const recordId = String(body.id || body.productId || id());
+  const ref = doc(db, "subscriptionPlanProducts", recordId);
+  if (body.delete) { await deleteDoc(ref); return { ok: true }; }
+  const optionalRupees = (value: unknown) => (value === "" || value === null || value === undefined ? null : Number(value));
+  await setDoc(ref, stripUndefinedDeep({
+    id: recordId,
+    productId: str(body.productId || recordId),
+    name: str(body.name, "Product"),
+    price: Number(body.individualPrice || 0),
+    monthlyPrice: optionalRupees(body.monthlyPrice),
+    yearlyPrice: optionalRupees(body.yearlyPrice),
+    planPricing: body.planPricing && typeof body.planPricing === "object" ? body.planPricing : {},
+    included: body.included === true,
+    active: body.active !== false,
+    sortOrder: Math.floor(Number(body.sortOrder || 0)),
+    updatedAt: serverTimestamp(),
+  }), { merge: true });
+  return { product: { ...body, id: recordId } };
+}
+
 async function customersRequest(url: URL, init?: RequestInit) {
   const parts=url.pathname.split("/").filter(Boolean); const uid=parts[3];
   if(uid){const ref=doc(db,"users",uid); const snap=await getDoc(ref); if(!snap.exists())throw new ApiError("Customer not found",404); let data=snap.data();
@@ -261,6 +302,7 @@ export async function adminFetch<T=unknown>(input:string,init?:RequestInit):Prom
   else if(p.startsWith("/api/admin/orders"))result=await ordersRequest(url);
   else if(p==="/api/admin/subscriptions/plans")result=await subscriptionPlansRequest(init);
   else if(p==="/api/admin/subscriptions/features")result=await subscriptionFeaturesRequest(init);
+  else if(p==="/api/admin/subscriptions/products")result=await subscriptionPlanProductsRequest(init);
   else if(p==="/api/admin/subscriptions/referrals")result=await settingsRequest("referralProgram","settings",init);
   else if(p==="/api/admin/coupons")result=await genericCollection("siteCoupons","coupons",init);
   else if(p==="/api/admin/reviews")result=await genericCollection("siteReviews","reviews",init);

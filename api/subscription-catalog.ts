@@ -20,6 +20,7 @@ import {
   loadActivePlans,
   loadPlanModuleUnlocks,
   loadPlanProductUnlocks,
+  loadSubscriptionProducts,
 } from "./_lib/subscriptions.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -32,9 +33,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch {
       // ignore — public read is allowed.
     }
-    const [plans, features] = await Promise.all([
+    const [plans, features, subProducts] = await Promise.all([
       loadActivePlans(),
       loadActiveFeatures(),
+      loadSubscriptionProducts(),
     ]);
     const productUnlocks: Array<{ planId: string; productId: string; active: boolean }> = [];
     const moduleUnlocks: Array<{ planId: string; productId: string; moduleId: string; active: boolean }> = [];
@@ -51,6 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       catalog: {
         plans,
         features,
+        subscriptionProducts: subProducts || [],
         productUnlocks,
         moduleUnlocks,
         loadedAt: Date.now(),
