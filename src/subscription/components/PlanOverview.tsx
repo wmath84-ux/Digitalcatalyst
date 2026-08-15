@@ -6,7 +6,7 @@
 // took hard-coded `basePriceMonthly` / `basePriceYearly` props;
 // those are gone.
 
-import { Check, Crown, X as XIcon, ChevronDown, ChevronUp } from "lucide-react";
+import { BadgeCheck, Check, Crown, X as XIcon, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type {
@@ -30,6 +30,10 @@ interface Props {
   selectedFeatureRecords: FeatureWithResolvedPrice[];
   includedFeatureRecords: FeatureWithResolvedPrice[];
   totalPaise: number;
+  /** Plan id the buyer already owns (active membership), if any. */
+  ownedPlanId?: string | null;
+  /** Billing cycle of that owned membership. */
+  ownedCycle?: BillingCycle | null;
 }
 
 export default function PlanOverview({
@@ -41,6 +45,8 @@ export default function PlanOverview({
   selectedFeatureRecords,
   includedFeatureRecords,
   totalPaise,
+  ownedPlanId = null,
+  ownedCycle = null,
 }: Props) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const activePlan = plans.find((p) => p.id === selectedPlanId) || null;
@@ -60,6 +66,9 @@ export default function PlanOverview({
         <div className="relative mb-3 flex flex-wrap items-center gap-2">
           {plans.map((plan) => {
             const isActive = plan.id === selectedPlanId;
+            // Owned plans are marked so the buyer can tell, before tapping,
+            // which subscription type is already on their account.
+            const isOwned = Boolean(ownedPlanId && plan.id === ownedPlanId);
             return (
               <button
                 key={plan.id}
@@ -67,14 +76,21 @@ export default function PlanOverview({
                 onClick={() => onChangePlan(plan.id)}
                 disabled={!plan.active}
                 data-subscription-plan-pill={plan.id}
-                className={`rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-wider transition ${
+                data-subscription-plan-owned={isOwned ? "true" : undefined}
+                className={`inline-flex items-center rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-wider transition ${
                   isActive
-                    ? "bg-white text-slate-900 shadow"
-                    : "bg-white/10 text-white/80 ring-1 ring-white/20 hover:bg-white/20"
+                    ? isOwned
+                      ? "bg-emerald-400 text-emerald-950 shadow"
+                      : "bg-white text-slate-900 shadow"
+                    : isOwned
+                      ? "bg-emerald-400/20 text-emerald-100 ring-1 ring-emerald-300/40 hover:bg-emerald-400/30"
+                      : "bg-white/10 text-white/80 ring-1 ring-white/20 hover:bg-white/20"
                 } ${!plan.active ? "cursor-not-allowed opacity-50" : ""}`}
               >
+                {isOwned ? <BadgeCheck className="mr-1 h-3 w-3" aria-hidden="true" /> : null}
                 {plan.name}
-                {plan.badge ? <span className="ml-1 rounded bg-amber-300/90 px-1 text-[9px] text-slate-900">{plan.badge}</span> : null}
+                {isOwned ? <span className="ml-1 text-[9px] font-black">· ACTIVE</span> : null}
+                {!isOwned && plan.badge ? <span className="ml-1 rounded bg-amber-300/90 px-1 text-[9px] text-slate-900">{plan.badge}</span> : null}
               </button>
             );
           })}
@@ -109,6 +125,10 @@ export default function PlanOverview({
         <div className="relative mt-4 inline-flex rounded-full bg-white/10 p-1 text-[11px] font-bold ring-1 ring-white/15">
           {(["monthly", "yearly"] as BillingCycle[]).map((c) => {
             const enabled = supportedCycles.includes(c);
+            // The owned cycle is only "owned" on the plan that was bought.
+            const isOwnedCycle = Boolean(
+              ownedPlanId && ownedCycle === c && selectedPlanId === ownedPlanId,
+            );
             return (
               <button
                 key={c}
@@ -116,12 +136,21 @@ export default function PlanOverview({
                 disabled={!enabled}
                 onClick={() => enabled && onChangeCycle(c)}
                 data-subscription-cycle={c}
+                data-subscription-cycle-owned={isOwnedCycle ? "true" : undefined}
                 className={`rounded-full px-3 py-1.5 transition ${
-                  cycle === c ? "bg-white text-slate-900 shadow" : "text-white/80 hover:text-white"
+                  cycle === c
+                    ? isOwnedCycle
+                      ? "bg-emerald-400 text-emerald-950 shadow"
+                      : "bg-white text-slate-900 shadow"
+                    : "text-white/80 hover:text-white"
                 } ${!enabled ? "cursor-not-allowed opacity-50" : ""}`}
               >
                 {c === "monthly" ? "Monthly" : "Yearly"}
-                {c === "yearly" ? <span className="ml-1 text-[9px] text-emerald-600">Save</span> : null}
+                {isOwnedCycle ? (
+                  <span className="ml-1 text-[9px] font-black">· ACTIVE</span>
+                ) : c === "yearly" ? (
+                  <span className="ml-1 text-[9px] text-emerald-600">Save</span>
+                ) : null}
               </button>
             );
           })}

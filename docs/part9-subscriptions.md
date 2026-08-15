@@ -377,3 +377,93 @@ in a single transaction:
   `src/`). These fail identically on the pristine
   `main` branch with `Error: ENOENT ... 'App.tsx'`
   and are out of scope.
+
+---
+
+## Addendum — Duplicate purchase of an already-owned subscription
+
+### Problem
+
+A member who already held, say, **Premium · yearly** could re-open the
+subscription page, tap the Premium pill and the Yearly toggle, and be shown
+the complete buy flow again: the product picker, the feature picker, the
+coupon field, a price summary and a violet **"Subscribe via Razorpay"**
+button. Nothing on the page said the plan was already active, so the second
+payment went through and the only visible effect was a silently extended
+expiry date.
+
+The pre-existing `ActiveMemberView` only covered the *default* landing state.
+As soon as the member entered "manage plan" mode — the documented way to
+change plan or renew — the guard was gone and every plan × cycle combination,
+including the owned one, was purchasable again.
+
+### The rule
+
+A **subscription type** is the plan **and** the billing cycle together, so
+Basic/Premium/Pro × monthly/yearly are six distinct things a user can own.
+
+* A selection is **owned** when the buyer has an active, unexpired
+  subscription whose `planId` *and* `cycle` both match the selection.
+  Switching either one is still a legitimate purchase.
+* An owned selection is **blocked** until the membership enters its renewal
+  window — the final `RENEWAL_WINDOW_DAYS` (7) days before expiry — or has
+  expired. Deliberate renewals keep working; accidental double purchases
+  become impossible.
+
+### What the member now sees
+
+When the current plan + cycle selection is the owned one:
+
+* The entire buy flow is replaced by `OwnedPlanCard`. The course picker, the
+  feature picker, the price-tier strip, the coupon/referral inputs and the
+  price summary are **not rendered at all** — there is nothing to select and
+  nothing to mis-read.
+* The card states the active plan, its cycle, the days remaining, exactly
+  which features and courses it unlocks, and when renewal opens.
+* The plan pill and the cycle toggle for the owned combination are tinted
+  emerald and marked `· ACTIVE`, so the member can tell which subscription
+  type they hold *before* tapping.
+* The sticky bottom button switches from the violet
+  "Subscribe via Razorpay" to an emerald **"Subscribed"** (or
+  "Subscribed · Renew" inside the renewal window). The colour itself is the
+  signal. Outside the renewal window it is disabled.
+
+### Enforcement
+
+The rule lives once, as pure functions, in `utils/subscriptionOwnership.js`:
+
+| Export | Role |
+| --- | --- |
+| `evaluateSubscriptionSelection` | The single decision — `owned` / `renewalEligible` / `blocked` + machine code + human reason. |
+| `buildOwnedPlanSummary` | View-model for the owned card (plan, cycle, countdown, owned features, owned courses). |
+| `resolveSubscribeCta` | Label + colour tone + disabled flag for the bottom bar. |
+
+Three surfaces consume it, so they cannot disagree:
+
+1. `SubscriptionPage.tsx` renders the owned state and refuses to call
+   `startCheckout` for a blocked selection.
+2. `SubscribeBar.tsx` derives its label / tone / disabled state from
+   `resolveSubscribeCta`.
+3. `api/_lib/quotes.ts` calls `assertSubscriptionPurchasable` **before**
+   loading the subscription context, and returns `409` with
+   `subscriptionErrorCode: SUBSCRIPTION_ALREADY_ACTIVE`. The client is never
+   the authority — a crafted request cannot buy the same membership twice.
+
+### Files added
+
+| Path | Purpose |
+| --- | --- |
+| `utils/subscriptionOwnership.js` | Pure duplicate-purchase rules. |
+| `utils/subscriptionOwnership.d.ts` | Type declarations for those rules. |
+| `src/subscription/components/OwnedPlanCard.tsx` | The "already subscribed" state that replaces the buy flow. |
+| `tests/subscriptionRepurchaseGuard.test.mjs` | 26 tests — the rules, the view-model, the CTA, and the UI/server wiring contracts. |
+
+### Files modified
+
+| Path | Change |
+| --- | --- |
+| `src/subscription/components/SubscriptionPage.tsx` | Derives `ownershipState`; renders `OwnedPlanCard` instead of the buy flow for an owned selection; clears stale coupons; blocks `handleSubscribe`. |
+| `src/subscription/components/SubscribeBar.tsx` | Emerald "Subscribed" CTA driven by `resolveSubscribeCta`. |
+| `src/subscription/components/PlanOverview.tsx` | New `ownedPlanId` / `ownedCycle` props mark the active plan pill and cycle toggle. |
+| `api/_lib/subscriptions.ts` | New `loadCurrentSubscription` + `assertSubscriptionPurchasable`. |
+| `api/_lib/quotes.ts` | Calls the guard for every subscription quote. |

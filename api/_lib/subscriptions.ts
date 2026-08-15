@@ -21,6 +21,10 @@ import { Timestamp, type Firestore, type QueryDocumentSnapshot, type Transaction
 import { adminDb, parseProductPricePaise } from "./firebaseAdmin.js";
 import { getRenewalBaseTime } from "../../utils/subscriptionRenewal.js";
 import {
+  ALREADY_ACTIVE_CODE,
+  evaluateSubscriptionSelection,
+} from "../../utils/subscriptionOwnership.js";
+import {
   buildSubscriptionLineItems,
   computeCycleExpiresAt,
   formatBillingCycle,
@@ -114,6 +118,55 @@ export const ensureDefaultSubscriptionPlans = async (db: Firestore): Promise<voi
     // Seeding is best-effort — never let a seed failure break a catalog read.
     console.warn("[subscriptions] default plan seeding skipped", error);
   }
+};
+
+/**
+ * Read the buyer's live subscription record. Returns `null` when they have
+ * never subscribed. Used by the duplicate-purchase guard below.
+ */
+export const loadCurrentSubscription = async (
+  uid: string,
+  options: { db?: Firestore } = {},
+): Promise<Record<string, unknown> | null> => {
+  if (!uid) return null;
+  const db = options.db ?? adminDb();
+  const snap = await db
+    .collection(USER_SUBS_COLLECTION)
+    .doc(uid)
+    .collection(USER_SUBS_DOC)
+    .doc("current")
+    .get();
+  return snap.exists ? ((snap.data() || {}) as Record<string, unknown>) : null;
+};
+
+/**
+ * Refuse a quote for a subscription type the buyer already holds.
+ *
+ * The client hides the buy flow for an owned plan + cycle, but the client is
+ * never the authority: this re-runs the identical pure rule against the stored
+ * record so a crafted request cannot buy the same membership twice. Renewals
+ * inside the renewal window are still allowed.
+ */
+export const assertSubscriptionPurchasable = async (
+  uid: string,
+  selection: { subscriptionPlanId?: string | null; billingCycle?: BillingCycle | null },
+  options: { db?: Firestore; now?: number } = {},
+): Promise<{ ok: true } | { ok: false; status: number; code: string; error: string }> => {
+  const record = await loadCurrentSubscription(uid, options);
+  if (!record) return { ok: true };
+  const verdict = evaluateSubscriptionSelection({
+    record,
+    planId: String(selection.subscriptionPlanId || ""),
+    cycle: selection.billingCycle === "yearly" ? "yearly" : "monthly",
+    now: options.now ?? Date.now(),
+  });
+  if (!verdict.blocked) return { ok: true };
+  return {
+    ok: false,
+    status: 409,
+    code: verdict.code || ALREADY_ACTIVE_CODE,
+    error: verdict.reason || "You already have this subscription active.",
+  };
 };
 
 /** Load a single plan by id (returns null when missing / inactive). */

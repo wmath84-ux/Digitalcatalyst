@@ -4,8 +4,16 @@
 // (server is the only authority on price math). The previous
 // implementation used dollar amounts from a `setTimeout` simulation;
 // both are gone.
+//
+// Duplicate-purchase state: when the selected plan + cycle is the one the
+// buyer already owns, the CTA is rendered in emerald and reads "Subscribed"
+// instead of "Subscribe via Razorpay", and it is disabled outside the renewal
+// window. The label / colour / disabled decision comes from the shared pure
+// helper `resolveSubscribeCta`, so the bar can never disagree with the server
+// guard that refuses the same order.
 
-import { ShieldCheck, Loader2 } from "lucide-react";
+import { BadgeCheck, ShieldCheck, Loader2 } from "lucide-react";
+import { resolveSubscribeCta, type SubscriptionSelectionState } from "../../../utils/subscriptionOwnership";
 
 interface Props {
   totalPaise: number;
@@ -15,6 +23,8 @@ interface Props {
   disabled?: boolean;
   onSubscribe: () => void;
   totalRupees: string;
+  /** Ownership verdict for the current plan + cycle selection. */
+  ownershipState?: SubscriptionSelectionState | null;
 }
 
 const formatRupee = (paise: number): string =>
@@ -28,44 +38,82 @@ export default function SubscribeBar({
   disabled,
   onSubscribe,
   totalRupees,
+  ownershipState = null,
 }: Props) {
   const hasDiscount = couponDiscountPaise > 0;
+  const cta = resolveSubscribeCta({
+    state: ownershipState,
+    loading,
+    hasPlan: !disabled,
+  });
+  const isOwned = cta.owned;
+  const isDisabled = Boolean(loading || disabled || cta.disabled);
+
   return (
     <div
       className="sticky bottom-0 z-30 border-t border-slate-100 bg-white/90 px-5 pb-[calc(0.9rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-lg"
       data-subscription-subscribe-bar
+      data-subscription-owned={isOwned ? "true" : "false"}
     >
       <div className="mb-2.5 flex items-center justify-between">
         <div className="flex items-baseline gap-2">
-          <span
-            data-subscription-total
-            className="text-xl font-extrabold text-slate-900"
-          >
-            {totalRupees || formatRupee(totalPaise)}
-          </span>
-          {hasDiscount ? (
-            <span className="text-xs font-semibold text-slate-400 line-through">
-              {formatRupee(subtotalPaise)}
+          {isOwned ? (
+            <span
+              data-subscription-owned-note
+              className="text-[13px] font-extrabold text-emerald-700"
+            >
+              Active on your account
             </span>
-          ) : null}
+          ) : (
+            <>
+              <span
+                data-subscription-total
+                className="text-xl font-extrabold text-slate-900"
+              >
+                {totalRupees || formatRupee(totalPaise)}
+              </span>
+              {hasDiscount ? (
+                <span className="text-xs font-semibold text-slate-400 line-through">
+                  {formatRupee(subtotalPaise)}
+                </span>
+              ) : null}
+            </>
+          )}
         </div>
         <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Secure checkout
+          {isOwned ? (
+            <>
+              <BadgeCheck className="h-3.5 w-3.5 text-emerald-500" /> Already subscribed
+            </>
+          ) : (
+            <>
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Secure checkout
+            </>
+          )}
         </div>
       </div>
       <button
         type="button"
         onClick={onSubscribe}
-        disabled={Boolean(loading || disabled)}
+        disabled={isDisabled}
         data-subscription-subscribe
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 py-4 text-sm font-extrabold text-white shadow-lg shadow-violet-300 active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-70"
+        data-subscription-cta-tone={cta.tone}
+        className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-extrabold text-white transition-transform active:scale-[0.98] disabled:cursor-not-allowed ${
+          isOwned
+            ? "bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg shadow-emerald-200 disabled:opacity-100"
+            : "bg-gradient-to-r from-violet-600 to-indigo-600 shadow-lg shadow-violet-300 disabled:opacity-70"
+        }`}
       >
         {loading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" /> Processing…
           </>
+        ) : isOwned ? (
+          <>
+            <BadgeCheck className="h-4 w-4" /> {cta.label}
+          </>
         ) : (
-          "Subscribe via Razorpay"
+          cta.label
         )}
       </button>
     </div>
