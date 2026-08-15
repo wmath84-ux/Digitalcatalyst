@@ -20,6 +20,7 @@
 import { Timestamp, type Firestore, type QueryDocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import { adminDb, parseProductPricePaise } from "./firebaseAdmin.js";
 import { getRenewalBaseTime } from "../../utils/subscriptionRenewal.js";
+import { resolveFeaturePrice } from "../../utils/featurePricing.js";
 import {
   ALREADY_ACTIVE_CODE,
   evaluateSubscriptionSelection,
@@ -565,11 +566,22 @@ export const writeSubscriptionAfterPayment = async (
     };
   }
 
+  const previousPlanId = String(previousData.planId || "");
+  const previousCycle = previousData.cycle === "yearly" ? "yearly" : "monthly";
+  const isPlanChange = previous.exists && (
+    previousPlanId !== args.plan.id || previousCycle !== args.cycle
+  );
+  // A same-plan renewal extends the time already paid for. A switch to any
+  // other plan/cycle activates immediately and starts the selected cycle now;
+  // otherwise a monthly→yearly upgrade could be queued behind a distant old
+  // expiry while the current record already advertised the new plan.
   const renewalBase = getRenewalBaseTime(previousData.expiresAt, args.now);
-  // Trials apply only to first activation, never to a renewal.
+  const subscriptionBase = isPlanChange ? args.now : renewalBase;
+  // Trials apply only to first activation, never to a renewal or plan change.
   const renewalPlan = previous.exists ? { ...args.plan, trialDays: 0 } : args.plan;
-  const expiresAt = computeCycleExpiresAt(renewalPlan, args.cycle, renewalBase);
-  const renewalCount = Math.max(0, Number(previousData.renewalCount || 0)) + (previous.exists ? 1 : 0);
+  const expiresAt = computeCycleExpiresAt(renewalPlan, args.cycle, subscriptionBase);
+  const renewalCount = Math.max(0, Number(previousData.renewalCount || 0)) + (previous.exists && !isPlanChange ? 1 : 0);
+  const upgradeCount = Math.max(0, Number(previousData.upgradeCount || 0)) + (isPlanChange ? 1 : 0);
   const record: SubscriptionRecord = {
     uid: args.uid,
     planId: args.plan.id,
@@ -590,7 +602,18 @@ export const writeSubscriptionAfterPayment = async (
     couponCode: args.couponCode || null,
     requestedEduCoins: Math.max(0, Math.floor(Number(args.requestedEduCoins || 0))),
   };
-  tx.set(subRef, { ...record, activatedAt: nowTs, renewedAt: previous.exists ? nowTs : null, renewalCount, expiresAt: Timestamp.fromMillis(expiresAt), renewalReminderOptOut: Boolean(previousData.renewalReminderOptOut) }, { merge: false });
+  tx.set(subRef, {
+    ...record,
+    activatedAt: nowTs,
+    renewedAt: previous.exists && !isPlanChange ? nowTs : (previousData.renewedAt || null),
+    changedAt: isPlanChange ? nowTs : (previousData.changedAt || null),
+    previousPlanId: isPlanChange ? previousPlanId : (previousData.previousPlanId || null),
+    previousCycle: isPlanChange ? previousCycle : (previousData.previousCycle || null),
+    renewalCount,
+    upgradeCount,
+    expiresAt: Timestamp.fromMillis(expiresAt),
+    renewalReminderOptOut: Boolean(previousData.renewalReminderOptOut),
+  }, { merge: false });
 
   // Mirror the high-value fields on the user doc for legacy readers.
   const userRef = adminDb().collection(USER_SUBS_COLLECTION).doc(args.uid);
@@ -604,6 +627,9 @@ export const writeSubscriptionAfterPayment = async (
       subscriptionExpiresAt: Timestamp.fromMillis(expiresAt),
       subscriptionAutoRenew: false,
       subscriptionRenewalCount: renewalCount,
+      subscriptionUpgradeCount: upgradeCount,
+      subscriptionPreviousPlanId: isPlanChange ? previousPlanId : (previousData.previousPlanId || null),
+      subscriptionChangedAt: isPlanChange ? nowTs : (previousData.changedAt || null),
       subscriptionActivatedAt: nowTs,
       updatedAt: nowTs,
     },

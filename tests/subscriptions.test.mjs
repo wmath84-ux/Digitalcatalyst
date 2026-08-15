@@ -244,7 +244,7 @@ test("rule 6: included features bypass the feature price and don't show up as a 
   // One line for the plan, none for the included feature.
   assert.equal(items.length, 1);
   assert.equal(items[0].kind, "subscription");
-  assert.equal(items[0].effectivePrice, 0);
+  assert.equal(items[0].effectivePrice, 19900);
 });
 
 test("rule 6: isFeatureIdAllowed is true for included feature ids on the plan", () => {
@@ -424,7 +424,7 @@ test("monthly + 1 paid feature → plan line + 1 feature line (e.g. 199 + 299 = 
   assert.equal(r.ok, true);
   const planLine = r.lineItems.find((i) => i.kind === "subscription");
   const featureLine = r.lineItems.find((i) => i.featureId === "offline");
-  assert.equal(planLine.effectivePrice, 0);
+  assert.equal(planLine.effectivePrice, 19900);
   assert.equal(featureLine.effectivePrice, 29900);
 });
 
@@ -437,7 +437,7 @@ test("yearly + 0 features + included feature → only the plan line, included by
   });
   assert.equal(r.ok, true);
   assert.equal(r.lineItems.length, 1);
-  assert.equal(r.lineItems[0].effectivePrice, 0);
+  assert.equal(r.lineItems[0].effectivePrice, 199900);
 });
 
 test("custom combo: monthly + 2 paid features + 1 included + 1 product unlock", () => {

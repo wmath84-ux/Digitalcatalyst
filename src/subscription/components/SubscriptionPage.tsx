@@ -35,6 +35,7 @@ import { playSfxError, playSfxSuccess } from "../../utils/sfx";
 import { shouldShowCouponInput } from "../../../utils/couponVisibility";
 import {
   groupFeaturesByPriceTier,
+  resolveFeaturePrice,
   resolveFeaturesForPlan,
   sumSelectedFeaturePaise,
 } from "../../../utils/featurePricing";
@@ -261,8 +262,12 @@ export default function SubscriptionPage({
     }
   }, [plan, supportedCycles, cycle]);
 
-  // Plans have no standalone price. Payable total = selected features + products.
-  const selectedPlanPricePaise = 0;
+  // The plan's admin-configured cycle price is part of the payable total.
+  // Checkout resolves the same field server-side, so this display cannot be
+  // used to tamper with the amount.
+  const selectedPlanPricePaise = plan
+    ? (cycle === "yearly" ? plan.yearlyPricePaise : plan.monthlyPricePaise)
+    : 0;
 
   // Feature prices are plan-aware AND cycle-aware: the same feature can
   // cost ₹99 on Basic, ₹49 on Premium and be free on Pro, with separate
@@ -334,7 +339,24 @@ export default function SubscriptionPage({
       };
     });
   }, [rawSubscriptionProducts, selectedPlanId, cycle]);
-  const productsTotalPaise = useMemo(() => selectedProductRecords.reduce((sum, product) => sum + Math.max(0, Math.round(product.price * 100)), 0), [selectedProductRecords]);
+  const subscriptionDisplayProducts = useMemo(() => availableProducts.map((product) => {
+    const pricing = resolvedSubscriptionProducts.find((entry) =>
+      String(entry.productId || entry.id) === String(product.id) ||
+      String(entry.productId || entry.id) === String(product.documentId || ""),
+    );
+    return pricing
+      ? { ...product, price: Math.max(0, Number(pricing.resolvedPrice || 0)) }
+      : product;
+  }), [availableProducts, resolvedSubscriptionProducts]);
+  const productsTotalPaise = useMemo(() => selectedProductRecords.reduce((sum, product) => {
+    const pricing = resolvedSubscriptionProducts.find((entry) =>
+      String(entry.productId || entry.id) === String(product.id) ||
+      String(entry.productId || entry.id) === String(product.documentId || ""),
+    );
+    return sum + (pricing
+      ? Math.max(0, Math.round(Number(pricing.resolvedPrice || 0) * 100))
+      : Math.max(0, Math.round(product.price * 100)));
+  }, 0), [selectedProductRecords, resolvedSubscriptionProducts]);
   const subtotalPaise = selectedPlanPricePaise + featuresTotalPaise + productsTotalPaise;
   const couponDiscountPaise = appliedReferral?.discountPaise || appliedCoupon?.discountPaise || 0;
   // Server-validated floor: minimum payable = plan's minimum
@@ -658,7 +680,14 @@ export default function SubscriptionPage({
             renewalView={memberRenewalView}
             reminderOptOut={Boolean(activeSubscription?.renewalReminderOptOut)}
             onRenew={() => setManageMode(true)}
-            onChangePlan={() => setManageMode(true)}
+            onChangePlan={() => {
+              // Open directly on another active plan so an existing subscriber
+              // can immediately upgrade/downgrade to any catalog plan.
+              const currentPlanId = String(activeSubscription?.planId || "");
+              const nextPlan = plans.find((candidate) => candidate.active && candidate.id !== currentPlanId);
+              if (nextPlan) setSelectedPlanId(nextPlan.id);
+              setManageMode(true);
+            }}
             onToggleReminders={(next) => {
               if (!user) return;
               void updateDoc(doc(db, "users", user.id, "subscription", "current"), {
@@ -678,7 +707,7 @@ export default function SubscriptionPage({
         {isActiveMember && manageMode ? (
           <div className="mx-5 mt-4 flex items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2.5">
             <p className="text-[11px] font-semibold leading-relaxed text-violet-900">
-              You already have an active membership. Changes apply from your current expiry date.
+              You already have an active membership. Choose any active plan, feature, or product below. Plan changes activate after verified payment.
             </p>
             <button
               type="button"
@@ -847,7 +876,7 @@ export default function SubscriptionPage({
         selected={selectedCourseIds}
         onClose={() => setCourseModalOpen(false)}
         onChangeSelected={setSelectedCourseIds}
-        products={availableProducts}
+        products={subscriptionDisplayProducts}
       />
 
       <FeatureSelectModal
