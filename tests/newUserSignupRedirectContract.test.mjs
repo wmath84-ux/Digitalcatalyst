@@ -26,6 +26,10 @@ test("ambiguous credential errors offer a clear signup action", () => {
 });
 
 test("learner/admin landing behavior remains intact", () => {
-  assert.match(main, /user\.role !== "admin" && landingRouteRequested && !desktopLocked/);
-  assert.match(main, /user\.role === "admin"/);
+  // Landing is now the entry point for everyone in a browser; only an
+  // installed mobile PWA goes straight to Home. This used to assert the
+  // superseded "signed-in non-admin skips landing" rule.
+  assert.match(main, /installedMobilePwa && landingRouteRequested && !desktopLocked/);
+  // Admins stay exempt from the learner-only catalog splash.
+  assert.match(main, /user\.role !== "admin" && catalogLoading/);
 });

@@ -50,6 +50,12 @@ test("catalog changes create notifications for purchased products including stri
 });
 
 test("admin enforces paid-update packaging for paid modules", () => {
-  assert.match(admin, /must include at least one module or file/);
+  // Both guards are intact; the noun changed from "file" to "resource"
+  // to match the rest of the editor's vocabulary, which is what broke
+  // the old literal match.
+  assert.match(admin, /must include at least one module or (resource|file)/);
   assert.match(admin, /must be included in a Paid update package/);
+  // The empty-package guard only applies to an ACTIVE update — a
+  // drafted one is allowed to be empty while it is being built.
+  assert.match(admin, /u\.active && validIncludedIds\.length === 0/);
 });

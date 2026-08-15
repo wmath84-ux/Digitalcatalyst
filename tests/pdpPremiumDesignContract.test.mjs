@@ -34,7 +34,13 @@ test("related products are deterministic live-catalog matches", () => {
 test("all premium PDP commerce controls are wired to app handlers", () => {
   assert.match(pdp, /onAddToCart\?\.\(product\.id\)/);
   assert.match(pdp, /onToggleFavorite\?\.\(product\.id\)/);
-  assert.match(pdp, /onCheckoutSelection\(selection, summary\.effectiveSubtotal\)/);
+  // The main buy path now forwards the coupon-adjusted selection
+  // (`withCoupon`) rather than the raw one, so the literal
+  // `onCheckoutSelection(selection, ...)` no longer appears there.
+  // Assert the wiring and the price argument instead of the variable name.
+  assert.match(pdp, /onCheckoutSelection\((?:withCoupon|selection), summary\.effectiveSubtotal\)/);
+  // The paid-update path forwards its own price.
+  assert.match(pdp, /onCheckoutSelection\(selection, Number\(update\.cashPrice\) \|\| 0\)/);
   assert.match(main, /onCheckoutSelection=\{navigatePdpSelectionToCheckout\}/);
   assert.match(main, /startCheckout\(\{/);
 });

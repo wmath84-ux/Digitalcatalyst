@@ -54,7 +54,15 @@ test("subscription exposes only the paid My Day feature", () => {
   assert.equal((fallback.match(/\nid: "my-day"|\n      id: "my-day"/g) || []).length, 1);
   assert.doesNotMatch(fallback, /id: "downloads"|id: "certificates"|id: "community"/);
   assert.match(server, /feature\.id === "my-day"/);
-  assert.match(server, /pricePaise: 14900/);
+  // The ₹149 price belongs to the offline fallback catalog. It used to
+  // be hard-coded in the server loader too, and this test pinned it
+  // there — but feature pricing is admin-configurable now, so the
+  // loader deliberately returns whatever the catalog holds instead of
+  // forcing a My Day row into the response. Asserting the constant
+  // against the server would re-introduce exactly what was removed.
+  assert.match(fallback, /pricePaise: 14900/);
+  assert.match(server, /feature\.active/, "the loader must expose active catalog features as-is");
+  assert.doesNotMatch(server, /pricePaise:\s*14900/, "the server must not hard-code the My Day price");
 });
 
 test("bonus product picker uses every live catalog product with real price and checkbox", () => {
