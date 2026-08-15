@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { BookOpen, CalendarClock, Coffee, GraduationCap, Pencil, PenSquare, Plus, Trash2, User, type LucideIcon } from "lucide-react";
 import type { EventType, ScheduleEvent } from "../../types";
 import { cn } from "../../utils/cn";
@@ -9,6 +9,8 @@ interface TimelineProps {
   onAdd: () => void;
   onEdit: (event: ScheduleEvent) => void;
   onDelete: (id: string) => void;
+  /** Id of the event a notification deep-linked to — scrolls to it + highlights it. */
+  highlightId?: string | null;
 }
 
 const typeMeta: Record<
@@ -32,16 +34,23 @@ function durationLabel(start: string, end: string) {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-export default function Timeline({ events, onAdd, onEdit, onDelete }: TimelineProps) {
+export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId = null }: TimelineProps) {
   const nowMinutes = useMemo(() => {
     const now = new Date();
     return now.getHours() * 60 + now.getMinutes();
   }, []);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const sorted = useMemo(
     () => [...events].sort((a, b) => toMinutes(a.startTime) - toMinutes(b.startTime)),
     [events],
   );
+
+  useEffect(() => {
+    if (!highlightId) return;
+    const el = listRef.current?.querySelector(`[data-highlight="${CSS.escape(highlightId)}"]`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId, sorted]);
 
   const activeId = useMemo(() => {
     const active = sorted.find(
@@ -96,16 +105,17 @@ export default function Timeline({ events, onAdd, onEdit, onDelete }: TimelinePr
         ) : (
           <div className="relative pl-7">
             <div className="absolute left-[11px] top-2 bottom-2 w-px bg-gradient-to-b from-slate-200 via-slate-200 to-transparent" />
-            <div className="space-y-3">
+            <div ref={listRef} className="space-y-3">
               {sorted.map((event, idx) => {
                 const meta = typeMeta[event.type];
                 const Icon = meta.icon;
                 const isActive = event.id === activeId;
                 const isNext = event.id === nextId;
                 const isPast = !isActive && !isNext && toMinutes(event.endTime) <= nowMinutes;
+                const isHighlighted = event.id === highlightId;
 
                 return (
-                  <div key={event.id} className="relative group" style={{ animationDelay: `${idx * 50}ms` }}>
+                  <div key={event.id} data-highlight={event.id} className="relative group" style={{ animationDelay: `${idx * 50}ms` }}>
                     {/* Dot */}
                     <div
                       className={cn(
@@ -123,6 +133,7 @@ export default function Timeline({ events, onAdd, onEdit, onDelete }: TimelinePr
                     <div
                       className={cn(
                         "rounded-2xl border p-3.5 transition-all duration-200",
+                        isHighlighted && "ring-2 ring-sky-400 ring-offset-2 ring-offset-white",
                         isActive
                           ? "border-indigo-300 bg-indigo-50/80 shadow-lg shadow-indigo-100/50"
                           : isNext
@@ -130,6 +141,7 @@ export default function Timeline({ events, onAdd, onEdit, onDelete }: TimelinePr
                             : isPast
                               ? "border-transparent bg-slate-50/50 opacity-60"
                               : "border-slate-100 bg-slate-50/80",
+                        isHighlighted && isPast && "opacity-100",
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">

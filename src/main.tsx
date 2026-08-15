@@ -29,7 +29,7 @@ import { CheckoutProvider } from "./checkout/CheckoutContext";
 import { clearAdminSession, hasAdminSession } from "./utils/adminSession";
 import { useOwnedUpdateIds } from "./hooks/useOwnedUpdates";
 import { type CheckoutReturnRoute } from "./checkout/types";
-import { buildContentNotificationInventory, createContentNotifications, loadContentNotificationBaseline, loadSiteNotifications, mergeSiteNotifications, saveContentNotificationBaseline, saveSiteNotifications, type SiteNotification } from "../utils/siteNotifications";
+import { buildContentNotificationInventory, createContentNotifications, getMyDayItemDeepLink, getNotificationDeepLink, loadContentNotificationBaseline, loadSiteNotifications, mergeSiteNotifications, saveContentNotificationBaseline, saveSiteNotifications, type SiteNotification } from "../utils/siteNotifications";
 import { getRenewalReminder } from "../utils/subscriptionRenewal";
 import { buildCheckoutSessionRecord, writeToSessionStorage as writeCheckoutToStorage } from "../utils/checkoutSession";
 import type { CheckoutSelection } from "./types/commerce";
@@ -46,11 +46,17 @@ if ("serviceWorker" in navigator) {
     void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
   });
   // The service worker focuses an already-open PWA window on notification
-  // taps. Finish the job in the page by navigating to the notification URL.
+  // taps. Finish the job in the page by navigating to the notification's
+  // exact URL (hash route). The worker now always includes the url in the
+  // message so the deep link survives every click path.
   navigator.serviceWorker.addEventListener("message", (event) => {
     const message = event.data || {};
-    if (message.type === "site-notification-open" && message.notificationId) {
-      window.location.hash = NOTIFICATIONS_HASH;
+    if (message.type === "site-notification-open") {
+      if (typeof message.url === "string" && message.url.includes("#")) {
+        window.location.hash = message.url.slice(message.url.indexOf("#"));
+      } else {
+        window.location.hash = NOTIFICATIONS_HASH;
+      }
       return;
     }
     if (message.type === "push-open" && typeof message.url === "string") {
@@ -351,7 +357,10 @@ function Root() {
       for (const item of due) {
         if (shown[item.key] || pending.has(item.key)) continue;
         pending.add(item.key);
-        void showLocalSystemNotification(item.title, item.body, "/#/my-day", `myday-${item.key}`)
+        // Deep-link the system alert to the exact My Day tab + item so the
+        // tap lands on the task/schedule/reminder that fired, not the overview.
+        const itemUrl = `/${getMyDayItemDeepLink(item.section, item.itemId)}`;
+        void showLocalSystemNotification(item.title, item.body, itemUrl, `myday-${item.key}`)
           .then((displayed) => {
             // Do not dedupe a failed display (for example before permission is
             // granted); the next tick must be allowed to retry it.
@@ -401,11 +410,7 @@ function Root() {
         // Foreground fallback: Web Push normally supplies this system alert.
         // A stable tag lets Android collapse it with the matching server push.
         incoming.forEach((notification) => {
-          const target = notification.target;
-          const url = target.type === "product"
-            ? `/#/product/${encodeURIComponent(String(target.productId))}`
-            : target.type === "purchases" ? "/#/store/purchases" : "/#/notifications";
-          void showLocalSystemNotification(notification.title, notification.body, url, notification.id);
+          void showLocalSystemNotification(notification.title, notification.body, `/${getNotificationDeepLink(notification)}`, notification.id);
         });
       }
     }

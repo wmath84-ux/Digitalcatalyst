@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardList, ListFilter, Plus, Search, X } from "lucide-react";
 import type { Task, TaskStatus } from "../../types";
 import TaskItem from "./TaskItem";
@@ -12,6 +12,8 @@ interface TaskListProps {
   onDelete: (id: string) => void;
   onAdd: () => void;
   globalSearch?: string;
+  /** Id of the task a notification deep-linked to — scrolls to it + highlights it. */
+  highlightId?: string | null;
 }
 
 type FilterKey = "all" | TaskStatus;
@@ -23,10 +25,11 @@ const filters: { key: FilterKey; label: string }[] = [
   { key: "completed", label: "Done" },
 ];
 
-export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDelete, onAdd, globalSearch = "" }: TaskListProps) {
+export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDelete, onAdd, globalSearch = "", highlightId = null }: TaskListProps) {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [localSearch, setLocalSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Combine global and local search
   const searchQuery = globalSearch.trim() || localSearch.trim();
@@ -58,6 +61,18 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
   }, [tasks]);
 
   const isSearchActive = searchQuery.length > 0;
+
+  // A notification deep link can point at a task that is filtered out
+  // (e.g. already completed); reveal it by resetting the local filter.
+  useEffect(() => {
+    if (highlightId && tasks.some((t) => t.id === highlightId) && filter !== "all" && !globalSearch) setFilter("all");
+  }, [filter, globalSearch, highlightId, tasks]);
+
+  useEffect(() => {
+    if (!highlightId) return;
+    const el = listRef.current?.querySelector(`[data-highlight="${CSS.escape(highlightId)}"]`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [filtered, highlightId]);
 
   return (
     <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
@@ -159,7 +174,7 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
       </div>
 
       {/* Task list */}
-      <div className="space-y-2 p-4 sm:p-6 sm:pt-4">
+      <div ref={listRef} className="space-y-2 p-4 sm:p-6 sm:pt-4">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 py-12 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
@@ -189,7 +204,8 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
           filtered.map((task, idx) => (
             <div
               key={task.id}
-              className="animate-slideUp"
+              data-highlight={task.id}
+              className={cn("animate-slideUp", task.id === highlightId && "rounded-2xl ring-2 ring-indigo-400 ring-offset-2 ring-offset-white")}
               style={{ animationDelay: `${idx * 30}ms` }}
             >
               <TaskItem

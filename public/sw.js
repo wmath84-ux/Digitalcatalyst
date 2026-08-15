@@ -56,6 +56,9 @@ const routeNotificationClick = async (notification) => {
   notification.close();
   const data = notification.data || {};
   const notificationId = data.notificationId || '';
+  // The url is the exact deep link (e.g. /#/my-day?section=reminders&item=r1,
+  // /#/product/p1 or /#/subscription?renew=1), so every click path lands on
+  // the precise location that produced the alert.
   const targetUrl = data.url || (notificationId ? `/?siteNotification=${encodeURIComponent(notificationId)}` : '/');
 
   const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
@@ -67,14 +70,16 @@ const routeNotificationClick = async (notification) => {
       try { await existingClient.navigate(targetUrl); } catch { /* message fallback below */ }
     }
     await existingClient.focus();
-    if (notificationId) existingClient.postMessage({ type: 'site-notification-open', notificationId });
-    else existingClient.postMessage({ type: 'push-open', url: targetUrl, target: data.target });
+    // Always include the url in the message: the page handler then applies
+    // the same deep link even when navigate() failed or the SW navigation
+    // was a no-op (e.g. same-hash taps on an already-open window).
+    existingClient.postMessage({ type: 'site-notification-open', notificationId, url: targetUrl, target: data.target });
     return;
   }
 
   const openedClient = await self.clients.openWindow(targetUrl);
-  if (openedClient && notificationId) {
-    openedClient.postMessage({ type: 'site-notification-open', notificationId });
+  if (openedClient) {
+    openedClient.postMessage({ type: 'site-notification-open', notificationId, url: targetUrl, target: data.target });
   }
 };
 

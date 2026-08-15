@@ -77,24 +77,27 @@ export const collectDueMyDayItems = (data, nowMs, tzOffsetMinutes, lookbackMs = 
   const log = data.notificationLog && typeof data.notificationLog === "object" ? data.notificationLog : {};
   const already = (key) => Object.prototype.hasOwnProperty.call(log, key);
 
-  const pushItem = (kind, id, clock, title, body) => {
+  // The section maps a due item back to its My Day tab so a notification tap
+  // can open the exact list (tasks / schedule / reminders) with the item
+  // highlighted, instead of landing on the generic overview.
+  const pushItem = (kind, section, id, clock, title, body) => {
     if (!clock) return;
     const dueAt = dueEpochMs(dateKey, clock, tzOffsetMinutes);
     if (dueAt > nowMs || nowMs - dueAt > lookbackMs) return;
     const key = `${kind}:${sanitizeKeySegment(id)}:${dateKey}`;
     if (already(key)) return;
-    due.push({ key, kind, title, body, dueAt });
+    due.push({ key, kind, section, itemId: String(id ?? ""), title, body, dueAt });
   };
 
   (Array.isArray(data.reminders) ? data.reminders : []).forEach((reminder) => {
     if (!reminder || reminder.done) return;
-    pushItem("reminder", reminder.id, parseClockTime(reminder.time),
+    pushItem("reminder", "reminders", reminder.id, parseClockTime(reminder.time),
       "⏰ Reminder", String(reminder.text || "Time for your reminder."));
   });
 
   (Array.isArray(data.tasks) ? data.tasks : []).forEach((task) => {
     if (!task || task.status === "completed") return;
-    pushItem("task", task.id, parseClockTime(task.time),
+    pushItem("task", "tasks", task.id, parseClockTime(task.time),
       "📝 Task time", `${String(task.title || "Task")}${task.subject ? ` · ${task.subject}` : ""}`);
   });
 
@@ -108,7 +111,7 @@ export const collectDueMyDayItems = (data, nowMs, tzOffsetMinutes, lookbackMs = 
       const endAt = dueEpochMs(dateKey, end, tzOffsetMinutes);
       if (endAt > dueEpochMs(dateKey, start, tzOffsetMinutes) && nowMs > endAt) return;
     }
-    pushItem("schedule", event.id, start,
+    pushItem("schedule", "schedule", event.id, start,
       `📅 ${String(event.title || "Scheduled event")}`,
       `Starts at ${event.startTime}${event.detail ? ` — ${event.detail}` : ""}`);
   });

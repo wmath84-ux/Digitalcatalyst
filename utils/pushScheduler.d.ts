@@ -23,6 +23,10 @@ export function dueEpochMs(dateKey: string, clock: ClockTime, tzOffsetMinutes: n
 export interface DueMyDayItem {
   key: string;
   kind: "reminder" | "task" | "schedule";
+  /** My Day tab the item lives in — used for exact deep links. */
+  section: "reminders" | "tasks" | "schedule";
+  /** The reminder/task/schedule-event id that fired. */
+  itemId: string;
   title: string;
   body: string;
   dueAt: number;
