@@ -237,13 +237,45 @@ async function subscriptionFeaturesRequest(init?: RequestInit) {
 async function subscriptionPlanProductsRequest(init?: RequestInit) {
   const method = init?.method || "GET";
   if (method === "GET") {
-    const snap = await getDocs(collection(db, "subscriptionPlanProducts"));
-    return { products: snap.docs.map((item) => {
+    const [pricingSnap, productsSnap] = await Promise.all([
+      getDocs(collection(db, "subscriptionPlanProducts")),
+      getDocs(collection(db, "siteProducts")),
+    ]);
+    const pricing = new Map<string, any>(pricingSnap.docs.map((item) => {
       const data = item.data() || {};
+      return [String(data.productId || item.id), { id: item.id, ...data }];
+    }));
+    // Every existing store product is shown, even before an override has been
+    // created. This lets Admin customise the whole current catalog instead of
+    // manually copying product IDs one by one.
+    const rows = productsSnap.docs.map((item) => {
+      const product = item.data() || {};
+      const productId = String(product.id || item.id);
+      const data: any = pricing.get(productId) || pricing.get(item.id) || {};
+      pricing.delete(productId);
+      pricing.delete(item.id);
       return {
-        id: item.id,
-        productId: data.productId || item.id,
+        id: data.id || productId,
+        productId,
+        name: data.name || product.title || "Product",
+        description: data.description || product.description || "",
+        individualPrice: String(money(data.price ?? data.individualPrice ?? product.salePrice ?? product.price ?? 0)),
+        monthlyPrice: data.monthlyPrice === undefined || data.monthlyPrice === null ? "" : String(money(data.monthlyPrice)),
+        yearlyPrice: data.yearlyPrice === undefined || data.yearlyPrice === null ? "" : String(money(data.yearlyPrice)),
+        planPricing: data.planPricing && typeof data.planPricing === "object" ? data.planPricing : {},
+        included: data.included === true,
+        active: data.active !== false && product.isVisible !== false && product.inStock !== false,
+        sortOrder: Number(data.sortOrder || 0),
+      };
+    });
+    // Keep legacy overrides whose product document is temporarily unavailable,
+    // so Admin can still edit or deactivate them.
+    for (const data of pricing.values()) {
+      rows.push({
+        id: data.id,
+        productId: data.productId || data.id,
         name: data.name || "Product",
+        description: data.description || "",
         individualPrice: String(money(data.price ?? data.individualPrice ?? 0)),
         monthlyPrice: data.monthlyPrice === undefined || data.monthlyPrice === null ? "" : String(money(data.monthlyPrice)),
         yearlyPrice: data.yearlyPrice === undefined || data.yearlyPrice === null ? "" : String(money(data.yearlyPrice)),
@@ -251,8 +283,9 @@ async function subscriptionPlanProductsRequest(init?: RequestInit) {
         included: data.included === true,
         active: data.active !== false,
         sortOrder: Number(data.sortOrder || 0),
-      };
-    }) };
+      });
+    }
+    return { products: rows };
   }
   const body = bodyOf(init);
   const recordId = String(body.id || body.productId || id());

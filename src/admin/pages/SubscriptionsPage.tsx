@@ -297,8 +297,10 @@ export default function SubscriptionsPage() {
           <div className="space-y-3">
             <Field label="Name" required><input className={inputClass} value={editingPlan.name ?? ""} onChange={(e) => setEditingPlan({ ...editingPlan, name: e.target.value })} /></Field>
             <Field label="Description"><textarea className={textareaClass} value={editingPlan.description ?? ""} onChange={(e) => setEditingPlan({ ...editingPlan, description: e.target.value })} /></Field>
-            <p className="text-xs text-slate-500">Plan base price is not charged. The payable total is selected features and products only.</p>
-            <Field label="Monthly price (₹) — unused">
+            <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs text-violet-800">
+              These plan prices are charged at checkout. Feature and product add-on prices are added separately.
+            </div>
+            <Field label="Monthly plan price (₹)">
               <input
                 className={inputClass}
                 type="number"
@@ -306,7 +308,7 @@ export default function SubscriptionsPage() {
                 onChange={(e) => setEditingPlan({ ...editingPlan, billingCycles: [{ cycle: "monthly", label: "Monthly", price: Number(e.target.value) }, ...(editingPlan.billingCycles?.slice(1) ?? [])] })}
               />
             </Field>
-            <Field label="Yearly price (₹)">
+            <Field label="Yearly plan price (₹)">
               <input
                 className={inputClass}
                 type="number"

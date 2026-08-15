@@ -230,8 +230,10 @@ export const buildSubscriptionLineItems = ({
   if (!plan) return [];
   const items = [];
 
-  // Plan line — access entitlement only. The plan itself has no
-  // standalone price; the payable total is selected features + products.
+  // Plan line — the admin-configured cycle price is authoritative. Older
+  // versions displayed this value but forced the checkout line to ₹0, which
+  // made plan-price customisation ineffective.
+  const planPricePaise = getPlanCyclePricePaise(plan, cycle);
   items.push({
     id: `subscription:${plan.id}:${cycle}`,
     kind: "subscription",
@@ -243,9 +245,9 @@ export const buildSubscriptionLineItems = ({
     featureId: null,
     title: `${plan.name} (${cycle === "monthly" ? "Monthly" : "Yearly"})`,
     parentTitle: plan.description || "",
-    regularPrice: 0,
+    regularPrice: planPricePaise,
     salePrice: null,
-    effectivePrice: 0,
+    effectivePrice: planPricePaise,
     quantity: 1,
     alreadyOwned: false,
     entitlementId: `subscription:${plan.id}`,
