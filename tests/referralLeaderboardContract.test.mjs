@@ -97,6 +97,31 @@ test("a used referral ID is spent permanently: discontinued, never resurrected, 
   assert.match(referrals, /active: !spent/);
 });
 
+test("historic referral usage is repaired automatically, with zero manual steps", () => {
+  // The repair reconstructs redemptions + counts from siteOrders and
+  // discontinues every spent referral coupon…
+  assert.match(referrals, /export const repairReferralUsage/);
+  assert.match(referrals, /couponRedemptions/);
+  assert.match(referrals, /backfilled: true/);
+  assert.match(referrals, /status: "inactive"/);
+  assert.match(referrals, /referralUsedCount/);
+  // …runs exactly once behind a settings flag…
+  assert.match(referrals, /export const runReferralRepairOnce/);
+  assert.match(referrals, /referralUsageRepair/);
+  // …and is wired into three self-triggering paths: the leaderboard
+  // fetch, the referral apply endpoint, and the daily cron.
+  const leaderboardApi = fs.readFileSync("api/referral-leaderboard.ts", "utf8");
+  const applyApi = fs.readFileSync("api/subscription-referral.ts", "utf8");
+  const cron = fs.readFileSync("api/cron/subscription-renewals.ts", "utf8");
+  assert.match(leaderboardApi, /runReferralRepairOnce/);
+  assert.match(applyApi, /runReferralRepairOnce/);
+  assert.match(cron, /runReferralRepairOnce/);
+  // The repair must never break the endpoint that hosts it.
+  assert.match(leaderboardApi, /repair skipped/);
+  assert.match(applyApi, /repair skipped/);
+  assert.match(cron, /repair skipped/);
+});
+
 test("the owner's profile crosses out a used referral ID with a clear Used badge", () => {
   const profile = fs.readFileSync("src/profile/App.tsx", "utf8");
   assert.match(profile, /referralUsedCount/);

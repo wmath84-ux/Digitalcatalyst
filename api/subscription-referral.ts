@@ -1,5 +1,5 @@
 import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./_lib/firebaseAdmin.js";
-import { ensureReferralCoupon, loadReferralConfig } from "./_lib/referrals.js";
+import { ensureReferralCoupon, loadReferralConfig, runReferralRepairOnce } from "./_lib/referrals.js";
 import { loadUserCouponUsageCount } from "./_lib/coupons.js";
 import { normaliseCouponCode } from "../utils/coupons.js";
 
@@ -14,6 +14,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // without the `.js` extension fails on Vercel's ESM runtime with
     // "Cannot find module /var/task/api/_lib/firebaseAdmin".
     const db = adminDb();
+    // One-time self-healing: make sure historic redemptions (from
+    // before the single-use fix) are counted before we validate this
+    // code — otherwise a spent-but-uncounted ID would still pass.
+    try {
+      await runReferralRepairOnce();
+    } catch (repairError) {
+      console.warn("[subscription-referral] referral usage repair skipped", repairError);
+    }
     let snap = await db.collection("coupons").doc(code).get();
     let data = snap.data() || {};
     if (!snap.exists || !data.referralOwnerUid) {

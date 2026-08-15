@@ -1,5 +1,5 @@
 import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from "./_lib/firebaseAdmin.js";
-import { referralCodeForUid } from "./_lib/referrals.js";
+import { referralCodeForUid, runReferralRepairOnce } from "./_lib/referrals.js";
 
 type SubscriberRow = {
   uid: string;
@@ -70,6 +70,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     const db = adminDb();
+    // One-time self-healing: backfill referral usage that predates the
+    // single-use fix so used IDs drop out of "Unused IDs" without any
+    // manual step. After the first run this is a single doc read.
+    try {
+      await runReferralRepairOnce();
+    } catch (repairError) {
+      console.warn("[leaderboard] referral usage repair skipped", repairError);
+    }
     type LeaderboardDoc = { id: string; data: () => Record<string, unknown> };
     const recent = await db.collection("users").limit(200).get();
     const allDocs: LeaderboardDoc[] = recent.docs;
