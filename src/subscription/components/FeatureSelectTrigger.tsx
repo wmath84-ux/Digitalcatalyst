@@ -7,8 +7,13 @@
 import { ChevronRight, Sparkles } from "lucide-react";
 import type { SubscriptionFeatureDoc } from "../utils/subscriptionCatalog";
 
+type FeatureWithResolvedPrice = SubscriptionFeatureDoc & {
+  resolvedPricePaise?: number;
+  resolvedIncluded?: boolean;
+};
+
 interface Props {
-  features: SubscriptionFeatureDoc[];
+  features: FeatureWithResolvedPrice[];
   selectedIds: string[];
   onOpen: () => void;
 }
@@ -18,7 +23,13 @@ const formatRupee = (paise: number): string =>
 
 export default function FeatureSelectTrigger({ features, selectedIds, onOpen }: Props) {
   const selectedFeatures = features.filter((f) => selectedIds.includes(f.id));
-  const totalPaise = selectedFeatures.reduce((sum, f) => sum + (f.pricePaise || 0), 0);
+  // Plan/cycle-resolved rate when available (the page resolves the list
+  // via `resolveFeaturesForPlan`); flat rate as a safety fallback.
+  const totalPaise = selectedFeatures.reduce(
+    (sum, f) =>
+      sum + (f.resolvedIncluded ? 0 : typeof f.resolvedPricePaise === "number" ? f.resolvedPricePaise : f.pricePaise || 0),
+    0,
+  );
   return (
     <div className="px-5 pt-3">
       <button

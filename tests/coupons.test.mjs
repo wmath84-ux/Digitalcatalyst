@@ -628,3 +628,34 @@ test("shouldIncrementCouponUsage is true only for pending redemptions of an acti
   // Coupon expired → false.
   assert.equal(shouldIncrementCouponUsage(pending, expired), false);
 });
+
+// ---------------------------------------------------------------------------
+// Server-side ₹0-order guard — mirrors utils/couponVisibility.js on the API
+// side. The UI hides the coupon box on a free order; this rule makes sure a
+// direct API call cannot sneak one through either.
+// ---------------------------------------------------------------------------
+
+test("validateCoupon refuses any coupon on a ₹0 (free) order", () => {
+  const result = validateCoupon(percentCoupon(), baseOrderContext({ subtotalPaise: 0 }));
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "COUPON_FREE_ORDER");
+});
+
+test("validateCoupon refuses a flat coupon on a free order too", () => {
+  const result = validateCoupon(flatCoupon(), baseOrderContext({ subtotalPaise: 0 }));
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "COUPON_FREE_ORDER");
+});
+
+test("the free-order guard fires before every other rule (even an inactive coupon reports FREE_ORDER)", () => {
+  const expired = percentCoupon({ expiresAt: Date.now() - 1000 });
+  const result = validateCoupon(expired, baseOrderContext({ subtotalPaise: 0 }));
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "COUPON_FREE_ORDER");
+});
+
+test("a paid order still validates normally after the free-order guard", () => {
+  const result = validateCoupon(percentCoupon(), baseOrderContext({ subtotalPaise: 200000 }));
+  assert.equal(result.ok, true);
+  assert.equal(result.discountPaise, 40000); // 20% of ₹2000
+});

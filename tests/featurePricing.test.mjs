@@ -239,7 +239,36 @@ test("SubscriptionPage prices features through the shared resolver", () => {
 test("Admin subscriptions page exposes plan-wise and cycle pricing inputs", () => {
   const source = readSource("src/admin/pages/SubscriptionsPage.tsx");
   assert.match(source, /Plan-wise pricing/);
-  assert.match(source, /Cycle pricing/);
+  assert.match(source, /Monthly \/ Yearly pricing/);
   assert.match(source, /planPricing/);
   assert.match(source, /Free on this plan/);
+});
+
+test("Admin feature editor previews the buyer-facing price with the shared resolver", () => {
+  const source = readSource("src/admin/pages/SubscriptionsPage.tsx");
+  assert.match(source, /What buyers will see/);
+  assert.match(source, /resolveFeaturePrice\(previewDoc, plan\.id, "monthly"\)/);
+  assert.match(source, /resolveFeaturePrice\(previewDoc, plan\.id, "yearly"\)/);
+});
+
+test("FeatureSelectModal and trigger price from the plan-resolved rate, not the flat rate", () => {
+  const modal = readSource("src/subscription/components/FeatureSelectModal.tsx");
+  assert.match(modal, /resolvedPricePaise/);
+  assert.match(modal, /featurePrice\(feat\)/);
+  // The running total must skip plan-included features.
+  assert.match(modal, /!includedSet\.has\(f\.id\)/);
+  const trigger = readSource("src/subscription/components/FeatureSelectTrigger.tsx");
+  assert.match(trigger, /resolvedPricePaise/);
+});
+
+test("legacy feature docs with individualPrice/pricePaise fields still resolve their real price", () => {
+  // Older admin builds wrote `individualPrice` (rupees) instead of `price`.
+  const legacyRupees = normaliseFeatureDoc({ name: "My Day", individualPrice: 500, active: true }, "my-day");
+  assert.equal(legacyRupees.pricePaise, 50000);
+  // Even older docs stored paise directly.
+  const legacyPaise = normaliseFeatureDoc({ name: "My Day", pricePaise: 50000, active: true }, "my-day");
+  assert.equal(legacyPaise.pricePaise, 50000);
+  // The current admin field still wins when both are present.
+  const both = normaliseFeatureDoc({ name: "My Day", price: 500, individualPrice: 900, active: true }, "my-day");
+  assert.equal(both.pricePaise, 50000);
 });

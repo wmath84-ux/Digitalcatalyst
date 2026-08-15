@@ -264,6 +264,15 @@ export const validateCoupon = (coupon, orderContext, now = Date.now()) => {
   if (!isObject(coupon)) {
     return { ok: false, code: "COUPON_NOT_FOUND", reason: "Coupon code is invalid." };
   }
+  // Server-side mirror of the UI rule in `utils/couponVisibility.js`:
+  // a coupon can only reduce money that is actually charged. The UI no
+  // longer renders the input on a ₹0 order, but the endpoints must not
+  // trust the UI — a direct API call with a coupon on a free order is
+  // refused here, in the one place every quote path passes through.
+  const orderSubtotal = Math.max(0, Math.round(Number(orderContext?.subtotalPaise || 0)));
+  if (orderSubtotal <= 0) {
+    return { ok: false, code: "COUPON_FREE_ORDER", reason: "Coupons cannot be applied to a free order." };
+  }
   if (!isCouponActive(coupon, now)) {
     return { ok: false, code: "COUPON_INACTIVE", reason: "This coupon is no longer active." };
   }

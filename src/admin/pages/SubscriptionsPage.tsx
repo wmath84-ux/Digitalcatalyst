@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { DangerButton, EmptyState, ErrorState, Field, LoadingState, Pill, PrimaryButton, RecordCard, SecondaryButton, Sheet, Tabs, inputClass, selectClass, textareaClass } from "@/components/admin/ui";
 import { useConfirm, useToast } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
+import { resolveFeaturePrice, toPaise } from "../../../utils/featurePricing";
 
 type Plan = {
   id: string;
@@ -266,10 +267,15 @@ export default function SubscriptionsPage() {
 
             {/* Cycle-specific base rates — apply to every plan that has no
                 explicit override below. Blank falls back to the base price. */}
-            {!editingFeature.included && (
+            {editingFeature.included ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                <p className="text-xs font-semibold text-emerald-800">This feature is marked free for everyone</p>
+                <p className="mt-0.5 text-[11px] text-emerald-700">Buyers always see it as Free. Untick "Included / free feature" below to charge for it and unlock the Monthly / Yearly and plan-wise pricing controls.</p>
+              </div>
+            ) : (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-semibold text-slate-700">Cycle pricing (optional)</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">Leave blank to charge the base price for both cycles.</p>
+                <p className="text-xs font-semibold text-slate-700">Monthly / Yearly pricing (optional)</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">Charge a different rate per billing cycle on every plan. Leave blank to charge the individual price above for both cycles.</p>
                 <div className="mt-2 grid grid-cols-2 gap-3">
                   <Field label="Monthly (₹)"><input className={inputClass} type="number" min="0" placeholder="base" value={editingFeature.monthlyPrice ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, monthlyPrice: e.target.value })} /></Field>
                   <Field label="Yearly (₹)"><input className={inputClass} type="number" min="0" placeholder="base" value={editingFeature.yearlyPrice ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, yearlyPrice: e.target.value })} /></Field>
@@ -309,6 +315,36 @@ export default function SubscriptionsPage() {
                             <input className={inputClass} type="number" min="0" placeholder="Yearly ₹" value={(override.yearly as string) ?? ""} onChange={(e) => setOverride({ yearly: e.target.value })} />
                           </div>
                         )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {/* Live preview — resolves the price with the SAME engine the
+                subscription page and the payment server use, so the admin
+                sees exactly what the buyer will be shown before saving. */}
+            {plans.length > 0 && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3">
+                <p className="text-xs font-semibold text-slate-700">What buyers will see</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">Resolved from the values above — same engine the subscription page and checkout use.</p>
+                <div className="mt-2 space-y-1">
+                  {plans.filter((p) => p.active).map((plan) => {
+                    const previewDoc = {
+                      id: editingFeature.key || "preview",
+                      included: editingFeature.included === true,
+                      pricePaise: toPaise(editingFeature.individualPrice ?? 0),
+                      monthlyPricePaise: editingFeature.monthlyPrice === "" || editingFeature.monthlyPrice === null || editingFeature.monthlyPrice === undefined ? null : toPaise(editingFeature.monthlyPrice),
+                      yearlyPricePaise: editingFeature.yearlyPrice === "" || editingFeature.yearlyPrice === null || editingFeature.yearlyPrice === undefined ? null : toPaise(editingFeature.yearlyPrice),
+                      planPricing: editingFeature.planPricing ?? {},
+                    };
+                    const monthly = resolveFeaturePrice(previewDoc, plan.id, "monthly");
+                    const yearly = resolveFeaturePrice(previewDoc, plan.id, "yearly");
+                    const fmt = (r: { pricePaise: number; included: boolean }) => (r.included || r.pricePaise === 0 ? "Free" : `₹${Math.round(r.pricePaise / 100).toLocaleString("en-IN")}`);
+                    return (
+                      <div key={plan.id} className="flex items-center justify-between rounded-lg bg-white px-2.5 py-1.5 text-[11px]">
+                        <span className="font-semibold text-slate-800">{plan.name}</span>
+                        <span className="text-slate-600">{fmt(monthly)}/mo · {fmt(yearly)}/yr</span>
                       </div>
                     );
                   })}

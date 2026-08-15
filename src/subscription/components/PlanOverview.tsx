@@ -15,15 +15,20 @@ import type {
   SubscriptionPlanDoc,
 } from "../utils/subscriptionCatalog";
 
+type FeatureWithResolvedPrice = SubscriptionFeatureDoc & {
+  resolvedPricePaise?: number;
+  resolvedIncluded?: boolean;
+};
+
 interface Props {
   plans: SubscriptionPlanDoc[];
-  features: SubscriptionFeatureDoc[];
+  features: FeatureWithResolvedPrice[];
   selectedPlanId: string | null;
   onChangePlan: (planId: string) => void;
   cycle: BillingCycle;
   onChangeCycle: (cycle: BillingCycle) => void;
-  selectedFeatureRecords: SubscriptionFeatureDoc[];
-  includedFeatureRecords: SubscriptionFeatureDoc[];
+  selectedFeatureRecords: FeatureWithResolvedPrice[];
+  includedFeatureRecords: FeatureWithResolvedPrice[];
   totalPaise: number;
 }
 
@@ -188,7 +193,9 @@ export default function PlanOverview({
                   <XIcon size={12} className="mt-0.5 shrink-0 text-amber-600" />
                   <div>
                     <p className="font-bold text-slate-900">{f.name}</p>
-                    <p className="text-slate-500">₹{(f.pricePaise / 100).toFixed(2)} added.</p>
+                    <p className="text-slate-500">
+                      ₹{(((typeof f.resolvedPricePaise === "number" ? f.resolvedPricePaise : f.pricePaise) || 0) / 100).toFixed(2)} added.
+                    </p>
                   </div>
                 </div>
               ))}

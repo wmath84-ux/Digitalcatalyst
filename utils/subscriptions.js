@@ -106,7 +106,12 @@ export const normaliseFeatureDoc = (raw, id) => {
     name: String(raw.name || "Feature").trim(),
     description: String(raw.description || "").trim(),
     icon: String(raw.icon || "sparkles").trim(),
-    pricePaise: toPaise(raw.price ?? 0),
+    // The current admin writes the rupee rate to `price`, but older docs
+    // stored it as `individualPrice` (rupees) or `pricePaise` (paise).
+    // Reading only `price` made every legacy feature resolve to ₹0 — the
+    // subscription page showed "Free" while the admin editor showed the
+    // real rate the owner had typed in.
+    pricePaise: cyclePaise(raw.price ?? raw.individualPrice, raw.pricePaise) ?? 0,
     // Cycle-aware base rates (null = fall back to the flat price).
     monthlyPricePaise: cyclePaise(raw.monthlyPrice, raw.monthlyPricePaise),
     yearlyPricePaise: cyclePaise(raw.yearlyPrice, raw.yearlyPricePaise),
