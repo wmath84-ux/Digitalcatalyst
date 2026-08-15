@@ -37,6 +37,7 @@ const read = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const cron = read("api/cron/subscription-renewals.ts");
 const workflow = read("ops/push-scheduler.workflow.yml");
+const liveWorkflow = read(".github/workflows/push-scheduler.yml");
 const vercelConfig = JSON.parse(read("vercel.json"));
 
 // 2026-08-13T04:30:00Z is exactly 10:00 IST (offset -330).
@@ -112,12 +113,27 @@ test("the foreground and server paths agree on the notification tag", () => {
   assert.match(cron, /`myday-\$\{item\.key\}`/);
 });
 
-test("the workflow template tells you it must be installed by hand", () => {
-  // The agent's GitHub App cannot commit workflow files, so this ships
-  // as a template. If the instructions are lost, the whole feature
-  // quietly falls back to once-a-day delivery.
-  assert.match(workflow, /NOT ACTIVE/);
-  assert.match(workflow, /\.github\/workflows\/push-scheduler\.yml/);
+test("a minute-level scheduler workflow is committed and active", () => {
+  // The live workflow must live under .github/workflows/ — that is the
+  // only location GitHub Actions schedules from. A template that only
+  // lived in ops/ meant reminders silently fell back to once-a-day.
+  assert.match(liveWorkflow, /name: Push scheduler/);
+  for (const source of [liveWorkflow, workflow]) {
+    assert.match(source, /workflow_dispatch/, "manual runs make this testable");
+    assert.match(source, /concurrency:/, "a slow run must not overlap the next tick");
+    assert.match(source, /Authorization: Bearer/);
+    assert.match(source, /\$\{\{ secrets\.CRON_SECRET \}\}/);
+    assert.match(source, /\$\{\{ secrets\.SCHEDULER_URL \}\}/);
+  }
+});
+
+test("the scheduler pings every minute for exact-time delivery", () => {
+  // Exact-time reminders need a one-minute tick (the endpoint's own
+  // lookback window absorbs jitter). Any coarser cadence makes a
+  // reminder late, so guard the cron expression against loosening.
+  for (const source of [liveWorkflow, workflow]) {
+    assert.match(source, /cron: "\* \* \* \* \*"/, "scheduler must run every minute");
+  }
 });
 
 test("a minute-level scheduler exists, because Vercel Hobby cron cannot do it", () => {
@@ -126,12 +142,6 @@ test("a minute-level scheduler exists, because Vercel Hobby cron cannot do it", 
   const schedule = vercelConfig.crons[0].schedule;
   assert.doesNotMatch(schedule, /^\*/, "a sub-daily Vercel cron breaks Hobby deployments");
   assert.equal(schedule.split(" ").length, 5);
-
-  // The real cadence comes from the repo's own workflow.
-  assert.match(workflow, /cron: "\*\/5 \* \* \* \*"/);
-  assert.match(workflow, /Authorization: Bearer/);
-  assert.match(workflow, /workflow_dispatch/, "manual runs make this testable");
-  assert.match(workflow, /concurrency:/, "a slow run must not overlap the next tick");
 });
 
 test("the scheduler endpoint stays authenticated", () => {

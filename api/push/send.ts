@@ -19,7 +19,7 @@
 // email whose users/{uid}.role is "admin"). Previously this endpoint was
 // unauthenticated, which let anyone broadcast arbitrary pushes.
 
-import * as webpush from "web-push";
+import { setVapidDetails, sendNotification } from "../_lib/webpush.js";
 import { Timestamp } from "firebase-admin/firestore";
 import {
   adminDb,
@@ -188,7 +188,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!publicKey || !privateKey) {
       return res.status(500).json({ ok: false, error: 'Web Push VAPID keys are not configured.' });
     }
-    webpush.setVapidDetails(
+    setVapidDetails(
       process.env.WEB_PUSH_SUBJECT || 'mailto:admin@eduvora.app',
       publicKey,
       privateKey,
@@ -237,7 +237,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const results: Array<{ endpoint: string; status: string; error?: string }> = [];
     for (const subscription of subscriptions) {
       try {
-        await webpush.sendNotification(subscription, payloadString, { TTL: 60 * 60 * 24 });
+        await sendNotification(subscription, payloadString, { TTL: 60 * 60 * 24 });
         results.push({ endpoint: subscription.endpoint, status: 'sent' });
       } catch (error) {
         const statusCode = typeof (error as { statusCode?: number }).statusCode === 'number'

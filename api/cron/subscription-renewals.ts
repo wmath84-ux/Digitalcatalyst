@@ -20,7 +20,7 @@
 // `GET /api/cron/subscription-renewals` with `Authorization: Bearer $CRON_SECRET`.
 // Every job is deduplicated, so frequent pings are safe.
 
-import * as webpush from "web-push";
+import { setVapidDetails, sendNotification } from "../_lib/webpush.js";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from "../_lib/firebaseAdmin.js";
 import { getRenewalNotification, getRenewalReminder } from "../../utils/subscriptionRenewal.js";
@@ -43,7 +43,7 @@ const vapidConfigured = () => {
   const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY;
   const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY;
   if (!publicKey || !privateKey) return false;
-  webpush.setVapidDetails(process.env.WEB_PUSH_SUBJECT || "mailto:admin@eduvora.app", publicKey, privateKey);
+  setVapidDetails(process.env.WEB_PUSH_SUBJECT || "mailto:admin@eduvora.app", publicKey, privateKey);
   return true;
 };
 
@@ -51,7 +51,7 @@ async function sendToSubscriptionDoc(item: { ref: { delete: () => Promise<unknow
   const data = item.data() || {};
   if (!data.endpoint || !data.p256dh || !data.auth) return 0;
   try {
-    await webpush.sendNotification(
+    await sendNotification(
       { endpoint: String(data.endpoint), keys: { p256dh: String(data.p256dh), auth: String(data.auth) } },
       payloadString,
       { TTL: 86400 },

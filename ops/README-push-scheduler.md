@@ -12,7 +12,7 @@ running. The pieces:
 | --- | --- |
 | Due-item detection | `utils/pushScheduler.js` → `collectDueMyDayItems` |
 | Scheduler endpoint | `api/cron/subscription-renewals.ts` (job 2) |
-| Push delivery | `web-push` → `public/sw.js` `push` handler |
+| Push delivery | `api/_lib/webpush.ts` (CJS/ESM shim over `web-push`) → `public/sw.js` `push` handler |
 | Foreground safety net | `src/main.tsx` (while the app is open) |
 | Per-item, per-day dedupe | `notificationLog` on `users/{uid}/myDay/current` |
 
@@ -21,31 +21,23 @@ The user's device timezone is written to the My Day document on every save, so
 
 ---
 
-## ⚠️ One manual step is required
+## Minute pinger (required for exact-time delivery)
 
 **Nothing fires on time until an external pinger calls the scheduler.**
 
 Vercel's Hobby plan caps cron at **one run per day** — a sub-daily expression
 in `vercel.json` fails at deploy time, and even the daily run can land
 anywhere inside its hour. The daily cron in `vercel.json` is only a fallback
-sweep. Minute-accurate reminders need something calling the endpoint every few
-minutes.
+sweep. Minute-accurate reminders need something calling the endpoint every
+minute.
 
-### Option A — GitHub Actions (free, lives in this repo)
+### Option A — GitHub Actions (free, lives in this repo) — already installed
 
-The agent's GitHub App is not permitted to commit workflow files, so install
-the template yourself:
+The live workflow is `.github/workflows/push-scheduler.yml` and runs every
+minute (`cron: "* * * * *"`). `ops/push-scheduler.workflow.yml` is the kept-in-sync template.
 
-```bash
-mkdir -p .github/workflows
-cp ops/push-scheduler.workflow.yml .github/workflows/push-scheduler.yml
-git add .github/workflows/push-scheduler.yml
-git commit -m "Add push scheduler workflow"
-git push
-```
-
-Then add two repository secrets under **Settings → Secrets and variables →
-Actions**:
+Only two repository secrets are needed under **Settings → Secrets and
+variables → Actions** (set them once):
 
 | Secret | Value |
 | --- | --- |
@@ -58,7 +50,7 @@ run returns a JSON summary with a `myDay` block.
 ### Option B — any external cron service
 
 cron-job.org, UptimeRobot, Runhooks, or your own box. Same endpoint, every
-5 minutes:
+minute (the closer to one minute, the closer to exact-time delivery):
 
 ```
 GET https://<your-domain>/api/cron/subscription-renewals
