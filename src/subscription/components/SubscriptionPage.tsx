@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
-import { db } from "../../../firebase";
+import { auth, db } from "../../../firebase";
 import { ChevronLeft, HelpCircle, LoaderCircle } from "lucide-react";
 import StackedCards from "./StackedCards";
 import PlanOverview from "./PlanOverview";
@@ -61,13 +61,20 @@ type SubscriptionRecordLike = {
   features?: unknown;
   includedProductIds?: unknown;
   expiresAt?: unknown;
+  orderId?: unknown;
   renewalReminderOptOut?: boolean;
 };
+
+const productHasId = (
+  product: { id: string; documentId?: string },
+  ids: ReadonlySet<string>,
+) => ids.has(String(product.id)) || Boolean(product.documentId && ids.has(String(product.documentId)));
 
 export default function SubscriptionPage() {
   const { user } = useAuth();
   const { products: availableProducts } = useCatalog();
   const renewalLoadedRef = useRef(false);
+  const repairedOrderIdsRef = useRef<Set<string>>(new Set());
 
   // The buyer's live subscription record (null when never subscribed).
   const [activeSubscription, setActiveSubscription] = useState<SubscriptionRecordLike | null>(null);
@@ -167,6 +174,24 @@ export default function SubscriptionPage() {
     }, () => setActiveSubscription(null));
   }, [user]);
 
+  // Self-heal purchases made before product ids became first-class quote
+  // metadata. A verified intent can be safely replayed by its owner; the server
+  // merges any missing product ids without extending the membership period.
+  useEffect(() => {
+    const orderId = String(activeSubscription?.orderId || "").trim();
+    if (!user || activeSubscription?.status !== "active" || !orderId || repairedOrderIdsRef.current.has(orderId)) return;
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser || firebaseUser.uid !== user.id) return;
+    repairedOrderIdsRef.current.add(orderId);
+    void firebaseUser.getIdToken().then((token) => fetch("/api/razorpay/verify-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ orderId }),
+    })).then((response) => {
+      if (!response.ok) repairedOrderIdsRef.current.delete(orderId);
+    }).catch(() => repairedOrderIdsRef.current.delete(orderId));
+  }, [activeSubscription, user]);
+
   // Renewal / change-plan checkout restores the user's current plan, cycle,
   // features and bonus products so they review the exact package before
   // paying again.
@@ -180,8 +205,12 @@ export default function SubscriptionPage() {
       if (data.cycle === "monthly" || data.cycle === "yearly") setCycle(data.cycle);
       const activeFeatureIds = new Set(catalog.features.map((feature) => feature.id));
       setSelectedFeatureIds((Array.isArray(data.features) ? data.features.map(String) : []).filter((id) => activeFeatureIds.has(id)));
-      const liveProductIds = new Set(availableProducts.map((product) => product.id));
-      setSelectedCourseIds((Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : []).filter((id) => liveProductIds.has(id)));
+      const storedProductIds = new Set(Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : []);
+      setSelectedCourseIds(
+        availableProducts
+          .filter((product) => productHasId(product, storedProductIds))
+          .map((product) => String(product.documentId || product.id)),
+      );
     });
   }, [availableProducts, catalog, user]);
 
@@ -256,7 +285,10 @@ export default function SubscriptionPage() {
     () => sumSelectedFeaturePaise(rawFeatures, selectedFeatureIds, selectedPlanId, cycle),
     [rawFeatures, selectedFeatureIds, selectedPlanId, cycle],
   );
-  const selectedProductRecords = useMemo(() => availableProducts.filter((product) => selectedCourseIds.includes(product.id)), [availableProducts, selectedCourseIds]);
+  const selectedProductRecords = useMemo(() => {
+    const selected = new Set(selectedCourseIds);
+    return availableProducts.filter((product) => productHasId(product, selected));
+  }, [availableProducts, selectedCourseIds]);
   const productsTotalPaise = useMemo(() => selectedProductRecords.reduce((sum, product) => sum + Math.max(0, Math.round(product.price * 100)), 0), [selectedProductRecords]);
   const subtotalPaise = selectedPlanPricePaise + featuresTotalPaise + productsTotalPaise;
   const couponDiscountPaise = appliedReferral?.discountPaise || appliedCoupon?.discountPaise || 0;
@@ -304,7 +336,7 @@ export default function SubscriptionPage() {
         ? activeSubscription.includedProductIds.map(String)
         : [],
     );
-    return availableProducts.filter((product) => ids.has(product.id)).map((product) => product.title);
+    return availableProducts.filter((product) => productHasId(product, ids)).map((product) => product.title);
   }, [activeSubscription, availableProducts]);
 
   // ---------- Handlers ----------

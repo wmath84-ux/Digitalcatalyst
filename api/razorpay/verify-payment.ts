@@ -155,6 +155,7 @@ interface PaymentIntent {
   subscriptionCycle?: "monthly" | "yearly" | null;
   subscriptionExpiresAt?: number | null;
   subscriptionFeatureIds?: string[] | null;
+  subscriptionProductIds?: string[] | null;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -178,9 +179,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!orderId) {
       return res.status(400).json({ ok: false, verified: false, error: "Missing Razorpay order id." });
-    }
-    if (!isFree && (!paymentId || !signature)) {
-      return res.status(400).json({ ok: false, verified: false, error: "Missing payment verification fields." });
     }
 
     const db = adminDb();
@@ -251,6 +249,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           subscriptionCycle: intent.subscriptionCycle || null,
           subscriptionExpiresAt: intent.subscriptionExpiresAt || null,
           subscriptionFeatureIds: Array.isArray(intent.subscriptionFeatureIds) ? intent.subscriptionFeatureIds : null,
+          subscriptionProductIds: Array.isArray(intent.subscriptionProductIds) ? intent.subscriptionProductIds : null,
         };
 
     // Optional client-supplied quoteId hint must match the intent.
@@ -324,6 +323,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
           : undefined,
       });
+    }
+
+    // A verified intent may be replayed by the signed-in owner with only its
+    // order id, allowing older partial subscription grants to self-repair.
+    // Unverified paid intents still require the full Razorpay proof below.
+    if (!isFree && (!paymentId || !signature)) {
+      return res.status(400).json({ ok: false, verified: false, error: "Missing payment verification fields." });
     }
 
     // -----------------------------------------------------------------

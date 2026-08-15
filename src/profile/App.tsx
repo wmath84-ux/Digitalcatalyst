@@ -73,7 +73,12 @@ export default function ProfileApp() {
     return () => { unsubscribeProfile(); unsubscribeSubscription(); };
   }, [user]);
 
-  const purchasedProducts = useMemo(() => products.filter((product) => purchasedIds.has(product.id)), [products, purchasedIds]);
+  const purchasedProducts = useMemo(() => {
+    const owned = new Set([...purchasedIds, ...canonicalOwnedIds]);
+    return products.filter((product) =>
+      owned.has(product.id) || Boolean(product.documentId && owned.has(product.documentId)),
+    );
+  }, [products, purchasedIds, canonicalOwnedIds]);
   const initials = user?.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
   const memberSince = user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-IN", { month: "long", year: "numeric" }) : "Recently";
   // Purchased count used by both the library stat and the footer badge.

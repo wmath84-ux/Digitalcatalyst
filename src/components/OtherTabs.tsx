@@ -14,7 +14,9 @@ export function PurchasesTab({
   const { ownedProductIds: canonicalOwnedIds, signedIn } = useOwnedProducts();
   const ownedSet = new Set<string>(signedIn ? canonicalOwnedIds : []);
   for (const id of purchased) ownedSet.add(id);
-  const items: Product[] = products.filter((product) => ownedSet.has(product.id));
+  const items: Product[] = products.filter((product) =>
+    ownedSet.has(product.id) || Boolean(product.documentId && ownedSet.has(product.documentId)),
+  );
 
   if (items.length === 0) {
     return (

@@ -342,12 +342,13 @@ export const useOwnedProducts = (): {
 } => {
   const { user } = useAuth();
   const uid = user?.id || null;
-  const [ownedProductIds, setOwnedProductIds] = useState<string[]>([]);
+  const [entitlementProductIds, setEntitlementProductIds] = useState<string[]>([]);
+  const [subscriptionProductIds, setSubscriptionProductIds] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(Boolean(uid));
 
   useEffect(() => {
     if (!uid) {
-      setOwnedProductIds([]);
+      setEntitlementProductIds([]);
       setLoading(false);
       return undefined;
     }
@@ -364,13 +365,40 @@ export const useOwnedProducts = (): {
             ids.add(String(data.productId));
           }
         });
-        setOwnedProductIds(Array.from(ids));
+        setEntitlementProductIds(Array.from(ids));
         setLoading(false);
       },
       () => setLoading(false),
     );
     return () => unsubscribe();
   }, [uid]);
+
+  // Subscription products are time-limited ownership, but they must still be
+  // visible in the learner's library and open without showing another buy
+  // button while the membership is active.
+  useEffect(() => {
+    if (!uid) {
+      setSubscriptionProductIds([]);
+      return undefined;
+    }
+    return onSnapshot(doc(db, "users", uid, "subscription", "current"), (snapshot) => {
+      const data = snapshot.data() || {};
+      const record: SubscriptionRecordShape = {
+        status: data.status ? String(data.status) : undefined,
+        expiresAt: timestampMillis(data.expiresAt),
+      };
+      setSubscriptionProductIds(
+        snapshot.exists() && isSubscriptionRecordActive(record) && Array.isArray(data.includedProductIds)
+          ? data.includedProductIds.map(String)
+          : [],
+      );
+    }, () => setSubscriptionProductIds([]));
+  }, [uid]);
+
+  const ownedProductIds = useMemo(
+    () => Array.from(new Set([...entitlementProductIds, ...subscriptionProductIds])),
+    [entitlementProductIds, subscriptionProductIds],
+  );
 
   return { ownedProductIds, loading, signedIn: Boolean(uid) };
 };

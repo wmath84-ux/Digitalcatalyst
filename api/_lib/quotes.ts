@@ -375,6 +375,7 @@ export const handleCreateQuote = async (req: VercelRequest, res: VercelResponse)
     // is the only place that touches Firestore.
     let subscriptionLineItems: unknown[] | null = null;
     let subscriptionExpiresAt: number | null = null;
+    let subscriptionProductIds: string[] | null = null;
     if (
       selection.purchaseKind === "subscription" ||
       selection.purchaseKind === "subscription_features"
@@ -390,6 +391,7 @@ export const handleCreateQuote = async (req: VercelRequest, res: VercelResponse)
       }
       subscriptionLineItems = subContext.lineItems as unknown[];
       subscriptionExpiresAt = subContext.expiresAt;
+      subscriptionProductIds = subContext.selectedProductIds;
     }
 
     const out = buildQuote({
@@ -406,6 +408,7 @@ export const handleCreateQuote = async (req: VercelRequest, res: VercelResponse)
       productCategories,
       subscriptionLineItems,
       subscriptionExpiresAt,
+      subscriptionProductIds,
     });
     if (!out.ok) {
       // When the engine refused because of a bad coupon, return a
