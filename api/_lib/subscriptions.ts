@@ -137,14 +137,17 @@ export const loadActiveFeatures = async (
   options: { db?: Firestore } = {},
 ): Promise<SubscriptionFeatureDoc[]> => {
   const db = options.db ?? adminDb();
-  const snap = await db.collection(FEATURES_COLLECTION).where("active", "==", true).get();
+  // Read the complete collection instead of querying only active rows. This
+  // distinction matters: deleting/deactivating a feature in Admin must remove
+  // its subscription gate, not silently recreate the old My Day feature.
+  const snap = await db.collection(FEATURES_COLLECTION).get();
   const features: SubscriptionFeatureDoc[] = [];
   for (const doc of snap.docs) {
     const feature = normaliseFeatureDoc(doc.data() || {}, doc.id);
-    if (feature && feature.active && feature.id === "my-day") features.push(feature);
-  }
-  if (!features.some((feature) => feature.id === "my-day")) {
-    features.push({ id: "my-day", name: "My Day cloud saving", description: "Securely save and sync tasks, schedules, reminders and notes.", icon: "calendar", pricePaise: 14900, included: false, active: true, badge: "PAID", sortOrder: 0 });
+    // The admin catalog is the source of truth: expose every active feature.
+    // The legacy my-day rule is now evaluated from this same catalog entry
+    // (feature.id === "my-day"); it is no longer forced into the response.
+    if (feature && feature.active) features.push(feature);
   }
   features.sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
   return features;

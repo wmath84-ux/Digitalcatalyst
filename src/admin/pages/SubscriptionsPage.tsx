@@ -23,11 +23,15 @@ type FeatureRow = {
   name: string;
   description: string | null;
   individualPrice: string | null;
+  icon: string | null;
+  included: boolean;
+  badge: string | null;
+  sortOrder: number;
   active: boolean;
 };
 
 const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }], accessTier: "basic", cta: "Subscribe", featured: false, active: true };
-const EMPTY_FEATURE: Partial<FeatureRow> = { id: "my-day", key: "my-day", name: "My Day cloud saving", description: "Securely save and sync tasks, schedules, reminders and notes.", individualPrice: "149", active: true };
+const EMPTY_FEATURE: Partial<FeatureRow> = { key: "", name: "", description: "", individualPrice: "0", icon: "sparkles", included: false, badge: "", sortOrder: 0, active: true };
 
 export default function SubscriptionsPage() {
   const [tab, setTab] = useState("plans");
@@ -49,7 +53,10 @@ export default function SubscriptionsPage() {
         adminFetch<{ settings: { enabled?: boolean; discountPaise?: number; maxUsesPerReferrer?: number | null } }>("/api/admin/subscriptions/referrals"),
       ]);
       setPlans(p.plans);
-      setFeatures(f.features.filter((feature) => feature.id === "my-day"));
+      // Keep every active/inactive catalog feature visible here. The public
+      // subscription page is driven by this same collection, so hiding all
+      // but My Day made the other feature cards impossible to configure.
+      setFeatures(f.features);
       setReferralSettings({ enabled: r.settings.enabled !== false, discountPaise: Number(r.settings.discountPaise ?? 25000), maxUsesPerReferrer: r.settings.maxUsesPerReferrer ?? null });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load subscriptions.");
@@ -149,8 +156,8 @@ export default function SubscriptionsPage() {
       {tab === "features" && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">{features.length} feature(s)</p>
-            <PrimaryButton onClick={() => setEditingFeature(EMPTY_FEATURE)}>Configure My Day</PrimaryButton>
+            <p className="text-xs text-slate-500">{features.length} feature(s) · Configure My Day or any feature · Delete/deactivate to remove its subscription gate</p>
+            <PrimaryButton onClick={() => setEditingFeature({ ...EMPTY_FEATURE })}>+ Add feature</PrimaryButton>
           </div>
           {features.length === 0 ? <EmptyState title="No features yet" /> : (
             <div className="space-y-2">
@@ -160,7 +167,7 @@ export default function SubscriptionsPage() {
                     <span className="text-sm font-semibold text-slate-900">{f.name}</span>
                     <Pill tone={f.active ? "success" : "default"}>{f.active ? "active" : "inactive"}</Pill>
                   </div>
-                  <p className="mt-0.5 text-xs text-slate-500">{f.key} · ₹{f.individualPrice}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{f.key} · {f.included ? "Included in plan" : `₹${f.individualPrice} per billing cycle`} {f.badge ? `· ${f.badge}` : ""}</p>
                   <div className="mt-2 flex gap-2">
                     <SecondaryButton className="h-9 flex-1 text-xs" onClick={() => setEditingFeature(f)}>Edit</SecondaryButton>
                     <DangerButton className="h-9 flex-1 text-xs" onClick={() => removeFeature(f)}>Delete</DangerButton>
@@ -229,13 +236,24 @@ export default function SubscriptionsPage() {
       <Sheet open={!!editingFeature} onClose={() => setEditingFeature(null)} title={editingFeature?.id ? "Edit feature" : "Add feature"} footer={<PrimaryButton className="w-full" loading={saving} onClick={saveFeature}>Save feature</PrimaryButton>}>
         {editingFeature && (
           <div className="space-y-3">
-            <Field label="Feature key" required hint="Fixed system entitlement"><input className={inputClass} value="my-day" disabled /></Field>
-            <Field label="Name" required><input className={inputClass} value={editingFeature.name ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, name: e.target.value })} /></Field>
-            <Field label="Description"><textarea className={textareaClass} value={editingFeature.description ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, description: e.target.value })} /></Field>
-            <Field label="Individual price (₹)"><input className={inputClass} type="number" value={editingFeature.individualPrice ?? "0"} onChange={(e) => setEditingFeature({ ...editingFeature, individualPrice: e.target.value })} /></Field>
+            <Field label="Feature key" required hint="Unique ID used by the subscription catalog"><input className={inputClass} placeholder="for example: ai-mentor" value={editingFeature.key ?? ""} disabled={!!editingFeature.id} onChange={(e) => setEditingFeature({ ...editingFeature, key: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "-") })} /></Field>
+            <Field label="Name" required><input className={inputClass} placeholder="Feature name shown to customers" value={editingFeature.name ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, name: e.target.value })} /></Field>
+            <Field label="Description"><textarea className={textareaClass} placeholder="Explain what this feature includes" value={editingFeature.description ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, description: e.target.value })} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Individual price (₹) per billing cycle" hint="Set 0 only when the feature is included/free"><input className={inputClass} type="number" min="0" value={editingFeature.individualPrice ?? "0"} onChange={(e) => setEditingFeature({ ...editingFeature, individualPrice: e.target.value })} /></Field>
+              <Field label="Icon key" hint="calendar, rocket, code, users…"><input className={inputClass} value={editingFeature.icon ?? "sparkles"} onChange={(e) => setEditingFeature({ ...editingFeature, icon: e.target.value })} /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Badge"><input className={inputClass} placeholder="POPULAR" value={editingFeature.badge ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, badge: e.target.value })} /></Field>
+              <Field label="Display order"><input className={inputClass} type="number" value={editingFeature.sortOrder ?? 0} onChange={(e) => setEditingFeature({ ...editingFeature, sortOrder: Number(e.target.value || 0) })} /></Field>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" className="h-5 w-5" checked={!!editingFeature.included} onChange={(e) => setEditingFeature({ ...editingFeature, included: e.target.checked, individualPrice: e.target.checked ? "0" : (editingFeature.individualPrice || "0") })} />
+              Included / free feature (no add-on charge)
+            </label>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" className="h-5 w-5" checked={!!editingFeature.active} onChange={(e) => setEditingFeature({ ...editingFeature, active: e.target.checked })} />
-              Active
+              Visible and selectable on subscription page
             </label>
           </div>
         )}
