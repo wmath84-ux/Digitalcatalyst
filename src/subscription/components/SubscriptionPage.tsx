@@ -30,6 +30,7 @@ import { FALLBACK_SUBSCRIPTION_CATALOG } from "../data/fallbackCatalog";
 import { useAuth } from "../../context/AuthContext";
 import { useCatalog } from "../../context/CatalogContext";
 import { playSfxError, playSfxSuccess } from "../../utils/sfx";
+import { shouldShowCouponInput } from "../../../utils/couponVisibility";
 import {
   startCheckout,
   type SubscriptionCatalog,
@@ -205,6 +206,14 @@ export default function SubscriptionPage() {
   const totalPaise = Math.max(subtotalPaise - couponDiscountPaise, minPayablePaise);
   const totalRupees = (totalPaise / 100).toFixed(2);
 
+  // A coupon can only reduce money that is actually charged. When the
+  // selection is free (no paid features / products and no minimum
+  // payable), the coupon field is not rendered at all.
+  const canShowCouponInput = shouldShowCouponInput({
+    purchaseKind: "subscription",
+    payablePaise: Math.max(subtotalPaise, minPayablePaise),
+  });
+
   // ---------- Handlers ----------
   const handleApplyCoupon = useCallback(
     async (rawCode: string): Promise<PromoResult> => {
@@ -262,6 +271,17 @@ export default function SubscriptionPage() {
     setCouponErrorMessage(null);
     setCouponStatus("idle");
   }, []);
+
+  // If the selection drops to ₹0 while a coupon was applied, discard
+  // the code so nothing stale is carried into checkout.
+  useEffect(() => {
+    if (!canShowCouponInput && appliedCoupon) {
+      setCouponInput("");
+      setAppliedCoupon(null);
+      setCouponErrorMessage(null);
+      setCouponStatus("idle");
+    }
+  }, [canShowCouponInput, appliedCoupon]);
 
   const handleApplyReferral = useCallback(async (rawCode: string): Promise<PromoResult> => {
     const code = rawCode.trim().toUpperCase();
@@ -427,19 +447,22 @@ export default function SubscriptionPage() {
           onOpen={() => setFeatureModalOpen(true)}
         />
 
-        {/* Coupon section — server-validated via the Part 7 engine. */}
+        {/* Coupon section — server-validated via the Part 7 engine.
+            The coupon field is hidden when nothing is payable. */}
         <div className="space-y-3 px-5 pt-5">
-          <PromoCodeInput
-            kind="coupon"
-            label="Have a coupon? Enter the code below."
-            placeholder="Enter coupon code"
-            appliedCode={appliedCoupon?.code ?? null}
-            appliedMessage={appliedCoupon?.label ?? null}
-            errorMessage={couponStatus === "error" ? couponErrorMessage : null}
-            onApply={handleApplyCoupon}
-            onRemove={handleRemoveCoupon}
-            disabled={isSubmitting}
-          />
+          {canShowCouponInput ? (
+            <PromoCodeInput
+              kind="coupon"
+              label="Have a coupon? Enter the code below."
+              placeholder="Enter coupon code"
+              appliedCode={appliedCoupon?.code ?? null}
+              appliedMessage={appliedCoupon?.label ?? null}
+              errorMessage={couponStatus === "error" ? couponErrorMessage : null}
+              onApply={handleApplyCoupon}
+              onRemove={handleRemoveCoupon}
+              disabled={isSubmitting}
+            />
+          ) : null}
           <PromoCodeInput
             kind="referral"
             label="Have a referral code? Get ₹250 off the final price."
