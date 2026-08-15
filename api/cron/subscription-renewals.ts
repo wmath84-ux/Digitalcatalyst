@@ -4,8 +4,10 @@
 // Vercel Hobby plan allows only 12 functions and the daily cron entry already
 // points here). One invocation runs three independent, idempotent jobs:
 //
-//   1. Subscription renewal reminders (the original job) — 7d/3d/1d/due/expired
-//      stages, in-app notification + optional web push per user.
+//   1. Subscription renewal reminders (the original job) — 7d/3d/1d/due heads-up
+//      before expiry, then one `expired-<n>` stage per morning for 10 days after
+//      expiry. In-app notification + optional web push per user. The renew
+//      button (client-side) only activates on those expired stages.
 //   2. My Day activity reminders — tasks, schedule events and reminders fire a
 //      push at the exact user-set local time (device timezone is stored on the
 //      myDay document). Works when the app is closed: this is server push.
@@ -21,7 +23,7 @@
 import * as webpush from "web-push";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from "../_lib/firebaseAdmin.js";
-import { getRenewalReminder } from "../../utils/subscriptionRenewal.js";
+import { getRenewalNotification, getRenewalReminder } from "../../utils/subscriptionRenewal.js";
 import {
   buildProductInventoryEntry,
   collectDueMyDayItems,
@@ -106,17 +108,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const uid = document.ref.parent.parent?.id;
         if (!uid) continue;
         const data = document.data() || {};
-        const reminder = getRenewalReminder(data, now);
+
+        // The lifecycle stage drives the expired flag and stays true even
+        // after the 10-day notification window closes, so a missed run can
+        // never leave an expired doc looking active.
+        const lifecycle = getRenewalReminder(data, now);
+        if (!lifecycle) continue;
+        if (lifecycle.expired && data.status !== "expired") {
+          await document.ref.set({ status: "expired", expiredAt: Timestamp.fromMillis(now), updatedAt: Timestamp.fromMillis(now) }, { merge: true });
+        }
+
+        // The notification itself only fires inside the 10-morning window.
+        const reminder = getRenewalNotification(data, now);
         if (!reminder) continue;
+
         const notificationRef = db.collection("users").doc(uid).collection("notifications").doc(reminder.id);
         const existing = await notificationRef.get();
         if (existing.exists) continue;
         await notificationRef.set({ ...reminder, category: "subscription", read: false, source: "system", createdAt: Timestamp.fromMillis(now) });
         created += 1;
-        if (reminder.stage === "expired" && data.status !== "expired") {
-          await document.ref.set({ status: "expired", expiredAt: Timestamp.fromMillis(now), updatedAt: Timestamp.fromMillis(now) }, { merge: true });
-        }
-        pushed += await sendPush(db, uid, reminder.title, reminder.body, { tag: "subscription-renewal", url: "/#/subscription" });
+        // Per-day tag so each morning's post-expiry notice stands alone in the
+        // tray instead of collapsing into the previous day's notification.
+        pushed += await sendPush(db, uid, reminder.title, reminder.body, { tag: `subscription-renewal:${reminder.stage}`, url: "/#/subscription" });
       }
       summary.renewals = { scanned: snapshot.size, created, pushed };
     }

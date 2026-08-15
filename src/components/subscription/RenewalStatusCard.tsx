@@ -96,14 +96,16 @@ export default function RenewalStatusCard({
       <p className="mt-3 text-xs leading-5 text-slate-600">{view.body}</p>
 
       <div className="mt-3 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onRenew}
-          data-renewal-card-cta
-          className={`flex-1 rounded-2xl px-4 py-2.5 text-sm font-black text-white shadow-sm transition active:scale-[0.98] ${tone.cta}`}
-        >
-          {view.cta}
-        </button>
+        {view.canRenew ? (
+          <button
+            type="button"
+            onClick={onRenew}
+            data-renewal-card-cta
+            className={`flex-1 rounded-2xl px-4 py-2.5 text-sm font-black text-white shadow-sm transition active:scale-[0.98] ${tone.cta}`}
+          >
+            {view.cta}
+          </button>
+        ) : null}
         {onToggleReminders ? (
           <button
             type="button"

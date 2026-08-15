@@ -4,6 +4,7 @@ import fs from "node:fs";
 
 const cron = fs.readFileSync("api/cron/subscription-renewals.ts", "utf8");
 const subscriptions = fs.readFileSync("api/_lib/subscriptions.ts", "utf8");
+const renewal = fs.readFileSync("utils/subscriptionRenewal.js", "utf8");
 const notifications = fs.readFileSync("src/components/NotificationsPage.tsx", "utf8");
 const profile = fs.readFileSync("src/profile/App.tsx", "utf8");
 const page = fs.readFileSync("src/subscription/components/SubscriptionPage.tsx", "utf8");
@@ -15,7 +16,19 @@ test("daily scheduler is authenticated and deduplicates notifications", () => {
   assert.match(cron, /CRON_SECRET/);
   assert.match(cron, /existing\.exists/);
   assert.match(cron, /collectionGroup\("subscription"\)/);
-  assert.deepEqual(vercel.crons[0], { path: "/api/cron/subscription-renewals", schedule: "30 3 * * *" });
+  assert.deepEqual(vercel.crons[0], { path: "/api/cron/subscription-renewals", schedule: "30 0 * * *" });
+});
+
+test("post-expiry reminders run every morning for ten days, then stop", () => {
+  assert.match(renewal, /POST_EXPIRY_REMINDER_DAYS = 10/);
+  assert.match(renewal, /expired-\$\{dayNumber\}/);
+  // The scheduler derives notifications from the 10-day window, but keeps the
+  // lifecycle stage so the expired flag survives a missed run.
+  assert.match(cron, /getRenewalNotification/);
+  assert.match(cron, /getRenewalReminder/);
+  assert.match(cron, /lifecycle\.expired/);
+  // Each morning gets its own stage, so the per-day push tag stays distinct.
+  assert.match(cron, /subscription-renewal:\$\{reminder\.stage\}/);
 });
 
 test("scheduler writes in-app notification and attempts optional push", () => {

@@ -3,12 +3,17 @@
 // Presentation layer for subscription expiry / renewal messaging.
 //
 // `utils/subscriptionRenewal.js` decides WHICH reminder stage a
-// subscription is in (7d / 3d / 1d / due / expired). This module
-// decides HOW that stage is presented: urgency, tone tokens, headline,
-// supporting copy, and the call-to-action. Keeping it pure and
-// separate means the in-app banner, the notification row, the profile
-// card and the sandbox preview all render the exact same words for a
-// given state — there is a single source of truth for the copy.
+// subscription is in (7d / 3d / 1d / due, then one `expired-<n>` stage per
+// morning for the 10-day post-expiry window). This module decides HOW that
+// stage is presented: urgency, tone tokens, headline, supporting copy, and
+// the call-to-action. Keeping it pure and separate means the in-app banner,
+// the notification row, the profile card and the sandbox preview all render
+// the exact same words for a given state — there is a single source of truth
+// for the copy.
+//
+// The renew button only becomes active once the subscription has expired
+// (`canRenew`). Before that, the reminder is informational: it tells the
+// member when access ends without inviting a premature renewal.
 //
 // No React, no Firestore: the Node test runner imports this directly.
 
@@ -17,9 +22,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /**
  * Visual + editorial treatment per reminder stage.
  *
- *   urgency — 0 calm … 3 critical. Drives sort order and whether the
- *             banner is dismissible.
- *   tone    — semantic colour key the React components map to Tailwind.
+ *   urgency    — 0 calm … 3 critical. Drives sort order and whether the
+ *                banner is dismissible.
+ *   tone       — semantic colour key the React components map to Tailwind.
+ *   canRenew   — whether the renew call-to-action is active for this stage.
+ *                Only true once the subscription has expired.
  */
 export const RENEWAL_STAGE_PRESENTATION = {
   d7: {
@@ -30,6 +37,7 @@ export const RENEWAL_STAGE_PRESENTATION = {
     headline: "Your subscription renews in a week",
     cta: "Review renewal",
     dismissible: true,
+    canRenew: false,
   },
   d3: {
     urgency: 2,
@@ -39,6 +47,7 @@ export const RENEWAL_STAGE_PRESENTATION = {
     headline: "Only a few days of access left",
     cta: "Renew now",
     dismissible: true,
+    canRenew: false,
   },
   d1: {
     urgency: 3,
@@ -48,6 +57,7 @@ export const RENEWAL_STAGE_PRESENTATION = {
     headline: "Your subscription expires tomorrow",
     cta: "Renew now",
     dismissible: true,
+    canRenew: false,
   },
   due: {
     urgency: 3,
@@ -57,6 +67,7 @@ export const RENEWAL_STAGE_PRESENTATION = {
     headline: "Today is the last day of your access",
     cta: "Renew today",
     dismissible: false,
+    canRenew: false,
   },
   expired: {
     urgency: 3,
@@ -66,6 +77,7 @@ export const RENEWAL_STAGE_PRESENTATION = {
     headline: "Your subscription has expired",
     cta: "Reactivate access",
     dismissible: false,
+    canRenew: true,
   },
 };
 
@@ -90,12 +102,19 @@ export const daysUntil = (expiresAt, now = Date.now()) => {
 
 /** Human phrase for the remaining window. */
 export const formatRemaining = (expiresAt, now = Date.now()) => {
-  const days = daysUntil(expiresAt, now);
-  if (days > 1) return `${days} days left`;
-  if (days === 1) return "1 day left";
-  if (days === 0) return "Expires today";
-  if (days === -1) return "Expired yesterday";
-  return `Expired ${Math.abs(days)} days ago`;
+  const diff = toMillis(expiresAt) - now;
+  if (diff >= 0) {
+    const days = daysUntil(expiresAt, now);
+    if (days > 1) return `${days} days left`;
+    if (days === 1) return "1 day left";
+    return "Expires today";
+  }
+  // Expired: a sub-day expiry reads as "today", not "yesterday", so the
+  // first morning-after notice is accurate.
+  const hours = Math.abs(diff) / (60 * 60 * 1000);
+  if (hours < 24) return "Expired today";
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "Expired yesterday" : `Expired ${days} days ago`;
 };
 
 /** Locale date string used across every renewal surface. */
@@ -115,13 +134,17 @@ export const formatExpiryDate = (expiresAt) => {
 export const buildRenewalView = (reminder, options = {}) => {
   if (!reminder || typeof reminder !== "object") return null;
   const stage = String(reminder.stage || "");
-  const presentation = RENEWAL_STAGE_PRESENTATION[stage];
+  // Every post-expiry day shares the same "expired" treatment; the exact
+  // `expired-<n>` stage is preserved on the view for dismissal keys and
+  // data attributes.
+  const stageKey = stage.startsWith("expired") ? "expired" : stage;
+  const presentation = RENEWAL_STAGE_PRESENTATION[stageKey];
   if (!presentation) return null;
 
   const now = Number(options.now) || Date.now();
   const planName = String(options.planName || reminder.planName || "Subscription");
   const expiresAt = toMillis(reminder.expiresAt);
-  const expired = stage === "expired";
+  const expired = reminder.expired === true || stageKey === "expired";
   const days = daysUntil(expiresAt, now);
 
   const body = expired
@@ -137,8 +160,10 @@ export const buildRenewalView = (reminder, options = {}) => {
     headline: presentation.headline,
     body,
     cta: presentation.cta,
+    canRenew: presentation.canRenew,
     dismissible: presentation.dismissible,
     expired,
+    day: typeof reminder.day === "number" ? reminder.day : undefined,
     expiresAt,
     daysRemaining: days,
     remainingLabel: formatRemaining(expiresAt, now),

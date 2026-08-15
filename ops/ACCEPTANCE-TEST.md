@@ -146,8 +146,8 @@ us time par system notification jaye, app band ho tab bhi.
   (`utils/pushScheduler.js` `resolveLookbackMs`, capped at 1h) instead of a
   fixed 15 min; push tag is per-item per-day so simultaneous reminders no
   longer collapse into one; matches the foreground tag so no duplicates.
-- `vercel.json` stays daily (`30 3 * * *`) because Vercel Hobby rejects
-  sub-daily crons; a minute-level GitHub Actions pinger is provided.
+- `vercel.json` stays daily (`30 0 * * *`, 06:00 IST) because Vercel Hobby
+  rejects sub-daily crons; a minute-level GitHub Actions pinger is provided.
 - Tests: `tests/myDayExactTimeDeliveryContract.test.mjs` (9).
 
 **⚠️ NOT ACTIVE UNTIL MANUAL STEPS DONE:**

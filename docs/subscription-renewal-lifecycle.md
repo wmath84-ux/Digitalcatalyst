@@ -4,15 +4,18 @@ Renewals are explicit, user-confirmed purchases because the current Razorpay int
 
 ## Reminder cadence
 
-The scheduler runs daily at 09:00 IST (`03:30 UTC`) and creates at most one notification per stage and subscription expiry:
+The scheduler runs daily at the start of the day, in the morning — 06:00 IST (`00:30 UTC`) — and creates at most one notification per stage and subscription expiry.
+
+Before expiry, the member gets a calm heads-up (no renew button — renewal is not required yet):
 
 1. 7 days before expiry
 2. 3 days before expiry
 3. 1 day before expiry
-4. Due day
-5. Once after expiry
+4. Due day (the final day)
 
-The document ID is derived from the expiry timestamp and stage, making delivery idempotent across cron retries and devices. Cancelled, paused, and opted-out subscriptions are excluded. Reminders are stored in `users/{uid}/notifications`, shown in-app, and optionally sent by Web Push when VAPID is configured. Invalid push endpoints are removed.
+The moment the subscription ends, the renew button becomes active and the daily notification sequence starts. One notification is sent every morning for **10 consecutive days** (`expired-1` … `expired-10`), after which the reminders stop. The renew button itself stays active for as long as the subscription remains expired.
+
+The document ID is derived from the expiry timestamp and stage (including the post-expiry day number), making each morning's delivery idempotent across cron retries and devices. Cancelled, paused, and opted-out subscriptions are excluded. Reminders are stored in `users/{uid}/notifications`, shown in-app, and optionally sent by Web Push when VAPID is configured. Invalid push endpoints are removed.
 
 ## Renewal checkout
 

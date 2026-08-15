@@ -91,14 +91,16 @@ export default function RenewalBanner({ view, onRenew, onDismiss, className = ""
           </p>
 
           <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onRenew}
-              data-renewal-cta
-              className={`rounded-xl px-3.5 py-2 text-xs font-black shadow-sm transition active:scale-[0.98] ${tone.cta}`}
-            >
-              {view.cta}
-            </button>
+            {view.canRenew ? (
+              <button
+                type="button"
+                onClick={onRenew}
+                data-renewal-cta
+                className={`rounded-xl px-3.5 py-2 text-xs font-black shadow-sm transition active:scale-[0.98] ${tone.cta}`}
+              >
+                {view.cta}
+              </button>
+            ) : null}
             {view.dismissible && onDismiss ? (
               <button
                 type="button"

@@ -28,7 +28,7 @@ import {
   Lock,
   RefreshCw,
 } from "lucide-react";
-import { getRenewalReminder } from "../../../utils/subscriptionRenewal";
+import { getRenewalNotification, getRenewalReminder } from "../../../utils/subscriptionRenewal";
 import { buildRenewalView, shouldShowRenewalBanner } from "../../../utils/renewalPresentation";
 import RenewalBanner from "./RenewalBanner";
 import RenewalStatusCard from "./RenewalStatusCard";
@@ -42,7 +42,10 @@ const PRESETS = [
   { label: "3 days", days: 3 },
   { label: "Tomorrow", days: 1 },
   { label: "Due today", days: 0 },
-  { label: "Expired", days: -2 },
+  { label: "Expired · day 1", days: -0.5 },
+  { label: "Expired · day 5", days: -5 },
+  { label: "Expired · day 10", days: -10 },
+  { label: "Expired · day 11", days: -11 },
 ];
 
 const ICONS = {
@@ -120,7 +123,7 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
 
             <input
               type="range"
-              min={-10}
+              min={-12}
               max={40}
               step={1}
               value={offsetDays}
@@ -204,7 +207,7 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 {optOut
                   ? "Reminders are switched off for this subscriber."
-                  : "Renewal notices begin 7 days before expiry. Move the slider closer to zero."}
+                  : "Renewal notices begin 7 days before expiry, then continue every morning for 10 days after it ends."}
               </p>
             </div>
           ) : (
@@ -279,7 +282,13 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
     tone: view.tone,
     title: reminder?.title,
     body: view.body,
+    expired: view.expired,
+    canRenew: view.canRenew,
+    day: view.day,
     daysRemaining: view.daysRemaining,
+    // True while the 10-morning notification window is still open. The renew
+    // button itself stays active for as long as the subscription is expired.
+    sendsNotificationToday: Boolean(getRenewalNotification(subscription, now)),
     target: view.target,
   },
   null,
