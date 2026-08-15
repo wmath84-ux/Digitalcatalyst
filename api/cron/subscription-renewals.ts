@@ -26,6 +26,7 @@ import {
   buildProductInventoryEntry,
   collectDueMyDayItems,
   diffProductInventory,
+  resolveLookbackMs,
 } from "../../utils/pushScheduler.js";
 
 const bearer = (req: VercelRequest) => {
@@ -88,6 +89,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const now = Date.now();
     const summary: Record<string, unknown> = {};
 
+    // How long since the previous successful run. The My Day job uses
+    // this to size its catch-up window, so a delayed or missed ping
+    // makes a reminder late rather than making it vanish.
+    const runStateRef = db.collection("settings").doc("pushSchedulerState");
+    const lastRunAt = Number((await runStateRef.get()).data()?.lastRunAt || 0);
+
     // ------------------------------------------------------------------ 1. renewals
     {
       const snapshot = await db.collectionGroup("subscription").get();
@@ -115,6 +122,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ------------------------------------------------------------- 2. My Day items
     {
+      const lookbackMs = resolveLookbackMs(lastRunAt, now);
+      summary.myDayLookbackMs = lookbackMs;
       const myDaySnap = await db.collectionGroup("myDay").get();
       let processed = 0;
       let pushed = 0;
@@ -125,7 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!uid) continue;
         const data = document.data() || {};
         const tzOffsetMinutes = Number(data.tzOffsetMinutes);
-        const due = collectDueMyDayItems(data, now, tzOffsetMinutes);
+        const due = collectDueMyDayItems(data, now, tzOffsetMinutes, lookbackMs);
         if (!due.length) continue;
         processed += 1;
         const logPatch: Record<string, unknown> = {};
@@ -148,7 +157,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             createdAt: Timestamp.fromMillis(item.dueAt),
             target: { type: "mayday" },
           }, { merge: true });
-          pushed += await sendPush(db, uid, item.title, item.body, { tag: `myday-${item.kind}`, url: "/#/my-day" });
+          // The tag must be per-item, not per-kind. Tagging by kind made
+          // the browser collapse every due task into a single
+          // notification (three tasks at 9:00 → one alert), and it did
+          // not match the foreground tag, so an open app could show the
+          // same reminder twice. `item.key` is unique per item per day
+          // and is exactly what the in-app path uses.
+          pushed += await sendPush(db, uid, item.title, item.body, { tag: `myday-${item.key}`, url: "/#/my-day" });
         }
         try {
           await document.ref.update(logPatch);
@@ -214,6 +229,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         courseUpdatePushes: coursePushes,
       };
     }
+
+    // Record the run only after every job finished. If this handler
+    // throws halfway, `lastRunAt` stays where it was and the next run
+    // re-covers the same window — late is recoverable, skipped is not.
+    await runStateRef.set({ lastRunAt: now, updatedAt: Timestamp.fromMillis(now) }, { merge: true });
 
     return res.status(200).json({ ok: true, ...summary });
   } catch (error) {
