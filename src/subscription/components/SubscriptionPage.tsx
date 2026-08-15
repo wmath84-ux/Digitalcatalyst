@@ -15,6 +15,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { auth, db } from "../../../firebase";
 import { ChevronLeft, HelpCircle, LoaderCircle } from "lucide-react";
+import Header from "../../components/Header";
+import BottomNav, { type TabKey } from "../../components/BottomNav";
 import StackedCards from "./StackedCards";
 import PlanOverview from "./PlanOverview";
 import PromoCodeInput, { type PromoResult } from "./PromoCodeInput";
@@ -70,7 +72,23 @@ const productHasId = (
   ids: ReadonlySet<string>,
 ) => ids.has(String(product.id)) || Boolean(product.documentId && ids.has(String(product.documentId)));
 
-export default function SubscriptionPage() {
+type SubscriptionPageProps = {
+  cartCount: number;
+  purchasesBadge: number;
+  onNavigateToCart: () => void;
+  onNavigateToSubscription: () => void;
+  onNavigateToNotifications: () => void;
+  onNavigateFooter: (tab: TabKey) => void;
+};
+
+export default function SubscriptionPage({
+  cartCount,
+  purchasesBadge,
+  onNavigateToCart,
+  onNavigateToSubscription,
+  onNavigateToNotifications,
+  onNavigateFooter,
+}: SubscriptionPageProps) {
   const { user } = useAuth();
   const { products: availableProducts } = useCatalog();
   const renewalLoadedRef = useRef(false);
@@ -505,34 +523,39 @@ export default function SubscriptionPage() {
   }, [user, plan, cycle, selectedFeatureIds, selectedCourseIds, appliedCoupon, appliedReferral]);
 
   // ---------- Render ----------
-  if (catalogLoading) {
-    return (
-      <div data-subscription-loading className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-gradient-to-b from-slate-50 to-white p-6 text-center text-sm text-slate-500">
-        <LoaderCircle className="h-6 w-6 animate-spin text-violet-600" />
-        <p className="font-semibold">Loading subscription plans…</p>
-      </div>
-    );
-  }
-
-  if (catalogError && !catalog) {
-    return (
-      <div data-subscription-catalog-error className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-gradient-to-b from-slate-50 to-white p-6 text-center text-sm text-slate-700">
-        <p className="font-black text-rose-700">We couldn't load the subscription catalog.</p>
-        <p className="text-xs text-slate-500">{catalogError}</p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-bold text-white"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex min-h-[100dvh] w-full flex-col bg-gradient-to-b from-slate-50 to-white">
-      {/* Header */}
+    <div className="min-h-screen bg-slate-100 sm:py-6">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
+        <Header
+          cartCount={cartCount}
+          notifCount={0}
+          onNavigateToSubscription={onNavigateToSubscription}
+          onNavigateToCart={onNavigateToCart}
+          onNavigateToNotifications={onNavigateToNotifications}
+        />
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="flex min-h-full w-full flex-col bg-gradient-to-b from-slate-50 to-white">
+            {catalogLoading ? (
+              <div data-subscription-loading className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-slate-500">
+                <LoaderCircle className="h-6 w-6 animate-spin text-violet-600" />
+                <p className="font-semibold">Loading subscription plans…</p>
+              </div>
+            ) : catalogError && !catalog ? (
+              <div data-subscription-catalog-error className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-slate-700">
+                <p className="font-black text-rose-700">We couldn't load the subscription catalog.</p>
+                <p className="text-xs text-slate-500">{catalogError}</p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-bold text-white"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <>
+      {/* Page title bar */}
       <div className="sticky top-0 z-30 flex items-center justify-between bg-gradient-to-b from-slate-50 to-slate-50/70 px-5 pb-2 pt-5 backdrop-blur-sm">
         <button
           onClick={() => {
@@ -747,6 +770,13 @@ export default function SubscriptionPage() {
       <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
       </>
       )}
+      </>
+      )}
+          </div>
+        </main>
+
+        <BottomNav active={null} onChange={onNavigateFooter} purchasesBadge={purchasesBadge} />
+      </div>
     </div>
   );
 }

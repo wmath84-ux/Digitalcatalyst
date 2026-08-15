@@ -716,7 +716,30 @@ function Root() {
   if (hash.startsWith(RENEWAL_PREVIEW_HASH)) {
     return <RenewalPreviewPage onBack={() => { window.location.hash = SUBSCRIPTION_HASH; }} />;
   }
-  if (hash.startsWith(SUBSCRIPTION_HASH)) return <SubscriptionApp />;
+  if (hash.startsWith(SUBSCRIPTION_HASH)) {
+    return (
+      <SubscriptionApp
+        cartCount={cartIds.size}
+        purchasesBadge={purchasedIds.size}
+        onNavigateToCart={() => {
+          window.location.hash = CART_HASH;
+        }}
+        onNavigateToSubscription={() => {
+          window.location.hash = SUBSCRIPTION_HASH;
+        }}
+        onNavigateToNotifications={() => {
+          window.location.hash = NOTIFICATIONS_HASH;
+        }}
+        onNavigateFooter={(tab) => {
+          if (tab === "home") window.location.hash = HOME_HASH;
+          else if (tab === "myday") window.location.hash = MY_DAY_HASH;
+          else if (tab === "store") window.location.hash = STORE_HASH;
+          else if (tab === "purchases") window.location.hash = `${STORE_HASH}/purchases`;
+          else if (tab === "profile") window.location.hash = PROFILE_HASH;
+        }}
+      />
+    );
+  }
   if (hash.startsWith(NOTIFICATIONS_HASH)) {
     return (
       <NotificationsPage
