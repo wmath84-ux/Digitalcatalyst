@@ -33,6 +33,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Feature availability is public catalog metadata. The app reads this
+    // entry to decide whether a feature still has a subscription gate.
+    match /subscriptionFeatures/{featureId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow create: if isOwner(uid)
@@ -69,10 +76,14 @@ service cloud.firestore {
         allow read: if isOwner(uid) || isAdmin();
         allow create, update: if isOwner(uid)
           && documentId == 'current'
-          && exists(/databases/$(database)/documents/users/$(uid)/subscription/current)
-          && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.status == 'active'
-          && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.expiresAt > request.time
-          && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.features.hasAny(['my-day']);
+          // A catalog feature controls its own gate. If Admin removes the
+          // feature (or deactivates it), My Day is intentionally free again.
+          && (!exists(/databases/$(database)/documents/subscriptionFeatures/my-day)
+            || get(/databases/$(database)/documents/subscriptionFeatures/my-day).data.active == false
+            || (exists(/databases/$(database)/documents/users/$(uid)/subscription/current)
+              && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.status == 'active'
+              && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.expiresAt > request.time
+              && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.features.hasAny(['my-day'])));
         allow delete: if isOwner(uid) || isAdmin();
       }
 

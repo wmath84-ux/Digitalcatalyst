@@ -225,11 +225,11 @@ async function subscriptionFeaturesRequest(init?: RequestInit) {
   const method = init?.method || "GET";
   if (method === "GET") {
     const snap = await getDocs(collection(db, "subscriptionFeatures"));
-    return { features: snap.docs.map((item) => { const data = item.data() || {}; return { id: item.id, key: data.key || item.id, name: data.name || "Feature", description: data.description || "", individualPrice: String(money(data.price ?? data.individualPrice ?? 0)), active: data.active !== false }; }) };
+    return { features: snap.docs.map((item) => { const data = item.data() || {}; return { id: item.id, key: data.key || item.id, name: data.name || "Feature", description: data.description || "", individualPrice: String(money(data.price ?? data.individualPrice ?? 0)), icon: data.icon || "sparkles", included: data.included === true, badge: data.badge || "", sortOrder: Number(data.sortOrder || 0), active: data.active !== false }; }) };
   }
   const body = bodyOf(init); const recordId = String(body.id || body.key || id()); const ref = doc(db, "subscriptionFeatures", recordId);
   if (body.delete) { await deleteDoc(ref); return { ok: true }; }
-  await setDoc(ref, stripUndefinedDeep({ id: recordId, key: str(body.key, recordId), name: str(body.name, "Feature"), description: str(body.description), price: Number(body.individualPrice || 0), icon: recordId === "my-day" ? "calendar" : "sparkles", included: false, active: body.active !== false, updatedAt: serverTimestamp() }), { merge: true });
+  await setDoc(ref, stripUndefinedDeep({ id: recordId, key: str(body.key, recordId), name: str(body.name, "Feature"), description: str(body.description), price: Number(body.individualPrice || 0), icon: str(body.icon, recordId === "my-day" ? "calendar" : "sparkles"), included: body.included === true, badge: str(body.badge), sortOrder: Math.floor(Number(body.sortOrder || 0)), active: body.active !== false, updatedAt: serverTimestamp() }), { merge: true });
   return { feature: { ...body, id: recordId } };
 }
 
