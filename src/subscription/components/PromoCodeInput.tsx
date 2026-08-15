@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Tag, Users, CheckCircle2, XCircle, X, Loader2 } from "lucide-react";
+import { Tag, Users, CheckCircle2, XCircle, X, Loader2, AlertTriangle } from "lucide-react";
 
 export interface PromoResult {
   valid: boolean;
@@ -123,28 +123,44 @@ export default function PromoCodeInput({
             </button>
           </motion.div>
           {displayError ? (
-            <div
-              role="alert"
-              data-subscription-coupon-error
-              className="mt-1.5 flex items-start gap-1.5 text-[11px] font-bold text-rose-600"
-            >
-              <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>
-                {displayError}
-                {kind === "referral" && /already used/i.test(displayError) ? (
-                  <>
-                    {" "}
+            kind === "referral" && /already used/i.test(displayError) ? (
+              <motion.div
+                role="alert"
+                data-subscription-coupon-error
+                data-referral-already-used
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-2 rounded-2xl border border-rose-200 bg-rose-50 p-3"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+                  <div>
+                    <p className="text-sm font-extrabold text-rose-900">
+                      This referral is already used by someone
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-rose-700">
+                      Each referral ID works only once, and this one has already been redeemed. Try a different code from the leaderboard's unused IDs.
+                    </p>
                     <button
                       type="button"
                       onClick={() => { window.location.hash = "#/leaderboard"; }}
-                      className="underline decoration-rose-300 underline-offset-2"
+                      className="mt-2 rounded-xl bg-rose-600 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-sm active:scale-[0.98] transition-transform"
                     >
                       Open Unused IDs
                     </button>
-                  </>
-                ) : null}
-              </span>
-            </div>
+                  </div>
+                </div>
+              </motion.div>
+            ) : (
+              <div
+                role="alert"
+                data-subscription-coupon-error
+                className="mt-1.5 flex items-start gap-1.5 text-[11px] font-bold text-rose-600"
+              >
+                <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{displayError}</span>
+              </div>
+            )
           ) : null}
         </div>
       )}

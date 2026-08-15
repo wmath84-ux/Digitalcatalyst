@@ -281,7 +281,7 @@ export const validateCoupon = (coupon, orderContext, now = Date.now()) => {
   }
   if (!isWithinGlobalLimit(coupon)) {
     if (coupon.referralOwnerUid) {
-      return { ok: false, code: "REFERRAL_ALREADY_USED", reason: "Referral ID already used. Explore leaderboard Unused IDs." };
+      return { ok: false, code: "REFERRAL_ALREADY_USED", reason: "This referral is already used by someone. Referral ID already used — each ID works only once. Explore leaderboard Unused IDs." };
     }
     return { ok: false, code: "COUPON_LIMIT_REACHED", reason: "This coupon has reached its global usage limit." };
   }

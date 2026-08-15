@@ -55,6 +55,50 @@ test("a referral ID can be redeemed only once", () => {
   assert.match(apply, /usedCount \|\| 0\) >= 1/);
 });
 
+test("reusing a spent referral shows a clear already-used message on the subscription page", () => {
+  // The server refuses the spent code with an explicit, human message…
+  const apply = fs.readFileSync("api/subscription-referral.ts", "utf8");
+  assert.match(apply, /REFERRAL_ALREADY_USED/);
+  assert.match(apply, /This referral is already used by someone/);
+  // …the shared coupon validator repeats the same refusal so a spent
+  // code slipped straight into checkout is caught with the same words…
+  const engine = fs.readFileSync("utils/coupons.js", "utf8");
+  assert.match(engine, /This referral is already used by someone/);
+  // …and the subscription-page input renders it as a prominent alert
+  // card (not just a tiny error line) with a route to unused IDs.
+  const input = fs.readFileSync("src/subscription/components/PromoCodeInput.tsx", "utf8");
+  assert.match(input, /data-referral-already-used/);
+  assert.match(input, /This referral is already used by someone/);
+  assert.match(input, /role="alert"/);
+  assert.match(input, /Open Unused IDs/);
+  assert.match(input, /#\/leaderboard/);
+});
+
+test("a spent referral coupon is refused by the shared validator with the already-used code", () => {
+  const coupon = normaliseCouponDoc({
+    code: "DCOWNER",
+    type: "flat",
+    value: 25000,
+    referralOwnerUid: "owner",
+    globalLimit: 1,
+    usedCount: 1,
+  });
+  const result = validateCoupon(coupon, {
+    subtotalPaise: 50000,
+    productIds: [],
+    moduleIds: [],
+    resourceIds: [],
+    categories: [],
+    purchaseKind: "subscription",
+    userHasPriorPurchases: false,
+    userUsageCount: 0,
+    userUid: "someone-else",
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "REFERRAL_ALREADY_USED");
+  assert.match(result.reason, /already used by someone/i);
+});
+
 test("subscription has a separate server-validated referral input", () => {
   assert.match(subscription, /kind="referral"/);
   assert.match(subscription, /\/api\/subscription-referral/);

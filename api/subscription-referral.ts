@@ -36,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(409).json({
         ok: false,
         code: "REFERRAL_ALREADY_USED",
-        error: "Referral ID already used. Explore leaderboard Unused IDs.",
+        error: "This referral is already used by someone. Referral ID already used — each ID works only once. Explore leaderboard Unused IDs.",
       });
     }
     // Refresh the generated coupon with the current admin configuration.
