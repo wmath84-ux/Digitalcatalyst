@@ -64,6 +64,11 @@ type SubscriptionRecordLike = {
   renewalReminderOptOut?: boolean;
 };
 
+const productHasId = (
+  product: { id: string; documentId?: string },
+  ids: ReadonlySet<string>,
+) => ids.has(String(product.id)) || Boolean(product.documentId && ids.has(String(product.documentId)));
+
 export default function SubscriptionPage() {
   const { user } = useAuth();
   const { products: availableProducts } = useCatalog();
@@ -180,8 +185,12 @@ export default function SubscriptionPage() {
       if (data.cycle === "monthly" || data.cycle === "yearly") setCycle(data.cycle);
       const activeFeatureIds = new Set(catalog.features.map((feature) => feature.id));
       setSelectedFeatureIds((Array.isArray(data.features) ? data.features.map(String) : []).filter((id) => activeFeatureIds.has(id)));
-      const liveProductIds = new Set(availableProducts.map((product) => product.id));
-      setSelectedCourseIds((Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : []).filter((id) => liveProductIds.has(id)));
+      const storedProductIds = new Set(Array.isArray(data.includedProductIds) ? data.includedProductIds.map(String) : []);
+      setSelectedCourseIds(
+        availableProducts
+          .filter((product) => productHasId(product, storedProductIds))
+          .map((product) => String(product.documentId || product.id)),
+      );
     });
   }, [availableProducts, catalog, user]);
 
@@ -256,7 +265,10 @@ export default function SubscriptionPage() {
     () => sumSelectedFeaturePaise(rawFeatures, selectedFeatureIds, selectedPlanId, cycle),
     [rawFeatures, selectedFeatureIds, selectedPlanId, cycle],
   );
-  const selectedProductRecords = useMemo(() => availableProducts.filter((product) => selectedCourseIds.includes(product.id)), [availableProducts, selectedCourseIds]);
+  const selectedProductRecords = useMemo(() => {
+    const selected = new Set(selectedCourseIds);
+    return availableProducts.filter((product) => productHasId(product, selected));
+  }, [availableProducts, selectedCourseIds]);
   const productsTotalPaise = useMemo(() => selectedProductRecords.reduce((sum, product) => sum + Math.max(0, Math.round(product.price * 100)), 0), [selectedProductRecords]);
   const subtotalPaise = selectedPlanPricePaise + featuresTotalPaise + productsTotalPaise;
   const couponDiscountPaise = appliedReferral?.discountPaise || appliedCoupon?.discountPaise || 0;
@@ -304,7 +316,7 @@ export default function SubscriptionPage() {
         ? activeSubscription.includedProductIds.map(String)
         : [],
     );
-    return availableProducts.filter((product) => ids.has(product.id)).map((product) => product.title);
+    return availableProducts.filter((product) => productHasId(product, ids)).map((product) => product.title);
   }, [activeSubscription, availableProducts]);
 
   // ---------- Handlers ----------

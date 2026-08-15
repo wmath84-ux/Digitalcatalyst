@@ -555,6 +555,10 @@ export const buildQuote = (input) => {
     // Part 9 — the cycle expiry timestamp (ms). Surfaced on the
     // ServerPriceQuoteRecord for the success page + auto-renew.
     subscriptionExpiresAt = null,
+    // Exact, server-resolved product identities selected with this
+    // subscription. Kept separately from priced lines for the same reason as
+    // subscriptionFeatureIds: grants must not infer access from receipt UI.
+    subscriptionProductIds = null,
   } = input || {};
 
   if (!isObject(selection)) {
@@ -978,6 +982,12 @@ export const buildQuote = (input) => {
     // subscription would activate without the feature unlocked.
     subscriptionFeatureIds: kind === "subscription" || kind === "subscription_features"
       ? Array.from(new Set((selection.featureIds || []).map(String)))
+      : null,
+    // Product access is also first-class quote metadata. The server loader
+    // supplies canonical public/document aliases; direct pure-engine callers
+    // fall back to the selected ids for backwards compatibility.
+    subscriptionProductIds: kind === "subscription" || kind === "subscription_features"
+      ? Array.from(new Set((Array.isArray(subscriptionProductIds) ? subscriptionProductIds : (selection.productIds || [])).map(String).filter(Boolean)))
       : null,
   };
   return { ok: true, quote };

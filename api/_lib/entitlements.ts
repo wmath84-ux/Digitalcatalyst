@@ -577,15 +577,24 @@ export const grantSubscriptionFromQuote = async (
     .map((line) => String(line.featureId));
   // Dedupe.
   const uniqueFeatures = Array.from(new Set(selectedFeatureIds));
-  const productUnlocks = (quote.verifiedLineItems || [])
+  // Products have their own authoritative quote field. Rebuilding the grant
+  // only from receipt line items is lossy (and was the reason features worked
+  // while a paid bonus product remained locked). Line inference remains for
+  // plan mappings and quotes created before the explicit field existed.
+  const lineProductIds = (quote.verifiedLineItems || [])
     .filter((line) => line.kind === "subscription_features" && line.productId && !line.moduleId)
-    .map((line) => ({ planId: plan.id, productId: String(line.productId), active: true }));
+    .map((line) => String(line.productId));
+  const quotedProductIds = Array.isArray(quote.subscriptionProductIds)
+    ? quote.subscriptionProductIds.map(String).filter(Boolean)
+    : [];
+  const productUnlocks = Array.from(new Set(lineProductIds))
+    .map((productId) => ({ planId: plan.id, productId, active: true }));
   const moduleUnlocks = (quote.verifiedLineItems || [])
     .filter((line) => line.kind === "subscription_features" && line.productId && line.moduleId)
     .map((line) => ({ planId: plan.id, productId: String(line.productId), moduleId: String(line.moduleId), active: true }));
   const effectivePlan: SubscriptionPlanDoc = {
     ...plan,
-    includedProductIds: Array.from(new Set([...(plan.includedProductIds || []), ...productUnlocks.map((unlock) => unlock.productId)])),
+    includedProductIds: Array.from(new Set([...(plan.includedProductIds || []), ...productUnlocks.map((unlock) => unlock.productId), ...quotedProductIds])),
     includedModuleKeys: Array.from(new Set([...(plan.includedModuleKeys || []), ...moduleUnlocks.map((unlock) => `${unlock.productId}:${unlock.moduleId}`)])),
   };
   // Subscription-specific entitlement ids.

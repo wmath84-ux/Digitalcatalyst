@@ -189,11 +189,16 @@ export const resolveCourseAccess = (input = {}) => {
   const subscriptionModuleIds = new Set(arr(input.subscriptionModuleIds).map(String));
   const subscriptionResourceIds = new Set(arr(input.subscriptionResourceIds).map(String));
 
-  const productId = product?.id ? String(product.id) : null;
+  // Firestore's document id and a product's public `id` can differ. Checkout
+  // uses the document id for an authoritative lookup while routes/catalog UI
+  // commonly use the public id, so either alias must resolve the same access.
+  const productIdentityIds = [product?.id, product?.documentId]
+    .map((value) => String(value || "").trim())
+    .filter((value, index, values) => Boolean(value) && values.indexOf(value) === index);
   // Full product access comes from EITHER a base purchase OR an
   // active subscription that grants the base product.
-  const hasFullProductAccess = Boolean(
-    (productId && (ownedProductIds.has(productId) || subscriptionProductIds.has(productId))),
+  const hasFullProductAccess = productIdentityIds.some(
+    (productId) => ownedProductIds.has(productId) || subscriptionProductIds.has(productId),
   );
 
   // Modules the user owns via per-module purchase OR subscription.

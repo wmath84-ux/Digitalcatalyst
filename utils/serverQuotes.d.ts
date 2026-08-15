@@ -102,6 +102,8 @@ export interface ServerPriceQuoteRecord {
   subscriptionCycle?: "monthly" | "yearly" | null;
   subscriptionExpiresAt?: number | null;
   subscriptionFeatureIds?: string[] | null;
+  /** Server-resolved public/document ids for selected subscription products. */
+  subscriptionProductIds?: string[] | null;
 }
 
 export interface BuildQuoteOk {
@@ -177,6 +179,8 @@ export interface BuildQuoteInput {
    * MUST read this list instead of re-deriving it from line items.
    */
   subscriptionFeatureIds?: string[] | null;
+  /** Exact product ids that activation must add to the subscription record. */
+  subscriptionProductIds?: string[] | null;
 }
 
 // Function signatures ---------------------------------------------------------

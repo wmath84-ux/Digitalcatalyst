@@ -54,6 +54,26 @@ const MODULE_UNLOCKS_COLLECTION = "subscriptionPlanModuleUnlocks";
 const USER_SUBS_COLLECTION = "users";
 const USER_SUBS_DOC = "subscription";
 
+/** Merge verified access into a stored same-order subscription without time math. */
+const mergeSubscriptionAccess = (
+  previousData: Record<string, unknown>,
+  plan: SubscriptionPlanDoc,
+  selectedFeatureIds: string[],
+) => ({
+  features: Array.from(new Set([
+    ...(Array.isArray(previousData.features) ? previousData.features.map(String) : []),
+    ...selectedFeatureIds,
+  ])),
+  includedProductIds: Array.from(new Set([
+    ...(Array.isArray(previousData.includedProductIds) ? previousData.includedProductIds.map(String) : []),
+    ...plan.includedProductIds,
+  ])),
+  includedModuleKeys: Array.from(new Set([
+    ...(Array.isArray(previousData.includedModuleKeys) ? previousData.includedModuleKeys.map(String) : []),
+    ...plan.includedModuleKeys,
+  ])),
+});
+
 /**
  * Built-in default plans, seeded when no active plan exists yet. Their ids
  * ("basic" / "premium" / "pro") match the client fallback catalog
@@ -201,6 +221,31 @@ export const loadPlanModuleUnlocks = async (
 };
 
 /**
+ * Resolve either the Firestore document id or the public `siteProducts.id`.
+ * CatalogContext deliberately exposes both identities, and older products can
+ * have different values. Subscription checkout must therefore mirror the
+ * normal product quote loader instead of assuming the public id is a doc id.
+ */
+const loadSubscriptionProductByAnyId = async (
+  db: Firestore,
+  requestedId: string,
+): Promise<{ documentId: string; data: Record<string, unknown> } | null> => {
+  const direct = await db.collection("siteProducts").doc(requestedId).get();
+  if (direct.exists) {
+    return { documentId: direct.id, data: (direct.data() || {}) as Record<string, unknown> };
+  }
+
+  const candidates: Array<string | number> = [requestedId];
+  if (/^\d+$/.test(requestedId)) candidates.push(Number(requestedId));
+  for (const candidate of candidates) {
+    const byPublicId = await db.collection("siteProducts").where("id", "==", candidate).limit(1).get();
+    const match = byPublicId.docs[0];
+    if (match) return { documentId: match.id, data: (match.data() || {}) as Record<string, unknown> };
+  }
+  return null;
+};
+
+/**
  * Resolve the Part 9 selection to a fully-loaded context the
  * Part 4 engine can consume. Returns either
  * `{ ok: true, plan, features, lineItems, expiresAt }` or
@@ -217,6 +262,8 @@ export const loadSubscriptionSelectionContext = async (
       lineItems: ReturnType<typeof buildSubscriptionLineItems>;
       productUnlocks: SubscriptionPlanProductUnlock[];
       moduleUnlocks: SubscriptionPlanModuleUnlock[];
+      /** Public/document aliases that must unlock after payment. */
+      selectedProductIds: string[];
       expiresAt: number;
       cycle: BillingCycle;
     }
@@ -271,22 +318,48 @@ export const loadSubscriptionSelectionContext = async (
     moduleUnlocks,
   });
   // Buyer-selected bonus products are loaded from the live server catalog.
-  // Their IDs and prices are never trusted from the client.
-  const selectedProductIds = Array.from(new Set((selection.productIds || []).map(String)));
-  if (selectedProductIds.length) {
-    const refs = selectedProductIds.map((id) => db.collection("siteProducts").doc(id));
-    const snapshots = await db.getAll(...refs);
-    for (let index = 0; index < snapshots.length; index += 1) {
-      const snapshot = snapshots[index];
-      const data = snapshot.data() || {};
-      if (!snapshot.exists || data.isVisible === false || data.inStock === false) {
-        return { ok: false, status: 404, code: "SUBSCRIPTION_PRODUCT_UNAVAILABLE", error: "A selected bonus product is no longer available." };
-      }
-      const productId = selectedProductIds[index];
-      const effectivePrice = parseProductPricePaise(data);
-      const regularPrice = parseProductPricePaise({ ...data, salePrice: null });
-      lineItems.push({ id: `subscription_product:${plan.id}:${productId}`, kind: "subscription_features", productId, moduleId: null, resourceId: null, updateId: null, subscriptionPlanId: plan.id, featureId: null, title: String(data.title || "Bonus product"), parentTitle: plan.name, regularPrice, salePrice: effectivePrice < regularPrice ? effectivePrice : null, effectivePrice, quantity: 1, alreadyOwned: false, entitlementId: productId });
+  // Their IDs and prices are never trusted from the client. Keep both the
+  // public id and Firestore document id as access aliases: CatalogContext and
+  // legacy course routes do not always use the same identity.
+  const requestedProductIds = Array.from(new Set((selection.productIds || []).map(String).filter(Boolean)));
+  const selectedProductIds = new Set<string>();
+  const loadedDocumentIds = new Set<string>();
+  for (const requestedProductId of requestedProductIds) {
+    const product = await loadSubscriptionProductByAnyId(db, requestedProductId);
+    const data = product?.data || {};
+    if (!product || data.isVisible === false || data.inStock === false) {
+      return { ok: false, status: 404, code: "SUBSCRIPTION_PRODUCT_UNAVAILABLE", error: "A selected bonus product is no longer available." };
     }
+
+    // Selecting the same product through two aliases must never charge twice.
+    if (loadedDocumentIds.has(product.documentId)) continue;
+    loadedDocumentIds.add(product.documentId);
+
+    const publicProductId = String(data.id ?? product.documentId).trim() || product.documentId;
+    selectedProductIds.add(publicProductId);
+    selectedProductIds.add(product.documentId);
+    selectedProductIds.add(requestedProductId);
+
+    const effectivePrice = parseProductPricePaise(data);
+    const regularPrice = parseProductPricePaise({ ...data, salePrice: null });
+    lineItems.push({
+      id: `subscription_product:${plan.id}:${publicProductId}`,
+      kind: "subscription_features",
+      productId: publicProductId,
+      moduleId: null,
+      resourceId: null,
+      updateId: null,
+      subscriptionPlanId: plan.id,
+      featureId: null,
+      title: String(data.title || "Bonus product"),
+      parentTitle: plan.name,
+      regularPrice,
+      salePrice: effectivePrice < regularPrice ? effectivePrice : null,
+      effectivePrice,
+      quantity: 1,
+      alreadyOwned: false,
+      entitlementId: `subscription_product_unlock:${plan.id}:${publicProductId}`,
+    });
   }
   const expiresAt = computeCycleExpiresAt(plan, cycle, now);
   return {
@@ -296,6 +369,7 @@ export const loadSubscriptionSelectionContext = async (
     lineItems,
     productUnlocks,
     moduleUnlocks,
+    selectedProductIds: Array.from(selectedProductIds),
     expiresAt,
     cycle,
   };
@@ -351,17 +425,22 @@ export const writeSubscriptionAfterPayment = async (
       storedActivated && typeof (storedActivated as { toMillis?: () => number }).toMillis === "function"
         ? (storedActivated as { toMillis: () => number }).toMillis()
         : Number(storedActivated || args.now);
+
+    // Repair access from the verified quote, but preserve the stored dates.
+    const access = mergeSubscriptionAccess(previousData, args.plan, args.selectedFeatureIds);
+    tx.set(subRef, access, { merge: true });
+    tx.set(adminDb().collection(USER_SUBS_COLLECTION).doc(args.uid), {
+      subscriptionFeatures: access.features,
+      subscriptionExpiresAt: Timestamp.fromMillis(expiresAtMs),
+      updatedAt: nowTs,
+    }, { merge: true });
     return {
       uid: args.uid,
       planId: String(previousData.planId || args.plan.id),
       cycle: (previousData.cycle === "yearly" ? "yearly" : "monthly") as BillingCycle,
-      features: Array.isArray(previousData.features) ? previousData.features.map(String) : args.selectedFeatureIds.slice(),
-      includedProductIds: Array.isArray(previousData.includedProductIds)
-        ? previousData.includedProductIds.map(String)
-        : args.plan.includedProductIds.slice(),
-      includedModuleKeys: Array.isArray(previousData.includedModuleKeys)
-        ? previousData.includedModuleKeys.map(String)
-        : args.plan.includedModuleKeys.slice(),
+      features: access.features,
+      includedProductIds: access.includedProductIds,
+      includedModuleKeys: access.includedModuleKeys,
       status: "active",
       activatedAt: activatedAtMs,
       expiresAt: expiresAtMs,

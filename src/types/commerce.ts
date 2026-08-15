@@ -221,6 +221,12 @@ export interface ServerPriceQuote {
    * would drop free features and leave them locked after payment.
    */
   subscriptionFeatureIds?: string[] | null;
+  /**
+   * Server-resolved ids for products bought as part of this subscription.
+   * This is independent of receipt line items so activation cannot silently
+   * lose a product while features still unlock.
+   */
+  subscriptionProductIds?: string[] | null;
 }
 
 // =========================================================================
