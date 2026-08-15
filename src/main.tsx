@@ -20,6 +20,7 @@ import AdminLoginApp from "./AdminLoginApp";
 import AdminApp from "./admin/AdminApp";
 import NotificationsPage from "./components/NotificationsPage";
 import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
+import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
@@ -212,6 +213,26 @@ function AppLaunchSplash({ label = "Preparing your learning space…" }: { label
         <div className="app-boot-track" aria-hidden="true"><div className="app-boot-bar" /></div>
       </div>
     </main>
+  );
+}
+
+/**
+ * Renewal notice for the whole shell.
+ *
+ * `Root` returns early on almost every route, so the banner cannot live
+ * inside it without being repeated a dozen times. Mounting it as a
+ * sibling keeps exactly one instance alive across navigations — the
+ * host itself decides when to stay quiet.
+ */
+function RenewalNotice() {
+  const { user } = useAuth();
+  return (
+    <RenewalBannerHost
+      uid={user?.id ?? null}
+      onRenew={() => {
+        window.location.hash = `${SUBSCRIPTION_HASH}?renew=1`;
+      }}
+    />
   );
 }
 
@@ -822,6 +843,7 @@ createRoot(document.getElementById("root")!).render(
       <CatalogProvider>
         <CommerceProvider>
           <Root />
+          <RenewalNotice />
         </CommerceProvider>
       </CatalogProvider>
     </AuthProvider>

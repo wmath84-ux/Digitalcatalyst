@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { BookOpen, CalendarClock, Coffee, GraduationCap, Pencil, PenSquare, Plus, Trash2, User, type LucideIcon } from "lucide-react";
 import type { EventType, ScheduleEvent } from "../../types";
 import { cn } from "../../utils/cn";
+import { formatTime12, toMinutes } from "../../../utils/timeOfDay";
 
 interface TimelineProps {
   events: ScheduleEvent[];
@@ -21,17 +22,7 @@ const typeMeta: Record<
   exam: { icon: PenSquare, text: "text-rose-600", dot: "bg-rose-500", bg: "bg-rose-50", ring: "ring-rose-200" },
 };
 
-function toMinutes(time: string) {
-  const [h, m] = time.split(":").map(Number);
-  return h * 60 + m;
-}
-
-function formatTime(time: string) {
-  const [h, m] = time.split(":").map(Number);
-  const period = h >= 12 ? "PM" : "AM";
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
-}
+const formatTime = formatTime12;
 
 function durationLabel(start: string, end: string) {
   const diff = toMinutes(end) - toMinutes(start);

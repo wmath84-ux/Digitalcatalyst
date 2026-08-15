@@ -260,13 +260,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // -----------------------------------------------------------------
     // 3. Idempotency / replay-prevention at the intent layer. If the
-    //    intent is already verified, return the original orderId +
-    //    paymentId without re-running Razorpay, the signature check,
-    //    or the entitlement grant. The entitlement writer is also
-    //    idempotent, but skipping here saves a round-trip + a
-    //    transaction.
+    //    intent is already verified we skip Razorpay and the signature
+    //    check — but NOT the grants.
+    //
+    //    `grantEntitlementsFromQuote` flips the intent to "verified"
+    //    inside its own transaction, and the subscription grant runs
+    //    afterwards in a separate one. So a failure in between (cold
+    //    start timeout, Firestore contention, a transient plan read)
+    //    leaves an intent marked verified with no subscription
+    //    written — and every retry used to return early here, so the
+    //    membership could never activate. That is the "I paid and the
+    //    feature is still locked" report.
+    //
+    //    Both grants are idempotent (existing entitlement docs are
+    //    skipped; the subscription write short-circuits when the
+    //    stored orderId matches), so re-running them on a replay is
+    //    safe and self-healing.
     // -----------------------------------------------------------------
     if (intent.status === "verified") {
+      let repairedEntitlementIds: string[] = [];
+      try {
+        const replayGrant = await grantEntitlementsFromQuote({
+          quote,
+          orderId,
+          paymentId: intent.paymentId || paymentId || null,
+          source: isFree ? "free" : "razorpay",
+          isReplay: true,
+        });
+        repairedEntitlementIds = replayGrant.grantedEntitlementIds;
+        await grantSubscriptionFromQuote({
+          quote,
+          orderId,
+          paymentId: intent.paymentId || paymentId || null,
+          source: isFree ? "free" : "razorpay",
+        });
+      } catch (replayError) {
+        // The payment is genuinely verified, so never turn a recovery
+        // attempt into a client-visible failure — the next replay (or
+        // the reconciliation cron) tries again.
+        console.error("[verify-payment] replay grant repair failed", replayError);
+      }
       return res.status(200).json({
         ok: true,
         verified: true,
@@ -274,7 +307,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         paymentId: intent.paymentId || paymentId || null,
         alreadyVerified: true,
         replayed: true,
-        grantedEntitlementIds: [],
+        grantedEntitlementIds: repairedEntitlementIds,
         // Part 7 — surface the coupon that was applied. On a
         // replay we don't re-run the redemption, so the response
         // always reports the coupon code + type from the intent.

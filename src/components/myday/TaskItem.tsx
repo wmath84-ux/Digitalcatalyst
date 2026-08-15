@@ -1,5 +1,6 @@
 import { Check, Clock3, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { formatTime12 } from "../../../utils/timeOfDay";
 import type { Task } from "../../types";
 
 interface TaskItemProps {
@@ -108,7 +109,7 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
           {task.time && (
             <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-slate-400">
               <Clock3 className="h-3 w-3" />
-              {task.time}
+              {formatTime12(task.time)}
             </span>
           )}
           <span

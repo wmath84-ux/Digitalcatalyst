@@ -333,6 +333,48 @@ export const writeSubscriptionAfterPayment = async (
     .doc("current");
   const previous = args.existingSubscription || (() => { throw new Error("Existing subscription snapshot is required before transaction writes."); })();
   const previousData = previous.data || {};
+
+  // Replay guard. The verify endpoint may legitimately run twice for
+  // the same order (page refresh, webhook retry, a resumed grant after
+  // a partial failure). Re-running the write would treat the existing
+  // record as a *renewal* and extend the expiry by another full cycle,
+  // silently gifting free time. If this exact order already activated
+  // the subscription, return the stored record untouched.
+  if (previous.exists && String(previousData.orderId || "") === args.orderId) {
+    const storedExpiry = previousData.expiresAt;
+    const expiresAtMs =
+      storedExpiry && typeof (storedExpiry as { toMillis?: () => number }).toMillis === "function"
+        ? (storedExpiry as { toMillis: () => number }).toMillis()
+        : Number(storedExpiry || 0);
+    const storedActivated = previousData.activatedAt;
+    const activatedAtMs =
+      storedActivated && typeof (storedActivated as { toMillis?: () => number }).toMillis === "function"
+        ? (storedActivated as { toMillis: () => number }).toMillis()
+        : Number(storedActivated || args.now);
+    return {
+      uid: args.uid,
+      planId: String(previousData.planId || args.plan.id),
+      cycle: (previousData.cycle === "yearly" ? "yearly" : "monthly") as BillingCycle,
+      features: Array.isArray(previousData.features) ? previousData.features.map(String) : args.selectedFeatureIds.slice(),
+      includedProductIds: Array.isArray(previousData.includedProductIds)
+        ? previousData.includedProductIds.map(String)
+        : args.plan.includedProductIds.slice(),
+      includedModuleKeys: Array.isArray(previousData.includedModuleKeys)
+        ? previousData.includedModuleKeys.map(String)
+        : args.plan.includedModuleKeys.slice(),
+      status: "active",
+      activatedAt: activatedAtMs,
+      expiresAt: expiresAtMs,
+      autoRenew: false,
+      orderId: args.orderId,
+      paymentId: args.paymentId,
+      amountPaise: Math.max(0, Math.round(Number(previousData.amountPaise ?? args.amountPaise ?? 0))),
+      source: args.source,
+      couponCode: args.couponCode || null,
+      requestedEduCoins: Math.max(0, Math.floor(Number(args.requestedEduCoins || 0))),
+    };
+  }
+
   const renewalBase = getRenewalBaseTime(previousData.expiresAt, args.now);
   // Trials apply only to first activation, never to a renewal.
   const renewalPlan = previous.exists ? { ...args.plan, trialDays: 0 } : args.plan;

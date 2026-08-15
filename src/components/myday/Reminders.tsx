@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlarmClock, Bell, Check, Pencil, Plus, Trash2 } from "lucide-react";
 import type { Reminder } from "../../types";
 import { cn } from "../../utils/cn";
+import { formatTime12, toMinutes } from "../../../utils/timeOfDay";
 import Modal from "../ui/Modal";
 
 interface RemindersProps {
@@ -10,18 +11,6 @@ interface RemindersProps {
   onEdit: (reminder: Reminder) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-}
-
-function formatTime12(time: string): string {
-  const [h, m] = time.split(":").map(Number);
-  const period = h >= 12 ? "PM" : "AM";
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
-}
-
-function toMinutes(time: string): number {
-  const [h, m] = time.split(":").map(Number);
-  return h * 60 + m;
 }
 
 function getTimeStatus(time: string, done: boolean) {
