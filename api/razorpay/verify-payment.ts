@@ -180,9 +180,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!orderId) {
       return res.status(400).json({ ok: false, verified: false, error: "Missing Razorpay order id." });
     }
-    if (!isFree && (!paymentId || !signature)) {
-      return res.status(400).json({ ok: false, verified: false, error: "Missing payment verification fields." });
-    }
 
     const db = adminDb();
     const intentRef = db.collection("_paymentIntents").doc(orderId);
@@ -326,6 +323,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
           : undefined,
       });
+    }
+
+    // A verified intent may be replayed by the signed-in owner with only its
+    // order id, allowing older partial subscription grants to self-repair.
+    // Unverified paid intents still require the full Razorpay proof below.
+    if (!isFree && (!paymentId || !signature)) {
+      return res.status(400).json({ ok: false, verified: false, error: "Missing payment verification fields." });
     }
 
     // -----------------------------------------------------------------

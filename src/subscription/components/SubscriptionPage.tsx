@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
-import { db } from "../../../firebase";
+import { auth, db } from "../../../firebase";
 import { ChevronLeft, HelpCircle, LoaderCircle } from "lucide-react";
 import StackedCards from "./StackedCards";
 import PlanOverview from "./PlanOverview";
@@ -61,6 +61,7 @@ type SubscriptionRecordLike = {
   features?: unknown;
   includedProductIds?: unknown;
   expiresAt?: unknown;
+  orderId?: unknown;
   renewalReminderOptOut?: boolean;
 };
 
@@ -73,6 +74,7 @@ export default function SubscriptionPage() {
   const { user } = useAuth();
   const { products: availableProducts } = useCatalog();
   const renewalLoadedRef = useRef(false);
+  const repairedOrderIdsRef = useRef<Set<string>>(new Set());
 
   // The buyer's live subscription record (null when never subscribed).
   const [activeSubscription, setActiveSubscription] = useState<SubscriptionRecordLike | null>(null);
@@ -171,6 +173,24 @@ export default function SubscriptionPage() {
       setActiveSubscription(snapshot.exists() ? (snapshot.data() as SubscriptionRecordLike) : null);
     }, () => setActiveSubscription(null));
   }, [user]);
+
+  // Self-heal purchases made before product ids became first-class quote
+  // metadata. A verified intent can be safely replayed by its owner; the server
+  // merges any missing product ids without extending the membership period.
+  useEffect(() => {
+    const orderId = String(activeSubscription?.orderId || "").trim();
+    if (!user || activeSubscription?.status !== "active" || !orderId || repairedOrderIdsRef.current.has(orderId)) return;
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser || firebaseUser.uid !== user.id) return;
+    repairedOrderIdsRef.current.add(orderId);
+    void firebaseUser.getIdToken().then((token) => fetch("/api/razorpay/verify-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ orderId }),
+    })).then((response) => {
+      if (!response.ok) repairedOrderIdsRef.current.delete(orderId);
+    }).catch(() => repairedOrderIdsRef.current.delete(orderId));
+  }, [activeSubscription, user]);
 
   // Renewal / change-plan checkout restores the user's current plan, cycle,
   // features and bonus products so they review the exact package before

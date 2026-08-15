@@ -149,3 +149,16 @@ test("active subscription products appear in the learner library", () => {
   assert.match(hook, /data\.includedProductIds\.map\(String\)/);
   assert.match(purchases, /product\.documentId/);
 });
+
+test("an existing verified order can self-repair without another payment", () => {
+  const page = read("src/subscription/components/SubscriptionPage.tsx");
+  const verify = read("api/razorpay/verify-payment.ts");
+  const replayStart = verify.indexOf('if (intent.status === "verified")');
+  const missingProofCheck = verify.indexOf('if (!isFree && (!paymentId || !signature))');
+
+  assert.match(page, /activeSubscription\?\.orderId/);
+  assert.match(page, /\/api\/razorpay\/verify-payment/);
+  assert.match(page, /JSON\.stringify\(\{ orderId \}\)/);
+  assert.ok(replayStart >= 0 && missingProofCheck > replayStart, "verified-owner replay must run before new-payment proof validation");
+  assert.match(verify.slice(replayStart, missingProofCheck), /grantSubscriptionFromQuote/);
+});
