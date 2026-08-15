@@ -114,6 +114,9 @@ const formatDate = (value: number): string => {
 
 const cycleLabel = (cycle: string): string => cycle === "yearly" ? "Yearly" : "Monthly";
 
+const isActiveSubscription = (subscription: SubscriptionSnapshot, now: number): boolean =>
+  subscription.status === "active" && subscription.expiresAt > now;
+
 const MEMBERSHIP_THEMES: Record<MembershipTier, {
   hero: string;
   heroGlow: string;
@@ -276,10 +279,10 @@ export default function ProfileApp() {
       return { tier: "normal", subscription: null, active: false, expired: false, subscriber: false };
     }
     const tier = normalizeMembershipTier(subscription.planId);
-    const expired = subscription.status === "expired"
-      || subscription.status === "cancelled"
-      || (subscription.expiresAt > 0 && subscription.expiresAt <= now);
-    const active = !expired;
+    // Match the access resolver and SubscriptionPage: a plan is active only
+    // while its server-issued expiry is in the future.
+    const active = isActiveSubscription(subscription, now);
+    const expired = !active;
     return { tier, subscription, active, expired, subscriber: true };
   }, [now, profileSubscription, subscriptionRenewal]);
 
@@ -533,7 +536,7 @@ export default function ProfileApp() {
 
 function ProfileRenewalCard({ tier, subscription, now, onRenew, onToggleReminders }: { tier: MembershipTier; subscription: SubscriptionSnapshot; now: number; onRenew: () => void; onToggleReminders: (next: boolean) => void }) {
   const theme = MEMBERSHIP_THEMES[tier];
-  const expired = subscription.status === "expired" || subscription.status === "cancelled" || (subscription.expiresAt > 0 && subscription.expiresAt <= now);
+  const expired = !isActiveSubscription(subscription, now);
   const daysRemaining = subscription.expiresAt > now ? Math.max(1, Math.ceil((subscription.expiresAt - now) / 86400000)) : 0;
   const totalDays = subscription.cycle === "yearly" ? 365 : 30;
   const progress = subscription.expiresAt > 0 ? Math.max(0, Math.min(100, Math.round((daysRemaining / totalDays) * 100))) : 100;
