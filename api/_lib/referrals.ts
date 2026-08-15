@@ -28,12 +28,19 @@ export const ensureReferralCoupon = async (input: { uid: string; name?: string; 
   const [existing, userSnap] = await Promise.all([couponRef.get(), db.collection("users").doc(input.uid).get()]);
   const userData = userSnap.data() || {};
   const usedCount = Math.max(0, Number(existing.data()?.usedCount || 0));
+  // A referral ID is single-use and terminal: once spent (usedCount
+  // >= 1) it stays "inactive" forever. Re-provisioning (renewals,
+  // referral refresh) must NEVER resurrect a spent coupon back to
+  // "active" — that was the loophole that let a used referral be
+  // redeemed again from another account.
+  const spent = usedCount >= 1;
+  const status = spent ? "inactive" : config.enabled ? "active" : "inactive";
   await Promise.all([
     couponRef.set({
       code,
       type: "flat",
       value: config.discountPaise,
-      status: config.enabled ? "active" : "inactive",
+      status,
       perUserLimit: 1,
       globalLimit: 1,
       usedCount,
@@ -48,10 +55,10 @@ export const ensureReferralCoupon = async (input: { uid: string; name?: string; 
       photoURL: input.photoURL || userData.photoURL || null,
       referralCode: code,
       usedCount,
-      active: true,
+      active: !spent,
       updatedAt: Date.now(),
     }, { merge: true }),
-    db.collection("users").doc(input.uid).set({ referralCode: code, updatedAt: Date.now() }, { merge: true }),
+    db.collection("users").doc(input.uid).set({ referralCode: code, referralUsedCount: usedCount, updatedAt: Date.now() }, { merge: true }),
   ]);
   return { code, config, usedCount };
 };

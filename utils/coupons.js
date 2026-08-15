@@ -273,6 +273,12 @@ export const validateCoupon = (coupon, orderContext, now = Date.now()) => {
   if (orderSubtotal <= 0) {
     return { ok: false, code: "COUPON_FREE_ORDER", reason: "Coupons cannot be applied to a free order." };
   }
+  // A spent referral ID gets its precise message BEFORE the generic
+  // inactive check: spending a referral also discontinues it (status
+  // flips to "inactive"), and the user deserves the real reason.
+  if (coupon.referralOwnerUid && coupon.usedCount >= 1) {
+    return { ok: false, code: "REFERRAL_ALREADY_USED", reason: "This referral is already used by someone. Referral ID already used — each ID works only once. Explore leaderboard Unused IDs." };
+  }
   if (!isCouponActive(coupon, now)) {
     return { ok: false, code: "COUPON_INACTIVE", reason: "This coupon is no longer active." };
   }
@@ -417,7 +423,13 @@ export const buildCouponRedemptionDocId = (couponCode, orderId) => {
  */
 export const shouldIncrementCouponUsage = (redemptionDoc, coupon, now = Date.now()) => {
   if (!isObject(redemptionDoc) || !isObject(coupon)) return false;
-  if (String(redemptionDoc.status || "") !== "pending") return false;
+  const status = String(redemptionDoc.status || "");
+  // A FRESH redemption (no prior doc → empty status) increments the
+  // count: this is the normal verify-payment path, where the
+  // redemption doc is created in the same transaction. The "pending"
+  // status is the rare repair path (payment reserved, grant rolled
+  // back). "applied" / "reverted" are terminal — never re-increment.
+  if (status !== "" && status !== "pending") return false;
   if (!isCouponActive(coupon, now)) return false;
   if (!isWithinGlobalLimit(coupon)) return false;
   return true;

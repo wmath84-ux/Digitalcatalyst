@@ -223,8 +223,11 @@ export default function LeaderboardApp() {
                   </div>
                   <div className="mt-3 flex items-center justify-between rounded-xl bg-white/70 px-3 py-2">
                     <span className="text-[10px] font-bold uppercase text-slate-400">Referral ID</span>
-                    <code className="max-w-[230px] truncate text-xs font-black text-slate-800">{row.referralCode}</code>
+                    <code className={`max-w-[230px] truncate text-xs font-black ${used ? "text-slate-400 line-through decoration-2 decoration-rose-400" : "text-slate-800"}`}>{row.referralCode}</code>
                   </div>
+                  {used ? (
+                    <p className="mt-2 text-[10px] font-semibold text-amber-700">This referral ID has been used and is discontinued.</p>
+                  ) : null}
                 </article>
                 );
               })}

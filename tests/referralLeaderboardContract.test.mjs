@@ -74,16 +74,52 @@ test("reusing a spent referral shows a clear already-used message on the subscri
   assert.match(input, /#\/leaderboard/);
 });
 
+test("a used referral ID is spent permanently: discontinued, never resurrected, counted for real", () => {
+  const couponsLib = fs.readFileSync("api/_lib/coupons.ts", "utf8");
+  const engine = fs.readFileSync("utils/coupons.js", "utf8");
+  // 1. THE core fix: a fresh redemption (no prior doc → empty status)
+  //    must increment usedCount. Before this fix only the rare
+  //    "pending" repair path incremented, so referral usedCount never
+  //    moved and a spent ID kept working from other accounts.
+  assert.match(engine, /status !== "" && status !== "pending"/);
+  // 2. Spending a referral flips the coupon to "inactive" in the same
+  //    transaction — the ID is discontinued the moment it is used.
+  assert.match(couponsLib, /status: "inactive", usedByUid: args\.uid/);
+  // 3. The redemption writer re-reads the coupon INSIDE the
+  //    transaction so two concurrent payments cannot both spend a
+  //    one-shot referral.
+  assert.match(couponsLib, /tx\.get\(couponTxRef\)/);
+  // 4. The owner's profile is stamped so the UI can cross the ID out.
+  assert.match(couponsLib, /referralUsedCount: FieldValue\.increment\(1\)/);
+  // 5. Re-provisioning (renewals) must never resurrect a spent coupon.
+  assert.match(referrals, /const spent = usedCount >= 1/);
+  assert.match(referrals, /spent \? "inactive"/);
+  assert.match(referrals, /active: !spent/);
+});
+
+test("the owner's profile crosses out a used referral ID with a clear Used badge", () => {
+  const profile = fs.readFileSync("src/profile/App.tsx", "utf8");
+  assert.match(profile, /referralUsedCount/);
+  assert.match(profile, /data-profile-referral-used/);
+  assert.match(profile, /line-through/);
+  assert.match(profile, />Used</);
+  assert.match(profile, /no longer active/);
+});
+
+test("leaderboard hides used IDs from Unused and crosses them out elsewhere", () => {
+  // Unused view lists only never-used, still-active IDs.
+  assert.match(leaderboard, /row\.usedCount < 1 && row\.available/);
+  // Used rows show a crossed-out code and a discontinued note.
+  assert.match(leaderboard, /line-through/);
+  assert.match(leaderboard, /discontinued/);
+  // The API derives availability from the coupon's live state.
+  const api = fs.readFileSync("api/referral-leaderboard.ts", "utf8");
+  assert.match(api, /usedCount < 1/);
+  assert.match(api, /status !== "inactive"|status\)? !== \\?"inactive\\?"|"inactive"/);
+});
+
 test("a spent referral coupon is refused by the shared validator with the already-used code", () => {
-  const coupon = normaliseCouponDoc({
-    code: "DCOWNER",
-    type: "flat",
-    value: 25000,
-    referralOwnerUid: "owner",
-    globalLimit: 1,
-    usedCount: 1,
-  });
-  const result = validateCoupon(coupon, {
+  const orderContext = {
     subtotalPaise: 50000,
     productIds: [],
     moduleIds: [],
@@ -93,10 +129,35 @@ test("a spent referral coupon is refused by the shared validator with the alread
     userHasPriorPurchases: false,
     userUsageCount: 0,
     userUid: "someone-else",
+  };
+  const coupon = normaliseCouponDoc({
+    code: "DCOWNER",
+    type: "flat",
+    value: 25000,
+    referralOwnerUid: "owner",
+    globalLimit: 1,
+    usedCount: 1,
   });
+  const result = validateCoupon(coupon, orderContext);
   assert.equal(result.ok, false);
   assert.equal(result.code, "REFERRAL_ALREADY_USED");
   assert.match(result.reason, /already used by someone/i);
+  // Even after the coupon has been discontinued (status flipped to
+  // "inactive" by the redemption writer), the precise already-used
+  // message wins over the generic inactive one.
+  const discontinued = normaliseCouponDoc({
+    code: "DCOWNER",
+    type: "flat",
+    value: 25000,
+    referralOwnerUid: "owner",
+    globalLimit: 1,
+    usedCount: 1,
+    status: "inactive",
+  });
+  const discontinuedResult = validateCoupon(discontinued, orderContext);
+  assert.equal(discontinuedResult.ok, false);
+  assert.equal(discontinuedResult.code, "REFERRAL_ALREADY_USED");
+  assert.match(discontinuedResult.reason, /already used by someone/i);
 });
 
 test("subscription has a separate server-validated referral input", () => {
