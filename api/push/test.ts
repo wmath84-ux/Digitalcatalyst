@@ -1,4 +1,4 @@
-import * as webpush from "web-push";
+import { setVapidDetails, sendNotification } from "../_lib/webpush.js";
 import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "../_lib/firebaseAdmin.js";
 
 const clean = (value: unknown, max: number) => String(value || "").trim().slice(0, max);
@@ -20,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!publicKey || !privateKey) {
       return res.status(503).json({ ok: false, code: "vapid_not_configured", error: "Server Web Push keys are not configured. Add WEB_PUSH_VAPID_PUBLIC_KEY and WEB_PUSH_VAPID_PRIVATE_KEY in Vercel." });
     }
-    webpush.setVapidDetails(process.env.WEB_PUSH_SUBJECT || "mailto:admin@eduvora.app", publicKey, privateKey);
+    setVapidDetails(process.env.WEB_PUSH_SUBJECT || "mailto:admin@eduvora.app", publicKey, privateKey);
 
     const body = (req.body || {}) as Record<string, unknown>;
     const liveEndpoint = clean(body.endpoint, 2000);
@@ -60,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         continue;
       }
       try {
-        await webpush.sendNotification({ endpoint: String(data.endpoint), keys: { p256dh: String(data.p256dh), auth: String(data.auth) } }, payload, { TTL: 300 });
+        await sendNotification({ endpoint: String(data.endpoint), keys: { p256dh: String(data.p256dh), auth: String(data.auth) } }, payload, { TTL: 300 });
         results.push({ id: item.id, sent: true });
       } catch (error) {
         const statusCode = Number((error as { statusCode?: unknown }).statusCode || 0);

@@ -6,7 +6,7 @@
 // (purchase unlocks, admin product saves, manual admin announcements) share
 // these.
 
-import * as webpush from "web-push";
+import { setVapidDetails, sendNotification } from "./webpush.js";
 import type { Firestore } from "firebase-admin/firestore";
 
 export type PushPayload = { title: string; body: string; tag?: string; url?: string };
@@ -15,7 +15,7 @@ export const pushConfigured = (): boolean => {
   const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY;
   const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY;
   if (!publicKey || !privateKey) return false;
-  webpush.setVapidDetails(process.env.WEB_PUSH_SUBJECT || "mailto:admin@eduvora.app", publicKey, privateKey);
+  setVapidDetails(process.env.WEB_PUSH_SUBJECT || "mailto:admin@eduvora.app", publicKey, privateKey);
   return true;
 };
 
@@ -25,7 +25,7 @@ const sendToSubscriptionDoc = async (item: SubscriptionDoc, payloadString: strin
   const data = item.data() || {};
   if (!data.endpoint || !data.p256dh || !data.auth) return 0;
   try {
-    await webpush.sendNotification(
+    await sendNotification(
       { endpoint: String(data.endpoint), keys: { p256dh: String(data.p256dh), auth: String(data.auth) } },
       payloadString,
       { TTL: 86400 },
