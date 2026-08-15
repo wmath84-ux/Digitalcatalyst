@@ -1,54 +1,48 @@
-# Minute-level pinger for the push scheduler.
+# Minute-level pinger for the real-time push scheduler.
 #
-# ⚠️  THIS FILE IS NOT ACTIVE WHERE IT SITS.
-#     Copy it to .github/workflows/push-scheduler.yml and commit that
-#     yourself — the agent's GitHub App is not allowed to create or
-#     modify workflow files, so it cannot install this for you:
-#
-#       mkdir -p .github/workflows
-#       cp ops/push-scheduler.workflow.yml .github/workflows/push-scheduler.yml
-#       git add .github/workflows/push-scheduler.yml
-#       git commit -m "Add push scheduler workflow" && git push
-#
-#     Until it lives in .github/workflows/, My Day reminders are only
-#     delivered by the once-a-day Vercel cron — i.e. almost never on
-#     time. Any external pinger (cron-job.org, UptimeRobot, Runhooks)
-#     hitting the same URL with the same Authorization header works
-#     just as well if you prefer not to use GitHub Actions.
+# ⚠️  THIS FILE IS THE TEMPLATE; the live workflow is
+#     .github/workflows/push-scheduler.yml (already committed). Keep the two
+#     in sync if you change one.
 #
 # Why this exists: My Day reminders have to fire at the exact minute the
-# user chose, whether or not the app is open. That needs something
-# calling the scheduler every few minutes — and Vercel's Hobby plan caps
-# cron at ONE run per day (a sub-daily expression in vercel.json fails at
-# deploy time), with even that run landing anywhere inside its hour.
+# user chose, whether or not the app is open. That needs something calling
+# the scheduler every minute — and Vercel's Hobby plan caps cron at ONE run
+# per day (a sub-daily expression in vercel.json fails at deploy time), with
+# even that run landing anywhere inside its hour.
 #
 # The scheduler endpoint is an ordinary authenticated HTTP route, so any
-# external timer can drive it. GitHub Actions is free for this and lives
-# in the repo, so there is no third-party account to lose.
+# external timer can drive it. GitHub Actions is free for this and lives in
+# the repo, so there is no third-party account to lose.
 #
-# The daily Vercel cron stays as a safety net: if this workflow is
-# disabled or GitHub has an outage, the catch-up window still sweeps up
-# anything missed (see resolveLookbackMs in utils/pushScheduler.js).
+# The daily Vercel cron stays as a safety net: if this workflow is disabled
+# or GitHub has an outage, the catch-up window still sweeps up anything
+# missed (see resolveLookbackMs in utils/pushScheduler.js).
 #
 # Setup (one time):
 #   1. Repo → Settings → Secrets and variables → Actions
 #   2. Add secret  CRON_SECRET     — same value as the Vercel env var
 #   3. Add secret  SCHEDULER_URL   — https://<your-domain>/api/cron/subscription-renewals
 #
-# Note on GitHub's scheduler: `*/5` is best-effort, not exact — runs can
-# be delayed under load. That is fine here because the endpoint derives
-# its own catch-up window from the last successful run, so a late ping
-# still delivers every reminder in between.
+# GitHub's scheduler is best-effort, not hard real-time — under load a run
+# can land a minute late. That is fine here: the endpoint derives its own
+# catch-up window from the last successful run, so a late ping still
+# delivers every reminder that came due in between (capped at 1h so a
+# 9 AM reminder never fires at 6 PM).
 
 name: Push scheduler
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    # Every minute. Runs are idempotent and cheap, and the endpoint
+    # deduplicates per item per local day, so an occasional double-fire
+    # never produces two notifications.
+    - cron: "* * * * *"
   # Lets you fire a run by hand from the Actions tab when testing.
   workflow_dispatch:
 
-# A slow run must never overlap with the next tick.
+# A slow run must never overlap with the next tick. cancel-in-progress:
+# false means a long run queues rather than being killed, so no minute is
+# silently skipped.
 concurrency:
   group: push-scheduler
   cancel-in-progress: false
@@ -56,7 +50,7 @@ concurrency:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 4
     steps:
       - name: Trigger scheduled push jobs
         env:
@@ -68,9 +62,33 @@ jobs:
             echo "::error::SCHEDULER_URL and CRON_SECRET repository secrets are required."
             exit 1
           fi
-          # --fail-with-body so a non-2xx surfaces the API's error message.
-          curl --silent --show-error --fail-with-body \
-            --max-time 120 \
-            --retry 2 --retry-delay 5 --retry-connrefused \
-            --header "Authorization: Bearer ${CRON_SECRET}" \
-            "${SCHEDULER_URL}"
+          # Capture the body once. Without this, --retry re-prints the same
+          # 500 body on every attempt, which is what produced three copies of
+          # {"ok":false,...} in the original failing logs.
+          body_file="$(mktemp)"
+          http_code=0
+          for attempt in 1 2 3; do
+            set +e
+            http_code="$(curl --silent --show-error \
+              --max-time 120 \
+              --header "Authorization: Bearer ${CRON_SECRET}" \
+              --output "${body_file}" \
+              --write-out '%{http_code}' \
+              "${SCHEDULER_URL}")"
+            curl_status=$?
+            set -e
+            if [ "${curl_status}" -eq 0 ] && [ "${http_code}" -ge 200 ] && [ "${http_code}" -lt 300 ]; then
+              echo "Scheduler responded HTTP ${http_code}:"
+              cat "${body_file}"
+              echo ""
+              rm -f "${body_file}"
+              exit 0
+            fi
+            echo "::warning::Attempt ${attempt} failed (curl exit ${curl_status}, HTTP ${http_code})."
+            if [ "${attempt}" -lt 3 ]; then sleep 5; fi
+          done
+          echo "::error::Scheduler did not return 2xx after 3 attempts. Last response (HTTP ${http_code}):"
+          cat "${body_file}"
+          echo ""
+          rm -f "${body_file}"
+          exit 1
