@@ -217,6 +217,7 @@ export default function SubscriptionPage() {
   // ---------- Derived ----------
   const plans: SubscriptionPlanDoc[] = catalog?.plans || [];
   const rawFeatures: SubscriptionFeatureDoc[] = catalog?.features || [];
+  const rawSubscriptionProducts: any[] = catalog?.subscriptionProducts || [];
   useEffect(() => {
     if (rawFeatures.some((feature) => feature.id === "my-day")) {
       setSelectedFeatureIds((current) => current.length === 0 ? ["my-day"] : current);
@@ -289,6 +290,27 @@ export default function SubscriptionPage() {
     const selected = new Set(selectedCourseIds);
     return availableProducts.filter((product) => productHasId(product, selected));
   }, [availableProducts, selectedCourseIds]);
+
+  // Resolve subscriptionProducts (new per-plan / duration priced add-ons) into selectable records
+  // These can be used to override prices of catalog products when selected via subscription.
+  const resolvedSubscriptionProducts = useMemo(() => {
+    return rawSubscriptionProducts.map((sp) => {
+      const resolved = resolveFeaturePrice({
+        id: sp.productId || sp.id,
+        included: sp.included,
+        pricePaise: sp.pricePaise || 0,
+        monthlyPricePaise: sp.monthlyPricePaise,
+        yearlyPricePaise: sp.yearlyPricePaise,
+        planPricing: sp.planPricing || {},
+      }, selectedPlanId, cycle);
+      return {
+        ...sp,
+        resolvedPrice: resolved.pricePaise / 100,
+        resolvedIncluded: resolved.included,
+        checkoutId: sp.productId || sp.id,
+      };
+    });
+  }, [rawSubscriptionProducts, selectedPlanId, cycle]);
   const productsTotalPaise = useMemo(() => selectedProductRecords.reduce((sum, product) => sum + Math.max(0, Math.round(product.price * 100)), 0), [selectedProductRecords]);
   const subtotalPaise = selectedPlanPricePaise + featuresTotalPaise + productsTotalPaise;
   const couponDiscountPaise = appliedReferral?.discountPaise || appliedCoupon?.discountPaise || 0;
