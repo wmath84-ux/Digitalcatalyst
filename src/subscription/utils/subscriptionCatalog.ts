@@ -55,8 +55,18 @@ export interface SubscriptionFeatureDoc {
   description: string;
   /** Icon name (matches a Lucide icon). */
   icon: string;
-  /** Feature price in paise. */
+  /** Feature price in paise (legacy flat rate; used when no override matches). */
   pricePaise: number;
+  /** Cycle-specific base rate in paise. Null falls back to `pricePaise`. */
+  monthlyPricePaise?: number | null;
+  /** Cycle-specific base rate in paise. Null falls back to `pricePaise`. */
+  yearlyPricePaise?: number | null;
+  /**
+   * Per-plan price overrides keyed by plan id, e.g.
+   * `{ premium: { monthly: 49, yearly: 490 }, pro: { included: true } }`.
+   * Resolved by `utils/featurePricing.js` on both client and server.
+   */
+  planPricing?: Record<string, unknown>;
   /** True when the feature is included for free with the plan. */
   included: boolean;
   /** Active flag (admin can disable a feature without removing it). */

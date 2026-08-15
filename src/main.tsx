@@ -19,6 +19,7 @@ import AuthApp from "./AuthApp";
 import AdminLoginApp from "./AdminLoginApp";
 import AdminApp from "./admin/AdminApp";
 import NotificationsPage from "./components/NotificationsPage";
+import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
@@ -76,6 +77,9 @@ const CART_HASH = "#/cart";
 const FAVORITES_HASH = "#/favorites";
 const SUBSCRIPTION_HASH = "#/subscription";
 const NOTIFICATIONS_HASH = "#/notifications";
+// Developer sandbox for the expiry / renewal messaging. Pure preview:
+// it synthesises a subscription document and never touches Firestore.
+const RENEWAL_PREVIEW_HASH = "#/dev/subscription-preview";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
 
@@ -686,6 +690,9 @@ function Root() {
   }
 
   if (hash.startsWith(ADMIN_HASH)) return user && hasAdminSession(user.id, user.email, user.role) ? <AdminApp /> : <AdminLoginApp />;
+  if (hash.startsWith(RENEWAL_PREVIEW_HASH)) {
+    return <RenewalPreviewPage onBack={() => { window.location.hash = SUBSCRIPTION_HASH; }} />;
+  }
   if (hash.startsWith(SUBSCRIPTION_HASH)) return <SubscriptionApp />;
   if (hash.startsWith(NOTIFICATIONS_HASH)) {
     return (

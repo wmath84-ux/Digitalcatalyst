@@ -1,0 +1,316 @@
+// src/components/subscription/RenewalPreviewPage.tsx
+//
+// Developer sandbox for the subscription expiry / renewal experience.
+//
+// Route: #/dev/subscription-preview
+//
+// Nothing here touches Firestore. A slider synthesises a subscription
+// document at an arbitrary distance from its expiry date, runs it
+// through the SAME pure pipeline the live app uses
+// (`getRenewalReminder` → `buildRenewalView`), and renders every
+// surface side by side:
+//
+//   - the sticky in-app banner
+//   - the notification-list row
+//   - the full renewal status card
+//   - the raw reminder payload the push scheduler would send
+//
+// Because it shares the real helpers, whatever appears here is exactly
+// what a buyer sees on that day — this is a preview, not a mock-up.
+
+import { useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  AlertTriangle,
+  Bell,
+  CalendarClock,
+  Clock,
+  Lock,
+  RefreshCw,
+} from "lucide-react";
+import { getRenewalReminder } from "../../../utils/subscriptionRenewal";
+import { buildRenewalView, shouldShowRenewalBanner } from "../../../utils/renewalPresentation";
+import RenewalBanner from "./RenewalBanner";
+import RenewalStatusCard from "./RenewalStatusCard";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** One-tap jumps to each meaningful stage boundary. */
+const PRESETS = [
+  { label: "30 days", days: 30 },
+  { label: "7 days", days: 7 },
+  { label: "3 days", days: 3 },
+  { label: "Tomorrow", days: 1 },
+  { label: "Due today", days: 0 },
+  { label: "Expired", days: -2 },
+];
+
+const ICONS = {
+  "calendar-clock": CalendarClock,
+  clock: Clock,
+  "alert-triangle": AlertTriangle,
+  lock: Lock,
+} as const;
+
+export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) {
+  const [offsetDays, setOffsetDays] = useState<number>(3);
+  const [planName, setPlanName] = useState<string>("Premium");
+  const [cycle, setCycle] = useState<"monthly" | "yearly">("monthly");
+  const [optOut, setOptOut] = useState<boolean>(false);
+  const [dismissed, setDismissed] = useState<string[]>([]);
+
+  // A synthetic subscription document, shaped exactly like
+  // `users/{uid}/subscription/current`.
+  const now = Date.now();
+  const subscription = useMemo(
+    () => ({
+      status: offsetDays < 0 ? "expired" : "active",
+      planId: planName.toLowerCase(),
+      planName,
+      cycle,
+      expiresAt: now + offsetDays * DAY_MS,
+      renewalReminderOptOut: optOut,
+    }),
+    [offsetDays, planName, cycle, optOut, now],
+  );
+
+  const reminder = useMemo(() => getRenewalReminder(subscription, now), [subscription, now]);
+  const view = useMemo(
+    () => buildRenewalView(reminder, { now, planName }),
+    [reminder, now, planName],
+  );
+  const bannerVisible = shouldShowRenewalBanner(view, dismissed);
+  const NotifIcon = view ? ICONS[view.icon as keyof typeof ICONS] || Bell : Bell;
+
+  return (
+    <div className="min-h-screen bg-slate-100 sm:py-6">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:rounded-[2rem] sm:border sm:border-slate-200">
+        {/* Header */}
+        <header className="flex items-center gap-3 border-b border-slate-100 px-4 py-4">
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="Back"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 active:scale-90"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          ) : null}
+          <div className="min-w-0">
+            <h1 className="text-base font-black text-slate-900">Renewal preview</h1>
+            <p className="text-[11px] font-medium text-slate-400">Sandbox · no data is written</p>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto pb-10">
+          {/* ---------------- Controls ---------------- */}
+          <section className="border-b border-slate-100 bg-slate-50/70 px-4 py-4">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black uppercase tracking-wider text-slate-500">
+                Days to expiry
+              </label>
+              <span
+                data-preview-offset
+                className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-black text-white"
+              >
+                {offsetDays > 0 ? `+${offsetDays}d` : offsetDays === 0 ? "today" : `${offsetDays}d`}
+              </span>
+            </div>
+
+            <input
+              type="range"
+              min={-10}
+              max={40}
+              step={1}
+              value={offsetDays}
+              onChange={(event) => setOffsetDays(Number(event.target.value))}
+              data-preview-slider
+              className="mt-3 w-full accent-violet-600"
+            />
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => setOffsetDays(preset.days)}
+                  className={`rounded-full px-2.5 py-1.5 text-[11px] font-bold transition active:scale-95 ${
+                    offsetDays === preset.days
+                      ? "bg-violet-600 text-white"
+                      : "bg-white text-slate-600 ring-1 ring-slate-200"
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-400">Plan</span>
+                <select
+                  value={planName}
+                  onChange={(event) => setPlanName(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-800"
+                >
+                  {["Basic", "Premium", "Pro"].map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-400">Cycle</span>
+                <select
+                  value={cycle}
+                  onChange={(event) => setCycle(event.target.value as "monthly" | "yearly")}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-800"
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-3 flex items-center gap-3">
+              <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={optOut}
+                  onChange={(event) => setOptOut(event.target.checked)}
+                  className="h-4 w-4 accent-violet-600"
+                />
+                Reminder opt-out
+              </label>
+              {dismissed.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setDismissed([])}
+                  className="flex items-center gap-1 text-[11px] font-bold text-violet-600"
+                >
+                  <RefreshCw className="h-3 w-3" /> Reset dismissals
+                </button>
+              ) : null}
+            </div>
+          </section>
+
+          {/* ---------------- No-reminder state ---------------- */}
+          {!view ? (
+            <div
+              data-preview-empty
+              className="mx-4 mt-5 rounded-2xl border border-dashed border-slate-200 p-6 text-center"
+            >
+              <p className="text-sm font-black text-slate-700">No reminder at this point</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                {optOut
+                  ? "Reminders are switched off for this subscriber."
+                  : "Renewal notices begin 7 days before expiry. Move the slider closer to zero."}
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* ---------------- Surface 1: banner ---------------- */}
+              <PreviewSection
+                title="In-app banner"
+                caption="Shown at the top of the app shell while the notice is active."
+              >
+                {bannerVisible ? (
+                  <RenewalBanner
+                    view={view}
+                    onRenew={() => undefined}
+                    onDismiss={(stage) => setDismissed((prev) => [...prev, stage])}
+                    className="mx-0"
+                  />
+                ) : (
+                  <p className="rounded-2xl bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">
+                    Dismissed for this stage. The next stage will show again.
+                  </p>
+                )}
+              </PreviewSection>
+
+              {/* ---------------- Surface 2: notification row ---------------- */}
+              <PreviewSection
+                title="Notification list row"
+                caption="How it appears inside #/notifications and as a push."
+              >
+                <div
+                  data-preview-notification
+                  className="flex w-full items-start gap-3 rounded-2xl bg-indigo-50/70 px-3 py-3 text-left"
+                >
+                  <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                    <NotifIcon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold text-slate-900">{reminder?.title}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">{view.body}</span>
+                    <span className="mt-1 block text-[11px] font-semibold text-slate-400">just now</span>
+                  </span>
+                  <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-indigo-600" />
+                </div>
+              </PreviewSection>
+
+              {/* ---------------- Surface 3: status card ---------------- */}
+              <PreviewSection
+                title="Renewal status card"
+                caption="Shown on the profile page and the subscription page."
+              >
+                <RenewalStatusCard
+                  view={view}
+                  cycle={cycle}
+                  reminderOptOut={optOut}
+                  onRenew={() => undefined}
+                  onToggleReminders={(next) => setOptOut(next)}
+                />
+              </PreviewSection>
+
+              {/* ---------------- Surface 4: raw payload ---------------- */}
+              <PreviewSection
+                title="Scheduler payload"
+                caption="Exactly what the daily cron writes and pushes."
+              >
+                <pre
+                  data-preview-payload
+                  className="overflow-x-auto rounded-2xl bg-slate-900 p-3 text-[10px] leading-relaxed text-emerald-300"
+                >
+{JSON.stringify(
+  {
+    stage: view.stage,
+    urgency: view.urgency,
+    tone: view.tone,
+    title: reminder?.title,
+    body: view.body,
+    daysRemaining: view.daysRemaining,
+    target: view.target,
+  },
+  null,
+  2,
+)}
+                </pre>
+              </PreviewSection>
+            </>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function PreviewSection({
+  title,
+  caption,
+  children,
+}: {
+  title: string;
+  caption: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="px-4 pt-5">
+      <div className="mb-2">
+        <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">{title}</h2>
+        <p className="mt-0.5 text-[11px] text-slate-400">{caption}</p>
+      </div>
+      {children}
+    </section>
+  );
+}

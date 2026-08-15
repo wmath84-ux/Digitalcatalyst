@@ -37,8 +37,14 @@ export interface SubscriptionFeatureDoc {
   name: string;
   description: string;
   icon: string;
-  /** Paise. */
+  /** Paise. Legacy flat price applied when no override matches. */
   pricePaise: number;
+  /** Paise. Cycle-specific base rate; null falls back to `pricePaise`. */
+  monthlyPricePaise?: number | null;
+  /** Paise. Cycle-specific base rate; null falls back to `pricePaise`. */
+  yearlyPricePaise?: number | null;
+  /** Per-plan price overrides keyed by plan id. */
+  planPricing?: Record<string, { included: boolean; monthlyPaise: number | null; yearlyPaise: number | null; flatPaise: number | null }>;
   included: boolean;
   active: boolean;
   badge: string | null;

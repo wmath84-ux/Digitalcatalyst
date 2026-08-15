@@ -17,12 +17,20 @@ type Plan = {
   active: boolean;
 };
 
+/** Per-plan price override stored on a feature doc. */
+type PlanPriceOverride = { included?: boolean; monthly?: number | string | null; yearly?: number | string | null };
+
 type FeatureRow = {
   id: string;
   key: string;
   name: string;
   description: string | null;
   individualPrice: string | null;
+  /** Optional cycle-specific base rates (rupees). Blank = use flat price. */
+  monthlyPrice?: string | null;
+  yearlyPrice?: string | null;
+  /** Optional per-plan overrides keyed by plan id. */
+  planPricing?: Record<string, PlanPriceOverride>;
   icon: string | null;
   included: boolean;
   badge: string | null;
@@ -31,7 +39,7 @@ type FeatureRow = {
 };
 
 const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }], accessTier: "basic", cta: "Subscribe", featured: false, active: true };
-const EMPTY_FEATURE: Partial<FeatureRow> = { key: "", name: "", description: "", individualPrice: "0", icon: "sparkles", included: false, badge: "", sortOrder: 0, active: true };
+const EMPTY_FEATURE: Partial<FeatureRow> = { key: "", name: "", description: "", individualPrice: "0", monthlyPrice: "", yearlyPrice: "", planPricing: {}, icon: "sparkles", included: false, badge: "", sortOrder: 0, active: true };
 
 export default function SubscriptionsPage() {
   const [tab, setTab] = useState("plans");
@@ -167,7 +175,19 @@ export default function SubscriptionsPage() {
                     <span className="text-sm font-semibold text-slate-900">{f.name}</span>
                     <Pill tone={f.active ? "success" : "default"}>{f.active ? "active" : "inactive"}</Pill>
                   </div>
-                  <p className="mt-0.5 text-xs text-slate-500">{f.key} · {f.included ? "Included in plan" : `₹${f.individualPrice} per billing cycle`} {f.badge ? `· ${f.badge}` : ""}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{f.key} · {f.included ? "Included in plan" : `₹${f.individualPrice} base`} {f.badge ? `· ${f.badge}` : ""}</p>
+                  {!f.included && (f.monthlyPrice || f.yearlyPrice || Object.keys(f.planPricing ?? {}).length > 0) && (
+                    <p className="mt-1 flex flex-wrap gap-1">
+                      {f.monthlyPrice ? <Pill tone="info">mo ₹{f.monthlyPrice}</Pill> : null}
+                      {f.yearlyPrice ? <Pill tone="info">yr ₹{f.yearlyPrice}</Pill> : null}
+                      {Object.entries(f.planPricing ?? {}).map(([planId, override]) => (
+                        <Pill key={planId} tone={override.included ? "success" : "default"}>
+                          {(plans.find((p) => p.id === planId)?.name ?? planId)}
+                          {override.included ? ": free" : `: ${override.monthly ? `₹${override.monthly}/mo` : ""}${override.monthly && override.yearly ? " · " : ""}${override.yearly ? `₹${override.yearly}/yr` : ""}`}
+                        </Pill>
+                      ))}
+                    </p>
+                  )}
                   <div className="mt-2 flex gap-2">
                     <SecondaryButton className="h-9 flex-1 text-xs" onClick={() => setEditingFeature(f)}>Edit</SecondaryButton>
                     <DangerButton className="h-9 flex-1 text-xs" onClick={() => removeFeature(f)}>Delete</DangerButton>
@@ -240,9 +260,61 @@ export default function SubscriptionsPage() {
             <Field label="Name" required><input className={inputClass} placeholder="Feature name shown to customers" value={editingFeature.name ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, name: e.target.value })} /></Field>
             <Field label="Description"><textarea className={textareaClass} placeholder="Explain what this feature includes" value={editingFeature.description ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, description: e.target.value })} /></Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Individual price (₹) per billing cycle" hint="Set 0 only when the feature is included/free"><input className={inputClass} type="number" min="0" value={editingFeature.individualPrice ?? "0"} onChange={(e) => setEditingFeature({ ...editingFeature, individualPrice: e.target.value })} /></Field>
+              <Field label="Individual price (₹)" hint="Base rate; overridden by the cycle/plan rules below"><input className={inputClass} type="number" min="0" value={editingFeature.individualPrice ?? "0"} onChange={(e) => setEditingFeature({ ...editingFeature, individualPrice: e.target.value })} /></Field>
               <Field label="Icon key" hint="calendar, rocket, code, users…"><input className={inputClass} value={editingFeature.icon ?? "sparkles"} onChange={(e) => setEditingFeature({ ...editingFeature, icon: e.target.value })} /></Field>
             </div>
+
+            {/* Cycle-specific base rates — apply to every plan that has no
+                explicit override below. Blank falls back to the base price. */}
+            {!editingFeature.included && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold text-slate-700">Cycle pricing (optional)</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">Leave blank to charge the base price for both cycles.</p>
+                <div className="mt-2 grid grid-cols-2 gap-3">
+                  <Field label="Monthly (₹)"><input className={inputClass} type="number" min="0" placeholder="base" value={editingFeature.monthlyPrice ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, monthlyPrice: e.target.value })} /></Field>
+                  <Field label="Yearly (₹)"><input className={inputClass} type="number" min="0" placeholder="base" value={editingFeature.yearlyPrice ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, yearlyPrice: e.target.value })} /></Field>
+                </div>
+              </div>
+            )}
+
+            {/* Per-plan overrides — the strongest rule. Lets the same feature
+                cost differently (or be free) on each plan. */}
+            {!editingFeature.included && plans.length > 0 && (
+              <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3">
+                <p className="text-xs font-semibold text-slate-700">Plan-wise pricing (optional)</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">Overrides the rates above for a specific plan. Blank = inherit.</p>
+                <div className="mt-2 space-y-2">
+                  {plans.map((plan) => {
+                    const override: PlanPriceOverride = editingFeature.planPricing?.[plan.id] ?? {};
+                    const setOverride = (next: PlanPriceOverride) => {
+                      const map = { ...(editingFeature.planPricing ?? {}) };
+                      const cleaned: PlanPriceOverride = { ...override, ...next };
+                      const empty = !cleaned.included && (cleaned.monthly === "" || cleaned.monthly === null || cleaned.monthly === undefined) && (cleaned.yearly === "" || cleaned.yearly === null || cleaned.yearly === undefined);
+                      if (empty) delete map[plan.id];
+                      else map[plan.id] = cleaned;
+                      setEditingFeature({ ...editingFeature, planPricing: map });
+                    };
+                    return (
+                      <div key={plan.id} className="rounded-lg border border-slate-200 bg-white p-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-slate-800">{plan.name}</span>
+                          <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
+                            <input type="checkbox" className="h-4 w-4" checked={override.included === true} onChange={(e) => setOverride({ included: e.target.checked })} />
+                            Free on this plan
+                          </label>
+                        </div>
+                        {!override.included && (
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            <input className={inputClass} type="number" min="0" placeholder="Monthly ₹" value={(override.monthly as string) ?? ""} onChange={(e) => setOverride({ monthly: e.target.value })} />
+                            <input className={inputClass} type="number" min="0" placeholder="Yearly ₹" value={(override.yearly as string) ?? ""} onChange={(e) => setOverride({ yearly: e.target.value })} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Badge"><input className={inputClass} placeholder="POPULAR" value={editingFeature.badge ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, badge: e.target.value })} /></Field>
               <Field label="Display order"><input className={inputClass} type="number" value={editingFeature.sortOrder ?? 0} onChange={(e) => setEditingFeature({ ...editingFeature, sortOrder: Number(e.target.value || 0) })} /></Field>

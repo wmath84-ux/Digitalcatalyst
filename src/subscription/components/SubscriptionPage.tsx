@@ -32,6 +32,12 @@ import { useCatalog } from "../../context/CatalogContext";
 import { playSfxError, playSfxSuccess } from "../../utils/sfx";
 import { shouldShowCouponInput } from "../../../utils/couponVisibility";
 import {
+  groupFeaturesByPriceTier,
+  resolveFeaturesForPlan,
+  sumSelectedFeaturePaise,
+} from "../../../utils/featurePricing";
+import FeaturePricingTiers from "./FeaturePricingTiers";
+import {
   startCheckout,
   type SubscriptionCatalog,
   type SubscriptionFeatureDoc,
@@ -145,12 +151,12 @@ export default function SubscriptionPage() {
 
   // ---------- Derived ----------
   const plans: SubscriptionPlanDoc[] = catalog?.plans || [];
-  const features: SubscriptionFeatureDoc[] = catalog?.features || [];
+  const rawFeatures: SubscriptionFeatureDoc[] = catalog?.features || [];
   useEffect(() => {
-    if (features.some((feature) => feature.id === "my-day")) {
+    if (rawFeatures.some((feature) => feature.id === "my-day")) {
       setSelectedFeatureIds((current) => current.length === 0 ? ["my-day"] : current);
     }
-  }, [features]);
+  }, [rawFeatures]);
   const plan = useMemo(
     () => plans.find((p) => p.id === selectedPlanId) || null,
     [plans, selectedPlanId],
@@ -169,18 +175,39 @@ export default function SubscriptionPage() {
   // Plans have no standalone price. Payable total = selected features + products.
   const selectedPlanPricePaise = 0;
 
+  // Feature prices are plan-aware AND cycle-aware: the same feature can
+  // cost ₹99 on Basic, ₹49 on Premium and be free on Pro, with separate
+  // yearly rates. `resolveFeaturesForPlan` projects the catalog onto the
+  // active plan + cycle so every price the buyer sees below already
+  // reflects those overrides. The server re-resolves with the identical
+  // helper, so display and charge can never drift apart.
+  const features = useMemo(
+    () => resolveFeaturesForPlan<SubscriptionFeatureDoc>(rawFeatures, selectedPlanId, cycle),
+    [rawFeatures, selectedPlanId, cycle],
+  );
+
   const selectedFeatureRecords = useMemo(
     () => features.filter((f) => selectedFeatureIds.includes(f.id)),
     [features, selectedFeatureIds],
   );
 
+  // Ascending price tiers for the "what you get at each price" strip.
+  const featureTiers = useMemo(
+    () => groupFeaturesByPriceTier(rawFeatures, selectedPlanId, cycle),
+    [rawFeatures, selectedPlanId, cycle],
+  );
+
   // Plan-included features (free with the plan) — we surface them
   // in the price section so the user understands why no extra
-  // charge is applied.
+  // charge is applied. A feature is also treated as included when the
+  // plan override resolved it to free.
   const includedFeatureIds = useMemo(() => {
-    if (!plan) return new Set<string>();
-    return new Set(plan.includedFeatureIds);
-  }, [plan]);
+    const ids = new Set<string>(plan ? plan.includedFeatureIds : []);
+    for (const feature of features) {
+      if (feature.resolvedIncluded) ids.add(feature.id);
+    }
+    return ids;
+  }, [plan, features]);
   const includedFeatureRecords = useMemo(
     () => features.filter((f) => includedFeatureIds.has(f.id)),
     [features, includedFeatureIds],
@@ -190,11 +217,8 @@ export default function SubscriptionPage() {
   // plan's cycle price + feature prices + coupon discount (from
   // the verified quote) — never derive the total client-side.
   const featuresTotalPaise = useMemo(
-    () =>
-      selectedFeatureRecords
-        .filter((f) => !includedFeatureIds.has(f.id))
-        .reduce((sum, f) => sum + (f.pricePaise || 0), 0),
-    [selectedFeatureRecords, includedFeatureIds],
+    () => sumSelectedFeaturePaise(rawFeatures, selectedFeatureIds, selectedPlanId, cycle),
+    [rawFeatures, selectedFeatureIds, selectedPlanId, cycle],
   );
   const selectedProductRecords = useMemo(() => availableProducts.filter((product) => selectedCourseIds.includes(product.id)), [availableProducts, selectedCourseIds]);
   const productsTotalPaise = useMemo(() => selectedProductRecords.reduce((sum, product) => sum + Math.max(0, Math.round(product.price * 100)), 0), [selectedProductRecords]);
@@ -445,6 +469,22 @@ export default function SubscriptionPage() {
           features={features}
           selectedIds={selectedFeatureIds}
           onOpen={() => setFeatureModalOpen(true)}
+        />
+
+        {/* Price-tier strip — features grouped by their resolved price
+            for the active plan + cycle. */}
+        <FeaturePricingTiers
+          tiers={featureTiers}
+          cycle={cycle}
+          selectedIds={selectedFeatureIds}
+          onToggleTier={(ids, allSelected) => {
+            setSelectedFeatureIds((current) => {
+              const next = new Set(current);
+              if (allSelected) ids.forEach((id) => next.delete(id));
+              else ids.forEach((id) => next.add(id));
+              return Array.from(next);
+            });
+          }}
         />
 
         {/* Coupon section — server-validated via the Part 7 engine.
