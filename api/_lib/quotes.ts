@@ -30,7 +30,7 @@ import {
   loadUserCouponUsageCount,
   loadUserHasPriorPurchases,
 } from "./coupons.js";
-import { loadSubscriptionSelectionContext } from "./subscriptions.js";
+import { assertSubscriptionPurchasable, loadSubscriptionSelectionContext } from "./subscriptions.js";
 import type { CouponDoc } from "../../utils/coupons.js";
 import type { CheckoutSelection } from "../../src/types/commerce.js";
 
@@ -380,6 +380,19 @@ export const handleCreateQuote = async (req: VercelRequest, res: VercelResponse)
       selection.purchaseKind === "subscription" ||
       selection.purchaseKind === "subscription_features"
     ) {
+      // Duplicate-purchase guard. A buyer who already holds this exact plan
+      // + billing cycle cannot buy it again until the renewal window opens.
+      // The subscription page hides the buy flow for that case; this is the
+      // authoritative half of the same rule.
+      const purchasable = await assertSubscriptionPurchasable(firebaseUser.uid, selection);
+      if (!purchasable.ok) {
+        return res.status(purchasable.status).json({
+          ok: false,
+          error: purchasable.error,
+          subscriptionRefused: true,
+          subscriptionErrorCode: purchasable.code,
+        });
+      }
       const subContext = await loadSubscriptionSelectionContext(selection);
       if (!subContext.ok) {
         return res.status(subContext.status).json({

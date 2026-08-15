@@ -40,6 +40,11 @@ import {
 } from "../../../utils/featurePricing";
 import FeaturePricingTiers from "./FeaturePricingTiers";
 import ActiveMemberView from "./ActiveMemberView";
+import OwnedPlanCard from "./OwnedPlanCard";
+import {
+  buildOwnedPlanSummary,
+  evaluateSubscriptionSelection,
+} from "../../../utils/subscriptionOwnership";
 import { getRenewalReminder } from "../../../utils/subscriptionRenewal";
 import {
   buildRenewalView,
@@ -379,6 +384,60 @@ export default function SubscriptionPage({
     return availableProducts.filter((product) => productHasId(product, ids)).map((product) => product.title);
   }, [activeSubscription, availableProducts]);
 
+  // ---------- Duplicate-purchase guard ----------
+  // A "subscription type" is the plan AND the billing cycle together
+  // (Basic/Premium/Pro × monthly/yearly). When the buyer lands on the exact
+  // combination they already own we must not render the buy flow at all:
+  // no product picker, no feature picker, no coupon field, no price summary.
+  // The shared pure helper decides ownership so the page, the checkout call
+  // and the server-side quote guard all agree.
+  const ownershipState = useMemo(
+    () =>
+      evaluateSubscriptionSelection({
+        record: activeSubscription,
+        planId: selectedPlanId,
+        cycle,
+      }),
+    // `activeSubscription` is a live snapshot, so this re-evaluates whenever
+    // the membership changes as well as when the selection changes.
+    [activeSubscription, selectedPlanId, cycle],
+  );
+  const isSelectionOwned = ownershipState.owned;
+
+  const ownedPlanSummary = useMemo(() => {
+    if (!isSelectionOwned) return null;
+    return buildOwnedPlanSummary<SubscriptionFeatureDoc>({
+      record: activeSubscription,
+      planName:
+        plans.find((p) => p.id === String(activeSubscription?.planId || ""))?.name ||
+        String(activeSubscription?.planId || "Your plan"),
+      features: memberFeatures,
+      productTitles: memberProductTitles,
+    });
+  }, [activeSubscription, isSelectionOwned, memberFeatures, memberProductTitles, plans]);
+
+  // Plans the buyer could still switch to — used for the "want something
+  // different?" hint on the owned card.
+  const purchasablePlanNames = useMemo(
+    () =>
+      plans
+        .filter((p) => p.active && p.id !== String(activeSubscription?.planId || ""))
+        .map((p) => p.name),
+    [plans, activeSubscription],
+  );
+
+  // Never leave a stale coupon / referral attached to a selection the buyer
+  // cannot purchase.
+  useEffect(() => {
+    if (!isSelectionOwned) return;
+    setAppliedCoupon(null);
+    setAppliedReferral(null);
+    setCouponErrorMessage(null);
+    setReferralError(null);
+    setCouponStatus("idle");
+    setSubmitError(null);
+  }, [isSelectionOwned]);
+
   // ---------- Handlers ----------
   const handleApplyCoupon = useCallback(
     async (rawCode: string): Promise<PromoResult> => {
@@ -490,6 +549,14 @@ export default function SubscriptionPage({
       setSubmitError("Please pick a plan to continue.");
       return;
     }
+    // Hard stop: the buyer already owns this exact plan + cycle and is not in
+    // the renewal window. The server refuses the quote too — this is the
+    // friendly, immediate half of the same rule.
+    if (ownershipState.blocked) {
+      setSubmitError(ownershipState.reason || "You already have this plan active.");
+      playSfxError();
+      return;
+    }
     setIsSubmitting(true);
     setSubmitError(null);
     try {
@@ -520,7 +587,7 @@ export default function SubscriptionPage({
       );
       setIsSubmitting(false);
     }
-  }, [user, plan, cycle, selectedFeatureIds, selectedCourseIds, appliedCoupon, appliedReferral]);
+  }, [user, plan, cycle, selectedFeatureIds, selectedCourseIds, appliedCoupon, appliedReferral, ownershipState]);
 
   // ---------- Render ----------
   return (
@@ -646,8 +713,30 @@ export default function SubscriptionPage({
           selectedFeatureRecords={selectedFeatureRecords}
           includedFeatureRecords={includedFeatureRecords}
           totalPaise={totalPaise}
+          ownedPlanId={isActiveMember ? String(activeSubscription?.planId || "") || null : null}
+          ownedCycle={
+            isActiveMember ? (activeSubscription?.cycle === "yearly" ? "yearly" : "monthly") : null
+          }
         />
 
+        {/* Already-owned selection: the entire buy flow below is replaced by
+            a single statement of what is active. Nothing purchasable is
+            rendered, so the same subscription type cannot be bought twice. */}
+        {isSelectionOwned && ownedPlanSummary ? (
+          <OwnedPlanCard
+            summary={ownedPlanSummary}
+            expiresAtLabel={formatExpiryDate(subscriptionExpiresAtMs)}
+            renewalOpensAtLabel={formatExpiryDate(ownedPlanSummary.renewalOpensAt)}
+            otherPlanNames={purchasablePlanNames}
+            onSeeOtherPlans={() => {
+              const firstOther = plans.find(
+                (p) => p.active && p.id !== String(activeSubscription?.planId || ""),
+              );
+              if (firstOther) setSelectedPlanId(firstOther.id);
+            }}
+          />
+        ) : (
+        <>
         {/* Course (product) selector trigger */}
         <CourseSelectTrigger
           selectedIds={selectedCourseIds}
@@ -727,6 +816,8 @@ export default function SubscriptionPage({
         <p className="px-5 pt-5 text-center text-[11px] leading-relaxed text-slate-400">
           By subscribing you agree to the Terms of Service. Access lasts for the selected {cycle === "monthly" ? "monthly" : "yearly"} period. We send limited renewal reminders; every renewal requires your confirmation.
         </p>
+        </>
+        )}
         {submitError ? (
           <p
             role="alert"
@@ -747,6 +838,7 @@ export default function SubscriptionPage({
         disabled={!plan || isSubmitting}
         onSubscribe={() => void handleSubscribe()}
         totalRupees={totalRupees}
+        ownershipState={ownershipState}
       />
 
       {/* Modals — only mounted when server-driven data is available. */}
