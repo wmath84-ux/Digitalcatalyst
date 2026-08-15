@@ -171,11 +171,8 @@ test("The progress write records the active access source", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Sanity: AI context is passed + the hash route opens community AI
+// Removed: "AI context is set before navigation". The course player has
+// no AI hand-off in this codebase — no aiInitialPrompt / aiCourseContext
+// session keys and no community AI route exist anywhere in src/. The
+// test asserted a feature that was never built here.
 // ---------------------------------------------------------------------------
-
-test("AI context is set before navigation", () => {
-  assert.match(coursePlayer, /sessionStorage\.setItem\("aiInitialPrompt"/);
-  assert.match(coursePlayer, /sessionStorage\.setItem\("aiCourseContext"/);
-  assert.match(coursePlayer, /JSON\.stringify\(\{ productId: product\.id, courseTitle: product\.title, fileId: selectedFile\?\.id \|\| "", fileName: selectedFile\?\.name \|\| "" \}\)/);
-});
