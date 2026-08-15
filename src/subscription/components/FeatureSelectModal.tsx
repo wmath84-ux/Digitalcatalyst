@@ -51,9 +51,23 @@ const ICON_BG: Record<string, string> = {
 const formatRupee = (paise: number): string =>
   `₹${Math.max(0, Math.round(paise / 100)).toLocaleString("en-IN")}`;
 
+/**
+ * The page passes features through `resolveFeaturesForPlan`, so each
+ * record carries the plan + cycle resolved price. Falling back to the
+ * flat `pricePaise` keeps the component safe if a caller ever passes
+ * an unresolved list.
+ */
+type FeatureWithResolvedPrice = SubscriptionFeatureDoc & {
+  resolvedPricePaise?: number;
+  resolvedIncluded?: boolean;
+};
+
+const featurePrice = (feature: FeatureWithResolvedPrice): number =>
+  typeof feature.resolvedPricePaise === "number" ? feature.resolvedPricePaise : feature.pricePaise || 0;
+
 interface Props {
   open: boolean;
-  features: SubscriptionFeatureDoc[];
+  features: FeatureWithResolvedPrice[];
   selected: string[];
   onClose: () => void;
   onChangeSelected: (ids: string[]) => void;
@@ -105,8 +119,8 @@ export default function FeatureSelectModal({
   };
 
   const selectedTotalPaise = features
-    .filter((f) => selected.includes(f.id))
-    .reduce((sum, f) => sum + (f.pricePaise || 0), 0);
+    .filter((f) => selected.includes(f.id) && !includedSet.has(f.id))
+    .reduce((sum, f) => sum + featurePrice(f), 0);
 
   return (
     <AnimatePresence>
@@ -245,7 +259,7 @@ export default function FeatureSelectModal({
                           </div>
                           <div className="flex flex-col items-end gap-1">
                             <span className="text-sm font-extrabold text-slate-800">
-                              {isIncluded ? "Free" : `+${formatRupee(feat.pricePaise)}`}
+                              {isIncluded ? "Free" : `+${formatRupee(featurePrice(feat))}`}
                             </span>
                             <span
                               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
