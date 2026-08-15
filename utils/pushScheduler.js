@@ -4,6 +4,40 @@
 
 export const MYDAY_LOOKBACK_MS = 15 * 60 * 1000;
 
+// How far back a catch-up run is allowed to reach. A reminder that is
+// hours late is noise, not a reminder — firing "9:00 AM Physics" at
+// 6 PM trains people to ignore the channel. Items older than this are
+// skipped for good: the dedupe key is scoped to the local date, so a
+// missed item is never revisited once its day rolls over.
+export const MYDAY_MAX_CATCHUP_MS = 60 * 60 * 1000;
+
+/**
+ * The window a scheduler run must cover.
+ *
+ * The fixed 15-minute lookback only worked if the scheduler actually
+ * ran every few minutes. On a daily cron — or after any outage,
+ * cold-start gap or missed ping — every item due in between fell
+ * outside the window and was silently skipped: the notification never
+ * arrived at all.
+ *
+ * Deriving the window from the last successful run instead means a
+ * run always covers exactly the time since the previous one, whatever
+ * the cadence, and a delayed pinger degrades to "slightly late"
+ * instead of "never".
+ */
+export const resolveLookbackMs = (lastRunAtMs, nowMs, {
+  minimum = MYDAY_LOOKBACK_MS,
+  maximum = MYDAY_MAX_CATCHUP_MS,
+} = {}) => {
+  const last = Number(lastRunAtMs || 0);
+  // No recorded run (first deploy, cleared state) → assume the default.
+  if (!Number.isFinite(last) || last <= 0) return minimum;
+  const elapsed = nowMs - last;
+  if (!Number.isFinite(elapsed) || elapsed <= 0) return minimum;
+  // A little padding absorbs jitter between the ping and this run.
+  return Math.min(maximum, Math.max(minimum, elapsed + 60 * 1000));
+};
+
 const pad2 = (n) => String(n).padStart(2, "0");
 
 // Accepts "HH:MM" 24h (native time inputs) as well as "09:00 AM" style strings.

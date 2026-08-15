@@ -26,6 +26,8 @@
 //   - Return the new server-authoritative selection that
 //     gets handed to the Part 4 engine.
 
+import { normalisePlanPricing, resolveFeaturePrice } from "./featurePricing.js";
+
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x !== null && x !== undefined) : []);
 
@@ -90,12 +92,26 @@ export const normaliseFeatureDoc = (raw, id) => {
   if (!isObject(raw)) return null;
   const featureId = String(raw.id || id || "").trim();
   if (!featureId) return null;
+  // Optional cycle-specific rates that apply across every plan.
+  const cyclePaise = (rupees, paise) => {
+    if (paise !== undefined && paise !== null && paise !== "") {
+      const n = Number(paise);
+      return Number.isFinite(n) ? Math.max(0, Math.round(n)) : null;
+    }
+    if (rupees !== undefined && rupees !== null && rupees !== "") return toPaise(rupees);
+    return null;
+  };
   return {
     id: featureId,
     name: String(raw.name || "Feature").trim(),
     description: String(raw.description || "").trim(),
     icon: String(raw.icon || "sparkles").trim(),
     pricePaise: toPaise(raw.price ?? 0),
+    // Cycle-aware base rates (null = fall back to the flat price).
+    monthlyPricePaise: cyclePaise(raw.monthlyPrice, raw.monthlyPricePaise),
+    yearlyPricePaise: cyclePaise(raw.yearlyPrice, raw.yearlyPricePaise),
+    // Per-plan overrides, e.g. { premium: { monthly: 49 }, pro: { included: true } }.
+    planPricing: normalisePlanPricing(raw.planPricing),
     included: raw.included === true,
     active: raw.active !== false,
     badge: typeof raw.badge === "string" ? raw.badge : null,
@@ -230,12 +246,16 @@ export const buildSubscriptionLineItems = ({
     entitlementId: `subscription:${plan.id}`,
   });
 
-  // Feature lines.
+  // Feature lines. The price is resolved against THIS plan and cycle,
+  // so a per-plan / per-cycle override in the feature doc is honoured
+  // by the server exactly as the subscription page displayed it.
   const featureIndex = new Map(arr(featureRecords).map((f) => [String(f.id), f]));
   for (const featureId of arr(selectedFeatureIds)) {
     const f = featureIndex.get(String(featureId));
     if (!f) continue;
-    if (f.included) continue; // included features don't carry a price
+    if (f.included) continue; // globally-included features don't carry a price
+    const resolved = resolveFeaturePrice(f, plan.id, cycle);
+    if (resolved.included) continue; // free on this specific plan
     items.push({
       id: `subscription_feature:${plan.id}:${f.id}`,
       kind: "subscription_features",
@@ -247,9 +267,9 @@ export const buildSubscriptionLineItems = ({
       featureId: f.id,
       title: f.name,
       parentTitle: plan.name,
-      regularPrice: f.pricePaise,
+      regularPrice: resolved.pricePaise,
       salePrice: null,
-      effectivePrice: f.pricePaise,
+      effectivePrice: resolved.pricePaise,
       quantity: 1,
       alreadyOwned: false,
       entitlementId: `subscription_feature:${plan.id}:${f.id}`,

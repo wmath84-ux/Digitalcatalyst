@@ -37,6 +37,7 @@ import { reviews as fallbackReviews } from "./home/data/mockData";
 import { useAuth } from "./context/AuthContext";
 import { auth, db } from "../firebase";
 import PromoCodeInput, { type PromoResult } from "./subscription/components/PromoCodeInput";
+import { isFreeProduct, shouldShowCouponInput } from "../utils/couponVisibility";
 import { playSfxCopy, playSfxError, playSfxSuccess } from "./utils/sfx";
 
 interface ProductDetailProps {
@@ -369,6 +370,27 @@ function PremiumProductContent({
     setCouponStatus("idle");
   }, []);
 
+  // A coupon can only reduce money that is actually charged. Free
+  // products (admin `isFree` switch or a ₹0 effective price) never
+  // render the coupon field anywhere on the PDP.
+  const productIsFree = isFreeProduct(product);
+  const canShowCouponInput = shouldShowCouponInput({
+    purchaseKind: "full_product",
+    payablePaise: Math.round((product.price || 0) * 100),
+    isFree: productIsFree,
+  });
+
+  // If a product becomes free (or the buyer already owns it) while a
+  // coupon was applied, drop the code so nothing stale is carried
+  // into checkout.
+  useEffect(() => {
+    if (!canShowCouponInput && appliedCoupon) {
+      setAppliedCoupon(null);
+      setCouponErrorMessage(null);
+      setCouponStatus("idle");
+    }
+  }, [canShowCouponInput, appliedCoupon]);
+
   const submitReview = async () => {
     if (!user) {
       window.location.hash = `#/auth?mode=login&return=${encodeURIComponent(window.location.hash)}`;
@@ -555,7 +577,7 @@ function PremiumProductContent({
               </div>
             )}
 
-            {!isProductOwned && !unavailable && !product.isFree && (
+            {!isProductOwned && !unavailable && canShowCouponInput && (
               <div className="rounded-2xl border border-zinc-100 bg-white p-4">
                 <PromoCodeInput
                   kind="coupon"

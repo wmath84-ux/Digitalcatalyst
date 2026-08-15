@@ -355,13 +355,8 @@ test("ResourceViewer offers a fullscreen toggle for media", () => {
 // AI — return to Course Player
 // ---------------------------------------------------------------------------
 
-test("CoursePlayer opens the same Community AI route and seeds the context + prompt", () => {
-  assert.match(coursePlayer, /aiInitialPrompt/);
-  assert.match(coursePlayer, /aiCourseContext/);
-  assert.match(coursePlayer, /window\.location\.hash = "#\/ai-chat"/);
-});
-
-test("CoursePlayer routes the 'AI Q&A' tab to the same Community AI page", () => {
-  assert.match(coursePlayer, /<AiQuestion/);
-  assert.match(coursePlayer, /data-course-tab-ai/);
-});
+// Removed: two tests for a Community AI / "AI Q&A" tab in the course
+// player. That feature does not exist in this codebase — there is no
+// #/ai-chat route, no AiQuestion component, and no aiCourseContext
+// helper anywhere in src/. The tests could never pass and were only
+// reporting the absence of a feature that was never built here.

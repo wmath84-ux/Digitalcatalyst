@@ -1,0 +1,76 @@
+# Minute-level pinger for the push scheduler.
+#
+# ⚠️  THIS FILE IS NOT ACTIVE WHERE IT SITS.
+#     Copy it to .github/workflows/push-scheduler.yml and commit that
+#     yourself — the agent's GitHub App is not allowed to create or
+#     modify workflow files, so it cannot install this for you:
+#
+#       mkdir -p .github/workflows
+#       cp ops/push-scheduler.workflow.yml .github/workflows/push-scheduler.yml
+#       git add .github/workflows/push-scheduler.yml
+#       git commit -m "Add push scheduler workflow" && git push
+#
+#     Until it lives in .github/workflows/, My Day reminders are only
+#     delivered by the once-a-day Vercel cron — i.e. almost never on
+#     time. Any external pinger (cron-job.org, UptimeRobot, Runhooks)
+#     hitting the same URL with the same Authorization header works
+#     just as well if you prefer not to use GitHub Actions.
+#
+# Why this exists: My Day reminders have to fire at the exact minute the
+# user chose, whether or not the app is open. That needs something
+# calling the scheduler every few minutes — and Vercel's Hobby plan caps
+# cron at ONE run per day (a sub-daily expression in vercel.json fails at
+# deploy time), with even that run landing anywhere inside its hour.
+#
+# The scheduler endpoint is an ordinary authenticated HTTP route, so any
+# external timer can drive it. GitHub Actions is free for this and lives
+# in the repo, so there is no third-party account to lose.
+#
+# The daily Vercel cron stays as a safety net: if this workflow is
+# disabled or GitHub has an outage, the catch-up window still sweeps up
+# anything missed (see resolveLookbackMs in utils/pushScheduler.js).
+#
+# Setup (one time):
+#   1. Repo → Settings → Secrets and variables → Actions
+#   2. Add secret  CRON_SECRET     — same value as the Vercel env var
+#   3. Add secret  SCHEDULER_URL   — https://<your-domain>/api/cron/subscription-renewals
+#
+# Note on GitHub's scheduler: `*/5` is best-effort, not exact — runs can
+# be delayed under load. That is fine here because the endpoint derives
+# its own catch-up window from the last successful run, so a late ping
+# still delivers every reminder in between.
+
+name: Push scheduler
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  # Lets you fire a run by hand from the Actions tab when testing.
+  workflow_dispatch:
+
+# A slow run must never overlap with the next tick.
+concurrency:
+  group: push-scheduler
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger scheduled push jobs
+        env:
+          SCHEDULER_URL: ${{ secrets.SCHEDULER_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SCHEDULER_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::SCHEDULER_URL and CRON_SECRET repository secrets are required."
+            exit 1
+          fi
+          # --fail-with-body so a non-2xx surfaces the API's error message.
+          curl --silent --show-error --fail-with-body \
+            --max-time 120 \
+            --retry 2 --retry-delay 5 --retry-connrefused \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            "${SCHEDULER_URL}"

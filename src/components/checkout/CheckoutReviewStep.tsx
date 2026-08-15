@@ -37,6 +37,7 @@ import { useAuth } from "../../context/AuthContext";
 import type { CheckoutLineItem } from "../../types/commerce";
 import CheckoutLineItemCard from "./CheckoutLineItemCard";
 import { formatPaise } from "../../utils/money";
+import { payableBeforeCouponPaise, shouldShowCouponInput } from "../../../utils/couponVisibility";
 
 const formatRupee = formatPaise;
 
@@ -132,6 +133,16 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
   const subscriptionAddonLines = lineItemsForDisplay.filter((line) => line.kind === "subscription_features");
   const productLines = lineItemsForDisplay.filter((line) => line.kind === "full_product" || line.kind === "cart_bundle" || line.kind === "free_entitlement");
 
+  // Coupon fields are only meaningful when money is actually charged.
+  // A free product, a free entitlement grant, or a subscription whose
+  // payable total is already ₹0 renders no coupon card at all.
+  // `cashPayable` is post-coupon, so the pre-coupon payable is used
+  // to keep an applied coupon removable when it zeroes the order.
+  const showCouponCard = shouldShowCouponInput({
+    purchaseKind: kind,
+    payablePaise: payableBeforeCouponPaise(cashPayable, couponDiscount),
+  });
+
   return (
     <div className="flex flex-col gap-3" data-checkout-review-step>
       {/* Purchase type chip */}
@@ -173,20 +184,23 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
         </div>
       </section>
 
-      {/* Part 7 — Coupon input card (server-validated, with verified savings). */}
-      <CouponCard
-        appliedCode={quote.couponCode || null}
-        appliedType={quote.couponType || null}
-        appliedValue={typeof quote.couponValue === "number" ? quote.couponValue : null}
-        appliedDiscount={couponDiscount}
-        status={checkout.couponStatus}
-        errorMessage={checkout.couponErrorMessage}
-        input={checkout.couponInput}
-        onChange={checkout.setCouponInput}
-        onApply={(code) => checkout.applyCoupon(code)}
-        onRemove={() => checkout.removeCoupon()}
-        disabled={showLoading}
-      />
+      {/* Part 7 — Coupon input card (server-validated, with verified savings).
+          Hidden entirely for free / ₹0-payable orders. */}
+      {showCouponCard ? (
+        <CouponCard
+          appliedCode={quote.couponCode || null}
+          appliedType={quote.couponType || null}
+          appliedValue={typeof quote.couponValue === "number" ? quote.couponValue : null}
+          appliedDiscount={couponDiscount}
+          status={checkout.couponStatus}
+          errorMessage={checkout.couponErrorMessage}
+          input={checkout.couponInput}
+          onChange={checkout.setCouponInput}
+          onApply={(code) => checkout.applyCoupon(code)}
+          onRemove={() => checkout.removeCoupon()}
+          disabled={showLoading}
+        />
+      ) : null}
 
       {/* Price section */}
       <section data-checkout-price-section className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">

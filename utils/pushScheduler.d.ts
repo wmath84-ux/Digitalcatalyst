@@ -1,4 +1,15 @@
 export const MYDAY_LOOKBACK_MS: number;
+export const MYDAY_MAX_CATCHUP_MS: number;
+
+/**
+ * Size the catch-up window from the previous successful run, so a
+ * delayed or missed ping makes a reminder late instead of dropping it.
+ */
+export function resolveLookbackMs(
+  lastRunAtMs: unknown,
+  nowMs: number,
+  options?: { minimum?: number; maximum?: number },
+): number;
 
 export interface ClockTime {
   hours: number;

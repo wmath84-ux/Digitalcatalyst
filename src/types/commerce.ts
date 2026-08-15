@@ -213,6 +213,14 @@ export interface ServerPriceQuote {
    * renders the renewal date from this value.
    */
   subscriptionExpiresAt?: number | null;
+  /**
+   * Every feature id the buyer selected — including features that are
+   * free (plan-included or zeroed by a plan override) and therefore
+   * produce no priced line item. The subscription activation writer
+   * reads this instead of re-deriving from `verifiedLineItems`, which
+   * would drop free features and leave them locked after payment.
+   */
+  subscriptionFeatureIds?: string[] | null;
 }
 
 // =========================================================================

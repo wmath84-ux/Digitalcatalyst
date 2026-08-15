@@ -165,13 +165,23 @@ test("api/_lib/subscriptions.ts writeSubscriptionAfterPayment stamps the canonic
 
 test("api/_lib/subscriptions.ts is idempotent (re-running does not double-write the entitlements)", () => {
   // The per-entitlement idempotency lives in
-  // `api/_lib/entitlements.ts` (the writer checks
-  // `existing.exists` on the canonical `entitlements` doc
-  // and short-circuits on a hit). The `subscriptions/{uid}/current`
-  // doc is a single per-user record that overwrites with the
-  // same values, so it's inherently idempotent.
-  assert.match(entitlementsCode, /existing\.exists/);
+  // `api/_lib/entitlements.ts`: the writer reads each canonical
+  // `entitlements` doc and short-circuits on a hit. Assert that
+  // behaviour rather than one variable name — this used to pin a
+  // literal `existing.exists` and broke when the snapshot was renamed,
+  // even though the guarantee never changed.
+  assert.match(
+    entitlementsCode,
+    /if\s*\(\s*[A-Za-z_$][\w$]*(?:\[[^\]]+\])?\.exists\s*\)\s*continue\s*;?/,
+    "an already-granted entitlement must be skipped, not rewritten",
+  );
   assert.match(entitlements, /collectSubscriptionEntitlementIds/);
+  // The subscription's own entitlement docs get the same treatment.
+  assert.match(entitlementsCode, /existingEntitlements\[index\]\.exists\s*\)\s*continue/);
+  // `users/{uid}/subscription/current` is one per-user record, so a
+  // re-grant overwrites with the same values — except for the expiry,
+  // which must NOT be extended when the same order is replayed.
+  assert.match(subscriptionsLib, /previousData\.orderId \|\| ""\) === args\.orderId/);
 });
 
 // ---------------------------------------------------------------------------

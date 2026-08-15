@@ -12,7 +12,7 @@
 // quote-driven flow as products / modules / updates.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "../../../firebase";
 import { ChevronLeft, HelpCircle, LoaderCircle } from "lucide-react";
 import StackedCards from "./StackedCards";
@@ -30,6 +30,20 @@ import { FALLBACK_SUBSCRIPTION_CATALOG } from "../data/fallbackCatalog";
 import { useAuth } from "../../context/AuthContext";
 import { useCatalog } from "../../context/CatalogContext";
 import { playSfxError, playSfxSuccess } from "../../utils/sfx";
+import { shouldShowCouponInput } from "../../../utils/couponVisibility";
+import {
+  groupFeaturesByPriceTier,
+  resolveFeaturesForPlan,
+  sumSelectedFeaturePaise,
+} from "../../../utils/featurePricing";
+import FeaturePricingTiers from "./FeaturePricingTiers";
+import ActiveMemberView from "./ActiveMemberView";
+import { getRenewalReminder } from "../../../utils/subscriptionRenewal";
+import {
+  buildRenewalView,
+  formatExpiryDate,
+  toMillis as renewalToMillis,
+} from "../../../utils/renewalPresentation";
 import {
   startCheckout,
   type SubscriptionCatalog,
@@ -39,10 +53,29 @@ import {
 
 export type BillingCycle = "monthly" | "yearly";
 
+/** Shape of `users/{uid}/subscription/current` that this page reads. */
+type SubscriptionRecordLike = {
+  status?: string;
+  planId?: string;
+  cycle?: string;
+  features?: unknown;
+  includedProductIds?: unknown;
+  expiresAt?: unknown;
+  renewalReminderOptOut?: boolean;
+};
+
 export default function SubscriptionPage() {
   const { user } = useAuth();
   const { products: availableProducts } = useCatalog();
   const renewalLoadedRef = useRef(false);
+
+  // The buyer's live subscription record (null when never subscribed).
+  const [activeSubscription, setActiveSubscription] = useState<SubscriptionRecordLike | null>(null);
+  // When true the member deliberately opened the buy flow (renew or
+  // change plan) and we show the full purchase UI again.
+  const [manageMode, setManageMode] = useState<boolean>(
+    () => typeof window !== "undefined" && /[?&]renew=1/.test(window.location.hash),
+  );
 
   // ---------- Server-driven state ----------
   const [catalog, setCatalog] = useState<SubscriptionCatalog | null>(null);
@@ -125,8 +158,18 @@ export default function SubscriptionPage() {
     };
   }, []);
 
-  // Renewal checkout restores the user's current plan, cycle, features and
-  // bonus products so they review the exact package before paying again.
+  // Live subscription record. Drives the member view: an active
+  // subscriber must never be shown the buy flow again by default.
+  useEffect(() => {
+    if (!user) { setActiveSubscription(null); return undefined; }
+    return onSnapshot(doc(db, "users", user.id, "subscription", "current"), (snapshot) => {
+      setActiveSubscription(snapshot.exists() ? (snapshot.data() as SubscriptionRecordLike) : null);
+    }, () => setActiveSubscription(null));
+  }, [user]);
+
+  // Renewal / change-plan checkout restores the user's current plan, cycle,
+  // features and bonus products so they review the exact package before
+  // paying again.
   useEffect(() => {
     if (!user || !catalog || renewalLoadedRef.current) return;
     renewalLoadedRef.current = true;
@@ -144,12 +187,12 @@ export default function SubscriptionPage() {
 
   // ---------- Derived ----------
   const plans: SubscriptionPlanDoc[] = catalog?.plans || [];
-  const features: SubscriptionFeatureDoc[] = catalog?.features || [];
+  const rawFeatures: SubscriptionFeatureDoc[] = catalog?.features || [];
   useEffect(() => {
-    if (features.some((feature) => feature.id === "my-day")) {
+    if (rawFeatures.some((feature) => feature.id === "my-day")) {
       setSelectedFeatureIds((current) => current.length === 0 ? ["my-day"] : current);
     }
-  }, [features]);
+  }, [rawFeatures]);
   const plan = useMemo(
     () => plans.find((p) => p.id === selectedPlanId) || null,
     [plans, selectedPlanId],
@@ -168,18 +211,39 @@ export default function SubscriptionPage() {
   // Plans have no standalone price. Payable total = selected features + products.
   const selectedPlanPricePaise = 0;
 
+  // Feature prices are plan-aware AND cycle-aware: the same feature can
+  // cost ₹99 on Basic, ₹49 on Premium and be free on Pro, with separate
+  // yearly rates. `resolveFeaturesForPlan` projects the catalog onto the
+  // active plan + cycle so every price the buyer sees below already
+  // reflects those overrides. The server re-resolves with the identical
+  // helper, so display and charge can never drift apart.
+  const features = useMemo(
+    () => resolveFeaturesForPlan<SubscriptionFeatureDoc>(rawFeatures, selectedPlanId, cycle),
+    [rawFeatures, selectedPlanId, cycle],
+  );
+
   const selectedFeatureRecords = useMemo(
     () => features.filter((f) => selectedFeatureIds.includes(f.id)),
     [features, selectedFeatureIds],
   );
 
+  // Ascending price tiers for the "what you get at each price" strip.
+  const featureTiers = useMemo(
+    () => groupFeaturesByPriceTier(rawFeatures, selectedPlanId, cycle),
+    [rawFeatures, selectedPlanId, cycle],
+  );
+
   // Plan-included features (free with the plan) — we surface them
   // in the price section so the user understands why no extra
-  // charge is applied.
+  // charge is applied. A feature is also treated as included when the
+  // plan override resolved it to free.
   const includedFeatureIds = useMemo(() => {
-    if (!plan) return new Set<string>();
-    return new Set(plan.includedFeatureIds);
-  }, [plan]);
+    const ids = new Set<string>(plan ? plan.includedFeatureIds : []);
+    for (const feature of features) {
+      if (feature.resolvedIncluded) ids.add(feature.id);
+    }
+    return ids;
+  }, [plan, features]);
   const includedFeatureRecords = useMemo(
     () => features.filter((f) => includedFeatureIds.has(f.id)),
     [features, includedFeatureIds],
@@ -189,11 +253,8 @@ export default function SubscriptionPage() {
   // plan's cycle price + feature prices + coupon discount (from
   // the verified quote) — never derive the total client-side.
   const featuresTotalPaise = useMemo(
-    () =>
-      selectedFeatureRecords
-        .filter((f) => !includedFeatureIds.has(f.id))
-        .reduce((sum, f) => sum + (f.pricePaise || 0), 0),
-    [selectedFeatureRecords, includedFeatureIds],
+    () => sumSelectedFeaturePaise(rawFeatures, selectedFeatureIds, selectedPlanId, cycle),
+    [rawFeatures, selectedFeatureIds, selectedPlanId, cycle],
   );
   const selectedProductRecords = useMemo(() => availableProducts.filter((product) => selectedCourseIds.includes(product.id)), [availableProducts, selectedCourseIds]);
   const productsTotalPaise = useMemo(() => selectedProductRecords.reduce((sum, product) => sum + Math.max(0, Math.round(product.price * 100)), 0), [selectedProductRecords]);
@@ -204,6 +265,47 @@ export default function SubscriptionPage() {
   const minPayablePaise = plan?.minPayablePaise || 0;
   const totalPaise = Math.max(subtotalPaise - couponDiscountPaise, minPayablePaise);
   const totalRupees = (totalPaise / 100).toFixed(2);
+
+  // A coupon can only reduce money that is actually charged. When the
+  // selection is free (no paid features / products and no minimum
+  // payable), the coupon field is not rendered at all.
+  const canShowCouponInput = shouldShowCouponInput({
+    purchaseKind: "subscription",
+    payablePaise: Math.max(subtotalPaise, minPayablePaise),
+  });
+
+  // ---------- Membership state ----------
+  // An active subscriber sees the member dashboard, never the buy flow,
+  // unless they explicitly chose to renew or change their plan.
+  const subscriptionExpiresAtMs = renewalToMillis(activeSubscription?.expiresAt);
+  const isActiveMember =
+    activeSubscription?.status === "active" && subscriptionExpiresAtMs > Date.now();
+  const showMemberView = isActiveMember && !manageMode;
+
+  const memberRenewalView = useMemo(() => {
+    if (!activeSubscription) return null;
+    const memberPlanName =
+      plans.find((p) => p.id === String(activeSubscription.planId || ""))?.name ||
+      String(activeSubscription.planId || "Subscription");
+    return buildRenewalView(getRenewalReminder(activeSubscription), { planName: memberPlanName });
+  }, [activeSubscription, plans]);
+
+  const memberFeatureIds = useMemo(
+    () => (Array.isArray(activeSubscription?.features) ? activeSubscription.features.map(String) : []),
+    [activeSubscription],
+  );
+  const memberFeatures = useMemo(
+    () => rawFeatures.filter((feature) => memberFeatureIds.includes(feature.id)),
+    [rawFeatures, memberFeatureIds],
+  );
+  const memberProductTitles = useMemo(() => {
+    const ids = new Set(
+      Array.isArray(activeSubscription?.includedProductIds)
+        ? activeSubscription.includedProductIds.map(String)
+        : [],
+    );
+    return availableProducts.filter((product) => ids.has(product.id)).map((product) => product.title);
+  }, [activeSubscription, availableProducts]);
 
   // ---------- Handlers ----------
   const handleApplyCoupon = useCallback(
@@ -262,6 +364,17 @@ export default function SubscriptionPage() {
     setCouponErrorMessage(null);
     setCouponStatus("idle");
   }, []);
+
+  // If the selection drops to ₹0 while a coupon was applied, discard
+  // the code so nothing stale is carried into checkout.
+  useEffect(() => {
+    if (!canShowCouponInput && appliedCoupon) {
+      setCouponInput("");
+      setAppliedCoupon(null);
+      setCouponErrorMessage(null);
+      setCouponStatus("idle");
+    }
+  }, [canShowCouponInput, appliedCoupon]);
 
   const handleApplyReferral = useCallback(async (rawCode: string): Promise<PromoResult> => {
     const code = rawCode.trim().toUpperCase();
@@ -376,7 +489,9 @@ export default function SubscriptionPage() {
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <h1 className="text-[15px] font-extrabold tracking-tight text-slate-900">Go Premium</h1>
+        <h1 className="text-[15px] font-extrabold tracking-tight text-slate-900">
+          {showMemberView ? "My membership" : manageMode && isActiveMember ? "Manage plan" : "Go Premium"}
+        </h1>
         <button
           onClick={() => setHelpOpen(true)}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm shadow-slate-200 active:scale-90 transition-transform"
@@ -386,7 +501,50 @@ export default function SubscriptionPage() {
         </button>
       </div>
 
+      {/* An active member gets the membership dashboard, not the buy flow. */}
+      {showMemberView ? (
+        <div className="flex-1">
+          <ActiveMemberView
+            planName={plans.find((p) => p.id === String(activeSubscription?.planId || ""))?.name || String(activeSubscription?.planId || "Your plan")}
+            plan={plans.find((p) => p.id === String(activeSubscription?.planId || "")) || null}
+            cycle={activeSubscription?.cycle === "yearly" ? "yearly" : "monthly"}
+            unlockedFeatures={memberFeatures}
+            unlockedProductTitles={memberProductTitles}
+            expiresAtLabel={formatExpiryDate(subscriptionExpiresAtMs)}
+            renewalView={memberRenewalView}
+            reminderOptOut={Boolean(activeSubscription?.renewalReminderOptOut)}
+            onRenew={() => setManageMode(true)}
+            onChangePlan={() => setManageMode(true)}
+            onToggleReminders={(next) => {
+              if (!user) return;
+              void updateDoc(doc(db, "users", user.id, "subscription", "current"), {
+                renewalReminderOptOut: next,
+              }).catch(() => undefined);
+            }}
+            onOpenFeature={(featureId) => {
+              if (featureId === "my-day") window.location.hash = "#/my-day";
+            }}
+          />
+          <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
+        </div>
+      ) : (
+      <>
       <div className="flex-1 pb-4">
+        {/* Returning member who chose to renew / change plan. */}
+        {isActiveMember && manageMode ? (
+          <div className="mx-5 mt-4 flex items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2.5">
+            <p className="text-[11px] font-semibold leading-relaxed text-violet-900">
+              You already have an active membership. Changes apply from your current expiry date.
+            </p>
+            <button
+              type="button"
+              onClick={() => setManageMode(false)}
+              className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 text-[11px] font-black text-violet-700 ring-1 ring-violet-200"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : null}
         {usingFallback && (
           <div className="mx-5 mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-800">
             <span aria-hidden="true">⚠️</span>
@@ -427,19 +585,38 @@ export default function SubscriptionPage() {
           onOpen={() => setFeatureModalOpen(true)}
         />
 
-        {/* Coupon section — server-validated via the Part 7 engine. */}
+        {/* Price-tier strip — features grouped by their resolved price
+            for the active plan + cycle. */}
+        <FeaturePricingTiers
+          tiers={featureTiers}
+          cycle={cycle}
+          selectedIds={selectedFeatureIds}
+          onToggleTier={(ids, allSelected) => {
+            setSelectedFeatureIds((current) => {
+              const next = new Set(current);
+              if (allSelected) ids.forEach((id) => next.delete(id));
+              else ids.forEach((id) => next.add(id));
+              return Array.from(next);
+            });
+          }}
+        />
+
+        {/* Coupon section — server-validated via the Part 7 engine.
+            The coupon field is hidden when nothing is payable. */}
         <div className="space-y-3 px-5 pt-5">
-          <PromoCodeInput
-            kind="coupon"
-            label="Have a coupon? Enter the code below."
-            placeholder="Enter coupon code"
-            appliedCode={appliedCoupon?.code ?? null}
-            appliedMessage={appliedCoupon?.label ?? null}
-            errorMessage={couponStatus === "error" ? couponErrorMessage : null}
-            onApply={handleApplyCoupon}
-            onRemove={handleRemoveCoupon}
-            disabled={isSubmitting}
-          />
+          {canShowCouponInput ? (
+            <PromoCodeInput
+              kind="coupon"
+              label="Have a coupon? Enter the code below."
+              placeholder="Enter coupon code"
+              appliedCode={appliedCoupon?.code ?? null}
+              appliedMessage={appliedCoupon?.label ?? null}
+              errorMessage={couponStatus === "error" ? couponErrorMessage : null}
+              onApply={handleApplyCoupon}
+              onRemove={handleRemoveCoupon}
+              disabled={isSubmitting}
+            />
+          ) : null}
           <PromoCodeInput
             kind="referral"
             label="Have a referral code? Get ₹250 off the final price."
@@ -514,6 +691,8 @@ export default function SubscriptionPage() {
       />
 
       <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
+      </>
+      )}
     </div>
   );
 }

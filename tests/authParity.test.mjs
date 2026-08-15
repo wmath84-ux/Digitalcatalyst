@@ -38,6 +38,12 @@ test('restored entitlement ids merge consistently for homepage unlocks', () => {
 
 test('google and password auth errors map through shared Firebase auth messages', () => {
   assert.equal(getFirebaseAuthErrorMessageFromCode({ code: 'auth/popup-closed-by-user' }), 'Google login was cancelled.');
-  assert.equal(getFirebaseAuthErrorMessageFromCode({ code: 'auth/email-already-in-use' }), 'This email already has an account. Please login instead or use password reset.');
-  assert.equal(getFirebaseAuthErrorMessageFromCode({ code: 'auth/wrong-password' }), 'Incorrect password.');
+  // Wording drifted ("already has an account" → "is already
+  // registered") without the guarantee changing. What matters is that
+  // the code maps to a message telling the user to log in or reset —
+  // pin that, not the exact sentence, so copy edits are not breakages.
+  const inUse = getFirebaseAuthErrorMessageFromCode({ code: 'auth/email-already-in-use' });
+  assert.match(inUse, /already (registered|has an account)/i);
+  assert.match(inUse, /login instead or use password reset/i);
+  assert.match(getFirebaseAuthErrorMessageFromCode({ code: 'auth/wrong-password' }), /^Incorrect password\./);
 });

@@ -11,9 +11,11 @@
 // destructive actions (cancel / back to source) live in the parent
 // `CheckoutApp`.
 
-import { ArrowLeft, BadgeCheck, CircleCheck, Package, ShoppingBag } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, BadgeCheck, CircleCheck, Package, ShoppingBag, Sparkles } from "lucide-react";
 import { useCheckout } from "../../checkout/CheckoutContext";
 import CheckoutLineItemCard from "./CheckoutLineItemCard";
+import UnlockCelebration from "../subscription/UnlockCelebration";
 import type { CheckoutLineItem, PurchaseKind } from "../../types/commerce";
 import { formatPaise } from "../../utils/money";
 
@@ -71,6 +73,29 @@ export default function CheckoutSuccessStep({
   const quote = checkout.quote;
   const lineItems: CheckoutLineItem[] = quote?.verifiedLineItems || [];
   const displayItems = lineItems.filter((line) => !line.alreadyOwned);
+
+  // A membership activation is a milestone, not a receipt line: greet it
+  // with the sparkle-blast celebration instead of the plain library CTA.
+  const isSubscription = purchaseKind === "subscription" || purchaseKind === "subscription_features";
+  const [celebrationOpen, setCelebrationOpen] = useState(false);
+  useEffect(() => {
+    if (isSubscription) setCelebrationOpen(true);
+  }, [isSubscription]);
+
+  const planLabel =
+    lineItems.find((line) => line.kind === "subscription")?.title ||
+    quote?.subscriptionPlanId ||
+    "Premium";
+  const unlockedFeatureNames = lineItems
+    .filter((line) => line.kind === "subscription_features" && line.featureId)
+    .map((line) => String(line.title || line.featureId));
+  const subscriptionExpiryLabel = quote?.subscriptionExpiresAt
+    ? new Date(Number(quote.subscriptionExpiresAt)).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "";
 
   if (!quote) {
     return (
@@ -210,13 +235,33 @@ export default function CheckoutSuccessStep({
 
       {/* CTAs */}
       <div className="space-y-2 pb-2">
-        <button
-          type="button"
-          onClick={onGoToLibrary}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-4 text-base font-black text-white shadow-lg shadow-emerald-200 transition hover:brightness-110 active:scale-[0.99]"
-        >
-          <ShoppingBag size={18} /> Go to my library
-        </button>
+        {isSubscription ? (
+          <>
+            <button
+              type="button"
+              onClick={() => { window.location.hash = "#/subscription"; }}
+              data-checkout-success-membership
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-violet-200 transition hover:brightness-110 active:scale-[0.99]"
+            >
+              <Sparkles size={18} /> Open my membership
+            </button>
+            <button
+              type="button"
+              onClick={() => setCelebrationOpen(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-700"
+            >
+              Replay celebration
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={onGoToLibrary}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-4 text-base font-black text-white shadow-lg shadow-emerald-200 transition hover:brightness-110 active:scale-[0.99]"
+          >
+            <ShoppingBag size={18} /> Go to my library
+          </button>
+        )}
         <button
           type="button"
           onClick={onBackToSource}
@@ -225,6 +270,20 @@ export default function CheckoutSuccessStep({
           <ArrowLeft size={14} /> Back to source
         </button>
       </div>
+
+      {/* Sparkle-blast welcome for a freshly activated membership. */}
+      <UnlockCelebration
+        open={celebrationOpen}
+        planName={String(planLabel)}
+        featureNames={unlockedFeatureNames}
+        expiresAtLabel={subscriptionExpiryLabel}
+        primaryLabel="Open my membership"
+        onDismiss={() => setCelebrationOpen(false)}
+        onPrimaryAction={() => {
+          setCelebrationOpen(false);
+          window.location.hash = "#/subscription";
+        }}
+      />
     </div>
   );
 }

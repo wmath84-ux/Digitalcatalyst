@@ -19,6 +19,8 @@ import AuthApp from "./AuthApp";
 import AdminLoginApp from "./AdminLoginApp";
 import AdminApp from "./admin/AdminApp";
 import NotificationsPage from "./components/NotificationsPage";
+import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
+import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
@@ -76,6 +78,9 @@ const CART_HASH = "#/cart";
 const FAVORITES_HASH = "#/favorites";
 const SUBSCRIPTION_HASH = "#/subscription";
 const NOTIFICATIONS_HASH = "#/notifications";
+// Developer sandbox for the expiry / renewal messaging. Pure preview:
+// it synthesises a subscription document and never touches Firestore.
+const RENEWAL_PREVIEW_HASH = "#/dev/subscription-preview";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
 
@@ -208,6 +213,26 @@ function AppLaunchSplash({ label = "Preparing your learning space…" }: { label
         <div className="app-boot-track" aria-hidden="true"><div className="app-boot-bar" /></div>
       </div>
     </main>
+  );
+}
+
+/**
+ * Renewal notice for the whole shell.
+ *
+ * `Root` returns early on almost every route, so the banner cannot live
+ * inside it without being repeated a dozen times. Mounting it as a
+ * sibling keeps exactly one instance alive across navigations — the
+ * host itself decides when to stay quiet.
+ */
+function RenewalNotice() {
+  const { user } = useAuth();
+  return (
+    <RenewalBannerHost
+      uid={user?.id ?? null}
+      onRenew={() => {
+        window.location.hash = `${SUBSCRIPTION_HASH}?renew=1`;
+      }}
+    />
   );
 }
 
@@ -686,6 +711,9 @@ function Root() {
   }
 
   if (hash.startsWith(ADMIN_HASH)) return user && hasAdminSession(user.id, user.email, user.role) ? <AdminApp /> : <AdminLoginApp />;
+  if (hash.startsWith(RENEWAL_PREVIEW_HASH)) {
+    return <RenewalPreviewPage onBack={() => { window.location.hash = SUBSCRIPTION_HASH; }} />;
+  }
   if (hash.startsWith(SUBSCRIPTION_HASH)) return <SubscriptionApp />;
   if (hash.startsWith(NOTIFICATIONS_HASH)) {
     return (
@@ -815,6 +843,7 @@ createRoot(document.getElementById("root")!).render(
       <CatalogProvider>
         <CommerceProvider>
           <Root />
+          <RenewalNotice />
         </CommerceProvider>
       </CatalogProvider>
     </AuthProvider>

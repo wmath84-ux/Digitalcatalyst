@@ -247,18 +247,33 @@ test("grantEntitlementsFromQuote marks the payment intent as verified", () => {
 });
 
 test("grantEntitlementsFromQuote is idempotent — skips existing entitlement docs", () => {
-  // The transaction writer must check `existing.exists` before writing.
+  // The writer must read each entitlement doc and skip the ones that
+  // already exist, rather than overwriting them. Match the behaviour,
+  // not one particular variable name: this previously pinned a literal
+  // `existing.exists`, so renaming the snapshot to `entitlementSnaps`
+  // failed the test while the guarantee was completely intact.
   const codeOnly = stripComments(entitlements);
-  assert.match(codeOnly, /existing\.exists/);
-  // The write must be conditional (skip, not overwrite).
-  const skipPattern = /if\s*\(\s*existing\.exists\s*\)\s*continue\s*;?/;
-  assert.match(codeOnly, skipPattern);
+  const skipExisting = /if\s*\(\s*[A-Za-z_$][\w$]*(?:\[[^\]]+\])?\.exists\s*\)\s*continue\s*;?/;
+  assert.match(codeOnly, skipExisting, "an existing entitlement doc must be skipped, not rewritten");
+  // The skip has to apply to the entitlement docs specifically.
+  assert.match(codeOnly, /entitlementSnaps\[index\]\.exists\s*\)\s*continue/);
+  // ...and to the legacy dual-write, or a replay would duplicate those.
+  assert.match(codeOnly, /legacyPurchaseSnaps\[index\]\.exists\s*\)\s*continue/);
 });
 
 test("grantEntitlementsFromQuote never re-stamps consumedAt on replay", () => {
-  // The spec: "Be idempotent. Prevent replay."
+  // The spec: "Be idempotent. Prevent replay." A quote may only move
+  // active → consumed; an already-consumed quote must keep its original
+  // consumedAt. The transition is expressed as a guard on the CURRENT
+  // status, so assert that guard rather than a fixed string.
   const codeOnly = stripComments(entitlements);
-  assert.match(codeOnly, /status === "consumed"/);
+  assert.match(codeOnly, /status:\s*"consumed"/, "the quote must be marked consumed");
+  assert.match(
+    codeOnly,
+    /current\.status === "active"/,
+    "the consumed stamp must be gated on the quote still being active",
+  );
+  assert.match(codeOnly, /consumedAt:\s*nowTs/);
 });
 
 // ---------------------------------------------------------------------------
