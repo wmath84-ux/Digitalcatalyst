@@ -11,6 +11,7 @@ import CheckoutApp from "./components/checkout/CheckoutApp";
 import MyDayApp from "./MyDayApp";
 import LeaderboardApp from "./LeaderboardApp";
 import ProfileApp from "./profile/App";
+import SubscriberExperiencePage from "./profile/SubscriberExperiencePage";
 import CourseRouteGuard from "./components/CourseRouteGuard";
 import CartWishlistApp from "./CartWishlistApp";
 import SubscriptionApp from "./subscription/App";
@@ -73,6 +74,7 @@ const CHECKOUT_HASH = "#/checkout";
 const MY_DAY_HASH = "#/my-day";
 const LEADERBOARD_HASH = "#/leaderboard";
 const PROFILE_HASH = "#/profile";
+const PROFILE_SUBSCRIBER_EXPERIENCE_HASH = "#/profile/subscriber-experience";
 const COURSE_HASH = "#/course/";
 const CART_HASH = "#/cart";
 const FAVORITES_HASH = "#/favorites";
@@ -736,6 +738,7 @@ function Root() {
       />
     );
   }
+  if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return <SubscriberExperiencePage />;
   if (hash.startsWith(COURSE_HASH)) {
     if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;
     return (
