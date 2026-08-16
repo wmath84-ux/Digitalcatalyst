@@ -655,7 +655,6 @@ export const grantSubscriptionFromQuote = async (
       amountPaise: Math.max(Number(quote.cashPayable || 0), Number(quote.minimumPayable || 0)),
       source,
       couponCode: quote.couponCode || null,
-      requestedEduCoins: Number(quote.eduCoinsReserved || 0),
       now,
       existingSubscription: { exists: existingSubscriptionSnapshot.exists, data: existingSubscriptionSnapshot.data() || {} },
     });

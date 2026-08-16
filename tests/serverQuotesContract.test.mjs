@@ -123,8 +123,6 @@ test("the persisted quote contains every required canonical field", () => {
     "regularSubtotal",
     "saleDiscount",
     "couponDiscount",
-    "eduCoinDiscount",
-    "eduCoinsReserved",
     "cashPayable",
     "minimumPayable",
     "currency",
@@ -138,12 +136,10 @@ test("the persisted quote contains every required canonical field", () => {
   // field is automatically persisted. This contract guard ensures a
   // refactor doesn't accidentally drop the spread.
   assert.match(helperSource, /\.\.\.quote/);
-  // Part 4 explicitly leaves `eduCoinDiscount = 0` (EduCoin is out of
-  // scope). `couponDiscount` is now conditional (Part 7) so we only
-  // assert that the engine declares the field — not that it is always
-  // 0. The contract test in `tests/couponsServerContract.test.mjs`
-  // covers the coupon-specific rules.
-  assert.match(engineSource, /eduCoinDiscount = 0/);
+  // `couponDiscount` is conditional (Part 7) so we only assert that the
+  // engine declares the field — not that it is always 0. The contract
+  // test in `tests/couponsServerContract.test.mjs` covers the
+  // coupon-specific rules.
   assert.match(engineSource, /couponDiscount/);
 });
 

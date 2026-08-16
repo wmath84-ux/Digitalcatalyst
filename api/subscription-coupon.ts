@@ -55,7 +55,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       billingCycle: cycle,
       featureIds,
       couponCode: null,
-      requestedEduCoins: 0,
       returnRoute: null,
     };
     const subContext = await loadSubscriptionSelectionContext(selection);

@@ -76,7 +76,7 @@ export type PaidUpdate = {
 
 export type OrderItem = {
   id: string;
-  kind: "product" | "module" | "update" | "subscription" | "feature" | "coins";
+  kind: "product" | "module" | "update" | "subscription" | "feature";
   refId: string;
   title: string;
   price: number;

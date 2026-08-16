@@ -20,7 +20,6 @@
 //     billingCycle: "monthly" | "yearly" | null,
 //     featureIds: string[],
 //     couponCode: string | null,
-//     requestedEduCoins: number,
 //     returnRoute: string | null,
 //   }
 //
@@ -29,8 +28,8 @@
 //   {
 //     quoteId, uid, purchaseKind,
 //     verifiedLineItems: CheckoutLineItem[],
-//     regularSubtotal, saleDiscount, couponDiscount, eduCoinDiscount,
-//     eduCoinsReserved, cashPayable, minimumPayable,
+//     regularSubtotal, saleDiscount, couponDiscount,
+//     cashPayable, minimumPayable,
 //     currency, expiresAt, status: "active" | "expired" | "consumed" | "invalid",
 //   }
 //
@@ -871,14 +870,12 @@ export const buildQuote = (input) => {
     }
   }
 
-  // The server never applies coupons or EduCoin deductions (out of scope).
+  // The server never applies coupons to the line total directly.
   // Part 7 — coupon handling. The coupon is validated against the
   // order and the discount is applied here. The engine refuses the
   // quote with `{ ok: false, status, reason }` when the coupon is
   // invalid (the caller should already have caught this via
   // `validateCoupon`; the inline check is defence-in-depth).
-  const eduCoinDiscount = 0;
-  const eduCoinsReserved = 0;
 
   let couponDiscount = 0;
   let couponCode = null;
@@ -951,8 +948,6 @@ export const buildQuote = (input) => {
     regularSubtotal,
     saleDiscount,
     couponDiscount,
-    eduCoinDiscount,
-    eduCoinsReserved,
     cashPayable,
     minimumPayable,
     currency: "INR",

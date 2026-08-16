@@ -44,7 +44,6 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
-  coins: number;
   photoURL?: string;
   mobile?: string;
   bio?: string;
@@ -143,7 +142,6 @@ const readAppUser = async (firebaseUser: FirebaseUser): Promise<AuthUser> => {
     createdAt: typeof data.createdAt?.toDate === "function" ? data.createdAt.toDate().toISOString() : String(data.createdAt || ""),
     subscriptionTier: String(data.subscriptionTier || "basic"),
     photoURL: String(data.photoURL || firebaseUser.photoURL || ""),
-    coins: Number(data.coinBalance ?? data.eduCoins ?? 300),
     role,
     providerIds: getProviderIds(firebaseUser),
   };
@@ -168,8 +166,6 @@ const ensureUserProfile = async (
       role: "user",
       status: "active",
       purchasedProductIds: [],
-      coinBalance: 300,
-      eduCoins: 300,
       authProvider: providerIds.includes("google.com") ? "google" : "password",
       providerIds,
       emailVerified: firebaseUser.emailVerified,
@@ -275,7 +271,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: String(data.name || current.name),
         mobile: String(data.mobile || ""),
         bio: String(data.bio || ""),
-        coins: Number(data.coinBalance ?? data.eduCoins ?? current.coins),
         subscriptionTier: String(data.subscriptionTier || current.subscriptionTier || "basic"),
         photoURL: String(data.photoURL || current.photoURL || ""),
         role: data.role === "admin" ? "admin" : "user",

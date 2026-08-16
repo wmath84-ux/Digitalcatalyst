@@ -84,7 +84,6 @@ const sanitiseSelection = (raw) => {
     billingCycle: raw.billingCycle === "monthly" || raw.billingCycle === "yearly" ? raw.billingCycle : null,
     featureIds: arr(raw.featureIds).map(String).slice(0, 50),
     couponCode: typeof raw.couponCode === "string" ? String(raw.couponCode).slice(0, 60) : null,
-    requestedEduCoins: typeof raw.requestedEduCoins === "number" && raw.requestedEduCoins >= 0 ? Math.floor(raw.requestedEduCoins) : 0,
     returnRoute: typeof raw.returnRoute === "string" ? String(raw.returnRoute).slice(0, 200) : null,
   };
 };
@@ -99,8 +98,6 @@ const sanitiseQuote = (raw) => {
     regularSubtotal: numOrZero(raw.regularSubtotal),
     saleDiscount: numOrZero(raw.saleDiscount),
     couponDiscount: numOrZero(raw.couponDiscount),
-    eduCoinDiscount: numOrZero(raw.eduCoinDiscount),
-    eduCoinsReserved: numOrZero(raw.eduCoinsReserved),
     cashPayable: numOrZero(raw.cashPayable),
     minimumPayable: numOrZero(raw.minimumPayable),
     currency: String(raw.currency || "INR"),
@@ -138,7 +135,6 @@ const sanitiseBuyer = (raw) => ({
   mobile: typeof raw.mobile === "string" ? String(raw.mobile) : null,
   emailVerified: Boolean(raw.emailVerified),
   tokenVerified: Boolean(raw.tokenVerified),
-  coins: numOrZero(raw.coins),
 });
 
 const sanitiseReturnRoute = (raw) => ({

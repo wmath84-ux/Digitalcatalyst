@@ -411,9 +411,8 @@ export const computeFullCoursePrice = ({ product, modules }) => {
 
 /**
  * Convert a (mode, selectedIds) state into a canonical `CheckoutSelection`
- * (see `src/types/commerce.ts`). The selection always carries the product id,
- * the list of selected module or resource ids, and an empty
- * `requestedEduCoins` (out of scope for Part 3).
+ * (see `src/types/commerce.ts`). The selection always carries the product id
+ * and the list of selected module or resource ids.
  */
 export const buildCheckoutSelection = ({ product, mode, selectedIds, paidUpdateId, returnRoute }) => {
   const idList = (selectedIds instanceof Set ? Array.from(selectedIds) : arr(selectedIds)).map(String);
@@ -429,7 +428,6 @@ export const buildCheckoutSelection = ({ product, mode, selectedIds, paidUpdateI
       billingCycle: null,
       featureIds: [],
       couponCode: null,
-      requestedEduCoins: 0,
       returnRoute: returnRoute || null,
     };
   }
@@ -444,7 +442,6 @@ export const buildCheckoutSelection = ({ product, mode, selectedIds, paidUpdateI
       billingCycle: null,
       featureIds: [],
       couponCode: null,
-      requestedEduCoins: 0,
       returnRoute: returnRoute || null,
     };
   }
@@ -459,7 +456,6 @@ export const buildCheckoutSelection = ({ product, mode, selectedIds, paidUpdateI
       billingCycle: null,
       featureIds: [],
       couponCode: null,
-      requestedEduCoins: 0,
       returnRoute: returnRoute || null,
     };
   }
@@ -474,7 +470,6 @@ export const buildCheckoutSelection = ({ product, mode, selectedIds, paidUpdateI
       billingCycle: null,
       featureIds: [],
       couponCode: null,
-      requestedEduCoins: 0,
       returnRoute: returnRoute || null,
     };
   }
@@ -488,7 +483,6 @@ export const buildCheckoutSelection = ({ product, mode, selectedIds, paidUpdateI
     billingCycle: null,
     featureIds: [],
     couponCode: null,
-    requestedEduCoins: 0,
     returnRoute: returnRoute || null,
   };
 };

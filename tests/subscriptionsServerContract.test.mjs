@@ -120,7 +120,6 @@ test("utils/subscriptions.d.ts declares the spec-shaped plan + feature + record 
     "amountPaise",
     "source",
     "couponCode",
-    "requestedEduCoins",
   ]) {
     assert.match(subscriptionsDts, new RegExp(`\\b${field}\\b`), `record missing field ${field}`);
   }

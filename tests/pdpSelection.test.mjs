@@ -477,7 +477,6 @@ test("buildCheckoutSelection produces a full_product selection", () => {
   const sel = buildCheckoutSelection({ product: buildProduct(), mode: "full_product", returnRoute: "#/store/purchases" });
   assert.equal(sel.purchaseKind, "full_product");
   assert.deepEqual(sel.productIds, ["prod_1"]);
-  assert.equal(sel.requestedEduCoins, 0);
   assert.equal(sel.returnRoute, "#/store/purchases");
 });
 

@@ -116,8 +116,6 @@ export interface SubscriptionRecord {
   source: "razorpay" | "free" | "admin";
   /** Coupon applied to the original payment. */
   couponCode: string | null;
-  /** EduCoin reservation the original payment requested. */
-  requestedEduCoins: number;
 }
 
 export const normalisePlanDoc: (raw: unknown, id?: string) => SubscriptionPlanDoc | null;

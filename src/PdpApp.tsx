@@ -333,7 +333,6 @@ function PremiumProductContent({
             billingCycle: null,
             featureIds: [],
             couponCode: code,
-            requestedEduCoins: 0,
             returnRoute: null,
           }),
         });
