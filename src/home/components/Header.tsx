@@ -37,6 +37,15 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         <div className="flex items-center gap-2">
           <button
             type="button"
+            aria-label="Leaderboard"
+            onClick={() => { window.location.hash = "#/leaderboard"; }}
+            className="flex h-10 items-center gap-1.5 rounded-xl border border-white/25 bg-white/15 px-3 backdrop-blur-sm transition hover:bg-white/25 active:scale-95"
+          >
+            <span className="text-base leading-none">🏆</span>
+            <span className="text-xs font-bold tracking-tight">Leaderboard</span>
+          </button>
+          <button
+            type="button"
             aria-label="Notifications"
             onClick={onOpenNotifications}
             className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm transition active:scale-90"

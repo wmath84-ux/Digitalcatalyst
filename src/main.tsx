@@ -10,6 +10,7 @@ import PdpApp from "./PdpApp";
 import CheckoutApp from "./components/checkout/CheckoutApp";
 import MyDayApp from "./MyDayApp";
 import LeaderboardApp from "./LeaderboardApp";
+import RevisionApp from "./revision/RevisionApp";
 import ProfileApp from "./profile/App";
 import SubscriberExperiencePage from "./profile/SubscriberExperiencePage";
 import CourseRouteGuard from "./components/CourseRouteGuard";
@@ -80,6 +81,7 @@ const PRODUCT_HASH = "#/product/";
 const CHECKOUT_HASH = "#/checkout";
 const MY_DAY_HASH = "#/my-day";
 const LEADERBOARD_HASH = "#/leaderboard";
+const REVISION_HASH = "#/revision";
 const PROFILE_HASH = "#/profile";
 const PROFILE_SUBSCRIBER_EXPERIENCE_HASH = "#/profile/subscriber-experience";
 const COURSE_HASH = "#/course/";
@@ -758,6 +760,7 @@ function Root() {
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
   if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
   if (hash.startsWith(LEADERBOARD_HASH)) return <LeaderboardApp />;
+  if (hash.startsWith(REVISION_HASH)) return <RevisionApp />;
   if (hash.startsWith(PRODUCT_HASH)) {
     return (
       <PdpWithOwnership
