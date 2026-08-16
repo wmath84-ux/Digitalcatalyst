@@ -236,22 +236,43 @@ html, body {
   overscroll-behavior: none;
 }
 
-/* Keep Eduvora header + footer visible while Razorpay Checkout is open. */
-body.eduvora-razorpay-open [data-site-header],
-body.eduvora-razorpay-open [data-site-footer] {
+/* Keep the Eduvora website header visible while Razorpay Checkout is open.
+   The Razorpay frame is inset below the header, anchored to the bottom of
+   the viewport (top + bottom, not a fixed height), so it behaves like an
+   in-app iframe: its own page scrolls internally and every field and button
+   stays reachable. The JS chrome utility sets --eduvora-header-h and the
+   exact left/width; these rules are the static fallback + layering. */
+body.eduvora-razorpay-open [data-site-header] {
   z-index: 2147483000 !important;
   background-color: rgba(255, 255, 255, 0.98);
 }
 
 body.eduvora-razorpay-open .razorpay-container,
 body.eduvora-razorpay-open .razorpay-checkout-frame {
+  position: fixed !important;
   top: var(--eduvora-header-h, 64px) !important;
-  height: calc(100dvh - var(--eduvora-header-h, 64px) - var(--eduvora-footer-h, 80px)) !important;
-  max-height: calc(100dvh - var(--eduvora-header-h, 64px) - var(--eduvora-footer-h, 80px)) !important;
+  bottom: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+body.eduvora-razorpay-open .razorpay-backdrop {
+  z-index: 2147482000 !important;
+}
+
+body.eduvora-razorpay-open .razorpay-container {
+  z-index: 2147482001 !important;
 }
 
 body.eduvora-razorpay-open iframe.razorpay-checkout-frame,
 body.eduvora-razorpay-open .razorpay-container iframe {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
   color-scheme: light;
 }
 

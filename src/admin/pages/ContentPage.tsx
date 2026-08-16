@@ -776,7 +776,7 @@ function PlayerTab({
         method: "PATCH",
         body: JSON.stringify({
           coursePlayerMessages: settings?.coursePlayerMessages,
-          docsEditorAccess: settings?.docsEditorAccess ?? "toolbar",
+          docsEditorAccess: settings?.docsEditorAccess ?? "full",
           docsEditorAccessByType: settings?.docsEditorAccessByType ?? {},
           drivePersonalCopy: settings?.drivePersonalCopy ?? { clientId: "", byType: {} },
         }),
@@ -804,7 +804,7 @@ function PlayerTab({
   ];
 
   const accessForType = (key: "doc" | "sheet" | "slides"): "off" | "toolbar" | "full" =>
-    settings?.docsEditorAccessByType?.[key] ?? settings?.docsEditorAccess ?? "toolbar";
+    settings?.docsEditorAccessByType?.[key] ?? settings?.docsEditorAccess ?? "full";
 
   const setAccessForType = (key: "doc" | "sheet" | "slides", value: "off" | "toolbar" | "full") =>
     patch({
