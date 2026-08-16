@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlarmClock, Bell, Check, Pencil, Plus, Trash2 } from "lucide-react";
 import type { Reminder } from "../../types";
 import { cn } from "../../utils/cn";
@@ -11,6 +11,8 @@ interface RemindersProps {
   onEdit: (reminder: Reminder) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  /** Id of the reminder a notification deep-linked to — scrolls to it + highlights it. */
+  highlightId?: string | null;
 }
 
 function getTimeStatus(time: string, done: boolean) {
@@ -30,10 +32,11 @@ const emptyReminder = (): Reminder => ({
   createdAt: Date.now(),
 });
 
-export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete }: RemindersProps) {
+export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete, highlightId = null }: RemindersProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [form, setForm] = useState<Reminder>(emptyReminder());
+  const listRef = useRef<HTMLDivElement>(null);
 
   const openAdd = () => {
     setEditingReminder(null);
@@ -60,6 +63,12 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
   };
 
   const sorted = [...reminders].sort((a, b) => toMinutes(a.time) - toMinutes(b.time));
+
+  useEffect(() => {
+    if (!highlightId) return;
+    const el = listRef.current?.querySelector(`[data-highlight="${CSS.escape(highlightId)}"]`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId, sorted]);
 
   const pendingCount = reminders.filter((r) => !r.done).length;
 
@@ -101,14 +110,16 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
               </button>
             </div>
           ) : (
-            <div className="space-y-2.5 max-h-72 overflow-y-auto custom-scrollbar">
+            <div ref={listRef} className="space-y-2.5 max-h-72 overflow-y-auto custom-scrollbar">
               {sorted.map((rem) => {
                 const status = getTimeStatus(rem.time, rem.done);
                 return (
                   <div
                     key={rem.id}
+                    data-highlight={rem.id}
                     className={cn(
                       "group flex items-center gap-3 rounded-xl border p-3 transition-all",
+                      rem.id === highlightId && "ring-2 ring-amber-400 ring-offset-2 ring-offset-white",
                       status === "done"
                         ? "border-emerald-200/60 bg-emerald-50/40"
                         : status === "overdue"

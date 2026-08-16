@@ -4,10 +4,15 @@ import { db } from "../../firebase";
 import Header from "./Header";
 import BottomNav, { type TabKey } from "./BottomNav";
 import {
+  filterNotifications,
+  getNotificationDeepLink,
+  getNotificationFilterKey,
   isNewsOrBlogNotification,
   loadSiteNotifications,
   mergeSiteNotifications,
+  NOTIFICATION_FILTER_ORDER,
   saveSiteNotifications,
+  type NotificationFilterKey,
   type SiteNotification,
   type SiteNotificationCategory,
 } from "../../utils/siteNotifications";
@@ -43,6 +48,35 @@ function timeAgo(ts: number): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// ---------------------------------------------------------------------------
+// Notification filters. Each chip shows how many notifications it contains;
+// tapping a chip shows only that group. Every category maps to exactly one
+// filter (see getNotificationFilterKey in utils/siteNotifications):
+//   product      → store, unlock, course (new/free product, product unlocked,
+//                  course content updates)
+//   my day       → mayday (tasks, schedule events, reminders)
+//   subscription → subscription (renewal reminders)
+//   updates      → announcement, community + any future/unknown category
+// ---------------------------------------------------------------------------
+const FILTER_META: Record<Exclude<NotificationFilterKey, "all">, { label: string; hint: string }> = {
+  product: {
+    label: "Product",
+    hint: "New products, unlocks and course content updates.",
+  },
+  mayday: {
+    label: "My Day",
+    hint: "Tasks, schedule events and reminders from My Day.",
+  },
+  subscription: {
+    label: "Subscription",
+    hint: "Subscription renewal and expiry alerts.",
+  },
+  updates: {
+    label: "Updates",
+    hint: "Announcements and community activity.",
+  },
+};
+
 export default function NotificationsPage({
   cartCount,
   purchasesBadge,
@@ -53,9 +87,20 @@ export default function NotificationsPage({
   const { user } = useAuth();
   const viewerKey = user?.id || "guest";
   const [items, setItems] = useState<SiteNotification[]>(() => loadSiteNotifications(viewerKey));
+  const [activeFilter, setActiveFilter] = useState<NotificationFilterKey>("all");
   const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">(() =>
     typeof window !== "undefined" && isWebPushSupported() ? window.Notification.permission : "unsupported"
   );
+
+  const filterCounts = useMemo(() => {
+    const counts: Record<NotificationFilterKey, number> = { all: items.length, product: 0, mayday: 0, subscription: 0, updates: 0 };
+    items.forEach((item) => {
+      counts[getNotificationFilterKey(item)] += 1;
+    });
+    return counts;
+  }, [items]);
+
+  const visibleItems = useMemo(() => filterNotifications(items, activeFilter), [activeFilter, items]);
 
   useEffect(() => {
     setItems(loadSiteNotifications(viewerKey));
@@ -103,7 +148,7 @@ export default function NotificationsPage({
         const rawTarget = data.target && typeof data.target === "object" && typeof (data.target as { type?: unknown }).type === "string"
           ? data.target
           : { type: "subscription" };
-        return { id: item.id, title: String(data.title || "Notification"), body: String(data.body || ""), category, createdAt, read: Boolean(data.read), source: "system", target: rawTarget as SiteNotification["target"], remoteNotificationId: item.id };
+        return { id: item.id, title: String(data.title || "Notification"), body: String(data.body || ""), category, createdAt, read: Boolean(data.read), source: "system" as const, target: rawTarget as SiteNotification["target"], remoteNotificationId: item.id };
       }).filter((item) => !isNewsOrBlogNotification(item));
       setItems((current) => mergeSiteNotifications(current, cloud));
     });
@@ -123,13 +168,10 @@ export default function NotificationsPage({
   const openNotification = (notification: SiteNotification) => {
     setItems((prev) => prev.map((item) => (item.id === notification.id ? { ...item, read: true } : item)));
     if (user && notification.remoteNotificationId) void updateDoc(doc(db, "users", user.id, "notifications", notification.remoteNotificationId), { read: true, readAt: serverTimestamp() });
-    const target = notification.target;
-    if (target.type === "product") window.location.hash = `#/product/${encodeURIComponent(String(target.productId))}`;
-    else if (target.type === "course") window.location.hash = `#/course/${encodeURIComponent(String(target.productId))}`;
-    else if (target.type === "purchases") window.location.hash = "#/store/purchases";
-    else if (target.type === "mayday") window.location.hash = "#/my-day";
-    else if (target.type === "subscription") window.location.hash = "#/subscription";
-    else window.location.hash = "#/store";
+    // Navigate to the exact location that caused the alert: a specific
+    // product/course page, the My Day tab with the item highlighted, or the
+    // subscription page (with renew intent when expired).
+    window.location.hash = getNotificationDeepLink(notification);
   };
 
   return (
@@ -184,19 +226,53 @@ export default function NotificationsPage({
             </div>
           )}
 
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 px-6 pb-10 pt-16 text-center">
+          {items.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {NOTIFICATION_FILTER_ORDER.map((key) => {
+                const isActive = activeFilter === key;
+                const label = key === "all" ? "All" : FILTER_META[key].label;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActiveFilter(key)}
+                    className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-semibold transition ${
+                      isActive
+                        ? "border-indigo-500 bg-indigo-600 text-white shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {label}
+                    <span
+                      className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
+                        isActive ? "bg-white/20 text-white" : "bg-indigo-50 text-indigo-600"
+                      }`}
+                    >
+                      {filterCounts[key]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {visibleItems.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 px-6 pb-10 pt-14 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
                 <BellIcon className="h-7 w-7" />
               </div>
-              <h3 className="text-xl font-extrabold text-slate-900">No notifications yet</h3>
+              <h3 className="text-xl font-extrabold text-slate-900">
+                {activeFilter === "all" ? "No notifications yet" : `No ${FILTER_META[activeFilter as Exclude<NotificationFilterKey, "all">].label} notifications`}
+              </h3>
               <p className="max-w-xs text-sm text-slate-500">
-                Store updates, course unlocks, and study reminders will show up here.
+                {activeFilter === "all"
+                  ? "Store updates, course unlocks, and study reminders will show up here."
+                  : FILTER_META[activeFilter as Exclude<NotificationFilterKey, "all">].hint}
               </p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100 px-2 pb-6">
-              {items.map((notification) => {
+              {visibleItems.map((notification) => {
                 const Icon = CATEGORY_ICON[notification.category] || BellIcon;
                 return (
                   <button

@@ -163,7 +163,9 @@ async function handleProductAction(req: VercelRequest, res: VercelResponse, acti
         title: "Your course has new content",
         body,
         tag: `content-course-${productId}`,
-        url: PRODUCT_URL(productId),
+        // Buyers already own the course — deep-link straight into the player
+        // so the tap lands on the new lessons, not the store page.
+        url: `/#/course/${productId}`,
       });
     }
   }

@@ -100,10 +100,12 @@ test("cron endpoint schedules renewals, My Day pushes and content announcements"
   assert.match(cron, /diffProductInventory/);
   assert.match(cron, /New free product available/);
   assert.match(cron, /Your course has new content/);
-  // Bell routing contract: the page opens 'mayday' targets on #/my-day, so the
-  // server-written doc must use the exact same target type.
-  assert.match(cron, /target: \{ type: "mayday" \}/);
+  // Bell routing contract: the server-written doc carries the exact My Day
+  // tab + item id so the page can open that list with the item highlighted.
+  assert.match(cron, /target: \{ type: "mayday", section: item\.section, itemId: item\.itemId \}/);
   assert.match(cron, /category: "mayday"/);
+  // The system push deep-links to the same tab + item.
+  assert.match(cron, /`\/#\/my-day\?section=\$\{item\.section\}&item=\$\{encodeURIComponent\(item\.itemId\)\}`/);
 });
 
 test("dedupe keys survive Firestore dot-path restrictions", () => {
@@ -125,5 +127,8 @@ test("My Day saves the device timezone so server push fires at the right local t
 test("bell center maps stored cloud categories (My Day reminders are not mislabeled)", () => {
   assert.match(notificationsPage, /data\.category/);
   assert.match(notificationsPage, /"mayday"/);
-  assert.match(notificationsPage, /target\.type === "mayday"/);
+  // Tapping a notification navigates through the shared deep-link helper so
+  // a My Day alert lands on #/my-day?section=<tab>&item=<id>, not the overview.
+  assert.match(notificationsPage, /getNotificationDeepLink/);
+  assert.match(notificationsPage, /window\.location\.hash = getNotificationDeepLink\(notification\)/);
 });

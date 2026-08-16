@@ -67,6 +67,9 @@ export default function App() {
   const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
   const [activeSection, setActiveSection] = useState<DaySection>("overview");
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  // Item id a notification deep-linked to (via #/my-day?section=…&item=…).
+  // The section opens and the matching card is scrolled into view + ringed.
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
   // Set true once the user mutates My Day locally (add/edit/delete/toggle).
   // Prevents the in-flight cloud load from clobbering a change the user made
@@ -183,6 +186,28 @@ export default function App() {
     }
     setCreateMenuOpen(false);
     setActiveSection(id as DaySection);
+    setHighlightId(null);
+  }, []);
+
+  // Notification deep links land on #/my-day?section=<tab>&item=<id>. Apply
+  // the section on mount and whenever the hash changes (e.g. the user taps a
+  // notification from another tab of the same app), and hand the item id to
+  // the section component so it can scroll to + highlight the exact item.
+  useEffect(() => {
+    const applyDeepLink = () => {
+      const hash = window.location.hash;
+      const queryIndex = hash.indexOf("?");
+      const params = queryIndex >= 0 ? new URLSearchParams(hash.slice(queryIndex + 1)) : null;
+      const section = params?.get("section");
+      if (section === "tasks" || section === "schedule" || section === "reminders" || section === "notes") {
+        setActiveSection(section);
+      }
+      const item = params?.get("item");
+      setHighlightId(item && item.trim() ? item.trim() : null);
+    };
+    applyDeepLink();
+    window.addEventListener("hashchange", applyDeepLink);
+    return () => window.removeEventListener("hashchange", applyDeepLink);
   }, []);
 
   const showConfirm = useCallback((title: string, message: string, onConfirm: () => void) => {
@@ -579,6 +604,7 @@ export default function App() {
                 onDelete={handleDeleteTask}
                 onAdd={openAddTask}
                 globalSearch={globalSearch}
+                highlightId={highlightId}
               />
             )}
 
@@ -588,6 +614,7 @@ export default function App() {
                 onAdd={openAddEvent}
                 onEdit={openEditEvent}
                 onDelete={handleDeleteEvent}
+                highlightId={highlightId}
               />
             )}
 
@@ -598,6 +625,7 @@ export default function App() {
                 onEdit={handleEditReminder}
                 onToggle={handleToggleReminder}
                 onDelete={handleDeleteReminder}
+                highlightId={highlightId}
               />
             )}
 

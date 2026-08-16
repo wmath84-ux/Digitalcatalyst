@@ -129,7 +129,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         created += 1;
         // Per-day tag so each morning's post-expiry notice stands alone in the
         // tray instead of collapsing into the previous day's notification.
-        pushed += await sendPush(db, uid, reminder.title, reminder.body, { tag: `subscription-renewal:${reminder.stage}`, url: "/#/subscription" });
+        // Expired stages deep-link straight into the renewal flow.
+        const renewalUrl = reminder.expired ? "/#/subscription?renew=1" : "/#/subscription";
+        pushed += await sendPush(db, uid, reminder.title, reminder.body, { tag: `subscription-renewal:${reminder.stage}`, url: renewalUrl });
       }
       summary.renewals = { scanned: snapshot.size, created, pushed };
     }
@@ -161,6 +163,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           logPatch[`notificationLog.${item.key}`] = now;
           logged += 1;
           // Cross-device bell entry (id == key makes this write idempotent).
+          // The target carries the exact My Day tab + item id so an in-app
+          // tap opens that list with the item highlighted.
           await db.collection("users").doc(uid).collection("notifications").doc(item.key).set({
             id: item.key,
             title: item.title,
@@ -169,7 +173,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             read: false,
             source: "system",
             createdAt: Timestamp.fromMillis(item.dueAt),
-            target: { type: "mayday" },
+            target: { type: "mayday", section: item.section, itemId: item.itemId },
           }, { merge: true });
           // The tag must be per-item, not per-kind. Tagging by kind made
           // the browser collapse every due task into a single
@@ -177,7 +181,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // not match the foreground tag, so an open app could show the
           // same reminder twice. `item.key` is unique per item per day
           // and is exactly what the in-app path uses.
-          pushed += await sendPush(db, uid, item.title, item.body, { tag: `myday-${item.key}`, url: "/#/my-day" });
+          const itemUrl = `/#/my-day?section=${item.section}&item=${encodeURIComponent(item.itemId)}`;
+          pushed += await sendPush(db, uid, item.title, item.body, { tag: `myday-${item.key}`, url: itemUrl });
         }
         try {
           await document.ref.update(logPatch);
@@ -230,7 +235,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }, { merge: true });
             coursePushes += await sendPush(db, buyer.id, "Your course has new content", `${update.title}: ${parts.join(" and ")}`, {
               tag: `content-course-${update.id}`,
-              url: `/#/product/${update.id}`,
+              // Buyers already own the course — deep-link into the player.
+              url: `/#/course/${update.id}`,
             });
           }
         }

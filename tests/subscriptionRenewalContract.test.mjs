@@ -40,7 +40,10 @@ test("scheduler writes in-app notification and attempts optional push", () => {
 
 test("notifications sync across devices and renewal opens subscription", () => {
   assert.match(notifications, /collection\(db, "users", user\.id, "notifications"\)/);
-  assert.match(notifications, /target\.type === "subscription"/);
+  // Subscription taps go through the shared deep-link helper, which opens
+  // #/subscription (and ?renew=1 for expired reminders).
+  assert.match(notifications, /getNotificationDeepLink/);
+  assert.match(notifications, /window\.location\.hash = getNotificationDeepLink\(notification\)/);
   assert.match(notifications, /markAllRead/);
   assert.match(rules, /match \/notifications\/\{notificationId\}/);
 });
