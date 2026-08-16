@@ -29,8 +29,7 @@ import { CheckoutProvider } from "./checkout/CheckoutContext";
 import { clearAdminSession, hasAdminSession } from "./utils/adminSession";
 import { useOwnedUpdateIds } from "./hooks/useOwnedUpdates";
 import { type CheckoutReturnRoute } from "./checkout/types";
-import { buildContentNotificationInventory, createContentNotifications, getMyDayItemDeepLink, getNotificationDeepLink, loadContentNotificationBaseline, loadSiteNotifications, mergeSiteNotifications, saveContentNotificationBaseline, saveSiteNotifications, type SiteNotification } from "../utils/siteNotifications";
-import { getRenewalReminder } from "../utils/subscriptionRenewal";
+import { getMyDayItemDeepLink } from "../utils/siteNotifications";
 import { buildCheckoutSessionRecord, writeToSessionStorage as writeCheckoutToStorage } from "../utils/checkoutSession";
 import type { CheckoutSelection } from "./types/commerce";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
@@ -389,33 +388,18 @@ function Root() {
     };
   }, [user]);
 
-  useEffect(() => {
-    if (!user) return undefined;
-    return onSnapshot(doc(db, "users", user.id, "subscription", "current"), (snapshot) => {
-      const reminder = getRenewalReminder(snapshot.data() || null);
-      if (!reminder) return;
-      const incoming: SiteNotification = { ...reminder, category: "subscription", read: false, source: "system" };
-      saveSiteNotifications(user.id, mergeSiteNotifications(loadSiteNotifications(user.id), [incoming]));
-    });
-  }, [user]);
-
-  useEffect(() => {
-    if (!user || catalogProducts.length === 0) return;
-    const current = buildContentNotificationInventory({ products: catalogProducts, articles: [], announcements: [], purchasedProductIds: Array.from(purchasedIds) });
-    const previous = loadContentNotificationBaseline(user.id);
-    if (previous) {
-      const incoming = createContentNotifications(previous, current);
-      if (incoming.length > 0) {
-        saveSiteNotifications(user.id, mergeSiteNotifications(loadSiteNotifications(user.id), incoming));
-        // Foreground fallback: Web Push normally supplies this system alert.
-        // A stable tag lets Android collapse it with the matching server push.
-        incoming.forEach((notification) => {
-          void showLocalSystemNotification(notification.title, notification.body, `/${getNotificationDeepLink(notification)}`, notification.id);
-        });
-      }
-    }
-    saveContentNotificationBaseline(user.id, current);
-  }, [catalogProducts, purchasedIds, user]);
+  // Renewal reminders, product unlocks, new-product announcements and course
+  // content updates are all SERVER-GENERATED now (the GitHub Actions minute
+  // pinger drives api/cron/subscription-renewals; instant paths live in
+  // api/razorpay/verify-payment and api/push/send). The server writes the
+  // cross-device bell doc AND sends the Web Push, so the app never needs to
+  // be open — and there is no client-side baseline diff left to misfire.
+  //
+  // The old client-side generator that lived here recomputed a localStorage
+  // baseline on every app open; because `purchasedIds` streams in after the
+  // catalog, the baseline was clobbered with an empty purchase list and the
+  // next render re-announced every owned product as "Product unlocked" —
+  // that was the repeating-notification bug. Do not reintroduce it.
 
   useEffect(() => {
     if (loading || user || !requiresAuthentication(hash)) return;

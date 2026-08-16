@@ -71,8 +71,11 @@ test("the bell page renders the five filter chips with per-filter counts", () =>
 test("product notifications deep-link to the exact product/course page", () => {
   assert.match(siteNotifications, /notification\.category === 'course' \? `#\/course\/\$\{productId\}` : `#\/product\/\$\{productId\}`/);
   assert.match(siteNotifications, /if \(target\.type === 'purchases'\) return '#\/store\/purchases'/);
-  // Unlock notifications now carry the product id so a tap opens the product.
-  assert.match(siteNotifications, /target: \{ type: 'product', productId: id \}/);
+  // Product/store notifications are server-generated with the product id in
+  // the target so a tap opens the exact product page (cron catch-up and the
+  // instant admin path write the same doc shape).
+  assert.match(cron, /target: \{ type: "product", productId: product\.id \}/);
+  assert.match(pushSend, /target: \{ type: "product", productId \}/);
 });
 
 test("My Day due items carry the exact section + item id for deep links", () => {
@@ -127,9 +130,11 @@ test("foreground local notifications use the same deep links", () => {
   // My Day foreground system alerts deep-link to the exact tab + item.
   assert.match(main, /const itemUrl = `\/\$\{getMyDayItemDeepLink\(item\.section, item\.itemId\)\}`/);
   assert.match(main, /showLocalSystemNotification\(item\.title, item\.body, itemUrl, `myday-\$\{item\.key\}`\)/);
-  // Content notifications (new product / unlock / course update) use the
-  // shared helper so the in-app and system paths can never disagree.
-  assert.match(main, /showLocalSystemNotification\(notification\.title, notification\.body, `\/\$\{getNotificationDeepLink\(notification\)\}`, notification\.id\)/);
+  // Content notifications (new product / unlock / course update) are
+  // SERVER-generated now — the client must not run its own baseline diff
+  // (that was the repeating "Product unlocked" bug).
+  assert.doesNotMatch(main, /createContentNotifications/);
+  assert.doesNotMatch(main, /ContentNotificationBaseline/);
 });
 
 test("service worker click path applies the exact url on every platform", () => {
