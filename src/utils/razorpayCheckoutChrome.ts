@@ -1,10 +1,19 @@
-// Pins the Eduvora header and footer above Razorpay Standard Checkout
-// so the payment iframe sits in the phone column between them instead
-// of covering the whole viewport.
+// Pins the Eduvora website header above Razorpay Standard Checkout and
+// insets the Razorpay frame between the header and the bottom of the
+// viewport. The payment checkout therefore behaves like an in-app iframe:
+// the site header stays visible and the checkout page (Razorpay's own
+// cross-origin frame) gets the full remaining viewport height and scrolls
+// internally, so every field, method option and button stays reachable by
+// scrolling — nothing is clipped behind the chrome.
 
 const OPEN_CLASS = "eduvora-razorpay-open";
 const HEADER_VAR = "--eduvora-header-h";
-const FOOTER_VAR = "--eduvora-footer-h";
+
+// Layering (Razorpay ships its own sky-high z-indexes):
+//   backdrop < payment frame < site header
+const HEADER_Z = "2147483000";
+const CONTAINER_Z = "2147482001";
+const BACKDROP_Z = "2147482000";
 
 type StyleSnapshot = { element: HTMLElement; cssText: string };
 
@@ -18,81 +27,13 @@ const restoreStyle = (snapshot: StyleSnapshot | null) => {
   snapshot.element.style.cssText = snapshot.cssText;
 };
 
-const pinElement = (
-  element: HTMLElement,
-  box: { top: number; left: number; width: number; height: number },
-) => {
-  element.style.setProperty("position", "fixed", "important");
-  element.style.setProperty("top", `${Math.max(0, box.top)}px`, "important");
-  element.style.setProperty("left", `${Math.max(0, box.left)}px`, "important");
-  element.style.setProperty("width", `${Math.max(0, box.width)}px`, "important");
-  element.style.setProperty("height", `${Math.max(0, box.height)}px`, "important");
-  element.style.setProperty("right", "auto", "important");
-  element.style.setProperty("bottom", "auto", "important");
-  element.style.setProperty("transform", "none", "important");
-  element.style.setProperty("z-index", "2147483000", "important");
-  element.style.setProperty("max-width", "none", "important");
-};
-
-const insetRazorpayFrame = (box: { top: number; left: number; width: number; height: number }) => {
-  const containers = document.querySelectorAll<HTMLElement>(".razorpay-container, .razorpay-checkout-frame");
-  containers.forEach((node) => {
-    node.style.setProperty("position", "fixed", "important");
-    node.style.setProperty("top", `${Math.max(0, box.top)}px`, "important");
-    node.style.setProperty("left", `${Math.max(0, box.left)}px`, "important");
-    node.style.setProperty("width", `${Math.max(0, box.width)}px`, "important");
-    node.style.setProperty("height", `${Math.max(0, box.height)}px`, "important");
-    node.style.setProperty("right", "auto", "important");
-    node.style.setProperty("bottom", "auto", "important");
-    node.style.setProperty("max-width", "none", "important");
-    node.style.setProperty("max-height", "none", "important");
-    node.style.setProperty("transform", "none", "important");
-    node.style.setProperty("margin", "0", "important");
-    node.style.setProperty("border-radius", "0", "important");
-  });
-
-  document.querySelectorAll<HTMLElement>("iframe.razorpay-checkout-frame, .razorpay-container iframe").forEach((frame) => {
-    frame.style.setProperty("width", "100%", "important");
-    frame.style.setProperty("height", "100%", "important");
-    frame.style.setProperty("max-height", "100%", "important");
-    frame.style.setProperty("color-scheme", "light");
-  });
-};
-
-const measureChrome = () => {
-  const shell = document.querySelector<HTMLElement>("[data-checkout-shell]");
-  const header = document.querySelector<HTMLElement>("[data-site-header]");
-  const footer = document.querySelector<HTMLElement>("[data-site-footer]");
-  const shellBox = shell?.getBoundingClientRect();
-  const headerBox = header?.getBoundingClientRect();
-  const footerBox = footer?.getBoundingClientRect();
-
-  const left = shellBox?.left ?? 0;
-  const width = shellBox?.width || window.innerWidth;
-  const headerHeight = Math.round(headerBox?.height || header?.offsetHeight || 64);
-  const footerHeight = Math.round(footerBox?.height || footer?.offsetHeight || 80);
-  const top = shellBox?.top ?? 0;
-  const bottom = shellBox?.bottom ?? window.innerHeight;
-
-  document.documentElement.style.setProperty(HEADER_VAR, `${headerHeight}px`);
-  document.documentElement.style.setProperty(FOOTER_VAR, `${footerHeight}px`);
-
-  return {
-    header,
-    footer,
-    headerBox: { top, left, width, height: headerHeight },
-    footerBox: { top: bottom - footerHeight, left, width, height: footerHeight },
-    frameBox: {
-      top: top + headerHeight,
-      left,
-      width,
-      height: Math.max(160, bottom - top - headerHeight - footerHeight),
-    },
-  };
+const setImportant = (element: HTMLElement, property: string, value: string) => {
+  element.style.setProperty(property, value, "important");
 };
 
 /**
- * Keep the store header and footer visible while Razorpay Checkout is open.
+ * Keep the site header visible while Razorpay Checkout is open, with the
+ * payment frame inset below it and the dimming backdrop underneath both.
  * Returns a disposer that restores the original chrome and CSS variables.
  */
 export const revealCheckoutChromeOverRazorpay = (): (() => void) => {
@@ -102,32 +43,108 @@ export const revealCheckoutChromeOverRazorpay = (): (() => void) => {
   document.body.setAttribute("data-eduvora-razorpay-open", "true");
 
   let headerSnap: StyleSnapshot | null = null;
-  let footerSnap: StyleSnapshot | null = null;
+  let rafId = 0;
 
   const apply = () => {
-    const measured = measureChrome();
-    if (measured.header && !headerSnap) headerSnap = snapshotStyle(measured.header);
-    if (measured.footer && !footerSnap) footerSnap = snapshotStyle(measured.footer);
-    if (measured.header) pinElement(measured.header, measured.headerBox);
-    if (measured.footer) pinElement(measured.footer, measured.footerBox);
-    insetRazorpayFrame(measured.frameBox);
+    const shell = document.querySelector<HTMLElement>("[data-checkout-shell]");
+    const header = document.querySelector<HTMLElement>("[data-site-header]");
+    const shellBox = shell?.getBoundingClientRect();
+    const headerBox = header?.getBoundingClientRect();
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+
+    // Match the phone column the checkout shell occupies (full width on
+    // mobile, the centered max-w-md column on desktop).
+    const left = Math.max(0, Math.round(shellBox?.left ?? 0));
+    const width = Math.max(0, Math.round(shellBox?.width || window.innerWidth));
+    const headerHeight = Math.round(headerBox?.height || header?.offsetHeight || 64);
+    // The header is sticky, so it is always on screen; pin it exactly where
+    // the user already sees it (top of the viewport in practice).
+    const headerTop = Math.min(
+      Math.max(0, Math.round(headerBox?.top ?? 0)),
+      Math.max(0, viewportHeight - headerHeight),
+    );
+
+    document.documentElement.style.setProperty(HEADER_VAR, `${headerHeight}px`);
+
+    if (header && !headerSnap) headerSnap = snapshotStyle(header);
+    if (header) {
+      setImportant(header, "position", "fixed");
+      setImportant(header, "top", `${headerTop}px`);
+      setImportant(header, "left", `${left}px`);
+      setImportant(header, "width", `${width}px`);
+      setImportant(header, "height", `${headerHeight}px`);
+      setImportant(header, "right", "auto");
+      setImportant(header, "bottom", "auto");
+      setImportant(header, "transform", "none");
+      setImportant(header, "z-index", HEADER_Z);
+      setImportant(header, "max-width", "none");
+    }
+
+    // The payment frame fills everything below the pinned header down to
+    // the bottom of the viewport. `top` + `bottom` anchoring (instead of a
+    // pre-computed height) means it always tracks the real, live viewport —
+    // including mobile URL-bar changes — and its inner page scrolls on its
+    // own when the content is taller than the frame.
+    const frameTop = headerTop + headerHeight;
+    document.querySelectorAll<HTMLElement>(".razorpay-container, .razorpay-checkout-frame").forEach((node) => {
+      setImportant(node, "position", "fixed");
+      setImportant(node, "top", `${frameTop}px`);
+      setImportant(node, "left", `${left}px`);
+      setImportant(node, "width", `${width}px`);
+      setImportant(node, "right", "auto");
+      setImportant(node, "bottom", "0");
+      setImportant(node, "height", "auto");
+      setImportant(node, "max-width", "none");
+      setImportant(node, "max-height", "none");
+      // Razorpay animates the container in from the bottom of the screen;
+      // kill the transform so the frame sits exactly in its inset box.
+      setImportant(node, "transform", "none");
+      setImportant(node, "margin", "0");
+      setImportant(node, "border-radius", "0");
+      setImportant(node, "overflow", "hidden");
+      setImportant(node, "z-index", CONTAINER_Z);
+    });
+
+    // The dimming backdrop stays underneath the payment frame and the header.
+    document.querySelectorAll<HTMLElement>(".razorpay-backdrop").forEach((node) => {
+      setImportant(node, "z-index", BACKDROP_Z);
+    });
+
+    document.querySelectorAll<HTMLElement>("iframe.razorpay-checkout-frame, .razorpay-container iframe").forEach((frame) => {
+      setImportant(frame, "width", "100%");
+      setImportant(frame, "height", "100%");
+      setImportant(frame, "max-height", "100%");
+      setImportant(frame, "color-scheme", "light");
+    });
+  };
+
+  // Re-apply on the next frame — Razorpay mounts/animates its nodes over
+  // several mutations, and rAF batching keeps the loop cheap.
+  const schedule = () => {
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(apply);
   };
 
   apply();
-  const observer = new MutationObserver(apply);
+  const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true });
-  window.addEventListener("resize", apply);
-  window.addEventListener("orientationchange", apply);
+  window.addEventListener("resize", schedule);
+  window.addEventListener("orientationchange", schedule);
+  // Mobile browsers change the visual viewport as the URL bar hides/shows —
+  // track it so the payment frame never ends up taller than the screen.
+  window.visualViewport?.addEventListener("resize", schedule);
+  window.visualViewport?.addEventListener("scroll", schedule);
 
   return () => {
+    cancelAnimationFrame(rafId);
     observer.disconnect();
-    window.removeEventListener("resize", apply);
-    window.removeEventListener("orientationchange", apply);
+    window.removeEventListener("resize", schedule);
+    window.removeEventListener("orientationchange", schedule);
+    window.visualViewport?.removeEventListener("resize", schedule);
+    window.visualViewport?.removeEventListener("scroll", schedule);
     restoreStyle(headerSnap);
-    restoreStyle(footerSnap);
     document.body.classList.remove(OPEN_CLASS);
     document.body.removeAttribute("data-eduvora-razorpay-open");
     document.documentElement.style.removeProperty(HEADER_VAR);
-    document.documentElement.style.removeProperty(FOOTER_VAR);
   };
 };

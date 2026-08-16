@@ -96,7 +96,7 @@ export default function SubscriptionPage({
   onNavigateFooter,
 }: SubscriptionPageProps) {
   const { user } = useAuth();
-  const { products: availableProducts } = useCatalog();
+  const { products: availableProducts, purchasedIds } = useCatalog();
   const renewalLoadedRef = useRef(false);
   const repairedOrderIdsRef = useRef<Set<string>>(new Set());
 
@@ -977,6 +977,7 @@ export default function SubscriptionPage({
         onClose={() => setCourseModalOpen(false)}
         onChangeSelected={setSelectedCourseIds}
         products={subscriptionDisplayProducts}
+        purchasedIds={purchasedIds}
       />
 
       <FeatureSelectModal

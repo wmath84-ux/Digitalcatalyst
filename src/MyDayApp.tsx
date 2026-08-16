@@ -2,11 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import {
-  Bell,
   CalendarClock,
   ClipboardList,
-  Download,
-  LayoutGrid,
   NotebookPen,
   Plus,
   Search,
@@ -441,113 +438,39 @@ export default function App() {
         <StoreHeader
           cartCount={cartIds.size}
           notifCount={1}
+          title="Eduvora Taskar"
+          subtitle="My Day Activities"
+          onDownloadReport={handleDownloadReport}
+          onToggleSearch={() => setShowMobileSearch((s) => !s)}
+          searchActive={showMobileSearch || Boolean(globalSearch)}
           onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
           onNavigateToCart={() => { window.location.hash = "#/cart"; }}
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
         />
 
-        {/* The My Day toolbar remains independently sticky directly below
-            the 68px store header, so neither header covers the other. */}
-        <header className="sticky top-[68px] z-20 border-b border-slate-100 bg-white/90 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-2.5 lg:hidden">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200">
-                <LayoutGrid className="h-[18px] w-[18px]" />
-              </div>
-              <div>
-                <span className="text-sm font-extrabold tracking-tight text-slate-900">Eduvora Tasker</span>
-                <p className="-mt-0.5 text-[10px] font-medium text-slate-400">My Day</p>
-              </div>
-            </div>
-
-            <h1 className="hidden text-lg font-bold text-slate-900 lg:block">My Day</h1>
-
-            <div className="flex items-center gap-2 sm:gap-3">
-              <button
-                onClick={() => setShowMobileSearch((s) => !s)}
-                aria-label="Search"
-                className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-xl transition sm:hidden",
-                  showMobileSearch || globalSearch
-                    ? "bg-indigo-100 text-indigo-600"
-                    : "bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
-                )}
-              >
-                <Search className="h-[18px] w-[18px]" />
-              </button>
-              <div className="hidden items-center gap-2 rounded-xl bg-slate-100 px-3.5 py-2.5 transition-all focus-within:bg-white focus-within:shadow-sm focus-within:ring-2 focus-within:ring-indigo-100 sm:flex">
-                <Search className="h-4 w-4 shrink-0 text-slate-400" />
-                <input
-                  value={globalSearch}
-                  onChange={(e) => setGlobalSearch(e.target.value)}
-                  placeholder="Search tasks, notes..."
-                  className="w-40 bg-transparent text-sm text-slate-600 outline-none placeholder:text-slate-400 lg:w-56"
-                />
-                {globalSearch && (
-                  <button
-                    onClick={() => setGlobalSearch("")}
-                    className="shrink-0 rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-              <button
-                onClick={handleDownloadReport}
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-2.5 text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-800 sm:px-3"
-                aria-label="Download report"
-              >
-                <Download className="h-4 w-4" />
-                <span className="hidden text-xs font-semibold sm:inline">Report</span>
-              </button>
-              <button
-                aria-label="Notifications"
-                onClick={() => { window.location.hash = "#/notifications"; }}
-                className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
-              >
-                <Bell className="h-[18px] w-[18px]" />
-                {reminders.filter((r) => !r.done).length > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white ring-2 ring-white">
-                    {reminders.filter((r) => !r.done).length}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                aria-label="Profile"
-                onClick={() => { window.location.hash = "#/profile"; }}
-                className="h-9 w-9 overflow-hidden rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 shadow-md ring-2 ring-white"
-              >
-                <div className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
-                  AV
-                </div>
-              </button>
+        {/* Search dropdown toggled from the header's search button. */}
+        {showMobileSearch && (
+          <div className="animate-slideUp border-b border-indigo-100 bg-white px-4 pb-3 pt-2">
+            <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/50 px-3.5 py-2.5 ring-2 ring-indigo-100">
+              <Search className="h-4 w-4 shrink-0 text-indigo-500" />
+              <input
+                autoFocus
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
+                placeholder="Search tasks, notes..."
+                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              />
+              {globalSearch && (
+                <button
+                  onClick={() => { setGlobalSearch(""); setShowMobileSearch(false); }}
+                  className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-white hover:text-slate-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
-
-          {showMobileSearch && (
-            <div className="animate-slideUp px-4 pb-3 sm:hidden">
-              <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/50 px-3.5 py-2.5 ring-2 ring-indigo-100">
-                <Search className="h-4 w-4 shrink-0 text-indigo-500" />
-                <input
-                  autoFocus
-                  value={globalSearch}
-                  onChange={(e) => setGlobalSearch(e.target.value)}
-                  placeholder="Search tasks, notes..."
-                  className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                />
-                {globalSearch && (
-                  <button
-                    onClick={() => { setGlobalSearch(""); setShowMobileSearch(false); }}
-                    className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-white hover:text-slate-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </header>
+        )}
 
         <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 pt-6 sm:px-6 lg:px-8">
           <SideNav active={activeSection} onNavigate={handleNavigate} />

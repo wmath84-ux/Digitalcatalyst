@@ -112,6 +112,14 @@ test("the viewer header carries the edit toggle for editable Google files", () =
   assert.match(resourceViewer, /canEditInline \? \(/);
 });
 
+test("editable Google files open DIRECTLY in the editor (toolbar + header)", () => {
+  // Edit mode is ON by default for editable files — learners granted editor
+  // permission see Google's toolbar (and, with full chrome, its header)
+  // without hunting for the toggle. The toggle still returns to preview.
+  assert.match(resourceViewer, /useState\(canEditInline\)/);
+  assert.match(resourceViewer, /open DIRECTLY in the editor/);
+});
+
 test("the PER-TYPE admin switch gates the toggle and picks the editor chrome", () => {
   // Each Google family (doc / sheet / slides) has its own off/toolbar/full
   // switch; "off" hides the toggle entirely for that type only.
@@ -157,7 +165,9 @@ test("the admin hook reads the live public settings doc with a safe fallback", (
   assert.match(hook, /docsEditorAccessByType/);
   // Legacy single value is the inherited default for un-overridden types.
   assert.match(hook, /normalizeDocsEditorAccess\(data\?\.docsEditorAccess/);
-  assert.match(hook, /DEFAULT_DOCS_EDITOR_ACCESS: DocsEditorAccess = "toolbar"/);
+  // The shipped default is the FULL editor (header + toolbar), because
+  // editable Google files now open in the editor straight away.
+  assert.match(hook, /DEFAULT_DOCS_EDITOR_ACCESS: DocsEditorAccess = "full"/);
 });
 
 test("normalizeDocsEditorAccess only accepts off / toolbar / full", async () => {
@@ -184,7 +194,7 @@ test("the admin Content page exposes a per-type three-way editor control", () =>
     assert.ok(contentPage.includes(value), `missing admin option ${value}`);
   }
   // Both fields persist through the settings pipeline.
-  assert.match(contentPage, /docsEditorAccess: settings\?\.docsEditorAccess \?\? "toolbar"/);
+  assert.match(contentPage, /docsEditorAccess: settings\?\.docsEditorAccess \?\? "full"/);
   assert.match(contentPage, /docsEditorAccessByType: settings\?\.docsEditorAccessByType \?\? \{\}/);
   // The page explains why forms/PDFs have no switch.
   assert.match(contentPage, /form <em>builder<\/em>/);

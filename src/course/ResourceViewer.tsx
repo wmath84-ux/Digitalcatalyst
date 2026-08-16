@@ -135,7 +135,12 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
   const editorAccess = editableKind ? accessByType[editableKind] : "off";
   const editorChrome: DocsEditorChrome = editorAccess === "full" ? "full" : "toolbar";
   const canEditInline = editorAccess !== "off" && isEditableGoogleFile(file);
-  const [editMode, setEditMode] = useState(false);
+  // Google Docs / Sheets / Slides open DIRECTLY in the editor (full toolbar
+  // +, with "full" chrome, Google's header) whenever the admin hasn't
+  // disabled the editor for that file type — learners who were granted
+  // editor permission no longer have to hunt for a toggle to see it. The
+  // header toggle still switches back to the read-only preview at any time.
+  const [editMode, setEditMode] = useState(canEditInline);
 
   // ── Personal copy (admin-controlled, PER FILE TYPE) ─────────────────
   // When the admin enables "Personal copy" for this file's family AND an

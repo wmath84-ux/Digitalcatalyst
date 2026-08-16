@@ -40,8 +40,12 @@ import {
 } from "../utils/courseEmbed";
 import { getGoogleClientId } from "../../utils/googleIdentity";
 
-/** What ships when the admin has never touched the switches. */
-export const DEFAULT_DOCS_EDITOR_ACCESS: DocsEditorAccess = "toolbar";
+/** What ships when the admin has never touched the switches.
+ *  "full" — the complete docs.google.com page (header, menu bar AND
+ *  toolbar) — because the in-player editor now opens by default for
+ *  editable Google files, and the full page is what learners expect
+ *  when the owner has granted editor permission. */
+export const DEFAULT_DOCS_EDITOR_ACCESS: DocsEditorAccess = "full";
 
 const DEFAULT_MAP: DocsEditorAccessMap = {
   doc: DEFAULT_DOCS_EDITOR_ACCESS,
