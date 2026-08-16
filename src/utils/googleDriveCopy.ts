@@ -40,9 +40,13 @@ export type DriveCopyErrorCode =
   | "consent_denied"
   | "token_failed"
   | "token_expired"
+  /** A token was issued, but the learner unticked the Drive permission. */
+  | "scope_missing"
   | "source_not_found"
   | "forbidden"
   | "copy_failed"
+  /** The copy itself worked; only the Firestore mapping write was refused. */
+  | "mapping_denied"
   | "network_error";
 
 export class DriveCopyError extends Error {
@@ -53,18 +57,42 @@ export class DriveCopyError extends Error {
   }
 }
 
-type TokenBundle = { token: string; expiresAt: number };
+type TokenBundle = { token: string; expiresAt: number; scope?: string };
 
 let memoryToken: TokenBundle | null = null;
 
+/**
+ * True when the token Google issued actually carries the Drive scope.
+ *
+ * Google's consent screen lets a user UNTICK an individual permission and
+ * still finish: the callback then returns a perfectly valid access token
+ * that `files.copy` rejects with `ACCESS_TOKEN_SCOPE_INSUFFICIENT`. The
+ * response echoes the granted scopes, so a partial grant is caught before a
+ * request is ever made — and, crucially, before it is cached.
+ */
+const grantsDriveScope = (scope: string | undefined): boolean => {
+  // No `scope` field at all: older GIS builds omitted it. Trust the token
+  // rather than block a flow that may be perfectly fine.
+  if (typeof scope !== "string" || !scope.trim()) return true;
+  return scope.split(/\s+/).includes(DRIVE_COPY_SCOPE);
+};
+
 const readStoredToken = (): TokenBundle | null => {
   const now = Date.now();
-  if (memoryToken && memoryToken.expiresAt > now + TOKEN_SAFETY_MS) return memoryToken;
+  if (memoryToken && memoryToken.expiresAt > now + TOKEN_SAFETY_MS && grantsDriveScope(memoryToken.scope)) {
+    return memoryToken;
+  }
   try {
     const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as TokenBundle;
-    if (parsed && typeof parsed.token === "string" && parsed.expiresAt > now + TOKEN_SAFETY_MS) {
+    if (
+      parsed
+      && typeof parsed.token === "string"
+      && parsed.expiresAt > now + TOKEN_SAFETY_MS
+      // A cached token from a partial grant would keep failing forever.
+      && grantsDriveScope(parsed.scope)
+    ) {
       memoryToken = parsed;
       return parsed;
     }
@@ -74,10 +102,11 @@ const readStoredToken = (): TokenBundle | null => {
   return null;
 };
 
-const storeToken = (token: string, expiresInSeconds: number) => {
+const storeToken = (token: string, expiresInSeconds: number, scope?: string) => {
   const bundle: TokenBundle = {
     token,
     expiresAt: Date.now() + Math.max(0, expiresInSeconds) * 1000,
+    scope,
   };
   memoryToken = bundle;
   try {
@@ -96,15 +125,17 @@ export const clearStoredDriveToken = () => {
   }
 };
 
-type TokenClientResponse = { access_token?: string; expires_in?: number; error?: string };
+type TokenClientResponse = { access_token?: string; expires_in?: number; error?: string; scope?: string };
 type TokenClient = { requestAccessToken: (options?: { prompt?: string }) => void };
 type OAuth2Namespace = {
   initTokenClient: (config: {
     client_id: string;
     scope: string;
+    include_granted_scopes?: boolean;
     callback: (response: TokenClientResponse) => void;
     error_callback?: (error: { type?: string; message?: string }) => void;
   }) => TokenClient;
+  hasGrantedAllScopes?: (response: TokenClientResponse, ...scopes: string[]) => boolean;
 };
 
 const getOAuth2 = (): OAuth2Namespace | null => {
@@ -143,9 +174,24 @@ export const requestDriveAccessToken = async (clientId: string): Promise<string>
       const client = oauth2.initTokenClient({
         client_id: trimmedClientId,
         scope: DRIVE_COPY_SCOPE,
+        // Keep any permission the learner already granted this app instead
+        // of silently replacing it with the Drive-only grant.
+        include_granted_scopes: true,
         callback: (response) => {
           if (response && response.access_token) {
-            storeToken(response.access_token, Number(response.expires_in || 3600));
+            const granted = typeof oauth2.hasGrantedAllScopes === "function"
+              ? oauth2.hasGrantedAllScopes(response, DRIVE_COPY_SCOPE)
+              : grantsDriveScope(response.scope);
+            if (!granted) {
+              // Do NOT cache a scope-deficient token — it would turn one
+              // unticked checkbox into a permanent failure for the session.
+              settle(() => reject(new DriveCopyError(
+                "scope_missing",
+                "Google Drive permission was not granted.",
+              )));
+              return;
+            }
+            storeToken(response.access_token, Number(response.expires_in || 3600), response.scope);
             settle(() => resolve(response.access_token as string));
             return;
           }
@@ -213,6 +259,17 @@ export const copyDriveFile = async (
     );
   }
   if (response.status === 403) {
+    // A 403 is ambiguous: it is either a project-level refusal (Drive API
+    // off / quota) or a token that simply lacks the Drive scope because the
+    // learner unticked the permission. Google says which in the body.
+    const detail = await response.text().catch(() => "");
+    if (/ACCESS_TOKEN_SCOPE_INSUFFICIENT|insufficient.{0,20}scope|insufficientPermissions/i.test(detail)) {
+      clearStoredDriveToken();
+      throw new DriveCopyError(
+        "scope_missing",
+        "Google Drive permission is missing for this account.",
+      );
+    }
     throw new DriveCopyError(
       "forbidden",
       "Google Drive refused the copy. Make sure the Drive API is enabled for the OAuth project and the daily quota is not exhausted.",
@@ -236,6 +293,10 @@ export const friendlyDriveCopyError = (error: unknown): string => {
         return "Your browser blocked the Google window. Allow popups for this site and try again.";
       case "token_expired":
         return "Google authorization expired. Tap My copy again to re-authorize.";
+      case "scope_missing":
+        return "Google Drive access wasn't granted. Tap My copy again and keep the “See, edit, create and delete all of your Google Drive files” box ticked.";
+      case "mapping_denied":
+        return "Your copy was created in Google Drive, but this app couldn't save the link to it. Please sign out and sign back in, then tap My copy again.";
       case "source_not_found":
         return "The master file isn't visible to your Google account. Ask the course owner to share it as “Anyone with the link → Viewer”.";
       case "forbidden":
