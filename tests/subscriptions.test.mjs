@@ -308,11 +308,9 @@ test("rule 9: validateSubscriptionSelection forwards the Part 7 coupon context",
   assert.equal(r.couponContext.discountPaise, 3980);
 });
 
-test("rule 10: requestedEduCoins is captured by the Part 4 engine (forwarded via the quote)", () => {
-  // The pure subscription engine does not touch EduCoin math;
-  // the Part 4 engine does. We assert the engine surfaces the
-  // field through to the verified line items so the receiver
-  // (Part 4 / coupon writer) can pick it up.
+test("rule 10: buildSubscriptionLineItems emits the plan line for an empty feature selection", () => {
+  // The plan line is always present, independent of any selected
+  // features, so the quote always carries the base subscription item.
   const items = buildSubscriptionLineItems({
     plan: basePlan(),
     cycle: "monthly",

@@ -13,7 +13,6 @@ type OrderRow = {
   purchaseKind: string;
   items: { title: string }[] | null;
   couponCode: string | null;
-  coinsUsed: number;
   cashPaid: string;
   finalAmount: string;
   paymentStatus: string;
@@ -92,7 +91,7 @@ export default function OrdersPage() {
                 <p className="mt-0.5 text-xs text-slate-500">{o.customerName || o.customerEmail || "Unknown"} · {new Date(o.createdAt).toLocaleString()}</p>
                 <p className="mt-1 text-xs text-slate-600">{o.items?.map((i) => i.title).join(", ") || "—"}</p>
                 <div className="mt-1 flex items-center justify-between text-xs">
-                  <span className="text-slate-500">{o.purchaseKind} {o.couponCode ? `· coupon ${o.couponCode}` : ""}{o.coinsUsed > 0 ? ` · ${o.coinsUsed} coins` : ""}</span>
+                  <span className="text-slate-500">{o.purchaseKind} {o.couponCode ? `· coupon ${o.couponCode}` : ""}</span>
                   <span className="font-semibold text-slate-900">₹{Number(o.finalAmount).toLocaleString("en-IN")}</span>
                 </div>
               </RecordCard>
@@ -118,7 +117,7 @@ export default function OrdersPage() {
             <p className="mb-1 text-xs font-medium text-slate-700">Purchase kind</p>
             <select className={selectClass} value={kind} onChange={(e) => setKind(e.target.value)}>
               <option value="">All</option>
-              {["product", "module", "update", "subscription", "feature", "coins"].map((k) => (
+              {["product", "module", "update", "subscription", "feature"].map((k) => (
                 <option key={k} value={k}>{k}</option>
               ))}
             </select>

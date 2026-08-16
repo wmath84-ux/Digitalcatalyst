@@ -90,7 +90,6 @@ export const parseSelection = (body: unknown): CheckoutSelection | null => {
     billingCycle: (raw.billingCycle === "monthly" || raw.billingCycle === "yearly") ? raw.billingCycle : null,
     featureIds: isStringArray(raw.featureIds) ? raw.featureIds.slice(0, MAX_PRODUCT_IDS) : [],
     couponCode: typeof raw.couponCode === "string" ? cleanString(raw.couponCode, 60) : null,
-    requestedEduCoins: typeof raw.requestedEduCoins === "number" && raw.requestedEduCoins >= 0 ? Math.floor(raw.requestedEduCoins) : 0,
     returnRoute: typeof raw.returnRoute === "string" ? cleanString(raw.returnRoute, 200) : null,
   };
 };

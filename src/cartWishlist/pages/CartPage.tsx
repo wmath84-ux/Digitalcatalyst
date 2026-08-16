@@ -41,7 +41,7 @@ export default function CartPage({ cartProducts, onRemove, onClearAll, onCheckou
             <div className="border-t border-dashed border-slate-200 pt-3 flex justify-between"><span className="font-extrabold">Total payable</span><span className="text-lg font-extrabold text-indigo-600">{formatINR(finalTotal)}</span></div>
           </div>
           {savings > 0 && <div className="mt-3 flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700"><Sparkles size={13} />You save {formatINR(savings)} on this order.</div>}
-          <p className="mt-3 text-[11px] leading-5 text-slate-400">Final amount is recalculated from Firestore by the payment server. EduCoin redemption stays unavailable until atomic wallet deduction is enabled.</p>
+          <p className="mt-3 text-[11px] leading-5 text-slate-400">Final amount is recalculated from Firestore by the payment server.</p>
         </div>
       </div>
       <div className="border-t border-slate-100 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+12px)] shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.15)]">

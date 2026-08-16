@@ -374,7 +374,6 @@ test("buildQuote: full_product returns a verified line item with sale applied", 
   assert.equal(out.quote.regularSubtotal, 199900);
   assert.equal(out.quote.saleDiscount, 50000); // 1999 - 1499 = 500 ₹ → 50000 paise
   assert.equal(out.quote.couponDiscount, 0);
-  assert.equal(out.quote.eduCoinDiscount, 0);
   assert.equal(out.quote.cashPayable, 149900);
   assert.equal(out.quote.currency, "INR");
   assert.equal(out.quote.status, "active");

@@ -236,8 +236,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           couponCode: intent.couponCode || null,
           couponType: intent.couponType || null,
           couponValue: typeof intent.couponValue === "number" ? intent.couponValue : null,
-          eduCoinDiscount: 0,
-          eduCoinsReserved: 0,
           cashPayable: Number(intent.amountPaise || 0),
           minimumPayable: 0,
           currency: "INR" as const,

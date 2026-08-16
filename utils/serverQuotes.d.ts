@@ -73,8 +73,6 @@ export interface ServerPriceQuoteRecord {
   regularSubtotal: number;
   saleDiscount: number;
   couponDiscount: number;
-  eduCoinDiscount: number;
-  eduCoinsReserved: number;
   cashPayable: number;
   minimumPayable: number;
   currency: "INR";
@@ -164,7 +162,7 @@ export interface BuildQuoteInput {
    * Part 9 — when the selection is a subscription, the endpoint
    * has already pre-built the line items via the pure
    * `utils/subscriptions.js` engine. The Part 4 engine
-   * propagates them through the existing coupon / EduCoin
+   * propagates them through the existing coupon
    * pipeline; the engine NEVER re-derives plan / feature math.
    */
   subscriptionLineItems?: unknown[] | null;

@@ -130,7 +130,6 @@ export const buildSubscriptionSelection = (input: {
   selectedProductIds: string[];
   selectedModuleIds: string[];
   couponCode: string | null;
-  requestedEduCoins: number;
   returnRoute?: string;
 }): CheckoutSelection => ({
   purchaseKind: "subscription",
@@ -142,7 +141,6 @@ export const buildSubscriptionSelection = (input: {
   billingCycle: input.cycle,
   featureIds: input.selectedFeatureIds.slice(),
   couponCode: input.couponCode,
-  requestedEduCoins: Math.max(0, Math.floor(Number(input.requestedEduCoins || 0))),
   returnRoute: input.returnRoute || null,
 });
 
@@ -175,7 +173,6 @@ export const startCheckout = async (input: {
       mobile: null,
       emailVerified: false,
       tokenVerified: true,
-      coins: 0,
     },
     returnRoute: input.returnRoute,
     idempotencyKey: input.idempotencyKey || null,

@@ -487,7 +487,6 @@ export default function SubscriptionPage({
           selectedProductIds: selectedCourseIds,
           selectedModuleIds: [],
           couponCode: code,
-          requestedEduCoins: 0,
         });
         setCouponStatus("idle");
         setAppliedReferral(null);
@@ -593,7 +592,6 @@ export default function SubscriptionPage({
           billingCycle: cycle,
           featureIds: selectedFeatureIds,
           couponCode: appliedReferral?.code || appliedCoupon?.code || null,
-          requestedEduCoins: 0,
           returnRoute: "#/subscription",
         },
         buyer: {
@@ -944,7 +942,6 @@ async function preflightSubscriptionCoupon(selection: {
   selectedProductIds: string[];
   selectedModuleIds: string[];
   couponCode: string;
-  requestedEduCoins: number;
 }): Promise<number> {
   const firebaseUser = await import("../../../firebase").then((m) => m.auth.currentUser);
   if (!firebaseUser) throw new Error("Please sign in to apply a coupon.");

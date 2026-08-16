@@ -9,16 +9,14 @@ export interface LegacyIdentityCleanupResult {
   deletedOrphanProfiles: number;
   deletedOrphanFollows: number;
   copiedPurchases: number;
-  copiedCoinTransactions: number;
   manualReviewIds: string[];
 }
 
 type RawRecord = { id: string; data: Record<string, any> };
-type LegacySubcollections = Record<string, { purchases: RawRecord[]; coinTransactions: RawRecord[] }>;
+type LegacySubcollections = Record<string, { purchases: RawRecord[] }>;
 
 const NUMERIC_LEGACY_ID = /^\d{10,}$/;
 const normalizeEmail = (value: unknown) => String(value || '').trim().toLowerCase();
-const numberValue = (value: unknown) => Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0;
 const uniqueValues = (values: unknown[]) => Array.from(new Set(values.filter((value) => value !== undefined && value !== null && value !== '')));
 const isStableUid = (value: string) => !NUMERIC_LEGACY_ID.test(value) && value.length >= 20;
 
@@ -51,7 +49,7 @@ const loadCollection = async (name: string): Promise<RawRecord[]> => {
   return snapshot.docs.map((item) => ({ id: item.id, data: item.data() as Record<string, any> }));
 };
 
-const loadUserSubcollection = async (userId: string, name: 'purchases' | 'coinTransactions'): Promise<RawRecord[]> => {
+const loadUserSubcollection = async (userId: string, name: 'purchases'): Promise<RawRecord[]> => {
   const snapshot = await getDocs(collection(db, 'users', userId, name));
   return snapshot.docs.map((item) => ({ id: item.id, data: item.data() as Record<string, any> }));
 };
@@ -62,23 +60,8 @@ const hasMeaningfulLegacyData = (record: RawRecord) => {
     normalizeEmail(data.email) ||
     String(data.name || data.displayName || '').trim() ||
     String(data.mobile || '').trim() ||
-    numberValue(data.coinBalance ?? data.eduCoins) ||
-    numberValue(data.totalCoinsEarned ?? data.totalLifetimeCoins) ||
-    numberValue(data.totalCoinsSpent) ||
     (Array.isArray(data.purchasedProductIds) && data.purchasedProductIds.length)
   );
-};
-
-const copyCoinTransactions = async (legacyId: string, canonicalId: string, rows: RawRecord[]) => {
-  for (const item of rows) {
-    await setDoc(doc(db, 'users', canonicalId, 'coinTransactions', item.id), {
-      ...item.data,
-      migratedFromUserId: legacyId,
-      migratedAt: serverTimestamp(),
-    }, { merge: true });
-    await deleteDoc(doc(db, 'users', legacyId, 'coinTransactions', item.id));
-  }
-  return rows.length;
 };
 
 export const cleanupLegacyIdentityRecords = async (): Promise<LegacyIdentityCleanupResult> => {
@@ -98,11 +81,10 @@ export const cleanupLegacyIdentityRecords = async (): Promise<LegacyIdentityClea
   const legacyCandidates = users.filter((record) => NUMERIC_LEGACY_ID.test(record.id) || !record.data.uid || record.data.uid !== record.id);
   const legacySubcollections: LegacySubcollections = {};
   for (const legacy of legacyCandidates) {
-    const [purchases, coinTransactions] = await Promise.all([
+    const [purchases] = await Promise.all([
       loadUserSubcollection(legacy.id, 'purchases'),
-      loadUserSubcollection(legacy.id, 'coinTransactions'),
     ]);
-    legacySubcollections[legacy.id] = { purchases, coinTransactions };
+    legacySubcollections[legacy.id] = { purchases };
   }
 
   const backupFileName = downloadBackup({
@@ -132,11 +114,10 @@ export const cleanupLegacyIdentityRecords = async (): Promise<LegacyIdentityClea
   let deletedOrphanProfiles = 0;
   let deletedOrphanFollows = 0;
   let copiedPurchases = 0;
-  let copiedCoinTransactions = 0;
   const manualReviewIds: string[] = [];
 
   for (const legacy of legacyCandidates) {
-    const nested = legacySubcollections[legacy.id] || { purchases: [], coinTransactions: [] };
+    const nested = legacySubcollections[legacy.id] || { purchases: [] };
     const email = normalizeEmail(legacy.data.email);
     const matches = email ? (canonicalByEmail.get(email) || []) : [];
 
@@ -160,11 +141,6 @@ export const cleanupLegacyIdentityRecords = async (): Promise<LegacyIdentityClea
       await setDoc(doc(db, 'users', canonical.id), {
         name: nextName || canonicalData.name,
         mobile: canonicalData.mobile || legacy.data.mobile || '',
-        coinBalance: Math.max(numberValue(canonicalData.coinBalance ?? canonicalData.eduCoins), numberValue(legacy.data.coinBalance ?? legacy.data.eduCoins)),
-        eduCoins: Math.max(numberValue(canonicalData.coinBalance ?? canonicalData.eduCoins), numberValue(legacy.data.coinBalance ?? legacy.data.eduCoins)),
-        totalCoinsEarned: Math.max(numberValue(canonicalData.totalCoinsEarned ?? canonicalData.totalLifetimeCoins), numberValue(legacy.data.totalCoinsEarned ?? legacy.data.totalLifetimeCoins)),
-        totalLifetimeCoins: Math.max(numberValue(canonicalData.totalCoinsEarned ?? canonicalData.totalLifetimeCoins), numberValue(legacy.data.totalCoinsEarned ?? legacy.data.totalLifetimeCoins)),
-        totalCoinsSpent: Math.max(numberValue(canonicalData.totalCoinsSpent), numberValue(legacy.data.totalCoinsSpent)),
         purchasedProductIds,
         rewardedArticleIds,
         readArticles,
@@ -176,13 +152,12 @@ export const cleanupLegacyIdentityRecords = async (): Promise<LegacyIdentityClea
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      copiedCoinTransactions += await copyCoinTransactions(legacy.id, canonical.id, nested.coinTransactions);
       await deleteDoc(doc(db, 'users', legacy.id));
       mergedLegacyUsers += 1;
       continue;
     }
 
-    if (!hasMeaningfulLegacyData(legacy) && nested.purchases.length === 0 && nested.coinTransactions.length === 0) {
+    if (!hasMeaningfulLegacyData(legacy) && nested.purchases.length === 0) {
       await deleteDoc(doc(db, 'users', legacy.id));
       deletedBlankLegacyUsers += 1;
     } else {
@@ -225,7 +200,6 @@ export const cleanupLegacyIdentityRecords = async (): Promise<LegacyIdentityClea
     deletedOrphanProfiles,
     deletedOrphanFollows,
     copiedPurchases,
-    copiedCoinTransactions,
     manualReviewIds,
   };
 };

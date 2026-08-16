@@ -109,7 +109,6 @@ export default function CheckoutSuccessStep({
   const regularSubtotal = quote.regularSubtotal || 0;
   const saleDiscount = quote.saleDiscount || 0;
   const couponDiscount = quote.couponDiscount || 0;
-  const eduCoinDiscount = quote.eduCoinDiscount || 0;
   const quoteCashPayable = quote.cashPayable || 0;
   const quoteMinimumPayable = quote.minimumPayable || 0;
   // Prefer the verified-payment `cashPaid` (the actual Razorpay
@@ -215,7 +214,6 @@ export default function CheckoutSuccessStep({
           <ReceiptRow label="Regular subtotal" value={formatRupee(regularSubtotal)} />
           {saleDiscount > 0 ? <ReceiptRow label="Sale discount" value={`− ${formatRupee(saleDiscount)}`} highlight /> : null}
           {couponDiscount > 0 ? <ReceiptRow label="Coupon discount" value={`− ${formatRupee(couponDiscount)}`} highlight /> : null}
-          {eduCoinDiscount > 0 ? <ReceiptRow label="EduCoin discount" value={`− ${formatRupee(eduCoinDiscount)}`} highlight /> : null}
           {resolvedMinPayable > 0 ? <ReceiptRow label="Minimum payable" value={formatRupee(resolvedMinPayable)} /> : null}
         </dl>
         <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">

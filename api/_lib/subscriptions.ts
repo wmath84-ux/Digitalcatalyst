@@ -506,7 +506,6 @@ export const writeSubscriptionAfterPayment = async (
     amountPaise: number;
     source: "razorpay" | "free" | "admin";
     couponCode: string | null;
-    requestedEduCoins: number;
     now: number;
     existingSubscription?: { exists: boolean; data: Record<string, unknown> };
   },
@@ -562,7 +561,6 @@ export const writeSubscriptionAfterPayment = async (
       amountPaise: Math.max(0, Math.round(Number(previousData.amountPaise ?? args.amountPaise ?? 0))),
       source: args.source,
       couponCode: args.couponCode || null,
-      requestedEduCoins: Math.max(0, Math.floor(Number(args.requestedEduCoins || 0))),
     };
   }
 
@@ -600,7 +598,6 @@ export const writeSubscriptionAfterPayment = async (
     amountPaise: Math.max(0, Math.round(Number(args.amountPaise || 0))),
     source: args.source,
     couponCode: args.couponCode || null,
-    requestedEduCoins: Math.max(0, Math.floor(Number(args.requestedEduCoins || 0))),
   };
   tx.set(subRef, {
     ...record,

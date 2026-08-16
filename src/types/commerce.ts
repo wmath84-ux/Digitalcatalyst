@@ -160,7 +160,6 @@ export interface CheckoutSelection {
   billingCycle: BillingCycle | null;
   featureIds: string[];
   couponCode: string | null;
-  requestedEduCoins: number;
   returnRoute: string | null;
 }
 
@@ -176,8 +175,6 @@ export interface ServerPriceQuote {
   regularSubtotal: number;
   saleDiscount: number;
   couponDiscount: number;
-  eduCoinDiscount: number;
-  eduCoinsReserved: number;
   cashPayable: number;
   minimumPayable: number;
   currency: "INR";

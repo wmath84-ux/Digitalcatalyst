@@ -22,7 +22,6 @@ export interface CheckoutBuyer {
   emailVerified: boolean;
   /** True when the Firebase ID token has been verified by the server. */
   tokenVerified: boolean;
-  coins: number;
 }
 
 /** Tags the source route that opened the checkout so we can go back. */
@@ -147,7 +146,6 @@ export const buyerFromAuthUser = (input: {
   email?: string | null;
   displayName?: string | null;
   mobile?: string | null;
-  coins?: number;
   emailVerified?: boolean;
 }): CheckoutBuyer => ({
   uid: String(input.uid || ""),
@@ -156,5 +154,4 @@ export const buyerFromAuthUser = (input: {
   mobile: input.mobile ? String(input.mobile) : null,
   emailVerified: Boolean(input.emailVerified),
   tokenVerified: Boolean(input.uid),
-  coins: Number(input.coins || 0),
 });

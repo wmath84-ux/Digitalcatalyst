@@ -186,7 +186,7 @@ const startCheckout = ({
   idempotencyKey,
 }: {
   selection: CheckoutSelection;
-  buyer: { uid: string; name: string; email: string; mobile?: string | null; coins?: number; emailVerified?: boolean };
+  buyer: { uid: string; name: string; email: string; mobile?: string | null; emailVerified?: boolean };
   returnRoute: CheckoutReturnRoute;
   idempotencyKey?: string | null;
 }) => {
@@ -201,7 +201,6 @@ const startCheckout = ({
       mobile: buyer.mobile ?? null,
       emailVerified: Boolean(buyer.emailVerified),
       tokenVerified: Boolean(buyer.uid),
-      coins: Number(buyer.coins || 0),
     },
     returnRoute,
     idempotencyKey: idempotencyKey || null,
@@ -461,7 +460,6 @@ function Root() {
         billingCycle: null,
         featureIds: [],
         couponCode: null,
-        requestedEduCoins: 0,
         returnRoute: null,
       },
       buyer: {
@@ -469,7 +467,6 @@ function Root() {
         name: user.name,
         email: user.email,
         mobile: null,
-        coins: user.coins,
         emailVerified: false,
       },
       returnRoute: { hash: `#/course/${encodeURIComponent(selectedCourseProduct.id)}` },
@@ -492,7 +489,6 @@ function Root() {
         billingCycle: null,
         featureIds: [],
         couponCode: null,
-        requestedEduCoins: 0,
         returnRoute: null,
       },
       buyer: {
@@ -500,7 +496,6 @@ function Root() {
         name: user.name,
         email: user.email,
         mobile: null,
-        coins: user.coins,
         emailVerified: false,
       },
       returnRoute: { hash: CART_HASH },
@@ -559,7 +554,6 @@ function Root() {
         billingCycle: null,
         featureIds: [],
         couponCode: couponCode || null,
-        requestedEduCoins: 0,
         returnRoute: null,
       },
       buyer: {
@@ -567,7 +561,6 @@ function Root() {
         name: user.name,
         email: user.email,
         mobile: null,
-        coins: user.coins,
         emailVerified: false,
       },
       returnRoute: { hash: `${PRODUCT_HASH}${encodeURIComponent(checkoutCatalogProduct.id)}` },
@@ -593,7 +586,6 @@ function Root() {
         name: user.name,
         email: user.email,
         mobile: null,
-        coins: user.coins,
         emailVerified: false,
       },
       returnRoute: { hash: `${PRODUCT_HASH}${encodeURIComponent(selectedCatalogProduct.id)}` },
