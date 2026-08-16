@@ -296,6 +296,7 @@ async function subscriptionPlanProductsRequest(init?: RequestInit) {
     id: recordId,
     productId: str(body.productId || recordId),
     name: str(body.name, "Product"),
+    description: str(body.description),
     price: Number(body.individualPrice || 0),
     monthlyPrice: optionalRupees(body.monthlyPrice),
     yearlyPrice: optionalRupees(body.yearlyPrice),

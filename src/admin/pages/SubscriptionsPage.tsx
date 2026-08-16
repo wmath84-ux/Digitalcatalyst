@@ -40,6 +40,19 @@ type FeatureRow = {
 };
 
 /** Subscription add-on product (like features but unlocks real products). */
+type ProductOption = {
+  id: string;
+  title: string;
+  category?: string | null;
+  productType?: string | null;
+  regularPrice?: string | number | null;
+  salePrice?: string | number | null;
+  price?: string | number | null;
+  visibility?: string | null;
+  availableForSale?: boolean;
+  isFree?: boolean;
+};
+
 type SubscriptionProductRow = {
   id: string;
   productId: string;
@@ -63,6 +76,8 @@ export default function SubscriptionsPage() {
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [features, setFeatures] = useState<FeatureRow[] | null>(null);
   const [subscriptionProducts, setSubscriptionProducts] = useState<SubscriptionProductRow[] | null>(null);
+  const [availableProducts, setAvailableProducts] = useState<ProductOption[]>([]);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [referralSettings, setReferralSettings] = useState({ enabled: true, discountPaise: 25000, maxUsesPerReferrer: null as number | null });
   const [error, setError] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<Partial<Plan> | null>(null);
@@ -74,11 +89,12 @@ export default function SubscriptionsPage() {
 
   const load = async () => {
     try {
-      const [p, f, sp, r] = await Promise.all([
+      const [p, f, sp, r, allProducts] = await Promise.all([
         adminFetch<{ plans: Plan[] }>("/api/admin/subscriptions/plans"),
         adminFetch<{ features: FeatureRow[] }>("/api/admin/subscriptions/features"),
         adminFetch<{ products: SubscriptionProductRow[] }>("/api/admin/subscriptions/products"),
         adminFetch<{ settings: { enabled?: boolean; discountPaise?: number; maxUsesPerReferrer?: number | null } }>("/api/admin/subscriptions/referrals"),
+        adminFetch<{ products: ProductOption[] }>("/api/admin/products"),
       ]);
       setPlans(p.plans);
       // Keep every active/inactive catalog feature visible here. The public
@@ -87,6 +103,7 @@ export default function SubscriptionsPage() {
       setFeatures(f.features);
       setSubscriptionProducts(sp.products || []);
       setReferralSettings({ enabled: r.settings.enabled !== false, discountPaise: Number(r.settings.discountPaise ?? 25000), maxUsesPerReferrer: r.settings.maxUsesPerReferrer ?? null });
+      setAvailableProducts(allProducts.products || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load subscriptions.");
     }
@@ -170,6 +187,20 @@ export default function SubscriptionsPage() {
     load();
   }
 
+  const rupeeNumber = (value: unknown) => Number(String(value ?? 0).replace(/[^0-9.-]/g, "")) || 0;
+  const productPrice = (product: ProductOption) => product.isFree ? 0 : rupeeNumber(product.salePrice ?? product.regularPrice ?? product.price ?? 0);
+  const selectAvailableProduct = (product: ProductOption) => {
+    setEditingSubscriptionProduct({
+      ...editingSubscriptionProduct,
+      productId: String(product.id),
+      name: product.title || String(product.id),
+      description: product.category || product.productType || editingSubscriptionProduct?.description || "",
+      individualPrice: String(productPrice(product)),
+      active: product.visibility !== "hidden" && product.availableForSale !== false,
+    });
+    setProductPickerOpen(false);
+  };
+
   if (error) return <ErrorState message={error} onRetry={load} />;
   if (!plans || !features) return <LoadingState />;
 
@@ -246,7 +277,7 @@ export default function SubscriptionsPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs text-slate-500">{(subscriptionProducts || []).length} subscription product(s) · Add products that can be purchased individually or unlocked free per plan / duration</p>
-            <PrimaryButton onClick={() => setEditingSubscriptionProduct({ ...EMPTY_SUB_PRODUCT })}>+ Add product</PrimaryButton>
+            <PrimaryButton onClick={() => { setEditingSubscriptionProduct({ ...EMPTY_SUB_PRODUCT }); setProductPickerOpen(true); }}>+ Add product</PrimaryButton>
           </div>
           {(subscriptionProducts || []).length === 0 ? <EmptyState title="No subscription products yet" /> : (
             <div className="space-y-2">
@@ -451,10 +482,49 @@ export default function SubscriptionsPage() {
       </Sheet>
 
       {/* Subscription Products Sheet — add individual products (courses) with per-plan / per-duration pricing + free checkbox */}
-      <Sheet open={!!editingSubscriptionProduct} onClose={() => setEditingSubscriptionProduct(null)} title={editingSubscriptionProduct?.id ? "Edit subscription product" : "Add subscription product"} footer={<PrimaryButton className="w-full" loading={saving} onClick={saveSubscriptionProduct}>Save subscription product</PrimaryButton>}>
+      <Sheet open={!!editingSubscriptionProduct} onClose={() => { setEditingSubscriptionProduct(null); setProductPickerOpen(false); }} title={editingSubscriptionProduct?.id ? "Edit subscription product" : "Add subscription product"} footer={<PrimaryButton className="w-full" loading={saving} onClick={saveSubscriptionProduct}>Save subscription product</PrimaryButton>}>
         {editingSubscriptionProduct && (
           <div className="space-y-3">
-            <Field label="Product ID (exact id from Products)" required hint="Must match a live product id or document id"><input className={inputClass} placeholder="e.g. 1001 or course-xyz" value={editingSubscriptionProduct.productId ?? ""} onChange={(e) => setEditingSubscriptionProduct({ ...editingSubscriptionProduct, productId: e.target.value })} /></Field>
+            <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-800">Available products</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Pick a live product and it will be linked to this subscription add-on automatically.</p>
+                </div>
+                <SecondaryButton className="h-9 shrink-0 px-3 text-xs" onClick={() => setProductPickerOpen((open) => !open)}>
+                  {productPickerOpen ? "Close" : "See available products"}
+                </SecondaryButton>
+              </div>
+              {editingSubscriptionProduct.productId ? (
+                <p className="mt-2 rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-medium text-violet-800">
+                  Selected: {editingSubscriptionProduct.name || editingSubscriptionProduct.productId} · {editingSubscriptionProduct.productId}
+                </p>
+              ) : null}
+              {productPickerOpen ? (
+                <div className="mt-2 max-h-64 space-y-1 overflow-y-auto rounded-xl border border-violet-100 bg-white p-1.5 shadow-inner">
+                  {availableProducts.length === 0 ? (
+                    <p className="px-2 py-3 text-center text-xs text-slate-500">No products found. Create products first.</p>
+                  ) : availableProducts.map((product) => {
+                    const selected = String(editingSubscriptionProduct.productId || "") === String(product.id);
+                    return (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() => selectAvailableProduct(product)}
+                        className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition ${selected ? "bg-violet-600 text-white" : "hover:bg-violet-50"}`}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-semibold">{product.title || product.id}</span>
+                          <span className={`block truncate text-[10px] ${selected ? "text-violet-100" : "text-slate-500"}`}>{product.id} · {product.category || product.productType || "Product"}</span>
+                        </span>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${selected ? "bg-white/20" : "bg-slate-100 text-slate-700"}`}>₹{productPrice(product).toLocaleString("en-IN")}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+            <Field label="Product ID (auto-filled from Products)" required hint="Manual editing is still allowed if you need a legacy ID"><input className={inputClass} placeholder="e.g. 1001 or course-xyz" value={editingSubscriptionProduct.productId ?? ""} onChange={(e) => setEditingSubscriptionProduct({ ...editingSubscriptionProduct, productId: e.target.value })} /></Field>
             <Field label="Display name" required><input className={inputClass} placeholder="e.g. AI Mastery Course" value={editingSubscriptionProduct.name ?? ""} onChange={(e) => setEditingSubscriptionProduct({ ...editingSubscriptionProduct, name: e.target.value })} /></Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Individual price (₹)" hint="Base rate"><input className={inputClass} type="number" min="0" value={editingSubscriptionProduct.individualPrice ?? "0"} onChange={(e) => setEditingSubscriptionProduct({ ...editingSubscriptionProduct, individualPrice: e.target.value })} /></Field>
