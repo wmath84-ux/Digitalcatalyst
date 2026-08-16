@@ -40,7 +40,8 @@ import { AlertTriangle, Download, ExternalLink, Eye, FileQuestion, Maximize2, Pe
 import type { CourseFile } from "../types/course";
 import ImageViewer from "./ImageViewer";
 import AudioPlayer from "./AudioPlayer";
-import { getCourseDownload, getCourseEmbed, getGoogleEditorUrl, hasNativeMobileRendering, isEditableGoogleFile, VIEWPORT_AWARE_KINDS, type CourseDownload } from "../utils/courseEmbed";
+import { getCourseDownload, getCourseEmbed, getGoogleEditorUrl, hasNativeMobileRendering, isEditableGoogleFile, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
+import { useDocsEditorAccess } from "../hooks/useDocsEditorAccess";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
 
 const SUPPORTED_KINDS = new Set([
@@ -114,17 +115,24 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
  * documents.
  */
 function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, chromeHidden = false, desktopView = true }: ResourceViewerProps & { file: CourseFile }) {
-  // ── Google Docs full-editor mode ────────────────────────────────────
-  // When ON, native Google Docs / Sheets / Slides files load Google's own
-  // `/edit` page inside the frame: the complete Google toolbar, menus,
-  // comments and revision history — full editing, not a preview. Requires
-  // the learner to have edit permission on the file (Google enforces it).
-  const canEditInline = isEditableGoogleFile(file);
+  // ── Google Docs in-frame editor (admin-controlled) ──────────────────
+  // The admin decides in Admin → Content → Course Player what learners
+  // get on native Google Docs / Sheets / Slides files:
+  //   "off"     → preview only, no Edit toggle at all.
+  //   "toolbar" → compact editor: full formatting toolbar, Google's outer
+  //               header (title + menu bar + share) hidden.
+  //   "full"    → the complete docs.google.com page: title, menu bar,
+  //               toolbar, tabs/outline side panel, comments — everything.
+  // Editing still requires the learner to have edit permission on the
+  // file (Google enforces that; no client code can bypass it).
+  const editorAccess = useDocsEditorAccess();
+  const editorChrome: DocsEditorChrome = editorAccess === "full" ? "full" : "toolbar";
+  const canEditInline = editorAccess !== "off" && isEditableGoogleFile(file);
   const [editMode, setEditMode] = useState(false);
 
   // The desktop/mobile choice is resolved BEFORE the URL is built: a phone
   // rendering is a different endpoint on the host, not a narrower iframe.
-  const embed = getCourseEmbed(file, { viewport: desktopView ? "desktop" : "mobile", mode: canEditInline && editMode ? "edit" : "preview" });
+  const embed = getCourseEmbed(file, { viewport: desktopView ? "desktop" : "mobile", mode: canEditInline && editMode ? "edit" : "preview", editorChrome });
   const download = getCourseDownload(file);
   const isSupported = SUPPORTED_KINDS.has(embed.kind);
   const isImage = file.type === "image" && embed.kind === "direct";
@@ -606,7 +614,12 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editM
         className={`block border-0 ${mobileDocument ? "absolute left-0 top-0 bg-white" : "h-full max-h-full min-h-0 w-full max-w-full min-w-0"} ${kind === "youtube" ? "absolute inset-0 bg-black" : mobileDocument ? "" : "bg-white"}`}
         style={frameStyle}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-read; clipboard-write"
-        sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin allow-presentation"
+        // The FULL Google editor (edit mode) must run unsandboxed: Google's
+        // own /edit page needs sign-in cookies, share/comment popups that
+        // escape the frame, print, and download flows that a sandbox list
+        // silently breaks. docs.google.com is a trusted first-party host —
+        // the sandbox stays on for every ordinary preview/embed.
+        sandbox={editMode ? undefined : "allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin allow-presentation"}
         allowFullScreen
         referrerPolicy="strict-origin-when-cross-origin"
         data-course-viewer-iframe

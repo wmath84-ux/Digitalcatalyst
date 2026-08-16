@@ -17,7 +17,10 @@ const styles = fs.readFileSync("src/index.css", "utf8");
 test("Google Form answering and confirmation remain in the framed player", () => {
   assert.match(courseEmbed, /url\.searchParams\.set\("embedded", "true"\)/);
   assert.match(courseEmbed, /\/viewform/);
-  assert.match(resourceViewer, /sandbox="allow-scripts allow-forms/);
+  // Previews stay sandboxed; only the trusted Google full editor (edit
+  // mode) runs unsandboxed because Google's /edit page needs sign-in
+  // cookies + popups a sandbox list silently breaks.
+  assert.match(resourceViewer, /sandbox=\{editMode \? undefined : "allow-scripts allow-forms/);
   assert.doesNotMatch(resourceViewer, /allow-top-navigation/);
   assert.match(coursePlayer, /data-course-header/);
   assert.match(coursePlayer, /data-course-mark-complete-bar/);

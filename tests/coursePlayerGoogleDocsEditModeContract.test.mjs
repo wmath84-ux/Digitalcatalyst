@@ -41,22 +41,32 @@ const gform = { id: "f1", name: "Quiz", type: "google_form", url: "https://docs.
 const driveFile = { id: "v1", name: "Bytes", type: "pdf", url: "https://drive.google.com/file/d/DRIVE123/view" };
 
 // ---------------------------------------------------------------------------
-// 1. Edit mode loads the real Google editor
+// 1. Edit mode loads the real Google editor — chrome level is the ADMIN's
+//    choice ("toolbar" = compact rm=embedded, "full" = complete /edit page)
 // ---------------------------------------------------------------------------
 
-test("edit mode resolves a Google Doc to its full /edit editor", () => {
+test("edit mode defaults to the compact toolbar editor (rm=embedded)", () => {
   const { url, kind } = getCourseEmbed(gdoc, { mode: "edit" });
   assert.equal(kind, "doc");
   assert.match(url, /\/document\/d\/DOC123\/edit\?rm=embedded/);
 });
 
-test("edit mode resolves Sheets and Slides to their full editors too", () => {
-  assert.match(getCourseEmbed(gsheet, { mode: "edit" }).url, /\/spreadsheets\/d\/SHEET123\/edit\?rm=embedded/);
-  assert.match(getCourseEmbed(gslides, { mode: "edit" }).url, /\/presentation\/d\/SLIDES123\/edit\?rm=embedded/);
+test("editorChrome 'full' loads the COMPLETE docs.google.com page (no rm= stripping)", () => {
+  const { url } = getCourseEmbed(gdoc, { mode: "edit", editorChrome: "full" });
+  assert.match(url, /\/document\/d\/DOC123\/edit$/, "plain /edit keeps title + menu bar + side tabs");
+  assert.doesNotMatch(url, /rm=embedded/, "rm=embedded would hide Google's header");
 });
 
-test("getGoogleEditorUrl exposes the plain editor link for the new-tab fallback", () => {
-  assert.match(getGoogleEditorUrl(gdoc), /docs\.google\.com\/document\/d\/DOC123\/edit/);
+test("both chrome levels work for Sheets and Slides too", () => {
+  assert.match(getCourseEmbed(gsheet, { mode: "edit" }).url, /\/spreadsheets\/d\/SHEET123\/edit\?rm=embedded/);
+  assert.match(getCourseEmbed(gslides, { mode: "edit" }).url, /\/presentation\/d\/SLIDES123\/edit\?rm=embedded/);
+  assert.match(getCourseEmbed(gsheet, { mode: "edit", editorChrome: "full" }).url, /\/spreadsheets\/d\/SHEET123\/edit$/);
+  assert.match(getCourseEmbed(gslides, { mode: "edit", editorChrome: "full" }).url, /\/presentation\/d\/SLIDES123\/edit$/);
+});
+
+test("getGoogleEditorUrl exposes the editor link for the new-tab fallback", () => {
+  assert.match(getGoogleEditorUrl(gdoc), /docs\.google\.com\/document\/d\/DOC123\/edit$/);
+  assert.match(getGoogleEditorUrl(gdoc, "toolbar"), /rm=embedded/);
   assert.equal(getGoogleEditorUrl(driveFile), "", "drive binaries have no editor endpoint");
 });
 
@@ -93,7 +103,7 @@ test("edit mode never leaks onto forms or drive files", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Viewer wiring
+// 4. Viewer wiring — the ADMIN switch decides what learners get
 // ---------------------------------------------------------------------------
 
 test("the viewer header carries the edit toggle for editable Google files", () => {
@@ -102,9 +112,43 @@ test("the viewer header carries the edit toggle for editable Google files", () =
   assert.match(resourceViewer, /canEditInline \? \(/);
 });
 
-test("the viewer passes the mode into getCourseEmbed and tags the stage", () => {
-  assert.match(resourceViewer, /mode: canEditInline && editMode \? "edit" : "preview"/);
+test("the admin switch gates the toggle and picks the editor chrome", () => {
+  // "off" hides the toggle entirely; "toolbar"/"full" choose the chrome.
+  assert.match(resourceViewer, /useDocsEditorAccess\(\)/);
+  assert.match(resourceViewer, /editorAccess !== "off" && isEditableGoogleFile\(file\)/);
+  assert.match(resourceViewer, /editorAccess === "full" \? "full" : "toolbar"/);
+});
+
+test("the viewer passes the mode + admin chrome into getCourseEmbed and tags the stage", () => {
+  assert.match(resourceViewer, /mode: canEditInline && editMode \? "edit" : "preview", editorChrome/);
   assert.match(resourceViewer, /data-doc-mode=/);
+});
+
+test("the admin hook reads the live public settings doc with a safe fallback", () => {
+  const hook = read("src/hooks/useDocsEditorAccess.ts");
+  assert.match(hook, /doc\(db, "settings", "adminContent"\)/);
+  assert.match(hook, /onSnapshot/);
+  assert.match(hook, /normalizeDocsEditorAccess/);
+  assert.match(hook, /DEFAULT_DOCS_EDITOR_ACCESS: DocsEditorAccess = "toolbar"/);
+});
+
+test("normalizeDocsEditorAccess only accepts off / toolbar / full", async () => {
+  const { normalizeDocsEditorAccess } = await import("../src/utils/courseEmbed.ts");
+  assert.equal(normalizeDocsEditorAccess("off"), "off");
+  assert.equal(normalizeDocsEditorAccess("toolbar"), "toolbar");
+  assert.equal(normalizeDocsEditorAccess("FULL"), "full");
+  assert.equal(normalizeDocsEditorAccess("banana"), "toolbar", "unknown values fall back");
+  assert.equal(normalizeDocsEditorAccess(undefined, "off"), "off", "fallback is honoured");
+});
+
+test("the admin Content page exposes the three-way editor control", () => {
+  const contentPage = read("src/admin/pages/ContentPage.tsx");
+  assert.match(contentPage, /data-admin-docs-editor-access/);
+  assert.match(contentPage, /data-docs-editor-option=\{option\.value\}/);
+  assert.match(contentPage, /docsEditorAccess: settings\?\.docsEditorAccess \?\? "toolbar"/);
+  for (const value of ['value: "off"', 'value: "toolbar"', 'value: "full"']) {
+    assert.ok(contentPage.includes(value), `missing admin option ${value}`);
+  }
 });
 
 test("the editor is never mobile-scaled (it manages its own layout)", () => {

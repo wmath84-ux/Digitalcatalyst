@@ -59,6 +59,15 @@ type ContentSettings = {
   pdpHelperTexts: Record<string, string>;
   coursePlayerMessages: Record<string, string>;
   authLabels: Record<string, string>;
+  /**
+   * Google Docs editor access inside the Course Player:
+   *   "off"     — learners only see the read-only preview.
+   *   "toolbar" — Edit opens the compact Google editor (full formatting
+   *               toolbar, Google header hidden). Default.
+   *   "full"    — Edit opens the complete docs.google.com page (title,
+   *               menu bar, toolbar, side tabs, comments — everything).
+   */
+  docsEditorAccess?: "off" | "toolbar" | "full";
 };
 
 function genLocalId(prefix: string) {
@@ -748,7 +757,10 @@ function PlayerTab({
     try {
       await adminFetch("/api/admin/content", {
         method: "PATCH",
-        body: JSON.stringify({ coursePlayerMessages: settings?.coursePlayerMessages }),
+        body: JSON.stringify({
+          coursePlayerMessages: settings?.coursePlayerMessages,
+          docsEditorAccess: settings?.docsEditorAccess ?? "toolbar",
+        }),
       });
       notify("success", "Course player settings saved.");
       setDirty(false);
@@ -758,6 +770,12 @@ function PlayerTab({
       setSaving(false);
     }
   }
+
+  const docsEditorOptions: Array<{ value: "off" | "toolbar" | "full"; label: string; hint: string }> = [
+    { value: "off", label: "Preview only", hint: "Learners never see the Edit button — Google files stay read-only." },
+    { value: "toolbar", label: "Toolbar editor", hint: "Edit opens Google's compact editor: the complete formatting toolbar, but the Google header (title, File/Edit/View menus, Share) stays hidden." },
+    { value: "full", label: "Full Google Docs", hint: "Edit opens the complete docs.google.com page — title, whole menu bar, toolbar, tabs/outline side panel, comments, Share. Everything." },
+  ];
 
   const playerKeys = [
     ["emptyCourseTitle", "Empty course title"],
@@ -775,6 +793,39 @@ function PlayerTab({
 
   return (
     <div className="space-y-3">
+      <SectionCard title="Google Docs editing">
+        <p className="text-xs text-slate-500">
+          Choose what learners get when they open a Google Doc / Sheet / Slides file inside the Course Player.
+          Editing always requires the file to be shared with edit permission (e.g. “Anyone with the link → Editor”).
+        </p>
+        <div className="mt-3 space-y-2" data-admin-docs-editor-access>
+          {docsEditorOptions.map((option) => {
+            const current = settings.docsEditorAccess ?? "toolbar";
+            const selected = current === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => patch({ docsEditorAccess: option.value })}
+                data-docs-editor-option={option.value}
+                aria-pressed={selected}
+                className={`w-full rounded-xl border p-3 text-left transition ${
+                  selected ? "border-violet-400 bg-violet-50 ring-1 ring-violet-200" : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <span className="flex items-center justify-between">
+                  <span className={`text-sm font-bold ${selected ? "text-violet-900" : "text-slate-800"}`}>{option.label}</span>
+                  <span className={`grid h-4 w-4 place-items-center rounded-full border-2 ${selected ? "border-violet-600 bg-violet-600" : "border-slate-300"}`}>
+                    {selected ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : null}
+                  </span>
+                </span>
+                <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">{option.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+      </SectionCard>
+
       <SectionCard title="Course player messages">
         {playerKeys.map(([key, label]) => (
           <Field key={key} label={label}>

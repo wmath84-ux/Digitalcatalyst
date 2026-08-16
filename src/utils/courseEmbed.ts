@@ -125,9 +125,38 @@ export type CourseEmbedViewport = "desktop" | "mobile";
  */
 export type CourseEmbedMode = "preview" | "edit";
 
+/**
+ * How much Google chrome the FULL editor shows — an ADMIN choice
+ * (Admin → Content → Course Player), never decided by the learner:
+ *
+ *   · "toolbar" — compact editor (`/edit?rm=embedded`): the complete
+ *                 formatting toolbar, but Google's outer header (doc
+ *                 title, File/Edit/View menu bar, share) stays hidden.
+ *   · "full"    — the COMPLETE docs.google.com experience (`/edit`):
+ *                 title, whole menu bar, toolbar, tabs/outline side
+ *                 panel, comments, share — everything.
+ */
+export type DocsEditorChrome = "toolbar" | "full";
+
+/**
+ * Admin switch for the in-player Google Docs editor:
+ *   · "off"     — learners never see the Edit toggle (preview only).
+ *   · "toolbar" — Edit loads the compact editor (toolbar, no header).
+ *   · "full"    — Edit loads the complete Google Docs page.
+ */
+export type DocsEditorAccess = "off" | DocsEditorChrome;
+
+/** Normalise the stored admin setting; unknown values fall back safely. */
+export const normalizeDocsEditorAccess = (raw: unknown, fallback: DocsEditorAccess = "toolbar"): DocsEditorAccess => {
+  const value = String(raw ?? "").trim().toLowerCase();
+  return value === "off" || value === "toolbar" || value === "full" ? value : fallback;
+};
+
 export interface CourseEmbedOptions {
   viewport?: CourseEmbedViewport;
   mode?: CourseEmbedMode;
+  /** Editor chrome when `mode` is "edit". Defaults to "toolbar" (compact). */
+  editorChrome?: DocsEditorChrome;
 }
 
 export type CourseEmbedKind = "youtube" | "pdf" | "doc" | "sheet" | "slides" | "form" | "drive" | "mindmap" | "embed" | "direct" | "none";
@@ -156,17 +185,24 @@ export const isEditableGoogleFile = (file: CourseFile): boolean => {
 };
 
 /**
- * The full Google editor URL for a native Google file — complete toolbar
- * and menus, exactly as on docs.google.com. `rm=embedded` asks Google for
- * its embed-friendly chrome (it keeps the whole toolbar; it only drops the
- * outer Drive navigation bar so the editor fits our stage).
+ * The Google editor URL for a native Google file. The chrome level is the
+ * admin's choice:
+ *
+ *   · "full"    → plain `/edit` — the COMPLETE docs.google.com experience:
+ *                 document title, the whole menu bar (File / Edit / View /
+ *                 Insert / Format / Tools / Extensions / Help), the full
+ *                 toolbar, the tabs/outline side panel, comments, share.
+ *   · "toolbar" → `/edit?rm=embedded` — Google's compact editor chrome:
+ *                 the complete formatting toolbar stays, but the outer
+ *                 header (title + menu bar + share) is hidden.
  */
-export const getGoogleEditorUrl = (file: CourseFile): string => {
+export const getGoogleEditorUrl = (file: CourseFile, chrome: DocsEditorChrome = "full"): string => {
   const google = googleParts(getCourseFileUrl(file));
   if (!google) return "";
-  if (google.kind === "document") return `https://docs.google.com/document/d/${google.id}/edit?rm=embedded&widget=true`;
-  if (google.kind === "spreadsheets") return `https://docs.google.com/spreadsheets/d/${google.id}/edit?rm=embedded&widget=true`;
-  if (google.kind === "presentation") return `https://docs.google.com/presentation/d/${google.id}/edit?rm=embedded&widget=true`;
+  const suffix = chrome === "toolbar" ? "edit?rm=embedded&widget=true" : "edit";
+  if (google.kind === "document") return `https://docs.google.com/document/d/${google.id}/${suffix}`;
+  if (google.kind === "spreadsheets") return `https://docs.google.com/spreadsheets/d/${google.id}/${suffix}`;
+  if (google.kind === "presentation") return `https://docs.google.com/presentation/d/${google.id}/${suffix}`;
   return "";
 };
 
@@ -187,13 +223,18 @@ export const getCourseEmbed = (file: CourseFile, options: CourseEmbedOptions = {
     const url = getGoogleFormEmbedUrl(raw);
     return url ? { url, kind: "form" } : { url: "", kind: "none" };
   }
-  // Edit mode — the FULL Google editor (toolbar, menus, comments, the
-  // works) loaded in-frame via `/edit?rm=embedded`. The learner needs
-  // edit permission on the file; the viewer surfaces a friendly fallback
-  // when Google refuses (see ResourceViewer's edit-mode help panel).
-  if (editMode && google?.kind === "document") return { url: `https://docs.google.com/document/d/${google.id}/edit?rm=embedded&widget=true`, kind: "doc" };
-  if (editMode && google?.kind === "spreadsheets") return { url: `https://docs.google.com/spreadsheets/d/${google.id}/edit?rm=embedded&widget=true`, kind: "sheet" };
-  if (editMode && google?.kind === "presentation") return { url: `https://docs.google.com/presentation/d/${google.id}/edit?rm=embedded&widget=true`, kind: "slides" };
+  // Edit mode — Google's real editor in-frame. The admin picks the chrome:
+  //   "toolbar" → `/edit?rm=embedded` (full formatting toolbar, no outer
+  //               Google header) — the compact default.
+  //   "full"    → plain `/edit` — the complete docs.google.com page: title,
+  //               whole menu bar, toolbar, tabs/outline panel, comments.
+  // The learner needs edit permission on the file; the viewer surfaces a
+  // friendly fallback when Google refuses (see the edit-mode help panel).
+  const editorChrome: DocsEditorChrome = options.editorChrome === "full" ? "full" : "toolbar";
+  const editorSuffix = editorChrome === "toolbar" ? "edit?rm=embedded&widget=true" : "edit";
+  if (editMode && google?.kind === "document") return { url: `https://docs.google.com/document/d/${google.id}/${editorSuffix}`, kind: "doc" };
+  if (editMode && google?.kind === "spreadsheets") return { url: `https://docs.google.com/spreadsheets/d/${google.id}/${editorSuffix}`, kind: "sheet" };
+  if (editMode && google?.kind === "presentation") return { url: `https://docs.google.com/presentation/d/${google.id}/${editorSuffix}`, kind: "slides" };
   // `/preview` is a fixed-width paginated renderer — on a phone it is a
   // shrunken A4 page. `/mobilebasic` is Google's own reflowing mobile
   // rendering of the SAME document: real phone-sized text, no zooming.

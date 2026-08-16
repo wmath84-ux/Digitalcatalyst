@@ -97,7 +97,10 @@ test("ResourceViewer handles direct video natively and audio with the custom pla
 });
 
 test("ResourceViewer uses a sandboxed iframe with fullscreen / clipboard permissions", () => {
-  assert.match(resourceViewer, /sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin allow-presentation"/);
+  // Previews stay sandboxed; only the trusted Google full-editor (edit
+  // mode) runs unsandboxed because Google's own /edit page needs sign-in
+  // cookies + share/comment popups a sandbox list silently breaks.
+  assert.match(resourceViewer, /sandbox=\{editMode \? undefined : "allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin allow-presentation"\}/);
   assert.match(resourceViewer, /allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-read; clipboard-write"/);
 });
 
