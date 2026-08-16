@@ -108,7 +108,7 @@ export default function App() {
     (next: Partial<{ tasks: Task[]; schedule: ScheduleEvent[]; notes: QuickNote[]; reminders: Reminder[] }>) => {
       mutatedRef.current = true;
       if (!uid || !hasMyDayAccess) return;
-      void setDoc(
+      setDoc(
         doc(db, "users", uid, "myDay", "current"),
         {
           ...(next.tasks ? { tasks: next.tasks } : {}),
@@ -119,9 +119,15 @@ export default function App() {
           updatedAt: serverTimestamp(),
         },
         { merge: true },
-      );
+      ).catch(() => {
+        // A failed cloud write must never block the UI, but it must also
+        // never fail silently — otherwise a My Day save can be lost without
+        // the user ever knowing. Surface it so this class of bug can't
+        // regress invisibly again.
+        addToast("My Day cloud save failed", "error");
+      });
     },
-    [hasMyDayAccess, uid],
+    [addToast, hasMyDayAccess, uid],
   );
 
   useEffect(() => {
@@ -147,8 +153,10 @@ export default function App() {
 
   useEffect(() => {
     if (!uid || !hasMyDayAccess || !cloudLoaded) return;
-    void setDoc(doc(db, "users", uid, "myDay", "current"), { tasks, schedule, notes, reminders, tzOffsetMinutes: new Date().getTimezoneOffset(), updatedAt: serverTimestamp() }, { merge: true });
-  }, [cloudLoaded, hasMyDayAccess, notes, reminders, schedule, tasks, uid]);
+    setDoc(doc(db, "users", uid, "myDay", "current"), { tasks, schedule, notes, reminders, tzOffsetMinutes: new Date().getTimezoneOffset(), updatedAt: serverTimestamp() }, { merge: true }).catch(() => {
+      addToast("My Day cloud save failed", "error");
+    });
+  }, [addToast, cloudLoaded, hasMyDayAccess, notes, reminders, schedule, tasks, uid]);
 
   // Close the "Add to your day" menu when the user taps/clicks outside it, or
   // scrolls anywhere outside the menu (page scroll, a scroll container, or a
