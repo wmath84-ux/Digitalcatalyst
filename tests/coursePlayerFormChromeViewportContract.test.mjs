@@ -88,7 +88,7 @@ test("the form renders in the normal viewer stack, so the chrome stays mounted",
   // the form is just another embed inside it — nothing about submitting can
   // unmount them.
   assert.match(coursePlayer, /const markCompleteBar = selectedFile && !fileBarsHidden \?/);
-  assert.match(resourceViewer, /\{chromeHidden \? null : <ViewerHeader/);
+  assert.match(resourceViewer, /\{chromeHidden \? null : \(\s*<ViewerHeader/);
   // Popups/top-navigation are NOT granted, so the frame cannot escape.
   assert.doesNotMatch(resourceViewer, /allow-top-navigation/);
 });
@@ -134,8 +134,13 @@ test("only hosts lacking a mobile endpoint fall back to the narrow-frame trick",
   assert.match(resourceViewer, /!hasNativeMobileRendering\(embed\.kind\)/);
 });
 
-test("the viewer resolves the embed url from the chosen viewport", () => {
-  assert.match(resourceViewer, /getCourseEmbed\(file, \{ viewport: desktopView \? "desktop" : "mobile" \}\)/);
+test("the viewer resolves the embed url from the chosen viewport (and the edit/preview mode)", () => {
+  // The viewport decision still happens BEFORE the URL is built; the viewer
+  // additionally forwards the Google Docs full-editor mode when the learner
+  // toggles Edit in the header, and the personal-copy URL replaces the
+  // stage when the learner opens their own Drive copy.
+  assert.match(resourceViewer, /getCourseEmbed\(file, \{ viewport: desktopView \? "desktop" : "mobile", mode: canEditInline && editMode && !showPersonalCopy \? "edit" : "preview", editorChrome \}\)/);
+  assert.match(resourceViewer, /showPersonalCopy \? \{ url: personalCopyUrl, kind: baseEmbed\.kind \} : baseEmbed/);
 });
 
 test("the switch drives the document's layout viewport like the browser setting", () => {

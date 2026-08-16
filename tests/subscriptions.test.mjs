@@ -209,23 +209,58 @@ test("rule 4: validateSubscriptionSelection refuses missing features with SUBSCR
 // Rule 5: feature prices
 // ---------------------------------------------------------------------------
 
-test("rule 5: isFeaturePayable accepts paid and included features, rejects zero-price extras", () => {
+test("rule 5: isFeaturePayable accepts paid, included AND zero-price (free) features", () => {
   assert.equal(isFeaturePayable(baseFeature({ included: false, pricePaise: 29900 })), true);
   assert.equal(isFeaturePayable(baseFeature({ included: true, pricePaise: 0 })), true);
-  // A non-included feature with zero price is suspicious — the
-  // engine refuses it via SUBSCRIPTION_FEATURE_INVALID_PRICE.
-  assert.equal(isFeaturePayable(baseFeature({ included: false, pricePaise: 0 })), false);
+  // "Zero means free": an admin who sets the price to 0 declares the
+  // feature free — it must stay selectable and simply charge nothing.
+  assert.equal(isFeaturePayable(baseFeature({ included: false, pricePaise: 0 })), true);
+  // Only a genuinely broken record (negative / non-numeric) is refused.
+  assert.equal(isFeaturePayable(baseFeature({ included: false, pricePaise: -100 })), false);
+  assert.equal(isFeaturePayable(baseFeature({ included: false, pricePaise: NaN })), false);
 });
 
-test("rule 5: validateSubscriptionSelection refuses a paid feature with zero price", () => {
+test("rule 5: validateSubscriptionSelection accepts a zero-price feature as free", () => {
   const r = validateSubscriptionSelection({
     plan: basePlan(),
     cycle: "monthly",
     selectedFeatureIds: ["free-extra"],
     featureRecords: [baseFeature({ id: "free-extra", included: false, pricePaise: 0 })],
   });
+  assert.equal(r.ok, true);
+  // The free feature contributes a ₹0 line (entitlement still granted).
+  const featureLine = r.lineItems.find((item) => item.featureId === "free-extra");
+  assert.ok(featureLine, "the free feature must still produce its entitlement line");
+  assert.equal(featureLine.effectivePrice, 0);
+});
+
+test("rule 5: validateSubscriptionSelection still refuses a negative feature price", () => {
+  const r = validateSubscriptionSelection({
+    plan: basePlan(),
+    cycle: "monthly",
+    selectedFeatureIds: ["broken"],
+    featureRecords: [baseFeature({ id: "broken", included: false, pricePaise: -100 })],
+  });
   assert.equal(r.ok, false);
   assert.equal(r.code, "SUBSCRIPTION_FEATURE_INVALID_PRICE");
+});
+
+// ---------------------------------------------------------------------------
+// Zero-price plan — "price 0 means the subscription is free"
+// ---------------------------------------------------------------------------
+
+test("a plan priced at ₹0 builds a fully free quote (cash payable 0)", () => {
+  const r = validateSubscriptionSelection({
+    plan: basePlan({ monthlyPricePaise: 0, yearlyPricePaise: 0 }),
+    cycle: "monthly",
+    selectedFeatureIds: [],
+    featureRecords: [],
+  });
+  assert.equal(r.ok, true);
+  const total = r.lineItems.reduce((sum, item) => sum + item.effectivePrice * item.quantity, 0);
+  assert.equal(total, 0, "a ₹0 plan with no paid add-ons must be entirely free");
+  // The plan entitlement line is still present, so activation grants access.
+  assert.ok(r.lineItems.some((item) => item.entitlementId === `subscription:${basePlan().id}`));
 });
 
 // ---------------------------------------------------------------------------

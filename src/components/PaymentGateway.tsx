@@ -322,8 +322,8 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
       </div>
 
       <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 p-5 text-white shadow-lg shadow-indigo-200">
-        <p className="text-xs font-bold uppercase tracking-wider text-indigo-200">Amount to pay</p>
-        <p className="mt-1 text-3xl font-extrabold">{displayAmount}</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-indigo-200">{finalPrice === 0 ? "No payment needed" : "Amount to pay"}</p>
+        <p className="mt-1 text-3xl font-extrabold">{finalPrice === 0 ? "FREE" : displayAmount}</p>
         <p className="mt-1 truncate text-xs text-indigo-200">{productName}</p>
         <p className="mt-2 truncate text-[10px] font-mono text-indigo-200/70">quote {quoteId}</p>
       </div>

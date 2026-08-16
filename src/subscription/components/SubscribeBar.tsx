@@ -41,10 +41,15 @@ export default function SubscribeBar({
   ownershipState = null,
 }: Props) {
   const hasDiscount = couponDiscountPaise > 0;
+  // "Zero means free": when the admin priced the whole selection at ₹0 the
+  // bar shows FREE and the CTA stops advertising a Razorpay payment. The
+  // server still re-verifies the ₹0 total before granting anything.
+  const isFreeSelection = totalPaise <= 0;
   const cta = resolveSubscribeCta({
     state: ownershipState,
     loading,
     hasPlan: !disabled,
+    freeSelection: isFreeSelection,
   });
   const isOwned = cta.owned;
   const isDisabled = Boolean(loading || disabled || cta.disabled);
@@ -68,9 +73,10 @@ export default function SubscribeBar({
             <>
               <span
                 data-subscription-total
-                className="text-xl font-extrabold text-slate-900"
+                data-subscription-free={isFreeSelection ? "true" : undefined}
+                className={`text-xl font-extrabold ${isFreeSelection ? "text-emerald-600" : "text-slate-900"}`}
               >
-                {totalRupees || formatRupee(totalPaise)}
+                {isFreeSelection ? "FREE" : totalRupees || formatRupee(totalPaise)}
               </span>
               {hasDiscount ? (
                 <span className="text-xs font-semibold text-slate-400 line-through">
@@ -87,7 +93,7 @@ export default function SubscribeBar({
             </>
           ) : (
             <>
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Secure checkout
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> {isFreeSelection ? "No payment needed" : "Secure checkout"}
             </>
           )}
         </div>

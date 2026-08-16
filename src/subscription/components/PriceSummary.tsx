@@ -51,12 +51,16 @@ export default function PriceSummary({
           <h3 className="text-sm font-bold text-slate-800">Order summary</h3>
         </div>
         <div className="space-y-2 text-sm">
-          {/* Base plan */}
+          {/* Base plan — a ₹0 admin price means the plan itself is free. */}
           <div className="flex justify-between text-slate-500" data-subscription-row="base">
             <span>
               {plan ? plan.name : "Base plan"} ({cycleLabel})
             </span>
-            <span className="font-medium text-slate-700">{formatRupee(basePricePaise)}</span>
+            {basePricePaise <= 0 ? (
+              <span className="font-medium text-emerald-600">Free</span>
+            ) : (
+              <span className="font-medium text-slate-700">{formatRupee(basePricePaise)}</span>
+            )}
           </div>
 
           {/* Features (paid add-ons) */}
@@ -107,9 +111,10 @@ export default function PriceSummary({
           <span className="text-base font-black text-slate-900">Total</span>
           <span
             data-subscription-row="total"
-            className="text-2xl font-black text-slate-900 sm:text-3xl"
+            data-subscription-total-free={totalPaise <= 0 ? "true" : undefined}
+            className={`text-2xl font-black sm:text-3xl ${totalPaise <= 0 ? "text-emerald-600" : "text-slate-900"}`}
           >
-            {formatRupee(totalPaise)}
+            {totalPaise <= 0 ? "Free" : formatRupee(totalPaise)}
           </span>
         </div>
       </div>

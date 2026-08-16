@@ -332,8 +332,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // -----------------------------------------------------------------
     // 4. Free path: signature check + Razorpay round-trip skipped.
+    //    Server-side guard: the client saying `free: true` is never
+    //    trusted on its own. The stored payment intent must itself be a
+    //    free intent (created by the ₹0 branch of create-order, i.e.
+    //    `free: true` / `amountPaise === 0`). Otherwise a paid order
+    //    could be "verified" without a Razorpay signature.
     // -----------------------------------------------------------------
     if (isFree) {
+      const intentIsFree = intent.free === true || Number(intent.amountPaise || 0) === 0;
+      if (!intentIsFree) {
+        return res.status(400).json({ ok: false, verified: false, error: "This order is not a free order. Complete the Razorpay payment to verify it." });
+      }
       const grant = await grantEntitlementsFromQuote({
         quote,
         orderId,

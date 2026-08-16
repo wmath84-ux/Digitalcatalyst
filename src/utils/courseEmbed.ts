@@ -105,8 +105,88 @@ const whimsicalEmbedUrl = (value: string) => {
  */
 export type CourseEmbedViewport = "desktop" | "mobile";
 
+/**
+ * Which experience the frame should load for a native Google file.
+ *
+ *   · "preview" — the read-only rendering (default; what learners see).
+ *   · "edit"    — the FULL Google editor (`/edit`): complete toolbar,
+ *                 menus, comments, revision history — everything Google
+ *                 Docs / Sheets / Slides offers. This is the real editor
+ *                 page loaded inside our frame, not a stripped preview.
+ *
+ * Edit mode has two hard external requirements that no client code can
+ * bypass (they are Google's rules, not ours):
+ *
+ *   1. The document must be editable by the viewer: either shared as
+ *      "Anyone with the link → Editor", or the learner is signed in to a
+ *      Google account that has edit permission on the file.
+ *   2. The browser must allow Google sign-in cookies inside iframes
+ *      (blocking third-party cookies makes Google show a sign-in screen).
+ */
+export type CourseEmbedMode = "preview" | "edit";
+
+/**
+ * How much Google chrome the FULL editor shows — an ADMIN choice
+ * (Admin → Content → Course Player), never decided by the learner:
+ *
+ *   · "toolbar" — compact editor (`/edit?rm=embedded`): the complete
+ *                 formatting toolbar, but Google's outer header (doc
+ *                 title, File/Edit/View menu bar, share) stays hidden.
+ *   · "full"    — the COMPLETE docs.google.com experience (`/edit`):
+ *                 title, whole menu bar, toolbar, tabs/outline side
+ *                 panel, comments, share — everything.
+ */
+export type DocsEditorChrome = "toolbar" | "full";
+
+/**
+ * Admin switch for the in-player Google Docs editor:
+ *   · "off"     — learners never see the Edit toggle (preview only).
+ *   · "toolbar" — Edit loads the compact editor (toolbar, no header).
+ *   · "full"    — Edit loads the complete Google Docs page.
+ */
+export type DocsEditorAccess = "off" | DocsEditorChrome;
+
+/** Normalise the stored admin setting; unknown values fall back safely. */
+export const normalizeDocsEditorAccess = (raw: unknown, fallback: DocsEditorAccess = "toolbar"): DocsEditorAccess => {
+  const value = String(raw ?? "").trim().toLowerCase();
+  return value === "off" || value === "toolbar" || value === "full" ? value : fallback;
+};
+
+/**
+ * The Google file families that HAVE an in-place editor endpoint. Forms
+ * deliberately absent: a form's `/edit` page is the form BUILDER (owner
+ * only) — the learner-facing interactive mode is filling the form, which
+ * the player already embeds. PDFs / Drive binaries have no editor at all.
+ */
+export type EditableGoogleKind = "doc" | "sheet" | "slides";
+
+/**
+ * Per-type admin switch: each editable Google family gets its own
+ * off / toolbar / full setting, so e.g. Docs can open the full editor
+ * while Sheets stay preview-only.
+ */
+export type DocsEditorAccessMap = Record<EditableGoogleKind, DocsEditorAccess>;
+
+/**
+ * Normalise the stored per-type map. Accepts the new
+ * `docsEditorAccessByType` object; any missing/invalid entry falls back
+ * to `legacy` — the old single `docsEditorAccess` value — so existing
+ * saved settings keep exactly their previous behaviour.
+ */
+export const normalizeDocsEditorAccessMap = (raw: unknown, legacy: DocsEditorAccess = "toolbar"): DocsEditorAccessMap => {
+  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  return {
+    doc: normalizeDocsEditorAccess(source.doc, legacy),
+    sheet: normalizeDocsEditorAccess(source.sheet, legacy),
+    slides: normalizeDocsEditorAccess(source.slides, legacy),
+  };
+};
+
 export interface CourseEmbedOptions {
   viewport?: CourseEmbedViewport;
+  mode?: CourseEmbedMode;
+  /** Editor chrome when `mode` is "edit". Defaults to "toolbar" (compact). */
+  editorChrome?: DocsEditorChrome;
 }
 
 export type CourseEmbedKind = "youtube" | "pdf" | "doc" | "sheet" | "slides" | "form" | "drive" | "mindmap" | "embed" | "direct" | "none";
@@ -124,8 +204,127 @@ export const VIEWPORT_AWARE_KINDS: CourseEmbedKind[] = ["doc", "sheet", "slides"
  */
 export const hasNativeMobileRendering = (kind: CourseEmbedKind) => kind === "doc" || kind === "sheet" || kind === "form";
 
+/**
+ * True when this file can open in Google's own full editor inside the
+ * player (native Google Docs / Sheets / Slides link). Forms and Drive
+ * binaries have no in-place editor endpoint.
+ */
+export const isEditableGoogleFile = (file: CourseFile): boolean => {
+  const google = googleParts(getCourseFileUrl(file));
+  return google?.kind === "document" || google?.kind === "spreadsheets" || google?.kind === "presentation";
+};
+
+/**
+ * Which editable Google family this file belongs to, or null when it has
+ * no in-place editor (Forms, PDFs, Drive binaries, direct files…). This
+ * is what the per-type admin switch keys on.
+ */
+export const editableGoogleKind = (file: CourseFile): EditableGoogleKind | null => {
+  const google = googleParts(getCourseFileUrl(file));
+  if (google?.kind === "document") return "doc";
+  if (google?.kind === "spreadsheets") return "sheet";
+  if (google?.kind === "presentation") return "slides";
+  return null;
+};
+
+// ---------------------------------------------------------------------------
+// Personal copies (Drive API)
+// ---------------------------------------------------------------------------
+
+/**
+ * The file families that support a per-student PERSONAL COPY via Drive
+ * `files.copy`: native editors (doc / sheet / slides) plus any Drive
+ * binary (PDF, images, zips…). Forms are deliberately excluded — copying
+ * a form hands the student the form BUILDER, not a fillable form.
+ */
+export type PersonalCopyKind = "doc" | "sheet" | "slides" | "drive";
+
+/** Which personal-copy family this file belongs to, or null. */
+export const personalCopyKind = (file: CourseFile): PersonalCopyKind | null => {
+  const google = googleParts(getCourseFileUrl(file));
+  if (google?.kind === "document") return "doc";
+  if (google?.kind === "spreadsheets") return "sheet";
+  if (google?.kind === "presentation") return "slides";
+  if (google?.kind === "drive") return "drive";
+  return null;
+};
+
+/** The Drive file id the personal copy is cloned from. */
+export const getDriveSourceFileId = (file: CourseFile): string => {
+  const google = googleParts(getCourseFileUrl(file));
+  if (!google) return "";
+  return google.kind === "forms" ? "" : google.id;
+};
+
+/**
+ * The in-player URL for the student's OWN copy. Native editors open in
+ * edit mode (the student owns the copy, so editing always works); Drive
+ * binaries open in the Drive preview of the copy.
+ */
+export const buildPersonalCopyUrl = (kind: PersonalCopyKind, copyFileId: string, chrome: DocsEditorChrome = "toolbar"): string => {
+  const id = String(copyFileId || "").trim();
+  if (!id) return "";
+  const suffix = chrome === "full" ? "edit" : "edit?rm=embedded&widget=true";
+  if (kind === "doc") return `https://docs.google.com/document/d/${id}/${suffix}`;
+  if (kind === "sheet") return `https://docs.google.com/spreadsheets/d/${id}/${suffix}`;
+  if (kind === "slides") return `https://docs.google.com/presentation/d/${id}/${suffix}`;
+  return `https://drive.google.com/file/d/${id}/preview`;
+};
+
+/** Admin configuration for the personal-copy feature. */
+export interface DrivePersonalCopySettings {
+  /** Public OAuth Client ID (Web application) from Google Cloud Console. */
+  clientId: string;
+  /** Per-type enable switches. */
+  byType: Record<PersonalCopyKind, boolean>;
+}
+
+/**
+ * Normalise the stored admin setting. Everything defaults OFF — the
+ * feature only activates for the types the admin explicitly enables,
+ * and only once a Client ID is available (stored or env fallback).
+ */
+export const normalizeDrivePersonalCopySettings = (raw: unknown, fallbackClientId = ""): DrivePersonalCopySettings => {
+  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const byTypeRaw = source.byType && typeof source.byType === "object" && !Array.isArray(source.byType)
+    ? (source.byType as Record<string, unknown>)
+    : {};
+  return {
+    clientId: String(source.clientId ?? "").trim() || String(fallbackClientId || "").trim(),
+    byType: {
+      doc: byTypeRaw.doc === true,
+      sheet: byTypeRaw.sheet === true,
+      slides: byTypeRaw.slides === true,
+      drive: byTypeRaw.drive === true,
+    },
+  };
+};
+
+/**
+ * The Google editor URL for a native Google file. The chrome level is the
+ * admin's choice:
+ *
+ *   · "full"    → plain `/edit` — the COMPLETE docs.google.com experience:
+ *                 document title, the whole menu bar (File / Edit / View /
+ *                 Insert / Format / Tools / Extensions / Help), the full
+ *                 toolbar, the tabs/outline side panel, comments, share.
+ *   · "toolbar" → `/edit?rm=embedded` — Google's compact editor chrome:
+ *                 the complete formatting toolbar stays, but the outer
+ *                 header (title + menu bar + share) is hidden.
+ */
+export const getGoogleEditorUrl = (file: CourseFile, chrome: DocsEditorChrome = "full"): string => {
+  const google = googleParts(getCourseFileUrl(file));
+  if (!google) return "";
+  const suffix = chrome === "toolbar" ? "edit?rm=embedded&widget=true" : "edit";
+  if (google.kind === "document") return `https://docs.google.com/document/d/${google.id}/${suffix}`;
+  if (google.kind === "spreadsheets") return `https://docs.google.com/spreadsheets/d/${google.id}/${suffix}`;
+  if (google.kind === "presentation") return `https://docs.google.com/presentation/d/${google.id}/${suffix}`;
+  return "";
+};
+
 export const getCourseEmbed = (file: CourseFile, options: CourseEmbedOptions = {}): { url: string; kind: CourseEmbedKind } => {
   const mobile = options.viewport === "mobile";
+  const editMode = options.mode === "edit";
   const raw = getCourseFileUrl(file);
   if (file.type === "mindmap" || file.provider === "whimsical_mindmap" || /whimsical\.com/i.test(raw)) {
     const url = whimsicalEmbedUrl(raw);
@@ -140,6 +339,18 @@ export const getCourseEmbed = (file: CourseFile, options: CourseEmbedOptions = {
     const url = getGoogleFormEmbedUrl(raw);
     return url ? { url, kind: "form" } : { url: "", kind: "none" };
   }
+  // Edit mode — Google's real editor in-frame. The admin picks the chrome:
+  //   "toolbar" → `/edit?rm=embedded` (full formatting toolbar, no outer
+  //               Google header) — the compact default.
+  //   "full"    → plain `/edit` — the complete docs.google.com page: title,
+  //               whole menu bar, toolbar, tabs/outline panel, comments.
+  // The learner needs edit permission on the file; the viewer surfaces a
+  // friendly fallback when Google refuses (see the edit-mode help panel).
+  const editorChrome: DocsEditorChrome = options.editorChrome === "full" ? "full" : "toolbar";
+  const editorSuffix = editorChrome === "toolbar" ? "edit?rm=embedded&widget=true" : "edit";
+  if (editMode && google?.kind === "document") return { url: `https://docs.google.com/document/d/${google.id}/${editorSuffix}`, kind: "doc" };
+  if (editMode && google?.kind === "spreadsheets") return { url: `https://docs.google.com/spreadsheets/d/${google.id}/${editorSuffix}`, kind: "sheet" };
+  if (editMode && google?.kind === "presentation") return { url: `https://docs.google.com/presentation/d/${google.id}/${editorSuffix}`, kind: "slides" };
   // `/preview` is a fixed-width paginated renderer — on a phone it is a
   // shrunken A4 page. `/mobilebasic` is Google's own reflowing mobile
   // rendering of the SAME document: real phone-sized text, no zooming.

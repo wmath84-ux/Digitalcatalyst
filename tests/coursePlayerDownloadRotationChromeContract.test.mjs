@@ -134,7 +134,7 @@ test("A single view-options button opens a dropdown with both hide options", () 
 test("Hiding the file bars removes the download header and the complete footer", () => {
   assert.match(coursePlayer, /const markCompleteBar = selectedFile && !fileBarsHidden \?/);
   assert.match(coursePlayer, /chromeHidden=\{fileBarsHidden\}/);
-  assert.match(resourceViewer, /\{chromeHidden \? null : <ViewerHeader/);
+  assert.match(resourceViewer, /\{chromeHidden \? null : \(\s*<ViewerHeader/);
 });
 
 test("Hiding the player chrome removes the course header and the dock", () => {

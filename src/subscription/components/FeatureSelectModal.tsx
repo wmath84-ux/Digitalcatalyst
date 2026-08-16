@@ -259,7 +259,7 @@ export default function FeatureSelectModal({
                           </div>
                           <div className="flex flex-col items-end gap-1">
                             <span className="text-sm font-extrabold text-slate-800">
-                              {isIncluded ? "Free" : `+${formatRupee(featurePrice(feat))}`}
+                              {isIncluded || featurePrice(feat) <= 0 ? "Free" : `+${formatRupee(featurePrice(feat))}`}
                             </span>
                             <span
                               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
