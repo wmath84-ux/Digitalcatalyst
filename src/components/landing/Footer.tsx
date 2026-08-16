@@ -15,7 +15,7 @@ export default function Footer() {
           </span>
         </div>
         <p className="text-xs">© {new Date().getFullYear()} Eduvora. All rights reserved.</p>
-        <div className="flex gap-4 text-xs">
+        <div className="flex flex-wrap items-center gap-4 text-xs">
           <button
             type="button"
             onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
@@ -26,6 +26,12 @@ export default function Footer() {
           <button type="button" onClick={openApp} className="hover:text-slate-300">
             Open App
           </button>
+          <a href="/privacy-policy.html" className="hover:text-slate-300">
+            Privacy Policy
+          </a>
+          <a href="/terms-of-service.html" className="hover:text-slate-300">
+            Terms of Service
+          </a>
         </div>
       </div>
       <button type="button" onClick={() => { window.location.hash = "#/admin-login"; }} className="mx-auto mt-7 block text-[9px] font-medium tracking-wide text-slate-700 transition hover:text-slate-500">Open dashboard</button>

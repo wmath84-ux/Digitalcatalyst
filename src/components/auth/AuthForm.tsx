@@ -320,6 +320,18 @@ export default function AuthForm() {
       <p className="mt-6 text-center text-xs leading-5 text-slate-500">
         Firebase securely manages your credentials and persistent login session. Your password is never stored in this app.
       </p>
+
+      <p className="mt-4 text-center text-[11px] leading-5 text-slate-500">
+        By continuing you agree to our{" "}
+        <a href="/terms-of-service.html" className="font-semibold text-slate-300 underline-offset-2 hover:text-white hover:underline">
+          Terms of Service
+        </a>{" "}
+        and{" "}
+        <a href="/privacy-policy.html" className="font-semibold text-slate-300 underline-offset-2 hover:text-white hover:underline">
+          Privacy Policy
+        </a>
+        .
+      </p>
     </motion.div>
   );
 }
