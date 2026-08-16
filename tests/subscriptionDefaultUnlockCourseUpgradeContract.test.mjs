@@ -14,7 +14,10 @@ const admin = fs.readFileSync("src/components/admin/products/ProductEditor.tsx",
 
 test("My Day feature is selected by default and changes subscription total", () => {
   assert.match(subscription, /current\.length === 0 \? \["my-day"\]/);
-  assert.match(subscription, /selectedPlanPricePaise \+ featuresTotalPaise \+ productsTotalPaise/);
+  // Add-on upgrades zero out the plan price (already paid), so the subtotal
+  // is built from the conditional `planPricePaise` — same field the server
+  // quotes from.
+  assert.match(subscription, /planPricePaise \+ featuresTotalPaise \+ productsTotalPaise/);
 });
 
 test("subscription quote preserves feature/product line kinds and IDs for unlocking", () => {

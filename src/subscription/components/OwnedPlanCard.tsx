@@ -10,7 +10,7 @@
 // single, unambiguous statement of what is already active, what it unlocks,
 // and when it can next be renewed.
 
-import { BadgeCheck, CalendarClock, Check, Info, Package, Sparkles } from "lucide-react";
+import { BadgeCheck, CalendarClock, Check, Info, Package, PlusCircle, Sparkles } from "lucide-react";
 import type { OwnedPlanSummary } from "../../../utils/subscriptionOwnership";
 import type { SubscriptionFeatureDoc } from "../utils/subscriptionCatalog";
 
@@ -21,6 +21,8 @@ interface Props {
   /** Plans the member does NOT own yet — offered as the way forward. */
   otherPlanNames: string[];
   onSeeOtherPlans: () => void;
+  /** Open the pickers so the member can add features / courses to THIS plan. */
+  onAddMore?: () => void;
 }
 
 export default function OwnedPlanCard({
@@ -29,6 +31,7 @@ export default function OwnedPlanCard({
   renewalOpensAtLabel,
   otherPlanNames,
   onSeeOtherPlans,
+  onAddMore,
 }: Props) {
   return (
     <div className="flex flex-col gap-4 px-5 pt-5" data-subscription-owned-plan={summary.planId}>
@@ -141,7 +144,30 @@ export default function OwnedPlanCard({
         ) : null}
       </section>
 
-      {/* The only forward path: a different plan or a different cycle. */}
+      {/* Forward path 1: add features / courses to THIS plan (add-on upgrade).
+          Only the new items are ever charged — the plan price is not charged
+          again and the expiry does not move. */}
+      {onAddMore ? (
+        <button
+          type="button"
+          onClick={onAddMore}
+          data-subscription-owned-add-more
+          className="flex items-start gap-3 rounded-3xl border border-violet-200 bg-violet-50/70 p-4 text-left shadow-sm transition active:scale-[0.99] hover:bg-violet-50"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+            <PlusCircle className="h-4.5 w-4.5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-black text-slate-900">Add features or courses to this plan</span>
+            <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">
+              Unlock more without changing your plan — you only pay for the new items, at the
+              price set for this plan.
+            </span>
+          </span>
+        </button>
+      ) : null}
+
+      {/* Forward path 2: a different plan or a different cycle. */}
       {otherPlanNames.length > 0 ? (
         <button
           type="button"

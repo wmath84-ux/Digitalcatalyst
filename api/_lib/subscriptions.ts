@@ -146,11 +146,18 @@ export const loadCurrentSubscription = async (
  * The client hides the buy flow for an owned plan + cycle, but the client is
  * never the authority: this re-runs the identical pure rule against the stored
  * record so a crafted request cannot buy the same membership twice. Renewals
- * inside the renewal window are still allowed.
+ * inside the renewal window are still allowed, and an ADD-ON UPGRADE (same
+ * plan + cycle but at least one new feature / product) is always allowed —
+ * only the new items are charged, the plan is not charged twice.
  */
 export const assertSubscriptionPurchasable = async (
   uid: string,
-  selection: { subscriptionPlanId?: string | null; billingCycle?: BillingCycle | null },
+  selection: {
+    subscriptionPlanId?: string | null;
+    billingCycle?: BillingCycle | null;
+    featureIds?: string[];
+    productIds?: string[];
+  },
   options: { db?: Firestore; now?: number } = {},
 ): Promise<{ ok: true } | { ok: false; status: number; code: string; error: string }> => {
   const record = await loadCurrentSubscription(uid, options);
@@ -159,6 +166,8 @@ export const assertSubscriptionPurchasable = async (
     record,
     planId: String(selection.subscriptionPlanId || ""),
     cycle: selection.billingCycle === "yearly" ? "yearly" : "monthly",
+    featureIds: Array.isArray(selection.featureIds) ? selection.featureIds.map(String) : [],
+    productIds: Array.isArray(selection.productIds) ? selection.productIds.map(String) : [],
     now: options.now ?? Date.now(),
   });
   if (!verdict.blocked) return { ok: true };
@@ -330,12 +339,18 @@ const loadSubscriptionProductByAnyId = async (
 /**
  * Resolve the Part 9 selection to a fully-loaded context the
  * Part 4 engine can consume. Returns either
- * `{ ok: true, plan, features, lineItems, expiresAt }` or
+ * `{ ok: true, plan, features, lineItems, expiresAt, addOnPurchase }` or
  * `{ ok: false, status, error }`.
+ *
+ * `options.existingSubscription` lets the quote endpoint pass the buyer's
+ * current membership record so ADD-ON UPGRADES can be priced correctly:
+ * when the selection keeps the owned plan + cycle but adds new features /
+ * products, the plan line (already paid) and every already-owned line are
+ * dropped — the buyer is charged only for the NEW items.
  */
 export const loadSubscriptionSelectionContext = async (
   selection: { subscriptionPlanId?: string | null; billingCycle?: BillingCycle | null; featureIds?: string[]; productIds?: string[]; moduleIds?: string[] },
-  options: { db?: Firestore; now?: number } = {},
+  options: { db?: Firestore; now?: number; existingSubscription?: Record<string, unknown> | null } = {},
 ): Promise<
   | {
       ok: true;
@@ -348,6 +363,12 @@ export const loadSubscriptionSelectionContext = async (
       selectedProductIds: string[];
       expiresAt: number;
       cycle: BillingCycle;
+      /** True when this quote is an add-on upgrade of the currently owned plan + cycle. */
+      addOnPurchase: boolean;
+      /** Features the current membership does not already unlock. */
+      newFeatureIds: string[];
+      /** Products the current membership does not already unlock. */
+      newProductIds: string[];
     }
   | { ok: false; status: number; error: string; code: string }
 > => {
@@ -407,6 +428,38 @@ export const loadSubscriptionSelectionContext = async (
   const selectedProductIds = new Set<string>();
   const loadedDocumentIds = new Set<string>();
 
+  // ADD-ON UPGRADE detection. When the buyer already owns this exact plan +
+  // cycle and the selection adds at least one feature / product they do not
+  // have, the quote charges ONLY the new items: the plan line (already paid)
+  // and every already-owned line are dropped below, and the membership expiry
+  // stays where it is (no time is gifted or lost). The pure helper is shared
+  // with the client page, so display and charge can never disagree.
+  const ownershipVerdict = options.existingSubscription
+    ? evaluateSubscriptionSelection({
+        record: options.existingSubscription,
+        planId,
+        cycle,
+        featureIds: selectedFeatureIds,
+        productIds: requestedProductIds,
+        now,
+      })
+    : null;
+  const isAddOnPurchase = Boolean(ownershipVerdict && ownershipVerdict.addOnPurchase);
+  const addOnNewFeatureIds = new Set(
+    ownershipVerdict && isAddOnPurchase ? ownershipVerdict.newFeatureIds : [],
+  );
+  // Requested ids that are genuinely new. `addOnNewResolvedProductIds` below
+  // is filled while products load: it holds every alias (requested id, public
+  // id, Firestore document id) of the new products so the line filter can
+  // match regardless of which identity the line item carries.
+  const addOnNewProductIds = new Set(
+    ownershipVerdict && isAddOnPurchase ? ownershipVerdict.newProductIds : [],
+  );
+  const addOnNewResolvedProductIds = new Set<string>();
+  const existingExpiresAt = ownershipVerdict && ownershipVerdict.expiresAt
+    ? Number(ownershipVerdict.expiresAt)
+    : 0;
+
   // Load subscription product pricing rules so we can apply per-plan / per-cycle / free overrides
   const subProducts = await loadSubscriptionProducts(options);
 
@@ -425,6 +478,13 @@ export const loadSubscriptionSelectionContext = async (
     selectedProductIds.add(publicProductId);
     selectedProductIds.add(product.documentId);
     selectedProductIds.add(requestedProductId);
+    // For add-on upgrades remember every alias of a NEW product so the line
+    // filter below keeps exactly the chargeable new items.
+    if (addOnNewProductIds.has(requestedProductId)) {
+      addOnNewResolvedProductIds.add(requestedProductId);
+      addOnNewResolvedProductIds.add(publicProductId);
+      addOnNewResolvedProductIds.add(product.documentId);
+    }
 
     // Resolve pricing from subscriptionPlanProducts if present (new customisation)
     let effectivePrice = parseProductPricePaise(data);
@@ -473,17 +533,38 @@ export const loadSubscriptionSelectionContext = async (
       entitlementId: `subscription_product_unlock:${plan.id}:${publicProductId}`,
     });
   }
-  const expiresAt = computeCycleExpiresAt(plan, cycle, now);
+  // Add-on upgrade pricing: the buyer already paid for this plan + cycle, so
+  // the plan line and every already-owned feature / product line are removed.
+  // Only the NEW add-ons are charged — this is what makes an in-plan upgrade
+  // cheaper than buying the extra item separately.
+  const pricedLineItems = isAddOnPurchase
+    ? lineItems.filter((item) => {
+        if (item.kind === "subscription") return false; // plan already paid
+        if (item.featureId && !addOnNewFeatureIds.has(String(item.featureId))) return false;
+        if (item.productId && !addOnNewResolvedProductIds.has(String(item.productId))) return false;
+        return true;
+      })
+    : lineItems;
+
+  // An add-on purchase must never move the membership window: the buyer keeps
+  // their current expiry. Only brand-new activations / plan changes compute a
+  // fresh cycle.
+  const expiresAt = isAddOnPurchase && existingExpiresAt > 0
+    ? existingExpiresAt
+    : computeCycleExpiresAt(plan, cycle, now);
   return {
     ok: true,
     plan,
     features,
-    lineItems,
+    lineItems: pricedLineItems,
     productUnlocks,
     moduleUnlocks,
     selectedProductIds: Array.from(selectedProductIds),
     expiresAt,
     cycle,
+    addOnPurchase: isAddOnPurchase,
+    newFeatureIds: Array.from(addOnNewFeatureIds),
+    newProductIds: Array.from(addOnNewProductIds),
   };
 };
 
@@ -507,6 +588,8 @@ export const writeSubscriptionAfterPayment = async (
     source: "razorpay" | "free" | "admin";
     couponCode: string | null;
     now: number;
+    /** True when this order is an add-on upgrade of the currently owned plan + cycle. */
+    addOn?: boolean;
     existingSubscription?: { exists: boolean; data: Record<string, unknown> };
   },
 ): Promise<SubscriptionRecord> => {
@@ -569,6 +652,62 @@ export const writeSubscriptionAfterPayment = async (
   const isPlanChange = previous.exists && (
     previousPlanId !== args.plan.id || previousCycle !== args.cycle
   );
+
+  // ---------------------------------------------------------------------------
+  // ADD-ON UPGRADE: the buyer kept their plan + cycle and only paid for new
+  // features / products. Merge the new access into the stored record and keep
+  // the plan, cycle, activation date and expiry untouched — no time math, no
+  // renewal-count bump (nothing was renewed), only the upgrade counter moves.
+  // ---------------------------------------------------------------------------
+  if (previous.exists && args.addOn && !isPlanChange) {
+    const previousExpiry = previousData.expiresAt;
+    const expiresAtMs =
+      previousExpiry && typeof (previousExpiry as { toMillis?: () => number }).toMillis === "function"
+        ? (previousExpiry as { toMillis: () => number }).toMillis()
+        : Number(previousExpiry || 0);
+    const previousActivated = previousData.activatedAt;
+    const activatedAtMs =
+      previousActivated && typeof (previousActivated as { toMillis?: () => number }).toMillis === "function"
+        ? (previousActivated as { toMillis: () => number }).toMillis()
+        : Number(previousActivated || args.now);
+    const access = mergeSubscriptionAccess(previousData, args.plan, args.selectedFeatureIds);
+    const upgradeCount = Math.max(0, Number(previousData.upgradeCount || 0)) + 1;
+    const addOnRecord: SubscriptionRecord = {
+      uid: args.uid,
+      planId: previousPlanId || args.plan.id,
+      cycle: (previousCycle === "yearly" ? "yearly" : "monthly") as BillingCycle,
+      features: access.features,
+      includedProductIds: access.includedProductIds,
+      includedModuleKeys: access.includedModuleKeys,
+      status: "active",
+      activatedAt: activatedAtMs,
+      expiresAt: expiresAtMs,
+      autoRenew: false,
+      orderId: args.orderId,
+      paymentId: args.paymentId,
+      amountPaise: Math.max(0, Math.round(Number(args.amountPaise || 0))),
+      source: args.source,
+      couponCode: args.couponCode || null,
+    };
+    tx.set(subRef, {
+      ...addOnRecord,
+      activatedAt: Timestamp.fromMillis(activatedAtMs),
+      upgradedAt: nowTs,
+      renewalCount: Math.max(0, Number(previousData.renewalCount || 0)),
+      upgradeCount,
+      expiresAt: Timestamp.fromMillis(expiresAtMs),
+      renewalReminderOptOut: Boolean(previousData.renewalReminderOptOut),
+    }, { merge: true });
+    const addOnUserRef = adminDb().collection(USER_SUBS_COLLECTION).doc(args.uid);
+    tx.set(addOnUserRef, {
+      subscriptionFeatures: access.features,
+      subscriptionExpiresAt: Timestamp.fromMillis(expiresAtMs),
+      subscriptionUpgradeCount: upgradeCount,
+      updatedAt: nowTs,
+    }, { merge: true });
+    return addOnRecord;
+  }
+
   // A same-plan renewal extends the time already paid for. A switch to any
   // other plan/cycle activates immediately and starts the selected cycle now;
   // otherwise a monthly→yearly upgrade could be queued behind a distant old

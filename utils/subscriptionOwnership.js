@@ -1,6 +1,6 @@
 // utils/subscriptionOwnership.js
 //
-// Duplicate-purchase rules for subscriptions.
+// Duplicate-purchase rules for subscriptions — including UPGRADES.
 //
 // Problem this solves: a member who already owns (say) "Premium · yearly"
 // could re-open the subscription page, pick that exact same plan + cycle and
@@ -13,11 +13,19 @@
 //   * A selection is OWNED when the buyer has an active (non-expired)
 //     subscription whose planId AND billing cycle both match the selection.
 //     Basic/Premium/Pro and monthly/yearly are all distinct "subscription
-//     types", so switching either one is still a legitimate purchase.
+//     types", so switching to ANY other plan (or cycle) is always a
+//     legitimate upgrade / downgrade purchase.
 //   * An owned selection is BLOCKED (not purchasable) until the membership
 //     enters its renewal window — the final `RENEWAL_WINDOW_DAYS` days before
 //     expiry — or has expired. That keeps deliberate renewals working while
 //     making an accidental double purchase impossible.
+//   * ADD-ON UPGRADE exception: when the selection keeps the owned plan +
+//     cycle but adds at least one feature or product the membership does NOT
+//     already include, the selection is purchasable right away. The buyer is
+//     only charged for the NEW items (the plan price is not charged again and
+//     the expiry does not move) — this is the mechanism that lets an admin
+//     price an extra feature/course cheaper inside the member's own plan so
+//     upgrading costs less than buying the item separately.
 //
 // The client uses these helpers to render the "already active" state and to
 // disable the subscribe button; the quote endpoint uses the very same helpers
@@ -105,6 +113,9 @@ export const renewalOpensAt = (record, renewalWindowDays = RENEWAL_WINDOW_DAYS) 
  *   active           — the buyer currently holds an active membership
  *   owned            — the selection is that exact membership (plan + cycle)
  *   renewalEligible  — the owned selection may be renewed right now
+ *   addOnPurchase    — same plan + cycle, but the selection adds at least one
+ *                      feature / product the membership does not have yet.
+ *                      Purchasable immediately; only the NEW items are charged.
  *   blocked          — the purchase must be refused
  *   code / reason    — machine + human explanation when blocked
  */
@@ -112,6 +123,8 @@ export const evaluateSubscriptionSelection = ({
   record,
   planId,
   cycle,
+  featureIds = [],
+  productIds = [],
   now = Date.now(),
   renewalWindowDays = RENEWAL_WINDOW_DAYS,
 } = {}) => {
@@ -121,19 +134,33 @@ export const evaluateSubscriptionSelection = ({
   const isOwned = Boolean(active && isSameSelection);
   const opensAt = renewalOpensAt(record, renewalWindowDays);
   const renewalEligible = isOwned ? now >= opensAt : true;
-  const blocked = isOwned && !renewalEligible;
+
+  // Add-on upgrade detection: the selection must keep the owned plan + cycle
+  // AND include something the current membership does not already unlock.
+  const selectedFeatureIds = toStringArray(featureIds);
+  const selectedProductIds = toStringArray(productIds);
+  const ownedFeatureIds = new Set(owned ? owned.featureIds : []);
+  const ownedProductIds = new Set(owned ? owned.productIds : []);
+  const newFeatureIds = selectedFeatureIds.filter((id) => !ownedFeatureIds.has(id));
+  const newProductIds = selectedProductIds.filter((id) => !ownedProductIds.has(id));
+  const addOnPurchase = Boolean(isOwned && (newFeatureIds.length > 0 || newProductIds.length > 0));
+
+  const blocked = isOwned && !renewalEligible && !addOnPurchase;
   const daysRemaining = daysUntilExpiry(record, now);
 
   return {
     active,
     owned: isOwned,
     renewalEligible,
+    addOnPurchase,
     blocked,
     planId: owned ? owned.planId : null,
     cycle: owned ? owned.cycle : null,
     expiresAt: owned ? owned.expiresAt : 0,
     daysRemaining,
     renewalOpensAt: opensAt,
+    newFeatureIds,
+    newProductIds,
     code: blocked ? ALREADY_ACTIVE_CODE : null,
     reason: blocked
       ? `You already have an active ${normaliseCycle(cycle) === "yearly" ? "yearly" : "monthly"} membership on this plan. You can renew it in the last ${renewalWindowDays} days before it ends.`
@@ -187,9 +214,21 @@ export const buildOwnedPlanSummary = ({
  * Label / colour intent / disabled flag for the sticky bottom button. The
  * "owned" tone is what the page renders in emerald instead of violet so the
  * colour itself communicates that the plan is already subscribed.
+ *
+ * Add-on upgrades: when the member keeps their plan + cycle but adds new
+ * features / products, the CTA reads "Upgrade my membership" so it is clear
+ * only the NEW items will be charged (the server re-verifies the same rule).
  */
 export const resolveSubscribeCta = ({ state, loading = false, hasPlan = true, freeSelection = false } = {}) => {
   if (loading) return { label: "Processing…", tone: "default", disabled: true, owned: false };
+  if (state && state.addOnPurchase && !state.blocked) {
+    return {
+      label: "Upgrade my membership",
+      tone: "upgrade",
+      disabled: !hasPlan,
+      owned: false,
+    };
+  }
   if (state && state.owned) {
     return {
       label: state.renewalEligible ? "Subscribed · Renew" : "Subscribed",

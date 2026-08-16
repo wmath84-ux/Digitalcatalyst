@@ -12,6 +12,8 @@ interface Props {
   plan: SubscriptionPlanDoc | null;
   cycle: "monthly" | "yearly";
   basePricePaise: number;
+  /** True for add-on upgrades: the plan row is already paid and reads "Included". */
+  planAlreadyIncluded?: boolean;
   featuresTotalPaise: number;
   featuresCount: number;
   includedFeatureCount: number;
@@ -31,6 +33,7 @@ export default function PriceSummary({
   plan,
   cycle,
   basePricePaise,
+  planAlreadyIncluded = false,
   featuresTotalPaise,
   featuresCount,
   includedFeatureCount,
@@ -51,12 +54,21 @@ export default function PriceSummary({
           <h3 className="text-sm font-bold text-slate-800">Order summary</h3>
         </div>
         <div className="space-y-2 text-sm">
-          {/* Base plan — a ₹0 admin price means the plan itself is free. */}
+          {/* Base plan — a ₹0 admin price means the plan itself is free. For an
+              add-on upgrade the plan row was already paid with the original
+              membership, so it reads "Included" and carries no charge. */}
           <div className="flex justify-between text-slate-500" data-subscription-row="base">
             <span>
               {plan ? plan.name : "Base plan"} ({cycleLabel})
             </span>
-            {basePricePaise <= 0 ? (
+            {planAlreadyIncluded ? (
+              <span
+                className="font-medium text-emerald-600"
+                data-subscription-row-plan-included
+              >
+                Included in your membership
+              </span>
+            ) : basePricePaise <= 0 ? (
               <span className="font-medium text-emerald-600">Free</span>
             ) : (
               <span className="font-medium text-slate-700">{formatRupee(basePricePaise)}</span>

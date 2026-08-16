@@ -30,7 +30,7 @@ import {
   loadUserCouponUsageCount,
   loadUserHasPriorPurchases,
 } from "./coupons.js";
-import { assertSubscriptionPurchasable, loadSubscriptionSelectionContext } from "./subscriptions.js";
+import { assertSubscriptionPurchasable, loadCurrentSubscription, loadSubscriptionSelectionContext } from "./subscriptions.js";
 import type { CouponDoc } from "../../utils/coupons.js";
 import type { CheckoutSelection } from "../../src/types/commerce.js";
 
@@ -375,14 +375,22 @@ export const handleCreateQuote = async (req: VercelRequest, res: VercelResponse)
     let subscriptionLineItems: unknown[] | null = null;
     let subscriptionExpiresAt: number | null = null;
     let subscriptionProductIds: string[] | null = null;
+    let subscriptionAddOn: boolean = false;
     if (
       selection.purchaseKind === "subscription" ||
       selection.purchaseKind === "subscription_features"
     ) {
+      // The buyer's current membership record drives two rules below:
+      //   1. the duplicate-purchase guard (same plan + cycle is refused until
+      //      the renewal window), and
+      //   2. add-on upgrade pricing (same plan + cycle PLUS new features /
+      //      products charges ONLY the new items).
+      const currentSubscription = await loadCurrentSubscription(firebaseUser.uid);
       // Duplicate-purchase guard. A buyer who already holds this exact plan
-      // + billing cycle cannot buy it again until the renewal window opens.
-      // The subscription page hides the buy flow for that case; this is the
-      // authoritative half of the same rule.
+      // + billing cycle cannot buy it again until the renewal window opens —
+      // unless the selection adds at least one new feature / product, which
+      // makes it a purchasable add-on upgrade. The subscription page mirrors
+      // this rule; this is the authoritative half of it.
       const purchasable = await assertSubscriptionPurchasable(firebaseUser.uid, selection);
       if (!purchasable.ok) {
         return res.status(purchasable.status).json({
@@ -392,7 +400,9 @@ export const handleCreateQuote = async (req: VercelRequest, res: VercelResponse)
           subscriptionErrorCode: purchasable.code,
         });
       }
-      const subContext = await loadSubscriptionSelectionContext(selection);
+      const subContext = await loadSubscriptionSelectionContext(selection, {
+        existingSubscription: currentSubscription,
+      });
       if (!subContext.ok) {
         return res.status(subContext.status).json({
           ok: false,
@@ -404,6 +414,7 @@ export const handleCreateQuote = async (req: VercelRequest, res: VercelResponse)
       subscriptionLineItems = subContext.lineItems as unknown[];
       subscriptionExpiresAt = subContext.expiresAt;
       subscriptionProductIds = subContext.selectedProductIds;
+      subscriptionAddOn = subContext.addOnPurchase === true;
     }
 
     const out = buildQuote({
@@ -421,6 +432,7 @@ export const handleCreateQuote = async (req: VercelRequest, res: VercelResponse)
       subscriptionLineItems,
       subscriptionExpiresAt,
       subscriptionProductIds,
+      subscriptionAddOn,
     });
     if (!out.ok) {
       // When the engine refused because of a bad coupon, return a

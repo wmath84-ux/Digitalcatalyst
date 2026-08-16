@@ -278,7 +278,18 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           ) : null}
           {kind === "subscription" || kind === "subscription_features" ? (
             <div className="space-y-3">
-              <SelectionList title="Subscription plan" emptyLabel="Plan details unavailable." lines={subscriptionPlanLines} />
+              {quote.subscriptionAddOn ? (
+                <div className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold leading-5 text-emerald-900">
+                  <span aria-hidden="true">⬆️</span>
+                  <span>
+                    Upgrading your current membership — you are only charged for
+                    the new add-ons below. Your plan, billing cycle and expiry
+                    date stay exactly as they are.
+                  </span>
+                </div>
+              ) : (
+                <SelectionList title="Subscription plan" emptyLabel="Plan details unavailable." lines={subscriptionPlanLines} />
+              )}
               <SelectionList title={`Included add-ons & products (${subscriptionAddonLines.length})`} emptyLabel="No optional add-ons selected." lines={subscriptionAddonLines} />
             </div>
           ) : null}

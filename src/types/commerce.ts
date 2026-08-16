@@ -224,6 +224,12 @@ export interface ServerPriceQuote {
    * lose a product while features still unlock.
    */
   subscriptionProductIds?: string[] | null;
+  /**
+   * True when the buyer already owned this plan + cycle and this quote only
+   * charges NEW features / products (add-on upgrade). Activation then merges
+   * the new access into the existing membership without touching its expiry.
+   */
+  subscriptionAddOn?: boolean;
 }
 
 // =========================================================================

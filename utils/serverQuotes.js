@@ -558,6 +558,10 @@ export const buildQuote = (input) => {
     // subscription. Kept separately from priced lines for the same reason as
     // subscriptionFeatureIds: grants must not infer access from receipt UI.
     subscriptionProductIds = null,
+    // Part 9 — true when the buyer already owns the selected plan + cycle and
+    // this quote only charges NEW features / products (add-on upgrade). The
+    // subscription writer uses it to merge access without touching expiry.
+    subscriptionAddOn = false,
   } = input || {};
 
   if (!isObject(selection)) {
@@ -984,6 +988,11 @@ export const buildQuote = (input) => {
     subscriptionProductIds: kind === "subscription" || kind === "subscription_features"
       ? Array.from(new Set((Array.isArray(subscriptionProductIds) ? subscriptionProductIds : (selection.productIds || [])).map(String).filter(Boolean)))
       : null,
+    // Add-on upgrade flag: the entitlement writer merges the new access into
+    // the existing membership record instead of starting a fresh cycle.
+    subscriptionAddOn: kind === "subscription" || kind === "subscription_features"
+      ? Boolean(subscriptionAddOn)
+      : false,
   };
   return { ok: true, quote };
 };

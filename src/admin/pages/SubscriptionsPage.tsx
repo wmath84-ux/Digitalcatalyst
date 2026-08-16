@@ -214,6 +214,18 @@ export default function SubscriptionsPage() {
             <p className="text-xs text-slate-500">{plans.length} plan(s)</p>
             <PrimaryButton onClick={() => setEditingPlan(EMPTY_PLAN)}>+ Add plan</PrimaryButton>
           </div>
+          <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-3 text-xs leading-relaxed text-violet-900">
+            <p className="font-semibold">💡 Customise prices for subscribed users</p>
+            <p className="mt-1 text-[11px]">
+              Every price on this page is per subscriber: the <strong>plan price</strong> is
+              charged at checkout, and each <strong>feature / product</strong> can have its own
+              monthly, yearly and per-plan rate (or be free on a specific plan). Set an item
+              cheaper on a higher plan — or free on it — and upgrading becomes cheaper than
+              buying the item separately. Existing members can upgrade to any plan, and they
+              can also add features / courses to their current plan while paying only for the
+              new items.
+            </p>
+          </div>
           {plans.length === 0 ? <EmptyState title="No plans yet" /> : (
             <div className="space-y-2">
               {plans.map((p) => (

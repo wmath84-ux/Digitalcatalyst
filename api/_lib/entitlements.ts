@@ -656,6 +656,9 @@ export const grantSubscriptionFromQuote = async (
       source,
       couponCode: quote.couponCode || null,
       now,
+      // Add-on upgrade: merge the new access into the existing membership and
+      // keep its plan / cycle / expiry untouched (only new items were charged).
+      addOn: quote.subscriptionAddOn === true,
       existingSubscription: { exists: existingSubscriptionSnapshot.exists, data: existingSubscriptionSnapshot.data() || {} },
     });
     return sub;

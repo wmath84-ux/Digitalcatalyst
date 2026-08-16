@@ -107,6 +107,10 @@ export default function SubscriptionPage({
   const [manageMode, setManageMode] = useState<boolean>(
     () => typeof window !== "undefined" && /[?&]renew=1/.test(window.location.hash),
   );
+  // When true the member explicitly wants to ADD features / courses to their
+  // current plan (an add-on upgrade) — the pickers stay visible even though
+  // the selected plan + cycle is the one they already own.
+  const [addOnIntent, setAddOnIntent] = useState<boolean>(false);
 
   // ---------- Server-driven state ----------
   const [catalog, setCatalog] = useState<SubscriptionCatalog | null>(null);
@@ -307,17 +311,52 @@ export default function SubscriptionPage({
     [features, includedFeatureIds],
   );
 
+  // ---------------------------------------------------------------------------
+  // Ownership + add-on upgrade verdict. `activeSubscription` is a live
+  // snapshot, so this re-evaluates whenever the membership changes as well as
+  // when the selection changes. Passed to the pricing block below so an
+  // add-on upgrade charges ONLY the new items.
+  // ---------------------------------------------------------------------------
+  const ownershipState = useMemo(
+    () =>
+      evaluateSubscriptionSelection({
+        record: activeSubscription,
+        planId: selectedPlanId,
+        cycle,
+        featureIds: selectedFeatureIds,
+        productIds: selectedCourseIds,
+      }),
+    [activeSubscription, selectedPlanId, cycle, selectedFeatureIds, selectedCourseIds],
+  );
+  const isSelectionOwned = ownershipState.owned;
+  // An add-on upgrade: the member keeps their current plan + cycle but adds at
+  // least one feature / product they don't have yet. Only the NEW items are
+  // charged (the server enforces the same rule when it builds the quote).
+  const isAddOnUpgrade = Boolean(ownershipState.addOnPurchase && !ownershipState.blocked);
+
   // Server is the only authority on price math. We display the
   // plan's cycle price + feature prices + coupon discount (from
   // the verified quote) — never derive the total client-side.
-  const featuresTotalPaise = useMemo(
-    () => sumSelectedFeaturePaise(rawFeatures, selectedFeatureIds, selectedPlanId, cycle),
-    [rawFeatures, selectedFeatureIds, selectedPlanId, cycle],
+  //
+  // Add-on upgrades charge ONLY the new items: the plan line (already paid)
+  // and every already-owned feature / product are excluded from the payable
+  // total shown here, exactly like the server filters the quote line items.
+  const chargeableFeatureIds = useMemo(
+    () => (isAddOnUpgrade ? ownershipState.newFeatureIds : selectedFeatureIds),
+    [isAddOnUpgrade, ownershipState.newFeatureIds, selectedFeatureIds],
   );
-  const selectedProductRecords = useMemo(() => {
-    const selected = new Set(selectedCourseIds);
-    return availableProducts.filter((product) => productHasId(product, selected));
-  }, [availableProducts, selectedCourseIds]);
+  const chargeableCourseIds = useMemo(
+    () => (isAddOnUpgrade ? ownershipState.newProductIds : selectedCourseIds),
+    [isAddOnUpgrade, ownershipState.newProductIds, selectedCourseIds],
+  );
+  const featuresTotalPaise = useMemo(
+    () => sumSelectedFeaturePaise(rawFeatures, chargeableFeatureIds, selectedPlanId, cycle),
+    [rawFeatures, chargeableFeatureIds, selectedPlanId, cycle],
+  );
+  const chargeableProductRecords = useMemo(() => {
+    const chargeable = new Set(chargeableCourseIds);
+    return availableProducts.filter((product) => productHasId(product, chargeable));
+  }, [availableProducts, chargeableCourseIds]);
 
   // Resolve subscriptionProducts (new per-plan / duration priced add-ons) into selectable records
   // These can be used to override prices of catalog products when selected via subscription.
@@ -348,7 +387,7 @@ export default function SubscriptionPage({
       ? { ...product, price: Math.max(0, Number(pricing.resolvedPrice || 0)) }
       : product;
   }), [availableProducts, resolvedSubscriptionProducts]);
-  const productsTotalPaise = useMemo(() => selectedProductRecords.reduce((sum, product) => {
+  const productsTotalPaise = useMemo(() => chargeableProductRecords.reduce((sum, product) => {
     const pricing = resolvedSubscriptionProducts.find((entry) =>
       String(entry.productId || entry.id) === String(product.id) ||
       String(entry.productId || entry.id) === String(product.documentId || ""),
@@ -356,12 +395,16 @@ export default function SubscriptionPage({
     return sum + (pricing
       ? Math.max(0, Math.round(Number(pricing.resolvedPrice || 0) * 100))
       : Math.max(0, Math.round(product.price * 100)));
-  }, 0), [selectedProductRecords, resolvedSubscriptionProducts]);
-  const subtotalPaise = selectedPlanPricePaise + featuresTotalPaise + productsTotalPaise;
+  }, 0), [chargeableProductRecords, resolvedSubscriptionProducts]);
+  // The plan's cycle price is NOT charged again for an add-on upgrade —
+  // the plan was already paid when the membership started.
+  const planPricePaise = isAddOnUpgrade ? 0 : selectedPlanPricePaise;
+  const subtotalPaise = planPricePaise + featuresTotalPaise + productsTotalPaise;
   const couponDiscountPaise = appliedReferral?.discountPaise || appliedCoupon?.discountPaise || 0;
   // Server-validated floor: minimum payable = plan's minimum
-  // payable paise (admin-set), default 0.
-  const minPayablePaise = plan?.minPayablePaise || 0;
+  // payable paise (admin-set), default 0. Add-on upgrades only charge the
+  // new items, so the plan's floor must not inflate them.
+  const minPayablePaise = isAddOnUpgrade ? 0 : plan?.minPayablePaise || 0;
   const totalPaise = Math.max(subtotalPaise - couponDiscountPaise, minPayablePaise);
   const totalRupees = (totalPaise / 100).toFixed(2);
 
@@ -413,28 +456,16 @@ export default function SubscriptionPage({
     return availableProducts.filter((product) => productHasId(product, ids)).map((product) => product.title);
   }, [activeSubscription, availableProducts]);
 
-  // ---------- Duplicate-purchase guard ----------
-  // A "subscription type" is the plan AND the billing cycle together
-  // (Basic/Premium/Pro × monthly/yearly). When the buyer lands on the exact
-  // combination they already own we must not render the buy flow at all:
-  // no product picker, no feature picker, no coupon field, no price summary.
-  // The shared pure helper decides ownership so the page, the checkout call
-  // and the server-side quote guard all agree.
-  const ownershipState = useMemo(
-    () =>
-      evaluateSubscriptionSelection({
-        record: activeSubscription,
-        planId: selectedPlanId,
-        cycle,
-      }),
-    // `activeSubscription` is a live snapshot, so this re-evaluates whenever
-    // the membership changes as well as when the selection changes.
-    [activeSubscription, selectedPlanId, cycle],
-  );
-  const isSelectionOwned = ownershipState.owned;
-
+  // ---------- Owned-plan summary card ----------
+  // The shared ownership verdict (computed in the pricing block above) drives
+  // this card: when the buyer lands on the exact plan + cycle they already
+  // own, the buy flow is replaced by a statement of what is active — except
+  // while the member is browsing add-ons for that plan (`addOnIntent`), when
+  // the pickers reopen and only the new items are ever charged.
   const ownedPlanSummary = useMemo(() => {
-    if (!isSelectionOwned) return null;
+    // The owned card is replaced by the pickers while the member is browsing
+    // add-ons for their current plan.
+    if (!isSelectionOwned || addOnIntent) return null;
     return buildOwnedPlanSummary<SubscriptionFeatureDoc>({
       record: activeSubscription,
       planName:
@@ -443,7 +474,7 @@ export default function SubscriptionPage({
       features: memberFeatures,
       productTitles: memberProductTitles,
     });
-  }, [activeSubscription, isSelectionOwned, memberFeatures, memberProductTitles, plans]);
+  }, [activeSubscription, isSelectionOwned, addOnIntent, memberFeatures, memberProductTitles, plans]);
 
   // Plans the buyer could still switch to — used for the "want something
   // different?" hint on the owned card.
@@ -456,16 +487,17 @@ export default function SubscriptionPage({
   );
 
   // Never leave a stale coupon / referral attached to a selection the buyer
-  // cannot purchase.
+  // cannot purchase. Add-on upgrades ARE purchasable, so their coupon state
+  // is kept.
   useEffect(() => {
-    if (!isSelectionOwned) return;
+    if (!isSelectionOwned || isAddOnUpgrade) return;
     setAppliedCoupon(null);
     setAppliedReferral(null);
     setCouponErrorMessage(null);
     setReferralError(null);
     setCouponStatus("idle");
     setSubmitError(null);
-  }, [isSelectionOwned]);
+  }, [isSelectionOwned, isAddOnUpgrade]);
 
   // ---------- Handlers ----------
   const handleApplyCoupon = useCallback(
@@ -717,19 +749,48 @@ export default function SubscriptionPage({
       ) : (
       <>
       <div className="flex-1 pb-4">
-        {/* Returning member who chose to renew / change plan. */}
+        {/* Returning member who chose to renew / change plan / add items. */}
         {isActiveMember && manageMode ? (
-          <div className="mx-5 mt-4 flex items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2.5">
-            <p className="text-[11px] font-semibold leading-relaxed text-violet-900">
-              You already have an active membership. Choose any active plan, feature, or product below. Plan changes activate after verified payment.
-            </p>
-            <button
-              type="button"
-              onClick={() => setManageMode(false)}
-              className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 text-[11px] font-black text-violet-700 ring-1 ring-violet-200"
-            >
-              Cancel
-            </button>
+          <div className="mx-5 mt-4 space-y-2">
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2.5">
+              <p className="text-[11px] font-semibold leading-relaxed text-violet-900">
+                You already have an active membership. Choose any active plan, feature, or product below. Plan changes activate after verified payment.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setManageMode(false);
+                  setAddOnIntent(false);
+                }}
+                className="shrink-0 rounded-xl bg-white px-2.5 py-1.5 text-[11px] font-black text-violet-700 ring-1 ring-violet-200"
+              >
+                Cancel
+              </button>
+            </div>
+            {isAddOnUpgrade ? (
+              <div
+                data-subscription-addon-upgrade-note
+                className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] leading-relaxed text-emerald-800"
+              >
+                <span aria-hidden="true">⬆️</span>
+                <span>
+                  <strong>Add-on upgrade:</strong> you&apos;ll only be charged for
+                  the <strong>{ownershipState.newFeatureIds.length + ownershipState.newProductIds.length} new item{ownershipState.newFeatureIds.length + ownershipState.newProductIds.length === 1 ? "" : "s"}</strong> you
+                  added. Your current plan, cycle and expiry date stay exactly
+                  as they are — no plan price is charged again.
+                </span>
+              </div>
+            ) : null}
+            {!isAddOnUpgrade && isSelectionOwned ? (
+              <div className="flex items-start gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-[11px] leading-relaxed text-violet-800">
+                <span aria-hidden="true">💡</span>
+                <span>
+                  This is your current plan + cycle. Add a new feature or
+                  course below to upgrade it, or pick another plan. Renewal of
+                  this exact package opens in the last 7 days before expiry.
+                </span>
+              </div>
+            ) : null}
           </div>
         ) : null}
         {usingFallback && (
@@ -764,7 +825,9 @@ export default function SubscriptionPage({
 
         {/* Already-owned selection: the entire buy flow below is replaced by
             a single statement of what is active. Nothing purchasable is
-            rendered, so the same subscription type cannot be bought twice. */}
+            rendered, so the same subscription type cannot be bought twice —
+            EXCEPT through the explicit add-on path ("Add features / courses"),
+            which reopens the pickers and only ever charges the new items. */}
         {isSelectionOwned && ownedPlanSummary ? (
           <OwnedPlanCard
             summary={ownedPlanSummary}
@@ -777,6 +840,7 @@ export default function SubscriptionPage({
               );
               if (firstOther) setSelectedPlanId(firstOther.id);
             }}
+            onAddMore={() => setAddOnIntent(true)}
           />
         ) : (
         <>
@@ -856,11 +920,12 @@ export default function SubscriptionPage({
         <PriceSummary
           plan={plan}
           cycle={cycle}
-          basePricePaise={selectedPlanPricePaise}
+          basePricePaise={planPricePaise}
+          planAlreadyIncluded={isAddOnUpgrade}
           featuresTotalPaise={featuresTotalPaise}
-          featuresCount={selectedFeatureIds.filter((id) => !includedFeatureIds.has(id)).length}
+          featuresCount={chargeableFeatureIds.filter((id) => !includedFeatureIds.has(id)).length}
           includedFeatureCount={includedFeatureIds.size}
-          productsCount={selectedProductRecords.length}
+          productsCount={chargeableProductRecords.length}
           productsTotalPaise={productsTotalPaise}
           couponDiscountPaise={couponDiscountPaise}
           couponCode={appliedReferral?.code ?? appliedCoupon?.code ?? null}
