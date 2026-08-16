@@ -216,6 +216,15 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
           {copyState.errorMessage}
         </div>
       ) : null}
+      {/*
+        The copy EXISTS — only remembering it for next time failed. Shown as
+        a quiet note, never as the red "it didn't work" banner.
+      */}
+      {personalCopyEnabled && copyState.status !== "error" && copyState.warningMessage ? (
+        <div className="border-b border-[var(--course-border)] bg-[var(--course-soft)] px-4 py-2 text-xs font-semibold text-[var(--course-muted)]" data-course-personal-copy-warning>
+          {copyState.warningMessage}
+        </div>
+      ) : null}
       {copyBusy ? (
         <div className="border-b border-[var(--course-border)] bg-[var(--course-soft)] px-4 py-2 text-xs font-semibold text-[var(--course-muted)]" data-course-personal-copy-busy>
           {copyState.status === "authorizing" ? "Waiting for Google authorization…" : "Creating your personal copy in Google Drive…"}
@@ -586,6 +595,40 @@ interface EmbedFrameProps {
 /** CSS pixels a phone browser reports — what the embedded host will see. */
 const MOBILE_VIEWPORT_WIDTH = 420;
 
+/**
+ * ── Why the FULL Google editor needs its own width ──────────────────────
+ * Google has no mobile web editor: `/edit` on a phone-sized frame still
+ * ships the desktop application (its menu bar, toolbar, outline/comment
+ * rails). Squeezed into a ~400px iframe that page does not reflow — it
+ * simply overflows, which is the "everything is oversized, I have to drag
+ * left and right" bug. Nothing in the URL fixes it (`overridemobile` and
+ * friends are ignored) and the frame is cross-origin, so we cannot restyle
+ * it from here.
+ *
+ * The one lever that works is the iframe's own box: give the editor the
+ * desktop-class width it expects, then CSS-scale that box down so it fits
+ * the stage exactly. Google lays out a complete, unbroken editor; the
+ * learner sees all of it at once with no horizontal scrolling — the same
+ * "it just fits" feel the mobile preview has.
+ *
+ * Each width is the NARROWEST that editor still lays out cleanly at, because
+ * the narrower the frame, the less it has to be shrunk and the bigger the
+ * text stays.
+ */
+const EDITOR_VIEWPORT_WIDTHS: Record<string, number> = {
+  // Docs is the constrained one: its page canvas is a fixed 8.5in ≈ 816px at
+  // 100% zoom and does NOT shrink with the window, so anything narrower than
+  // the page plus its margins scrolls sideways inside the frame — exactly
+  // the reported bug. 900 clears the page, the canvas gutter and the
+  // scrollbar.
+  doc: 900,
+  // Sheets is fully fluid (the grid just shows fewer columns), so it can be
+  // kept tight — which means less downscaling and larger cell text.
+  sheet: 780,
+  // Slides needs the 16:9 canvas plus the slide filmstrip beside it.
+  slides: 860,
+};
+
 function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editMode = false, editorOriginalUrl = "" }: EmbedFrameProps) {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -593,13 +636,32 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editM
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageWidth, setStageWidth] = useState(0);
+  const [stageHeight, setStageHeight] = useState(0);
+  /**
+   * Extra magnification on top of "fit the width", for the full editor only.
+   * 1 = the whole editor fits the stage (no horizontal scrolling at all),
+   * higher values trade that for bigger text and let the stage pan.
+   */
+  const [editorZoom, setEditorZoom] = useState(1);
+
+  // Google's full editor never reflows, so it is laid out at a desktop-class
+  // width and scaled down to the stage (see EDITOR_VIEWPORT_WIDTHS). Only the
+  // three real editors qualify: a personal copy of a Drive binary is still an
+  // ordinary preview page and reflows on its own.
+  const editorViewportWidth = EDITOR_VIEWPORT_WIDTHS[kind] ?? 0;
+  const scalesEditor = editMode && !mobileDocument && kind in EDITOR_VIEWPORT_WIDTHS;
+  // Both paths need the live stage width.
+  const measuresStage = mobileDocument || scalesEditor;
 
   // Track the real stage width so the narrow frame can be scaled to fill it.
   useEffect(() => {
-    if (!mobileDocument) return undefined;
+    if (!measuresStage) return undefined;
     const stage = stageRef.current;
     if (!stage) return undefined;
-    const measure = () => setStageWidth(stage.clientWidth);
+    const measure = () => {
+      setStageWidth(stage.clientWidth);
+      setStageHeight(stage.clientHeight);
+    };
     measure();
     const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
     observer?.observe(stage);
@@ -608,11 +670,12 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editM
       observer?.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [mobileDocument]);
+  }, [measuresStage]);
 
   useEffect(() => {
     setLoading(true);
     setFailed(false);
+    setEditorZoom(1);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     // 12s safety net: if the embed never fires `onLoad`
     // (e.g. a sandboxed docs.google.com page that blocks
@@ -630,6 +693,24 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editM
 
   // Scale the narrow frame up so it still fills the stage edge-to-edge.
   const mobileScale = mobileDocument && stageWidth > 0 ? Math.max(stageWidth / MOBILE_VIEWPORT_WIDTH, 0.5) : 1;
+
+  // ── Full editor: lay out wide, then shrink to fit ─────────────────────
+  // The frame is given a desktop-class CSS viewport and scaled down until it
+  // lands exactly on the stage, so the editor always fills the stage with no
+  // outer scrolling in any direction.
+  //
+  // Zooming in narrows that CSS viewport instead of overflowing the stage
+  // (900px at 1x, 600px at 1.5x…). The scaled box therefore still fits the
+  // stage perfectly, everything gets proportionally bigger, and if Google
+  // then needs to scroll sideways it does so INSIDE its own frame — where a
+  // touch drag actually works. An outer scroll container would be unusable
+  // on a phone, because the iframe swallows the drag.
+  const editorFrameWidth = scalesEditor ? editorViewportWidth / editorZoom : 0;
+  const editorScale = scalesEditor && stageWidth > 0 && editorFrameWidth > 0
+    ? Math.min(stageWidth / editorFrameWidth, 1)
+    : 1;
+  const scalingEditor = scalesEditor && stageWidth > 0 && editorScale < 1;
+
   const frameStyle = mobileDocument && stageWidth > 0
     ? {
         width: `${MOBILE_VIEWPORT_WIDTH}px`,
@@ -637,7 +718,18 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editM
         transform: `scale(${mobileScale})`,
         transformOrigin: "top left" as const,
       }
-    : undefined;
+    : scalingEditor
+      ? {
+          // The editor believes it is on a desktop-width screen…
+          width: `${editorFrameWidth}px`,
+          // …and exactly as tall as the stage once the scale is undone, so
+          // the editor's own scrollbar is the only one on screen.
+          height: `${Math.max(stageHeight, 1) / editorScale}px`,
+          // …while the box it occupies is scaled to fit the stage.
+          transform: `scale(${editorScale})`,
+          transformOrigin: "top left" as const,
+        }
+      : undefined;
 
   return (
     <div
@@ -646,6 +738,7 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editM
       data-course-viewer-embed
       data-embed-kind={kind}
       data-viewport-mode={mobileDocument ? "mobile" : "desktop"}
+      data-editor-fit={scalingEditor ? editorScale.toFixed(2) : undefined}
     >
       {loading ? (
         <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-[var(--course-loading)] text-[var(--course-text)]">
@@ -695,7 +788,7 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editM
         key={reloadKey}
         src={url}
         title={title}
-        className={`block border-0 ${mobileDocument ? "absolute left-0 top-0 bg-white" : "h-full max-h-full min-h-0 w-full max-w-full min-w-0"} ${kind === "youtube" ? "absolute inset-0 bg-black" : mobileDocument ? "" : "bg-white"}`}
+        className={`block border-0 ${mobileDocument || scalingEditor ? "absolute left-0 top-0 bg-white" : "h-full max-h-full min-h-0 w-full max-w-full min-w-0"} ${kind === "youtube" ? "absolute inset-0 bg-black" : mobileDocument || scalingEditor ? "" : "bg-white"}`}
         style={frameStyle}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-read; clipboard-write"
         // The FULL Google editor (edit mode) must run unsandboxed: Google's
@@ -718,6 +811,46 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editM
           setFailed(true);
         }}
       />
+      {/*
+        Fitting a desktop editor onto a phone makes it small. Each tap here
+        narrows the frame's CSS viewport, so the editor re-lays-out bigger
+        while still filling the stage exactly — the learner is never stuck
+        with text they can't read.
+      */}
+      {scalingEditor && !failed ? (
+        <div
+          className="absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-full bg-black/70 p-1 text-white shadow-lg backdrop-blur"
+          data-course-editor-zoom
+        >
+          <button
+            type="button"
+            onClick={() => setEditorZoom((value) => Math.max(Number((value - 0.25).toFixed(2)), 1))}
+            disabled={editorZoom <= 1}
+            className="grid h-7 w-7 place-items-center rounded-full text-sm font-black disabled:opacity-40"
+            aria-label="Fit the editor to the screen"
+            title="Zoom out"
+            data-course-editor-zoom-out
+          >
+            −
+          </button>
+          <span className="min-w-[2.5rem] text-center text-[10px] font-black tabular-nums" data-course-editor-zoom-pct>
+            {Math.round(editorZoom * 100)}%
+          </span>
+          <button
+            type="button"
+            // Capped at 2x: past that the CSS viewport is narrow enough that
+            // Google would start serving its cramped layout again.
+            onClick={() => setEditorZoom((value) => Math.min(Number((value + 0.25).toFixed(2)), 2))}
+            disabled={editorZoom >= 2}
+            className="grid h-7 w-7 place-items-center rounded-full text-sm font-black disabled:opacity-40"
+            aria-label="Magnify the editor"
+            title="Zoom in"
+            data-course-editor-zoom-in
+          >
+            +
+          </button>
+        </div>
+      ) : null}
       {!supported ? (
         <p className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/65 px-3 py-1 text-[10px] font-bold text-[var(--course-muted)]">
           {kind} embed
