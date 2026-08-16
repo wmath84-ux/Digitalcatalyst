@@ -227,6 +227,79 @@ export const editableGoogleKind = (file: CourseFile): EditableGoogleKind | null 
   return null;
 };
 
+// ---------------------------------------------------------------------------
+// Personal copies (Drive API)
+// ---------------------------------------------------------------------------
+
+/**
+ * The file families that support a per-student PERSONAL COPY via Drive
+ * `files.copy`: native editors (doc / sheet / slides) plus any Drive
+ * binary (PDF, images, zips…). Forms are deliberately excluded — copying
+ * a form hands the student the form BUILDER, not a fillable form.
+ */
+export type PersonalCopyKind = "doc" | "sheet" | "slides" | "drive";
+
+/** Which personal-copy family this file belongs to, or null. */
+export const personalCopyKind = (file: CourseFile): PersonalCopyKind | null => {
+  const google = googleParts(getCourseFileUrl(file));
+  if (google?.kind === "document") return "doc";
+  if (google?.kind === "spreadsheets") return "sheet";
+  if (google?.kind === "presentation") return "slides";
+  if (google?.kind === "drive") return "drive";
+  return null;
+};
+
+/** The Drive file id the personal copy is cloned from. */
+export const getDriveSourceFileId = (file: CourseFile): string => {
+  const google = googleParts(getCourseFileUrl(file));
+  if (!google) return "";
+  return google.kind === "forms" ? "" : google.id;
+};
+
+/**
+ * The in-player URL for the student's OWN copy. Native editors open in
+ * edit mode (the student owns the copy, so editing always works); Drive
+ * binaries open in the Drive preview of the copy.
+ */
+export const buildPersonalCopyUrl = (kind: PersonalCopyKind, copyFileId: string, chrome: DocsEditorChrome = "toolbar"): string => {
+  const id = String(copyFileId || "").trim();
+  if (!id) return "";
+  const suffix = chrome === "full" ? "edit" : "edit?rm=embedded&widget=true";
+  if (kind === "doc") return `https://docs.google.com/document/d/${id}/${suffix}`;
+  if (kind === "sheet") return `https://docs.google.com/spreadsheets/d/${id}/${suffix}`;
+  if (kind === "slides") return `https://docs.google.com/presentation/d/${id}/${suffix}`;
+  return `https://drive.google.com/file/d/${id}/preview`;
+};
+
+/** Admin configuration for the personal-copy feature. */
+export interface DrivePersonalCopySettings {
+  /** Public OAuth Client ID (Web application) from Google Cloud Console. */
+  clientId: string;
+  /** Per-type enable switches. */
+  byType: Record<PersonalCopyKind, boolean>;
+}
+
+/**
+ * Normalise the stored admin setting. Everything defaults OFF — the
+ * feature only activates for the types the admin explicitly enables,
+ * and only once a Client ID is available (stored or env fallback).
+ */
+export const normalizeDrivePersonalCopySettings = (raw: unknown, fallbackClientId = ""): DrivePersonalCopySettings => {
+  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const byTypeRaw = source.byType && typeof source.byType === "object" && !Array.isArray(source.byType)
+    ? (source.byType as Record<string, unknown>)
+    : {};
+  return {
+    clientId: String(source.clientId ?? "").trim() || String(fallbackClientId || "").trim(),
+    byType: {
+      doc: byTypeRaw.doc === true,
+      sheet: byTypeRaw.sheet === true,
+      slides: byTypeRaw.slides === true,
+      drive: byTypeRaw.drive === true,
+    },
+  };
+};
+
 /**
  * The Google editor URL for a native Google file. The chrome level is the
  * admin's choice:

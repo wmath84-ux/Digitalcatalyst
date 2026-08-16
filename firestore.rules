@@ -111,6 +111,21 @@ service cloud.firestore {
         allow create, delete: if isAdmin();
       }
 
+      // Per-student Google Drive personal copies. One doc per master file
+      // id, carrying the student's own copyFileId. The copy itself lives in
+      // the STUDENT's Drive; this is only the id mapping so the same copy
+      // reopens on every device.
+      match /driveCopies/{sourceFileId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.sourceFileId == sourceFileId
+          && request.resource.data.copyFileId is string
+          && request.resource.data.copyFileId.size() > 8
+          && request.resource.data.copyFileId.size() <= 200;
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
       match /webPushSubscriptions/{subscriptionId} {
         allow read: if isOwner(uid) || isAdmin();
         allow create, update: if isOwner(uid)

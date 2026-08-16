@@ -76,6 +76,15 @@ type ContentSettings = {
    * editor endpoint, so no switch exists for them.
    */
   docsEditorAccessByType?: Partial<Record<"doc" | "sheet" | "slides", "off" | "toolbar" | "full">>;
+  /**
+   * Personal-copy feature (Drive `files.copy`): every student gets their
+   * OWN copy of the master file in their OWN Google Drive. Needs the
+   * public OAuth Client ID; each Google family has its own enable switch.
+   */
+  drivePersonalCopy?: {
+    clientId?: string;
+    byType?: Partial<Record<"doc" | "sheet" | "slides" | "drive", boolean>>;
+  };
 };
 
 function genLocalId(prefix: string) {
@@ -769,6 +778,7 @@ function PlayerTab({
           coursePlayerMessages: settings?.coursePlayerMessages,
           docsEditorAccess: settings?.docsEditorAccess ?? "toolbar",
           docsEditorAccessByType: settings?.docsEditorAccessByType ?? {},
+          drivePersonalCopy: settings?.drivePersonalCopy ?? { clientId: "", byType: {} },
         }),
       });
       notify("success", "Course player settings saved.");
@@ -805,6 +815,25 @@ function PlayerTab({
     patch({
       docsEditorAccess: value,
       docsEditorAccessByType: { doc: value, sheet: value, slides: value },
+    });
+
+  /** Personal-copy feature — every copyable Google family gets a switch. */
+  const personalCopyTypes: Array<{ key: "doc" | "sheet" | "slides" | "drive"; label: string; hint: string }> = [
+    { key: "doc", label: "Google Docs", hint: "Student edits their own document copy" },
+    { key: "sheet", label: "Google Sheets", hint: "Student edits their own spreadsheet copy" },
+    { key: "slides", label: "Google Slides", hint: "Student edits their own presentation copy" },
+    { key: "drive", label: "Drive files (PDF & others)", hint: "Student gets the file copied into their Drive" },
+  ];
+
+  const personalCopyOn = (key: "doc" | "sheet" | "slides" | "drive"): boolean =>
+    settings?.drivePersonalCopy?.byType?.[key] === true;
+
+  const setPersonalCopy = (key: "doc" | "sheet" | "slides" | "drive", value: boolean) =>
+    patch({
+      drivePersonalCopy: {
+        ...(settings?.drivePersonalCopy ?? {}),
+        byType: { ...(settings?.drivePersonalCopy?.byType ?? {}), [key]: value },
+      },
     });
 
   const playerKeys = [
@@ -886,6 +915,63 @@ function PlayerTab({
                   {docsEditorOptions.find((option) => option.value === current)?.hint}
                 </p>
               </div>
+            );
+          })}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Personal copies (Google Drive)">
+        <p className="text-xs text-slate-500">
+          Give every student their <strong>own private copy</strong> of a Google file, cloned into the
+          student&apos;s own Google Drive with one tap. The student owns the copy — they can always edit it,
+          and the master file stays untouched. Works per file type below.
+        </p>
+        <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500">
+          <span className="font-bold text-slate-600">Setup:</span> paste your Google OAuth <strong>Client ID</strong> (Web application)
+          below — from Google Cloud Console → APIs &amp; Services → Credentials. The Drive API must be enabled in the same
+          project, and your site&apos;s domain added to the client&apos;s <em>Authorized JavaScript origins</em>. The client
+          <em> secret</em> is <strong>not</strong> needed (browser token flow). Masters only need
+          &ldquo;Anyone with the link → Viewer&rdquo; sharing. Google Forms are excluded — copying a form would hand the
+          student your form <em>builder</em>, not a fillable form.
+        </div>
+        <Field label="Google OAuth Client ID" hint="Leave blank to use the VITE_GOOGLE_CLIENT_ID the app already uses for Google sign-in">
+          <input
+            className={inputClass}
+            placeholder="1234567890-abc123.apps.googleusercontent.com"
+            value={settings.drivePersonalCopy?.clientId ?? ""}
+            data-admin-drive-client-id
+            onChange={(e) =>
+              patch({
+                drivePersonalCopy: { ...(settings.drivePersonalCopy ?? {}), clientId: e.target.value },
+              })
+            }
+          />
+        </Field>
+        <div className="mt-3 space-y-2" data-admin-personal-copy>
+          {personalCopyTypes.map((type) => {
+            const enabled = personalCopyOn(type.key);
+            return (
+              <button
+                key={type.key}
+                type="button"
+                onClick={() => setPersonalCopy(type.key, !enabled)}
+                data-personal-copy-type={type.key}
+                aria-pressed={enabled}
+                className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition ${
+                  enabled ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-200" : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <span>
+                  <span className={`block text-sm font-bold ${enabled ? "text-emerald-900" : "text-slate-800"}`}>{type.label}</span>
+                  <span className="mt-0.5 block text-[11px] text-slate-500">{type.hint}</span>
+                </span>
+                <span
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${enabled ? "bg-emerald-500" : "bg-slate-300"}`}
+                  aria-hidden="true"
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${enabled ? "left-[calc(100%-1.375rem)]" : "left-0.5"}`} />
+                </span>
+              </button>
             );
           })}
         </div>

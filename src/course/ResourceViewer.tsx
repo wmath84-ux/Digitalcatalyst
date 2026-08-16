@@ -36,12 +36,14 @@
 // opens the source in a new tab as a fallback.
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Download, ExternalLink, Eye, FileQuestion, Maximize2, PencilLine, RefreshCw } from "lucide-react";
+import { AlertTriangle, Download, ExternalLink, Eye, FileQuestion, FileStack, Maximize2, PencilLine, RefreshCw } from "lucide-react";
 import type { CourseFile } from "../types/course";
 import ImageViewer from "./ImageViewer";
 import AudioPlayer from "./AudioPlayer";
-import { editableGoogleKind, getCourseDownload, getCourseEmbed, getGoogleEditorUrl, hasNativeMobileRendering, isEditableGoogleFile, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
+import { buildPersonalCopyUrl, editableGoogleKind, getCourseDownload, getCourseEmbed, getDriveSourceFileId, getGoogleEditorUrl, hasNativeMobileRendering, isEditableGoogleFile, personalCopyKind, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
 import { useDocsEditorAccess } from "../hooks/useDocsEditorAccess";
+import { usePersonalDriveCopy } from "../hooks/usePersonalDriveCopy";
+import { useAuth } from "../context/AuthContext";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
 
 const SUPPORTED_KINDS = new Set([
@@ -128,16 +130,50 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
   // binaries have no editor endpoint, so no switch exists for them.
   // Editing still requires the learner to have edit permission on the
   // file (Google enforces that; no client code can bypass it).
-  const accessByType = useDocsEditorAccess();
+  const { editorAccess: accessByType, personalCopy: personalCopySettings } = useDocsEditorAccess();
   const editableKind = editableGoogleKind(file);
   const editorAccess = editableKind ? accessByType[editableKind] : "off";
   const editorChrome: DocsEditorChrome = editorAccess === "full" ? "full" : "toolbar";
   const canEditInline = editorAccess !== "off" && isEditableGoogleFile(file);
   const [editMode, setEditMode] = useState(false);
 
+  // ── Personal copy (admin-controlled, PER FILE TYPE) ─────────────────
+  // When the admin enables "Personal copy" for this file's family AND an
+  // OAuth Client ID is configured, the learner gets a "My copy" toggle:
+  // the first tap runs Google's consent popup + Drive `files.copy`, so a
+  // private copy lands in the STUDENT's own Drive (they own it → editing
+  // always works, master stays untouched). The mapping is remembered in
+  // `users/{uid}/driveCopies/{sourceFileId}`, so later taps are instant.
+  const { user } = useAuth();
+  const copyKind = personalCopyKind(file);
+  const driveSourceId = getDriveSourceFileId(file);
+  const personalCopyEnabled = Boolean(
+    copyKind && driveSourceId && personalCopySettings.clientId && personalCopySettings.byType[copyKind],
+  );
+  const copyState = usePersonalDriveCopy({
+    uid: personalCopyEnabled ? user?.id : null,
+    sourceFileId: driveSourceId,
+    copyName: `${file.name || "Course file"} — ${user?.name || "my"} copy`,
+    clientId: personalCopySettings.clientId,
+  });
+  const [copyMode, setCopyMode] = useState(false);
+  const personalCopyUrl = personalCopyEnabled && copyKind && copyState.copyFileId
+    ? buildPersonalCopyUrl(copyKind, copyState.copyFileId, editorChrome)
+    : "";
+  const showPersonalCopy = personalCopyEnabled && copyMode && Boolean(personalCopyUrl);
+  const copyBusy = copyState.status === "authorizing" || copyState.status === "copying";
+  const handleToggleCopyMode = () => {
+    if (copyMode) { setCopyMode(false); return; }
+    setEditMode(false);
+    if (copyState.copyFileId) { setCopyMode(true); return; }
+    void copyState.createCopy().then(() => setCopyMode(true)).catch(() => undefined);
+  };
+
   // The desktop/mobile choice is resolved BEFORE the URL is built: a phone
   // rendering is a different endpoint on the host, not a narrower iframe.
-  const embed = getCourseEmbed(file, { viewport: desktopView ? "desktop" : "mobile", mode: canEditInline && editMode ? "edit" : "preview", editorChrome });
+  const baseEmbed = getCourseEmbed(file, { viewport: desktopView ? "desktop" : "mobile", mode: canEditInline && editMode && !showPersonalCopy ? "edit" : "preview", editorChrome });
+  // The personal copy takes over the stage when active — same kind, own URL.
+  const embed = showPersonalCopy ? { url: personalCopyUrl, kind: baseEmbed.kind } : baseEmbed;
   const download = getCourseDownload(file);
   const isSupported = SUPPORTED_KINDS.has(embed.kind);
   const isImage = file.type === "image" && embed.kind === "direct";
@@ -156,12 +192,35 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
   // Forms already loaded their own reflowing mobile page above, so scaling
   // them a second time would shrink the text we just made readable.
   // The full Google editor manages its own layout — never scale it.
-  const isEditingInline = canEditInline && editMode;
+  const isEditingInline = (canEditInline && editMode && !showPersonalCopy) || showPersonalCopy;
   const mobileDocument = documentKind && !desktopView && !hasNativeMobileRendering(embed.kind) && !isEditingInline;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-chrome-hidden={chromeHidden ? "true" : "false"} data-doc-mode={canEditInline ? (isEditingInline ? "edit" : "preview") : undefined} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>
-      {chromeHidden ? null : <ViewerHeader file={file} embed={embed} download={download} canEditInline={canEditInline} editMode={isEditingInline} onToggleEditMode={() => setEditMode((value) => !value)} />}
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-chrome-hidden={chromeHidden ? "true" : "false"} data-doc-mode={canEditInline || personalCopyEnabled ? (showPersonalCopy ? "personal-copy" : isEditingInline ? "edit" : "preview") : undefined} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>
+      {chromeHidden ? null : (
+        <ViewerHeader
+          file={file}
+          embed={embed}
+          download={download}
+          canEditInline={canEditInline && !showPersonalCopy}
+          editMode={canEditInline && editMode && !showPersonalCopy}
+          onToggleEditMode={() => { setCopyMode(false); setEditMode((value) => !value); }}
+          personalCopyEnabled={personalCopyEnabled}
+          personalCopyActive={showPersonalCopy}
+          personalCopyBusy={copyBusy}
+          onTogglePersonalCopy={handleToggleCopyMode}
+        />
+      )}
+      {personalCopyEnabled && copyState.status === "error" && copyState.errorMessage ? (
+        <div className="border-b border-amber-300/40 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-600" role="alert" data-course-personal-copy-error>
+          {copyState.errorMessage}
+        </div>
+      ) : null}
+      {copyBusy ? (
+        <div className="border-b border-[var(--course-border)] bg-[var(--course-soft)] px-4 py-2 text-xs font-semibold text-[var(--course-muted)]" data-course-personal-copy-busy>
+          {copyState.status === "authorizing" ? "Waiting for Google authorization…" : "Creating your personal copy in Google Drive…"}
+        </div>
+      ) : null}
       <div className={`relative min-h-0 flex-1 overflow-hidden ${isCinematic ? "bg-black p-0" : "bg-[var(--course-bg)]"}`}>
         {isImage ? (
           <ImageViewer
@@ -205,7 +264,7 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
             )}
           </div>
         ) : (
-          <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} mobileDocument={mobileDocument} editMode={isEditingInline} editorOriginalUrl={isEditingInline ? getGoogleEditorUrl(file) : ""} />
+          <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} mobileDocument={mobileDocument} editMode={isEditingInline} editorOriginalUrl={showPersonalCopy ? personalCopyUrl : isEditingInline ? getGoogleEditorUrl(file) : ""} />
         )}
       </div>
     </div>
@@ -380,7 +439,7 @@ function YouTubeFrame({ url, title, active, resumeAt, onProgress }: { url: strin
   );
 }
 
-function ViewerHeader({ file, embed, download, canEditInline = false, editMode = false, onToggleEditMode }: { file: CourseFile; embed: { url: string; kind: string }; download: CourseDownload; canEditInline?: boolean; editMode?: boolean; onToggleEditMode?: () => void }) {
+function ViewerHeader({ file, embed, download, canEditInline = false, editMode = false, onToggleEditMode, personalCopyEnabled = false, personalCopyActive = false, personalCopyBusy = false, onTogglePersonalCopy }: { file: CourseFile; embed: { url: string; kind: string }; download: CourseDownload; canEditInline?: boolean; editMode?: boolean; onToggleEditMode?: () => void; personalCopyEnabled?: boolean; personalCopyActive?: boolean; personalCopyBusy?: boolean; onTogglePersonalCopy?: () => void }) {
   const kindLabel = embed.kind === "none" ? "No preview" : embed.kind === "direct" ? file.type : embed.kind;
   const isMedia = embed.kind === "youtube" || file.type === "video" || file.type === "audio";
   const toggleFullscreen = () => {
@@ -393,8 +452,28 @@ function ViewerHeader({ file, embed, download, canEditInline = false, editMode =
     <div className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-[var(--course-border)] bg-[var(--course-surface)] px-3 py-2.5 text-[var(--course-text)] backdrop-blur sm:gap-3 sm:px-4">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-black" title={file.name}>{file.name}</p>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--course-muted)]" data-course-viewer-kind>{kindLabel} {editMode ? "editor" : "preview"}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--course-muted)]" data-course-viewer-kind>{kindLabel} {personalCopyActive ? "my copy" : editMode ? "editor" : "preview"}</p>
       </div>
+      {personalCopyEnabled ? (
+        <button
+          type="button"
+          onClick={onTogglePersonalCopy}
+          disabled={personalCopyBusy}
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors disabled:cursor-wait disabled:opacity-60 ${
+            personalCopyActive
+              ? "bg-emerald-600 text-white hover:bg-emerald-700"
+              : "bg-[var(--course-soft)] text-[var(--course-text)] hover:bg-[var(--course-soft-hover)]"
+          }`}
+          aria-pressed={personalCopyActive}
+          aria-label={personalCopyActive ? "Back to the course master file" : "Open your own personal copy of this file"}
+          title={personalCopyActive ? "Back to the master file" : "Get your own editable copy in your Google Drive"}
+          data-course-viewer-copy-toggle
+          data-copy-active={personalCopyActive ? "true" : "false"}
+        >
+          {personalCopyBusy ? <RefreshCw size={14} className="animate-spin" /> : <FileStack size={14} />}
+          <span className="hidden sm:inline">{personalCopyActive ? "Master" : "My copy"}</span>
+        </button>
+      ) : null}
       {canEditInline ? (
         <button
           type="button"

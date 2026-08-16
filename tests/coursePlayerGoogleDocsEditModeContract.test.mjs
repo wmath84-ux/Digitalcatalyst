@@ -145,7 +145,7 @@ test("normalizeDocsEditorAccessMap gives every type its own value with legacy in
 });
 
 test("the viewer passes the mode + admin chrome into getCourseEmbed and tags the stage", () => {
-  assert.match(resourceViewer, /mode: canEditInline && editMode \? "edit" : "preview", editorChrome/);
+  assert.match(resourceViewer, /mode: canEditInline && editMode && !showPersonalCopy \? "edit" : "preview", editorChrome/);
   assert.match(resourceViewer, /data-doc-mode=/);
 });
 
