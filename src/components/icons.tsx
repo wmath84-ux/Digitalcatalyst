@@ -40,6 +40,15 @@ export function TrophyIcon(props: SVGProps<SVGSVGElement>) {
   return <svg viewBox="0 0 24 24" {...base} {...props}><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4Z" /><path d="M7 6H4v2a4 4 0 0 0 4 4M17 6h3v2a4 4 0 0 1-4 4" /></svg>;
 }
 
+export function SparkBookIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M12 6.5c-1.7-1.3-4-2-6.5-2v13c2.5 0 4.8.7 6.5 2 1.7-1.3 4-2 6.5-2v-13c-2.5 0-4.8.7-6.5 2Z" />
+      <path d="M12 6.5v13" />
+    </svg>
+  );
+}
+
 export function UserIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" {...base} {...props}>

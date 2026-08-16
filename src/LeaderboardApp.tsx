@@ -234,7 +234,7 @@ export default function LeaderboardApp() {
             </div>
           )}
         </main>
-        <BottomNav active="leaderboard" onChange={(tab) => {
+        <BottomNav active={null} onChange={(tab) => {
             if (tab === "home") window.location.hash = "#/home";
             else if (tab === "myday") window.location.hash = "#/my-day";
             else if (tab === "store") window.location.hash = "#/store";
