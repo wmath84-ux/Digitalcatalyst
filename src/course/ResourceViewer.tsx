@@ -36,7 +36,7 @@
 // opens the source in a new tab as a fallback.
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Download, ExternalLink, Eye, FileQuestion, FileStack, Maximize2, PencilLine, RefreshCw } from "lucide-react";
+import { AlertTriangle, Download, ExternalLink, Eye, FileQuestion, FileStack, Maximize2, PencilLine, RefreshCw, X } from "lucide-react";
 import type { CourseFile } from "../types/course";
 import ImageViewer from "./ImageViewer";
 import AudioPlayer from "./AudioPlayer";
@@ -162,12 +162,44 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
     : "";
   const showPersonalCopy = personalCopyEnabled && copyMode && Boolean(personalCopyUrl);
   const copyBusy = copyState.status === "authorizing" || copyState.status === "copying";
+
+  // ── Desktop/mobile switch while an editor is open ─────────────────────
+  // The viewport choice only changes the PREVIEW rendering: the editor URL
+  // is identical in both modes (Google has no mobile editor), so flipping
+  // the header's desktop/mobile button while the editor — or a personal
+  // copy — is on stage would appear to do nothing at all. Flipping it
+  // therefore exits the editor straight into the preview of the newly
+  // chosen viewport, which is exactly what the learner asked to see.
+  const previousDesktopViewRef = useRef(desktopView);
+  /** Bumped on every viewport flip so an in-flight copy can't re-enter edit. */
+  const viewportFlipRef = useRef(0);
+  useEffect(() => {
+    if (previousDesktopViewRef.current === desktopView) return;
+    previousDesktopViewRef.current = desktopView;
+    viewportFlipRef.current += 1;
+    setEditMode(false);
+    setCopyMode(false);
+  }, [desktopView]);
+
   const handleToggleCopyMode = () => {
     if (copyMode) { setCopyMode(false); return; }
     setEditMode(false);
     if (copyState.copyFileId) { setCopyMode(true); return; }
-    void copyState.createCopy().then(() => setCopyMode(true)).catch(() => undefined);
+    const flip = viewportFlipRef.current;
+    void copyState.createCopy().then(() => {
+      // The learner may have flipped the viewport while Drive was still
+      // copying; that flip exits editor modes, so don't drag them back in.
+      if (viewportFlipRef.current === flip) setCopyMode(true);
+    }).catch(() => undefined);
   };
+
+  // A non-blocking note must never overstay: it fades out on its own and
+  // can be dismissed immediately.
+  useEffect(() => {
+    if (!copyState.warningMessage) return undefined;
+    const timer = setTimeout(() => copyState.dismissWarning(), 8000);
+    return () => clearTimeout(timer);
+  }, [copyState.warningMessage, copyState.dismissWarning]);
 
   // The desktop/mobile choice is resolved BEFORE the URL is built: a phone
   // rendering is a different endpoint on the host, not a narrower iframe.
@@ -218,11 +250,21 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
       ) : null}
       {/*
         The copy EXISTS — only remembering it for next time failed. Shown as
-        a quiet note, never as the red "it didn't work" banner.
+        a quiet, dismissible note, never as the red "it didn't work" banner.
       */}
       {personalCopyEnabled && copyState.status !== "error" && copyState.warningMessage ? (
-        <div className="border-b border-[var(--course-border)] bg-[var(--course-soft)] px-4 py-2 text-xs font-semibold text-[var(--course-muted)]" data-course-personal-copy-warning>
-          {copyState.warningMessage}
+        <div className="flex items-center gap-2 border-b border-[var(--course-border)] bg-[var(--course-soft)] px-4 py-2 text-xs font-semibold text-[var(--course-muted)]" role="status" data-course-personal-copy-warning>
+          <span className="min-w-0 flex-1">{copyState.warningMessage}</span>
+          <button
+            type="button"
+            onClick={copyState.dismissWarning}
+            className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+            aria-label="Dismiss this message"
+            title="Dismiss"
+            data-course-personal-copy-warning-dismiss
+          >
+            <X size={13} />
+          </button>
         </div>
       ) : null}
       {copyBusy ? (

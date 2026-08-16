@@ -296,7 +296,7 @@ export const friendlyDriveCopyError = (error: unknown): string => {
       case "scope_missing":
         return "Google Drive access wasn't granted. Tap My copy again and keep the “See, edit, create and delete all of your Google Drive files” box ticked.";
       case "mapping_denied":
-        return "Your copy was created in Google Drive, but this app couldn't save the link to it. Please sign out and sign back in, then tap My copy again.";
+        return "Your copy was created in Google Drive and saved on this device. Syncing the link to your account failed, so it will open here but not on your other devices.";
       case "source_not_found":
         return "The master file isn't visible to your Google account. Ask the course owner to share it as “Anyone with the link → Viewer”.";
       case "forbidden":
