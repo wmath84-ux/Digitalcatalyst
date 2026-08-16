@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="robots" content="index, follow" />
+  <meta name="description" content="Privacy Policy for Eduvora | Digital Catalyst — what data we collect, how we use it, and how we handle Google user data." />
+  <title>Privacy Policy — Eduvora | Digital Catalyst</title>
+  <link rel="canonical" href="https://eduvora.shop/privacy-policy.html" />
+  <style>
+    :root {
+      --ink: #0f172a;
+      --body: #475569;
+      --muted: #64748b;
+      --line: #e6e8f2;
+      --line-soft: #eef0f6;
+      --bg: #f5f6fb;
+      --card: #ffffff;
+      --indigo: #4f46e5;
+      --violet: #7c3aed;
+      --fuchsia: #c026d3;
+      --violet-ink: #5b21b6;
+      --accent: linear-gradient(135deg, #4f46e5 0%, #7c3aed 46%, #c026d3 100%);
+      --accent-soft: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 50%, #fdf4ff 100%);
+      --ring: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -18px rgba(79, 70, 229, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle at 12% -6%, rgba(124, 58, 237, 0.14), transparent 34%),
+        radial-gradient(circle at 88% 2%, rgba(6, 182, 212, 0.10), transparent 30%);
+      background-repeat: no-repeat;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    a { color: var(--violet-ink); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .brand-badge {
+      width: 38px;
+      height: 38px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 11px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 900;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+      box-shadow: 0 8px 18px -8px rgba(124, 58, 237, 0.6);
+    }
+
+    /* ── Sticky header ─────────────────────────────────────────────── */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .site-header-inner {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+    }
+    .brand-name {
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+    .brand-sub {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+    .header-link {
+      flex: none;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--violet-ink);
+      background: #f3f0ff;
+      border: 1px solid #e4ddfb;
+      padding: 7px 13px;
+      border-radius: 999px;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .header-link:hover { background: #ebe5fd; text-decoration: none; }
+
+    /* ── Hero ──────────────────────────────────────────────────────── */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      color: #fff;
+      background: linear-gradient(135deg, #4338ca 0%, #6d28d9 48%, #a21caf 100%);
+      padding: 46px 20px 42px;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: radial-gradient(circle at 50% 0%, #000 20%, transparent 78%);
+      -webkit-mask-image: radial-gradient(circle at 50% 0%, #000 20%, transparent 78%);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -80px;
+      top: -90px;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.16);
+      filter: blur(60px);
+    }
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 880px;
+      margin: 0 auto;
+    }
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #e0e7ff;
+    }
+    .kicker::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #67e8f9;
+      box-shadow: 0 0 0 4px rgba(103, 232, 249, 0.22);
+    }
+    .hero h1 {
+      margin: 12px 0 10px;
+      font-size: clamp(28px, 7vw, 40px);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.12;
+    }
+    .hero p {
+      margin: 0;
+      max-width: 620px;
+      color: #e0e7ff;
+      font-size: 15px;
+    }
+    .meta-row {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+    }
+    .chip {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.22);
+      backdrop-filter: blur(6px);
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────── */
+    .page {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 28px 18px 60px;
+      display: grid;
+      gap: 22px;
+    }
+
+    .toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .toc a {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--violet-ink);
+      background: #fff;
+      border: 1px solid var(--line);
+      padding: 6px 12px;
+      border-radius: 999px;
+      transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .toc a:hover {
+      text-decoration: none;
+      border-color: #c4b5fd;
+      transform: translateY(-1px);
+      box-shadow: var(--ring);
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line-soft);
+      border-radius: 20px;
+      padding: 24px 22px;
+      box-shadow: var(--ring);
+      scroll-margin-top: 92px;
+    }
+    @media (min-width: 640px) {
+      .card { padding: 30px 32px; border-radius: 24px; }
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      margin-bottom: 6px;
+    }
+    .section-icon {
+      flex: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 15px;
+      font-weight: 800;
+      box-shadow: 0 10px 20px -10px rgba(124, 58, 237, 0.65);
+    }
+    .section-head h2 {
+      margin: 0;
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+
+    .card h3 {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      margin: 22px 0 6px;
+    }
+    .card h3:first-of-type { margin-top: 0; }
+    .card p { margin: 0 0 12px; color: var(--body); font-size: 15px; }
+    .card p:last-child { margin-bottom: 0; }
+    .card ul, .card ol { margin: 4px 0 14px; padding-left: 20px; color: var(--body); font-size: 15px; }
+    .card li { margin: 7px 0; }
+    .card li::marker { color: var(--violet); font-weight: 700; }
+    .card strong { color: var(--ink); font-weight: 700; }
+    .card code, .card .scope {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.88em;
+      background: #f1f5f9;
+      border: 1px solid var(--line-soft);
+      padding: 1px 6px;
+      border-radius: 6px;
+      color: var(--violet-ink);
+      word-break: break-all;
+    }
+
+    /* Google User Data — highlighted section */
+    .card--google {
+      border-color: #d8cdfa;
+      background: linear-gradient(180deg, #ffffff 0%, #faf8ff 100%);
+      box-shadow: 0 1px 2px rgba(15,23,42,0.05), 0 18px 40px -24px rgba(124, 58, 237, 0.5);
+    }
+    .card--google .section-icon {
+      background: linear-gradient(135deg, #4285F4 0%, #7c3aed 60%, #c026d3 100%);
+    }
+    .notice {
+      display: flex;
+      gap: 10px;
+      margin: 4px 0 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #f3f0ff;
+      border: 1px solid #e4ddfb;
+      color: var(--body);
+      font-size: 13.5px;
+    }
+    .notice .pill {
+      flex: none;
+      align-self: flex-start;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #fff;
+      background: var(--accent);
+      padding: 3px 9px;
+      border-radius: 999px;
+      margin-top: 1px;
+    }
+
+    .compliance {
+      margin: 6px 0 0;
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: #ffffff;
+      border: 1px solid #e4ddfb;
+      border-left: 4px solid var(--violet);
+      color: var(--ink);
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .contact-block {
+      display: grid;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .contact-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14.5px;
+      color: var(--body);
+      flex-wrap: wrap;
+    }
+    .contact-line .key {
+      flex: none;
+      min-width: 84px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--violet-ink);
+    }
+
+    /* ── Footer ────────────────────────────────────────────────────── */
+    .site-footer {
+      margin-top: 12px;
+      background: #0b1020;
+      color: #94a3b8;
+    }
+    .site-footer-inner {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 36px 18px 44px;
+      text-align: center;
+    }
+    .site-footer .brand {
+      justify-content: center;
+    }
+    .site-footer .brand-name { color: #e2e8f0; }
+    .site-footer .brand-sub { color: #64748b; }
+    .footer-links {
+      margin: 20px 0 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+    .footer-links a {
+      font-size: 13px;
+      font-weight: 700;
+      color: #c7d2fe;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      padding: 7px 14px;
+      border-radius: 999px;
+      transition: background 0.15s ease;
+    }
+    .footer-links a:hover { background: rgba(255,255,255,0.12); text-decoration: none; }
+    .site-footer .fine {
+      font-size: 12.5px;
+      color: #64748b;
+      margin: 0;
+    }
+    .site-footer .fine a { color: #c7d2fe; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="/#/home" aria-label="Eduvora home">
+        <span class="brand-badge">E</span>
+        <span>
+          <span class="brand-name">Eduvora</span>
+          <span class="brand-sub">Digital Catalyst</span>
+        </span>
+      </a>
+      <a class="header-link" href="/terms-of-service.html">Terms of Service →</a>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <span class="kicker">Legal</span>
+      <h1>Privacy Policy</h1>
+      <p>How Eduvora collects, uses, stores and protects your information — and exactly how we handle your Google data.</p>
+      <div class="meta-row">
+        <span class="chip">Last updated: 16 August 2026</span>
+        <span class="chip">Applies to: eduvora.shop</span>
+      </div>
+    </div>
+  </section>
+
+  <main class="page">
+    <nav class="toc" aria-label="On this page">
+      <a href="#intro">Introduction</a>
+      <a href="#collect">Information we collect</a>
+      <a href="#google-data">Google user data</a>
+      <a href="#use">How we use it</a>
+      <a href="#storage">Storage &amp; retention</a>
+      <a href="#sharing">Sharing</a>
+      <a href="#payments">Payments</a>
+      <a href="#rights">Your rights &amp; deletion</a>
+      <a href="#cookies">Cookies</a>
+      <a href="#children">Children</a>
+      <a href="#changes">Changes</a>
+      <a href="#contact">Contact</a>
+    </nav>
+
+    <section class="card" id="intro">
+      <div class="section-head">
+        <span class="section-icon">01</span>
+        <h2>Introduction</h2>
+      </div>
+      <p>Eduvora, operated by <strong>Digital Catalyst</strong> (&ldquo;we&rdquo;, &ldquo;our&rdquo; or &ldquo;us&rdquo;), is a digital learning service that offers online courses, subscriptions, notes and study tools (the &ldquo;Service&rdquo;).</p>
+      <p>This Privacy Policy explains what information we collect when you use the Service, why we collect it, how we store and protect it, and the choices and rights you have over your data. By creating an account or using the Service, you agree to the practices described in this policy.</p>
+    </section>
+
+    <section class="card" id="collect">
+      <div class="section-head">
+        <span class="section-icon">02</span>
+        <h2>Information we collect</h2>
+      </div>
+      <h3>Account &amp; profile information</h3>
+      <ul>
+        <li><strong>Google sign-in:</strong> when you sign in with Google, we receive your <strong>name</strong>, <strong>email address</strong> and <strong>profile photo</strong> from your Google account.</li>
+        <li><strong>Email sign-up:</strong> your name, email address, an optional mobile number, and a password. Passwords are handled entirely by Firebase Authentication — we never see or store your plain-text password.</li>
+      </ul>
+      <h3>Purchases &amp; subscription records</h3>
+      <p>When you buy a course or subscribe, we keep records of your order and plan details — the items purchased, price paid, billing cycle, purchase date, coupon or referral codes used, and your subscription status and expiry date.</p>
+      <h3>Learning activity</h3>
+      <p>To run the Service we store your <strong>course progress</strong>, completed lessons, <strong>saved notes</strong>, bookmarks and the resources you open.</p>
+      <h3>Push-notification subscription</h3>
+      <p>If you enable notifications, we store a <strong>Web Push subscription token</strong> for your device so we can send you reminders and service updates. You can switch this off in your profile settings at any time.</p>
+      <h3>Technical &amp; usage data</h3>
+      <p>We collect basic technical information such as device type, browser, operating system and coarse usage analytics through Firebase, to keep the Service reliable and secure.</p>
+      <h3>Google Drive data</h3>
+      <p>We request limited access to your Google Drive only for the personal-copy feature. This is explained in detail in the next section.</p>
+    </section>
+
+    <section class="card card--google" id="google-data">
+      <div class="section-head">
+        <span class="section-icon">G</span>
+        <h2>Google user data</h2>
+      </div>
+      <div class="notice">
+        <span class="pill">Important</span>
+        <span>This section describes how Eduvora uses information received from Google APIs. It is the most important part of this policy.</span>
+      </div>
+      <p>Eduvora requests the Google Drive scope <span class="scope">https://www.googleapis.com/auth/drive</span> for <strong>one purpose only</strong>: when you tap &ldquo;My copy&rdquo; on a course file, we use Google Drive&rsquo;s <code>files.copy</code> method to create a copy of the master course file <strong>in your own Google Drive</strong>, at your request. The copy is created under your own account and is owned by you.</p>
+      <ul>
+        <li>We <strong>never store or transfer</strong> the content of your Drive files to our servers.</li>
+        <li>We <strong>never share</strong> your Drive data with any third party.</li>
+        <li>We <strong>never use</strong> your Drive data for advertising, analytics or marketing.</li>
+        <li>Apart from creating that one copy, we perform <strong>no read, write or delete</strong> operations on your Drive.</li>
+        <li>The Google access token is kept <strong>only in your browser</strong> (in memory and session storage) and is never transmitted to our servers.</li>
+        <li>We only store a small reference so your copy opens instantly next time: the source file ID and the ID of the copy we created for you (in <code>users/{uid}/driveCopies/</code>). The actual file contents remain in Google Drive.</li>
+      </ul>
+      <p class="compliance">This use is compliant with the Google API Services User Data Policy, including the Limited Use requirements.</p>
+    </section>
+
+    <section class="card" id="use">
+      <div class="section-head">
+        <span class="section-icon">03</span>
+        <h2>How we use your information</h2>
+      </div>
+      <p>We use the information we collect to:</p>
+      <ul>
+        <li>Create and manage your account and authenticate you securely.</li>
+        <li>Provide the Service — courses, subscriptions, notes, progress tracking and your personal Google Drive copies.</li>
+        <li>Process orders and subscriptions and deliver what you have paid for.</li>
+        <li>Send service notices, renewal reminders and (if you have enabled them) notifications.</li>
+        <li>Respond to your support and deletion requests.</li>
+        <li>Improve the Service, and prevent fraud, abuse and security incidents.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="storage">
+      <div class="section-head">
+        <span class="section-icon">04</span>
+        <h2>Data storage &amp; retention</h2>
+      </div>
+      <p>Your data is stored on <strong>Google Firebase</strong> services — Cloud Firestore for your account and learning data, Firebase Authentication for credentials, and Firebase Storage for any uploaded files.</p>
+      <p>We keep your information only for as long as needed to provide the Service and to meet our legal and tax obligations. Account and learning data is retained while your account is active. If your account is closed or you request deletion, we remove or anonymise your data within a reasonable time, unless we are required by law to retain it.</p>
+    </section>
+
+    <section class="card" id="sharing">
+      <div class="section-head">
+        <span class="section-icon">05</span>
+        <h2>Data sharing &amp; third parties</h2>
+      </div>
+      <p>We <strong>do not sell</strong> your personal information. We share data only with the service providers that are strictly necessary to operate the Service:</p>
+      <ul>
+        <li><strong>Google</strong> — for sign-in and, only at your request, to create your personal Drive copy.</li>
+        <li><strong>Google Firebase</strong> — authentication, database, storage and hosting.</li>
+        <li><strong>Razorpay</strong> — payment processing (see Payments below).</li>
+      </ul>
+      <p>We may also disclose information where required to comply with applicable law or to protect the rights, property or safety of Eduvora, our users or the public.</p>
+    </section>
+
+    <section class="card" id="payments">
+      <div class="section-head">
+        <span class="section-icon">₹</span>
+        <h2>Payments</h2>
+      </div>
+      <p>Payments on Eduvora are processed by <strong>Razorpay</strong>, a PCI-DSS compliant payment gateway. We <strong>do not collect or store</strong> your card number, UPI details, net-banking credentials or any other payment instrument information. Razorpay processes your payment details directly and handles them under its own privacy policy and security standards.</p>
+    </section>
+
+    <section class="card" id="rights">
+      <div class="section-head">
+        <span class="section-icon">06</span>
+        <h2>Your rights &amp; data deletion</h2>
+      </div>
+      <p>You can review and update your name, mobile number and bio from your in-app profile at any time.</p>
+      <p>You can revoke Eduvora&rsquo;s access to your Google account at any time from your Google account permissions page (<a href="https://myaccount.google.com/permissions" rel="noopener noreferrer" target="_blank">myaccount.google.com/permissions</a>). Revoking access does not delete the copy already in your Drive — that file belongs to you.</p>
+      <p>To request <strong>deletion of your account and all associated data</strong>, email us at the contact address below. We will action verified requests within a reasonable time, subject to any retention required by law.</p>
+    </section>
+
+    <section class="card" id="cookies">
+      <div class="section-head">
+        <span class="section-icon">07</span>
+        <h2>Cookies &amp; local storage</h2>
+      </div>
+      <p>We use browser cookies and local/session storage to keep you signed in, remember your preferences and cache the Google access token for your current session. These are required for the Service to function. We do not use third-party advertising trackers or sell data derived from cookies.</p>
+    </section>
+
+    <section class="card" id="children">
+      <div class="section-head">
+        <span class="section-icon">08</span>
+        <h2>Children&rsquo;s privacy</h2>
+      </div>
+      <p>The Service is not directed at children under 13 years of age, and we do not knowingly collect personal information from children. If you believe a child has provided us personal data, contact us and we will take steps to remove it.</p>
+    </section>
+
+    <section class="card" id="changes">
+      <div class="section-head">
+        <span class="section-icon">09</span>
+        <h2>Changes to this policy</h2>
+      </div>
+      <p>We may update this Privacy Policy from time to time. When we make material changes, we will post the revised policy on this page and update the &ldquo;Last updated&rdquo; date. Continued use of the Service after changes are posted means you accept the updated policy.</p>
+    </section>
+
+    <section class="card" id="contact">
+      <div class="section-head">
+        <span class="section-icon">✉</span>
+        <h2>Contact us</h2>
+      </div>
+      <p>If you have any questions about this Privacy Policy, or wish to exercise your rights, contact us:</p>
+      <div class="contact-block">
+        <div class="contact-line"><span class="key">Company</span><strong>Eduvora | Digital Catalyst</strong></div>
+        <div class="contact-line"><span class="key">Email</span><a href="mailto:wmath84@gmail.com">wmath84@gmail.com</a></div>
+        <div class="contact-line"><span class="key">Website</span><a href="https://eduvora.shop">eduvora.shop</a></div>
+      </div>
+    </section>
+
+    <p><a class="back-link" href="/#/home">← Back to Eduvora</a></p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <a class="brand" href="/#/home">
+        <span class="brand-badge">E</span>
+        <span>
+          <span class="brand-name">Eduvora</span>
+          <span class="brand-sub">Digital Catalyst</span>
+        </span>
+      </a>
+      <div class="footer-links">
+        <a href="/privacy-policy.html">Privacy Policy</a>
+        <a href="/terms-of-service.html">Terms of Service</a>
+        <a href="/#/home">Open the app</a>
+      </div>
+      <p class="fine">© 2026 Eduvora | Digital Catalyst. All rights reserved. · <a href="mailto:wmath84@gmail.com">wmath84@gmail.com</a></p>
+    </div>
+  </footer>
+</body>
+</html>

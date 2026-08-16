@@ -870,7 +870,15 @@ export default function SubscriptionPage({
         />
 
         <p className="px-5 pt-5 text-center text-[11px] leading-relaxed text-slate-400">
-          By subscribing you agree to the Terms of Service. Access lasts for the selected {cycle === "monthly" ? "monthly" : "yearly"} period. We send limited renewal reminders; every renewal requires your confirmation.
+          By subscribing you agree to the{" "}
+          <a href="/terms-of-service.html" className="font-semibold text-violet-600 underline underline-offset-2 hover:text-violet-700">
+            Terms of Service
+          </a>{" "}
+          and{" "}
+          <a href="/privacy-policy.html" className="font-semibold text-violet-600 underline underline-offset-2 hover:text-violet-700">
+            Privacy Policy
+          </a>
+          . Access lasts for the selected {cycle === "monthly" ? "monthly" : "yearly"} period. We send limited renewal reminders; every renewal requires your confirmation.
         </p>
         </>
         )}

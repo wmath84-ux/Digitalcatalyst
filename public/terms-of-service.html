@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="robots" content="index, follow" />
+  <meta name="description" content="Terms of Service for Eduvora | Digital Catalyst — account rules, payments, refunds, subscriptions and acceptable use." />
+  <title>Terms of Service — Eduvora | Digital Catalyst</title>
+  <link rel="canonical" href="https://eduvora.shop/terms-of-service.html" />
+  <style>
+    :root {
+      --ink: #0f172a;
+      --body: #475569;
+      --muted: #64748b;
+      --line: #e6e8f2;
+      --line-soft: #eef0f6;
+      --bg: #f5f6fb;
+      --card: #ffffff;
+      --indigo: #4f46e5;
+      --violet: #7c3aed;
+      --fuchsia: #c026d3;
+      --violet-ink: #5b21b6;
+      --accent: linear-gradient(135deg, #4f46e5 0%, #7c3aed 46%, #c026d3 100%);
+      --ring: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -18px rgba(79, 70, 229, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle at 12% -6%, rgba(124, 58, 237, 0.14), transparent 34%),
+        radial-gradient(circle at 88% 2%, rgba(6, 182, 212, 0.10), transparent 30%);
+      background-repeat: no-repeat;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    a { color: var(--violet-ink); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .brand-badge {
+      width: 38px;
+      height: 38px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 11px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 900;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+      box-shadow: 0 8px 18px -8px rgba(124, 58, 237, 0.6);
+    }
+
+    /* ── Sticky header ─────────────────────────────────────────────── */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .site-header-inner {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+    }
+    .brand-name {
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+    .brand-sub {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+    .header-link {
+      flex: none;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--violet-ink);
+      background: #f3f0ff;
+      border: 1px solid #e4ddfb;
+      padding: 7px 13px;
+      border-radius: 999px;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .header-link:hover { background: #ebe5fd; text-decoration: none; }
+
+    /* ── Hero ──────────────────────────────────────────────────────── */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      color: #fff;
+      background: linear-gradient(135deg, #4338ca 0%, #6d28d9 48%, #a21caf 100%);
+      padding: 46px 20px 42px;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: radial-gradient(circle at 50% 0%, #000 20%, transparent 78%);
+      -webkit-mask-image: radial-gradient(circle at 50% 0%, #000 20%, transparent 78%);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -80px;
+      top: -90px;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.16);
+      filter: blur(60px);
+    }
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 880px;
+      margin: 0 auto;
+    }
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #e0e7ff;
+    }
+    .kicker::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #67e8f9;
+      box-shadow: 0 0 0 4px rgba(103, 232, 249, 0.22);
+    }
+    .hero h1 {
+      margin: 12px 0 10px;
+      font-size: clamp(28px, 7vw, 40px);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.12;
+    }
+    .hero p {
+      margin: 0;
+      max-width: 620px;
+      color: #e0e7ff;
+      font-size: 15px;
+    }
+    .meta-row {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+    }
+    .chip {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.22);
+      backdrop-filter: blur(6px);
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────── */
+    .page {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 28px 18px 60px;
+      display: grid;
+      gap: 22px;
+    }
+
+    .toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .toc a {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--violet-ink);
+      background: #fff;
+      border: 1px solid var(--line);
+      padding: 6px 12px;
+      border-radius: 999px;
+      transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .toc a:hover {
+      text-decoration: none;
+      border-color: #c4b5fd;
+      transform: translateY(-1px);
+      box-shadow: var(--ring);
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line-soft);
+      border-radius: 20px;
+      padding: 24px 22px;
+      box-shadow: var(--ring);
+      scroll-margin-top: 92px;
+    }
+    @media (min-width: 640px) {
+      .card { padding: 30px 32px; border-radius: 24px; }
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      margin-bottom: 6px;
+    }
+    .section-icon {
+      flex: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 15px;
+      font-weight: 800;
+      box-shadow: 0 10px 20px -10px rgba(124, 58, 237, 0.65);
+    }
+    .section-head h2 {
+      margin: 0;
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+
+    .card h3 {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      margin: 22px 0 6px;
+    }
+    .card h3:first-of-type { margin-top: 0; }
+    .card p { margin: 0 0 12px; color: var(--body); font-size: 15px; }
+    .card p:last-child { margin-bottom: 0; }
+    .card ul, .card ol { margin: 4px 0 14px; padding-left: 20px; color: var(--body); font-size: 15px; }
+    .card li { margin: 7px 0; }
+    .card li::marker { color: var(--violet); font-weight: 700; }
+    .card strong { color: var(--ink); font-weight: 700; }
+
+    .notice {
+      display: flex;
+      gap: 10px;
+      margin: 4px 0 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #f3f0ff;
+      border: 1px solid #e4ddfb;
+      color: var(--body);
+      font-size: 13.5px;
+    }
+    .notice .pill {
+      flex: none;
+      align-self: flex-start;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #fff;
+      background: var(--accent);
+      padding: 3px 9px;
+      border-radius: 999px;
+      margin-top: 1px;
+    }
+
+    .contact-block {
+      display: grid;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .contact-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14.5px;
+      color: var(--body);
+      flex-wrap: wrap;
+    }
+    .contact-line .key {
+      flex: none;
+      min-width: 84px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--violet-ink);
+    }
+
+    /* ── Footer ────────────────────────────────────────────────────── */
+    .site-footer {
+      margin-top: 12px;
+      background: #0b1020;
+      color: #94a3b8;
+    }
+    .site-footer-inner {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 36px 18px 44px;
+      text-align: center;
+    }
+    .site-footer .brand {
+      justify-content: center;
+    }
+    .site-footer .brand-name { color: #e2e8f0; }
+    .site-footer .brand-sub { color: #64748b; }
+    .footer-links {
+      margin: 20px 0 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+    .footer-links a {
+      font-size: 13px;
+      font-weight: 700;
+      color: #c7d2fe;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      padding: 7px 14px;
+      border-radius: 999px;
+      transition: background 0.15s ease;
+    }
+    .footer-links a:hover { background: rgba(255,255,255,0.12); text-decoration: none; }
+    .site-footer .fine {
+      font-size: 12.5px;
+      color: #64748b;
+      margin: 0;
+    }
+    .site-footer .fine a { color: #c7d2fe; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="/#/home" aria-label="Eduvora home">
+        <span class="brand-badge">E</span>
+        <span>
+          <span class="brand-name">Eduvora</span>
+          <span class="brand-sub">Digital Catalyst</span>
+        </span>
+      </a>
+      <a class="header-link" href="/privacy-policy.html">Privacy Policy →</a>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <span class="kicker">Legal</span>
+      <h1>Terms of Service</h1>
+      <p>The rules that govern your use of Eduvora — accounts, payments, refunds, subscriptions and acceptable use.</p>
+      <div class="meta-row">
+        <span class="chip">Last updated: 16 August 2026</span>
+        <span class="chip">Applies to: eduvora.shop</span>
+      </div>
+    </div>
+  </section>
+
+  <main class="page">
+    <nav class="toc" aria-label="On this page">
+      <a href="#acceptance">Acceptance</a>
+      <a href="#service">The service</a>
+      <a href="#accounts">Accounts</a>
+      <a href="#payments">Payments</a>
+      <a href="#refunds">Refunds</a>
+      <a href="#subscriptions">Subscriptions</a>
+      <a href="#ownership">Content ownership</a>
+      <a href="#use-rules">Acceptable use</a>
+      <a href="#third-party">Third-party services</a>
+      <a href="#liability">Disclaimers</a>
+      <a href="#termination">Termination</a>
+      <a href="#law">Governing law</a>
+      <a href="#contact">Contact</a>
+    </nav>
+
+    <section class="card" id="acceptance">
+      <div class="section-head">
+        <span class="section-icon">01</span>
+        <h2>Acceptance of these terms</h2>
+      </div>
+      <p>These Terms of Service (&ldquo;Terms&rdquo;) are a legal agreement between you and <strong>Eduvora | Digital Catalyst</strong> (&ldquo;Eduvora&rdquo;, &ldquo;we&rdquo;, &ldquo;our&rdquo; or &ldquo;us&rdquo;). By creating an account, subscribing, purchasing, or otherwise accessing or using the Service, you agree to be bound by these Terms. If you do not agree, please do not use the Service.</p>
+    </section>
+
+    <section class="card" id="service">
+      <div class="section-head">
+        <span class="section-icon">02</span>
+        <h2>The service</h2>
+      </div>
+      <p>Eduvora is a digital learning platform that provides <strong>online courses, digital study resources, notes, learning tools and subscription plans</strong>. The Service may be accessed through the Eduvora website and the Eduvora mobile app (PWA).</p>
+      <p>We may add, modify or remove features, content or plans at any time. Certain content may be offered for free while other content requires a one-time purchase or an active subscription.</p>
+    </section>
+
+    <section class="card" id="accounts">
+      <div class="section-head">
+        <span class="section-icon">03</span>
+        <h2>Accounts &amp; eligibility</h2>
+      </div>
+      <ul>
+        <li>You must provide accurate and complete information when creating an account and keep it up to date.</li>
+        <li>You are responsible for keeping your login credentials confidential and for all activity under your account.</li>
+        <li>Each person is limited to one account unless we agree otherwise. Accounts are personal and may not be sold or transferred.</li>
+        <li>You must be at least 13 years old (or the applicable minimum age in your country) to use the Service, and have the consent of a parent or guardian where required by law.</li>
+        <li>We may suspend or terminate accounts that violate these Terms or that we believe pose a risk to the Service or other users.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="payments">
+      <div class="section-head">
+        <span class="section-icon">04</span>
+        <h2>Payments &amp; pricing</h2>
+      </div>
+      <p>Prices are shown in Indian Rupees (₹) and include applicable taxes unless stated otherwise. We may change prices or introduce new plans at any time; changes apply to future purchases only.</p>
+      <p>All payments are processed securely by <strong>Razorpay</strong>. We do not collect or store your card, UPI or banking details. By completing a payment you confirm that you are authorised to use the payment method provided.</p>
+      <p>A purchase is considered complete once payment is successfully processed and the order is confirmed. Access is delivered electronically to the account used for the purchase.</p>
+    </section>
+
+    <section class="card" id="refunds">
+      <div class="section-head">
+        <span class="section-icon">05</span>
+        <h2>Refund policy</h2>
+      </div>
+      <p>Because our products are digital content delivered instantly, <strong>purchases are generally non-refundable once the content has been accessed or the entitlement delivered</strong>. If you have a genuine issue — for example, a payment was processed but access was not granted, or the content was materially different from its description — contact us at the email below within <strong>7 days</strong> of the purchase and we will review it in good faith.</p>
+      <p>Approved refunds are returned to the original payment method through Razorpay and may take a few business days to reflect in your account. Nothing in this section affects any non-excludable statutory rights you may have under Indian consumer law.</p>
+    </section>
+
+    <section class="card" id="subscriptions">
+      <div class="section-head">
+        <span class="section-icon">06</span>
+        <h2>Subscriptions &amp; renewal</h2>
+      </div>
+      <div class="notice">
+        <span class="pill">Important</span>
+        <span>Eduvora subscriptions are <strong>manual</strong>. We do <strong>not</strong> auto-charge you — every renewal requires your explicit confirmation.</span>
+      </div>
+      <ul>
+        <li>A subscription grants you access to the selected plan for the chosen period (monthly or yearly), starting from the date of activation.</li>
+        <li>Access ends automatically when the selected period expires. We may send you a limited number of renewal reminders, but these are informational only.</li>
+        <li><strong>Renewal is never automatic:</strong> we will not charge you without your confirmation, and no recurring billing is set up on your payment method.</li>
+        <li>You can renew or extend your access at any time from your profile or the subscription page.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="ownership">
+      <div class="section-head">
+        <span class="section-icon">07</span>
+        <h2>Content ownership</h2>
+      </div>
+      <p><strong>Our content.</strong> All courses, videos, documents, images, designs, software, trademarks and other materials provided by Eduvora are owned by Eduvora or its licensors and are protected by intellectual-property laws. We grant you a limited, non-exclusive, non-transferable, revocable licence to access and use this content for your personal, non-commercial learning only. You may not copy, redistribute, resell, republish, or create derivative works from our content without our written permission.</p>
+      <p><strong>Your content.</strong> Notes, uploads and other material you create remain yours. By posting or uploading content, you grant us the limited rights needed to store and display it to you as part of the Service.</p>
+    </section>
+
+    <section class="card" id="use-rules">
+      <div class="section-head">
+        <span class="section-icon">08</span>
+        <h2>Acceptable use</h2>
+      </div>
+      <p>You agree not to:</p>
+      <ul>
+        <li>Use the Service for any unlawful or fraudulent purpose.</li>
+        <li>Resell, share, or redistribute access to purchased content or subscriptions.</li>
+        <li>Attempt to reverse engineer, decompile or extract the source code of the Service.</li>
+        <li>Interfere with, disrupt, or place an unreasonable load on the Service, or attempt to gain unauthorised access to other users&rsquo; accounts or data.</li>
+        <li>Upload content that is unlawful, defamatory, infringing or harmful.</li>
+        <li>Misuse coupon, referral or discount codes, or attempt to bypass pricing or entitlement controls.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="third-party">
+      <div class="section-head">
+        <span class="section-icon">09</span>
+        <h2>Third-party services</h2>
+      </div>
+      <p>The Service integrates with third parties including <strong>Google</strong> (sign-in and personal Drive copies) and <strong>Razorpay</strong> (payments). Your use of those services is subject to their own terms and policies.</p>
+      <p>The personal Drive-copy feature creates a copy of a course file in <strong>your own Google Drive</strong> at your request. That copy belongs to you and is subject to Google&rsquo;s terms. Eduvora is not responsible for the availability, accuracy or content of third-party services.</p>
+    </section>
+
+    <section class="card" id="liability">
+      <div class="section-head">
+        <span class="section-icon">10</span>
+        <h2>Disclaimers &amp; limitation of liability</h2>
+      </div>
+      <p>The Service is provided on an &ldquo;as is&rdquo; and &ldquo;as available&rdquo; basis. To the maximum extent permitted by law, we disclaim all warranties, whether express or implied, including warranties of merchantability, fitness for a particular purpose and non-infringement. We do not guarantee that the Service will be uninterrupted, error-free or always available.</p>
+      <p>To the maximum extent permitted by law, Eduvora and its affiliates will not be liable for any indirect, incidental, special, consequential or punitive damages, or for loss of profits, data or goodwill, arising from your use of the Service. Our total aggregate liability, if any, will not exceed the amount you paid to Eduvora in the twelve months preceding the event giving rise to the claim.</p>
+      <p>Educational content is provided for learning purposes and does not constitute professional, legal, financial or medical advice.</p>
+    </section>
+
+    <section class="card" id="termination">
+      <div class="section-head">
+        <span class="section-icon">11</span>
+        <h2>Termination</h2>
+      </div>
+      <p>You may stop using the Service at any time and may request deletion of your account as described in our Privacy Policy. We may suspend or terminate your access if you breach these Terms, with or without notice. On termination, rights granted to you under these Terms end immediately, but sections that by their nature should survive (including ownership, disclaimers and limitation of liability) will continue to apply.</p>
+    </section>
+
+    <section class="card" id="law">
+      <div class="section-head">
+        <span class="section-icon">12</span>
+        <h2>Governing law</h2>
+      </div>
+      <p>These Terms are governed by and construed in accordance with the <strong>laws of India</strong>. Any dispute arising out of or relating to these Terms or the Service shall be subject to the exclusive jurisdiction of the courts of <strong>Uttar Pradesh, India</strong>.</p>
+    </section>
+
+    <section class="card" id="changes">
+      <div class="section-head">
+        <span class="section-icon">13</span>
+        <h2>Changes to these terms</h2>
+      </div>
+      <p>We may update these Terms from time to time. Material changes will be posted on this page with a new &ldquo;Last updated&rdquo; date. Your continued use of the Service after changes are posted means you accept the revised Terms.</p>
+    </section>
+
+    <section class="card" id="contact">
+      <div class="section-head">
+        <span class="section-icon">✉</span>
+        <h2>Contact us</h2>
+      </div>
+      <p>Questions about these Terms, purchases or subscriptions? Contact us:</p>
+      <div class="contact-block">
+        <div class="contact-line"><span class="key">Company</span><strong>Eduvora | Digital Catalyst</strong></div>
+        <div class="contact-line"><span class="key">Email</span><a href="mailto:wmath84@gmail.com">wmath84@gmail.com</a></div>
+        <div class="contact-line"><span class="key">Website</span><a href="https://eduvora.shop">eduvora.shop</a></div>
+      </div>
+    </section>
+
+    <p><a class="back-link" href="/#/home">← Back to Eduvora</a></p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <a class="brand" href="/#/home">
+        <span class="brand-badge">E</span>
+        <span>
+          <span class="brand-name">Eduvora</span>
+          <span class="brand-sub">Digital Catalyst</span>
+        </span>
+      </a>
+      <div class="footer-links">
+        <a href="/privacy-policy.html">Privacy Policy</a>
+        <a href="/terms-of-service.html">Terms of Service</a>
+        <a href="/#/home">Open the app</a>
+      </div>
+      <p class="fine">© 2026 Eduvora | Digital Catalyst. All rights reserved. · <a href="mailto:wmath84@gmail.com">wmath84@gmail.com</a></p>
+    </div>
+  </footer>
+</body>
+</html>
