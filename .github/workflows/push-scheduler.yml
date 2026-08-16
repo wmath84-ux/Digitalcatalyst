@@ -1,48 +1,57 @@
 # Minute-level pinger for the real-time push scheduler.
 #
-# ⚠️  THIS FILE IS THE TEMPLATE; the live workflow is
+#     THIS COPY IS THE TEMPLATE; the live workflow is
 #     .github/workflows/push-scheduler.yml (already committed). Keep the two
 #     in sync if you change one.
+# Why this exists: every notification (My Day reminders, renewals, unlocks,
+# product/content announcements) is delivered by the server scheduler, so it
+# has to be pinged every minute — whether or not the app is open. Vercel's
+# Hobby plan caps cron at ONE run per day, so an external timer must drive it.
 #
-# Why this exists: My Day reminders have to fire at the exact minute the
-# user chose, whether or not the app is open. That needs something calling
-# the scheduler every minute — and Vercel's Hobby plan caps cron at ONE run
-# per day (a sub-daily expression in vercel.json fails at deploy time), with
-# even that run landing anywhere inside its hour.
+# ── Why each run LOOPS instead of pinging once ──────────────────────────────
+# GitHub's `schedule` trigger is best-effort, not real-time. Measured on this
+# repository, "* * * * *" actually started runs 11–79 minutes apart (average
+# ~28 min). A single ping per run therefore meant reminders arrived up to an
+# hour late — or, past the catch-up cap, never. The user-visible symptom:
+# "notifications only arrive when I open the app" (the app's foreground clock
+# was doing the work the scheduler should have).
 #
-# The scheduler endpoint is an ordinary authenticated HTTP route, so any
-# external timer can drive it. GitHub Actions is free for this and lives in
-# the repo, so there is no third-party account to lose.
+# The fix: every scheduled start runs a ~21-minute loop that pings the
+# scheduler every 60 seconds. Even with GitHub's drift between starts, the
+# loops overlap-or-abut into near-continuous minute coverage, and the
+# endpoint's own catch-up window (resolveLookbackMs, capped at 2h) absorbs
+# any residual hole. The concurrency group queues runs so loops never overlap
+# — GitHub keeps one running + one pending per group and cancels older
+# pending duplicates, which is harmless (they'd have pinged the same idempotent
+# endpoint).
 #
-# The daily Vercel cron stays as a safety net: if this workflow is disabled
-# or GitHub has an outage, the catch-up window still sweeps up anything
-# missed (see resolveLookbackMs in utils/pushScheduler.js).
+# This repository is public, so GitHub-hosted runner minutes are free.
+# NOTE: GitHub disables scheduled workflows after ~60 days without repository
+# activity — any commit re-enables them.
 #
 # Setup (one time):
 #   1. Repo → Settings → Secrets and variables → Actions
 #   2. Add secret  CRON_SECRET     — same value as the Vercel env var
 #   3. Add secret  SCHEDULER_URL   — https://<your-domain>/api/cron/subscription-renewals
 #
-# GitHub's scheduler is best-effort, not hard real-time — under load a run
-# can land a minute late. That is fine here: the endpoint derives its own
-# catch-up window from the last successful run, so a late ping still
-# delivers every reminder that came due in between (capped at 1h so a
-# 9 AM reminder never fires at 6 PM).
+# The daily Vercel cron stays as a safety net: if this workflow is disabled
+# or GitHub has an outage, the catch-up window still sweeps up anything
+# missed (see resolveLookbackMs in utils/pushScheduler.js).
 
 name: Push scheduler
 
 on:
   schedule:
-    # Every minute. Runs are idempotent and cheap, and the endpoint
-    # deduplicates per item per local day, so an occasional double-fire
-    # never produces two notifications.
+    # Every minute. GitHub throttles this heavily (see above) — the loop in
+    # the job compensates. Runs are idempotent and cheap, and the endpoint
+    # deduplicates per item per local day, so overlapping pings are safe.
     - cron: "* * * * *"
   # Lets you fire a run by hand from the Actions tab when testing.
   workflow_dispatch:
 
-# A slow run must never overlap with the next tick. cancel-in-progress:
-# false means a long run queues rather than being killed, so no minute is
-# silently skipped.
+# One loop at a time. cancel-in-progress: false means a fresh scheduled run
+# queues behind the active loop instead of killing it, so coverage is
+# continuous: active loop ends → queued loop starts immediately.
 concurrency:
   group: push-scheduler
   cancel-in-progress: false
@@ -50,45 +59,52 @@ concurrency:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 26
     steps:
-      - name: Trigger scheduled push jobs
+      - name: Trigger scheduled push jobs (minute loop)
         env:
           SCHEDULER_URL: ${{ secrets.SCHEDULER_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           if [ -z "${SCHEDULER_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
             echo "::error::SCHEDULER_URL and CRON_SECRET repository secrets are required."
             exit 1
           fi
-          # Capture the body once. Without this, --retry re-prints the same
-          # 500 body on every attempt, which is what produced three copies of
-          # {"ok":false,...} in the original failing logs.
-          body_file="$(mktemp)"
-          http_code=0
-          for attempt in 1 2 3; do
-            set +e
+          # ~21 one-minute ticks per run. With GitHub's observed 11–79 min
+          # gap between scheduled starts, back-to-back queued loops keep the
+          # scheduler pinged near-continuously.
+          LOOP_MINUTES=21
+          successes=0
+          last_body=""
+          for tick in $(seq 1 "${LOOP_MINUTES}"); do
+            started="$(date +%s)"
+            body_file="$(mktemp)"
             http_code="$(curl --silent --show-error \
-              --max-time 120 \
+              --max-time 55 \
               --header "Authorization: Bearer ${CRON_SECRET}" \
               --output "${body_file}" \
               --write-out '%{http_code}' \
-              "${SCHEDULER_URL}")"
-            curl_status=$?
-            set -e
-            if [ "${curl_status}" -eq 0 ] && [ "${http_code}" -ge 200 ] && [ "${http_code}" -lt 300 ]; then
-              echo "Scheduler responded HTTP ${http_code}:"
-              cat "${body_file}"
-              echo ""
-              rm -f "${body_file}"
-              exit 0
+              "${SCHEDULER_URL}")" || http_code=0
+            body="$(cat "${body_file}")"
+            rm -f "${body_file}"
+            if [ "${http_code}" -ge 200 ] && [ "${http_code}" -lt 300 ]; then
+              successes=$((successes + 1))
+              last_body="${body}"
+              echo "tick ${tick}/${LOOP_MINUTES}: HTTP ${http_code} ${body}"
+            else
+              # A single failed tick is not fatal — the next tick lands in
+              # 60s and the endpoint's lookback window covers the gap.
+              echo "::warning::tick ${tick}/${LOOP_MINUTES} failed (HTTP ${http_code}): ${body}"
             fi
-            echo "::warning::Attempt ${attempt} failed (curl exit ${curl_status}, HTTP ${http_code})."
-            if [ "${attempt}" -lt 3 ]; then sleep 5; fi
+            if [ "${tick}" -lt "${LOOP_MINUTES}" ]; then
+              elapsed=$(( $(date +%s) - started ))
+              sleep_for=$(( 60 - elapsed ))
+              if [ "${sleep_for}" -gt 0 ]; then sleep "${sleep_for}"; fi
+            fi
           done
-          echo "::error::Scheduler did not return 2xx after 3 attempts. Last response (HTTP ${http_code}):"
-          cat "${body_file}"
-          echo ""
-          rm -f "${body_file}"
-          exit 1
+          if [ "${successes}" -eq 0 ]; then
+            echo "::error::Every ping in this run failed. Check SCHEDULER_URL, CRON_SECRET and the deployment."
+            exit 1
+          fi
+          echo "Completed ${successes}/${LOOP_MINUTES} successful pings. Last response: ${last_body}"
