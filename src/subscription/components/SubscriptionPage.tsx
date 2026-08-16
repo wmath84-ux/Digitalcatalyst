@@ -365,6 +365,13 @@ export default function SubscriptionPage({
   const totalPaise = Math.max(subtotalPaise - couponDiscountPaise, minPayablePaise);
   const totalRupees = (totalPaise / 100).toFixed(2);
 
+  // "Zero means free": when the admin priced the plan (and every selected
+  // add-on) at ₹0 and no minimum-payable floor applies, this selection is a
+  // free subscription. Checkout still goes through the same server-verified
+  // quote — the server independently computes ₹0 and takes the free-order
+  // path (no Razorpay), so this flag is display/UX only and can't be abused.
+  const isFreeSelection = Math.max(subtotalPaise, minPayablePaise) <= 0;
+
   // A coupon can only reduce money that is actually charged. When the
   // selection is free (no paid features / products and no minimum
   // payable), the coupon field is not rendered at all.
@@ -527,6 +534,15 @@ export default function SubscriptionPage({
       setCouponStatus("idle");
     }
   }, [canShowCouponInput, appliedCoupon]);
+
+  // Same rule for referral codes: there is nothing to discount on a free
+  // selection, so never carry a stale referral into a ₹0 checkout.
+  useEffect(() => {
+    if (isFreeSelection && appliedReferral) {
+      setAppliedReferral(null);
+      setReferralError(null);
+    }
+  }, [isFreeSelection, appliedReferral]);
 
   const handleApplyReferral = useCallback(async (rawCode: string): Promise<PromoResult> => {
     const code = rawCode.trim().toUpperCase();
@@ -810,17 +826,30 @@ export default function SubscriptionPage({
               disabled={isSubmitting}
             />
           ) : null}
-          <PromoCodeInput
-            kind="referral"
-            label="Have a referral code? Get ₹250 off the final price."
-            placeholder="Enter referral code"
-            appliedCode={appliedReferral?.code ?? null}
-            appliedMessage={appliedReferral?.label ?? null}
-            errorMessage={referralError}
-            onApply={handleApplyReferral}
-            onRemove={handleRemoveReferral}
-            disabled={isSubmitting}
-          />
+          {!isFreeSelection ? (
+            <PromoCodeInput
+              kind="referral"
+              label="Have a referral code? Get ₹250 off the final price."
+              placeholder="Enter referral code"
+              appliedCode={appliedReferral?.code ?? null}
+              appliedMessage={appliedReferral?.label ?? null}
+              errorMessage={referralError}
+              onApply={handleApplyReferral}
+              onRemove={handleRemoveReferral}
+              disabled={isSubmitting}
+            />
+          ) : (
+            <div
+              data-subscription-free-note
+              className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] leading-relaxed text-emerald-800"
+            >
+              <span aria-hidden="true">🎉</span>
+              <span>
+                This subscription is <strong>free</strong> — no payment is
+                needed. Tap the button below to activate it instantly.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Order summary */}

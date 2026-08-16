@@ -134,8 +134,11 @@ test("only hosts lacking a mobile endpoint fall back to the narrow-frame trick",
   assert.match(resourceViewer, /!hasNativeMobileRendering\(embed\.kind\)/);
 });
 
-test("the viewer resolves the embed url from the chosen viewport", () => {
-  assert.match(resourceViewer, /getCourseEmbed\(file, \{ viewport: desktopView \? "desktop" : "mobile" \}\)/);
+test("the viewer resolves the embed url from the chosen viewport (and the edit/preview mode)", () => {
+  // The viewport decision still happens BEFORE the URL is built; the viewer
+  // additionally forwards the Google Docs full-editor mode when the learner
+  // toggles Edit in the header.
+  assert.match(resourceViewer, /getCourseEmbed\(file, \{ viewport: desktopView \? "desktop" : "mobile", mode: canEditInline && editMode \? "edit" : "preview" \}\)/);
 });
 
 test("the switch drives the document's layout viewport like the browser setting", () => {

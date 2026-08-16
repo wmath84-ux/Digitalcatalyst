@@ -147,11 +147,19 @@ export const isFeatureSelectable = (plan, feature, selectedFeatureIds) => {
   return arr(selectedFeatureIds).indexOf(feature.id) !== -1 || true; // always allowed
 };
 
-/** Rule 4: every selected feature is included for free OR has a positive price. */
+/**
+ * Rule 4: every selected feature carries a usable price.
+ *
+ * Pricing rule — "zero means free": an admin who sets a price of 0
+ * (plan, feature, or bonus product) is declaring the item FREE, not
+ * mis-configuring it. A ₹0 feature therefore stays selectable and simply
+ * contributes nothing to the payable total, exactly like an `included`
+ * feature. Only a broken record (negative / non-numeric price) is refused.
+ */
 export const isFeaturePayable = (feature) => {
   if (!feature) return false;
   if (feature.included) return true;
-  return feature.pricePaise > 0;
+  return Number.isFinite(feature.pricePaise) && feature.pricePaise >= 0;
 };
 
 /** Rule 5: included feature ids must be a subset of the plan's includedFeatureIds. */

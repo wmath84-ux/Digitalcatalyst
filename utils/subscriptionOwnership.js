@@ -188,7 +188,7 @@ export const buildOwnedPlanSummary = ({
  * "owned" tone is what the page renders in emerald instead of violet so the
  * colour itself communicates that the plan is already subscribed.
  */
-export const resolveSubscribeCta = ({ state, loading = false, hasPlan = true } = {}) => {
+export const resolveSubscribeCta = ({ state, loading = false, hasPlan = true, freeSelection = false } = {}) => {
   if (loading) return { label: "Processing…", tone: "default", disabled: true, owned: false };
   if (state && state.owned) {
     return {
@@ -196,6 +196,18 @@ export const resolveSubscribeCta = ({ state, loading = false, hasPlan = true } =
       tone: "owned",
       disabled: !state.renewalEligible,
       owned: true,
+    };
+  }
+  // Zero-price selection (admin set the plan price — and every selected
+  // add-on — to ₹0): nothing is charged, so the CTA must not promise a
+  // Razorpay payment. The server still verifies the ₹0 total and issues
+  // the same entitlements through the free-order path.
+  if (freeSelection) {
+    return {
+      label: "Activate free subscription",
+      tone: "default",
+      disabled: !hasPlan,
+      owned: false,
     };
   }
   return {

@@ -192,7 +192,7 @@ export default function SubscriptionsPage() {
                     <Pill tone={p.active ? "success" : "default"}>{p.active ? "active" : "inactive"}</Pill>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">{p.description}</p>
-                  <p className="mt-1 text-xs text-slate-600">{p.billingCycles?.map((c) => `${c.label}: ₹${c.price}`).join(" · ")}</p>
+                  <p className="mt-1 text-xs text-slate-600">{p.billingCycles?.map((c) => `${c.label}: ${Number(c.price) === 0 ? "FREE" : `₹${c.price}`}`).join(" · ")}</p>
                   <div className="mt-2 flex gap-2">
                     <SecondaryButton className="h-9 flex-1 text-xs" onClick={() => setEditingPlan(p)}>Edit</SecondaryButton>
                     <DangerButton className="h-9 flex-1 text-xs" onClick={() => removePlan(p)}>Delete</DangerButton>
@@ -299,6 +299,7 @@ export default function SubscriptionsPage() {
             <Field label="Description"><textarea className={textareaClass} value={editingPlan.description ?? ""} onChange={(e) => setEditingPlan({ ...editingPlan, description: e.target.value })} /></Field>
             <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs text-violet-800">
               These plan prices are charged at checkout. Feature and product add-on prices are added separately.
+              <span className="mt-1 block font-semibold text-emerald-700">Set a price to ₹0 to make this subscription FREE — buyers activate it without any payment (paid add-ons they select are still charged).</span>
             </div>
             <Field label="Monthly plan price (₹)">
               <input

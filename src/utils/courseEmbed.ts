@@ -105,8 +105,29 @@ const whimsicalEmbedUrl = (value: string) => {
  */
 export type CourseEmbedViewport = "desktop" | "mobile";
 
+/**
+ * Which experience the frame should load for a native Google file.
+ *
+ *   · "preview" — the read-only rendering (default; what learners see).
+ *   · "edit"    — the FULL Google editor (`/edit`): complete toolbar,
+ *                 menus, comments, revision history — everything Google
+ *                 Docs / Sheets / Slides offers. This is the real editor
+ *                 page loaded inside our frame, not a stripped preview.
+ *
+ * Edit mode has two hard external requirements that no client code can
+ * bypass (they are Google's rules, not ours):
+ *
+ *   1. The document must be editable by the viewer: either shared as
+ *      "Anyone with the link → Editor", or the learner is signed in to a
+ *      Google account that has edit permission on the file.
+ *   2. The browser must allow Google sign-in cookies inside iframes
+ *      (blocking third-party cookies makes Google show a sign-in screen).
+ */
+export type CourseEmbedMode = "preview" | "edit";
+
 export interface CourseEmbedOptions {
   viewport?: CourseEmbedViewport;
+  mode?: CourseEmbedMode;
 }
 
 export type CourseEmbedKind = "youtube" | "pdf" | "doc" | "sheet" | "slides" | "form" | "drive" | "mindmap" | "embed" | "direct" | "none";
@@ -124,8 +145,34 @@ export const VIEWPORT_AWARE_KINDS: CourseEmbedKind[] = ["doc", "sheet", "slides"
  */
 export const hasNativeMobileRendering = (kind: CourseEmbedKind) => kind === "doc" || kind === "sheet" || kind === "form";
 
+/**
+ * True when this file can open in Google's own full editor inside the
+ * player (native Google Docs / Sheets / Slides link). Forms and Drive
+ * binaries have no in-place editor endpoint.
+ */
+export const isEditableGoogleFile = (file: CourseFile): boolean => {
+  const google = googleParts(getCourseFileUrl(file));
+  return google?.kind === "document" || google?.kind === "spreadsheets" || google?.kind === "presentation";
+};
+
+/**
+ * The full Google editor URL for a native Google file — complete toolbar
+ * and menus, exactly as on docs.google.com. `rm=embedded` asks Google for
+ * its embed-friendly chrome (it keeps the whole toolbar; it only drops the
+ * outer Drive navigation bar so the editor fits our stage).
+ */
+export const getGoogleEditorUrl = (file: CourseFile): string => {
+  const google = googleParts(getCourseFileUrl(file));
+  if (!google) return "";
+  if (google.kind === "document") return `https://docs.google.com/document/d/${google.id}/edit?rm=embedded&widget=true`;
+  if (google.kind === "spreadsheets") return `https://docs.google.com/spreadsheets/d/${google.id}/edit?rm=embedded&widget=true`;
+  if (google.kind === "presentation") return `https://docs.google.com/presentation/d/${google.id}/edit?rm=embedded&widget=true`;
+  return "";
+};
+
 export const getCourseEmbed = (file: CourseFile, options: CourseEmbedOptions = {}): { url: string; kind: CourseEmbedKind } => {
   const mobile = options.viewport === "mobile";
+  const editMode = options.mode === "edit";
   const raw = getCourseFileUrl(file);
   if (file.type === "mindmap" || file.provider === "whimsical_mindmap" || /whimsical\.com/i.test(raw)) {
     const url = whimsicalEmbedUrl(raw);
@@ -140,6 +187,13 @@ export const getCourseEmbed = (file: CourseFile, options: CourseEmbedOptions = {
     const url = getGoogleFormEmbedUrl(raw);
     return url ? { url, kind: "form" } : { url: "", kind: "none" };
   }
+  // Edit mode — the FULL Google editor (toolbar, menus, comments, the
+  // works) loaded in-frame via `/edit?rm=embedded`. The learner needs
+  // edit permission on the file; the viewer surfaces a friendly fallback
+  // when Google refuses (see ResourceViewer's edit-mode help panel).
+  if (editMode && google?.kind === "document") return { url: `https://docs.google.com/document/d/${google.id}/edit?rm=embedded&widget=true`, kind: "doc" };
+  if (editMode && google?.kind === "spreadsheets") return { url: `https://docs.google.com/spreadsheets/d/${google.id}/edit?rm=embedded&widget=true`, kind: "sheet" };
+  if (editMode && google?.kind === "presentation") return { url: `https://docs.google.com/presentation/d/${google.id}/edit?rm=embedded&widget=true`, kind: "slides" };
   // `/preview` is a fixed-width paginated renderer — on a phone it is a
   // shrunken A4 page. `/mobilebasic` is Google's own reflowing mobile
   // rendering of the SAME document: real phone-sized text, no zooming.

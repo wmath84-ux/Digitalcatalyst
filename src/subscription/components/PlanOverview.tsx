@@ -102,9 +102,11 @@ export default function PlanOverview({
             <p className="text-[10px] font-bold uppercase tracking-wider text-violet-200/80">
               {activePlan ? activePlan.name : "Choose a plan"}
             </p>
-            <p className="mt-0.5 truncate text-2xl font-black tracking-tight text-white sm:text-3xl">
+            <p className="mt-0.5 truncate text-2xl font-black tracking-tight text-white sm:text-3xl" data-subscription-plan-price data-subscription-plan-free={activePlan && totalPaise <= 0 ? "true" : undefined}>
               {activePlan
-                ? `₹${totalRupees}`
+                ? totalPaise <= 0
+                  ? "FREE"
+                  : `₹${totalRupees}`
                 : "—"}
               <span className="ml-1 text-xs font-bold text-violet-200/80">
                 /{cycle === "monthly" ? "mo" : "yr"}

@@ -36,11 +36,11 @@
 // opens the source in a new tab as a fallback.
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Download, ExternalLink, FileQuestion, Maximize2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Download, ExternalLink, Eye, FileQuestion, Maximize2, PencilLine, RefreshCw } from "lucide-react";
 import type { CourseFile } from "../types/course";
 import ImageViewer from "./ImageViewer";
 import AudioPlayer from "./AudioPlayer";
-import { getCourseDownload, getCourseEmbed, hasNativeMobileRendering, VIEWPORT_AWARE_KINDS, type CourseDownload } from "../utils/courseEmbed";
+import { getCourseDownload, getCourseEmbed, getGoogleEditorUrl, hasNativeMobileRendering, isEditableGoogleFile, VIEWPORT_AWARE_KINDS, type CourseDownload } from "../utils/courseEmbed";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
 
 const SUPPORTED_KINDS = new Set([
@@ -95,9 +95,36 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
     );
   }
 
+  return (
+    <ResourceViewerBody
+      key={file.id}
+      file={file}
+      active={active}
+      playback={playback}
+      onPlaybackChange={onPlaybackChange}
+      chromeHidden={chromeHidden}
+      desktopView={desktopView}
+    />
+  );
+}
+
+/**
+ * Inner viewer, remounted per file (via `key={file.id}`) so per-file UI
+ * state — like the Google Docs edit-mode toggle — never leaks between
+ * documents.
+ */
+function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, chromeHidden = false, desktopView = true }: ResourceViewerProps & { file: CourseFile }) {
+  // ── Google Docs full-editor mode ────────────────────────────────────
+  // When ON, native Google Docs / Sheets / Slides files load Google's own
+  // `/edit` page inside the frame: the complete Google toolbar, menus,
+  // comments and revision history — full editing, not a preview. Requires
+  // the learner to have edit permission on the file (Google enforces it).
+  const canEditInline = isEditableGoogleFile(file);
+  const [editMode, setEditMode] = useState(false);
+
   // The desktop/mobile choice is resolved BEFORE the URL is built: a phone
   // rendering is a different endpoint on the host, not a narrower iframe.
-  const embed = getCourseEmbed(file, { viewport: desktopView ? "desktop" : "mobile" });
+  const embed = getCourseEmbed(file, { viewport: desktopView ? "desktop" : "mobile", mode: canEditInline && editMode ? "edit" : "preview" });
   const download = getCourseDownload(file);
   const isSupported = SUPPORTED_KINDS.has(embed.kind);
   const isImage = file.type === "image" && embed.kind === "direct";
@@ -115,11 +142,13 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
   // the only ones that still need the narrow-frame trick. Docs / Sheets /
   // Forms already loaded their own reflowing mobile page above, so scaling
   // them a second time would shrink the text we just made readable.
-  const mobileDocument = documentKind && !desktopView && !hasNativeMobileRendering(embed.kind);
+  // The full Google editor manages its own layout — never scale it.
+  const isEditingInline = canEditInline && editMode;
+  const mobileDocument = documentKind && !desktopView && !hasNativeMobileRendering(embed.kind) && !isEditingInline;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-chrome-hidden={chromeHidden ? "true" : "false"} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>
-      {chromeHidden ? null : <ViewerHeader file={file} embed={embed} download={download} />}
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-chrome-hidden={chromeHidden ? "true" : "false"} data-doc-mode={canEditInline ? (isEditingInline ? "edit" : "preview") : undefined} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>
+      {chromeHidden ? null : <ViewerHeader file={file} embed={embed} download={download} canEditInline={canEditInline} editMode={isEditingInline} onToggleEditMode={() => setEditMode((value) => !value)} />}
       <div className={`relative min-h-0 flex-1 overflow-hidden ${isCinematic ? "bg-black p-0" : "bg-[var(--course-bg)]"}`}>
         {isImage ? (
           <ImageViewer
@@ -163,7 +192,7 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
             )}
           </div>
         ) : (
-          <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} mobileDocument={mobileDocument} />
+          <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} mobileDocument={mobileDocument} editMode={isEditingInline} editorOriginalUrl={isEditingInline ? getGoogleEditorUrl(file) : ""} />
         )}
       </div>
     </div>
@@ -338,7 +367,7 @@ function YouTubeFrame({ url, title, active, resumeAt, onProgress }: { url: strin
   );
 }
 
-function ViewerHeader({ file, embed, download }: { file: CourseFile; embed: { url: string; kind: string }; download: CourseDownload }) {
+function ViewerHeader({ file, embed, download, canEditInline = false, editMode = false, onToggleEditMode }: { file: CourseFile; embed: { url: string; kind: string }; download: CourseDownload; canEditInline?: boolean; editMode?: boolean; onToggleEditMode?: () => void }) {
   const kindLabel = embed.kind === "none" ? "No preview" : embed.kind === "direct" ? file.type : embed.kind;
   const isMedia = embed.kind === "youtube" || file.type === "video" || file.type === "audio";
   const toggleFullscreen = () => {
@@ -351,8 +380,27 @@ function ViewerHeader({ file, embed, download }: { file: CourseFile; embed: { ur
     <div className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-[var(--course-border)] bg-[var(--course-surface)] px-3 py-2.5 text-[var(--course-text)] backdrop-blur sm:gap-3 sm:px-4">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-black" title={file.name}>{file.name}</p>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--course-muted)]" data-course-viewer-kind>{kindLabel} preview</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--course-muted)]" data-course-viewer-kind>{kindLabel} {editMode ? "editor" : "preview"}</p>
       </div>
+      {canEditInline ? (
+        <button
+          type="button"
+          onClick={onToggleEditMode}
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+            editMode
+              ? "bg-violet-600 text-white hover:bg-violet-700"
+              : "bg-[var(--course-soft)] text-[var(--course-text)] hover:bg-[var(--course-soft-hover)]"
+          }`}
+          aria-pressed={editMode}
+          aria-label={editMode ? "Switch back to preview" : "Open the full Google editor with the complete toolbar"}
+          title={editMode ? "Back to preview" : "Edit in Google Docs (full toolbar)"}
+          data-course-viewer-edit-toggle
+          data-doc-mode={editMode ? "edit" : "preview"}
+        >
+          {editMode ? <Eye size={14} /> : <PencilLine size={14} />}
+          <span className="hidden sm:inline">{editMode ? "Preview" : "Edit"}</span>
+        </button>
+      ) : null}
       {isMedia ? (
         <button
           type="button"
@@ -432,12 +480,21 @@ interface EmbedFrameProps {
    * phone-sized and readable instead of a shrunken desktop page.
    */
   mobileDocument?: boolean;
+  /**
+   * True when the frame is loading Google's FULL editor (`/edit`). Changes
+   * the loading copy and the failure panel: an editor that refuses to load
+   * almost always means the file isn't shared with edit permission or the
+   * browser blocks Google sign-in cookies inside iframes.
+   */
+  editMode?: boolean;
+  /** The plain editor URL to open in a new tab when in-frame editing is refused. */
+  editorOriginalUrl?: string;
 }
 
 /** CSS pixels a phone browser reports — what the embedded host will see. */
 const MOBILE_VIEWPORT_WIDTH = 420;
 
-function EmbedFrame({ url, title, kind, supported, mobileDocument = false }: EmbedFrameProps) {
+function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editMode = false, editorOriginalUrl = "" }: EmbedFrameProps) {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -502,7 +559,7 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false }: Emb
         <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-[var(--course-loading)] text-[var(--course-text)]">
           <div className="flex flex-col items-center gap-2">
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/25 border-t-violet-400" />
-            <p className="text-xs font-semibold text-[var(--course-muted)]">Loading preview…</p>
+            <p className="text-xs font-semibold text-[var(--course-muted)]">{editMode ? "Loading Google editor…" : "Loading preview…"}</p>
           </div>
         </div>
       ) : null}
@@ -510,18 +567,20 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false }: Emb
         <div className="absolute inset-0 z-20 grid place-items-center bg-[var(--course-bg)] p-8 text-center text-[var(--course-text)]">
           <div className="max-w-md">
             <AlertTriangle className="mx-auto h-12 w-12 text-amber-400" />
-            <p className="mt-4 font-black">Preview didn’t load</p>
+            <p className="mt-4 font-black">{editMode ? "Google editor didn’t load in-app" : "Preview didn’t load"}</p>
             <p className="mt-1 text-sm text-[var(--course-muted)]">
-              The host may be blocking the embed. Open the source in a new tab to view it directly.
+              {editMode
+                ? "Editing inside the app needs two things: the document must be shared as “Anyone with the link → Editor” (or your Google account must have edit access), and your browser must allow Google sign-in cookies in embedded frames. You can always edit in a new tab below."
+                : "The host may be blocking the embed. Open the source in a new tab to view it directly."}
             </p>
             <div className="mt-5 flex items-center justify-center gap-2">
               <a
-                href={url}
+                href={editMode && editorOriginalUrl ? editorOriginalUrl : url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-4 py-2 text-xs font-black text-white"
               >
-                <ExternalLink size={14} /> Open original
+                <ExternalLink size={14} /> {editMode ? "Edit in new tab" : "Open original"}
               </a>
               <button
                 type="button"

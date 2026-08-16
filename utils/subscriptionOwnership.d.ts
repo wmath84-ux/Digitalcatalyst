@@ -89,6 +89,8 @@ export declare const resolveSubscribeCta: (input?: {
   state?: SubscriptionSelectionState | null;
   loading?: boolean;
   hasPlan?: boolean;
+  /** True when the verified total is ₹0 — the CTA switches to the free-activation label. */
+  freeSelection?: boolean;
 }) => SubscribeCta;
 
 declare const _default: typeof evaluateSubscriptionSelection;
