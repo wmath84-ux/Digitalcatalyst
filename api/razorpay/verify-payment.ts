@@ -58,6 +58,7 @@ async function announceUnlock(
     subscriptionPlanId?: string | null;
     subscriptionFeatureIds?: string[] | null;
     subscriptionExpiresAt?: number | null;
+    subscriptionAddOn?: boolean;
   },
   orderId: string,
 ) {
@@ -83,8 +84,14 @@ async function announceUnlock(
           year: "numeric",
         })
       : "";
-    // Fall back to the legacy copy when the plan has no readable name.
-    const title = planLabel ? `🎉 Welcome to ${planLabel}!` : "✅ Subscription activated";
+    // Fall back to the legacy copy when the plan has no readable name. An
+    // add-on upgrade gets upgrade copy so a member who added one course is
+    // not greeted like a brand-new buyer.
+    const title = quote.subscriptionAddOn
+      ? `⬆️ ${planLabel || "Your membership"} upgraded`
+      : planLabel
+        ? `🎉 Welcome to ${planLabel}!`
+        : "✅ Subscription activated";
     const body = [
       featureCount > 0
         ? `${featureCount} feature${featureCount === 1 ? "" : "s"} unlocked and ready to use.`
@@ -156,6 +163,8 @@ interface PaymentIntent {
   subscriptionExpiresAt?: number | null;
   subscriptionFeatureIds?: string[] | null;
   subscriptionProductIds?: string[] | null;
+  /** True when the order was an add-on upgrade of the currently owned plan + cycle. */
+  subscriptionAddOn?: boolean;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -248,6 +257,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           subscriptionExpiresAt: intent.subscriptionExpiresAt || null,
           subscriptionFeatureIds: Array.isArray(intent.subscriptionFeatureIds) ? intent.subscriptionFeatureIds : null,
           subscriptionProductIds: Array.isArray(intent.subscriptionProductIds) ? intent.subscriptionProductIds : null,
+          subscriptionAddOn: intent.subscriptionAddOn === true,
         };
 
     // Optional client-supplied quoteId hint must match the intent.

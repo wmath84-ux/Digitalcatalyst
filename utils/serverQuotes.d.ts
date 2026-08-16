@@ -102,6 +102,8 @@ export interface ServerPriceQuoteRecord {
   subscriptionFeatureIds?: string[] | null;
   /** Server-resolved public/document ids for selected subscription products. */
   subscriptionProductIds?: string[] | null;
+  /** True when this quote is an add-on upgrade of the currently owned plan + cycle. */
+  subscriptionAddOn?: boolean;
 }
 
 export interface BuildQuoteOk {
@@ -179,6 +181,8 @@ export interface BuildQuoteInput {
   subscriptionFeatureIds?: string[] | null;
   /** Exact product ids that activation must add to the subscription record. */
   subscriptionProductIds?: string[] | null;
+  /** True when the buyer already owns this plan + cycle and only new add-ons are charged. */
+  subscriptionAddOn?: boolean;
 }
 
 // Function signatures ---------------------------------------------------------

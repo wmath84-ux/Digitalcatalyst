@@ -36,6 +36,8 @@ import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlis
 import type { PaidCourseUpdate } from "./types/course";
 import { isDesktopBrowserLocked, isInstalledMobilePwa, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
 import { disablePageZoom } from "./utils/disablePageZoom";
+import { recordRouteVisit } from "./utils/routeHistory";
+import { requiresAuthentication } from "./utils/appRoutes";
 import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
 import { collectDueMyDayItems, type MyDayDocData } from "../utils/pushScheduler";
 import { playSfxAdd, playSfxError, playSfxRemove } from "./utils/sfx";
@@ -161,17 +163,6 @@ function PdpWithOwnership({
     />
   );
 }
-
-const AUTH_REQUIRED_PREFIXES = [
-  CHECKOUT_HASH,
-  MY_DAY_HASH,
-  PROFILE_HASH,
-  COURSE_HASH,
-  SUBSCRIPTION_HASH,
-];
-
-const requiresAuthentication = (hash: string) =>
-  AUTH_REQUIRED_PREFIXES.some((prefix) => hash.startsWith(prefix));
 
 /**
  * Start a new checkout: build a validated session record, write it to
@@ -399,6 +390,16 @@ function Root() {
   // catalog, the baseline was clobbered with an empty purchase list and the
   // next render re-announced every owned product as "Product unlocked" —
   // that was the repeating-notification bug. Do not reintroduce it.
+
+  // Keep the in-app navigation history up to date so the auth screen's Back
+  // button can return to the page the user actually came from. Runs before
+  // the auth-guard effect below, so a protected deep link is recorded and
+  // then skipped by the Back resolver (it can never bounce back to login).
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      recordRouteVisit(hash, window.sessionStorage);
+    }
+  }, [hash]);
 
   useEffect(() => {
     if (loading || user || !requiresAuthentication(hash)) return;

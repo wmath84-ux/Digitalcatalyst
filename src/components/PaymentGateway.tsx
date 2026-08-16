@@ -64,7 +64,20 @@ type RazorpayOptions = {
   order_id: string;
   prefill?: { name?: string; email?: string };
   theme?: { color?: string };
-  modal?: { ondismiss?: () => void };
+  modal?: {
+    ondismiss?: () => void;
+    /**
+     * When true (Razorpay's default), a system back-press makes Razorpay
+     * simulate its own back gesture and render a "Continue payment / Cancel
+     * payment" confirmation dialog INSIDE its iframe. Because the app insets
+     * that iframe between the pinned header and footer, the dialog's buttons
+     * render half outside the frame and get clipped — the Cancel button was
+     * not visible. With `handleback: false` Razorpay leaves the back press to
+     * the app: our `popstate` handler closes the checkout and returns to the
+     * order summary, so back navigation behaves cleanly on the payment page.
+     */
+    handleback?: boolean;
+  };
   handler: (response: RazorpaySuccess) => void;
 };
 
@@ -275,6 +288,10 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
         prefill: order.customer,
         theme: { color: "#4f46e5" },
         modal: {
+          // System back on the payment page returns to the order summary via
+          // our popstate handler instead of Razorpay's clipped confirmation
+          // dialog (see the RazorpayOptions type for the full explanation).
+          handleback: false,
           ondismiss: () => {
             razorpayRef.current = null;
             releaseCheckoutChrome();

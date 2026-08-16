@@ -17,12 +17,18 @@ export interface SubscriptionSelectionState {
   active: boolean;
   owned: boolean;
   renewalEligible: boolean;
+  /** Same plan + cycle plus at least one new feature / product: purchasable add-on upgrade. */
+  addOnPurchase: boolean;
   blocked: boolean;
   planId: string | null;
   cycle: OwnedBillingCycle | null;
   expiresAt: number;
   daysRemaining: number;
   renewalOpensAt: number;
+  /** Features the current membership does not already unlock (empty unless addOnPurchase). */
+  newFeatureIds: string[];
+  /** Products the current membership does not already unlock (empty unless addOnPurchase). */
+  newProductIds: string[];
   code: string | null;
   reason: string | null;
 }
@@ -51,7 +57,7 @@ export interface OwnedPlanSummary<F = OwnedPlanSummaryFeature> {
 
 export interface SubscribeCta {
   label: string;
-  tone: "default" | "owned";
+  tone: "default" | "owned" | "upgrade";
   disabled: boolean;
   owned: boolean;
 }
@@ -72,6 +78,10 @@ export declare const evaluateSubscriptionSelection: (input?: {
   record?: unknown;
   planId?: string | null;
   cycle?: string | null;
+  /** Selected feature ids (used to detect add-on upgrades). */
+  featureIds?: string[];
+  /** Selected product ids (used to detect add-on upgrades). */
+  productIds?: string[];
   now?: number;
   renewalWindowDays?: number;
 }) => SubscriptionSelectionState;

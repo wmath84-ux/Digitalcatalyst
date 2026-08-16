@@ -232,7 +232,7 @@ test("buildSubscriptionLineItems honours the yearly override", () => {
 test("SubscriptionPage prices features through the shared resolver", () => {
   const source = readSource("src/subscription/components/SubscriptionPage.tsx");
   assert.match(source, /resolveFeaturesForPlan/);
-  assert.match(source, /sumSelectedFeaturePaise\(rawFeatures, selectedFeatureIds, selectedPlanId, cycle\)/);
+  assert.match(source, /sumSelectedFeaturePaise\(rawFeatures, chargeableFeatureIds, selectedPlanId, cycle\)/);
   assert.match(source, /groupFeaturesByPriceTier/);
 });
 

@@ -372,6 +372,25 @@
       color: var(--violet-ink);
     }
 
+    .policy-back-top {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 14px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      transition: background 0.15s ease;
+    }
+    .policy-back-top:hover {
+      background: rgba(255, 255, 255, 0.24);
+      text-decoration: none;
+    }
+
     /* ── Footer ────────────────────────────────────────────────────── */
     .site-footer {
       margin-top: 12px;
@@ -431,6 +450,7 @@
 
   <section class="hero">
     <div class="hero-inner">
+      <a class="policy-back-top" data-policy-back href="/#/home" aria-label="Back to the app"><span aria-hidden="true">←</span> Back</a>
       <span class="kicker">Legal</span>
       <h1>Privacy Policy</h1>
       <p>How Eduvora collects, uses, stores and protects your information — and exactly how we handle your Google data.</p>
@@ -603,7 +623,7 @@
       </div>
     </section>
 
-    <p><a class="back-link" href="/#/home">← Back to Eduvora</a></p>
+    <p><a class="back-link" data-policy-back href="/#/home">← Back to Eduvora</a></p>
   </main>
 
   <footer class="site-footer">
@@ -623,5 +643,6 @@
       <p class="fine">© 2026 Eduvora | Digital Catalyst. All rights reserved. · <a href="mailto:wmath84@gmail.com">wmath84@gmail.com</a></p>
     </div>
   </footer>
+  <script src="/policy-back.js" defer></script>
 </body>
 </html>

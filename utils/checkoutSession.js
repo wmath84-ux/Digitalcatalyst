@@ -103,6 +103,11 @@ const sanitiseQuote = (raw) => {
     currency: String(raw.currency || "INR"),
     expiresAt: numOrZero(raw.expiresAt),
     status: typeof raw.status === "string" ? String(raw.status) : "active",
+    // Part 9 — true when this quote is an add-on upgrade (only new
+    // features / products are charged). Kept across the sessionStorage
+    // round-trip so the review step can render the upgrade copy on a
+    // resumed checkout.
+    subscriptionAddOn: raw.subscriptionAddOn === true,
   };
 };
 
