@@ -18,7 +18,6 @@ import {
 } from "../../utils/siteNotifications";
 import { useAuth } from "../context/AuthContext";
 import { BellIcon, BookOpenIcon, StoreIcon } from "./icons";
-import { getRenewalNotification } from "../../utils/subscriptionRenewal";
 import { ensureSavedWebPushSubscription, isWebPushSupported } from "../../utils/webPush";
 
 type NotificationsPageProps = {
@@ -119,23 +118,15 @@ export default function NotificationsPage({
     if (typeof window !== "undefined" && isWebPushSupported()) setPushPermission(window.Notification.permission);
   };
 
-  // App-open fallback: users still receive the correct reminder even when a
-  // scheduled cron or push delivery was delayed. Post-expiry this respects the
-  // 10-morning window, so it stops nagging after the cadence has closed.
-  useEffect(() => {
-    if (!user) return undefined;
-    return onSnapshot(doc(db, "users", user.id, "subscription", "current"), (snapshot) => {
-      const reminder = getRenewalNotification(snapshot.data() || null);
-      if (!reminder) return;
-      const incoming: SiteNotification = { ...reminder, category: "subscription", read: false, source: "system" };
-      setItems((current) => mergeSiteNotifications(current, [incoming]));
-    });
-  }, [user]);
-
-  // Cloud notifications are written by the push scheduler (renewals, My Day
-  // activity reminders, course content announcements) and sync across every
-  // signed-in device. Category/target are stored on each doc — map them
-  // through so a My Day reminder doesn't masquerade as a subscription alert.
+  // Every notification is generated on the SERVER by the real-time push
+  // system (renewals, My Day activity reminders, product unlocks, new-product
+  // and course-content announcements) and written once to
+  // users/{uid}/notifications with an idempotent doc id — the GitHub Actions
+  // minute pinger keeps it exact-time even when the app is closed. This page
+  // only mirrors those cloud docs; it must never generate notifications
+  // itself (the old app-open fallback re-created the same alert on every
+  // visit). Category/target are stored on each doc — map them through so a
+  // My Day reminder doesn't masquerade as a subscription alert.
   useEffect(() => {
     if (!user) return undefined;
     const validCategories = new Set<SiteNotificationCategory>(["store", "reading", "course", "unlock", "community", "announcement", "mayday", "subscription"]);
@@ -148,7 +139,9 @@ export default function NotificationsPage({
         const rawTarget = data.target && typeof data.target === "object" && typeof (data.target as { type?: unknown }).type === "string"
           ? data.target
           : { type: "subscription" };
-        return { id: item.id, title: String(data.title || "Notification"), body: String(data.body || ""), category, createdAt, read: Boolean(data.read), source: "system" as const, target: rawTarget as SiteNotification["target"], remoteNotificationId: item.id };
+        // `expired` drives the renewal deep link (#/subscription?renew=1),
+        // so it must survive the cloud → local mapping.
+        return { id: item.id, title: String(data.title || "Notification"), body: String(data.body || ""), category, createdAt, read: Boolean(data.read), source: "system" as const, target: rawTarget as SiteNotification["target"], remoteNotificationId: item.id, expired: data.expired === true };
       }).filter((item) => !isNewsOrBlogNotification(item));
       setItems((current) => mergeSiteNotifications(current, cloud));
     });

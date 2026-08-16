@@ -5,11 +5,18 @@
 export const MYDAY_LOOKBACK_MS = 15 * 60 * 1000;
 
 // How far back a catch-up run is allowed to reach. A reminder that is
-// hours late is noise, not a reminder — firing "9:00 AM Physics" at
+// many hours late is noise, not a reminder — firing "9:00 AM Physics" at
 // 6 PM trains people to ignore the channel. Items older than this are
 // skipped for good: the dedupe key is scoped to the local date, so a
 // missed item is never revisited once its day rolls over.
-export const MYDAY_MAX_CATCHUP_MS = 60 * 60 * 1000;
+//
+// 2h, not 1h: GitHub's schedule trigger was measured starting runs up to
+// 79 minutes apart on this repository. With a 1h cap, an item due right
+// after one run could fall OUTSIDE the window of the next — dropped
+// forever, which users experienced as "no notification until I opened
+// the app". The workflow now loops to keep real gaps near one minute,
+// but the cap must still cover a worst-case scheduler stall.
+export const MYDAY_MAX_CATCHUP_MS = 2 * 60 * 60 * 1000;
 
 /**
  * The window a scheduler run must cover.

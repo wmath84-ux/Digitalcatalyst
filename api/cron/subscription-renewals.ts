@@ -15,10 +15,12 @@
 //      subscribed device; new modules/lessons in a purchased product push to
 //      that product's buyers. A Firestore baseline prevents repeat announcements.
 //
-// Invocation: Vercel cron runs this path daily as a catch-up. For timely My Day
-// reminders, point any external 1-minute pinger (e.g. cron-job.org) at
-// `GET /api/cron/subscription-renewals` with `Authorization: Bearer $CRON_SECRET`.
-// Every job is deduplicated, so frequent pings are safe.
+// Invocation: the GitHub Actions minute pinger
+// (.github/workflows/push-scheduler.yml) calls this endpoint every minute with
+// `Authorization: Bearer $CRON_SECRET`, so EVERY notification kind above is
+// delivered at the exact time whether the app is open or closed. The daily
+// Vercel cron stays as a catch-up safety net. Every job is deduplicated, so
+// frequent pings are safe.
 
 import { setVapidDetails, sendNotification } from "../_lib/webpush.js";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
@@ -207,12 +209,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       let coursePushes = 0;
       if (!diff.isBaseline) {
         for (const product of diff.newProducts.slice(0, 10)) {
+          const title = product.free ? "🎁 New free product available" : "🆕 New product added";
           await sendPushToAll(db, {
-            title: product.free ? "🎁 New free product available" : "🆕 New product added",
+            title,
             body: product.title,
             tag: `content-product-${product.id}`,
             url: `/#/product/${product.id}`,
           });
+          // Cross-device bell entry for every user (id is per-product, so a
+          // re-run can never duplicate it). The instant admin path
+          // (api/push/send product-created) writes the same doc id — this is
+          // the catch-up for products that slipped past that path.
+          const users = await db.collection("users").get();
+          const docId = `content:product:${product.id}`;
+          for (let offset = 0; offset < users.docs.length; offset += 450) {
+            const batch = db.batch();
+            users.docs.slice(offset, offset + 450).forEach((userDoc) => batch.set(userDoc.ref.collection("notifications").doc(docId), {
+              id: docId,
+              title,
+              body: product.title,
+              category: "store",
+              read: false,
+              source: "system",
+              createdAt: Timestamp.fromMillis(now),
+              target: { type: "product", productId: product.id },
+            }, { merge: true }));
+            await batch.commit();
+          }
           announced += 1;
         }
         for (const update of diff.updatedProducts.slice(0, 10)) {
