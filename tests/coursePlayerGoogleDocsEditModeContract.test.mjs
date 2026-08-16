@@ -112,11 +112,36 @@ test("the viewer header carries the edit toggle for editable Google files", () =
   assert.match(resourceViewer, /canEditInline \? \(/);
 });
 
-test("the admin switch gates the toggle and picks the editor chrome", () => {
-  // "off" hides the toggle entirely; "toolbar"/"full" choose the chrome.
+test("the PER-TYPE admin switch gates the toggle and picks the editor chrome", () => {
+  // Each Google family (doc / sheet / slides) has its own off/toolbar/full
+  // switch; "off" hides the toggle entirely for that type only.
   assert.match(resourceViewer, /useDocsEditorAccess\(\)/);
+  assert.match(resourceViewer, /editableGoogleKind\(file\)/);
+  assert.match(resourceViewer, /editableKind \? accessByType\[editableKind\] : "off"/);
   assert.match(resourceViewer, /editorAccess !== "off" && isEditableGoogleFile\(file\)/);
   assert.match(resourceViewer, /editorAccess === "full" \? "full" : "toolbar"/);
+});
+
+test("editableGoogleKind maps each family and excludes forms / drive binaries", async () => {
+  const { editableGoogleKind } = await import("../src/utils/courseEmbed.ts");
+  assert.equal(editableGoogleKind(gdoc), "doc");
+  assert.equal(editableGoogleKind(gsheet), "sheet");
+  assert.equal(editableGoogleKind(gslides), "slides");
+  assert.equal(editableGoogleKind(gform), null, "a form's /edit page is the owner-only builder");
+  assert.equal(editableGoogleKind(driveFile), null, "drive binaries have no editor");
+});
+
+test("normalizeDocsEditorAccessMap gives every type its own value with legacy inheritance", async () => {
+  const { normalizeDocsEditorAccessMap } = await import("../src/utils/courseEmbed.ts");
+  // Per-type overrides win…
+  const mixed = normalizeDocsEditorAccessMap({ doc: "full", sheet: "off" }, "toolbar");
+  assert.equal(mixed.doc, "full");
+  assert.equal(mixed.sheet, "off");
+  // …and a missing entry inherits the legacy single switch.
+  assert.equal(mixed.slides, "toolbar");
+  // A garbage map falls back entirely to the legacy value.
+  const fallback = normalizeDocsEditorAccessMap("banana", "off");
+  assert.deepEqual(fallback, { doc: "off", sheet: "off", slides: "off" });
 });
 
 test("the viewer passes the mode + admin chrome into getCourseEmbed and tags the stage", () => {
@@ -128,7 +153,10 @@ test("the admin hook reads the live public settings doc with a safe fallback", (
   const hook = read("src/hooks/useDocsEditorAccess.ts");
   assert.match(hook, /doc\(db, "settings", "adminContent"\)/);
   assert.match(hook, /onSnapshot/);
-  assert.match(hook, /normalizeDocsEditorAccess/);
+  assert.match(hook, /normalizeDocsEditorAccessMap/);
+  assert.match(hook, /docsEditorAccessByType/);
+  // Legacy single value is the inherited default for un-overridden types.
+  assert.match(hook, /normalizeDocsEditorAccess\(data\?\.docsEditorAccess/);
   assert.match(hook, /DEFAULT_DOCS_EDITOR_ACCESS: DocsEditorAccess = "toolbar"/);
 });
 
@@ -141,14 +169,25 @@ test("normalizeDocsEditorAccess only accepts off / toolbar / full", async () => 
   assert.equal(normalizeDocsEditorAccess(undefined, "off"), "off", "fallback is honoured");
 });
 
-test("the admin Content page exposes the three-way editor control", () => {
+test("the admin Content page exposes a per-type three-way editor control", () => {
   const contentPage = read("src/admin/pages/ContentPage.tsx");
   assert.match(contentPage, /data-admin-docs-editor-access/);
-  assert.match(contentPage, /data-docs-editor-option=\{option\.value\}/);
-  assert.match(contentPage, /docsEditorAccess: settings\?\.docsEditorAccess \?\? "toolbar"/);
+  // One switch row per editable Google family…
+  assert.match(contentPage, /data-docs-editor-type=\{type\.key\}/);
+  assert.match(contentPage, /data-docs-editor-option=\{`\$\{type\.key\}:\$\{option\.value\}`\}/);
+  for (const key of ['key: "doc"', 'key: "sheet"', 'key: "slides"']) {
+    assert.ok(contentPage.includes(key), `missing editor type ${key}`);
+  }
+  // …plus a set-all shortcut and the three access levels.
+  assert.match(contentPage, /data-admin-docs-editor-all/);
   for (const value of ['value: "off"', 'value: "toolbar"', 'value: "full"']) {
     assert.ok(contentPage.includes(value), `missing admin option ${value}`);
   }
+  // Both fields persist through the settings pipeline.
+  assert.match(contentPage, /docsEditorAccess: settings\?\.docsEditorAccess \?\? "toolbar"/);
+  assert.match(contentPage, /docsEditorAccessByType: settings\?\.docsEditorAccessByType \?\? \{\}/);
+  // The page explains why forms/PDFs have no switch.
+  assert.match(contentPage, /form <em>builder<\/em>/);
 });
 
 test("the editor is never mobile-scaled (it manages its own layout)", () => {

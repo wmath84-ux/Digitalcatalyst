@@ -152,6 +152,36 @@ export const normalizeDocsEditorAccess = (raw: unknown, fallback: DocsEditorAcce
   return value === "off" || value === "toolbar" || value === "full" ? value : fallback;
 };
 
+/**
+ * The Google file families that HAVE an in-place editor endpoint. Forms
+ * deliberately absent: a form's `/edit` page is the form BUILDER (owner
+ * only) — the learner-facing interactive mode is filling the form, which
+ * the player already embeds. PDFs / Drive binaries have no editor at all.
+ */
+export type EditableGoogleKind = "doc" | "sheet" | "slides";
+
+/**
+ * Per-type admin switch: each editable Google family gets its own
+ * off / toolbar / full setting, so e.g. Docs can open the full editor
+ * while Sheets stay preview-only.
+ */
+export type DocsEditorAccessMap = Record<EditableGoogleKind, DocsEditorAccess>;
+
+/**
+ * Normalise the stored per-type map. Accepts the new
+ * `docsEditorAccessByType` object; any missing/invalid entry falls back
+ * to `legacy` — the old single `docsEditorAccess` value — so existing
+ * saved settings keep exactly their previous behaviour.
+ */
+export const normalizeDocsEditorAccessMap = (raw: unknown, legacy: DocsEditorAccess = "toolbar"): DocsEditorAccessMap => {
+  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  return {
+    doc: normalizeDocsEditorAccess(source.doc, legacy),
+    sheet: normalizeDocsEditorAccess(source.sheet, legacy),
+    slides: normalizeDocsEditorAccess(source.slides, legacy),
+  };
+};
+
 export interface CourseEmbedOptions {
   viewport?: CourseEmbedViewport;
   mode?: CourseEmbedMode;
@@ -182,6 +212,19 @@ export const hasNativeMobileRendering = (kind: CourseEmbedKind) => kind === "doc
 export const isEditableGoogleFile = (file: CourseFile): boolean => {
   const google = googleParts(getCourseFileUrl(file));
   return google?.kind === "document" || google?.kind === "spreadsheets" || google?.kind === "presentation";
+};
+
+/**
+ * Which editable Google family this file belongs to, or null when it has
+ * no in-place editor (Forms, PDFs, Drive binaries, direct files…). This
+ * is what the per-type admin switch keys on.
+ */
+export const editableGoogleKind = (file: CourseFile): EditableGoogleKind | null => {
+  const google = googleParts(getCourseFileUrl(file));
+  if (google?.kind === "document") return "doc";
+  if (google?.kind === "spreadsheets") return "sheet";
+  if (google?.kind === "presentation") return "slides";
+  return null;
 };
 
 /**

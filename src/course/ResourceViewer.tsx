@@ -40,7 +40,7 @@ import { AlertTriangle, Download, ExternalLink, Eye, FileQuestion, Maximize2, Pe
 import type { CourseFile } from "../types/course";
 import ImageViewer from "./ImageViewer";
 import AudioPlayer from "./AudioPlayer";
-import { getCourseDownload, getCourseEmbed, getGoogleEditorUrl, hasNativeMobileRendering, isEditableGoogleFile, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
+import { editableGoogleKind, getCourseDownload, getCourseEmbed, getGoogleEditorUrl, hasNativeMobileRendering, isEditableGoogleFile, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
 import { useDocsEditorAccess } from "../hooks/useDocsEditorAccess";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
 
@@ -115,17 +115,22 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
  * documents.
  */
 function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, chromeHidden = false, desktopView = true }: ResourceViewerProps & { file: CourseFile }) {
-  // ── Google Docs in-frame editor (admin-controlled) ──────────────────
+  // ── Google in-frame editor (admin-controlled, PER FILE TYPE) ────────
   // The admin decides in Admin → Content → Course Player what learners
-  // get on native Google Docs / Sheets / Slides files:
+  // get — separately for Docs, Sheets and Slides:
   //   "off"     → preview only, no Edit toggle at all.
   //   "toolbar" → compact editor: full formatting toolbar, Google's outer
   //               header (title + menu bar + share) hidden.
   //   "full"    → the complete docs.google.com page: title, menu bar,
   //               toolbar, tabs/outline side panel, comments — everything.
+  // Forms have no learner-facing editor (their /edit page is the owner's
+  // form BUILDER; learners fill the embedded viewform) and PDFs / Drive
+  // binaries have no editor endpoint, so no switch exists for them.
   // Editing still requires the learner to have edit permission on the
   // file (Google enforces that; no client code can bypass it).
-  const editorAccess = useDocsEditorAccess();
+  const accessByType = useDocsEditorAccess();
+  const editableKind = editableGoogleKind(file);
+  const editorAccess = editableKind ? accessByType[editableKind] : "off";
   const editorChrome: DocsEditorChrome = editorAccess === "full" ? "full" : "toolbar";
   const canEditInline = editorAccess !== "off" && isEditableGoogleFile(file);
   const [editMode, setEditMode] = useState(false);
