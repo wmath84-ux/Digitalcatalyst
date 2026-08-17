@@ -654,6 +654,7 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
       const payload = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
         code?: string;
+        error?: string;
         questions?: AiGenerated[];
       };
       if (res.ok && Array.isArray(payload.questions) && payload.questions.length > 0) {
@@ -666,7 +667,9 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
         }));
       } else {
         if (payload.code === "ai_not_configured") {
-          setNotice("AI key not configured — used the built-in offline generator instead. Add AI_API_KEY (Vercel env) for real AI questions.");
+          setNotice("AI key not configured — used the built-in offline generator instead. Add GEMINI_API_KEY or AI_API_KEY in Vercel env for real AI questions.");
+        } else if (payload.error) {
+          setNotice(`${payload.error} — used the built-in offline generator instead.`);
         } else {
           setNotice("AI provider unavailable — used the built-in offline generator instead.");
         }
