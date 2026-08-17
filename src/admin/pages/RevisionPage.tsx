@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { auth } from "../../../firebase";
 import {
   EmptyState,
   Field,
@@ -28,6 +27,13 @@ import {
 } from "@/revision/engine/store";
 import { parseQuestionText, type ParsedQuestion } from "@/revision/engine/bulkParser";
 import { generateOfflineQuestions } from "@/revision/engine/offlineGenerator";
+import {
+  generateWithGeminiClient,
+  getGeminiKey,
+  getGeminiModel,
+  setGeminiKey,
+  setGeminiModel,
+} from "@/revision/engine/aiGenerate";
 
 const REVISION_TABS = [
   { key: "settings", label: "Settings" },
@@ -623,6 +629,8 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
   const [generating, setGenerating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewItem[]>([]);
+  const [apiKey, setApiKey] = useState(() => getGeminiKey() ?? "");
+  const [model, setModel] = useState(() => getGeminiModel());
 
   const topics = catalog.topics.filter((t) => t.subjectSlug === subjectSlug);
   const subject = catalog.subjects.find((s) => s.slug === subjectSlug);
@@ -642,41 +650,37 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
     setGenerating(true);
     setNotice(null);
     setPreview([]);
+
     let source: "ai" | "offline" = "ai";
     let generated: AiGenerated[] = [];
-    try {
-      const token = auth.currentUser ? await auth.currentUser.getIdToken(true) : null;
-      const res = await fetch("/api/ai/generate-revision", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
-        body: JSON.stringify({ subject: subject?.name ?? "", topic: topic.name, difficulty, count }),
-      });
-      const payload = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        code?: string;
-        error?: string;
-        questions?: AiGenerated[];
-      };
-      if (res.ok && Array.isArray(payload.questions) && payload.questions.length > 0) {
-        generated = payload.questions.map((q) => ({
-          prompt: q.prompt,
-          options: q.options,
-          correctIndex: q.correctIndex,
-          explanation: q.explanation,
-          difficulty: ["easy", "medium", "hard"].includes(q.difficulty) ? q.difficulty : difficulty,
-        }));
-      } else {
-        if (payload.code === "ai_not_configured") {
-          setNotice("AI key not configured — used the built-in offline generator instead. Add GEMINI_API_KEY or AI_API_KEY in Vercel env for real AI questions.");
-        } else if (payload.error) {
-          setNotice(`${payload.error} — used the built-in offline generator instead.`);
+    if (apiKey.trim()) {
+      setGeminiKey(apiKey);
+      setGeminiModel(model);
+      try {
+        const questions = await generateWithGeminiClient({
+          subject: subject?.name ?? "",
+          topic: topic.name,
+          difficulty,
+          count,
+        });
+        if (questions.length > 0) {
+          generated = questions.map((q) => ({
+            prompt: q.prompt,
+            options: q.options,
+            correctIndex: q.correctIndex,
+            explanation: q.explanation,
+            difficulty,
+          }));
         } else {
-          setNotice("AI provider unavailable — used the built-in offline generator instead.");
+          setNotice("Gemini returned no usable questions — used the built-in offline generator instead.");
+          source = "offline";
         }
+      } catch (err) {
+        setNotice(`${err instanceof Error ? err.message : "Gemini request failed"} — used the built-in offline generator instead.`);
         source = "offline";
       }
-    } catch {
-      setNotice("AI provider unreachable — used the built-in offline generator instead.");
+    } else {
+      setNotice("No Gemini API key set — used the built-in offline generator instead. Add your key below for real AI questions.");
       source = "offline";
     }
 
@@ -729,6 +733,31 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
 
   return (
     <div className="space-y-3">
+      <SectionCard
+        title="Gemini API key"
+        description="Your key is stored only in this browser (localStorage) and sent directly to Google's Gemini API — it never touches the public app bundle."
+      >
+        <Field label="Gemini API key" hint="Get one at aistudio.google.com → Get API key. Leave blank to use the offline generator.">
+          <input
+            className={inputClass}
+            type="password"
+            placeholder="AIza…"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+          />
+        </Field>
+        <div className="mt-2">
+          <Field label="Model" hint="Optional — defaults to gemini-2.0-flash.">
+            <input
+              className={inputClass}
+              placeholder="gemini-2.0-flash"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+            />
+          </Field>
+        </div>
+      </SectionCard>
+
       <SectionCard title="AI question generator" description="Generate ready-to-use MCQs for a topic in one click. Choose the correct answer on any item before adding.">
         <div className="space-y-2">
           <select className={selectClass} value={subjectSlug} onChange={(e) => setSubject(e.target.value)}>
