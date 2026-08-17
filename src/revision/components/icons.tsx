@@ -11,6 +11,17 @@ export function HomeIcon({ className = base }: IconProps) {
   );
 }
 
+export function DashboardIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth={1.8} stroke="currentColor">
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.6" />
+      <rect x="13.5" y="3.5" width="7" height="5" rx="1.6" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.6" />
+      <rect x="13.5" y="11.5" width="7" height="9" rx="1.6" />
+    </svg>
+  );
+}
+
 export function BankIcon({ className = base }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} strokeWidth={1.8} stroke="currentColor">
