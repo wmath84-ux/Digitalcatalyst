@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, CreditCard, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import { auth } from "../../firebase";
-import { revealCheckoutChromeOverRazorpay } from "../utils/razorpayCheckoutChrome";
+import { revealCheckoutChromeOverRazorpay, type CheckoutChromeController } from "../utils/razorpayCheckoutChrome";
 import { playPaymentSuccessChime, preparePaymentSound } from "../utils/paymentSounds";
 import { formatPaise } from "../utils/money";
 
@@ -77,6 +77,12 @@ type RazorpayOptions = {
      * order summary, so back navigation behaves cleanly on the payment page.
      */
     handleback?: boolean;
+    /** Disable Razorpay's own Esc-to-close so our exit flow stays the only path. */
+    escape?: boolean;
+    /** Disable close-on-backdrop-tap (the backdrop is mostly hidden anyway). */
+    backdropclose?: boolean;
+    /** Disable Razorpay's in-iframe close confirmation (we render our own). */
+    confirm_close?: boolean;
   };
   handler: (response: RazorpaySuccess) => void;
 };
@@ -148,13 +154,15 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
   const [error, setError] = useState("");
   const razorpayRef = useRef<RazorpayInstance | null>(null);
-  const unpinChromeRef = useRef<(() => void) | null>(null);
+  const chromeRef = useRef<CheckoutChromeController | null>(null);
   const razorpayHistoryPushedRef = useRef(false);
+  const goBackRef = useRef(onGoBack);
+  goBackRef.current = onGoBack;
   const displayAmount = formatPaise(finalPrice);
 
   const releaseCheckoutChrome = () => {
-    unpinChromeRef.current?.();
-    unpinChromeRef.current = null;
+    chromeRef.current?.release();
+    chromeRef.current = null;
   };
 
   const consumeRazorpayHistory = () => {
@@ -177,23 +185,38 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
     consumeRazorpayHistory();
   };
 
+  /**
+   * Abandon the payment for real: tear down the Razorpay modal, drop our
+   * history entry and hand the user back to the order summary.
+   */
+  const abandonPayment = () => {
+    try {
+      razorpayRef.current?.close?.();
+    } catch {
+      // Modal may already be gone.
+    }
+    razorpayRef.current = null;
+    releaseCheckoutChrome();
+    consumeRazorpayHistory();
+    setPaymentState("idle");
+    setError("Payment was cancelled. No money was charged and no access was granted.");
+    goBackRef.current();
+  };
+
   useEffect(() => {
+    // Back / swipe-back while the payment frame is open must NOT silently
+    // walk the history stack. Razorpay's own "Continue payment / Cancel
+    // payment" prompt lives inside its cross-origin iframe (and gets clipped
+    // by our inset layout), so we show the identical prompt from our own DOM
+    // instead, and immediately re-arm the history entry so the guard keeps
+    // working for repeated back presses.
     const onPopState = () => {
-      if (!razorpayRef.current) return;
-      razorpayHistoryPushedRef.current = false;
-      try {
-        razorpayRef.current.close?.();
-      } catch {
-        // Modal may already be gone.
+      if (!razorpayRef.current || !chromeRef.current) return;
+      if (typeof window !== "undefined") {
+        window.history.pushState({ eduvoraRazorpayOpen: true }, "");
+        razorpayHistoryPushedRef.current = true;
       }
-      razorpayRef.current = null;
-      releaseCheckoutChrome();
-      setPaymentState("idle");
-      setError("Payment window was closed. No access was granted.");
-      // The system/browser back button was pressed while the Razorpay
-      // overlay was open — return to the order summary instead of letting
-      // the back gesture walk the whole history stack and close the app.
-      onGoBack();
+      chromeRef.current.requestExit();
     };
     window.addEventListener("popstate", onPopState);
     return () => {
@@ -288,20 +311,26 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
         prefill: order.customer,
         theme: { color: "#4f46e5" },
         modal: {
-          // System back on the payment page returns to the order summary via
-          // our popstate handler instead of Razorpay's clipped confirmation
-          // dialog (see the RazorpayOptions type for the full explanation).
+          // Razorpay's own back handling renders a confirmation dialog INSIDE
+          // its iframe, which our inset layout clips. We disable it and show
+          // our own always-visible "Continue payment / Cancel payment" sheet
+          // (see the RazorpayOptions type for the full explanation).
           handleback: false,
+          // Keep the frame on screen if the user taps the dim backdrop; the
+          // only ways out are our Cancel bar and Razorpay's own close button.
+          escape: false,
+          backdropclose: false,
+          confirm_close: false,
           ondismiss: () => {
             razorpayRef.current = null;
             releaseCheckoutChrome();
             consumeRazorpayHistory();
             setPaymentState("idle");
             setError("Payment window was closed. No access was granted.");
-            // Razorpay closed its own overlay (back gesture / tap-outside) —
-            // return to the order summary so the user isn't left stranded on
-            // the payment step with no way back.
-            onGoBack();
+            // Razorpay closed its own overlay (its × button) — return to the
+            // order summary so the user isn't left stranded on the payment
+            // step with no way back.
+            goBackRef.current();
           },
         },
         handler: (response) => {
@@ -321,7 +350,10 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
         razorpayHistoryPushedRef.current = true;
       }
       checkout.open();
-      unpinChromeRef.current = revealCheckoutChromeOverRazorpay();
+      chromeRef.current = revealCheckoutChromeOverRazorpay({
+        label: order.productName || productName,
+        onCancel: abandonPayment,
+      });
     } catch (paymentError) {
       setPaymentState("error");
       setError(paymentError instanceof Error ? paymentError.message : "Could not start secure payment.");
