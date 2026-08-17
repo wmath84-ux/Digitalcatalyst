@@ -1,6 +1,7 @@
+import { Award } from "lucide-react";
 import { BagIcon, CalendarIcon, HomeIcon, SparkBookIcon, StoreIcon, UserIcon } from "./icons";
 
-export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision";
+export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "leaderboard" | "revision";
 
 type BottomNavProps = {
   active: TabKey | null;
@@ -15,6 +16,7 @@ const TABS: { key: TabKey; label: string; icon: typeof HomeIcon }[] = [
   { key: "store", label: "Store", icon: StoreIcon },
   { key: "purchases", label: "Purchases", icon: BagIcon },
   { key: "profile", label: "Profile", icon: UserIcon },
+  { key: "leaderboard", label: "Leaders", icon: Award as unknown as typeof HomeIcon },
   { key: "revision", label: "Revision", icon: SparkBookIcon },
 ];
 
@@ -31,6 +33,7 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
               type="button"
               onClick={() => {
                 if (key === "revision") window.location.hash = "#/revision";
+                else if (key === "leaderboard") window.location.hash = "#/leaderboard";
                 else onChange(key);
               }}
               className={`relative flex flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-semibold transition ${

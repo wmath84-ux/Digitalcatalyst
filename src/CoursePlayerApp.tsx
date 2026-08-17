@@ -186,11 +186,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   const [immersive, setImmersive] = useState(false);
   const [theme, setTheme] = useState<CoursePlayerTheme>(loadCourseTheme);
   // ── Chrome visibility ───────────────────────────────────────────────────
-  // Two independent direct toggles live in the header, just like the theme
-  // button. One hides the resource header/footer; the other hides the Course
-  // Player's own header + bottom dock. No dropdown is needed.
+  // One view-options button opens a dropdown with two independent hides:
+  // the file's own header+footer, and the Course Player's header+dock.
   const [fileBarsHidden, setFileBarsHidden] = useState(false);
   const [playerChromeHidden, setPlayerChromeHidden] = useState(false);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  // Hiding the header must not leave the menu flag stale-open
+  useEffect(() => { if (playerChromeHidden) setViewMenuOpen(false); }, [playerChromeHidden]);
   // Desktop request mode for embedded documents — a Google Doc / Sheet /
   // Slides deck rendered at desktop width is unreadable on a phone, so the
   // learner can flip the same embed to its mobile rendering.
@@ -257,12 +259,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      if (viewMenuOpen) { setViewMenuOpen(false); return; }
       if (immersive) { setImmersive(false); return; }
       if (playerChromeHidden || fileBarsHidden) { setPlayerChromeHidden(false); setFileBarsHidden(false); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [immersive, playerChromeHidden, fileBarsHidden]);
+  }, [immersive, playerChromeHidden, fileBarsHidden, viewMenuOpen]);
 
   // Scrolling inside the quarter-turned immersive view has to be driven
   // manually. Without this, browsers bind scrollTop to a left/right gesture
@@ -496,9 +499,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     </button>
   ) : null;
 
-  // ── Direct chrome toggles ───────────────────────────────────────────────
-  // These behave like the light/dark button: one tap flips the state and the
-  // icon immediately reflects what the next tap will do.
+  // ── View-options dropdown (one button, two hides) ───────────────────────
+  // A single button opens a dropdown with both hide options. The two hides are
+  // independent and always reversible; Escape restores everything.
   const fileBarsToggle = (
     <button
       type="button"
@@ -535,6 +538,41 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     >
       {playerChromeHidden ? <Maximize size={17} /> : <Minimize size={17} />}
     </button>
+  );
+
+  const viewOptionsControl = (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setViewMenuOpen((o) => !o)}
+        className={`course-icon-button grid h-10 w-10 place-items-center rounded-xl transition ${viewMenuOpen ? "bg-violet-500 text-white" : "bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"}`}
+        aria-label="View options"
+        aria-haspopup="menu"
+        aria-expanded={viewMenuOpen}
+        data-course-view-options-toggle
+      >
+        <ChevronsDownUp size={17} />
+      </button>
+      {viewMenuOpen ? (
+        <>
+          <button type="button" aria-label="Close view options" onClick={() => setViewMenuOpen(false)} className="fixed inset-0 z-30 bg-transparent" data-course-view-options-scrim />
+          <div
+            data-course-view-options-menu
+            data-placement={useLandscapeRails ? "side" : "below"}
+            className={`absolute z-40 flex flex-col gap-2 rounded-2xl border border-[var(--course-border)] bg-[var(--course-surface)] p-2 shadow-2xl max-w-[min(15rem,calc(100vw-4.5rem))] ${useLandscapeRails ? "left-full top-0 ml-2" : "right-0 top-12"}`}
+          >
+            <div className="flex items-center gap-2">
+              {fileBarsToggle}
+              <span className="text-xs font-semibold text-[var(--course-text)]">{fileBarsHidden ? "Show file bars" : "Hide file bars"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {playerChromeToggle}
+              <span className="text-xs font-semibold text-[var(--course-text)]">{playerChromeHidden ? "Show player bars" : "Hide player bars"}</span>
+            </div>
+          </div>
+        </>
+      ) : null}
+    </div>
   );
 
   // Flip an embedded document between its desktop and mobile rendering.
@@ -693,8 +731,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
         data-course-mobile-landscape-header={mobileRotated ? "true" : undefined}
       >
         <button onClick={onBack} className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]" aria-label="Back" data-course-back><ArrowLeft size={18} /></button>
-        {fileBarsToggle}
-        {playerChromeToggle}
+        {viewOptionsControl}
         {showViewportToggle ? viewportToggle : null}
         {!mobileRotated ? themeToggle : null}
         <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -793,8 +830,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
             ) : null}
           </div>
         </div>
-        {fileBarsToggle}
-        {playerChromeToggle}
+        {viewOptionsControl}
         {showViewportToggle ? viewportToggle : null}
         {themeToggle}
       </header>
