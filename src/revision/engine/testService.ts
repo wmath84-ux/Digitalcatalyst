@@ -12,9 +12,11 @@ import {
   nowIso,
   todayDateStr,
   ServiceError,
+  DEFAULT_SETTINGS,
   type DailyTestRow,
   type RevisionDb,
   type TestAttemptRow,
+  type RevisionSettings,
 } from "./store";
 
 function mulberry32(seed: number) {
@@ -36,19 +38,20 @@ function hashString(str: string): number {
   return hash;
 }
 
-const QUESTIONS_PER_TEST = 10;
-const ESTIMATED_MINUTES = 5;
+function getSettings(db: RevisionDb): RevisionSettings {
+  return { ...DEFAULT_SETTINGS, ...(db.settings ?? {}) };
+}
 
-export function getOrCreateDailyTest(db: RevisionDb, dateStr: string): DailyTestRow {
-  const existing = db.dailyTests.find((t) => t.testDate === dateStr);
-  if (existing) return existing;
+function clampInt(value: number, min: number, max: number): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return min;
+  return Math.max(min, Math.min(max, n));
+}
 
+/** Deterministic, subject-round-robin ordering of every active question,
+ *  seeded by date so the daily tests stay stable across reloads. */
+function buildQuestionOrder(db: RevisionDb, dateStr: string): number[] {
   const allQuestions = db.questions.filter((q) => q.isActive);
-  if (allQuestions.length === 0) {
-    throw new ServiceError("NO_QUESTIONS", "No questions available to build a test.");
-  }
-
-  // Deterministic shuffle seeded by date so the test is stable across loads
   const rng = mulberry32(hashString(dateStr));
   const bySubject = new Map<number, number[]>();
   for (const q of allQuestions) {
@@ -56,7 +59,6 @@ export function getOrCreateDailyTest(db: RevisionDb, dateStr: string): DailyTest
     arr.push(q.id);
     bySubject.set(q.subjectId, arr);
   }
-  // shuffle within each subject bucket then round-robin pick for topic diversity
   const subjectIds = Array.from(bySubject.keys());
   for (const sid of subjectIds) {
     const arr = bySubject.get(sid)!;
@@ -65,35 +67,66 @@ export function getOrCreateDailyTest(db: RevisionDb, dateStr: string): DailyTest
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
   }
-  // shuffle subject order too, seeded
   for (let i = subjectIds.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [subjectIds[i], subjectIds[j]] = [subjectIds[j], subjectIds[i]];
   }
 
-  const picked: number[] = [];
+  const ordered: number[] = [];
   let cursor = 0;
-  while (picked.length < QUESTIONS_PER_TEST && picked.length < allQuestions.length) {
+  while (ordered.length < allQuestions.length) {
     const sid = subjectIds[cursor % subjectIds.length];
     const arr = bySubject.get(sid)!;
-    const idx = Math.floor(picked.length / subjectIds.length);
-    if (idx < arr.length) {
-      picked.push(arr[idx]);
-    }
+    const idx = Math.floor(ordered.length / subjectIds.length);
+    if (idx < arr.length) ordered.push(arr[idx]);
     cursor++;
-    if (cursor > subjectIds.length * (QUESTIONS_PER_TEST + 2)) break;
+    if (cursor > subjectIds.length * (allQuestions.length + 2)) break;
+  }
+  return ordered;
+}
+
+/** Ensure every slot of today's tests exists, then return them (sorted by slot). */
+export function getOrCreateDailyTests(db: RevisionDb, dateStr: string): DailyTestRow[] {
+  const settings = getSettings(db);
+  const testsPerDay = clampInt(settings.testsPerDay, 1, 20);
+  const perTest = clampInt(settings.questionsPerTest, 1, 100);
+  const estimatedMinutes = clampInt(settings.estimatedMinutes, 1, 240);
+
+  const existing = db.dailyTests
+    .filter((t) => t.testDate === dateStr)
+    .sort((a, b) => a.slot - b.slot);
+
+  if (existing.length >= testsPerDay) return existing.slice(0, testsPerDay);
+
+  const order = buildQuestionOrder(db, dateStr);
+  if (order.length === 0) {
+    throw new ServiceError("NO_QUESTIONS", "No questions available to build a test.");
   }
 
-  const row: DailyTestRow = {
-    id: nextId(db, "dailyTests"),
-    testDate: dateStr,
-    title: "Daily 5-Minute Test",
-    questionIds: picked,
-    totalQuestions: picked.length,
-    estimatedMinutes: ESTIMATED_MINUTES,
-  };
-  db.dailyTests.push(row);
-  return row;
+  for (let slot = 0; slot < testsPerDay; slot++) {
+    if (existing.some((t) => t.slot === slot)) continue;
+    const questionIds = order.slice(slot * perTest, (slot + 1) * perTest);
+    if (questionIds.length === 0) break; // not enough questions for more tests
+    const row: DailyTestRow = {
+      id: nextId(db, "dailyTests"),
+      testDate: dateStr,
+      slot,
+      title: testsPerDay > 1 ? `Daily Test ${slot + 1}` : "Daily 5-Minute Test",
+      questionIds,
+      totalQuestions: questionIds.length,
+      estimatedMinutes,
+    };
+    db.dailyTests.push(row);
+  }
+
+  return db.dailyTests
+    .filter((t) => t.testDate === dateStr)
+    .sort((a, b) => a.slot - b.slot);
+}
+
+/** Backwards-compatible helper: the first (slot 0) test of the day. */
+export function getOrCreateDailyTest(db: RevisionDb, dateStr: string): DailyTestRow {
+  return getOrCreateDailyTests(db, dateStr)[0];
 }
 
 export function markExpiredAttempts(db: RevisionDb, dateStr: string) {
@@ -111,7 +144,14 @@ export function getTodayTestState(uid: string) {
   const db = loadDb(uid);
   const dateStr = todayDateStr();
   markExpiredAttempts(db, dateStr);
-  const dailyTest = getOrCreateDailyTest(db, dateStr);
+  const tests = getOrCreateDailyTests(db, dateStr);
+
+  // The next test to offer is the first slot without a completed attempt.
+  const dailyTest =
+    tests.find((t) => {
+      const a = db.testAttempts.find((x) => x.dailyTestId === t.id);
+      return !a || a.status !== "completed";
+    }) ?? tests[tests.length - 1];
 
   const attempt = db.testAttempts.find((a) => a.dailyTestId === dailyTest.id) ?? null;
 
@@ -122,10 +162,17 @@ export function getTodayTestState(uid: string) {
     ? db.dailyTests.find((t) => t.id === completed[0].dailyTestId) ?? null
     : null;
 
+  const completedToday = tests.filter((t) =>
+    db.testAttempts.some((a) => a.dailyTestId === t.id && a.status === "completed"),
+  ).length;
+
   saveDb(uid, db);
   return {
+    testsTotal: tests.length,
+    completedToday,
     dailyTest: {
       id: dailyTest.id,
+      slot: dailyTest.slot,
       testDate: dailyTest.testDate,
       title: dailyTest.title,
       totalQuestions: dailyTest.totalQuestions,
@@ -147,7 +194,16 @@ export function startOrResumeAttempt(uid: string) {
   const db = loadDb(uid);
   const dateStr = todayDateStr();
   markExpiredAttempts(db, dateStr);
-  const dailyTest = getOrCreateDailyTest(db, dateStr);
+  const tests = getOrCreateDailyTests(db, dateStr);
+
+  // Pick the first slot that has no completed attempt yet.
+  const dailyTest = tests.find((t) => {
+    const a = db.testAttempts.find((x) => x.dailyTestId === t.id);
+    return !a || a.status !== "completed";
+  });
+  if (!dailyTest) {
+    throw new ServiceError("ALREADY_COMPLETED", "All of today's tests are already completed.");
+  }
 
   const existing = db.testAttempts.find((a) => a.dailyTestId === dailyTest.id);
   if (existing) {

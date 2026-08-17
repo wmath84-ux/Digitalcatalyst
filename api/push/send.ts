@@ -20,7 +20,7 @@
 // unauthenticated, which let anyone broadcast arbitrary pushes.
 
 import { setVapidDetails, sendNotification } from "../_lib/webpush.js";
-import { Timestamp } from "firebase-admin/firestore";
+import { Timestamp, type Firestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import {
   adminDb,
   errorResponse,
@@ -64,15 +64,15 @@ const PRODUCT_URL = (productId: string) => `/#/product/${productId}`;
 
 // Ownership has a canonical entitlement record plus a legacy array. Read both
 // so old purchases, string IDs and newer checkout writes all receive updates.
-async function findProductBuyerIds(db: FirebaseFirestore.Firestore, productId: string): Promise<string[]> {
+async function findProductBuyerIds(db: Firestore, productId: string): Promise<string[]> {
   const ids = new Set<string>();
   const keys: Array<string | number> = [productId];
   if (Number.isFinite(Number(productId))) keys.push(Number(productId));
   for (const key of keys) {
     const legacy = await db.collection("users").where("purchasedProductIds", "array-contains", key).get();
-    legacy.docs.forEach((item) => ids.add(item.id));
+    legacy.docs.forEach((item: QueryDocumentSnapshot) => ids.add(item.id));
     const entitlements = await db.collectionGroup("entitlements").where("productId", "==", key).get();
-    entitlements.docs.forEach((item) => {
+    entitlements.docs.forEach((item: QueryDocumentSnapshot) => {
       const uid = item.ref.parent.parent?.id;
       if (uid) ids.add(uid);
     });
@@ -80,14 +80,14 @@ async function findProductBuyerIds(db: FirebaseFirestore.Firestore, productId: s
   return Array.from(ids);
 }
 
-async function writeNewProductBellEntries(db: FirebaseFirestore.Firestore, productId: string, entry: ReturnType<typeof buildProductInventoryEntry>) {
+async function writeNewProductBellEntries(db: Firestore, productId: string, entry: ReturnType<typeof buildProductInventoryEntry>) {
   const users = await db.collection("users").get();
   const docId = `content:product:${productId}`;
   // Keep below Firestore's 500-operation batch ceiling and cover every user,
   // not just the first page of accounts.
   for (let offset = 0; offset < users.docs.length; offset += 450) {
     const batch = db.batch();
-    users.docs.slice(offset, offset + 450).forEach((user) => batch.set(user.ref.collection("notifications").doc(docId), {
+    users.docs.slice(offset, offset + 450).forEach((user: QueryDocumentSnapshot) => batch.set(user.ref.collection("notifications").doc(docId), {
       id: docId,
       title: entry.free ? "New free product available" : "New product added",
       body: entry.title,
@@ -223,9 +223,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : await db.collection('users').doc(uid).collection('webPushSubscriptions').get();
 
       subscriptions = snapshot.docs
-        .map(item => item.data())
-        .filter((data): data is Record<string, unknown> => Boolean(data))
-        .map(data => ({
+        .map((item: QueryDocumentSnapshot) => item.data())
+        .filter((data: unknown): data is Record<string, unknown> => Boolean(data))
+        .map((data: Record<string, unknown>) => ({
           endpoint: safeText(data.endpoint, 500),
           keys: { p256dh: safeText(data.p256dh, 300), auth: safeText(data.auth, 100) },
         }))

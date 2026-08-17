@@ -22,7 +22,7 @@ export default function PageShell({
   return (
     <>
       <AppHeader title={title} subtitle={subtitle} backHref={backHref} rightSlot={rightSlot} />
-      <main className="no-scrollbar flex-1 overflow-y-auto overscroll-contain">{children}</main>
+      <main className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</main>
       {!hideNav && <BottomNav route={route} />}
     </>
   );

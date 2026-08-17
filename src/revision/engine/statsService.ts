@@ -3,7 +3,7 @@
 // instead of date-fns so no new dependency is introduced.
 
 import { loadDb, saveDb, todayDateStr, daysAgoDateStr } from "./store";
-import { getOrCreateDailyTest, markExpiredAttempts } from "./testService";
+import { getOrCreateDailyTests, markExpiredAttempts } from "./testService";
 import { getRevisionSummary } from "./revisionService";
 
 type TopicAgg = {
@@ -231,21 +231,16 @@ function getCurrentStreak(uid: string) {
   let streak = 0;
   for (let i = 0; i < 90; i++) {
     const dateStr = daysAgoDateStr(i);
-    const dt = db.dailyTests.find((t) => t.testDate === dateStr);
-    if (!dt) {
-      if (i === 0) continue;
-      break;
-    }
-    const attempt = db.testAttempts.find(
-      (a) => a.dailyTestId === dt.id && a.status === "completed",
+    const testsThatDay = db.dailyTests.filter((t) => t.testDate === dateStr);
+    const completedAny = testsThatDay.some((dt) =>
+      db.testAttempts.some((a) => a.dailyTestId === dt.id && a.status === "completed"),
     );
-    if (attempt) {
+    if (completedAny) {
       streak += 1;
-    } else if (i === 0) {
       continue;
-    } else {
-      break;
     }
+    if (i === 0) continue; // today may still be in progress
+    break;
   }
   return streak;
 }
@@ -254,8 +249,15 @@ export function getDashboardData(uid: string) {
   const db = loadDb(uid);
   const dateStr = todayDateStr();
   markExpiredAttempts(db, dateStr);
-  const dailyTest = getOrCreateDailyTest(db, dateStr);
+  const todaysTests = getOrCreateDailyTests(db, dateStr);
   saveDb(uid, db);
+
+  // The next test to offer is the first slot without a completed attempt.
+  const dailyTest =
+    todaysTests.find((t) => {
+      const a = db.testAttempts.find((x) => x.dailyTestId === t.id);
+      return !a || a.status !== "completed";
+    }) ?? todaysTests[todaysTests.length - 1];
 
   const todayAttempt = db.testAttempts.find((a) => a.dailyTestId === dailyTest.id) ?? null;
 
@@ -276,6 +278,10 @@ export function getDashboardData(uid: string) {
   const totalQ = allCompleted.reduce((sum, a) => sum + a.totalQuestions, 0);
   const overallAccuracy = totalQ > 0 ? Math.round((totalCorrect / totalQ) * 100) : 0;
 
+  const completedToday = todaysTests.filter((t) =>
+    db.testAttempts.some((a) => a.dailyTestId === t.id && a.status === "completed"),
+  ).length;
+
   const streak = getCurrentStreak(uid);
   const weakTopics = getWeakTopics(uid);
   const revisionSummary = getRevisionSummary(uid);
@@ -288,6 +294,7 @@ export function getDashboardData(uid: string) {
   return {
     today: {
       dailyTestId: dailyTest.id,
+      slot: dailyTest.slot,
       title: dailyTest.title,
       totalQuestions: dailyTest.totalQuestions,
       estimatedMinutes: dailyTest.estimatedMinutes,
@@ -295,6 +302,10 @@ export function getDashboardData(uid: string) {
       attemptId: todayAttempt?.id ?? null,
       currentIndex: todayAttempt?.currentIndex ?? 0,
       score: todayAttempt?.status === "completed" ? todayAttempt.score : null,
+    },
+    testsToday: {
+      total: todaysTests.length,
+      completed: completedToday,
     },
     lastCompletedDate: lastCompletedTest?.testDate ?? null,
     quickStats: {

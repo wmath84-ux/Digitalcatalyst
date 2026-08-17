@@ -14,6 +14,46 @@ export type TestStatus = "not_started" | "in_progress" | "completed" | "expired"
 export type RevisionStatus = "learning" | "improving" | "mastered";
 export type SessionStatus = "in_progress" | "completed";
 
+/**
+ * Admin-configurable revision settings. These control how the daily test is
+ * built and are synced from the global Firestore catalog (settings/revisionCatalog).
+ */
+export type RevisionSettings = {
+  /** How many distinct tests are generated for each day. */
+  testsPerDay: number;
+  /** How many questions each daily test contains. */
+  questionsPerTest: number;
+  /** Estimated completion time (minutes) shown on the dashboard card. */
+  estimatedMinutes: number;
+};
+
+export const DEFAULT_SETTINGS: RevisionSettings = {
+  testsPerDay: 1,
+  questionsPerTest: 10,
+  estimatedMinutes: 5,
+};
+
+/** Portable (slug-based) catalog shapes — the form stored in Firestore and
+ *  editable in the admin panel, independent of the local numeric row ids. */
+export type CatalogSubject = { name: string; slug: string; icon: string; color: string };
+export type CatalogTopic = { subjectSlug: string; name: string; slug: string };
+export type CatalogQuestion = {
+  topicSlug: string;
+  difficulty: Difficulty;
+  prompt: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+  isActive: boolean;
+};
+
+export type RevisionCatalogInput = {
+  settings?: Partial<RevisionSettings>;
+  subjects: CatalogSubject[];
+  topics: CatalogTopic[];
+  questions: CatalogQuestion[];
+};
+
 export type SubjectRow = { id: number; name: string; slug: string; icon: string; color: string };
 export type TopicRow = { id: number; subjectId: number; name: string; slug: string };
 export type QuestionRow = {
@@ -30,6 +70,8 @@ export type QuestionRow = {
 export type DailyTestRow = {
   id: number;
   testDate: string;
+  /** 0-based slot within the day — supports multiple tests per day. */
+  slot: number;
   title: string;
   questionIds: number[];
   totalQuestions: number;
@@ -103,6 +145,9 @@ export type RevisionSessionAnswerRow = {
 
 export type RevisionDb = {
   seedVersion: number;
+  /** Monotonic version of the remote catalog last applied (0 = never). */
+  catalogVersion: number;
+  settings: RevisionSettings;
   subjects: SubjectRow[];
   topics: TopicRow[];
   questions: QuestionRow[];
@@ -125,20 +170,26 @@ export class ServiceError extends Error {
 
 const SEED_VERSION = 1;
 
-function buildSeededDb(): RevisionDb {
+/**
+ * Build a fresh runtime DB from a slug-based catalog. Used for both the
+ * bundled seed content and the remote Firestore catalog published by the
+ * admin panel, so a single builder guarantees identical id assignment
+ * (deterministic, ordered) in both paths.
+ */
+export function buildDbFromCatalog(input: RevisionCatalogInput): RevisionDb {
   const subjects: SubjectRow[] = [];
   const topics: TopicRow[] = [];
   const questions: QuestionRow[] = [];
 
   const subjectIdBySlug = new Map<string, number>();
-  SEED_SUBJECTS.forEach((s, i) => {
+  input.subjects.forEach((s, i) => {
     const id = i + 1;
     subjectIdBySlug.set(s.slug, id);
     subjects.push({ id, name: s.name, slug: s.slug, icon: s.icon, color: s.color });
   });
 
   const topicIdBySlug = new Map<string, number>();
-  SEED_TOPICS.forEach((t, i) => {
+  input.topics.forEach((t, i) => {
     const subjectId = subjectIdBySlug.get(t.subjectSlug);
     if (!subjectId) return;
     const id = i + 1;
@@ -146,9 +197,9 @@ function buildSeededDb(): RevisionDb {
     topics.push({ id, subjectId, name: t.name, slug: t.slug });
   });
 
-  SEED_QUESTIONS.forEach((q, i) => {
+  input.questions.forEach((q, i) => {
     const topicId = topicIdBySlug.get(q.topicSlug);
-    const topicMeta = SEED_TOPICS.find((t) => t.slug === q.topicSlug);
+    const topicMeta = input.topics.find((t) => t.slug === q.topicSlug);
     const subjectId = topicMeta ? subjectIdBySlug.get(topicMeta.subjectSlug) : undefined;
     if (!topicId || !subjectId) return;
     questions.push({
@@ -160,12 +211,14 @@ function buildSeededDb(): RevisionDb {
       options: q.options,
       correctIndex: q.correctIndex,
       explanation: q.explanation,
-      isActive: true,
+      isActive: q.isActive !== false,
     });
   });
 
   return {
     seedVersion: SEED_VERSION,
+    catalogVersion: 0,
+    settings: { ...DEFAULT_SETTINGS, ...(input.settings ?? {}) },
     subjects,
     topics,
     questions,
@@ -177,6 +230,14 @@ function buildSeededDb(): RevisionDb {
     revisionSessionAnswers: [],
     nextIds: {},
   };
+}
+
+function buildSeededDb(): RevisionDb {
+  return buildDbFromCatalog({
+    subjects: SEED_SUBJECTS.map((s) => ({ ...s })),
+    topics: SEED_TOPICS.map((t) => ({ ...t })),
+    questions: SEED_QUESTIONS.map((q) => ({ ...q, isActive: true })),
+  });
 }
 
 const storageKey = (uid: string) => `revision_db_${uid}`;
@@ -192,7 +253,7 @@ export function loadDb(uid: string): RevisionDb {
     if (raw) {
       const parsed = JSON.parse(raw) as RevisionDb;
       if (parsed && parsed.seedVersion === SEED_VERSION && Array.isArray(parsed.questions)) {
-        db = parsed;
+        db = normalizeDb(parsed);
       }
     }
   } catch {
@@ -200,6 +261,39 @@ export function loadDb(uid: string): RevisionDb {
   }
   if (!db) db = buildSeededDb();
   cache.set(uid, db);
+  return db;
+}
+
+/** Repair older persisted DBs that predate settings / catalogVersion / slots. */
+function normalizeDb(db: RevisionDb): RevisionDb {
+  if (!db.settings || typeof db.settings !== "object") {
+    db.settings = { ...DEFAULT_SETTINGS };
+  } else {
+    db.settings = { ...DEFAULT_SETTINGS, ...db.settings };
+  }
+  if (typeof db.catalogVersion !== "number") db.catalogVersion = 0;
+  if (!db.nextIds || typeof db.nextIds !== "object") db.nextIds = {};
+  for (const test of db.dailyTests ?? []) {
+    if (typeof test.slot !== "number") test.slot = 0;
+  }
+  return db;
+}
+
+/** Replace the catalog (subjects/topics/questions/settings) from remote data,
+ *  keeping the user's own progress (attempts, revision items, sessions). */
+export function applyCatalog(uid: string, input: RevisionCatalogInput, catalogVersion: number): RevisionDb {
+  const fresh = buildDbFromCatalog(input);
+  const current = loadDb(uid);
+  const db: RevisionDb = {
+    ...current,
+    seedVersion: SEED_VERSION,
+    catalogVersion,
+    settings: fresh.settings,
+    subjects: fresh.subjects,
+    topics: fresh.topics,
+    questions: fresh.questions,
+  };
+  saveDb(uid, db);
   return db;
 }
 

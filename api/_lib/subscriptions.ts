@@ -276,7 +276,7 @@ export const loadPlanProductUnlocks = async (
     .where("planId", "==", planId)
     .get();
   return snap.docs
-    .map((doc) => {
+    .map((doc: QueryDocumentSnapshot) => {
       const data = doc.data() || {};
       return {
         planId: String(data.planId || planId),
@@ -284,7 +284,7 @@ export const loadPlanProductUnlocks = async (
         active: data.active !== false,
       };
     })
-    .filter((u) => u.productId);
+    .filter((u: SubscriptionPlanProductUnlock) => u.productId);
 };
 
 /** Load all module unlocks for a plan. */
@@ -308,7 +308,7 @@ export const loadPlanModuleUnlocks = async (
         active: data.active !== false,
       };
     })
-    .filter((u) => u.productId && u.moduleId);
+    .filter((u: SubscriptionPlanModuleUnlock) => u.productId && u.moduleId);
 };
 
 /**
