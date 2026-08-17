@@ -23,7 +23,7 @@
 // frequent pings are safe.
 
 import { setVapidDetails, sendNotification } from "../_lib/webpush.js";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type Firestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from "../_lib/firebaseAdmin.js";
 import { getRenewalNotification, getRenewalReminder } from "../../utils/subscriptionRenewal.js";
 import {
@@ -66,7 +66,7 @@ async function sendToSubscriptionDoc(item: { ref: { delete: () => Promise<unknow
   }
 }
 
-async function sendPush(db: FirebaseFirestore.Firestore, uid: string, title: string, body: string, target?: { tag?: string; url?: string }) {
+async function sendPush(db: Firestore, uid: string, title: string, body: string, target?: { tag?: string; url?: string }) {
   if (!vapidConfigured()) return 0;
   const subscriptions = await db.collection("users").doc(uid).collection("webPushSubscriptions").get();
   const payloadString = JSON.stringify({ title, body, tag: target?.tag || "eduvora", url: target?.url || "/" });
@@ -75,7 +75,7 @@ async function sendPush(db: FirebaseFirestore.Firestore, uid: string, title: str
   return sent;
 }
 
-async function sendPushToAll(db: FirebaseFirestore.Firestore, payload: PushPayload) {
+async function sendPushToAll(db: Firestore, payload: PushPayload) {
   if (!vapidConfigured()) return { sent: 0, devices: 0 };
   const snapshot = await db.collectionGroup("webPushSubscriptions").get();
   const payloadString = JSON.stringify({ title: payload.title, body: payload.body, tag: payload.tag || "eduvora-content", url: payload.url || "/" });
@@ -199,7 +199,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     {
       const productsSnap = await db.collection("siteProducts").limit(500).get();
       const inventory: Record<string, ReturnType<typeof buildProductInventoryEntry>> = {};
-      productsSnap.docs.forEach((doc) => {
+      productsSnap.docs.forEach((doc: QueryDocumentSnapshot) => {
         inventory[doc.id] = buildProductInventoryEntry(doc.data() || {});
       });
       const stateRef = db.collection("settings").doc("contentPushState");
@@ -224,7 +224,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const docId = `content:product:${product.id}`;
           for (let offset = 0; offset < users.docs.length; offset += 450) {
             const batch = db.batch();
-            users.docs.slice(offset, offset + 450).forEach((userDoc) => batch.set(userDoc.ref.collection("notifications").doc(docId), {
+            users.docs.slice(offset, offset + 450).forEach((userDoc: QueryDocumentSnapshot) => batch.set(userDoc.ref.collection("notifications").doc(docId), {
               id: docId,
               title,
               body: product.title,
