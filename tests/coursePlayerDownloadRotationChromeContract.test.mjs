@@ -9,10 +9,10 @@
 //      guess which made a horizontal swipe scroll the wrong way.
 //   3. A desktop/mobile switch beside the theme toggle re-renders embedded
 //      documents at phone width so they are readable on a phone.
-//   4. One "view options" button opens a small dropdown with two hides:
-//      the file's own header + mark-complete footer, and the Course
-//      Player's own header + dock. Content takes the freed space, and
-//      there is always a way back.
+//   4. Two separate chrome toggle buttons sit in the header (and the
+//      landscape rail): one hides the file's own header + mark-complete
+//      footer, the other hides the Course Player's own header + dock.
+//      Content takes the freed space, and there is always a way back.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -118,17 +118,18 @@ test("Mobile view re-renders the embed at phone width", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. One button, two hides
+// 4. Two separate chrome toggle buttons
 // ---------------------------------------------------------------------------
 
-test("A single view-options button opens a dropdown with both hide options", () => {
-  assert.match(coursePlayer, /data-course-view-options-toggle/);
-  assert.match(coursePlayer, /data-course-view-options-menu/);
-  assert.match(coursePlayer, /aria-haspopup="menu"/);
+test("Two separate toggle buttons hide the file bars and the player chrome", () => {
+  // One button hides the file's own header/footer, the other hides the
+  // Course Player's header + dock — each with its own icon and label.
   assert.match(coursePlayer, /data-course-toggle-file-bars/);
   assert.match(coursePlayer, /data-course-toggle-player-chrome/);
-  // Tapping outside closes it.
-  assert.match(coursePlayer, /data-course-view-options-scrim/);
+  assert.match(coursePlayer, /aria-label=\{fileBarsHidden \? "Show file bars" : "Hide file bars"\}/);
+  assert.match(coursePlayer, /aria-label=\{playerChromeHidden \? "Show player bars" : "Hide player bars"\}/);
+  // Both toggles are rendered in the portrait header AND the landscape rail.
+  assert.ok((coursePlayer.match(/\{fileBarsToggle\}\s*\{playerChromeToggle\}/g) || []).length >= 2, "both toggles not present in the portrait header and the landscape rail");
 });
 
 test("Hiding the file bars removes the download header and the complete footer", () => {
@@ -150,7 +151,8 @@ test("The two hides are independent and always reversible", () => {
   assert.match(coursePlayer, /data-course-chrome-restore/);
   // Escape restores everything.
   assert.match(coursePlayer, /if \(playerChromeHidden \|\| fileBarsHidden\) \{ setPlayerChromeHidden\(false\); setFileBarsHidden\(false\); \}/);
-  // Hiding the header must not leave the menu flag stale-open, or the next
-  // Escape would be swallowed closing a menu nobody can see.
-  assert.match(coursePlayer, /if \(playerChromeHidden\) setViewMenuOpen\(false\)/);
+  // Each toggle is an aria-pressed switch that reflects its state.
+  assert.match(coursePlayer, /aria-pressed=\{fileBarsHidden\}/);
+  assert.match(coursePlayer, /aria-pressed=\{playerChromeHidden\}/);
+  assert.match(coursePlayer, /data-hidden=\{fileBarsHidden \? "true" : "false"\}/);
 });
