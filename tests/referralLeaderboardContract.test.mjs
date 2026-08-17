@@ -5,6 +5,7 @@ import { normaliseCouponDoc, validateCoupon } from "../utils/coupons.js";
 
 const home = fs.readFileSync("src/home/App.tsx", "utf8");
 const nav = fs.readFileSync("src/components/BottomNav.tsx", "utf8");
+const homeHeader = fs.readFileSync("src/home/components/Header.tsx", "utf8");
 const leaderboard = fs.readFileSync("src/LeaderboardApp.tsx", "utf8");
 const subscription = fs.readFileSync("src/subscription/components/SubscriptionPage.tsx", "utf8");
 const admin = fs.readFileSync("src/admin/pages/SubscriptionsPage.tsx", "utf8");
@@ -25,12 +26,17 @@ test("home switches category on horizontal swipe only on the filter and product 
   assert.match(home, /Math\.abs\(deltaX\) <= Math\.abs\(deltaY\)/);
 });
 
-test("shared footer places leaderboard after profile and routes to its page", () => {
-  assert.match(nav, /"leaderboard"/);
-  assert.ok(nav.indexOf('key: "leaderboard"') > nav.indexOf('key: "profile"'));
-  assert.match(nav, /#\/leaderboard/);
-  assert.match(leaderboard, /<Header/);
-  assert.match(leaderboard, /<BottomNav active="leaderboard"/);
+test("leaderboard is reached from the home header while the footer hosts Revision", () => {
+  // The footer's last tab is Revision — it deliberately replaced the
+  // leaderboard tab (the leaderboard button moved to the home header).
+  assert.match(nav, /key: "revision"/);
+  assert.match(nav, /#\/revision/);
+  assert.doesNotMatch(nav, /key: "leaderboard"/);
+  // The leaderboard entry point is the home header button.
+  assert.match(homeHeader, /aria-label="Leaderboard"/);
+  assert.match(homeHeader, /window\.location\.hash = "#\/leaderboard"/);
+  // The leaderboard page renders the shared footer without a highlighted tab.
+  assert.match(leaderboard, /<BottomNav active=\{null\}/);
 });
 
 test("leaderboard distinguishes used, available and unavailable codes", () => {

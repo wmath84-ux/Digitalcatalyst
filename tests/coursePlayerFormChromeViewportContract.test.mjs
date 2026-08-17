@@ -4,8 +4,8 @@
 //
 //   1. Submitting a Google Form keeps the learner INSIDE the player, with the
 //      course header and the mark-complete footer still on screen.
-//   2. The view-options dropdown is fully visible in mobile landscape /
-//      rotated mode, where the header is a narrow rail on the LEFT edge.
+//   2. The two chrome toggle buttons stay reachable in mobile landscape /
+//      rotated mode, where the header becomes a narrow rail on the LEFT edge.
 //   3. The header's document button behaves like the browser's own
 //      "Desktop site" switch: it drives the layout viewport AND loads the
 //      host's mobile rendering, so a phone in desktop-site mode stops
@@ -94,18 +94,21 @@ test("the form renders in the normal viewer stack, so the chrome stays mounted",
 });
 
 // ---------------------------------------------------------------------------
-// 2. The view-options dropdown is visible in landscape
+// 2. The chrome toggles are reachable in landscape too
 // ---------------------------------------------------------------------------
 
-test("the dropdown opens sideways off the left rail in landscape", () => {
-  // In landscape the header is a 56px rail pinned to the left edge. Anchoring
-  // a 240px panel with `right-0` pushed almost all of it off-screen.
-  assert.match(coursePlayer, /useLandscapeRails \? "left-full top-0 ml-2" : "right-0 top-12"/);
-  assert.match(coursePlayer, /data-placement=\{useLandscapeRails \? "side" : "below"\}/);
+test("the two chrome toggle buttons are present in the landscape rail", () => {
+  // In landscape the header becomes a 56px rail pinned to the left edge; it
+  // must still expose both independent chrome toggles.
+  assert.match(coursePlayer, /data-course-mobile-landscape-header=\{mobileRotated \? "true" : undefined\}/);
+  assert.ok((coursePlayer.match(/\{fileBarsToggle\}\s*\{playerChromeToggle\}/g) || []).length >= 2, "both toggles not present in the portrait header and the landscape rail");
 });
 
-test("the dropdown can never be wider than the space it has", () => {
-  assert.match(coursePlayer, /max-w-\[min\(15rem,calc\(100vw-4\.5rem\)\)\]/);
+test("each toggle reflects its hidden state", () => {
+  // The icon swaps so the button always shows what the next tap will do.
+  assert.match(coursePlayer, /fileBarsHidden \? <ChevronsUpDown size=\{17\} \/> : <ChevronsDownUp size=\{17\} \/>/);
+  assert.match(coursePlayer, /playerChromeHidden \? <Maximize size=\{17\} \/> : <Minimize size=\{17\} \/>/);
+  assert.match(coursePlayer, /data-hidden=\{playerChromeHidden \? "true" : "false"\}/);
 });
 
 // ---------------------------------------------------------------------------

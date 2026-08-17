@@ -234,13 +234,12 @@ export default function LeaderboardApp() {
             </div>
           )}
         </main>
-        <BottomNav active="leaderboard" onChange={(tab) => {
+        <BottomNav active={null} onChange={(tab) => {
             if (tab === "home") window.location.hash = "#/home";
             else if (tab === "myday") window.location.hash = "#/my-day";
             else if (tab === "store") window.location.hash = "#/store";
             else if (tab === "purchases") window.location.hash = "#/store/purchases";
             else if (tab === "profile") window.location.hash = "#/profile";
-            else if (tab === "leaderboard") window.location.hash = "#/leaderboard";
           }}
           purchasesBadge={purchasedIds.size}
         />
