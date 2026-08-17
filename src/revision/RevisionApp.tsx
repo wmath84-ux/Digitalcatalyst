@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import StoreHeader from "../components/Header";
 import { ExitGuardProvider } from "./components/ExitGuardContext";
 import DashboardPage from "./pages/DashboardPage";
@@ -13,6 +13,7 @@ import ProgressPage from "./pages/ProgressPage";
 import RevisionProfilePage from "./pages/RevisionProfilePage";
 import { useAuth } from "../context/AuthContext";
 import { useCommerce } from "../context/CommerceContext";
+import { syncRevisionCatalog } from "./engine/catalogService";
 
 /**
  * Daily Test & Revision feature shell.
@@ -32,6 +33,7 @@ export default function RevisionApp() {
   const { user } = useAuth();
   const { cartIds } = useCommerce();
   const [route, setRoute] = useState(() => window.location.hash);
+  const [syncKey, setSyncKey] = useState(0);
 
   useEffect(() => {
     const onHashChange = () => setRoute(window.location.hash);
@@ -42,10 +44,22 @@ export default function RevisionApp() {
   const uid = user?.id ?? "guest";
   const userName = user?.name?.split(" ")[0] || "Learner";
 
+  // Pull a newer admin-published catalog into the local engine when one
+  // exists, then re-mount the page so every stat reflects the new content.
+  useEffect(() => {
+    let cancelled = false;
+    void syncRevisionCatalog(uid).then((changed) => {
+      if (!cancelled && changed) setSyncKey((k) => k + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [uid]);
+
   // Strip query params so deep links like #/revision?x=1 still route.
   const path = route.split("?")[0];
 
-  let page: React.ReactNode;
+  let page: ReactNode;
   const sessionMatch = path.match(/^#\/revision\/session\/(\d+)(\/result)?$/);
   const resultMatch = path.match(/^#\/revision\/test\/result\/(\d+)$/);
   const reviewMatch = path.match(/^#\/revision\/test\/review\/(\d+)$/);
@@ -74,7 +88,7 @@ export default function RevisionApp() {
 
   return (
     <div className="min-h-screen bg-slate-100 sm:py-6">
-      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
+      <div className="relative mx-auto flex h-dvh w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
         <ExitGuardProvider onNavigate={(href) => { window.location.hash = href; }}>
           <StoreHeader
             cartCount={cartIds.size}
@@ -83,7 +97,7 @@ export default function RevisionApp() {
             onNavigateToCart={() => { window.location.hash = "#/cart"; }}
             onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
           />
-          {page}
+          <Fragment key={syncKey}>{page}</Fragment>
         </ExitGuardProvider>
       </div>
     </div>

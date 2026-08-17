@@ -15,6 +15,7 @@ import SubscriptionsPage from "./pages/SubscriptionsPage";
 import CouponsPage from "./pages/CouponsPage";
 import ReviewsPage from "./pages/ReviewsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
+import RevisionPage from "./pages/RevisionPage";
 import ContentPage from "./pages/ContentPage";
 import SessionPage from "./pages/SessionPage";
 
@@ -34,6 +35,7 @@ function AdminRoutes() {
   if (path === "/admin/coupons") return <CouponsPage />;
   if (path === "/admin/reviews") return <ReviewsPage />;
   if (path === "/admin/analytics") return <AnalyticsPage />;
+  if (path === "/admin/revision") return <RevisionPage />;
   if (path === "/admin/content") return <ContentPage />;
   if (path === "/admin/session") return <SessionPage />;
   return <DashboardPage />;

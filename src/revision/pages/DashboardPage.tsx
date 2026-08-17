@@ -179,6 +179,11 @@ function TodayTestCard({
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-indigo-100">Today&apos;s Test</p>
           <h2 className="mt-1 text-lg font-bold">{today.title}</h2>
+          {data.testsToday.total > 1 && (
+            <p className="mt-0.5 text-xs text-indigo-100">
+              Test {today.slot + 1} of {data.testsToday.total} · {data.testsToday.completed} done
+            </p>
+          )}
         </div>
         {today.status === "completed" && (
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20">

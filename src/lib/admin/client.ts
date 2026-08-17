@@ -9,6 +9,7 @@ import {
   stripUndefinedDeep,
 } from "../../../utils/productMapping";
 import { fullDemoCourseContent } from "../../data/demoCourseContent";
+import { defaultCatalog, normalizeCatalog, REVISION_CATALOG_DOC_ID } from "../../revision/engine/catalogService";
 import type { PaidUpdate, ProductModule } from "./types";
 
 export class ApiError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status; } }
@@ -325,6 +326,29 @@ async function ordersRequest(url:URL){const match=url.pathname.match(/\/orders\/
 const SETTINGS_DEFAULTS:Record<string,any>={adminContent:{siteName:"Digital Catalyst",banners:[],categories:[],testimonials:[],storeTitle:"Store",storeSubtitle:"",showWishlist:true,showRatings:true,showSaleBadges:true,emptyStateMessages:{},pdpHelperTexts:{},coursePlayerMessages:{},authLabels:{openDashboardLabel:"Open dashboard"},docsEditorAccess:"full",docsEditorAccessByType:{},drivePersonalCopy:{clientId:"",byType:{}}},referralProgram:{enabled:true,discountPaise:25000,maxUsesPerReferrer:null}};
 async function settingsRequest(documentId:string,key:string,init?:RequestInit){const ref=doc(db,"settings",documentId),defaults=SETTINGS_DEFAULTS[documentId]||{};if((init?.method||"GET")==="GET"){const snap=await getDoc(ref);return {[key]:{...defaults,...(snap.exists()?snap.data():{})}};}const b=bodyOf(init);await setDoc(ref,stripUndefinedDeep({...b,updatedAt:serverTimestamp()}),{merge:true});return {[key]:{...defaults,...b}};}
 
+async function revisionRequest(init?: RequestInit) {
+  const ref = doc(db, "settings", REVISION_CATALOG_DOC_ID);
+  if ((init?.method || "GET") === "GET") {
+    const snap = await getDoc(ref);
+    const catalog = snap.exists() ? normalizeCatalog(snap.data()) : null;
+    return { catalog: catalog ?? defaultCatalog(), isDefault: !snap.exists() };
+  }
+  const body = bodyOf(init);
+  const incoming = normalizeCatalog(body);
+  if (!incoming) throw new ApiError("Revision catalog data is invalid.", 400);
+  const nextVersion = Math.max(0, Math.round(Number(body.version || 0) || 0)) + 1;
+  const payload = {
+    version: nextVersion,
+    settings: { ...incoming.settings },
+    subjects: incoming.subjects,
+    topics: incoming.topics,
+    questions: incoming.questions,
+    updatedAt: serverTimestamp(),
+  };
+  await setDoc(ref, payload, { merge: true });
+  return { catalog: { ...incoming, version: nextVersion } };
+}
+
 async function dashboard(){const [p,u,o,r]=await Promise.all([getDocs(collection(db,"siteProducts")),getDocs(collection(db,"users")),getDocs(collection(db,"siteOrders")),getDocs(collection(db,"siteReviews"))]);const orders=o.docs.map(d=>mapOrder({id:d.id,...d.data()}));return {products:{total:p.size,hidden:p.docs.filter(d=>!isProductPublished(d.data())).length,unavailable:p.docs.filter(d=>d.data().inStock===false).length},users:{total:u.size,active:u.docs.filter(d=>d.data().status!=="blocked").length,blocked:u.docs.filter(d=>d.data().status==="blocked").length},orders:{verified:orders.filter(x=>["verified","access_granted","completed"].includes(x.paymentStatus)).length,pending:orders.filter(x=>x.paymentStatus.includes("pending")).length,failed:orders.filter(x=>x.paymentStatus==="failed").length},revenue:{total:orders.filter(x=>x.paymentStatus!=="failed").reduce((n,x)=>n+Number(x.finalAmount),0)},subscriptions:{active:u.docs.filter(d=>d.data().subscriptionTier&&d.data().subscriptionTier!=="basic").length,expiring:0},reviews:{pending:r.docs.filter(d=>d.data().status==="pending").length},recentOrders:orders.slice(0,5),attentionQueue:[]};}
 
 export async function adminFetch<T=unknown>(input:string,init?:RequestInit):Promise<T>{await ensureAdmin();const url=urlOf(input),p=url.pathname;
@@ -341,6 +365,7 @@ export async function adminFetch<T=unknown>(input:string,init?:RequestInit):Prom
   else if(p==="/api/admin/coupons")result=await genericCollection("siteCoupons","coupons",init);
   else if(p==="/api/admin/reviews")result=await genericCollection("siteReviews","reviews",init);
   else if(p==="/api/admin/content")result=await settingsRequest("adminContent","settings",init);
+  else if(p==="/api/admin/revision")result=await revisionRequest(init);
   else if(p.startsWith("/api/admin/analytics")){const [ordersRes,productsRes,customersRes,reviewsRes]=await Promise.all([ordersRequest(new URL("/api/admin/orders",url)),productsRequest(new URL("/api/admin/products",url)),customersRequest(new URL("/api/admin/customers",url)),genericCollection("siteReviews","reviews")]);const orders=(ordersRes as any).orders||[],products=(productsRes as any).products||[],customers=(customersRes as any).customers||[],reviews=(reviewsRes as any).reviews||[];const successful=orders.filter((o:any)=>!["failed","cancelled"].includes(o.paymentStatus)),revenue=successful.reduce((n:number,o:any)=>n+Number(o.finalAmount||0),0);result={range:{start:new Date(0).toISOString(),end:new Date().toISOString()},revenue,orders:orders.length,averageOrderValue:successful.length?revenue/successful.length:0,uniqueBuyers:new Set(successful.map((o:any)=>o.customerId)).size,newUsers:customers.length,paymentSuccessRate:orders.length?successful.length/orders.length*100:0,failedPayments:orders.filter((o:any)=>o.paymentStatus==="failed").length,topProducts:products.slice(0,5),activeSubscriptionPlans:0,averageReviewRating:reviews.length?reviews.reduce((n:number,r:any)=>n+Number(r.rating||0),0)/reviews.length:0,reviewsInRange:reviews.length};}
   else throw new ApiError(`Unsupported admin operation: ${p}`,404);
   return result as T;
