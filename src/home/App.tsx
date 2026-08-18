@@ -140,36 +140,6 @@ export default function App({
 
   const [activeCategory, setActiveCategory] = useState("all");
 
-  const switchCategory = (direction: -1 | 1) => {
-    const index = Math.max(0, categories.findIndex((category) => category.id === activeCategory));
-    const next = (index + direction + categories.length) % categories.length;
-    setActiveCategory(categories[next].id);
-  };
-  // Swipe-to-switch-category is intentionally scoped: only gestures that
-  // start on the filter (CategoryNav) or the product grid switch the filter.
-  // The reviews rail, hero carousel and Continue Learning card keep their own
-  // horizontal scrolling without flipping the category.
-  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
-
-  const handleSwipeStart = (event: React.TouchEvent) => {
-    const touch = event.changedTouches[0];
-    swipeStartRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
-  };
-  const handleSwipeEnd = (event: React.TouchEvent) => {
-    const start = swipeStartRef.current;
-    swipeStartRef.current = null;
-    if (start == null) return;
-    const touch = event.changedTouches[0];
-    if (!touch) return;
-    const deltaX = touch.clientX - start.x;
-    const deltaY = touch.clientY - start.y;
-    // Only a deliberate, mostly-horizontal swipe switches the category — a
-    // vertical or diagonal page scroll must not flip the filter.
-    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
-    switchCategory(deltaX < 0 ? 1 : -1);
-  };
-  const categorySwipeHandlers = { onTouchStart: handleSwipeStart, onTouchEnd: handleSwipeEnd };
-
   const categoryFiltered: Product[] = useMemo(() => {
     if (activeCategory === "all") {
       // "Trending Now" — show only the top 4 products, ranked by rating.
@@ -274,7 +244,7 @@ export default function App({
             <>
               <HeroCarousel banners={banners} />
 
-              <div {...categorySwipeHandlers}>
+              <div>
                 <CategoryNav
                   categories={categories}
                   activeCategory={activeCategory}
@@ -296,7 +266,7 @@ export default function App({
                 />
               )}
 
-              <section className="px-5 pt-6" {...categorySwipeHandlers}>
+              <section className="px-5 pt-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-bold text-slate-900">
                     {activeCategory === "all"

@@ -388,7 +388,7 @@ export default function SubscriptionsPage() {
             <Field label="Description"><textarea className={textareaClass} placeholder="Explain what this feature includes" value={editingFeature.description ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, description: e.target.value })} /></Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Individual price (₹)" hint="Base rate; overridden by the cycle/plan rules below"><input className={inputClass} type="number" min="0" value={editingFeature.individualPrice ?? "0"} onChange={(e) => setEditingFeature({ ...editingFeature, individualPrice: e.target.value })} /></Field>
-              <Field label="Icon key" hint="calendar, rocket, code, users…"><input className={inputClass} value={editingFeature.icon ?? "sparkles"} onChange={(e) => setEditingFeature({ ...editingFeature, icon: e.target.value })} /></Field>
+              <Field label="Icon key" hint="calendar, brain, refresh-cw, rocket, code, users…"><input className={inputClass} value={editingFeature.icon ?? "sparkles"} onChange={(e) => setEditingFeature({ ...editingFeature, icon: e.target.value })} /></Field>
             </div>
 
             {/* Cycle-specific base rates — apply to every plan that has no

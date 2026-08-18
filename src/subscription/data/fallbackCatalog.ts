@@ -76,6 +76,17 @@ export const FALLBACK_SUBSCRIPTION_CATALOG: SubscriptionCatalog = {
       badge: "PAID",
       sortOrder: 0,
     },
+    {
+      id: "revision",
+      name: "Revision Studio",
+      description: "Daily tests, smart revision sessions, weak-topic detection and progress analytics.",
+      icon: "brain",
+      pricePaise: 14900,
+      included: false,
+      active: true,
+      badge: "PAID",
+      sortOrder: 1,
+    },
   ],
   subscriptionProducts: [
     // Example of a custom subscription product that can have individual pricing
