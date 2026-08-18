@@ -4,5 +4,11 @@
       "path": "/api/cron/subscription-renewals",
       "schedule": "30 0 * * *"
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/embed-proxy",
+      "destination": "/api/referral-leaderboard"
+    }
   ]
 }

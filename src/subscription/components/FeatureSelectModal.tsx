@@ -21,6 +21,8 @@ import {
   Rocket,
   Sparkles,
   CalendarDays,
+  Brain,
+  RefreshCw,
 } from "lucide-react";
 import type { SubscriptionFeatureDoc } from "../utils/subscriptionCatalog";
 
@@ -34,6 +36,8 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   "bar-chart-3": <BarChart3 className="h-4.5 w-4.5" />,
   rocket: <Rocket className="h-4.5 w-4.5" />,
   calendar: <CalendarDays className="h-4.5 w-4.5" />,
+  brain: <Brain className="h-4.5 w-4.5" />,
+  "refresh-cw": <RefreshCw className="h-4.5 w-4.5" />,
 };
 
 const ICON_BG: Record<string, string> = {
@@ -46,6 +50,8 @@ const ICON_BG: Record<string, string> = {
   "bar-chart-3": "bg-cyan-50 text-cyan-600",
   rocket: "bg-orange-50 text-orange-500",
   calendar: "bg-violet-50 text-violet-600",
+  brain: "bg-indigo-50 text-indigo-600",
+  "refresh-cw": "bg-sky-50 text-sky-600",
 };
 
 const formatRupee = (paise: number): string =>

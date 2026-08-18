@@ -1,5 +1,6 @@
 import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from "./_lib/firebaseAdmin.js";
 import { referralCodeForUid, runReferralRepairOnce } from "./_lib/referrals.js";
+import { handleEmbedProxy } from "./_lib/embedProxy.js";
 
 type SubscriberRow = {
   uid: string;
@@ -67,6 +68,13 @@ const isSubscriber = (data: Record<string, unknown>) =>
   Boolean(data.subscriptionPlanId || (data.subscriptionTier && data.subscriptionTier !== "basic"));
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Course-player GitHub embed proxy. `/api/embed-proxy` rewrites here
+  // (see vercel.json) because the Hobby plan caps serverless functions at
+  // 12 and the project is already at the limit — the proxy logic lives in
+  // the private `_lib/embedProxy` helper so no extra function is deployed.
+  if (req.method === "GET" && req.query?.url) {
+    return handleEmbedProxy(req, res);
+  }
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     const db = adminDb();

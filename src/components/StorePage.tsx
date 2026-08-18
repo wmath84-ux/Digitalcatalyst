@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
 import Hero from "./Hero";
@@ -21,7 +21,6 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
   const [search, setSearch] = useState("");
   const [activeChip, setActiveChip] = useState("All");
   const [sort, setSort] = useState("Recommended");
-  const touchStartX = useRef<number | null>(null);
 
   const chips = useMemo(() => {
     const set = new Set<string>(["All"]);
@@ -61,27 +60,8 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
     return list;
   }, [products, search, activeChip, sort]);
 
-  const switchChip = (direction: -1 | 1) => {
-    if (chips.length === 0) return;
-    const index = Math.max(0, chips.indexOf(activeChip));
-    const next = (index + direction + chips.length) % chips.length;
-    setActiveChip(chips[next]);
-  };
-
-  const handleTouchStart = (event: React.TouchEvent) => {
-    touchStartX.current = event.changedTouches[0]?.clientX ?? null;
-  };
-
-  const handleTouchEnd = (event: React.TouchEvent) => {
-    if (touchStartX.current == null) return;
-    const delta = (event.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
-    touchStartX.current = null;
-    if (Math.abs(delta) < 48) return;
-    switchChip(delta < 0 ? 1 : -1);
-  };
-
   return (
-    <div className="pb-6" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div className="pb-6">
       <Hero resourceCount={filtered.length} />
 
       <div className="space-y-4">

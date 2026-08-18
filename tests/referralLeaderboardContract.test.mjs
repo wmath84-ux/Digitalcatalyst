@@ -13,17 +13,17 @@ const referrals = fs.readFileSync("api/_lib/referrals.ts", "utf8");
 const entitlements = fs.readFileSync("api/_lib/entitlements.ts", "utf8");
 const rules = fs.readFileSync("firestore.rules", "utf8");
 
-test("home switches category on horizontal swipe only on the filter and product areas", () => {
-  assert.match(home, /handleSwipeStart/);
-  assert.match(home, /handleSwipeEnd/);
-  assert.match(home, /switchCategory\(deltaX < 0 \? 1 : -1\)/);
-  // The swipe handlers wrap only the filter chips and the product grid…
-  assert.match(home, /<div \{\.\.\.categorySwipeHandlers\}>\s*<CategoryNav/s);
-  assert.match(home, /<section className="px-5 pt-6" \{\.\.\.categorySwipeHandlers\}>/);
-  // …not the whole page: swiping the reviews rail or hero carousel must not flip the filter.
-  assert.doesNotMatch(home, /<main[^>]*onTouchStart/);
-  // A vertical or diagonal page scroll is not a category switch.
-  assert.match(home, /Math\.abs\(deltaX\) <= Math\.abs\(deltaY\)/);
+test("home and store no longer switch filters on left/right swipe", () => {
+  // The swipe-to-switch-category gesture was removed: categories on Home and
+  // filter chips on the Store only change through explicit taps.
+  const store = fs.readFileSync("src/components/StorePage.tsx", "utf8");
+  assert.doesNotMatch(home, /handleSwipeStart|handleSwipeEnd|switchCategory|categorySwipeHandlers|onTouchStart|onTouchEnd/);
+  assert.doesNotMatch(store, /switchChip|handleTouchStart|handleTouchEnd|onTouchStart|onTouchEnd|touchStartX/);
+  // The tap-driven category nav itself remains intact on Home.
+  assert.match(home, /<CategoryNav/);
+  assert.match(home, /onSelect=\{setActiveCategory\}/);
+  // The store's tap-driven FilterChips remain intact.
+  assert.match(store, /<FilterChips chips=\{chips\} active=\{activeChip\} onSelect=\{setActiveChip\} \/>/);
 });
 
 test("leaderboard is reached from the home header while the footer hosts Revision", () => {

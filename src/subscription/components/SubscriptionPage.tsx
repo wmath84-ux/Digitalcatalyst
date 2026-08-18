@@ -246,9 +246,17 @@ export default function SubscriptionPage({
   const plans: SubscriptionPlanDoc[] = catalog?.plans || [];
   const rawFeatures: SubscriptionFeatureDoc[] = catalog?.features || [];
   const rawSubscriptionProducts: any[] = catalog?.subscriptionProducts || [];
+  // Default-select the core paid features (My Day + Revision Studio) whenever
+  // they exist in the catalog and the buyer has not made an explicit choice.
+  // Removing a feature from the catalog drops it from the default set too.
   useEffect(() => {
-    if (rawFeatures.some((feature) => feature.id === "my-day")) {
-      setSelectedFeatureIds((current) => current.length === 0 ? ["my-day"] : current);
+    const defaultFeatureIds = ["my-day", "revision"];
+    if (rawFeatures.some((feature) => defaultFeatureIds.includes(feature.id))) {
+      setSelectedFeatureIds((current) =>
+        current.length === 0
+          ? defaultFeatureIds.filter((id) => rawFeatures.some((feature) => feature.id === id))
+          : current,
+      );
     }
   }, [rawFeatures]);
   const plan = useMemo(
@@ -742,6 +750,7 @@ export default function SubscriptionPage({
             }}
             onOpenFeature={(featureId) => {
               if (featureId === "my-day") window.location.hash = "#/my-day";
+              if (featureId === "revision") window.location.hash = "#/revision";
             }}
           />
           <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />

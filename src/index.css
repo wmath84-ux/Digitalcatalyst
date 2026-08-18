@@ -572,3 +572,27 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 .course-rotated-surface [data-course-image-viewer] {
   touch-action: none;
 }
+
+/* ── Portrait guard overlay ────────────────────────────────────────────────
+   Full-screen "rotate your phone" panel shown whenever a mobile viewport is
+   landscape while the Course Player is closed. The icon does a gentle
+   quarter-turn loop as the rotation hint. */
+@keyframes app-portrait-card-in {
+  0% { opacity: 0; transform: scale(.94) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.app-portrait-card { animation: app-portrait-card-in .35s cubic-bezier(.2,.8,.2,1) both; }
+
+@keyframes app-rotate-hint {
+  0% { transform: rotate(0deg); }
+  55% { transform: rotate(-100deg); }
+  80% { transform: rotate(-70deg); }
+  100% { transform: rotate(-90deg); }
+}
+
+.app-rotate-hint { animation: app-rotate-hint 1.5s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .app-portrait-card, .app-rotate-hint { animation: none; }
+}

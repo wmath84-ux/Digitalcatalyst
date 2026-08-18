@@ -231,7 +231,8 @@ async function subscriptionFeaturesRequest(init?: RequestInit) {
   const body = bodyOf(init); const recordId = String(body.id || body.key || id()); const ref = doc(db, "subscriptionFeatures", recordId);
   if (body.delete) { await deleteDoc(ref); return { ok: true }; }
   const optionalRupees = (value: unknown) => (value === "" || value === null || value === undefined ? null : Number(value));
-  await setDoc(ref, stripUndefinedDeep({ id: recordId, key: str(body.key, recordId), name: str(body.name, "Feature"), description: str(body.description), price: Number(body.individualPrice || 0), monthlyPrice: optionalRupees(body.monthlyPrice), yearlyPrice: optionalRupees(body.yearlyPrice), planPricing: body.planPricing && typeof body.planPricing === "object" ? body.planPricing : {}, icon: str(body.icon, recordId === "my-day" ? "calendar" : "sparkles"), included: body.included === true, badge: str(body.badge), sortOrder: Math.floor(Number(body.sortOrder || 0)), active: body.active !== false, updatedAt: serverTimestamp() }), { merge: true });
+  const defaultIcon = recordId === "my-day" ? "calendar" : recordId === "revision" ? "brain" : "sparkles";
+  await setDoc(ref, stripUndefinedDeep({ id: recordId, key: str(body.key, recordId), name: str(body.name, "Feature"), description: str(body.description), price: Number(body.individualPrice || 0), monthlyPrice: optionalRupees(body.monthlyPrice), yearlyPrice: optionalRupees(body.yearlyPrice), planPricing: body.planPricing && typeof body.planPricing === "object" ? body.planPricing : {}, icon: str(body.icon, defaultIcon), included: body.included === true, badge: str(body.badge), sortOrder: Math.floor(Number(body.sortOrder || 0)), active: body.active !== false, updatedAt: serverTimestamp() }), { merge: true });
   return { feature: { ...body, id: recordId } };
 }
 

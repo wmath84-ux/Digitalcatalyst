@@ -54,6 +54,8 @@ import {
 
 const PLANS_COLLECTION = "subscriptionPlans";
 const FEATURES_COLLECTION = "subscriptionFeatures";
+const CATALOG_SETTINGS_COLLECTION = "subscriptionCatalogSettings";
+const CATALOG_SETTINGS_DOC = "defaults";
 const SUBSCRIPTION_PRODUCTS_COLLECTION = "subscriptionPlanProducts";
 const PRODUCT_UNLOCKS_COLLECTION = "subscriptionPlanProductUnlocks";
 const MODULE_UNLOCKS_COLLECTION = "subscriptionPlanModuleUnlocks";
@@ -98,6 +100,29 @@ const DEFAULT_SUBSCRIPTION_PLANS: Array<Record<string, unknown>> = [
 ];
 
 /**
+ * Built-in subscription features seeded ONCE so the Revision feature exists
+ * in the live catalog without the admin having to create it by hand.
+ *
+ * Unlike plans, features are never re-seeded: the admin catalog is the
+ * source of truth, and deleting/deactivating a feature in Admin must remove
+ * its subscription gate (same rule as the legacy My Day feature). A marker
+ * doc records what has been seeded, so a deliberate deletion is respected.
+ */
+const DEFAULT_SUBSCRIPTION_FEATURES: Array<Record<string, unknown>> = [
+  {
+    id: "revision",
+    name: "Revision Studio",
+    description: "Daily tests, smart revision sessions, weak-topic detection and progress analytics.",
+    icon: "brain",
+    price: 149,
+    included: false,
+    active: true,
+    badge: "PAID",
+    sortOrder: 1,
+  },
+];
+
+/**
  * Idempotently seed the default plan catalog when no active plan is
  * configured. This makes the subscription flow self-healing: a project that
  * was never seeded (or where every plan was left inactive) still resolves the
@@ -118,6 +143,39 @@ export const ensureDefaultSubscriptionPlans = async (db: Firestore): Promise<voi
   } catch (error) {
     // Seeding is best-effort — never let a seed failure break a catalog read.
     console.warn("[subscriptions] default plan seeding skipped", error);
+  }
+};
+
+/**
+ * One-time seed for the default subscription features. The marker doc keeps
+ * track of what has already been seeded, so an admin who deliberately
+ * deletes the Revision feature (to remove its gate) is never overridden by a
+ * silent re-seed.
+ */
+export const ensureDefaultSubscriptionFeatures = async (db: Firestore): Promise<void> => {
+  try {
+    const markerRef = db.collection(CATALOG_SETTINGS_COLLECTION).doc(CATALOG_SETTINGS_DOC);
+    const marker = await markerRef.get();
+    const seeded = marker.exists && Array.isArray(marker.data()?.seededFeatures)
+      ? marker.data()!.seededFeatures.map(String)
+      : [];
+    const pending = DEFAULT_SUBSCRIPTION_FEATURES.filter((feature) => !seeded.includes(String(feature.id)));
+    if (pending.length === 0) return;
+    await Promise.all(
+      pending.map((feature) =>
+        db.collection(FEATURES_COLLECTION).doc(String(feature.id)).set(
+          { ...feature, updatedAt: Timestamp.now() },
+          { merge: true },
+        ),
+      ),
+    );
+    await markerRef.set({
+      seededFeatures: Array.from(new Set([...seeded, ...pending.map((feature) => String(feature.id))])),
+      updatedAt: Timestamp.now(),
+    }, { merge: true });
+  } catch (error) {
+    // Seeding is best-effort — never let a seed failure break a catalog read.
+    console.warn("[subscriptions] default feature seeding skipped", error);
   }
 };
 
@@ -221,6 +279,9 @@ export const loadActiveFeatures = async (
   options: { db?: Firestore } = {},
 ): Promise<SubscriptionFeatureDoc[]> => {
   const db = options.db ?? adminDb();
+  // One-time seed so the Revision feature exists out of the box. The marker
+  // respects deliberate admin deletions (see ensureDefaultSubscriptionFeatures).
+  await ensureDefaultSubscriptionFeatures(db);
   // Read the complete collection instead of querying only active rows. This
   // distinction matters: deleting/deactivating a feature in Admin must remove
   // its subscription gate, not silently recreate the old My Day feature.

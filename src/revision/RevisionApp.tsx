@@ -13,7 +13,9 @@ import ProgressPage from "./pages/ProgressPage";
 import RevisionProfilePage from "./pages/RevisionProfilePage";
 import { useAuth } from "../context/AuthContext";
 import { useCommerce } from "../context/CommerceContext";
+import { useRevisionAccess } from "../hooks/useRevisionAccess";
 import { syncRevisionCatalog } from "./engine/catalogService";
+import RevisionLockScreen from "./components/RevisionLockScreen";
 
 /**
  * Daily Test & Revision feature shell.
@@ -32,6 +34,7 @@ import { syncRevisionCatalog } from "./engine/catalogService";
 export default function RevisionApp() {
   const { user } = useAuth();
   const { cartIds } = useCommerce();
+  const { hasAccess: hasRevisionAccess, loading: revisionAccessLoading } = useRevisionAccess();
   const [route, setRoute] = useState(() => window.location.hash);
   const [syncKey, setSyncKey] = useState(0);
 
@@ -97,7 +100,18 @@ export default function RevisionApp() {
             onNavigateToCart={() => { window.location.hash = "#/cart"; }}
             onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
           />
-          <Fragment key={syncKey}>{page}</Fragment>
+          {revisionAccessLoading ? (
+            <div data-revision-access-loading className="grid min-h-0 flex-1 place-items-center bg-white">
+              <div className="flex flex-col items-center gap-2 text-slate-400">
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-violet-500" />
+                <p className="text-xs font-semibold">Checking your membership…</p>
+              </div>
+            </div>
+          ) : hasRevisionAccess ? (
+            <Fragment key={syncKey}>{page}</Fragment>
+          ) : (
+            <RevisionLockScreen userName={userName} />
+          )}
         </ExitGuardProvider>
       </div>
     </div>
