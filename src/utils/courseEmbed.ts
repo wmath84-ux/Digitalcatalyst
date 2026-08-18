@@ -9,6 +9,29 @@ const safeUrl = (value?: string) => {
   }
 };
 
+/**
+ * github.com (including gist.github.com) sends
+ * `Content-Security-Policy: frame-ancestors 'none'` + `X-Frame-Options:
+ * deny`, so a direct iframe of those pages is a blank white surface. The
+ * app's /api/embed-proxy fetches them server-side and strips the blocking
+ * headers — embeds whose host matches here are routed through it.
+ */
+const GITHUB_FRAME_BLOCKED_HOST = /^([a-z0-9-]+\.)*github\.com$/i;
+
+/** True when this https URL's host refuses to be framed. */
+export const shouldProxyCourseEmbedUrl = (value: string): boolean => {
+  try {
+    const url = new URL(String(value || "").trim());
+    return url.protocol === "https:" && GITHUB_FRAME_BLOCKED_HOST.test(url.hostname);
+  } catch {
+    return false;
+  }
+};
+
+/** Same-origin proxy URL for a GitHub page that refuses to be framed. */
+export const getCourseEmbedProxyUrl = (value: string): string =>
+  `/api/embed-proxy?url=${encodeURIComponent(value)}`;
+
 export const getCourseFileUrl = (file: CourseFile) => safeUrl(file.embedUrl || file.youtubeUrl || file.url);
 
 export const extractYouTubeId = (value = "") => {
@@ -372,7 +395,12 @@ export const getCourseEmbed = (file: CourseFile, options: CourseEmbedOptions = {
     return { url: raw, kind: "slides" };
   }
   if ((file.type === "doc" || file.type === "sheet") && raw) return { url: `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(raw)}`, kind: file.type === "sheet" ? "sheet" : "doc" };
-  if (file.type === "embed" && raw) return { url: raw, kind: "embed" };
+  if (file.type === "embed" && raw) {
+    // GitHub pages / gist pages block framing — route them through the
+    // server-side proxy so the interactive page actually renders in-app.
+    const url = shouldProxyCourseEmbedUrl(raw) ? getCourseEmbedProxyUrl(raw) : raw;
+    return { url, kind: "embed" };
+  }
   return raw ? { url: raw, kind: "direct" } : { url: "", kind: "none" };
 };
 

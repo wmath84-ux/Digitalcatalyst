@@ -758,6 +758,29 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editM
     : 1;
   const scalingEditor = scalesEditor && stageWidth > 0 && editorScale < 1;
 
+  // Proxied GitHub embeds live under /api/embed-proxy?url=… — the failure
+  // panel's "Open original" link and Source line must point at the REAL host,
+  // not at the app's proxy path.
+  const openOriginalHref = (() => {
+    try {
+      const parsed = new URL(url, "https://x");
+      if (parsed.pathname === "/api/embed-proxy") {
+        const inner = parsed.searchParams.get("url");
+        if (inner) return inner;
+      }
+    } catch {
+      /* keep the embed URL itself */
+    }
+    return url;
+  })();
+  const sourceHost = (() => {
+    try {
+      return new URL(openOriginalHref).hostname;
+    } catch {
+      return "";
+    }
+  })();
+
   const frameStyle = mobileDocument && stageWidth > 0
     ? {
         width: `${MOBILE_VIEWPORT_WIDTH}px`,
@@ -807,7 +830,7 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editM
             </p>
             <div className="mt-5 flex items-center justify-center gap-2">
               <a
-                href={editMode && editorOriginalUrl ? editorOriginalUrl : url}
+                href={editMode && editorOriginalUrl ? editorOriginalUrl : openOriginalHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-4 py-2 text-xs font-black text-white"
@@ -827,7 +850,7 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editM
                 <RefreshCw size={14} /> Retry
               </button>
             </div>
-            <p className="mt-4 text-[10px] uppercase tracking-wider text-[var(--course-muted)]">Source: {new URL(url, "https://x").hostname}</p>
+            <p className="mt-4 text-[10px] uppercase tracking-wider text-[var(--course-muted)]">Source: {sourceHost}</p>
           </div>
         </div>
       ) : null}
