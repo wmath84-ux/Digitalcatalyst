@@ -361,12 +361,11 @@ export default function ProfileApp() {
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
         />
 
-        <main ref={mainRef} className="flex-1 overflow-y-auto px-4 py-5">
+        <main ref={mainRef} className="flex-1 overflow-y-auto px-4 pt-2 pb-5">
           <div className="space-y-5">
             <div className="flex items-center justify-between px-1">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-600">My account</p>
-                <h1 className="mt-1 text-xl font-black tracking-tight text-slate-950">Profile & library</h1>
+                <h1 className="text-xl font-black tracking-tight text-slate-950">Profile & library</h1>
               </div>
               <div className="flex items-center gap-2">
                 {membershipLoaded && membership.subscriber ? <span className="hidden rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 sm:inline-flex">{membership.active ? "Active" : "Expired"}</span> : null}

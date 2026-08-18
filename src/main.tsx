@@ -37,6 +37,7 @@ import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlis
 import type { PaidCourseUpdate } from "./types/course";
 import { isDesktopBrowserLocked, isInstalledMobilePwa, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
 import { disablePageZoom } from "./utils/disablePageZoom";
+import { setThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/themeColor";
 import { recordRouteVisit } from "./utils/routeHistory";
 import { requiresAuthentication } from "./utils/appRoutes";
 import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
@@ -599,6 +600,25 @@ function Root() {
   const cartProducts = shoppingProducts.filter((product) => cartIds.has(product.id));
   const favoriteProducts = shoppingProducts.filter((product) => favoriteIds.has(product.id));
   const protectedRoutePending = requiresAuthentication(hash) && (loading || !user);
+
+  // Keep the mobile status bar / browser chrome colour in sync with the
+  // screen on display. Only the dark brand screens (boot splash, landing,
+  // auth and admin login) get the dark bar; every light app screen switches
+  // the bar to the page background so it never shows black over light UI.
+  useEffect(() => {
+    const splashVisible =
+      loading
+      || skipLandingForInstalledMobilePwa
+      || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
+    const darkScreen =
+      splashVisible
+      || protectedRoutePending
+      || !hash
+      || hash.startsWith(LANDING_HASH)
+      || hash.startsWith(AUTH_HASH)
+      || hash.startsWith(ADMIN_LOGIN_HASH);
+    setThemeColor(darkScreen ? THEME_COLOR_DARK : THEME_COLOR_LIGHT);
+  }, [hash, loading, skipLandingForInstalledMobilePwa, protectedRoutePending, user, catalogLoading]);
 
   if (desktopLocked && !hash.startsWith(ADMIN_HASH) && !hash.startsWith(ADMIN_LOGIN_HASH)) {
     return <LandingApp />;

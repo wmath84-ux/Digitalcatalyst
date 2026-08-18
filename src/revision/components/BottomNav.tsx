@@ -2,11 +2,13 @@ import { useExitGuard } from "./ExitGuardContext";
 import { BankIcon, ChartIcon, DashboardIcon, HomeIcon, TargetIcon, UserIcon } from "./icons";
 
 // The revision footer now mirrors the website's own footer (src/components/BottomNav.tsx)
-// pixel-for-pixel: same container padding, same icon pill (h-9 w-12), same icon size
-// (h-5 w-5), same label size/weight, same active state. Only the tab set differs —
-// Home stays, and Dashboard / Bank / Weak Spots / Progress / Profile fill the other
-// slots. Dashboard sits right next to Home and points at the revision dashboard
-// (#/revision), which is the feature's own landing screen.
+// pixel-for-pixel: same container padding, same icon pill (h-9 w-14), same icon size
+// (h-5 w-5), same icon stroke width (2px), same label size/weight, same active state.
+// Only the tab set differs — Home stays, and Dashboard / Bank / Weak Spots / Progress /
+// Profile fill the other slots. Dashboard sits right next to Home and points at the
+// revision dashboard (#/revision), which is the feature's own landing screen.
+// Note: these local icons are drawn at strokeWidth 1.8 by default, so the footer
+// explicitly overrides the stroke to 2px to match the store/home footer's contrast.
 const TABS = [
   { href: "#/home", label: "Home", icon: HomeIcon, match: (p: string) => p === "#/home" },
   {
@@ -48,11 +50,11 @@ export default function BottomNav({ route }: { route: string }) {
               }`}
             >
               <span
-                className={`relative flex h-9 w-12 items-center justify-center rounded-full transition ${
+                className={`relative flex h-9 w-14 items-center justify-center rounded-full transition ${
                   active ? "bg-indigo-100" : ""
                 }`}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-5 w-5 [stroke-width:2px]" />
               </span>
               <span className="w-full truncate leading-tight">{tab.label}</span>
             </button>

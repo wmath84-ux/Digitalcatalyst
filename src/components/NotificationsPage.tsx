@@ -17,7 +17,7 @@ import {
   type SiteNotificationCategory,
 } from "../../utils/siteNotifications";
 import { useAuth } from "../context/AuthContext";
-import { BellIcon, BookOpenIcon, StoreIcon } from "./icons";
+import { BellIcon, BookOpenIcon, CheckIcon, StoreIcon } from "./icons";
 import { ensureSavedWebPushSubscription, isWebPushSupported } from "../../utils/webPush";
 
 type NotificationsPageProps = {
@@ -176,26 +176,55 @@ export default function NotificationsPage({
           onNavigateToSubscription={onNavigateToSubscription}
           onNavigateToCart={onNavigateToCart}
           onNavigateToNotifications={() => undefined}
-        />
-
-        <main className="flex-1 overflow-y-auto">
-          <div className="flex items-center justify-between px-4 pt-5 pb-3">
-            <div>
-              <h2 className="text-lg font-extrabold text-slate-900">Notifications</h2>
-              <p className="text-xs font-medium text-slate-400">
-                {unread > 0 ? `${unread} unread update${unread === 1 ? "" : "s"}` : "You're all caught up"}
-              </p>
-            </div>
-            {unread > 0 && (
+          icon={BellIcon}
+          title="Notifications"
+          subtitle={unread > 0 ? `${unread} unread update${unread === 1 ? "" : "s"}` : "You're all caught up"}
+          action={
+            unread > 0 ? (
               <button
                 type="button"
                 onClick={markAllRead}
-                className="text-xs font-bold text-indigo-600"
+                aria-label="Mark all read"
+                title="Mark all read"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm shadow-indigo-200 transition hover:bg-indigo-700 active:scale-95"
               >
-                Mark all read
+                <CheckIcon className="h-5 w-5" />
               </button>
-            )}
-          </div>
+            ) : null
+          }
+        >
+          {items.length > 0 && (
+            <div className="mt-3 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {NOTIFICATION_FILTER_ORDER.map((key) => {
+                const isActive = activeFilter === key;
+                const label = key === "all" ? "All" : FILTER_META[key].label;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActiveFilter(key)}
+                    className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition ${
+                      isActive
+                        ? "border-indigo-500 bg-indigo-600 text-white shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {label}
+                    <span
+                      className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
+                        isActive ? "bg-white/20 text-white" : "bg-indigo-50 text-indigo-600"
+                      }`}
+                    >
+                      {filterCounts[key]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </Header>
+
+        <main className="flex-1 overflow-y-auto">
 
           {pushPermission === "default" && (
             <div className="mx-4 mt-1 flex items-center justify-between gap-3 rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-100">
@@ -216,36 +245,6 @@ export default function NotificationsPage({
             <div className="mx-4 mt-1 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-100">
               <p className="text-sm font-bold text-slate-900">Notifications are blocked</p>
               <p className="mt-0.5 text-xs text-slate-500">Enable them in your browser's site settings (usually under App info → Notifications) to receive system alerts.</p>
-            </div>
-          )}
-
-          {items.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {NOTIFICATION_FILTER_ORDER.map((key) => {
-                const isActive = activeFilter === key;
-                const label = key === "all" ? "All" : FILTER_META[key].label;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setActiveFilter(key)}
-                    className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-semibold transition ${
-                      isActive
-                        ? "border-indigo-500 bg-indigo-600 text-white shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {label}
-                    <span
-                      className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
-                        isActive ? "bg-white/20 text-white" : "bg-indigo-50 text-indigo-600"
-                      }`}
-                    >
-                      {filterCounts[key]}
-                    </span>
-                  </button>
-                );
-              })}
             </div>
           )}
 

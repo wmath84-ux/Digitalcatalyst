@@ -597,14 +597,6 @@ function PremiumProductContent({
               <Trust icon={RotateCcw} label="Lifetime library" />
             </div>
 
-            {highlights.length > 0 && (
-              <div className="rounded-2xl border border-zinc-100 bg-white p-5">
-                <p className="mb-3 text-sm font-semibold text-zinc-900">What's included</p>
-                <ul className="space-y-2.5">
-                  {highlights.map((highlight) => <li key={highlight} className="flex items-start gap-2 text-sm text-zinc-600"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{highlight}</li>)}
-                </ul>
-              </div>
-            )}
           </section>
 
           {isProductOwned && availablePaidUpdates.length > 0 && (
@@ -629,7 +621,7 @@ function PremiumProductContent({
             </section>
           )}
 
-          <DetailsCard product={product} modules={modules} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
+          <DetailsCard product={product} modules={modules} highlights={highlights} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
           <ReviewsCard
             product={product}
             reviews={productReviews}
@@ -651,7 +643,7 @@ function PremiumProductContent({
   );
 }
 
-function DetailsCard({ product, modules, tab, onTab, expandedModule, onExpandModule }: { product: Product; modules: CurriculumModule[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void }) {
+function DetailsCard({ product, modules, highlights, tab, onTab, expandedModule, onExpandModule }: { product: Product; modules: CurriculumModule[]; highlights: string[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void }) {
   const tabs: DetailTab[] = ["Description", "Curriculum", "Instructor"];
   return (
     <section className="rounded-3xl border border-zinc-100 bg-white p-4 shadow-sm">
@@ -659,7 +651,17 @@ function DetailsCard({ product, modules, tab, onTab, expandedModule, onExpandMod
         {tabs.map((item) => <button key={item} onClick={() => onTab(item)} className={`flex-1 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition ${tab === item ? "bg-white text-zinc-900 shadow" : "text-zinc-500"}`}>{item}</button>)}
       </div>
       {tab === "Description" && (
-        <div className="space-y-4"><p className="text-sm leading-relaxed text-zinc-600">{product.description || `Complete information for ${product.title}.`}</p><div className="grid grid-cols-2 gap-3"><Fact label="Format" value={product.category} /><Fact label="Level" value={product.classLevel} /><Fact label="Subject" value={product.subject} /><Fact label="Access" value="Purchases library" /></div></div>
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-zinc-600">{product.description || `Complete information for ${product.title}.`}</p>
+          {highlights.length > 0 && (
+            <div className="rounded-2xl bg-zinc-50 p-4">
+              <p className="mb-3 text-sm font-semibold text-zinc-900">What's included</p>
+              <ul className="space-y-2.5">
+                {highlights.map((highlight) => <li key={highlight} className="flex items-start gap-2 text-sm text-zinc-600"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{highlight}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
       )}
       {tab === "Curriculum" && (
         modules.length === 0 ? <EmptyDetail text="No curriculum has been published for this product yet." /> : <div className="space-y-2">{modules.map((module, index) => (
@@ -791,7 +793,6 @@ function RatingStars({ rating, className = "" }: { rating: number; className?: s
 
 function Meta({ icon: Icon, text }: { icon: typeof Clock; text: string }) { return <div className="flex min-w-0 items-center gap-2"><Icon className="h-4 w-4 shrink-0 text-zinc-400" /><span className="truncate">{text}</span></div>; }
 function Trust({ icon: Icon, label }: { icon: typeof ShieldCheck; label: string }) { return <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-zinc-100 bg-white px-1 py-3 text-center shadow-sm"><Icon className="h-4 w-4 text-zinc-700" /><span className="text-[9px] font-medium text-zinc-500">{label}</span></div>; }
-function Fact({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-zinc-50 p-3"><p className="text-[10px] uppercase tracking-wide text-zinc-400">{label}</p><p className="mt-1 truncate text-xs font-semibold text-zinc-800">{value}</p></div>; }
 function EmptyDetail({ text }: { text: string }) { return <div className="flex flex-col items-center rounded-2xl bg-zinc-50 py-8 text-center"><PackageOpen className="h-7 w-7 text-zinc-300" /><p className="mt-2 px-5 text-xs text-zinc-400">{text}</p></div>; }
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "DC"; }
 
