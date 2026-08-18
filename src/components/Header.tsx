@@ -1,3 +1,4 @@
+import type { ComponentType, ReactNode } from "react";
 import { BellIcon, BookIcon, CartIcon, CrownIcon, DownloadIcon, SearchIcon } from "./icons";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
 
@@ -17,6 +18,21 @@ type HeaderProps = {
    * shows "My Day Activities".
    */
   subtitle?: string;
+  /**
+   * Logo icon override. The store shows a book; the notifications page
+   * shows a bell.
+   */
+  icon?: ComponentType<{ className?: string }>;
+  /**
+   * Optional extra action rendered at the far right of the header (for
+   * example the notifications page's circular "Mark all read" button).
+   */
+  action?: ReactNode;
+  /**
+   * Optional content rendered underneath the main row (for example the
+   * notifications page's filter chips).
+   */
+  children?: ReactNode;
   /**
    * When provided, the cart icon is replaced by a Download (report)
    * button. My Day uses this — its report download takes the cart's slot.
@@ -38,18 +54,22 @@ export default function Header({
   onNavigateToNotifications,
   title = "Eduvora",
   subtitle = "Premium learning store",
+  icon,
+  action,
+  children,
   onDownloadReport,
   onToggleSearch,
   searchActive = false,
 }: HeaderProps) {
   const liveNotificationCount = useUnreadNotificationCount();
   const displayedNotificationCount = liveNotificationCount ?? 0;
+  const LogoIcon = icon ?? BookIcon;
   return (
     <header data-site-header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-200">
-            <BookIcon className="h-6 w-6" />
+            <LogoIcon className="h-6 w-6" />
           </div>
           <div className="min-w-0 leading-tight">
             <h1 className="truncate text-lg font-extrabold tracking-tight text-slate-900">{title}</h1>
@@ -118,8 +138,10 @@ export default function Header({
           >
             <CrownIcon className="h-5 w-5" />
           </button>
+          {action}
         </div>
       </div>
+      {children}
     </header>
   );
 }
