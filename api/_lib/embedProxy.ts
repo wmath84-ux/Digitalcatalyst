@@ -1,10 +1,16 @@
-// api/embed-proxy.ts
+// api/_lib/embedProxy.ts
 //
-// Serverless proxy for course-player embeds whose hosts refuse to render
+// Shared proxy logic for course-player embeds whose hosts refuse to render
 // inside an iframe. github.com (and gist.github.com) send
 // `Content-Security-Policy: frame-ancestors 'none'` and
 // `X-Frame-Options: deny`, so a direct iframe shows nothing but a blank
 // white surface after the loading state clears.
+//
+// This is a PRIVATE helper (the `_lib` underscore prefix keeps it from
+// becoming its own serverless function). The public route is served by
+// `api/referral-leaderboard.ts`, which `vercel.json` rewrites to from
+// `/api/embed-proxy` — the Hobby plan caps serverless functions at 12,
+// and the project is already at that limit.
 //
 // The proxy fetches the page SERVER-side, strips the frame-blocking
 // headers, and rewrites the page's own subresource links (href/src/srcset/
@@ -132,7 +138,7 @@ const rewriteHtml = (html: string, baseUrl: string): string => {
       `${prefix}${quote}${rewriteSrcset(value, baseUrl)}${quote}`);
 };
 
-export default async function handler(
+export async function handleEmbedProxy(
   req: EmbedProxyRequest,
   res: EmbedProxyResponse,
   deps: EmbedProxyDeps = {},

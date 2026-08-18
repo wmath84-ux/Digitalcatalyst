@@ -5,11 +5,14 @@ import { FieldValue, getFirestore, Timestamp, type Firestore, type Transaction }
 export type VercelRequest = {
   method?: string;
   body?: Record<string, unknown>;
+  query?: Record<string, string | string[] | undefined>;
   headers?: Record<string, string | string[] | undefined>;
 };
 
 export type VercelResponse = {
   status: (code: number) => VercelResponse;
+  setHeader: (name: string, value: string) => VercelResponse;
+  end: (body?: string | Buffer) => void;
   json: (body: unknown) => void;
 };
 

@@ -10,10 +10,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import handler from "../api/embed-proxy.ts";
+import { handleEmbedProxy } from "../api/_lib/embedProxy.ts";
 
 const courseEmbed = fs.readFileSync("src/utils/courseEmbed.ts", "utf8");
-const proxy = fs.readFileSync("api/embed-proxy.ts", "utf8");
+const proxy = fs.readFileSync("api/_lib/embedProxy.ts", "utf8");
+const leaderboard = fs.readFileSync("api/referral-leaderboard.ts", "utf8");
+const vercelConfig = fs.readFileSync("vercel.json", "utf8");
 const viewer = fs.readFileSync("src/course/ResourceViewer.tsx", "utf8");
 
 // ---------------------------------------------------------------------------
@@ -47,7 +49,7 @@ class FakeRes {
 
 const run = async ({ url, accept = "text/html", method = "GET", fetchImpl, site = "same-origin" }) => {
   const res = new FakeRes();
-  await handler({ method, query: { url }, headers: { accept, "sec-fetch-site": site } }, res, { fetchImpl });
+  await handleEmbedProxy({ method, query: { url }, headers: { accept, "sec-fetch-site": site } }, res, { fetchImpl });
   return res;
 };
 
@@ -152,4 +154,34 @@ test("upstream failure renders a friendly in-frame error page with an escape lin
   assert.match(res.body, /This page could not be loaded/);
   assert.match(res.body, /Open the original page/);
   assert.match(res.body, /github\.com\/octocat\/Hello-World\/blob\/main\/index\.html/);
+});
+
+// ---------------------------------------------------------------------------
+// Deployment shape: the Hobby plan caps serverless functions at 12
+// ---------------------------------------------------------------------------
+
+test("the embed proxy is served through an existing function, not a new one", () => {
+  // github.com embeds were added as a NEW api route once — that exceeded
+  // Vercel Hobby's 12-function cap and every deployment failed. The proxy
+  // now lives in the private _lib helper and is served by the existing
+  // referral-leaderboard function through a rewrite.
+  assert.ok(!fs.existsSync("api/embed-proxy.ts"), "api/embed-proxy.ts must not exist as its own function");
+  assert.match(leaderboard, /handleEmbedProxy/);
+  assert.match(leaderboard, /req\.method === "GET" && req\.query\?\.url/);
+  assert.match(vercelConfig, /\/api\/embed-proxy/);
+  assert.match(vercelConfig, /\/api\/referral-leaderboard/);
+});
+
+test("serverless function count stays at or under the Hobby limit of 12", () => {
+  const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) return walk(full);
+    return [full];
+  });
+  // Vercel deploys every api/*.ts file as a function EXCEPT files whose
+  // path segment starts with "_" (private helpers, e.g. api/_lib/*).
+  const functions = walk("api").filter(
+    (file) => file.endsWith(".ts") && !file.split("/").some((segment) => segment.startsWith("_")),
+  );
+  assert.ok(functions.length <= 12, `serverless functions exceed the Hobby limit: ${functions.length} -> ${functions.join(", ")}`);
 });
