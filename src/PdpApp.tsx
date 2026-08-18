@@ -106,7 +106,7 @@ export default function ProductDetail(props: ProductDetailProps) {
           onNavigateToCart={props.onNavigateToCart || (() => undefined)}
           onNavigateToNotifications={props.onNavigateToNotifications || (() => undefined)}
         />
-        <main className="min-h-0 flex-1 overflow-y-auto">
+        <main data-pdp-scroll className="min-h-0 flex-1 overflow-y-auto">
           {props.product ? <PremiumProductContent {...props} product={props.product} /> : <MissingProduct onBack={props.onBack} />}
         </main>
         <BottomNav
@@ -298,8 +298,7 @@ function PremiumProductContent({
   };
 
   const primaryAction = () => {
-    if (isProductOwned && onOpenCourse) onOpenCourse(product);
-    else if (!unavailable) onCheckout(product.price, appliedCoupon?.code || null);
+    if (!unavailable) onCheckout(product.price, appliedCoupon?.code || null);
   };
 
   // Coupon handling — mirrors the subscription page. The code is validated
@@ -540,35 +539,64 @@ function PremiumProductContent({
               <Meta icon={BadgeCheck} text={`${modules.length} modules`} />
             </div>
 
-            <div className="relative rounded-3xl border border-zinc-200/80 bg-white/80 p-5 shadow-[0_10px_50px_-15px_rgba(0,0,0,0.15)]">
-              <div className="relative flex flex-wrap items-end gap-2">
-                <span className="text-4xl font-extrabold tracking-tight text-zinc-900">{isProductOwned ? "Owned" : formatPrice(product.price)}</span>
-                {!isProductOwned && product.originalPrice > product.price && <span className="mb-1 text-base text-zinc-400 line-through">{formatPrice(product.originalPrice)}</span>}
-                {!isProductOwned && discount > 0 && <span className="mb-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">-{discount}%</span>}
-              </div>
-              <div className="relative mt-5 flex gap-3">
-                <button disabled={unavailable} onClick={primaryAction} className="group flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-zinc-700 via-zinc-900 to-black px-4 py-3.5 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] disabled:cursor-not-allowed disabled:from-amber-200 disabled:via-amber-200 disabled:to-amber-300 disabled:text-amber-900 disabled:shadow-none active:scale-[0.98]">
-                  <Zap className="h-4 w-4 fill-current" /> {isProductOwned ? "Open Now" : unavailable ? "Coming soon" : "Buy Now"}
-                </button>
-                <button disabled={isProductOwned || inCart || unavailable} onClick={() => !unavailable && onAddToCart?.(product.id)} className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-zinc-300 bg-gradient-to-b from-white via-zinc-50 to-zinc-200 px-3 py-3.5 text-sm font-bold text-zinc-900 shadow-sm disabled:opacity-60">
-                  <ShoppingCart className="h-4 w-4" /> {isProductOwned ? "Purchased" : unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to Cart"}
-                </button>
-              </div>
-              <div className="relative mt-3 flex justify-end">
-                <div ref={shareRef} className="relative">
-                  <button type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-sm"><Share2 className="h-4 w-4" /></button>
-                  <div data-product-share className="absolute right-0 top-12 z-50 w-60 rounded-2xl border border-zinc-100 bg-white p-3 shadow-2xl" hidden={!shareOpen}>
-                    <p className="pb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Share this product</p>
-                    <div className="space-y-1.5">
-                      <button type="button" onClick={() => void shareNative()} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><Share2 className="h-3.5 w-3.5" /> Share via device</button>
-                      <button type="button" onClick={() => shareTo("whatsapp")} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</button>
-                      <button type="button" onClick={() => shareTo("telegram")} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><Send className="h-3.5 w-3.5" /> Telegram</button>
-                      <button type="button" onClick={() => void copyLink()} className="flex w-full items-center justify-between rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><span className="flex items-center gap-2"><Copy className="h-3.5 w-3.5" /> Copy product link</span>{copied && <Check className="h-3.5 w-3.5 text-emerald-500" />}</button>
+            {isProductOwned ? (
+              availablePaidUpdates.length > 0 ? (
+                <section data-pdp-upgrade-box className="relative overflow-hidden rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 shadow-[0_10px_50px_-15px_rgba(99,102,241,0.35)]">
+                  <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-indigo-200/40 blur-2xl" />
+                  <div className="relative flex items-start gap-3">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-200">
+                      <Zap size={20} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="text-[11px] font-black uppercase tracking-wider text-indigo-600">Course upgrade available</p>
+                        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-indigo-700">Premium content update</span>
+                      </div>
+                      <h2 className="mt-0.5 text-base font-black text-zinc-900">{availablePaidUpdates[0].title}</h2>
+                      <p className="mt-1 text-xs leading-5 text-zinc-600">New modules or files were added after your original purchase. Review exactly what is new before upgrading.</p>
+                    </div>
+                  </div>
+                  <button onClick={handleBuyUpgrade} className="relative mt-4 w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-black text-white shadow-md shadow-indigo-200 transition hover:brightness-110 active:scale-[0.99]">
+                    Buy upgrade · {formatPrice(availablePaidUpdates[0].cashPrice)}
+                  </button>
+                  {onOpenCourse ? (
+                    <button onClick={() => onOpenCourse(product)} className="relative mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-indigo-200 bg-white/80 py-2.5 text-xs font-bold text-indigo-600 transition hover:bg-indigo-50">
+                      <PlayCircle className="h-4 w-4" /> Open course in library
+                    </button>
+                  ) : null}
+                </section>
+              ) : null
+            ) : (
+              <div className="relative rounded-3xl border border-zinc-200/80 bg-white/80 p-5 shadow-[0_10px_50px_-15px_rgba(0,0,0,0.15)]">
+                <div className="relative flex flex-wrap items-end gap-2">
+                  <span className="text-4xl font-extrabold tracking-tight text-zinc-900">{formatPrice(product.price)}</span>
+                  {product.originalPrice > product.price && <span className="mb-1 text-base text-zinc-400 line-through">{formatPrice(product.originalPrice)}</span>}
+                  {discount > 0 && <span className="mb-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">-{discount}%</span>}
+                </div>
+                <div className="relative mt-5 flex gap-3">
+                  <button disabled={unavailable} onClick={primaryAction} className="group flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-zinc-700 via-zinc-900 to-black px-4 py-3.5 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] disabled:cursor-not-allowed disabled:from-amber-200 disabled:via-amber-200 disabled:to-amber-300 disabled:text-amber-900 disabled:shadow-none active:scale-[0.98]">
+                    <Zap className="h-4 w-4 fill-current" /> {unavailable ? "Coming soon" : "Buy Now"}
+                  </button>
+                  <button disabled={inCart || unavailable} onClick={() => !unavailable && onAddToCart?.(product.id)} className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-zinc-300 bg-gradient-to-b from-white via-zinc-50 to-zinc-200 px-3 py-3.5 text-sm font-bold text-zinc-900 shadow-sm disabled:opacity-60">
+                    <ShoppingCart className="h-4 w-4" /> {unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to Cart"}
+                  </button>
+                </div>
+                <div className="relative mt-3 flex justify-end">
+                  <div ref={shareRef} className="relative">
+                    <button type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-sm"><Share2 className="h-4 w-4" /></button>
+                    <div data-product-share className="absolute right-0 top-12 z-50 w-60 rounded-2xl border border-zinc-100 bg-white p-3 shadow-2xl" hidden={!shareOpen}>
+                      <p className="pb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Share this product</p>
+                      <div className="space-y-1.5">
+                        <button type="button" onClick={() => void shareNative()} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><Share2 className="h-3.5 w-3.5" /> Share via device</button>
+                        <button type="button" onClick={() => shareTo("whatsapp")} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</button>
+                        <button type="button" onClick={() => shareTo("telegram")} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><Send className="h-3.5 w-3.5" /> Telegram</button>
+                        <button type="button" onClick={() => void copyLink()} className="flex w-full items-center justify-between rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><span className="flex items-center gap-2"><Copy className="h-3.5 w-3.5" /> Copy product link</span>{copied && <Check className="h-3.5 w-3.5 text-emerald-500" />}</button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {unavailable && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -598,13 +626,6 @@ function PremiumProductContent({
             </div>
 
           </section>
-
-          {isProductOwned && availablePaidUpdates.length > 0 && (
-            <section className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 shadow-sm">
-              <div className="flex items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-500 text-white"><Zap size={20} /></span><div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-wider text-amber-700">Course upgrade available</p><h2 className="mt-0.5 text-base font-black text-zinc-900">{availablePaidUpdates[0].title}</h2><p className="mt-1 text-xs leading-5 text-zinc-600">New modules or files were added after your original purchase. Review exactly what is new before upgrading.</p></div></div>
-              <button onClick={handleBuyUpgrade} className="mt-4 w-full rounded-2xl bg-zinc-900 py-3 text-sm font-black text-white">Buy upgrade · {formatPrice(availablePaidUpdates[0].cashPrice)}</button>
-            </section>
-          )}
 
           {!isProductOwned && !unavailable && (
             <section id="pdp-purchase-options" className="scroll-mt-32">
@@ -645,30 +666,59 @@ function PremiumProductContent({
 
 function DetailsCard({ product, modules, highlights, tab, onTab, expandedModule, onExpandModule }: { product: Product; modules: CurriculumModule[]; highlights: string[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void }) {
   const tabs: DetailTab[] = ["Description", "Curriculum", "Instructor"];
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [tabBarStuck, setTabBarStuck] = useState(false);
+
+  // Magnet behaviour: the tab bar is sticky inside the PDP scroll container,
+  // so it sticks just below the app header while the user scrolls through the
+  // card. A 1px sentinel above the bar flips the "stuck" styling the moment
+  // the bar reaches the top edge.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || typeof IntersectionObserver === "undefined") return;
+    const root = sentinel.closest<HTMLElement>("[data-pdp-scroll]");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) setTabBarStuck(!entry.isIntersecting);
+      },
+      { root: root || null, threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <section className="rounded-3xl border border-zinc-100 bg-white p-4 shadow-sm">
-      <div className="mb-5 flex gap-1 overflow-x-auto rounded-2xl bg-zinc-100/70 p-1.5">
-        {tabs.map((item) => <button key={item} onClick={() => onTab(item)} className={`flex-1 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition ${tab === item ? "bg-white text-zinc-900 shadow" : "text-zinc-500"}`}>{item}</button>)}
-      </div>
-      {tab === "Description" && (
-        <div className="space-y-4">
-          <p className="text-sm leading-relaxed text-zinc-600">{product.description || `Complete information for ${product.title}.`}</p>
-          {highlights.length > 0 && (
-            <div className="rounded-2xl bg-zinc-50 p-4">
-              <p className="mb-3 text-sm font-semibold text-zinc-900">What's included</p>
-              <ul className="space-y-2.5">
-                {highlights.map((highlight) => <li key={highlight} className="flex items-start gap-2 text-sm text-zinc-600"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{highlight}</li>)}
-              </ul>
-            </div>
-          )}
+    <section className="rounded-3xl border border-zinc-100 bg-white shadow-sm">
+      <div ref={sentinelRef} aria-hidden className="h-px" />
+      <div
+        data-pdp-tabbar
+        className={`sticky top-0 z-30 bg-white/95 px-3 pb-2 pt-3 backdrop-blur transition-shadow duration-200 ${tabBarStuck ? "shadow-[0_10px_24px_-12px_rgba(24,24,27,0.28)]" : "rounded-t-[23px]"}`}
+      >
+        <div className="flex gap-1 overflow-x-auto rounded-2xl bg-zinc-100/70 p-1.5">
+          {tabs.map((item) => <button key={item} onClick={() => onTab(item)} className={`flex-1 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition ${tab === item ? "bg-white text-zinc-900 shadow" : "text-zinc-500 hover:text-zinc-700"}`}>{item}</button>)}
         </div>
-      )}
-      {tab === "Curriculum" && (
-        modules.length === 0 ? <EmptyDetail text="No curriculum has been published for this product yet." /> : <div className="space-y-2">{modules.map((module, index) => (
-          <CurriculumModuleRow key={module.id || `${module.title}-${index}`} module={module} index={index} expandedModule={expandedModule} onExpandModule={onExpandModule} />
-        ))}</div>
-      )}
-      {tab === "Instructor" && <div className="flex items-start gap-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-700 via-zinc-500 to-zinc-800 text-lg font-bold text-white shadow-lg">{initials(product.instructor)}</div><div><p className="font-bold text-zinc-900">{product.instructor}</p><p className="text-xs text-zinc-500">Creator of {product.title}</p><p className="mt-2 text-sm leading-relaxed text-zinc-500">Instructor information is synced from this live product's catalog record.</p></div></div>}
+      </div>
+      <div className="p-4 pt-3">
+        {tab === "Description" && (
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-zinc-600">{product.description || `Complete information for ${product.title}.`}</p>
+            {highlights.length > 0 && (
+              <div className="rounded-2xl bg-zinc-50 p-4">
+                <p className="mb-3 text-sm font-semibold text-zinc-900">What's included</p>
+                <ul className="space-y-2.5">
+                  {highlights.map((highlight) => <li key={highlight} className="flex items-start gap-2 text-sm text-zinc-600"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{highlight}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+        {tab === "Curriculum" && (
+          modules.length === 0 ? <EmptyDetail text="No curriculum has been published for this product yet." /> : <div className="space-y-2">{modules.map((module, index) => (
+            <CurriculumModuleRow key={module.id || `${module.title}-${index}`} module={module} index={index} expandedModule={expandedModule} onExpandModule={onExpandModule} />
+          ))}</div>
+        )}
+        {tab === "Instructor" && <div className="flex items-start gap-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-700 via-zinc-500 to-zinc-800 text-lg font-bold text-white shadow-lg">{initials(product.instructor)}</div><div><p className="font-bold text-zinc-900">{product.instructor}</p><p className="text-xs text-zinc-500">Creator of {product.title}</p><p className="mt-2 text-sm leading-relaxed text-zinc-500">Instructor information is synced from this live product's catalog record.</p></div></div>}
+      </div>
     </section>
   );
 }
@@ -680,7 +730,7 @@ function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, de
   return (
     <div className="overflow-hidden rounded-2xl border border-zinc-100" style={{ marginLeft: depth ? depth * 12 : 0 }}>
       <button type="button" onClick={() => onExpandModule(open ? null : module.id)} className="flex w-full items-center gap-3 bg-zinc-50/60 px-3 py-3 text-left">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">{index + 1}</span>
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white shadow-sm shadow-indigo-200">{index + 1}</span>
         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-800">{module.title}</span>
         <span className="text-[10px] text-zinc-400">{resources.length} resources{childModules.length ? ` · ${childModules.length} modules` : ""}</span>
         <ChevronDown className={`h-4 w-4 text-zinc-400 transition ${open ? "rotate-180" : ""}`} />
