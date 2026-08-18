@@ -12,6 +12,7 @@ import { useCourseAccess } from "./hooks/useCourseAccess";
 import { isEmptyRichText, richTextToPlain, sanitizeRichText } from "./utils/richText";
 import { useRotatedScroll } from "./course/useRotatedScroll";
 import { enterCourseLandscapeChrome, restoreStatusBarFromCoursePlayer, syncCourseLandscapeChromeColor } from "./utils/courseStatusBar";
+import { enterCoursePlayerRotation, exitCoursePlayerRotation } from "./utils/appOrientation";
 import { getCourseEmbed, VIEWPORT_AWARE_KINDS } from "./utils/courseEmbed";
 import { applyDocumentViewportMode, isBrowserDesktopSiteMode, resetDocumentViewportMode } from "./utils/documentViewportMode";
 import {
@@ -230,6 +231,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // The rotated immersive view only makes sense on a portrait viewport —
   // once the device is physically turned, drop back to the rail layout.
   useEffect(() => { if (isLandscape) setImmersive(false); }, [isLandscape]);
+
+  // ── App-wide orientation lock ───────────────────────────────────────────
+  // The Course Player is the ONLY screen where rotating the phone is
+  // allowed. Mounting the player unlocks the screen orientation; unmounting
+  // it locks the whole app straight back to portrait so no other screen can
+  // ever open in landscape.
+  useEffect(() => {
+    enterCoursePlayerRotation();
+    return () => exitCoursePlayerRotation();
+  }, []);
 
   // ── Status bar (phone chrome) ───────────────────────────────────────────
   // On mobile the phone's status bar is hidden BY DEFAULT while the player

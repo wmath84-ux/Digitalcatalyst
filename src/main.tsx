@@ -24,6 +24,7 @@ import NotificationsPage from "./components/NotificationsPage";
 import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
 import { CheckoutProvider } from "./checkout/CheckoutContext";
@@ -875,6 +876,7 @@ createRoot(document.getElementById("root")!).render(
         <CommerceProvider>
           <Root />
           <RenewalNotice />
+          <PortraitOnlyGuard />
         </CommerceProvider>
       </CatalogProvider>
     </AuthProvider>
