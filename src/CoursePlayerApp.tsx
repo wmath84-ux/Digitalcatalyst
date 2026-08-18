@@ -11,6 +11,7 @@ import { useAuth } from "./context/AuthContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
 import { isEmptyRichText, richTextToPlain, sanitizeRichText } from "./utils/richText";
 import { useRotatedScroll } from "./course/useRotatedScroll";
+import { enterCourseLandscapeChrome, restoreStatusBarFromCoursePlayer, syncCourseLandscapeChromeColor } from "./utils/courseStatusBar";
 import { getCourseEmbed, VIEWPORT_AWARE_KINDS } from "./utils/courseEmbed";
 import { applyDocumentViewportMode, isBrowserDesktopSiteMode, resetDocumentViewportMode } from "./utils/documentViewportMode";
 import {
@@ -229,6 +230,31 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // The rotated immersive view only makes sense on a portrait viewport —
   // once the device is physically turned, drop back to the rail layout.
   useEffect(() => { if (isLandscape) setImmersive(false); }, [isLandscape]);
+
+  // ── Status bar (phone chrome) ───────────────────────────────────────────
+  // On mobile the phone's status bar is hidden BY DEFAULT while the player
+  // is in landscape or the quarter-turned immersive view. There is no user
+  // option for this — it is simply always off during landscape learning
+  // and restored the moment the player leaves landscape or unmounts.
+  const courseBackgroundForStatusBar = theme === "dark" ? "#090912" : "#f1f5f9";
+  useEffect(() => {
+    if (isLandscape || immersive) {
+      enterCourseLandscapeChrome(courseBackgroundForStatusBar);
+      return () => restoreStatusBarFromCoursePlayer();
+    }
+    restoreStatusBarFromCoursePlayer();
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLandscape, immersive]);
+
+  // Theme flips while already in landscape only re-blend the bar colour —
+  // a fresh fullscreen request here would be gesture-less and get blocked.
+  useEffect(() => {
+    if (isLandscape || immersive) syncCourseLandscapeChromeColor(courseBackgroundForStatusBar);
+  }, [courseBackgroundForStatusBar, isLandscape, immersive]);
+
+  // Whatever happens, unmounting the player puts the phone chrome back.
+  useEffect(() => () => restoreStatusBarFromCoursePlayer(), []);
 
   // The preference is scoped to the Course Player and restored on the next
   // visit without changing the theme of the rest of the application.
@@ -592,7 +618,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
         {!useLandscapeRails ? (
           <button
             type="button"
-            onClick={() => setImmersive(true)}
+            onClick={() => {
+              // The tap is a real user gesture — hide the phone status bar
+              // (true fullscreen) before the rotated view renders. Calling
+              // this again from the landscape effect is a safe no-op.
+              enterCourseLandscapeChrome(courseBackgroundForStatusBar);
+              setImmersive(true);
+            }}
             className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
             aria-label="Rotate to fullscreen"
             title="Rotate to fullscreen"
@@ -751,7 +783,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // phone. Both side rails rotate with the viewer and remain interactive.
   if (immersive && !isLandscape) {
     return (
-      <div className="fixed inset-0 z-[100] overflow-hidden bg-black" data-course-mobile-landscape-viewport>
+      <div className="fixed inset-0 z-[100] overflow-hidden bg-black" data-course-mobile-landscape-viewport data-course-statusbar-hidden="true">
         <div
           ref={immersiveRootRef}
           className="course-rotated-surface absolute left-1/2 top-1/2 origin-center overflow-hidden"
@@ -769,7 +801,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // ── Landscape: header rail left, content centre, toggle rail right ──
   if (isLandscape) {
     return (
-      <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" style={{ colorScheme: browserColorScheme }}>
+      <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" data-course-statusbar-hidden="true" style={{ colorScheme: browserColorScheme }}>
         {landscapeLayout(false)}
       </div>
     );
