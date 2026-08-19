@@ -4,9 +4,9 @@
 //
 //   - A single "+" button opens a LARGE rich-text editor that fills the
 //     notes sheet, so long notes are comfortable to read while writing.
-//   - "Save" collapses the note back into the same thin one-line strip the
-//     panel has always shown — the big surface is an editing affordance
-//     only, it never changes how a saved note looks in the list.
+//   - "Save" collapses the note back into a square card in a grid — the
+//     big surface is an editing affordance only, it never changes how a
+//     saved note looks in the list.
 //   - The edit icon reopens that same large editor inline.
 //   - Delete removes the note.
 //   - Pasting from anywhere (Docs, Notion, a website, an IDE, chat) keeps
@@ -17,7 +17,7 @@
 // stay on the device and don't collide with Firestore course progress.
 
 import { useEffect, useState } from "react";
-import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import type { CoursePlayerNote } from "../types/course";
 import RichTextEditor from "./RichTextEditor";
 import { isEmptyRichText, plainToRichText, richTextToPlain } from "../utils/richText";
@@ -35,6 +35,24 @@ interface NotesPanelProps {
 // pipeline so nothing in the list ever disappears after the upgrade.
 const noteHtml = (note: CoursePlayerNote) => note.html || plainToRichText(note.text || "");
 const notePreview = (note: CoursePlayerNote) => richTextToPlain(noteHtml(note)) || note.text || "";
+
+/** Filled, high-contrast action marks — heavier than the old outline icons. */
+function PremiumEditIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M16.1 2.6a2.8 2.8 0 0 1 4 4L9.4 17.3l-5.2 1.5 1.5-5.2L16.1 2.6Z" />
+      <path d="M3.2 20.2h17.6v2.2H3.2z" />
+    </svg>
+  );
+}
+
+function PremiumDeleteIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M9.2 2.4h5.6l1.1 2.2H21v2.4H3V4.6h5.1L9.2 2.4Zm.6 7.2h2.3v8.4H9.8V9.6Zm4.1 0h2.3v8.4h-2.3V9.6ZM5.4 7.8h13.2l-1.1 13.4H6.5L5.4 7.8Z" />
+    </svg>
+  );
+}
 
 export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpenChange }: NotesPanelProps) {
   const [composing, setComposing] = useState(false);
@@ -156,52 +174,50 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
         </button>
       </div>
 
-      {/* Note list — thin strips. A saved note always collapses back to one
-          slim line; the rich formatting is preserved underneath and shown
-          again the moment the note is reopened for editing. */}
+      {/* Note list — square cards in a grid. A saved note always collapses
+          back to a compact square; the rich formatting is preserved
+          underneath and shown again the moment the note is reopened. */}
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {notes.length === 0 ? (
           <p className="rounded-lg border border-dashed border-[var(--course-border)] p-4 text-center text-xs font-semibold text-[var(--course-muted)]">
             No notes yet — tap + to add one.
           </p>
         ) : (
-          <ul className="relative space-y-1.5" data-course-notes-list data-course-notes-wire="true">
-            {notes.map((note, index) => {
+          <ul className="grid grid-cols-2 gap-3.5 sm:grid-cols-3" data-course-notes-list data-course-notes-grid="true">
+            {notes.map((note) => {
               const preview = notePreview(note);
-              const last = index === notes.length - 1;
               return (
                 <li
                   key={note.id}
-                  className="relative flex items-center gap-2"
+                  className="relative aspect-square overflow-visible rounded-2xl p-2.5"
                   data-course-note
                   data-note-id={note.id}
                 >
-                  <span className="relative flex h-8 w-4 shrink-0 flex-col items-center">
-                    <span className={`w-px flex-1 ${index === 0 ? "bg-transparent" : "bg-violet-400/30"}`} />
-                    <span className="relative z-10 h-2 w-2 rounded-full border border-violet-400 bg-[var(--course-panel)] shadow-[0_0_8px_rgba(167,139,250,0.55)]" />
-                    <span className={`w-px flex-1 ${last ? "bg-transparent" : "bg-violet-400/30"}`} />
-                  </span>
-                  <span className="flex min-w-0 flex-1 items-center gap-1.5 rounded-xl border border-[var(--course-border)] bg-[var(--course-soft)] py-1.5 pl-2.5 pr-1.5">
-                  <span className="min-w-0 flex-1 truncate text-xs text-[var(--course-muted)]" title={preview}>{preview}</span>
-                  <button
-                    type="button"
-                    onClick={() => startEdit(note)}
-                    className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
-                    aria-label="Edit note"
-                    data-course-note-edit
-                  >
-                    <Pencil size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(note.id)}
-                    className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-rose-300/70 transition hover:bg-rose-500/15 hover:text-rose-200"
-                    aria-label="Delete note"
-                    data-course-note-delete
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                  </span>
+                  <div className="flex h-full flex-col overflow-hidden">
+                    <p className="min-h-0 flex-1 overflow-hidden text-xs leading-snug text-[var(--course-muted)] line-clamp-5" title={preview}>
+                      {preview}
+                    </p>
+                    <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(note)}
+                        className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-[0_4px_10px_rgba(37,99,235,0.45)] transition hover:brightness-110"
+                        aria-label="Edit note"
+                        data-course-note-edit
+                      >
+                        <PremiumEditIcon />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(note.id)}
+                        className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-800 text-white shadow-[0_4px_10px_rgba(37,99,235,0.4)] transition hover:brightness-110"
+                        aria-label="Delete note"
+                        data-course-note-delete
+                      >
+                        <PremiumDeleteIcon />
+                      </button>
+                    </div>
+                  </div>
                 </li>
               );
             })}

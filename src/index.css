@@ -331,6 +331,29 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   animation: eq 0.8s ease-in-out infinite;
 }
 
+/* Course Player — square note cards lift off the panel with a mixed
+   blue gradient glow so the boxes stay readable against both themes. */
+[data-course-notes-grid] [data-course-note] {
+  background:
+    linear-gradient(165deg, rgb(125 211 252 / 0.22), rgb(37 99 235 / 0.08) 46%, rgb(29 78 216 / 0.04)),
+    var(--course-soft);
+  border: 1px solid rgb(96 165 250 / 0.38);
+  box-shadow:
+    0 16px 28px -12px rgb(37 99 235 / 0.62),
+    0 8px 18px -8px rgb(14 165 233 / 0.48),
+    0 0 0 1px rgb(59 130 246 / 0.22);
+}
+
+.course-player-shell[data-course-theme="light"] [data-course-notes-grid] [data-course-note] {
+  background:
+    linear-gradient(165deg, rgb(219 234 254 / 0.95), rgb(191 219 254 / 0.55) 48%, #ffffff);
+  border-color: rgb(59 130 246 / 0.28);
+  box-shadow:
+    0 16px 26px -12px rgb(37 99 235 / 0.42),
+    0 8px 16px -8px rgb(14 165 233 / 0.32),
+    0 0 0 1px rgb(59 130 246 / 0.16);
+}
+
 /* Course Player — overlay content swap (tab switch) */
 @keyframes course-overlay-in {
   from { opacity: 0; transform: translateY(14px); }

@@ -170,11 +170,17 @@ test("NotesPanel supports add, edit, and delete via a single + button", () => {
   assert.match(notesPanel, /data-course-note-delete/);
 });
 
-test("NotesPanel renders the empty state and a thin-strip notes list", () => {
+test("NotesPanel renders the empty state and a square-grid notes list", () => {
   assert.match(notesPanel, /data-course-notes-list/);
+  assert.match(notesPanel, /data-course-notes-grid/);
   assert.match(notesPanel, /No notes yet/);
   assert.match(notesPanel, /data-course-note/);
-  assert.match(notesPanel, /truncate text-xs/);
+  assert.match(notesPanel, /aspect-square/);
+  assert.match(notesPanel, /grid-cols-2/);
+  assert.match(notesPanel, /function PremiumEditIcon/);
+  assert.match(notesPanel, /function PremiumDeleteIcon/);
+  assert.doesNotMatch(notesPanel, /<Pencil /);
+  assert.doesNotMatch(notesPanel, /<Trash2 /);
 });
 
 test("NotesPanel drops the context box and keeps only the + composer", () => {
@@ -318,6 +324,13 @@ test("Modules overlay lists available modules, Resources lists only files", () =
   assert.match(overlay, /mode === "resources"/);
 });
 
+test("Resources overlay hides paid modules because they already have a dedicated Paid tab", () => {
+  assert.match(overlay, /const isPaidContent/);
+  assert.match(overlay, /!isPaidContent\(module\)/);
+  assert.match(overlay, /mode !== "resources" \|\| !isPaidContent\(file\)/);
+  assert.match(overlay, /moduleFiles\(module\)\.some\(\(file\) => isVisibleFile\(file\) && !isPaidContent\(file\)\)/);
+});
+
 test("Modules overlay only lists unlocked modules — locked/paid modules live in the Paid tab", () => {
   // The "Module" tab must not double-list purchasable content: locked and
   // paid modules are filtered out of the wire tree and surfaced through the
@@ -358,6 +371,15 @@ test("Custom AudioPlayer replaces the native audio element with a transport", ()
   assert.match(audioPlayer, /data-course-audio-loop/);
   assert.match(audioPlayer, /data-course-audio-mute/);
   assert.match(resourceViewer, /<AudioPlayer/);
+});
+
+test("CoursePlayer header uses the website logo in the back slot and keeps onBack", () => {
+  assert.match(coursePlayer, /data-course-back/);
+  assert.match(coursePlayer, /data-course-logo-back/);
+  assert.match(coursePlayer, /data-course-logo/);
+  assert.match(coursePlayer, /src="\/icons\/icon-192x192\.svg"/);
+  assert.match(coursePlayer, /onClick=\{onBack\}/);
+  assert.doesNotMatch(coursePlayer, /<ArrowLeft/);
 });
 
 test("CoursePlayer rotates content into a landscape layout with vertical header + toggles", () => {
