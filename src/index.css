@@ -337,6 +337,14 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   animation: course-overlay-in 0.22s ease both;
 }
 
+/* Course Player — left wire tree that connects modules to their files. */
+[data-course-overlay-wire] [data-course-wire-rail] {
+  isolation: isolate;
+}
+[data-course-overlay-wire] [data-course-wire-node] + [data-course-wire-node] {
+  margin-top: 0.05rem;
+}
+
 /* Course Player — scoped dark / light palette. The variables inherit through
    the viewer, overlay, notes and media tools without changing the site theme. */
 .course-player-shell {

@@ -165,16 +165,23 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
             No notes yet — tap + to add one.
           </p>
         ) : (
-          <ul className="space-y-1.5" data-course-notes-list>
-            {notes.map((note) => {
+          <ul className="relative space-y-1.5" data-course-notes-list data-course-notes-wire="true">
+            {notes.map((note, index) => {
               const preview = notePreview(note);
+              const last = index === notes.length - 1;
               return (
                 <li
                   key={note.id}
-                  className="flex items-center gap-1.5 rounded-md border border-[var(--course-border)] bg-[var(--course-soft)] py-1.5 pl-2.5 pr-1.5"
+                  className="relative flex items-center gap-2"
                   data-course-note
                   data-note-id={note.id}
                 >
+                  <span className="relative flex h-8 w-4 shrink-0 flex-col items-center">
+                    <span className={`w-px flex-1 ${index === 0 ? "bg-transparent" : "bg-violet-400/30"}`} />
+                    <span className="relative z-10 h-2 w-2 rounded-full border border-violet-400 bg-[var(--course-panel)] shadow-[0_0_8px_rgba(167,139,250,0.55)]" />
+                    <span className={`w-px flex-1 ${last ? "bg-transparent" : "bg-violet-400/30"}`} />
+                  </span>
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5 rounded-xl border border-[var(--course-border)] bg-[var(--course-soft)] py-1.5 pl-2.5 pr-1.5">
                   <span className="min-w-0 flex-1 truncate text-xs text-[var(--course-muted)]" title={preview}>{preview}</span>
                   <button
                     type="button"
@@ -194,6 +201,7 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
                   >
                     <Trash2 size={12} />
                   </button>
+                  </span>
                 </li>
               );
             })}
