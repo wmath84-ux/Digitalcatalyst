@@ -13,6 +13,7 @@ interface RemindersProps {
   onDelete: (id: string) => void;
   /** Id of the reminder a notification deep-linked to — scrolls to it + highlights it. */
   highlightId?: string | null;
+  onRequireAccess?: () => boolean;
 }
 
 function getTimeStatus(time: string, done: boolean) {
@@ -32,19 +33,21 @@ const emptyReminder = (): Reminder => ({
   createdAt: Date.now(),
 });
 
-export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete, highlightId = null }: RemindersProps) {
+export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete, highlightId = null, onRequireAccess }: RemindersProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [form, setForm] = useState<Reminder>(emptyReminder());
   const listRef = useRef<HTMLDivElement>(null);
 
   const openAdd = () => {
+    if (onRequireAccess && !onRequireAccess()) return;
     setEditingReminder(null);
     setForm(emptyReminder());
     setModalOpen(true);
   };
 
   const openEdit = (rem: Reminder) => {
+    if (onRequireAccess && !onRequireAccess()) return;
     setEditingReminder(rem);
     setForm({ ...rem });
     setModalOpen(true);

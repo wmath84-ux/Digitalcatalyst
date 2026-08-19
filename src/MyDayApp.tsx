@@ -27,7 +27,9 @@ import type { ToastMessage } from "./components/ui/Toast";
 import { initialNotes, initialReminders, initialSchedule, initialTasks } from "./data/sampleData";
 import type { NoteColor, QuickNote, Reminder, ScheduleEvent, Task, TaskStatus } from "./types";
 import { useCommerce } from "./context/CommerceContext";
+import { useAuth } from "./context/AuthContext";
 import { useMyDayAccess } from "./hooks/useMyDayAccess";
+import PremiumGate from "./components/subscription/PremiumGate";
 import { playSfxAdd, playSfxComplete, playSfxRemove, playSfxSuccess, playSfxToggle } from "./utils/sfx";
 
 const NOTE_COLORS: NoteColor[] = ["amber", "sky", "rose", "emerald", "violet"];
@@ -51,6 +53,7 @@ const CREATE_OPTIONS: { id: DaySection; label: string; hint: string; icon: typeo
 
 export default function App() {
   const { cartIds } = useCommerce();
+  const { user } = useAuth();
   const { hasAccess: hasMyDayAccess, uid } = useMyDayAccess();
   const [cloudLoaded, setCloudLoaded] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -65,14 +68,11 @@ export default function App() {
   const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
   const [activeSection, setActiveSection] = useState<DaySection>("overview");
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
-  // Item id a notification deep-linked to (via #/my-day?section=…&item=…).
-  // The section opens and the matching card is scrolled into view + ringed.
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
-  // Set true once the user mutates My Day locally (add/edit/delete/toggle).
-  // Prevents the in-flight cloud load from clobbering a change the user made
-  // before the initial Firestore read finished.
   const mutatedRef = useRef(false);
+
+  const userName = user?.name?.split(" ")[0] || "Learner";
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({
@@ -92,16 +92,16 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const canSaveMyDay = useCallback(() => {
+  // Same beautiful premium gate for My Day – appears when user tries to create/save
+  const requireMyDayAccess = useCallback(() => {
     if (hasMyDayAccess) return true;
     setPaywallOpen(true);
     return false;
   }, [hasMyDayAccess]);
 
-  // Write the current My Day arrays to Firestore. Used as write-through on
-  // deletes (and any mutation) so a removal is persisted to the cloud
-  // immediately — not just reflected in local state. Best-effort: a failed
-  // write must never block the UI.
+  // Keep alias for older handlers
+  const canSaveMyDay = requireMyDayAccess;
+
   const persistMyDay = useCallback(
     (next: Partial<{ tasks: Task[]; schedule: ScheduleEvent[]; notes: QuickNote[]; reminders: Reminder[] }>) => {
       mutatedRef.current = true;
@@ -118,10 +118,6 @@ export default function App() {
         },
         { merge: true },
       ).catch(() => {
-        // A failed cloud write must never block the UI, but it must also
-        // never fail silently — otherwise a My Day save can be lost without
-        // the user ever knowing. Surface it so this class of bug can't
-        // regress invisibly again.
         addToast("My Day cloud save failed", "error");
       });
     },
@@ -134,9 +130,6 @@ export default function App() {
     void getDoc(doc(db, "users", uid, "myDay", "current")).then((snapshot) => {
       if (cancelled) return;
       const data = snapshot.data() || {};
-      // If the user already made a change (e.g. deleted an item) while the
-      // read was in flight, keep their local state — do not resurrect a
-      // just-deleted item from the older cloud snapshot.
       if (!mutatedRef.current) {
         if (!snapshot.exists()) { setTasks([]); setSchedule([]); setNotes([]); setReminders([]); }
         if (Array.isArray(data.tasks)) setTasks(data.tasks as Task[]);
@@ -156,9 +149,6 @@ export default function App() {
     });
   }, [addToast, cloudLoaded, hasMyDayAccess, notes, reminders, schedule, tasks, uid]);
 
-  // Close the "Add to your day" menu when the user taps/clicks outside it, or
-  // scrolls anywhere outside the menu (page scroll, a scroll container, or a
-  // touch drag). Selecting an option already closes it via handleNavigate.
   useEffect(() => {
     if (!createMenuOpen) return;
     const closeOnOutsidePointer = (event: Event) => {
@@ -195,10 +185,6 @@ export default function App() {
     setHighlightId(null);
   }, []);
 
-  // Notification deep links land on #/my-day?section=<tab>&item=<id>. Apply
-  // the section on mount and whenever the hash changes (e.g. the user taps a
-  // notification from another tab of the same app), and hand the item id to
-  // the section component so it can scroll to + highlight the exact item.
   useEffect(() => {
     const applyDeepLink = () => {
       const hash = window.location.hash;
@@ -259,14 +245,16 @@ export default function App() {
   }, [addToast, persistMyDay, showConfirm, tasks]);
 
   const openAddTask = useCallback(() => {
+    if (!requireMyDayAccess()) return;
     setEditingTask(null);
     setTaskModalOpen(true);
-  }, []);
+  }, [requireMyDayAccess]);
 
   const openEditTask = useCallback((task: Task) => {
+    if (!requireMyDayAccess()) return;
     setEditingTask(task);
     setTaskModalOpen(true);
-  }, []);
+  }, [requireMyDayAccess]);
 
   const handleSaveTask = useCallback((task: Task) => {
     if (!canSaveMyDay()) return;
@@ -281,14 +269,16 @@ export default function App() {
   }, [addToast, canSaveMyDay, editingTask]);
 
   const openAddEvent = useCallback(() => {
+    if (!requireMyDayAccess()) return;
     setEditingEvent(null);
     setScheduleModalOpen(true);
-  }, []);
+  }, [requireMyDayAccess]);
 
   const openEditEvent = useCallback((event: ScheduleEvent) => {
+    if (!requireMyDayAccess()) return;
     setEditingEvent(event);
     setScheduleModalOpen(true);
-  }, []);
+  }, [requireMyDayAccess]);
 
   const handleSaveEvent = useCallback((event: ScheduleEvent) => {
     if (!canSaveMyDay()) return;
@@ -348,10 +338,11 @@ export default function App() {
   }, [addToast, canSaveMyDay]);
 
   const handleEditReminder = useCallback((reminder: Reminder) => {
+    if (!canSaveMyDay()) return;
     setReminders((prev) => prev.map((r) => (r.id === reminder.id ? reminder : r)));
     playSfxSuccess();
     addToast("Reminder updated");
-  }, [addToast]);
+  }, [addToast, canSaveMyDay]);
 
   const handleToggleReminder = useCallback((id: string) => {
     setReminders((prev) => prev.map((r) => (r.id !== id ? r : { ...r, done: !r.done })));
@@ -449,7 +440,6 @@ export default function App() {
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
         />
 
-        {/* Search dropdown toggled from the header's search button. */}
         {showMobileSearch && (
           <div className="animate-slideUp border-b border-indigo-100 bg-white px-4 pb-3 pt-2">
             <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/50 px-3.5 py-2.5 ring-2 ring-indigo-100">
@@ -480,7 +470,7 @@ export default function App() {
             {activeSection === "overview" && (
               <section className="space-y-8">
                 <GreetingHeader
-                  name="Aarav"
+                  name={userName}
                   completed={completedCount}
                   total={tasks.length}
                   streak={12}
@@ -508,7 +498,11 @@ export default function App() {
                           <button
                             key={option.id}
                             type="button"
-                            onClick={() => handleNavigate(option.id)}
+                            onClick={() => {
+                              // When user selects what to create, check access immediately
+                              if (!requireMyDayAccess()) { setCreateMenuOpen(false); return; }
+                              handleNavigate(option.id);
+                            }}
                             className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
                           >
                             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
@@ -558,6 +552,7 @@ export default function App() {
                 onToggle={handleToggleReminder}
                 onDelete={handleDeleteReminder}
                 highlightId={highlightId}
+                onRequireAccess={requireMyDayAccess}
               />
             )}
 
@@ -568,6 +563,7 @@ export default function App() {
                 onEdit={handleEditNote}
                 onDelete={handleDeleteNote}
                 globalSearch={globalSearch}
+                onRequireAccess={requireMyDayAccess}
               />
             )}
           </main>
@@ -598,16 +594,17 @@ export default function App() {
         onCancel={() => setConfirmOpen(false)}
       />
 
-      {paywallOpen && (
-        <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/50 px-5" onClick={() => setPaywallOpen(false)}>
-          <div className="w-full max-w-sm rounded-3xl bg-white p-5 text-center shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <h2 className="text-lg font-black text-slate-900">My Day cloud saving</h2>
-            <p className="mt-2 text-sm leading-5 text-slate-500">Cloud saving has ongoing server costs. Subscribe to save tasks, schedules and notes.</p>
-            <button onClick={() => { window.location.hash = "#/subscription"; }} className="mt-5 w-full rounded-2xl bg-violet-600 py-3 text-sm font-black text-white">View subscription</button>
-            <button onClick={() => setPaywallOpen(false)} className="mt-2 w-full py-2 text-xs font-bold text-slate-400">Not now</button>
-          </div>
-        </div>
-      )}
+      {/* Premium subscription gate for My Day – same beautiful design as Revision */}
+      <PremiumGate
+        variant="myday"
+        userName={userName}
+        open={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        onViewSubscription={() => {
+          setPaywallOpen(false);
+          window.location.hash = "#/subscription";
+        }}
+      />
 
       <Toast toasts={toasts} onRemove={removeToast} />
     </div>
