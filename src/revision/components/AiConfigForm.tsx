@@ -164,7 +164,7 @@ export default function AiConfigForm({
     <div className={`space-y-4 ${card ? "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" : ""}`}>
       {/* Provider picker */}
       <div>
-        <p className="text-[13px] font-bold text-slate-900">{title}</p>
+        {title && <p className="text-[13px] font-bold text-slate-900">{title}</p>}
         {description && <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{description}</p>}
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {AI_PROVIDERS.map((p) => (
