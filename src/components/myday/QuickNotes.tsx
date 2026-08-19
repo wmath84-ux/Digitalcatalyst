@@ -9,6 +9,7 @@ interface QuickNotesProps {
   onEdit: (id: string, text: string) => void;
   onDelete: (id: string) => void;
   globalSearch?: string;
+  onRequireAccess?: () => boolean;
 }
 
 const colorStyles: Record<NoteColor, { card: string; editBg: string; highlight: string }> = {
@@ -47,7 +48,7 @@ function highlightText(text: string, query: string, highlightClass: string) {
   );
 }
 
-export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearch = "" }: QuickNotesProps) {
+export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearch = "", onRequireAccess }: QuickNotesProps) {
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
@@ -68,18 +69,21 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
   }, [globalSearch, notes]);
 
   const submit = () => {
+    if (onRequireAccess && !onRequireAccess()) return;
     if (!draft.trim()) return;
     onAdd(draft.trim());
     setDraft("");
   };
 
   const startEdit = (note: QuickNote) => {
+    if (onRequireAccess && !onRequireAccess()) return;
     setEditingId(note.id);
     setEditText(note.text);
     setExpandedIds((prev) => new Set(prev).add(note.id));
   };
 
   const saveEdit = () => {
+    if (onRequireAccess && !onRequireAccess()) return;
     if (editingId && editText.trim()) {
       onEdit(editingId, editText.trim());
     }

@@ -35,7 +35,14 @@ function TrendBadge({ trend }: { trend: string }) {
   return <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">New</span>;
 }
 
-export default function WeakTopicsPage({ uid, route }: { uid: string; route: string }) {
+type Props = {
+  uid: string;
+  route: string;
+  hasAccess?: boolean;
+  onRequireAccess?: () => boolean;
+};
+
+export default function WeakTopicsPage({ uid, route, hasAccess = true, onRequireAccess }: Props) {
   const { navigate } = useExitGuard();
   const [revisingTopicId, setRevisingTopicId] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -43,6 +50,9 @@ export default function WeakTopicsPage({ uid, route }: { uid: string; route: str
   const data = useMemo(() => getWeakTopics(uid), [uid]);
 
   const handleRevise = (topicId: number) => {
+    // Gate appears when user tries to revise a weak topic
+    if (onRequireAccess && !onRequireAccess()) return;
+    if (hasAccess === false) return;
     setErrorMsg(null);
     setRevisingTopicId(topicId);
     try {

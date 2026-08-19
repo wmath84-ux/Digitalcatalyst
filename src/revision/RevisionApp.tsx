@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import StoreHeader from "../components/Header";
 import { ExitGuardProvider } from "./components/ExitGuardContext";
 import DashboardPage from "./pages/DashboardPage";
@@ -15,28 +15,26 @@ import { useAuth } from "../context/AuthContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useRevisionAccess } from "../hooks/useRevisionAccess";
 import { syncRevisionCatalog } from "./engine/catalogService";
-import RevisionLockScreen from "./components/RevisionLockScreen";
+import PremiumGate from "../components/subscription/PremiumGate";
 
 /**
- * Daily Test & Revision feature shell.
- *
- * Ported from the standalone reference app in daily-test-revision-system.zip
- * and integrated on the same pattern as the My Day feature:
- * - the website's own header (StoreHeader) stays on top;
- * - the feature's header sits sticky right below it (both always visible);
- * - the bottom navigation keeps ONLY the website's Home button and replaces
- *   every other slot with the feature's tabs (Bank / Weak Spots / Progress /
- *   Profile), exactly as designed in the reference BottomNav.
- *
- * All data runs on a local per-user engine (see ./engine) so the feature is
- * fully functional offline — the same optimisation approach as My Day.
+ * Daily Test & Revision feature shell – updated flow:
+ * - Dashboard / Bank / Weak Topics / Progress / Profile are ALWAYS visible
+ *   even without a subscription (so user can explore the product)
+ * - Subscription gate appears ONLY when the user tries to DO an activity:
+ *   Start test, Start revision session, Revise Now, Continue test etc.
+ * - Direct deep-link to a protected player (#/revision/test/play or
+ *   #/revision/session/:id) also triggers the gate and redirects back to
+ *   dashboard instead of hard-locking the whole feature.
  */
+
 export default function RevisionApp() {
   const { user } = useAuth();
   const { cartIds } = useCommerce();
   const { hasAccess: hasRevisionAccess, loading: revisionAccessLoading } = useRevisionAccess();
   const [route, setRoute] = useState(() => window.location.hash);
   const [syncKey, setSyncKey] = useState(0);
+  const [gateOpen, setGateOpen] = useState(false);
 
   useEffect(() => {
     const onHashChange = () => setRoute(window.location.hash);
@@ -47,8 +45,6 @@ export default function RevisionApp() {
   const uid = user?.id ?? "guest";
   const userName = user?.name?.split(" ")[0] || "Learner";
 
-  // Pull a newer admin-published catalog into the local engine when one
-  // exists, then re-mount the page so every stat reflects the new content.
   useEffect(() => {
     let cancelled = false;
     void syncRevisionCatalog(uid).then((changed) => {
@@ -59,16 +55,53 @@ export default function RevisionApp() {
     };
   }, [uid]);
 
+  const requireAccess = useCallback(() => {
+    if (hasRevisionAccess) return true;
+    setGateOpen(true);
+    return false;
+  }, [hasRevisionAccess]);
+
   // Strip query params so deep links like #/revision?x=1 still route.
   const path = route.split("?")[0];
 
-  let page: ReactNode;
   const sessionMatch = path.match(/^#\/revision\/session\/(\d+)(\/result)?$/);
   const resultMatch = path.match(/^#\/revision\/test\/result\/(\d+)$/);
   const reviewMatch = path.match(/^#\/revision\/test\/review\/(\d+)$/);
 
+  const isPlayAttempt = path === "#/revision/test/play";
+  const isSessionPlayAttempt = Boolean(sessionMatch && !sessionMatch[2]); // /session/:id (without /result)
+
+  // If user directly lands on a protected player without access, intercept:
+  // show gate and bounce to dashboard after a tick.
+  useEffect(() => {
+    if (revisionAccessLoading) return;
+    if (!hasRevisionAccess && (isPlayAttempt || isSessionPlayAttempt)) {
+      setGateOpen(true);
+      // Keep URL clean – push user back to dashboard after gate opens
+      // so back button does not loop on protected route.
+      if (window.location.hash !== "#/revision") {
+        window.location.hash = "#/revision";
+      }
+    }
+  }, [revisionAccessLoading, hasRevisionAccess, isPlayAttempt, isSessionPlayAttempt, path]);
+
+  let page: ReactNode;
+
   if (path === "#/revision/test/play") {
-    page = <TestPlayerPage uid={uid} route={path} />;
+    // If no access, still render dashboard (gate will overlay)
+    if (!revisionAccessLoading && !hasRevisionAccess) {
+      page = (
+        <DashboardPage
+          uid={uid}
+          route={"#/revision"}
+          userName={userName}
+          hasAccess={hasRevisionAccess}
+          onRequireAccess={requireAccess}
+        />
+      );
+    } else {
+      page = <TestPlayerPage uid={uid} route={path} />;
+    }
   } else if (resultMatch) {
     page = <TestResultPage uid={uid} route={path} attemptId={Number(resultMatch[1])} />;
   } else if (reviewMatch) {
@@ -76,17 +109,50 @@ export default function RevisionApp() {
   } else if (sessionMatch && sessionMatch[2]) {
     page = <RevisionSessionResultPage uid={uid} route={path} sessionId={Number(sessionMatch[1])} />;
   } else if (sessionMatch) {
-    page = <RevisionSessionPage uid={uid} route={path} sessionId={Number(sessionMatch[1])} />;
+    if (!revisionAccessLoading && !hasRevisionAccess) {
+      page = (
+        <RevisionBankPage
+          uid={uid}
+          route={"#/revision/bank"}
+          hasAccess={hasRevisionAccess}
+          onRequireAccess={requireAccess}
+        />
+      );
+    } else {
+      page = <RevisionSessionPage uid={uid} route={path} sessionId={Number(sessionMatch[1])} />;
+    }
   } else if (path.startsWith("#/revision/bank")) {
-    page = <RevisionBankPage uid={uid} route={path} />;
+    page = (
+      <RevisionBankPage
+        uid={uid}
+        route={path}
+        hasAccess={hasRevisionAccess}
+        onRequireAccess={requireAccess}
+      />
+    );
   } else if (path.startsWith("#/revision/weak-topics")) {
-    page = <WeakTopicsPage uid={uid} route={path} />;
+    page = (
+      <WeakTopicsPage
+        uid={uid}
+        route={path}
+        hasAccess={hasRevisionAccess}
+        onRequireAccess={requireAccess}
+      />
+    );
   } else if (path.startsWith("#/revision/progress")) {
     page = <ProgressPage uid={uid} route={path} />;
   } else if (path.startsWith("#/revision/profile")) {
     page = <RevisionProfilePage uid={uid} route={path} userName={userName} />;
   } else {
-    page = <DashboardPage uid={uid} route={path} userName={userName} />;
+    page = (
+      <DashboardPage
+        uid={uid}
+        route={path}
+        userName={userName}
+        hasAccess={hasRevisionAccess}
+        onRequireAccess={requireAccess}
+      />
+    );
   }
 
   return (
@@ -107,12 +173,22 @@ export default function RevisionApp() {
                 <p className="text-xs font-semibold">Checking your membership…</p>
               </div>
             </div>
-          ) : hasRevisionAccess ? (
-            <Fragment key={syncKey}>{page}</Fragment>
           ) : (
-            <RevisionLockScreen userName={userName} />
+            <Fragment key={syncKey}>{page}</Fragment>
           )}
         </ExitGuardProvider>
+
+        {/* Subscription gate that appears ONLY on activity attempt */}
+        <PremiumGate
+          variant="revision"
+          userName={userName}
+          open={gateOpen}
+          onClose={() => setGateOpen(false)}
+          onViewSubscription={() => {
+            setGateOpen(false);
+            window.location.hash = "#/subscription";
+          }}
+        />
       </div>
     </div>
   );

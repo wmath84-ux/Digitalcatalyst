@@ -22,12 +22,23 @@ function trendIcon(trend: string) {
   return null;
 }
 
-export default function DashboardPage({ uid, route, userName }: { uid: string; route: string; userName: string }) {
+type DashboardPageProps = {
+  uid: string;
+  route: string;
+  userName: string;
+  hasAccess?: boolean;
+  onRequireAccess?: () => boolean;
+};
+
+export default function DashboardPage({ uid, route, userName, hasAccess = true, onRequireAccess }: DashboardPageProps) {
   const { navigate } = useExitGuard();
   const [starting, setStarting] = useState(false);
   const data = getDashboardData(uid);
 
   const handleStart = () => {
+    // Gate appears ONLY when user tries to start / continue a test
+    if (onRequireAccess && !onRequireAccess()) return;
+    if (hasAccess === false) return;
     setStarting(true);
     try {
       startOrResumeAttempt(uid);
@@ -54,7 +65,7 @@ export default function DashboardPage({ uid, route, userName }: { uid: string; r
       }
     >
       <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
-        <TodayTestCard data={data} onStart={handleStart} starting={starting} />
+        <TodayTestCard data={data} onStart={handleStart} starting={starting} hasAccess={hasAccess} onRequireAccess={onRequireAccess} />
 
         <div className="grid grid-cols-3 gap-3">
           <StatChip icon={<ChartIcon className="h-5 w-5 text-indigo-600" />} label="Tests Done" value={String(data.quickStats.testsCompleted)} />
@@ -154,10 +165,14 @@ function TodayTestCard({
   data,
   onStart,
   starting,
+  hasAccess,
+  onRequireAccess,
 }: {
   data: DashboardData;
   onStart: () => void;
   starting: boolean;
+  hasAccess?: boolean;
+  onRequireAccess?: () => boolean;
 }) {
   const { navigate } = useExitGuard();
   const { today } = data;
@@ -226,7 +241,11 @@ function TodayTestCard({
         {today.status === "available" && (
           <button
             type="button"
-            onClick={onStart}
+            onClick={() => {
+              if (onRequireAccess && !onRequireAccess()) return;
+              if (hasAccess === false) return;
+              onStart();
+            }}
             disabled={starting}
             className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-white text-[15px] font-bold text-indigo-700 shadow-sm transition active:scale-[0.98] disabled:opacity-70"
           >
@@ -236,7 +255,11 @@ function TodayTestCard({
         {today.status === "in_progress" && (
           <button
             type="button"
-            onClick={onStart}
+            onClick={() => {
+              if (onRequireAccess && !onRequireAccess()) return;
+              if (hasAccess === false) return;
+              onStart();
+            }}
             disabled={starting}
             className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-white text-[15px] font-bold text-indigo-700 shadow-sm transition active:scale-[0.98] disabled:opacity-70"
           >

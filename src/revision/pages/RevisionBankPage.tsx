@@ -39,7 +39,14 @@ function relativeDate(dateStr: string | null) {
   return `${weeks}w ago`;
 }
 
-export default function RevisionBankPage({ uid, route }: { uid: string; route: string }) {
+type Props = {
+  uid: string;
+  route: string;
+  hasAccess?: boolean;
+  onRequireAccess?: () => boolean;
+};
+
+export default function RevisionBankPage({ uid, route, hasAccess = true, onRequireAccess }: Props) {
   const { navigate } = useExitGuard();
   const [statusTab, setStatusTab] = useState<StatusTab>("active");
   const [search, setSearch] = useState("");
@@ -67,6 +74,9 @@ export default function RevisionBankPage({ uid, route }: { uid: string; route: s
   const subjects = useMemo(() => getAllSubjects(uid), [uid]);
 
   const handleStartSession = () => {
+    // Gate appears when user tries to start a revision session
+    if (onRequireAccess && !onRequireAccess()) return;
+    if (hasAccess === false) return;
     setStartingSession(true);
     try {
       const session = startRevisionSession(uid, {
