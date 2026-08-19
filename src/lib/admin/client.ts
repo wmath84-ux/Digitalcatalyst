@@ -349,6 +349,7 @@ async function revisionRequest(init?: RequestInit) {
     subjects: incoming.subjects,
     topics: incoming.topics,
     questions: incoming.questions,
+    aiSettings: incoming.aiSettings ?? {},
     updatedAt: serverTimestamp(),
   };
   await setDoc(ref, payload, { merge: true });

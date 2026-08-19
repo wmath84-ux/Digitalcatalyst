@@ -23,6 +23,11 @@ import {
   type RevisionCatalogInput,
   type RevisionSettings,
 } from "./store";
+import {
+  defaultCatalogAiSettings,
+  normalizeCatalogAiSettings,
+  type CatalogAiSettings,
+} from "./aiConfig";
 
 export const REVISION_CATALOG_DOC_ID = "revisionCatalog";
 
@@ -34,6 +39,8 @@ export type RevisionCatalog = {
   subjects: CatalogSubject[];
   topics: CatalogTopic[];
   questions: CatalogQuestion[];
+  /** AI provider + default model the admin publishes for every user. */
+  aiSettings: CatalogAiSettings;
 };
 
 export function defaultCatalog(): RevisionCatalog {
@@ -45,6 +52,7 @@ export function defaultCatalog(): RevisionCatalog {
     subjects: SEED_SUBJECTS.map((s) => ({ ...s })),
     topics: SEED_TOPICS.map((t) => ({ ...t })),
     questions: SEED_QUESTIONS.map((q) => ({ ...q, isActive: true })),
+    aiSettings: defaultCatalogAiSettings(),
   };
 }
 
@@ -134,6 +142,7 @@ export function normalizeCatalog(data: unknown): RevisionCatalog | null {
     subjects,
     topics,
     questions,
+    aiSettings: normalizeCatalogAiSettings(raw.aiSettings),
   };
 }
 
@@ -175,6 +184,7 @@ export async function saveRemoteCatalog(catalog: RevisionCatalog): Promise<Revis
     subjects: catalog.subjects,
     topics: catalog.topics,
     questions: catalog.questions,
+    aiSettings: catalog.aiSettings ?? defaultCatalogAiSettings(),
     updatedAt: serverTimestamp(),
   };
   await setDoc(doc(db, "settings", REVISION_CATALOG_DOC_ID), payload, { merge: true });

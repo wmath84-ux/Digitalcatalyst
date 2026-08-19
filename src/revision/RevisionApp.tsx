@@ -12,6 +12,8 @@ import WeakTopicsPage from "./pages/WeakTopicsPage";
 import ProgressPage from "./pages/ProgressPage";
 import RevisionProfilePage from "./pages/RevisionProfilePage";
 import CustomizationPage from "./pages/CustomizationPage";
+import AiSettingsPage from "./pages/AiSettingsPage";
+import AiGeneratePage from "./pages/AiGeneratePage";
 import { useAuth } from "../context/AuthContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useRevisionAccess } from "../hooks/useRevisionAccess";
@@ -144,8 +146,14 @@ export default function RevisionApp() {
     page = <ProgressPage uid={uid} route={path} />;
   } else if (path.startsWith("#/revision/profile")) {
     page = <RevisionProfilePage uid={uid} route={path} userName={userName} />;
+  } else if (path.startsWith("#/revision/customize/ai-config")) {
+    page = <AiSettingsPage uid={uid} route={path} />;
   } else if (path.startsWith("#/revision/customize")) {
     page = <CustomizationPage uid={uid} route={path} />;
+  } else if (path.startsWith("#/revision/ai-settings")) {
+    page = <AiSettingsPage uid={uid} route={path} />;
+  } else if (path.startsWith("#/revision/ai-generate")) {
+    page = <AiGeneratePage uid={uid} route={path} />;
   } else {
     page = (
       <DashboardPage

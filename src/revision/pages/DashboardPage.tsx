@@ -67,6 +67,22 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
       <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
         <TodayTestCard data={data} onStart={handleStart} starting={starting} hasAccess={hasAccess} onRequireAccess={onRequireAccess} />
 
+        {/* AI Question Engine entry */}
+        <button
+          type="button"
+          onClick={() => navigate("#/revision/ai-settings")}
+          className="flex w-full items-center gap-3 rounded-3xl border border-purple-100 bg-gradient-to-r from-violet-50 to-fuchsia-50 p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition active:scale-[0.98]"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-sm">
+            <SparklesIcon className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold text-slate-900">AI Question Engine</span>
+            <span className="block text-xs text-slate-500">Connect your own AI key & generate unlimited questions</span>
+          </span>
+          <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-bold text-violet-700">NEW</span>
+        </button>
+
         <div className="grid grid-cols-3 gap-3">
           <StatChip icon={<ChartIcon className="h-5 w-5 text-indigo-600" />} label="Tests Done" value={String(data.quickStats.testsCompleted)} />
           <StatChip icon={<TargetIcon className="h-5 w-5 text-emerald-600" />} label="Accuracy" value={`${data.quickStats.overallAccuracy}%`} />
