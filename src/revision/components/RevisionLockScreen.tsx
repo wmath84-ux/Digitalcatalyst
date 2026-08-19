@@ -20,9 +20,9 @@ export default function RevisionLockScreen({ userName }: { userName: string }) {
   return (
     <div
       data-revision-lock
-      className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-white"
+      className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-white [-webkit-overflow-scrolling:touch]"
     >
-      <div className="relative overflow-hidden px-5 pb-8 pt-6">
+      <div className="relative px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-6">
         <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-indigo-100/70 blur-3xl" />
         <div className="pointer-events-none absolute -left-16 top-40 h-56 w-56 rounded-full bg-violet-100/60 blur-3xl" />
 
