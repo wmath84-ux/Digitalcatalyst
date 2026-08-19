@@ -574,9 +574,10 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 
 /* ── Portrait guard overlay ────────────────────────────────────────────────
-   Full-screen "rotate your phone" panel shown whenever a mobile viewport is
-   landscape while the Course Player is closed. The icon does a gentle
-   quarter-turn loop as the rotation hint. */
+   Full-screen "rotate your phone" panel shown only in the installed PWA
+   whenever a mobile viewport is landscape while the Course Player is closed.
+   Regular browser tabs never get this overlay so Install PWA stays reachable.
+   The icon does a gentle quarter-turn loop as the rotation hint. */
 @keyframes app-portrait-card-in {
   0% { opacity: 0; transform: scale(.94) translateY(8px); }
   100% { opacity: 1; transform: scale(1) translateY(0); }

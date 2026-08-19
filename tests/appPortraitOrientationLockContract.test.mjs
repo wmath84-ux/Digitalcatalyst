@@ -1,9 +1,10 @@
 // tests/appPortraitOrientationLockContract.test.mjs
 //
-// Contract for the app-wide portrait lock: every screen is locked to
-// portrait, and the ONLY place rotation unlocks is the Course Player.
-// Where the browser refuses the native lock (plain tabs, iOS), a full-screen
-// rotate-back overlay keeps the app out of landscape.
+// Contract for the installed-PWA portrait lock: every PWA screen is locked
+// to portrait, and the ONLY place rotation unlocks is the Course Player.
+// Regular browser tabs are never locked so visitors can install the app.
+// Inside the PWA, a full-screen rotate-back overlay covers landscape when
+// the native lock is refused (iOS).
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -20,11 +21,18 @@ test("one global portrait guard is mounted beside the app shell", () => {
   assert.match(main, /<PortraitOnlyGuard \/>/);
 });
 
-test("the app is locked to portrait by default via the orientation API", () => {
+test("the installed PWA is locked to portrait by default via the orientation API", () => {
   assert.match(orientation, /orientation\.lock\("portrait"\)/);
   assert.match(guard, /lockAppToPortrait\(\)/);
   // Rejections (no fullscreen / iOS / desktop) never crash the app.
   assert.match(orientation, /result\.catch|catch\(\(\) =>/);
+});
+
+test("portrait lock and rotate overlay apply only after the PWA is installed", () => {
+  // Browser tabs must stay free so landing / Install PWA stay reachable.
+  assert.match(orientation, /isPwaInstalled\(\)/);
+  assert.match(guard, /isPwaInstalled/);
+  assert.match(guard, /if \(isPwaInstalled\(\) && !isCoursePlayerRotationActive\(\)\) lockAppToPortrait\(\)/);
 });
 
 test("only mounting the Course Player unlocks rotation", () => {
@@ -43,8 +51,8 @@ test("a rotate-back overlay covers landscape while the player is closed", () => 
   assert.match(guard, /data-app-portrait-overlay/);
   assert.match(guard, /window\.innerWidth > window\.innerHeight/);
   assert.match(guard, /Rotate your phone/);
-  // The overlay never appears on desktop, and never over the open player.
-  assert.match(guard, /!mobile \|\| playerOpen \|\| !landscape/);
+  // Installed PWA only. Never on a browser tab, desktop, or the open player.
+  assert.match(guard, /!installed \|\| !mobile \|\| playerOpen \|\| !landscape/);
 });
 
 test("installed PWA manifest keeps dynamic rotation enabled for the player", () => {
