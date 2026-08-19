@@ -75,6 +75,31 @@ const fileIcon = (file: CourseFile) => {
 const isPaidLocked = (module: CourseModule, ownedUpdateIds: Set<string>) =>
   module.accessLevel === "paidUpdate" && Boolean(module.paidUpdateId) && !ownedUpdateIds.has(String(module.paidUpdateId));
 
+/**
+ * The "Module" tab only lists unlocked modules. Locked / paid modules are
+ * surfaced in the dedicated "Paid" tab instead, so the curriculum rail never
+ * double-lists purchasable content. A locked module also hides its nested
+ * children (the whole branch stays locked until the parent is unlocked), so
+ * the wire tree never shows an orphaned child under a hidden parent.
+ */
+const unlockedModuleIds = (
+  modules: CourseModule[],
+  accessibleModuleIds: Set<string>,
+  ownedUpdateIds: Set<string>,
+): Set<string> => {
+  const out = new Set<string>();
+  const visit = (nodes: CourseModule[], ancestorLocked: boolean) => {
+    for (const node of nodes) {
+      if (node.accessLevel === "hidden") continue;
+      const locked = ancestorLocked || !accessibleModuleIds.has(String(node.id)) || isPaidLocked(node, ownedUpdateIds);
+      if (!locked) out.add(String(node.id));
+      visit(node.modules || [], locked);
+    }
+  };
+  visit(modules, false);
+  return out;
+};
+
 interface CourseOverlayProps {
   orientation: DockOrientation;
   tab: DockTab;
@@ -124,9 +149,11 @@ export default function CourseOverlay(props: CourseOverlayProps) {
     : defaultHeight;
 
   const flatModules = useMemo(() => flattenModules(props.modules), [props.modules]);
+  // Only unlocked modules are listed in the "Module" tab, so the header
+  // count reflects the same set the learner actually sees.
   const visibleModuleCount = useMemo(
-    () => flatModules.filter(({ module }) => module.accessLevel !== "hidden").length,
-    [flatModules],
+    () => unlockedModuleIds(props.modules, props.accessibleModuleIds, props.ownedUpdateIds).size,
+    [props.modules, props.accessibleModuleIds, props.ownedUpdateIds],
   );
 
   // Escape closes the sheet.
@@ -264,12 +291,16 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
   const { flatModules, mode } = props;
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  // Resources mode: only modules that actually contain files are shown.
-  const visible = flatModules.filter(({ module }) => {
-    if (module.accessLevel === "hidden") return false;
-    if (mode === "resources") return moduleFiles(module).some(isVisibleFile);
-    return true;
-  });
+  // Modules mode: only unlocked modules are shown — locked / paid modules
+  // live in the dedicated "Paid" tab. Resources mode: only modules that
+  // actually contain files are shown.
+  const visible = useMemo(() => {
+    if (mode === "resources") {
+      return flatModules.filter(({ module }) => module.accessLevel !== "hidden" && moduleFiles(module).some(isVisibleFile));
+    }
+    const unlocked = unlockedModuleIds(props.modules, props.accessibleModuleIds, props.ownedUpdateIds);
+    return flatModules.filter(({ module }) => unlocked.has(String(module.id)));
+  }, [flatModules, mode, props.modules, props.accessibleModuleIds, props.ownedUpdateIds]);
 
   // Keep the module holding the open file expanded by default.
   useEffect(() => {
