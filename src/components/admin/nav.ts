@@ -8,7 +8,7 @@ export const ADMIN_NAV = [
   { href: "/admin/reviews", label: "Reviews", icon: "⭐" },
   { href: "/admin/analytics", label: "Analytics & Reports", icon: "📈" },
   { href: "/admin/revision", label: "Revision & Daily Tests", icon: "🧠" },
-  { href: "/admin/content", label: "App Content & Feature Controls", icon: "🧩" },
+  { href: "/admin/content", label: "Course Player Controls", icon: "🧩" },
   { href: "/admin/session", label: "Admin Session", icon: "🔐" },
 ] as const;
 
