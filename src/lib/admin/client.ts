@@ -344,6 +344,8 @@ async function revisionRequest(init?: RequestInit) {
   const payload = {
     version: nextVersion,
     settings: { ...incoming.settings },
+    classes: incoming.classes ?? [],
+    customizationLimits: incoming.customizationLimits ?? {},
     subjects: incoming.subjects,
     topics: incoming.topics,
     questions: incoming.questions,

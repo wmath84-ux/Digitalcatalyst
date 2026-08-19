@@ -9,7 +9,6 @@
 
 import { SEED_SUBJECTS, SEED_TOPICS, SEED_QUESTIONS } from "../data/seedData";
 
-export type Difficulty = "easy" | "medium" | "hard";
 export type TestStatus = "not_started" | "in_progress" | "completed" | "expired";
 export type RevisionStatus = "learning" | "improving" | "mastered";
 export type SessionStatus = "in_progress" | "completed";
@@ -33,6 +32,88 @@ export const DEFAULT_SETTINGS: RevisionSettings = {
   estimatedMinutes: 5,
 };
 
+/* ------------------------------------------------------------------ */
+/* User Custom Settings                                                */
+/* ------------------------------------------------------------------ */
+
+export type Difficulty = "easy" | "medium" | "hard";
+
+export type UserCustomSettings = {
+  /** Whether the user has opted into custom settings (vs using admin defaults). */
+  enabled: boolean;
+  /** User-selected class slug (filters which subjects/topics are available). */
+  classSlug: string;
+  /** User-selected subject slugs (empty = all). */
+  subjectSlugs: string[];
+  /** User-selected topic slugs (empty = all). */
+  topicSlugs: string[];
+  /** User-defined tests per day. */
+  testsPerDay: number;
+  /** User-defined questions per test. */
+  questionsPerTest: number;
+  /** User-defined estimated minutes. */
+  estimatedMinutes: number;
+  /** User-selected difficulty filter. */
+  difficulty: Difficulty | "mixed";
+};
+
+export const DEFAULT_USER_CUSTOM_SETTINGS: UserCustomSettings = {
+  enabled: false,
+  classSlug: "",
+  subjectSlugs: [],
+  topicSlugs: [],
+  testsPerDay: 1,
+  questionsPerTest: 10,
+  estimatedMinutes: 5,
+  difficulty: "mixed",
+};
+
+/* ------------------------------------------------------------------ */
+/* Admin Customization Limits                                          */
+/* ------------------------------------------------------------------ */
+
+export type CustomizationLimits = {
+  /** Whether users are allowed to customize their revision settings. */
+  allowUserCustomization: boolean;
+  /** Min tests per day the user can set. */
+  minTestsPerDay: number;
+  /** Max tests per day the user can set. */
+  maxTestsPerDay: number;
+  /** Min questions per test the user can set. */
+  minQuestionsPerTest: number;
+  /** Max questions per test the user can set. */
+  maxQuestionsPerTest: number;
+  /** Min estimated minutes. */
+  minEstimatedMinutes: number;
+  /** Max estimated minutes. */
+  maxEstimatedMinutes: number;
+  /** If true, user MUST pick a class. */
+  requireClassSelection: boolean;
+};
+
+export const DEFAULT_CUSTOMIZATION_LIMITS: CustomizationLimits = {
+  allowUserCustomization: true,
+  minTestsPerDay: 1,
+  maxTestsPerDay: 5,
+  minQuestionsPerTest: 5,
+  maxQuestionsPerTest: 50,
+  minEstimatedMinutes: 5,
+  maxEstimatedMinutes: 120,
+  requireClassSelection: false,
+};
+
+/* ------------------------------------------------------------------ */
+/* Class management                                                    */
+/* ------------------------------------------------------------------ */
+
+export type CatalogClass = {
+  name: string;
+  slug: string;
+  icon: string;
+  /** Subject slugs available for this class. */
+  subjectSlugs: string[];
+};
+
 /** Portable (slug-based) catalog shapes — the form stored in Firestore and
  *  editable in the admin panel, independent of the local numeric row ids. */
 export type CatalogSubject = { name: string; slug: string; icon: string; color: string };
@@ -49,6 +130,8 @@ export type CatalogQuestion = {
 
 export type RevisionCatalogInput = {
   settings?: Partial<RevisionSettings>;
+  classes?: CatalogClass[];
+  customizationLimits?: Partial<CustomizationLimits>;
   subjects: CatalogSubject[];
   topics: CatalogTopic[];
   questions: CatalogQuestion[];
@@ -328,4 +411,46 @@ export function daysAgoDateStr(days: number, from = new Date()): string {
   const d = new Date(from);
   d.setDate(d.getDate() - days);
   return todayDateStr(d);
+}
+
+/* ------------------------------------------------------------------ */
+/* User Custom Settings Storage                                        */
+/* ------------------------------------------------------------------ */
+
+const userSettingsKey = (uid: string) => `revision_custom_settings_${uid}`;
+
+export function loadUserCustomSettings(uid: string): UserCustomSettings {
+  try {
+    const raw = localStorage.getItem(userSettingsKey(uid));
+    if (raw) {
+      const parsed = JSON.parse(raw) as UserCustomSettings;
+      return { ...DEFAULT_USER_CUSTOM_SETTINGS, ...parsed };
+    }
+  } catch {
+    // ignore
+  }
+  return { ...DEFAULT_USER_CUSTOM_SETTINGS };
+}
+
+export function saveUserCustomSettings(uid: string, settings: UserCustomSettings) {
+  try {
+    localStorage.setItem(userSettingsKey(uid), JSON.stringify(settings));
+  } catch {
+    // Persistence is best-effort
+  }
+}
+
+/**
+ * Resolve the effective settings for a user by merging admin defaults with
+ * user customizations (if enabled and allowed by admin limits).
+ */
+export function getEffectiveSettings(uid: string, db: RevisionDb): RevisionSettings {
+  const custom = loadUserCustomSettings(uid);
+  if (!custom.enabled) return db.settings;
+  // User custom settings override admin defaults
+  return {
+    testsPerDay: custom.testsPerDay || db.settings.testsPerDay,
+    questionsPerTest: custom.questionsPerTest || db.settings.questionsPerTest,
+    estimatedMinutes: custom.estimatedMinutes || db.settings.estimatedMinutes,
+  };
 }
