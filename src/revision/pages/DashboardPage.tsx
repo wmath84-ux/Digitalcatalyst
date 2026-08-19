@@ -15,6 +15,7 @@ import {
 import { useExitGuard } from "../components/ExitGuardContext";
 import { getDashboardData, type DashboardData } from "../engine/statsService";
 import { startOrResumeAttempt } from "../engine/testService";
+import { listCustomTests, type CustomTestListItem } from "../engine/customTestService";
 
 function trendIcon(trend: string) {
   if (trend === "improving") return <TrendUpIcon className="h-4 w-4 text-emerald-600" />;
@@ -34,6 +35,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
   const { navigate } = useExitGuard();
   const [starting, setStarting] = useState(false);
   const data = getDashboardData(uid);
+  const customTests = listCustomTests(uid);
 
   const handleStart = () => {
     // Gate appears ONLY when user tries to start / continue a test
@@ -67,18 +69,56 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
       <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
         <TodayTestCard data={data} onStart={handleStart} starting={starting} hasAccess={hasAccess} onRequireAccess={onRequireAccess} />
 
-        {/* AI Question Engine entry */}
+        {/* User-generated tests (AI generator + bulk import) */}
+        {customTests.length > 0 && (
+          <div>
+            <div className="mb-2 flex items-center justify-between px-1">
+              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-slate-400">My Tests</h2>
+              <button
+                type="button"
+                onClick={() => navigate("#/revision/ai-generate")}
+                className="text-xs font-semibold text-indigo-600"
+              >
+                + New AI test
+              </button>
+            </div>
+            <div className="space-y-2.5">
+              {customTests.slice(0, 5).map((t) => (
+                <CustomTestCard
+                  key={t.id}
+                  test={t}
+                  onOpen={() => {
+                    if (onRequireAccess && !onRequireAccess()) return;
+                    if (hasAccess === false) return;
+                    if (t.status === "completed" && t.attemptId) {
+                      navigate(`#/revision/test/result/${t.attemptId}`);
+                    } else {
+                      navigate(`#/revision/test/play/${t.id}`);
+                    }
+                  }}
+                  onReview={
+                    t.status === "completed" && t.attemptId
+                      ? () => navigate(`#/revision/test/review/${t.attemptId}`)
+                      : undefined
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* AI test generator entry */}
         <button
           type="button"
-          onClick={() => navigate("#/revision/ai-settings")}
+          onClick={() => navigate("#/revision/ai-generate")}
           className="flex w-full items-center gap-3 rounded-3xl border border-purple-100 bg-gradient-to-r from-violet-50 to-fuchsia-50 p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition active:scale-[0.98]"
         >
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-sm">
             <SparklesIcon className="h-5 w-5" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-bold text-slate-900">AI Question Engine</span>
-            <span className="block text-xs text-slate-500">Connect your own AI key & generate unlimited questions</span>
+            <span className="block text-sm font-bold text-slate-900">Generate Questions with AI</span>
+            <span className="block text-xs text-slate-500">Pick class, subject, chapter & topic — get a ready exam</span>
           </span>
           <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-bold text-violet-700">NEW</span>
         </button>
@@ -173,6 +213,68 @@ function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string
       {icon}
       <span className="text-base font-bold text-slate-900">{value}</span>
       <span className="text-[10px] font-medium text-slate-500">{label}</span>
+    </div>
+  );
+}
+
+function CustomTestCard({
+  test,
+  onOpen,
+  onReview,
+}: {
+  test: CustomTestListItem;
+  onOpen: () => void;
+  onReview?: () => void;
+}) {
+  const isDone = test.status === "completed";
+  return (
+    <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.06)]">
+      <div className="flex items-center gap-3">
+        <span
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm ${
+            test.source === "bulk"
+              ? "bg-gradient-to-br from-sky-500 to-indigo-600"
+              : "bg-gradient-to-br from-indigo-500 to-violet-600"
+          }`}
+        >
+          {isDone ? <CheckIcon className="h-5 w-5" /> : <SparklesIcon className="h-5 w-5" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-slate-900">{test.title}</p>
+          <p className="text-xs text-slate-500">
+            {test.totalQuestions} questions · ~{test.estimatedMinutes} min ·{" "}
+            {test.source === "bulk" ? "imported" : "AI generated"}
+          </p>
+        </div>
+        {isDone && test.score !== null && (
+          <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">
+            {test.score}%
+          </span>
+        )}
+      </div>
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={onOpen}
+          className={`flex min-h-[42px] flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-bold transition active:scale-[0.98] ${
+            isDone
+              ? "bg-slate-100 text-slate-700"
+              : "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-200"
+          }`}
+        >
+          {isDone ? "View Results" : test.status === "in_progress" ? "Continue Test" : "Start Test"}
+          {!isDone && <ClockIcon className="h-4 w-4" />}
+        </button>
+        {onReview && (
+          <button
+            type="button"
+            onClick={onReview}
+            className="flex min-h-[42px] flex-1 items-center justify-center rounded-xl border border-slate-200 text-[13px] font-bold text-slate-600 active:bg-slate-50"
+          >
+            Review Answers
+          </button>
+        )}
+      </div>
     </div>
   );
 }

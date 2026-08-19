@@ -11,9 +11,9 @@ import TestReviewPage from "./pages/TestReviewPage";
 import WeakTopicsPage from "./pages/WeakTopicsPage";
 import ProgressPage from "./pages/ProgressPage";
 import RevisionProfilePage from "./pages/RevisionProfilePage";
-import CustomizationPage from "./pages/CustomizationPage";
 import AiSettingsPage from "./pages/AiSettingsPage";
 import AiGeneratePage from "./pages/AiGeneratePage";
+import BulkImportPage from "./pages/BulkImportPage";
 import { useAuth } from "../context/AuthContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useRevisionAccess } from "../hooks/useRevisionAccess";
@@ -68,10 +68,11 @@ export default function RevisionApp() {
   const sessionMatch = path.match(/^#\/revision\/session\/(\d+)(\/result)?$/);
   const resultMatch = path.match(/^#\/revision\/test\/result\/(\d+)$/);
   const reviewMatch = path.match(/^#\/revision\/test\/review\/(\d+)$/);
+  const playMatch = path.match(/^#\/revision\/test\/play(?:\/(\d+))?$/);
 
   let page: ReactNode;
 
-  if (path === "#/revision/test/play") {
+  if (playMatch) {
     // If no access, still render dashboard (gate will overlay)
     if (!revisionAccessLoading && !hasRevisionAccess) {
       page = (
@@ -84,7 +85,7 @@ export default function RevisionApp() {
         />
       );
     } else {
-      page = <TestPlayerPage uid={uid} route={path} />;
+      page = <TestPlayerPage uid={uid} route={path} testId={playMatch[1] ? Number(playMatch[1]) : null} />;
     }
   } else if (resultMatch) {
     page = <TestResultPage uid={uid} route={path} attemptId={Number(resultMatch[1])} />;
@@ -130,11 +131,15 @@ export default function RevisionApp() {
   } else if (path.startsWith("#/revision/customize/ai-config")) {
     page = <AiSettingsPage uid={uid} route={path} />;
   } else if (path.startsWith("#/revision/customize")) {
-    page = <CustomizationPage uid={uid} route={path} />;
+    // Legacy customization deep-links now land on the AI test generator —
+    // customization is fully user-driven from the profile page.
+    page = <AiGeneratePage uid={uid} route={path} />;
   } else if (path.startsWith("#/revision/ai-settings")) {
     page = <AiSettingsPage uid={uid} route={path} />;
   } else if (path.startsWith("#/revision/ai-generate")) {
     page = <AiGeneratePage uid={uid} route={path} />;
+  } else if (path.startsWith("#/revision/bulk-import")) {
+    page = <BulkImportPage uid={uid} route={path} />;
   } else {
     page = (
       <DashboardPage
