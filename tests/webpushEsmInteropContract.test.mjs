@@ -16,6 +16,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
@@ -57,16 +58,32 @@ test("the interop shim exposes callable setVapidDetails and sendNotification", (
   assert.match(shim, /sendNotification/);
 });
 
-test("the shim actually loads web-push and returns functions under native ESM", async () => {
+test("the shim actually loads web-push and returns functions under native ESM", async (t) => {
   // Compile the shim with the same module settings Vercel uses, then
   // import it in a real Node ESM context — this is the exact condition
   // that failed in production.
+  //
+  // Resolve TypeScript and web-push from the repo's installed dependencies.
+  // `npx tsc` is unsafe here: when node_modules is missing it downloads the
+  // unrelated deprecated `tsc` package and fails for an environment reason,
+  // not a real interop bug. If deps are not installed, skip so CI (after
+  // `pnpm install`) still runs the full check.
+  const requireFromRoot = createRequire(path.join(repoRoot, "package.json"));
+  let tscBin;
+  try {
+    tscBin = requireFromRoot.resolve("typescript/bin/tsc");
+    requireFromRoot.resolve("web-push");
+  } catch {
+    t.skip("dependencies not installed — run pnpm install");
+    return;
+  }
+
   const outDir = fs.mkdtempSync(path.join(process.cwd(), ".wp-interop-"));
   try {
     execFileSync(
-      "npx",
+      process.execPath,
       [
-        "tsc",
+        tscBin,
         path.join(apiRoot, "_lib", "webpush.ts"),
         "--module", "nodenext",
         "--moduleResolution", "nodenext",
