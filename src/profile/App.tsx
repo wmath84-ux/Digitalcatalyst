@@ -33,6 +33,7 @@ import { useCommerce } from "../context/CommerceContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
 import { APPROVED_ADMIN_EMAIL } from "../utils/adminSession";
 import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
+import AiQuotaCard from "../components/AiQuotaCard";
 
 type Modal = "edit" | "settings" | null;
 type Preferences = {
@@ -482,6 +483,8 @@ export default function ProfileApp() {
                 }}
               />
             ) : null}
+
+            <AiQuotaCard uid={user.id} />
 
             {referralCode && (
               <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">

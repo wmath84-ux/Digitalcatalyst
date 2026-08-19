@@ -58,6 +58,12 @@ export type CatalogAiSettings = {
   /** Optional key the admin explicitly chose to share with every user. */
   sharedApiKey: string;
   updatedAt: string;
+  /** Max AI generations per calendar day for every learner (0 = unlimited). */
+  dailyLimit: number;
+  /** Rolling window length shown on the profile (default 5 hours). */
+  windowHours: number;
+  /** Max AI generations inside the rolling window (0 = same as daily, -1 unlimited). */
+  windowLimit: number;
 };
 
 /* ------------------------------------------------------------------ */
@@ -599,6 +605,9 @@ export function defaultCatalogAiSettings(): CatalogAiSettings {
     models: [...KNOWN_MODELS.gemini],
     sharedApiKey: "",
     updatedAt: "",
+    dailyLimit: 20,
+    windowHours: 5,
+    windowLimit: 10,
   };
 }
 
@@ -621,11 +630,26 @@ export function normalizeCatalogAiSettings(raw: unknown): CatalogAiSettings {
         .filter((m) => m.id)
         .slice(0, 300)
     : [...KNOWN_MODELS[provider]];
+  const dailyLimit = clampLimit(r.dailyLimit, d.dailyLimit, 0, 10_000);
+  const windowHours = clampLimit(r.windowHours, d.windowHours, 1, 24);
+  const windowLimitRaw = Number(r.windowLimit);
+  const windowLimit = Number.isFinite(windowLimitRaw)
+    ? Math.max(-1, Math.min(10_000, Math.round(windowLimitRaw)))
+    : d.windowLimit;
   return {
     provider,
     model: cleanStr(r.model).trim() || models[0]?.id || d.model,
     models: models.length > 0 ? models : [...KNOWN_MODELS[provider]],
     sharedApiKey: cleanStr(r.sharedApiKey),
     updatedAt: cleanStr(r.updatedAt),
+    dailyLimit,
+    windowHours,
+    windowLimit,
   };
+}
+
+function clampLimit(value: unknown, fallback: number, min: number, max: number): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
 }

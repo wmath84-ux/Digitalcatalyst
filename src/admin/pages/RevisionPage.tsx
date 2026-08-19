@@ -1032,6 +1032,9 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
   const published = catalog.aiSettings ?? defaultCatalogAiSettings();
   const [publishModel, setPublishModel] = useState(published.model);
   const [shareKey, setShareKey] = useState(Boolean(published.sharedApiKey));
+  const [dailyLimit, setDailyLimit] = useState(published.dailyLimit ?? 20);
+  const [windowHours, setWindowHours] = useState(published.windowHours ?? 5);
+  const [windowLimit, setWindowLimit] = useState(published.windowLimit ?? 10);
   const [publishing, setPublishing] = useState(false);
 
   // Question generator state.
@@ -1073,6 +1076,9 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
       models: publishModels.slice(0, 300),
       sharedApiKey: shareKey ? adminCfg.config.apiKey.trim() : "",
       updatedAt: new Date().toISOString(),
+      dailyLimit: Math.max(0, Math.round(Number(dailyLimit) || 0)),
+      windowHours: Math.max(1, Math.min(24, Math.round(Number(windowHours) || 5))),
+      windowLimit: Math.max(-1, Math.round(Number(windowLimit) || 0)),
     };
     if (shareKey && !adminCfg.config.apiKey.trim()) {
       notify("error", "Enter your API key before sharing it with users.");
@@ -1254,6 +1260,28 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
             Anyone with the catalog can read it — only enable this for keys with strict spending limits.
           </p>
         )}
+
+        <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
+          <p className="text-sm font-semibold text-slate-900">Usage limits for every user</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            These numbers appear on each learner&apos;s profile with a live progress bar. Set daily to 0 for unlimited.
+            Window limit −1 = unlimited window.
+          </p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <Field label="Daily generations">
+              <input className={inputClass} type="number" min={0} max={10000} value={dailyLimit}
+                onChange={(e) => setDailyLimit(Math.max(0, Math.round(Number(e.target.value) || 0)))} />
+            </Field>
+            <Field label="Window hours">
+              <input className={inputClass} type="number" min={1} max={24} value={windowHours}
+                onChange={(e) => setWindowHours(Math.max(1, Math.min(24, Math.round(Number(e.target.value) || 5))))} />
+            </Field>
+            <Field label="Window limit">
+              <input className={inputClass} type="number" min={-1} max={10000} value={windowLimit}
+                onChange={(e) => setWindowLimit(Math.max(-1, Math.round(Number(e.target.value) || 0)))} />
+            </Field>
+          </div>
+        </div>
 
         <PrimaryButton className="mt-3 w-full" loading={publishing} onClick={publishDefault}>
           📢 Publish default for all users
