@@ -318,6 +318,13 @@ test("Modules overlay lists available modules, Resources lists only files", () =
   assert.match(overlay, /mode === "resources"/);
 });
 
+test("Course overlay draws modules and files as a left-side connected wire tree", () => {
+  assert.match(overlay, /data-course-overlay-wire/);
+  assert.match(overlay, /data-course-wire-rail/);
+  assert.match(overlay, /data-course-wire-node/);
+  assert.match(overlay, /function WireRail/);
+});
+
 test("Paid overlay lists only paid modules with a buy CTA", () => {
   assert.match(overlay, /data-course-overlay-paid/);
   assert.match(overlay, /accessLevel === "paidUpdate"/);

@@ -10,9 +10,11 @@ import {
   ChevronRight,
   Clock,
   Copy,
+  Crown,
   Expand,
   Globe,
   Heart,
+  LockKeyhole,
   MessageCircle,
   PackageOpen,
   PlayCircle,
@@ -38,6 +40,13 @@ import { useAuth } from "./context/AuthContext";
 import { auth, db } from "../firebase";
 import PromoCodeInput, { type PromoResult } from "./subscription/components/PromoCodeInput";
 import { isFreeProduct, shouldShowCouponInput } from "../utils/couponVisibility";
+import {
+  collectPaidModuleIdSet,
+  countCurriculumTree,
+  filterCurriculumForPdp,
+  isPaidUpgradeModule,
+  resolvePaidUpdateForModule,
+} from "../utils/pdpCurriculum";
 import { playSfxCopy, playSfxError, playSfxSuccess } from "./utils/sfx";
 
 interface ProductDetailProps {
@@ -65,9 +74,15 @@ type DetailTab = "Description" | "Curriculum" | "Instructor";
 type CurriculumModule = {
   id: string;
   title: string;
+  paid?: boolean;
+  paidUpdateId?: string;
+  paidUpdateTitle?: string;
+  paidUpdatePrice?: string;
   resources?: Array<{ id: string; name: string; type: string }>;
   modules?: CurriculumModule[];
 };
+
+type CurriculumViewMode = "included" | "paid-upgrade";
 
 const formatPrice = (price: number) => price === 0 ? "Free" : `₹${price.toLocaleString("en-IN")}`;
 
@@ -218,8 +233,25 @@ function PremiumProductContent({
   const discount = product.originalPrice > product.price && product.originalPrice > 0
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
-  const modules = useMemo(() => collectCurriculumModules(product), [product]);
-  const resourceCount = countCurriculumResources(modules);
+  const collectedModules = useMemo(() => collectCurriculumModules(product), [product]);
+  const includedCurriculum = useMemo(
+    () => filterCurriculumForPdp(collectedModules, { isProductOwned: false, ownedUpdateIds: new Set() }).modules,
+    [collectedModules],
+  );
+  const { modules, curriculumMode } = useMemo(
+    () => filterCurriculumForPdp(collectedModules, { isProductOwned, ownedUpdateIds: updates }),
+    [collectedModules, isProductOwned, updates],
+  );
+  const { modulesCount, resourcesCount: resourceCount } = useMemo(() => countCurriculumTree(includedCurriculum), [includedCurriculum]);
+
+  useEffect(() => {
+    const firstId = modules[0]?.id || null;
+    setExpandedModule((current) => {
+      const stillVisible = current ? curriculumContainsId(modules, current) : false;
+      return stillVisible ? current : firstId;
+    });
+  }, [product.id, curriculumMode, modules]);
+
   const productShareUrl = typeof window === "undefined"
     ? ""
     : `${window.location.origin}${window.location.pathname}#/product/${encodeURIComponent(product.id)}`;
@@ -460,7 +492,7 @@ function PremiumProductContent({
   };
 
   const autoHighlights = [
-    modules.length > 0 ? `${modules.length} structured module${modules.length === 1 ? "" : "s"}` : null,
+    modulesCount > 0 ? `${modulesCount} structured module${modulesCount === 1 ? "" : "s"}` : null,
     resourceCount > 0 ? `${resourceCount} downloadable or streaming resource${resourceCount === 1 ? "" : "s"}` : null,
     "Access from your purchases library",
     "Available on mobile and desktop",
@@ -536,7 +568,7 @@ function PremiumProductContent({
               <Meta icon={Clock} text={product.classLevel} />
               <Meta icon={BarChart3} text={product.subject} />
               <Meta icon={Globe} text={product.category} />
-              <Meta icon={BadgeCheck} text={`${modules.length} modules`} />
+              <Meta icon={BadgeCheck} text={`${modulesCount} modules`} />
             </div>
 
             {isProductOwned ? (
@@ -642,7 +674,7 @@ function PremiumProductContent({
             </section>
           )}
 
-          <DetailsCard product={product} modules={modules} highlights={highlights} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
+          <DetailsCard product={product} modules={modules} curriculumMode={curriculumMode} highlights={highlights} tab={activeTab} onTab={setActiveTab} expandedModule={expandedModule} onExpandModule={setExpandedModule} />
           <ReviewsCard
             product={product}
             reviews={productReviews}
@@ -664,7 +696,7 @@ function PremiumProductContent({
   );
 }
 
-function DetailsCard({ product, modules, highlights, tab, onTab, expandedModule, onExpandModule }: { product: Product; modules: CurriculumModule[]; highlights: string[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void }) {
+function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab, expandedModule, onExpandModule }: { product: Product; modules: CurriculumModule[]; curriculumMode: CurriculumViewMode; highlights: string[]; tab: DetailTab; onTab: (tab: DetailTab) => void; expandedModule: string | null; onExpandModule: (id: string | null) => void }) {
   const tabs: DetailTab[] = ["Description", "Curriculum", "Instructor"];
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [tabBarStuck, setTabBarStuck] = useState(false);
@@ -713,9 +745,23 @@ function DetailsCard({ product, modules, highlights, tab, onTab, expandedModule,
           </div>
         )}
         {tab === "Curriculum" && (
-          modules.length === 0 ? <EmptyDetail text="No curriculum has been published for this product yet." /> : <div className="space-y-2">{modules.map((module, index) => (
-            <CurriculumModuleRow key={module.id || `${module.title}-${index}`} module={module} index={index} expandedModule={expandedModule} onExpandModule={onExpandModule} />
-          ))}</div>
+          modules.length === 0 ? (
+            <EmptyDetail text={curriculumMode === "paid-upgrade" ? "Every published upgrade is already in your library." : "No curriculum has been published for this product yet."} />
+          ) : (
+            <div className="space-y-3" data-pdp-curriculum data-pdp-curriculum-mode={curriculumMode}>
+              {curriculumMode === "paid-upgrade" ? (
+                <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50 to-white px-3.5 py-3" data-pdp-curriculum-upgrade-hint>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-amber-700">Paid upgrades</p>
+                  <p className="mt-1 text-xs leading-5 text-amber-900/75">These modules stay locked after the course purchase. Unlock them with a paid upgrade — they look different here so they are never mixed with included lessons.</p>
+                </div>
+              ) : null}
+              <div className="space-y-2">
+                {modules.map((module, index) => (
+                  <CurriculumModuleRow key={module.id || `${module.title}-${index}`} module={module} index={index} expandedModule={expandedModule} onExpandModule={onExpandModule} />
+                ))}
+              </div>
+            </div>
+          )
         )}
         {tab === "Instructor" && <div className="flex items-start gap-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-700 via-zinc-500 to-zinc-800 text-lg font-bold text-white shadow-lg">{initials(product.instructor)}</div><div><p className="font-bold text-zinc-900">{product.instructor}</p><p className="text-xs text-zinc-500">Creator of {product.title}</p><p className="mt-2 text-sm leading-relaxed text-zinc-500">Instructor information is synced from this live product's catalog record.</p></div></div>}
       </div>
@@ -727,27 +773,45 @@ function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, de
   const open = expandedModule === module.id;
   const childModules = module.modules || [];
   const resources = module.resources || [];
+  const paid = Boolean(module.paid);
   return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-100" style={{ marginLeft: depth ? depth * 12 : 0 }}>
-      <button type="button" onClick={() => onExpandModule(open ? null : module.id)} className="flex w-full items-center gap-3 bg-zinc-50/60 px-3 py-3 text-left">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white shadow-sm shadow-indigo-200">{index + 1}</span>
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-800">{module.title}</span>
-        <span className="text-[10px] text-zinc-400">{resources.length} resources{childModules.length ? ` · ${childModules.length} modules` : ""}</span>
-        <ChevronDown className={`h-4 w-4 text-zinc-400 transition ${open ? "rotate-180" : ""}`} />
+    <div
+      className={`overflow-hidden rounded-2xl border ${paid ? "border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50/70 to-white shadow-[0_8px_24px_-16px_rgba(180,83,9,0.55)]" : "border-zinc-100"}`}
+      style={{ marginLeft: depth ? depth * 12 : 0 }}
+      data-pdp-curriculum-module
+      data-module-id={module.id}
+      data-paid={paid ? "true" : "false"}
+    >
+      <button type="button" onClick={() => onExpandModule(open ? null : module.id)} className={`flex w-full items-center gap-3 px-3 py-3 text-left ${paid ? "bg-amber-100/40" : "bg-zinc-50/60"}`}>
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm ${paid ? "bg-gradient-to-br from-amber-500 to-orange-600 shadow-amber-200" : "bg-gradient-to-br from-indigo-600 to-violet-600 shadow-indigo-200"}`}>{index + 1}</span>
+        <span className="min-w-0 flex-1">
+          <span className={`block truncate text-sm font-semibold ${paid ? "text-amber-950" : "text-zinc-800"}`}>{module.title}</span>
+          {paid ? (
+            <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-800">
+                <LockKeyhole className="h-2.5 w-2.5" /> Paid upgrade
+              </span>
+              {module.paidUpdatePrice ? <span className="text-[10px] font-bold text-amber-700">{module.paidUpdatePrice}</span> : null}
+            </span>
+          ) : null}
+        </span>
+        <span className={`text-[10px] ${paid ? "text-amber-700/70" : "text-zinc-400"}`}>{resources.length} resources{childModules.length ? ` · ${childModules.length} modules` : ""}</span>
+        {paid ? <Crown className="h-3.5 w-3.5 shrink-0 text-amber-500" /> : null}
+        <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""} ${paid ? "text-amber-500" : "text-zinc-400"}`} />
       </button>
       {open && (
         <div className="space-y-2 px-4 py-3">
           {resources.map((resource) => (
-            <div key={resource.id} className="flex items-center gap-2 text-xs text-zinc-500">
-              <PlayCircle className="h-4 w-4 text-zinc-300" />
+            <div key={resource.id} className={`flex items-center gap-2 text-xs ${paid ? "text-amber-900/70" : "text-zinc-500"}`}>
+              <PlayCircle className={`h-4 w-4 ${paid ? "text-amber-400" : "text-zinc-300"}`} />
               <span className="min-w-0 flex-1 truncate">{resource.name}</span>
-              <span className="uppercase text-[9px] text-zinc-400">{resource.type}</span>
+              <span className={`uppercase text-[9px] ${paid ? "text-amber-600/70" : "text-zinc-400"}`}>{resource.type}</span>
             </div>
           ))}
           {childModules.map((child, childIndex) => (
             <CurriculumModuleRow key={child.id || `${module.id}-${childIndex}`} module={child} index={childIndex} expandedModule={expandedModule} onExpandModule={onExpandModule} depth={depth + 1} />
           ))}
-          {resources.length === 0 && childModules.length === 0 ? <p className="text-xs text-zinc-400">Module details will appear here when published.</p> : null}
+          {resources.length === 0 && childModules.length === 0 ? <p className={`text-xs ${paid ? "text-amber-700/70" : "text-zinc-400"}`}>Module details will appear here when published.</p> : null}
         </div>
       )}
     </div>
@@ -846,7 +910,7 @@ function Trust({ icon: Icon, label }: { icon: typeof ShieldCheck; label: string 
 function EmptyDetail({ text }: { text: string }) { return <div className="flex flex-col items-center rounded-2xl bg-zinc-50 py-8 text-center"><PackageOpen className="h-7 w-7 text-zinc-300" /><p className="mt-2 px-5 text-xs text-zinc-400">{text}</p></div>; }
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "DC"; }
 
-const asCurriculumModule = (raw: unknown): CurriculumModule | null => {
+const asCurriculumModule = (raw: unknown, product: Product, paidModuleIds: Set<string>): CurriculumModule | null => {
   if (!raw || typeof raw !== "object") return null;
   const module = raw as Record<string, unknown>;
   if (module.visibility === "hidden" || module.active === false || module.accessLevel === "hidden") return null;
@@ -863,15 +927,34 @@ const asCurriculumModule = (raw: unknown): CurriculumModule | null => {
       type: String(resource.type || "file"),
     };
   }).filter((resource): resource is { id: string; name: string; type: string } => resource !== null);
-  const modules = (Array.isArray(module.modules) ? module.modules : []).map(asCurriculumModule).filter((item): item is CurriculumModule => Boolean(item));
-  return { id: id || title, title, resources, modules };
+  const modules = (Array.isArray(module.modules) ? module.modules : []).map((child) => asCurriculumModule(child, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
+  const paid = isPaidUpgradeModule(module, paidModuleIds);
+  const update = paid ? resolvePaidUpdateForModule(module, product.paidUpdates || []) : null;
+  const paidUpdateId = String(module.paidUpdateId || update?.id || "");
+  const paidUpdateTitle = String(module.paidUpdateTitle || update?.title || "");
+  const paidUpdatePrice = String(module.paidUpdatePrice || (update && Number(update.cashPrice) > 0 ? `₹${Number(update.cashPrice).toLocaleString("en-IN")}` : "") || "");
+  return {
+    id: id || title,
+    title,
+    paid,
+    paidUpdateId: paidUpdateId || undefined,
+    paidUpdateTitle: paidUpdateTitle || undefined,
+    paidUpdatePrice: paidUpdatePrice || undefined,
+    resources,
+    modules,
+  };
 };
 
 export const collectCurriculumModules = (product: Product): CurriculumModule[] => {
-  const canonical = (product.canonicalModules || []).map(asCurriculumModule).filter((item): item is CurriculumModule => Boolean(item));
+  const paidModuleIds = collectPaidModuleIdSet(product.paidUpdates || []);
+  const canonical = (product.canonicalModules || []).map((item) => asCurriculumModule(item, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
   if (canonical.length > 0) return canonical;
-  return (product.courseContent || []).map(asCurriculumModule).filter((item): item is CurriculumModule => Boolean(item));
+  return (product.courseContent || []).map((item) => asCurriculumModule(item, product, paidModuleIds)).filter((item): item is CurriculumModule => Boolean(item));
 };
+
+
+const curriculumContainsId = (modules: CurriculumModule[], id: string): boolean =>
+  modules.some((module) => module.id === id || curriculumContainsId(module.modules || [], id));
 
 export const countCurriculumResources = (modules: CurriculumModule[]): number =>
   modules.reduce((sum, module) => sum + (module.resources?.length || 0) + countCurriculumResources(module.modules || []), 0);
