@@ -4,6 +4,7 @@ import { Card, PrimaryButton, SecondaryButton } from "../components/ui";
 import { GearIcon, SlidersIcon, SparklesIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { fetchRemoteCatalog, type RevisionCatalog } from "../engine/catalogService";
+import { defaultCatalogAiSettings } from "../engine/aiConfig";
 import {
   DEFAULT_CUSTOMIZATION_LIMITS,
   DEFAULT_USER_CUSTOM_SETTINGS,
@@ -56,6 +57,7 @@ export default function CustomizationPage({ uid, route }: Props) {
             subjects: db.subjects.map((s) => ({ name: s.name, slug: s.slug, icon: s.icon, color: s.color })),
             topics: db.topics.map((t) => ({ subjectSlug: t.slug, name: t.name, slug: t.slug })),
             questions: [],
+            aiSettings: defaultCatalogAiSettings(),
           });
         }
       } catch {
@@ -69,6 +71,7 @@ export default function CustomizationPage({ uid, route }: Props) {
           subjects: db.subjects.map((s) => ({ name: s.name, slug: s.slug, icon: s.icon, color: s.color })),
           topics: db.topics.map((t) => ({ subjectSlug: t.slug, name: t.name, slug: t.slug })),
           questions: [],
+          aiSettings: defaultCatalogAiSettings(),
         });
       }
       setLoading(false);

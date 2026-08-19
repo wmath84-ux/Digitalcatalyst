@@ -8,6 +8,7 @@ import {
   ChevronRightIcon,
   FlameIcon,
   SlidersIcon,
+  SparklesIcon,
   TargetIcon,
   TrophyIcon,
   UserIcon,
@@ -76,6 +77,28 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
               )}
             </div>
           )}
+        </button>
+
+        {/* AI Settings Button */}
+        <button
+          type="button"
+          onClick={() => navigate("#/revision/ai-settings")}
+          className="group relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-5 text-left shadow-lg shadow-purple-200 transition-all active:scale-[0.98]"
+        >
+          <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10" />
+          <div className="absolute -bottom-6 -left-6 h-20 w-20 rounded-full bg-white/5" />
+          <div className="relative flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur">
+              <SparklesIcon className="h-7 w-7 text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-bold text-white">AI Question Engine</h3>
+              <p className="mt-0.5 text-xs text-purple-100">
+                Generate questions with your own AI — Gemini, ChatGPT, Claude, Groq & more
+              </p>
+            </div>
+            <ChevronRightIcon className="h-6 w-6 text-white/70" />
+          </div>
         </button>
 
         <div>

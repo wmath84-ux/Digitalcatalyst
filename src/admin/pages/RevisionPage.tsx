@@ -30,15 +30,18 @@ import {
 } from "@/revision/engine/store";
 import { parseQuestionText, type ParsedQuestion } from "@/revision/engine/bulkParser";
 import { generateOfflineQuestions } from "@/revision/engine/offlineGenerator";
+import AiConfigForm from "@/revision/components/AiConfigForm";
 import {
-  DEFAULT_MODEL as DEFAULT_GEMINI_MODEL,
-  MODEL_OPTIONS as GEMINI_MODEL_OPTIONS,
-  generateWithGeminiClient,
-  getGeminiKey,
-  getGeminiModel,
-  setGeminiKey,
-  setGeminiModel,
-} from "@/revision/engine/aiGenerate";
+  defaultCatalogAiSettings,
+  generateQuestionsWithAi,
+  getProvider,
+  loadAdminAiConfig,
+  mergeModelLists,
+  saveAdminAiConfig,
+  type CatalogAiSettings,
+  type ProviderModel,
+  type UserAiConfig,
+} from "@/revision/engine/aiConfig";
 
 const REVISION_TABS = [
   { key: "settings", label: "Settings" },
@@ -1021,6 +1024,17 @@ type AiGenerated = {
 };
 
 function AiTab({ catalog, update, persist, notify }: TabProps) {
+  // The admin's own AI connection — stored only in this browser.
+  const [adminCfg, setAdminCfg] = useState<UserAiConfig>(() => loadAdminAiConfig());
+  const [fetchedModels, setFetchedModels] = useState<ProviderModel[]>([]);
+
+  // Published default that every user sees.
+  const published = catalog.aiSettings ?? defaultCatalogAiSettings();
+  const [publishModel, setPublishModel] = useState(published.model);
+  const [shareKey, setShareKey] = useState(Boolean(published.sharedApiKey));
+  const [publishing, setPublishing] = useState(false);
+
+  // Question generator state.
   const [subjectSlug, setSubjectSlug] = useState(catalog.subjects[0]?.slug ?? "");
   const [topicSlug, setTopicSlug] = useState("");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
@@ -1028,8 +1042,6 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
   const [generating, setGenerating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewItem[]>([]);
-  const [apiKey, setApiKey] = useState(() => getGeminiKey() ?? "");
-  const [model, setModel] = useState(() => getGeminiModel());
 
   const topics = catalog.topics.filter((t) => t.subjectSlug === subjectSlug);
   const subject = catalog.subjects.find((s) => s.slug === subjectSlug);
@@ -1039,6 +1051,38 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
     setSubjectSlug(slug);
     const first = catalog.topics.find((t) => t.subjectSlug === slug);
     setTopicSlug(first?.slug ?? "");
+  };
+
+  const persistAdminCfg = (cfg: UserAiConfig) => {
+    setAdminCfg(cfg);
+    saveAdminAiConfig(cfg);
+  };
+
+  const publishProvider = adminCfg.config.provider;
+  const publishModels = mergeModelLists(publishProvider, fetchedModels);
+  const publishProviderMeta = getProvider(publishProvider);
+
+  const publishDefault = () => {
+    if (!publishModel) {
+      notify("error", "Pick a default model first.");
+      return;
+    }
+    const nextSettings: CatalogAiSettings = {
+      provider: publishProvider,
+      model: publishModel,
+      models: publishModels.slice(0, 300),
+      sharedApiKey: shareKey ? adminCfg.config.apiKey.trim() : "",
+      updatedAt: new Date().toISOString(),
+    };
+    if (shareKey && !adminCfg.config.apiKey.trim()) {
+      notify("error", "Enter your API key before sharing it with users.");
+      return;
+    }
+    setPublishing(true);
+    const next = { ...catalog, aiSettings: nextSettings };
+    update(next);
+    void persist(next).finally(() => setPublishing(false));
+    notify("success", shareKey ? "Published — users can now generate with your shared key." : "Published — users now see this provider & model as the default.");
   };
 
   const generate = async () => {
@@ -1052,19 +1096,15 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
 
     let source: "ai" | "offline" = "ai";
     let generated: AiGenerated[] = [];
-    if (apiKey.trim()) {
-      setGeminiKey(apiKey);
-      setGeminiModel(model);
+    if (adminCfg.config.apiKey.trim()) {
+      persistAdminCfg(adminCfg);
       try {
-        const questions = await generateWithGeminiClient({
+        const questions = await generateQuestionsWithAi(adminCfg.config, {
           subject: subject?.name ?? "",
           topic: topic.name,
           difficulty,
           count,
         });
-        // generateWithGeminiClient may auto-upgrade a retired model — mirror
-        // whatever it settled on back into the form.
-        setModel(getGeminiModel());
         if (questions.length > 0) {
           generated = questions.map((q) => ({
             prompt: q.prompt,
@@ -1074,16 +1114,15 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
             difficulty,
           }));
         } else {
-          setNotice("Gemini returned no usable questions — used the built-in offline generator instead.");
+          setNotice(`${getProvider(adminCfg.config.provider).name} returned no usable questions — used the built-in offline generator instead.`);
           source = "offline";
         }
       } catch (err) {
-        setModel(getGeminiModel());
-        setNotice(`${err instanceof Error ? err.message : "Gemini request failed"} — used the built-in offline generator instead.`);
+        setNotice(`${err instanceof Error ? err.message : "AI request failed"} — used the built-in offline generator instead.`);
         source = "offline";
       }
     } else {
-      setNotice("No Gemini API key set — used the built-in offline generator instead. Add your key below for real AI questions.");
+      setNotice("No API key set — used the built-in offline generator instead. Connect a provider above for real AI questions.");
       source = "offline";
     }
 
@@ -1136,40 +1175,92 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
 
   return (
     <div className="space-y-3">
+      {/* Connect any provider */}
       <SectionCard
-        title="Gemini API key"
-        description="Your key is stored only in this browser (localStorage) and sent directly to Google's Gemini API — it never touches the public app bundle."
+        title="Connect an AI provider"
+        description="Works with Google Gemini, OpenAI, Anthropic Claude, OpenRouter, Groq or any custom OpenAI-compatible API. Your key is stored only in this browser and sent directly to the provider — never baked into the app bundle."
       >
-        <Field label="Gemini API key" hint="Get one at aistudio.google.com → Get API key. Leave blank to use the offline generator.">
-          <input
-            className={inputClass}
-            type="password"
-            placeholder="AIza…"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-          />
-        </Field>
-        <div className="mt-2">
-          <Field label="Model" hint={`Defaults to ${DEFAULT_GEMINI_MODEL} — the current Gemini Flash model. Older 1.5/2.x models were retired by Google and now return 404.`}>
-            <select
-              className={selectClass}
-              value={model}
-              onChange={(e) => {
-                setModel(e.target.value);
-                setGeminiModel(e.target.value);
-              }}
-            >
-              {GEMINI_MODEL_OPTIONS.map((m) => (
-                <option key={m.value} value={m.value}>{m.label}</option>
+        <AiConfigForm
+          value={adminCfg.config}
+          onChange={(config) => {
+            if (config.provider !== adminCfg.config.provider) setFetchedModels([]);
+            persistAdminCfg({ ...adminCfg, source: "own", config });
+          }}
+          title="Your AI provider (admin)"
+          description="Pick a provider, paste your API key — every available model will appear in the dropdown automatically."
+          onModelsChange={(models) => setFetchedModels(models)}
+        />
+      </SectionCard>
+
+      {/* Publish default for all users */}
+      <SectionCard
+        title="Default for all users"
+        description="Choose the provider + model that is shown to every learner. Whatever you save here is visible to all users in their AI Settings. Your API key stays private unless you explicitly share it below."
+      >
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-base font-black text-white shadow-sm ${publishProviderMeta.gradient}`}>
+            {publishProviderMeta.mark}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-900">{publishProviderMeta.name}</p>
+            <p className="text-xs text-slate-500">
+              {published.updatedAt ? (
+                <>
+                  Currently published: <span className="font-mono font-semibold">{published.model}</span>
+                  {published.sharedApiKey ? " · shared key on" : " · no shared key"}
+                </>
+              ) : (
+                "Nothing published yet — users fall back to the offline bank."
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3">
+          <Field
+            label="Default model for users"
+            hint="Open the dropdown — every model this provider exposes (plus known models) is listed. Pick the one you want to fix for all learners."
+          >
+            <select className={selectClass} value={publishModel} onChange={(e) => setPublishModel(e.target.value)}>
+              {publishModels.length === 0 && <option value="">No models — connect a provider above</option>}
+              {publishModels.map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
               ))}
-              {!GEMINI_MODEL_OPTIONS.some((m) => m.value === model) && (
-                <option value={model}>{model} (custom)</option>
+              {publishModel && !publishModels.some((m) => m.id === publishModel) && (
+                <option value={publishModel}>{publishModel} (custom)</option>
               )}
             </select>
           </Field>
         </div>
+
+        <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <div>
+            <p className="text-sm font-medium text-slate-900">Share my API key with users</p>
+            <p className="text-xs text-slate-500">Users can then generate questions without their own key.</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={shareKey}
+            onClick={() => setShareKey((s) => !s)}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${shareKey ? "bg-amber-500" : "bg-slate-300"}`}
+          >
+            <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${shareKey ? "translate-x-5" : "translate-x-0.5"}`} />
+          </button>
+        </div>
+        {shareKey && (
+          <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-700">
+            ⚠️ Your key will be stored in the public revision catalog so every user can call the provider directly with it.
+            Anyone with the catalog can read it — only enable this for keys with strict spending limits.
+          </p>
+        )}
+
+        <PrimaryButton className="mt-3 w-full" loading={publishing} onClick={publishDefault}>
+          📢 Publish default for all users
+        </PrimaryButton>
       </SectionCard>
 
+      {/* Question generator */}
       <SectionCard title="AI question generator" description="Generate ready-to-use MCQs for a topic in one click. Choose the correct answer on any item before adding.">
         <div className="space-y-2">
           <select className={selectClass} value={subjectSlug} onChange={(e) => setSubject(e.target.value)}>

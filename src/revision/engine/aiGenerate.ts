@@ -133,7 +133,7 @@ type RawGenerated = {
   difficulty: string;
 };
 
-function systemPrompt(): string {
+export function systemPrompt(): string {
   return [
     "You are an expert exam question writer for a student revision app.",
     "You generate multiple-choice questions (MCQs) with exactly 4 options.",
@@ -148,7 +148,7 @@ function systemPrompt(): string {
   ].join("\n");
 }
 
-function extractJson(text: string): unknown {
+export function extractJson(text: string): unknown {
   const trimmed = text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
   try {
     return JSON.parse(trimmed);
@@ -167,7 +167,7 @@ function extractJson(text: string): unknown {
   }
 }
 
-function extractGeminiText(payload: unknown): string {
+export function extractGeminiText(payload: unknown): string {
   const candidates = (payload as Record<string, unknown>)?.candidates;
   if (!Array.isArray(candidates) || candidates.length === 0) return "";
   const content = (candidates[0] as Record<string, unknown>)?.content as Record<string, unknown> | undefined;
@@ -175,7 +175,7 @@ function extractGeminiText(payload: unknown): string {
   return parts.map((p) => (typeof p.text === "string" ? p.text : "")).join("");
 }
 
-function normalizeQuestions(raw: unknown, requestedDifficulty: string): RawGenerated[] {
+export function normalizeQuestions(raw: unknown, requestedDifficulty: string): RawGenerated[] {
   const source = Array.isArray(raw)
     ? raw
     : Array.isArray((raw as Record<string, unknown>)?.questions)
@@ -203,22 +203,37 @@ function normalizeQuestions(raw: unknown, requestedDifficulty: string): RawGener
   return out;
 }
 
-/** Call the Gemini generateContent endpoint directly from the browser. */
-export async function generateWithGeminiClient(input: GenerateInput): Promise<ParsedQuestion[]> {
-  const apiKey = getGeminiKey();
-  if (!apiKey) throw new Error("No Gemini API key configured.");
+/** Explicit runtime settings for a Gemini call (no localStorage involved). */
+export type GeminiRuntimeConfig = {
+  apiKey: string;
+  model: string;
+  /** Override for the API root (defaults to Google's public endpoint). */
+  baseUrl?: string;
+  /** Called when a retired model was auto-upgraded to a working one. */
+  onModelMigrated?: (model: string) => void;
+};
 
-  const userPrompt = [
+/** Build the user prompt that asks the model for MCQs. */
+export function buildUserPrompt(input: GenerateInput): string {
+  return [
     `Generate ${input.count} multiple-choice questions for a revision test.`,
     `Subject: ${input.subject || "General"}`,
     `Topic: ${input.topic || "General"}`,
     `Difficulty: ${input.difficulty}`,
     `Make every question distinct. Prefer clear, unambiguous options and a single correct answer.`,
   ].join("\n");
+}
+
+/** Call the Gemini generateContent endpoint directly from the browser. */
+export async function generateWithGemini(config: GeminiRuntimeConfig, input: GenerateInput): Promise<ParsedQuestion[]> {
+  const apiKey = config.apiKey.trim();
+  if (!apiKey) throw new Error("No Gemini API key configured.");
+
+  const endpointBase = (config.baseUrl || GEMINI_ENDPOINT).replace(/\/+$/, "");
 
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: systemPrompt() }] },
-    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+    contents: [{ role: "user", parts: [{ text: buildUserPrompt(input) }] }],
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.7,
@@ -226,7 +241,7 @@ export async function generateWithGeminiClient(input: GenerateInput): Promise<Pa
   });
 
   const call = (model: string) =>
-    fetch(`${GEMINI_ENDPOINT}/${model}:generateContent`, {
+    fetch(`${endpointBase}/${model}:generateContent`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -235,7 +250,7 @@ export async function generateWithGeminiClient(input: GenerateInput): Promise<Pa
       body,
     });
 
-  let model = getGeminiModel();
+  let model = config.model;
   let res = await call(model);
 
   // A retired model answers 404 and names its replacement — switch to it,
@@ -248,9 +263,9 @@ export async function generateWithGeminiClient(input: GenerateInput): Promise<Pa
     if (fallback) {
       const retry = await call(fallback);
       if (retry.ok) {
-        setGeminiModel(fallback);
         model = fallback;
         res = retry;
+        config.onModelMigrated?.(fallback);
       } else {
         const retryDetail = await retry.text().catch(() => "");
         throw new Error(
@@ -278,4 +293,22 @@ export async function generateWithGeminiClient(input: GenerateInput): Promise<Pa
     explanation: q.explanation,
     detected: true,
   }));
+}
+
+/**
+ * Legacy helper used by the admin panel: reads the key + model from
+ * localStorage (the old `dc_gemini_*` keys) and mirrors any model migration
+ * back into storage.
+ */
+export async function generateWithGeminiClient(input: GenerateInput): Promise<ParsedQuestion[]> {
+  const apiKey = getGeminiKey();
+  const model = getGeminiModel();
+  return generateWithGemini(
+    {
+      apiKey: apiKey ?? "",
+      model,
+      onModelMigrated: (next) => setGeminiModel(next),
+    },
+    input,
+  );
 }
