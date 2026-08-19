@@ -318,6 +318,18 @@ test("Modules overlay lists available modules, Resources lists only files", () =
   assert.match(overlay, /mode === "resources"/);
 });
 
+test("Modules overlay only lists unlocked modules — locked/paid modules live in the Paid tab", () => {
+  // The "Module" tab must not double-list purchasable content: locked and
+  // paid modules are filtered out of the wire tree and surfaced through the
+  // dedicated "Paid" dock tab instead.
+  assert.match(overlay, /unlockedModuleIds/);
+  assert.match(overlay, /accessibleModuleIds\.has\(String\(node\.id\)\)/);
+  assert.match(overlay, /isPaidLocked\(node, ownedUpdateIds\)/);
+  // A locked parent hides its nested children so no orphaned branch remains.
+  assert.match(overlay, /ancestorLocked/);
+  assert.match(overlay, /unlocked\.has\(String\(module\.id\)\)/);
+});
+
 test("Course overlay draws modules and files as a left-side connected wire tree", () => {
   assert.match(overlay, /data-course-overlay-wire/);
   assert.match(overlay, /data-course-wire-rail/);
