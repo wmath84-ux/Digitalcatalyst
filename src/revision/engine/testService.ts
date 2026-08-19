@@ -118,6 +118,11 @@ function buildQuestionOrder(db: RevisionDb, dateStr: string, uid?: string): numb
   return ordered;
 }
 
+/** True for the automatic daily tests (custom user-created tests are excluded). */
+function isDailyKind(t: DailyTestRow): boolean {
+  return t.kind !== "custom";
+}
+
 /** Ensure every slot of today's tests exists, then return them (sorted by slot). */
 export function getOrCreateDailyTests(db: RevisionDb, dateStr: string, uid?: string): DailyTestRow[] {
   const settings = uid ? getEffectiveSettings(uid, db) : getSettings(db);
@@ -126,7 +131,7 @@ export function getOrCreateDailyTests(db: RevisionDb, dateStr: string, uid?: str
   const estimatedMinutes = clampInt(settings.estimatedMinutes, 1, 240);
 
   const existing = db.dailyTests
-    .filter((t) => t.testDate === dateStr)
+    .filter((t) => t.testDate === dateStr && isDailyKind(t))
     .sort((a, b) => a.slot - b.slot);
 
   if (existing.length >= testsPerDay) return existing.slice(0, testsPerDay);
@@ -153,7 +158,7 @@ export function getOrCreateDailyTests(db: RevisionDb, dateStr: string, uid?: str
   }
 
   return db.dailyTests
-    .filter((t) => t.testDate === dateStr)
+    .filter((t) => t.testDate === dateStr && isDailyKind(t))
     .sort((a, b) => a.slot - b.slot);
 }
 
@@ -163,7 +168,9 @@ export function getOrCreateDailyTest(db: RevisionDb, dateStr: string, uid?: stri
 }
 
 export function markExpiredAttempts(db: RevisionDb, dateStr: string) {
-  const staleIds = db.dailyTests.filter((t) => t.testDate < dateStr).map((t) => t.id);
+  // Custom (user-generated) tests never expire — only the automatic daily
+  // rotation rolls over with the date.
+  const staleIds = db.dailyTests.filter((t) => t.testDate < dateStr && isDailyKind(t)).map((t) => t.id);
   if (staleIds.length === 0) return;
   for (const attempt of db.testAttempts) {
     if (staleIds.includes(attempt.dailyTestId) && attempt.status === "in_progress") {

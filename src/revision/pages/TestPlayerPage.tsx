@@ -11,13 +11,14 @@ import {
   submitTestAttempt,
   updateAttemptIndex,
 } from "../engine/testService";
+import { getCustomTestAttempt, startCustomTestAttempt } from "../engine/customTestService";
 import { ServiceError } from "../engine/store";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 
 type PlayerData = ReturnType<typeof getAttemptForPlayer>;
 
-export default function TestPlayerPage({ uid, route }: { uid: string; route: string }) {
+export default function TestPlayerPage({ uid, route, testId = null }: { uid: string; route: string; testId?: number | null }) {
   const { navigate, setGuard } = useExitGuard();
 
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -27,6 +28,18 @@ export default function TestPlayerPage({ uid, route }: { uid: string; route: str
 
   useEffect(() => {
     try {
+      if (testId) {
+        // Custom (user-generated) test: play this exact test.
+        const existing = getCustomTestAttempt(uid, testId);
+        if (existing?.status === "completed") {
+          setRedirectAttemptId(existing.id);
+          return;
+        }
+        const attempt = startCustomTestAttempt(uid, testId);
+        setPlayerData(getAttemptForPlayer(uid, attempt.id));
+        setLoadError(null);
+        return;
+      }
       const today = getTodayTestState(uid);
       if (today.attempt?.status === "completed") {
         setRedirectAttemptId(today.attempt.id);
@@ -38,7 +51,7 @@ export default function TestPlayerPage({ uid, route }: { uid: string; route: str
     } catch (err) {
       setLoadError(err instanceof ServiceError ? err.message : "We couldn't load the test. Please try again.");
     }
-  }, [uid, loadKey]);
+  }, [uid, loadKey, testId]);
 
   useEffect(() => {
     if (redirectAttemptId) {

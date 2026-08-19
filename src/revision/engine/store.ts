@@ -168,6 +168,14 @@ export type DailyTestRow = {
   questionIds: number[];
   totalQuestions: number;
   estimatedMinutes: number;
+  /**
+   * "custom" = a test the user created themselves (AI generator or bulk
+   * import). Custom tests live outside the automatic daily-test rotation:
+   * they never expire and never count towards the daily slots.
+   */
+  kind?: "daily" | "custom";
+  /** Where a custom test came from ("ai" | "bulk"). */
+  source?: string;
 };
 export type TestAttemptRow = {
   id: number;
