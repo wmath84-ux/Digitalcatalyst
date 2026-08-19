@@ -144,6 +144,21 @@ service cloud.firestore {
       }
 
 
+      match /aiUsage/{documentId} {
+        allow read: if documentId == 'current' && (isOwner(uid) || isAdmin());
+        allow create, update: if documentId == 'current'
+          && isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.dayCount is number
+          && request.resource.data.dayCount >= 0
+          && request.resource.data.dayCount <= 10000
+          && request.resource.data.dayKey is string
+          && request.resource.data.stamps is list
+          && request.resource.data.stamps.size() <= 200
+          && !request.resource.data.keys().hasAny(['apiKey', 'authorization', 'secret', 'role', 'status']);
+        allow delete: if isAdmin();
+      }
+
       match /aiMentorChats/{chatId} {
         allow read: if isOwner(uid) || isAdmin();
         allow create: if isOwner(uid)

@@ -16,6 +16,7 @@ import {
 import { useExitGuard } from "../components/ExitGuardContext";
 import { getDashboardData, getProgressData, getWeakTopics } from "../engine/statsService";
 import { loadUserCustomSettings } from "../engine/store";
+import AiQuotaCard from "../../components/AiQuotaCard";
 
 export default function RevisionProfilePage({ uid, route, userName }: { uid: string; route: string; userName: string }) {
   const { navigate } = useExitGuard();
@@ -78,6 +79,8 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
             </div>
           )}
         </button>
+
+        <AiQuotaCard uid={uid} />
 
         {/* AI Settings Button */}
         <button

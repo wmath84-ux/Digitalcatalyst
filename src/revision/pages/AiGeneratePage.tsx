@@ -21,6 +21,8 @@ import {
 } from "../engine/aiConfig";
 import { generateOfflineQuestions } from "../engine/offlineGenerator";
 import { addAiQuestionsToBank } from "../engine/aiBankService";
+import { consumeAiGeneration } from "../engine/aiUsage";
+import { defaultCatalogAiSettings } from "../engine/aiConfig";
 import type { ParsedQuestion } from "../engine/bulkParser";
 
 type Props = { uid: string; route: string };
@@ -104,6 +106,10 @@ export default function AiGeneratePage({ uid, route }: Props) {
     setAddedIds(null);
     setPreview([]);
     try {
+      if (!offline) {
+        // Pre-check + reserve a slot so two tabs cannot overshoot the published cap.
+        await consumeAiGeneration(uid, catalog?.aiSettings ?? defaultCatalogAiSettings());
+      }
       const questions = offline
         ? generateOfflineQuestions({ subjectName: subject?.name ?? "", topicName: topic.name, count, difficulty })
         : await generateQuestionsWithAi(activeConfig!, {

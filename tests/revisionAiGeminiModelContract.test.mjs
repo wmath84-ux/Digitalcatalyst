@@ -153,6 +153,22 @@ test("the admin-published default is part of the shared catalog", () => {
   assert.match(catalogService, /normalizeCatalogAiSettings\(raw\.aiSettings\)/);
 });
 
+test("admin can publish daily and rolling-window AI limits for every user", () => {
+  assert.match(aiConfig, /dailyLimit:/);
+  assert.match(aiConfig, /windowHours:/);
+  assert.match(aiConfig, /windowLimit:/);
+  assert.match(revisionPage, /Usage limits for every user/);
+  assert.match(revisionPage, /dailyLimit/);
+  assert.match(revisionPage, /windowHours/);
+  const profile = fs.readFileSync("src/profile/App.tsx", "utf8");
+  assert.match(profile, /AiQuotaCard/);
+  const usage = fs.readFileSync("src/revision/engine/aiUsage.ts", "utf8");
+  assert.match(usage, /consumeAiGeneration/);
+  assert.match(usage, /users.*aiUsage/);
+  const rules = fs.readFileSync("firestore.rules", "utf8");
+  assert.match(rules, /match \/aiUsage\/\{documentId\}/);
+});
+
 test("students can configure their own custom API in the app", () => {
   assert.match(aiSettingsPage, /loadUserAiConfig/);
   assert.match(aiSettingsPage, /saveUserAiConfig/);
