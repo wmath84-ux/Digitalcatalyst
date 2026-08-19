@@ -117,17 +117,6 @@ function GateContent({
         <div className="pointer-events-none absolute -left-16 top-40 h-56 w-56 rounded-full bg-violet-100/60 blur-3xl" />
 
         <div className="relative">
-          {!asPage && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="absolute -right-1 -top-1 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
-
           <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-indigo-600 ring-1 ring-indigo-100">
             <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
             {isMyDay ? "My Day Premium" : "Subscription feature"}
@@ -254,21 +243,36 @@ export default function PremiumGate({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm sm:items-center sm:p-4"
+      className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm sm:items-center sm:p-6"
       onClick={onClose}
     >
       <div
         className="w-full max-w-[480px] animate-slideUp"
         onClick={(e) => e.stopPropagation()}
       >
-        <GateContent
-          variant={variant}
-          userName={userName}
-          onClose={onClose}
-          onViewSubscription={onViewSubscription}
-          asPage={false}
-          subtitle={subtitle}
-        />
+        {/* Floating iframe-style frame for the subscription gate */}
+        <div className="overflow-hidden rounded-[1.75rem] border-4 border-white/80 bg-white shadow-[0_25px_70px_-12px_rgba(79,70,229,0.5)] ring-1 ring-indigo-200">
+          <GateContent
+            variant={variant}
+            userName={userName}
+            onClose={onClose}
+            onViewSubscription={onViewSubscription}
+            asPage={false}
+            subtitle={subtitle}
+          />
+        </div>
+
+        {/* Gradient blue shadow cross button, OUTSIDE the frame, to close the gate */}
+        <div className="mt-4 flex justify-center pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close subscription gate"
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 via-indigo-600 to-violet-700 text-white shadow-[0_12px_32px_-4px_rgba(37,99,235,0.75)] ring-4 ring-white/40 transition hover:scale-110 active:scale-95"
+          >
+            <X className="h-6 w-6" strokeWidth={2.75} />
+          </button>
+        </div>
       </div>
     </div>
   );

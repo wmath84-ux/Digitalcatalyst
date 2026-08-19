@@ -18,16 +18,16 @@ import { useAuth } from "../context/AuthContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useRevisionAccess } from "../hooks/useRevisionAccess";
 import { syncRevisionCatalog } from "./engine/catalogService";
-import RevisionLockScreen from "./components/RevisionLockScreen";
+import PremiumGate from "../components/subscription/PremiumGate";
 
 /**
- * Daily Test & Revision feature shell:
- * - While access is loading a spinner is shown.
- * - When the subscription gate applies (the `revision` feature doc exists
- *   and is active but the user's membership does not include it), the full
- *   RevisionLockScreen paywall is shown in place of the app.
- * - Otherwise the app renders normally — dashboard, bank, weak topics,
- *   progress, profile and the test/session players are all usable.
+ * Daily Test & Revision feature shell.
+ *
+ * Same behaviour as My Day: the app is always rendered so the learner can
+ * browse, and the subscription gate only appears as a floating modal when a
+ * paywalled action is attempted (starting a test, starting a revision
+ * session, generating a set, etc.). The gate applies only while the
+ * `revision` feature doc exists and is active in the subscription catalog.
  */
 
 export default function RevisionApp() {
@@ -36,6 +36,7 @@ export default function RevisionApp() {
   const { hasAccess: hasRevisionAccess, loading: revisionAccessLoading } = useRevisionAccess();
   const [route, setRoute] = useState(() => window.location.hash);
   const [syncKey, setSyncKey] = useState(0);
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   useEffect(() => {
     const onHashChange = () => setRoute(window.location.hash);
@@ -57,9 +58,11 @@ export default function RevisionApp() {
   }, [uid]);
 
   const requireAccess = useCallback(() => {
-    // Only reachable from pages, which only render while the user has
-    // access — the lock screen covers everyone the gate applies to.
-    return hasRevisionAccess;
+    // Gate appears ONLY when the learner tries a paywalled action (same as
+    // My Day). If they already have access, let the action proceed.
+    if (hasRevisionAccess) return true;
+    setPaywallOpen(true);
+    return false;
   }, [hasRevisionAccess]);
 
   // Strip query params so deep links like #/revision?x=1 still route.
@@ -165,12 +168,24 @@ export default function RevisionApp() {
                 <p className="text-xs font-semibold">Checking your membership…</p>
               </div>
             </div>
-          ) : !hasRevisionAccess ? (
-            <RevisionLockScreen userName={userName} />
           ) : (
             <Fragment key={syncKey}>{page}</Fragment>
           )}
         </ExitGuardProvider>
+
+        {/* Floating subscription gate — appears when a paywalled action is
+            attempted (same behaviour as My Day). */}
+        <PremiumGate
+          variant="revision"
+          userName={userName}
+          open={paywallOpen}
+          onClose={() => setPaywallOpen(false)}
+          onViewSubscription={() => {
+            setPaywallOpen(false);
+            window.location.hash = "#/subscription";
+          }}
+          subtitle="Daily tests, smart revision sessions aur weak-topic analytics ab Eduvora Plus+ subscription ka hissa hain. Subscribe karke turant shuru karo."
+        />
       </div>
     </div>
   );
