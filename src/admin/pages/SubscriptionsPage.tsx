@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DangerButton, EmptyState, ErrorState, Field, LoadingState, Pill, PrimaryButton, RecordCard, SecondaryButton, Sheet, Tabs, inputClass, selectClass, textareaClass } from "@/components/admin/ui";
 import { useConfirm, useToast } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
@@ -51,6 +51,7 @@ type ProductOption = {
   visibility?: string | null;
   availableForSale?: boolean;
   isFree?: boolean;
+  images?: Array<{ url: string }> | null;
 };
 
 type SubscriptionProductRow = {
@@ -65,6 +66,8 @@ type SubscriptionProductRow = {
   included: boolean;
   sortOrder: number;
   active: boolean;
+  /** True when an explicit pricing doc exists in subscriptionPlanProducts (vs virtual auto row) */
+  hasOverride?: boolean;
 };
 
 const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }], accessTier: "basic", cta: "Subscribe", featured: false, active: true };
@@ -78,6 +81,10 @@ export default function SubscriptionsPage() {
   const [subscriptionProducts, setSubscriptionProducts] = useState<SubscriptionProductRow[] | null>(null);
   const [availableProducts, setAvailableProducts] = useState<ProductOption[]>([]);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
+  // New: dedicated catalog picker for the Products tab's Add Product flow
+  const [catalogPickerOpen, setCatalogPickerOpen] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [quickAddingId, setQuickAddingId] = useState<string | null>(null);
   const [referralSettings, setReferralSettings] = useState({ enabled: true, discountPaise: 25000, maxUsesPerReferrer: null as number | null });
   const [error, setError] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<Partial<Plan> | null>(null);
@@ -110,6 +117,14 @@ export default function SubscriptionsPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // Auto-refresh when viewing Products tab so a newly created product
+  // appears directly without manual reload — as requested.
+  useEffect(() => {
+    if (tab !== "products") return;
+    const interval = setInterval(() => { load(); }, 15000);
+    return () => clearInterval(interval);
+  }, [tab]);
 
   async function savePlan() {
     if (!editingPlan?.name) { notify("error", "Plan name required."); return; }
@@ -201,6 +216,82 @@ export default function SubscriptionsPage() {
     setProductPickerOpen(false);
   };
 
+  // Keep EMPTY_SUB_PRODUCT referenced so TS noEmit stays clean (used as fallback defaults)
+  void EMPTY_SUB_PRODUCT;
+  // Direct one-click add from catalog picker → creates/updates the subscription product pricing doc
+  const handleQuickAdd = async (product: ProductOption) => {
+    const productId = String(product.id);
+    setQuickAddingId(productId);
+    try {
+      const price = productPrice(product);
+      // Check if already has override — if yes, just open editor for pricing config
+      const existing = (subscriptionProducts || []).find((sp) => String(sp.productId) === productId);
+      // If it's already a real configured product, open its editor instead of duplicate toast
+      if (existing && existing.hasOverride) {
+        setCatalogPickerOpen(false);
+        setEditingSubscriptionProduct(existing);
+        return;
+      }
+      // Create / ensure pricing doc exists so it is explicitly part of subscription feature
+      await adminFetch("/api/admin/subscriptions/products", {
+        method: "POST",
+        body: JSON.stringify({
+          id: productId,
+          productId,
+          name: product.title || productId,
+          description: product.category || product.productType || "",
+          individualPrice: String(price),
+          monthlyPrice: "",
+          yearlyPrice: "",
+          planPricing: {},
+          included: false,
+          sortOrder: 0,
+          active: product.visibility !== "hidden" && product.availableForSale !== false,
+        }),
+      });
+      notify("success", `"${product.title || productId}" subscription product feature me add ho gaya.`);
+      setCatalogPickerOpen(false);
+      // Reload so the new/updated row appears directly in the list
+      await load();
+      // Optionally open editor for immediate plan-wise pricing configuration
+      // Find the fresh row and open it
+      // We delay slightly to allow state update
+      setTimeout(() => {
+        // Re-find from latest — but we can just open with product data prefilled
+        setEditingSubscriptionProduct({
+          productId,
+          name: product.title || productId,
+          description: product.category || product.productType || "",
+          individualPrice: String(price),
+          monthlyPrice: "",
+          yearlyPrice: "",
+          planPricing: {},
+          included: false,
+          sortOrder: 0,
+          active: true,
+        });
+      }, 300);
+    } catch (err) {
+      notify("error", err instanceof Error ? err.message : "Failed to add product to subscription.");
+    } finally {
+      setQuickAddingId(null);
+    }
+  };
+
+  const filteredCatalogProducts = useMemo(() => {
+    const q = catalogSearch.trim().toLowerCase();
+    if (!q) return availableProducts;
+    return availableProducts.filter((p) => `${p.id} ${p.title} ${p.category || ""} ${p.productType || ""}`.toLowerCase().includes(q));
+  }, [availableProducts, catalogSearch]);
+
+  const hasOverrideSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const sp of subscriptionProducts || []) {
+      if (sp.hasOverride) s.add(String(sp.productId));
+    }
+    return s;
+  }, [subscriptionProducts]);
+
   if (error) return <ErrorState message={error} onRetry={load} />;
   if (!plans || !features) return <LoadingState />;
 
@@ -287,19 +378,29 @@ export default function SubscriptionsPage() {
 
       {tab === "products" && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">{(subscriptionProducts || []).length} subscription product(s) · Add products that can be purchased individually or unlocked free per plan / duration</p>
-            <PrimaryButton onClick={() => { setEditingSubscriptionProduct({ ...EMPTY_SUB_PRODUCT }); setProductPickerOpen(true); }}>+ Add product</PrimaryButton>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] leading-relaxed text-emerald-900">
+            <p className="font-semibold">🔄 Auto-sync enabled</p>
+            <p className="mt-0.5">Jo bhi naya product aap Products section me add karenge, wo yahan <strong>directly dikhega</strong> — har 15 second me list refresh hoti hai. Naye product ko subscription feature me add karne ke liye <strong>+ Add product</strong> dabayein.</p>
           </div>
-          {(subscriptionProducts || []).length === 0 ? <EmptyState title="No subscription products yet" /> : (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-slate-500">{(subscriptionProducts || []).length} subscription product(s) · Add products that can be purchased individually or unlocked free per plan / duration</p>
+            <div className="flex items-center gap-2">
+              <SecondaryButton className="h-9 px-3 text-xs" onClick={() => load()}>↻ Refresh</SecondaryButton>
+              <PrimaryButton onClick={() => { setCatalogSearch(""); setCatalogPickerOpen(true); }}>+ Add product</PrimaryButton>
+            </div>
+          </div>
+          {(subscriptionProducts || []).length === 0 ? <EmptyState title="No subscription products yet" description="Click + Add product to choose from your available products." /> : (
             <div className="space-y-2">
               {(subscriptionProducts || []).map((sp) => (
                 <RecordCard key={sp.id}>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-900">{sp.name}</span>
-                    <Pill tone={sp.active ? "success" : "default"}>{sp.active ? "active" : "inactive"}</Pill>
+                    <div className="flex items-center gap-1.5">
+                      {sp.hasOverride ? <Pill tone="info">custom pricing</Pill> : <Pill tone="default">auto</Pill>}
+                      <Pill tone={sp.active ? "success" : "default"}>{sp.active ? "active" : "inactive"}</Pill>
+                    </div>
                   </div>
-                  <p className="mt-0.5 text-xs text-slate-500">{sp.productId} · {sp.included ? "Included / free" : `₹${sp.individualPrice} base`}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{sp.productId} · {sp.included ? "Included / free" : `₹${sp.individualPrice} base`} {sp.hasOverride ? "" : "· auto-synced from Products"}</p>
                   {!sp.included && (sp.monthlyPrice || sp.yearlyPrice || Object.keys(sp.planPricing ?? {}).length > 0) && (
                     <p className="mt-1 flex flex-wrap gap-1">
                       {sp.monthlyPrice ? <Pill tone="info">mo ₹{sp.monthlyPrice}</Pill> : null}
@@ -491,6 +592,86 @@ export default function SubscriptionsPage() {
             </label>
           </div>
         )}
+      </Sheet>
+
+      {/* Catalog picker: shows every available product and lets admin one-click add to subscription */}
+      <Sheet open={catalogPickerOpen} onClose={() => setCatalogPickerOpen(false)} title="Add product to subscription" footer={
+        <div className="flex gap-2">
+          <SecondaryButton className="flex-1" onClick={() => setCatalogPickerOpen(false)}>Close</SecondaryButton>
+          <PrimaryButton className="flex-1" onClick={() => load()}>↻ Refresh list</PrimaryButton>
+        </div>
+      }>
+        <div className="space-y-3">
+          <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+            <p className="text-xs font-semibold text-slate-800">Sabhi available products</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">Kisi bhi product per click karke use <strong>directly subscription product feature me add</strong> kar sakte hain. Naye products yahan automatically dikhenge.</p>
+          </div>
+          <input
+            className={inputClass}
+            placeholder="Search products — title, category ya ID se..."
+            value={catalogSearch}
+            onChange={(e) => setCatalogSearch(e.target.value)}
+            autoFocus
+          />
+          <p className="text-xs text-slate-500">{filteredCatalogProducts.length} product(s) · {availableProducts.length} total · {subscriptionProducts?.length ?? 0} in subscription</p>
+          {availableProducts.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
+              <p className="text-sm font-semibold text-slate-700">Koi product nahi mila</p>
+              <p className="mt-1 text-xs text-slate-500">Pehle <strong>Products → + Add product</strong> se product banayein — yahan wo turant dikhega.</p>
+            </div>
+          ) : filteredCatalogProducts.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">Search se koi product nahi mila.</p>
+          ) : (
+            <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-1">
+              {filteredCatalogProducts.map((product) => {
+                const alreadyHasOverride = hasOverrideSet.has(String(product.id));
+                const existingRow = (subscriptionProducts || []).find((sp) => String(sp.productId) === String(product.id));
+                const isAuto = existingRow && !existingRow.hasOverride;
+                const isAdding = quickAddingId === String(product.id);
+                return (
+                  <div key={product.id} className={`flex items-center gap-3 rounded-xl border p-2.5 ${alreadyHasOverride ? "border-emerald-200 bg-emerald-50/50" : isAuto ? "border-slate-200 bg-slate-50" : "border-violet-200 bg-white"}`}>
+                    <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                      {product.images?.[0]?.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={product.images[0].url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-lg">📦</div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900">{product.title || product.id}</p>
+                      <p className="truncate text-[11px] text-slate-500">{product.id} · {product.category || product.productType || "Product"}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        <Pill tone={product.visibility === "visible" ? "success" : "default"}>{product.visibility || "hidden"}</Pill>
+                        {product.isFree ? <Pill tone="info">free</Pill> : <Pill tone="default">₹{productPrice(product).toLocaleString("en-IN")}</Pill>}
+                        {alreadyHasOverride ? <Pill tone="success">added ✓</Pill> : isAuto ? <Pill tone="default">auto visible</Pill> : null}
+                      </div>
+                    </div>
+                    <div className="shrink-0">
+                      {alreadyHasOverride ? (
+                        <SecondaryButton className="h-9 px-3 text-xs" onClick={() => { setCatalogPickerOpen(false); if (existingRow) setEditingSubscriptionProduct(existingRow); }}>
+                          Configure
+                        </SecondaryButton>
+                      ) : (
+                        <PrimaryButton className="h-9 px-3 text-xs" loading={isAdding} onClick={() => handleQuickAdd(product)}>
+                          + Add
+                        </PrimaryButton>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
+            <p className="font-semibold text-slate-800">Kaise kaam karta hai?</p>
+            <ul className="mt-1 list-disc pl-4">
+              <li><strong>+ Add</strong> per click karte hi product subscription feature me add ho jata hai aur list me <strong>directly dikhne lagta hai</strong>.</li>
+              <li>Uske baad <strong>Configure</strong> se aap monthly / yearly aur per-plan price (Free on this plan) set kar sakte hain.</li>
+              <li>Delete karne se wo subscription listing se hat jata hai, lekin Products me bana rehta hai.</li>
+            </ul>
+          </div>
+        </div>
       </Sheet>
 
       {/* Subscription Products Sheet — add individual products (courses) with per-plan / per-duration pricing + free checkbox */}

@@ -254,6 +254,7 @@ async function subscriptionPlanProductsRequest(init?: RequestInit) {
       const product = item.data() || {};
       const productId = String(product.id || item.id);
       const data: any = pricing.get(productId) || pricing.get(item.id) || {};
+      const hasOverride = Boolean(data && data.id);
       pricing.delete(productId);
       pricing.delete(item.id);
       return {
@@ -268,6 +269,7 @@ async function subscriptionPlanProductsRequest(init?: RequestInit) {
         included: data.included === true,
         active: data.active !== false && product.isVisible !== false && product.inStock !== false,
         sortOrder: Number(data.sortOrder || 0),
+        hasOverride,
       };
     });
     // Keep legacy overrides whose product document is temporarily unavailable,
@@ -285,6 +287,7 @@ async function subscriptionPlanProductsRequest(init?: RequestInit) {
         included: data.included === true,
         active: data.active !== false,
         sortOrder: Number(data.sortOrder || 0),
+        hasOverride: true,
       });
     }
     return { products: rows };
