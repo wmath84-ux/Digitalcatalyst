@@ -31,6 +31,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
+import { APPROVED_ADMIN_EMAIL } from "../utils/adminSession";
 import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
 
 type Modal = "edit" | "settings" | null;
@@ -527,6 +528,15 @@ export default function ProfileApp() {
               <span aria-hidden="true" className="text-slate-300">·</span>
               <a href="/terms-of-service.html" className="transition hover:text-violet-600 hover:underline">Terms of Service</a>
             </nav>
+
+            {user.role === "admin" && String(user.email || "").trim().toLowerCase() === APPROVED_ADMIN_EMAIL ? (
+              <button
+                type="button"
+                data-profile-open-dashboard
+                onClick={() => { window.location.hash = "#/admin-login"; }}
+                className="mx-auto mt-7 block text-[9px] font-medium tracking-wide text-slate-400 transition hover:text-slate-500"
+              >Open dashboard</button>
+            ) : null}
           </div>
         </main>
 

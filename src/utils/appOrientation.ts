@@ -1,20 +1,24 @@
 // src/utils/appOrientation.ts
 //
-// The whole app is locked to portrait EXCEPT while the Course Player is
+// The installed PWA is locked to portrait EXCEPT while the Course Player is
 // open. The player is the only screen where rotating the phone makes sense
 // (landscape lessons), so it is the only screen that unlocks rotation —
 // and it re-locks the moment it unmounts.
+//
+// A regular browser tab is never locked. Visitors must be able to browse
+// the site and tap Install PWA from any orientation; the Screen Orientation
+// API also rejects lock() outside standalone / fullscreen anyway.
 //
 // Two layers, because no single browser API is universal:
 //
 //   1. Screen Orientation API — `lock("portrait")` genuinely prevents
 //      rotation. It is honoured in installed PWAs (display: standalone)
-//      and inside fullscreen. A plain mobile browser tab rejects the call,
-//      so it is swallowed and layer 2 takes over.
+//      and inside fullscreen. A plain mobile browser tab is skipped.
 //   2. PortraitOnlyGuard overlay — a full-screen "rotate your phone" panel
-//      that covers the app whenever the viewport is landscape and the
-//      Course Player is closed, so the app never actually renders in
-//      landscape even where the lock was rejected.
+//      shown only in the installed PWA whenever the viewport is landscape
+//      and the Course Player is closed.
+
+import { isPwaInstalled } from "./pwaInstall";
 
 type RotationListener = () => void;
 
@@ -44,12 +48,14 @@ const notifyRotationChange = (): void => {
 };
 
 /**
- * Lock the screen to portrait. Best-effort: browsers that refuse (no
- * fullscreen, desktop, iOS) reject or throw, and the portrait overlay
- * covers those cases.
+ * Lock the screen to portrait. Installed PWA only — a regular browser
+ * tab must stay free so the landing / install flow remains usable.
+ * Best-effort: browsers that refuse (no fullscreen, desktop, iOS) reject
+ * or throw, and the portrait overlay covers those cases in the PWA.
  */
 export const lockAppToPortrait = (): void => {
   if (typeof screen === "undefined") return;
+  if (!isPwaInstalled()) return;
   const orientation = screen.orientation as OrientationLockable | undefined;
   if (!orientation || typeof orientation.lock !== "function") return;
   try {
