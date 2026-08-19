@@ -34,6 +34,10 @@ export const getCloudinaryImageUploadConfig = () => {
 
 export const isCloudinaryImageUploadConfigured = () => Boolean(getCloudinaryImageUploadConfig());
 
+export const imageProviderFromUrl = (url: string) => (
+  String(url || "").toLowerCase().includes("cloudinary") ? "Cloudinary" : "Public URL"
+);
+
 const normalizeCloudinaryFolder = (value?: string) => String(value || '')
   .trim()
   .replace(/^\/+|\/+$/g, '')

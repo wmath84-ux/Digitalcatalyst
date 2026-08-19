@@ -42,6 +42,20 @@ test("module customization keeps each module and its resource URL controls toget
   assert.match(editor, /normalizeResourceUrl\(resource\.url, resource\.type\)/);
 });
 
+test("module image resources reuse the product Cloudinary upload plus a custom URL field", () => {
+  const uploadField = fs.readFileSync("src/components/admin/products/CloudinaryImageUploadField.tsx", "utf8");
+  assert.match(uploadField, /uploadImageToCloudinary/);
+  assert.match(uploadField, /Choose image to upload/);
+  assert.match(uploadField, /isCloudinaryImageUploadConfigured/);
+  assert.match(editor, /CloudinaryImageUploadField/);
+  assert.match(editor, /folder="product-images"/);
+  assert.match(editor, /folder="module-images"/);
+  assert.match(editor, /resource\.type === "image_url"/);
+  assert.match(editor, /Your image \/ embed URL/);
+  assert.match(editor, /Image \(URL or Cloudinary\)/);
+  assert.match(editor, /Paste your own public or embed URL, or upload directly to Cloudinary/);
+});
+
 test("iframe snippets and pasted YouTube links become player-safe URLs", () => {
   assert.equal(
     normalizeResourceUrl('<iframe src="https://www.youtube.com/embed/U657Lyz5o7w?x=1"></iframe>', "youtube"),

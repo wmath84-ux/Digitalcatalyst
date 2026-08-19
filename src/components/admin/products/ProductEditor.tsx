@@ -18,7 +18,7 @@ import {
 import { useConfirm, useToast, useUnsavedGuard } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
 import type { PaidUpdate, ProductImage, ProductModule, ProductResource } from "@/lib/admin/types";
-import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from "../../../../utils/cloudinaryUpload";
+import { CloudinaryImageUploadField, imageProviderFromUrl } from "@/components/admin/products/CloudinaryImageUploadField";
 import { normalizeResourceUrl } from "../../../../utils/productMapping";
 
 type ProductForm = {
@@ -143,7 +143,6 @@ export function ProductEditor({ productId }: { productId?: string }) {
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState("basic");
   const [newImageUrl, setNewImageUrl] = useState("");
-  const [imageUploading, setImageUploading] = useState(false);
 
   useEffect(() => {
     if (isNew) return;
@@ -331,24 +330,15 @@ export function ProductEditor({ productId }: { productId?: string }) {
     }
   }
 
-  async function handleImageFileUpload(file: File) {
-    setImageUploading(true);
-    try {
-      const hostedUrl = await uploadImageToCloudinary(file, { folder: "product-images", tags: ["product"] });
-      const img: ProductImage = {
-        id: genLocalId("img"),
-        url: hostedUrl,
-        provider: "cloudinary",
-        sortOrder: form.images.length,
-        isPrimary: form.images.length === 0,
-      };
-      update("images", [...form.images, img]);
-      notify("success", "Image uploaded to Cloudinary.");
-    } catch (uploadError) {
-      notify("error", uploadError instanceof Error ? uploadError.message : "Image upload failed.");
-    } finally {
-      setImageUploading(false);
-    }
+  function addProductImage(url: string, provider: ProductImage["provider"]) {
+    const img: ProductImage = {
+      id: genLocalId("img"),
+      url,
+      provider,
+      sortOrder: form.images.length,
+      isPrimary: form.images.length === 0,
+    };
+    update("images", [...form.images, img]);
   }
 
   if (loading) return <LoadingState label="Loading product…" />;
@@ -452,14 +442,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
                       notify("error", "Image URL must be a public HTTPS URL.");
                       return;
                     }
-                    const img: ProductImage = {
-                      id: genLocalId("img"),
-                      url: newImageUrl.trim(),
-                      provider: newImageUrl.includes("cloudinary") ? "cloudinary" : "public",
-                      sortOrder: form.images.length,
-                      isPrimary: form.images.length === 0,
-                    };
-                    update("images", [...form.images, img]);
+                    addProductImage(newImageUrl.trim(), newImageUrl.includes("cloudinary") ? "cloudinary" : "public");
                     setNewImageUrl("");
                   }}
                 >
@@ -468,28 +451,11 @@ export function ProductEditor({ productId }: { productId?: string }) {
               </div>
             </Field>
 
-            {isCloudinaryImageUploadConfigured() ? (
-              <Field label="Upload image from your device" hint="Gallery / camera photo → converted to a Cloudinary URL automatically.">
-                <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-4 text-sm font-semibold text-slate-600 transition hover:border-indigo-400 hover:bg-indigo-50/40">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={imageUploading}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      event.target.value = "";
-                      if (file) void handleImageFileUpload(file);
-                    }}
-                  />
-                  {imageUploading ? "Uploading…" : "Choose image to upload"}
-                </label>
-              </Field>
-            ) : (
-              <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-                Cloudinary upload is disabled — set <code>VITE_CLOUDINARY_CLOUD_NAME</code> and <code>VITE_CLOUDINARY_UPLOAD_PRESET</code> to enable gallery uploads.
-              </p>
-            )}
+            <CloudinaryImageUploadField
+              folder="product-images"
+              tags={["product"]}
+              onUploaded={(hostedUrl) => addProductImage(hostedUrl, "cloudinary")}
+            />
 
             {form.images.length === 0 ? (
               <p className="text-sm text-slate-500">No images yet. The first added image becomes the primary image.</p>
@@ -735,7 +701,7 @@ const RESOURCE_TYPE_LABELS: Record<(typeof RESOURCE_TYPES)[number], string> = {
   youtube: "YouTube",
   video_url: "Video URL (MP4/web)",
   audio_url: "Audio URL",
-  image_url: "Image URL",
+  image_url: "Image (URL or Cloudinary)",
   gdrive: "Google Drive",
   pdf: "PDF",
   gdoc: "Google Doc",
@@ -964,18 +930,56 @@ function ModulesEditor({
                                 </Field>
                               </div>
 
-                              <Field label="Resource URL / YouTube ID / iframe code" required hint="Paste the link here. Full iframe embed code is also accepted and cleaned automatically.">
-                                <textarea
-                                  className={textareaClass + ` min-h-[76px] bg-white ${cleanUrl ? "border-emerald-300" : "border-red-300"}`}
-                                  placeholder={'https://… or <iframe src="https://…"></iframe>'}
-                                  value={resource.url}
-                                  onChange={(event) => updateResource(module.id, resource.id, { url: event.target.value })}
-                                  onBlur={() => {
-                                    const normalized = normalizeResourceUrl(resource.url, resource.type);
-                                    if (normalized && normalized !== resource.url) updateResource(module.id, resource.id, { url: normalized });
-                                  }}
-                                />
-                              </Field>
+                              {resource.type === "image_url" ? (
+                                <div className="space-y-3 rounded-xl border border-indigo-100 bg-white p-3">
+                                  <div>
+                                    <p className="text-xs font-bold uppercase tracking-wide text-indigo-700">Image source</p>
+                                    <p className="mt-1 text-[11px] leading-5 text-slate-500">Paste your own public or embed URL, or upload directly to Cloudinary — same as product images.</p>
+                                  </div>
+                                  <Field label="Your image / embed URL" required hint="Public HTTPS image URL, Cloudinary URL, or iframe embed code.">
+                                    <textarea
+                                      className={textareaClass + ` min-h-[76px] bg-white ${cleanUrl ? "border-emerald-300" : "border-red-300"}`}
+                                      placeholder={'https://… or <iframe src="https://…"></iframe>'}
+                                      value={resource.url}
+                                      onChange={(event) => updateResource(module.id, resource.id, { url: event.target.value, provider: imageProviderFromUrl(event.target.value) })}
+                                      onBlur={() => {
+                                        const normalized = normalizeResourceUrl(resource.url, resource.type);
+                                        if (normalized && normalized !== resource.url) updateResource(module.id, resource.id, { url: normalized, provider: imageProviderFromUrl(normalized) });
+                                      }}
+                                    />
+                                  </Field>
+                                  <div className="flex items-center gap-2">
+                                    <span className="h-px flex-1 bg-slate-200" />
+                                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">or</span>
+                                    <span className="h-px flex-1 bg-slate-200" />
+                                  </div>
+                                  <CloudinaryImageUploadField
+                                    folder="module-images"
+                                    tags={["module", "resource"]}
+                                    onUploaded={(hostedUrl) => updateResource(module.id, resource.id, { url: hostedUrl, provider: "Cloudinary" })}
+                                  />
+                                  {cleanUrl ? (
+                                    <div className="overflow-hidden rounded-lg border border-slate-200">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={cleanUrl} alt="" className="h-32 w-full object-cover" onError={(event) => ((event.target as HTMLImageElement).style.opacity = "0.2")} />
+                                      <p className="truncate px-2 py-1.5 text-[11px] text-slate-500">{cleanUrl}</p>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                <Field label="Resource URL / YouTube ID / iframe code" required hint="Paste the link here. Full iframe embed code is also accepted and cleaned automatically.">
+                                  <textarea
+                                    className={textareaClass + ` min-h-[76px] bg-white ${cleanUrl ? "border-emerald-300" : "border-red-300"}`}
+                                    placeholder={'https://… or <iframe src="https://…"></iframe>'}
+                                    value={resource.url}
+                                    onChange={(event) => updateResource(module.id, resource.id, { url: event.target.value })}
+                                    onBlur={() => {
+                                      const normalized = normalizeResourceUrl(resource.url, resource.type);
+                                      if (normalized && normalized !== resource.url) updateResource(module.id, resource.id, { url: normalized });
+                                    }}
+                                  />
+                                </Field>
+                              )}
                               {!cleanUrl && <p className="rounded-lg bg-red-100 p-2 text-xs font-medium text-red-700">Add a valid public URL before publishing. This resource cannot appear in the player yet.</p>}
                               {resource.type === "whimsical" && <p className="text-[11px] text-slate-500">Whimsical → Share → Enable Public Access → Copy URL.</p>}
 
