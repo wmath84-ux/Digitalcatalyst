@@ -233,27 +233,28 @@ function SettingsTab({ catalog, saving, update, persist }: TabProps) {
               <input className={inputClass} type="number" min={1} max={10} value={limits.minTestsPerDay}
                 onChange={(e) => update({ customizationLimits: { ...limits, minTestsPerDay: num(e.target.value, 1) } })} />
             </Field>
-            <Field label="Max tests/day">
-              <input className={inputClass} type="number" min={1} max={20} value={limits.maxTestsPerDay}
+            <Field label={limits.noLimitTestsPerDay ? "Max (unlimited)" : "Max tests/day"}>
+              <input className={inputClass} type="number" min={1} max={20} value={limits.maxTestsPerDay} disabled={limits.noLimitTestsPerDay}
                 onChange={(e) => update({ customizationLimits: { ...limits, maxTestsPerDay: num(e.target.value, 5) } })} />
             </Field>
             <Field label="Min questions/test">
               <input className={inputClass} type="number" min={1} max={50} value={limits.minQuestionsPerTest}
                 onChange={(e) => update({ customizationLimits: { ...limits, minQuestionsPerTest: num(e.target.value, 5) } })} />
             </Field>
-            <Field label="Max questions/test">
-              <input className={inputClass} type="number" min={1} max={100} value={limits.maxQuestionsPerTest}
+            <Field label={limits.noLimitQuestionsPerTest ? "Max (unlimited)" : "Max questions/test"}>
+              <input className={inputClass} type="number" min={1} max={100} value={limits.maxQuestionsPerTest} disabled={limits.noLimitQuestionsPerTest}
                 onChange={(e) => update({ customizationLimits: { ...limits, maxQuestionsPerTest: num(e.target.value, 50) } })} />
             </Field>
             <Field label="Min minutes">
               <input className={inputClass} type="number" min={1} max={60} value={limits.minEstimatedMinutes}
                 onChange={(e) => update({ customizationLimits: { ...limits, minEstimatedMinutes: num(e.target.value, 5) } })} />
             </Field>
-            <Field label="Max minutes">
-              <input className={inputClass} type="number" min={5} max={240} value={limits.maxEstimatedMinutes}
+            <Field label={limits.noLimitEstimatedMinutes ? "Max (unlimited)" : "Max minutes"}>
+              <input className={inputClass} type="number" min={5} max={240} value={limits.maxEstimatedMinutes} disabled={limits.noLimitEstimatedMinutes}
                 onChange={(e) => update({ customizationLimits: { ...limits, maxEstimatedMinutes: num(e.target.value, 120) } })} />
             </Field>
           </div>
+          <p className="text-[11px] text-slate-400">For detailed per-field No Limit toggles, use the Customization tab.</p>
         </div>
       </SectionCard>
 
@@ -879,47 +880,109 @@ function CustomizationTab({ catalog, saving, update, persist }: TabProps) {
 
       <SectionCard
         title="Range Limits"
-        description="Define the min and max values users can set for each parameter."
+        description="Define the min and max values users can set for each parameter. Toggle 'No Limit' to remove the max cap for individual fields."
       >
-        <div className="space-y-4">
+        <div className="space-y-5">
+          {/* Tests Per Day */}
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Tests Per Day</h4>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="mb-2 flex items-center justify-between">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tests Per Day</h4>
+              <label className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-slate-500">No Limit</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={limits.noLimitTestsPerDay}
+                  onClick={() => patchLimits({ noLimitTestsPerDay: !limits.noLimitTestsPerDay })}
+                  className={`relative h-6 w-10 rounded-full transition-colors ${limits.noLimitTestsPerDay ? "bg-amber-500" : "bg-slate-300"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${limits.noLimitTestsPerDay ? "translate-x-[18px]" : "translate-x-0.5"}`} />
+                </button>
+              </label>
+            </div>
+            <div className={`grid gap-2 ${limits.noLimitTestsPerDay ? "grid-cols-1" : "grid-cols-2"}`}>
               <Field label="Minimum">
                 <input className={inputClass} type="number" min={1} max={10} value={limits.minTestsPerDay}
                   onChange={(e) => patchLimits({ minTestsPerDay: Math.max(1, Math.round(Number(e.target.value) || 1)) })} />
               </Field>
-              <Field label="Maximum">
-                <input className={inputClass} type="number" min={1} max={20} value={limits.maxTestsPerDay}
-                  onChange={(e) => patchLimits({ maxTestsPerDay: Math.max(1, Math.round(Number(e.target.value) || 5)) })} />
-              </Field>
+              {!limits.noLimitTestsPerDay && (
+                <Field label="Maximum">
+                  <input className={inputClass} type="number" min={1} max={20} value={limits.maxTestsPerDay}
+                    onChange={(e) => patchLimits({ maxTestsPerDay: Math.max(1, Math.round(Number(e.target.value) || 5)) })} />
+                </Field>
+              )}
             </div>
+            {limits.noLimitTestsPerDay && (
+              <p className="mt-1 text-[11px] font-medium text-amber-600">∞ Users can set any number of tests per day.</p>
+            )}
           </div>
+
+          {/* Questions Per Test */}
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Questions Per Test</h4>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="mb-2 flex items-center justify-between">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Questions Per Test</h4>
+              <label className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-slate-500">No Limit</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={limits.noLimitQuestionsPerTest}
+                  onClick={() => patchLimits({ noLimitQuestionsPerTest: !limits.noLimitQuestionsPerTest })}
+                  className={`relative h-6 w-10 rounded-full transition-colors ${limits.noLimitQuestionsPerTest ? "bg-amber-500" : "bg-slate-300"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${limits.noLimitQuestionsPerTest ? "translate-x-[18px]" : "translate-x-0.5"}`} />
+                </button>
+              </label>
+            </div>
+            <div className={`grid gap-2 ${limits.noLimitQuestionsPerTest ? "grid-cols-1" : "grid-cols-2"}`}>
               <Field label="Minimum">
                 <input className={inputClass} type="number" min={1} max={50} value={limits.minQuestionsPerTest}
                   onChange={(e) => patchLimits({ minQuestionsPerTest: Math.max(1, Math.round(Number(e.target.value) || 5)) })} />
               </Field>
-              <Field label="Maximum">
-                <input className={inputClass} type="number" min={1} max={100} value={limits.maxQuestionsPerTest}
-                  onChange={(e) => patchLimits({ maxQuestionsPerTest: Math.max(1, Math.round(Number(e.target.value) || 50)) })} />
-              </Field>
+              {!limits.noLimitQuestionsPerTest && (
+                <Field label="Maximum">
+                  <input className={inputClass} type="number" min={1} max={100} value={limits.maxQuestionsPerTest}
+                    onChange={(e) => patchLimits({ maxQuestionsPerTest: Math.max(1, Math.round(Number(e.target.value) || 50)) })} />
+                </Field>
+              )}
             </div>
+            {limits.noLimitQuestionsPerTest && (
+              <p className="mt-1 text-[11px] font-medium text-amber-600">∞ Users can set any number of questions per test.</p>
+            )}
           </div>
+
+          {/* Estimated Minutes */}
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Estimated Minutes</h4>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="mb-2 flex items-center justify-between">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Estimated Minutes</h4>
+              <label className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-slate-500">No Limit</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={limits.noLimitEstimatedMinutes}
+                  onClick={() => patchLimits({ noLimitEstimatedMinutes: !limits.noLimitEstimatedMinutes })}
+                  className={`relative h-6 w-10 rounded-full transition-colors ${limits.noLimitEstimatedMinutes ? "bg-amber-500" : "bg-slate-300"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${limits.noLimitEstimatedMinutes ? "translate-x-[18px]" : "translate-x-0.5"}`} />
+                </button>
+              </label>
+            </div>
+            <div className={`grid gap-2 ${limits.noLimitEstimatedMinutes ? "grid-cols-1" : "grid-cols-2"}`}>
               <Field label="Minimum">
                 <input className={inputClass} type="number" min={1} max={60} value={limits.minEstimatedMinutes}
                   onChange={(e) => patchLimits({ minEstimatedMinutes: Math.max(1, Math.round(Number(e.target.value) || 5)) })} />
               </Field>
-              <Field label="Maximum">
-                <input className={inputClass} type="number" min={5} max={240} value={limits.maxEstimatedMinutes}
-                  onChange={(e) => patchLimits({ maxEstimatedMinutes: Math.max(1, Math.round(Number(e.target.value) || 120)) })} />
-              </Field>
+              {!limits.noLimitEstimatedMinutes && (
+                <Field label="Maximum">
+                  <input className={inputClass} type="number" min={5} max={240} value={limits.maxEstimatedMinutes}
+                    onChange={(e) => patchLimits({ maxEstimatedMinutes: Math.max(1, Math.round(Number(e.target.value) || 120)) })} />
+                </Field>
+              )}
             </div>
+            {limits.noLimitEstimatedMinutes && (
+              <p className="mt-1 text-[11px] font-medium text-amber-600">∞ Users can set any duration without a cap.</p>
+            )}
           </div>
         </div>
       </SectionCard>

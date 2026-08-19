@@ -79,14 +79,20 @@ export type CustomizationLimits = {
   minTestsPerDay: number;
   /** Max tests per day the user can set. */
   maxTestsPerDay: number;
+  /** When true, maxTestsPerDay is ignored — user can set any value. */
+  noLimitTestsPerDay: boolean;
   /** Min questions per test the user can set. */
   minQuestionsPerTest: number;
   /** Max questions per test the user can set. */
   maxQuestionsPerTest: number;
+  /** When true, maxQuestionsPerTest is ignored — user can set any value. */
+  noLimitQuestionsPerTest: boolean;
   /** Min estimated minutes. */
   minEstimatedMinutes: number;
   /** Max estimated minutes. */
   maxEstimatedMinutes: number;
+  /** When true, maxEstimatedMinutes is ignored — user can set any value. */
+  noLimitEstimatedMinutes: boolean;
   /** If true, user MUST pick a class. */
   requireClassSelection: boolean;
 };
@@ -95,10 +101,13 @@ export const DEFAULT_CUSTOMIZATION_LIMITS: CustomizationLimits = {
   allowUserCustomization: true,
   minTestsPerDay: 1,
   maxTestsPerDay: 5,
+  noLimitTestsPerDay: false,
   minQuestionsPerTest: 5,
   maxQuestionsPerTest: 50,
+  noLimitQuestionsPerTest: false,
   minEstimatedMinutes: 5,
   maxEstimatedMinutes: 120,
+  noLimitEstimatedMinutes: false,
   requireClassSelection: false,
 };
 

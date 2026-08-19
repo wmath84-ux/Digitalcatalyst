@@ -266,32 +266,32 @@ export default function CustomizationPage({ uid, route }: Props) {
             )}
 
             {/* Tests Per Day */}
-            <Section title="📊 Tests Per Day" subtitle="How many daily tests to generate">
+            <Section title="📊 Tests Per Day" subtitle={limits.noLimitTestsPerDay ? "No upper limit set by admin" : "How many daily tests to generate"}>
               <NumberStepper
                 value={settings.testsPerDay}
                 min={limits.minTestsPerDay}
-                max={limits.maxTestsPerDay}
+                max={limits.noLimitTestsPerDay ? null : limits.maxTestsPerDay}
                 onChange={(v) => update({ testsPerDay: v })}
               />
             </Section>
 
             {/* Questions Per Test */}
-            <Section title="❓ Questions Per Test" subtitle="Number of questions in each test">
+            <Section title="❓ Questions Per Test" subtitle={limits.noLimitQuestionsPerTest ? "No upper limit set by admin" : "Number of questions in each test"}>
               <NumberStepper
                 value={settings.questionsPerTest}
                 min={limits.minQuestionsPerTest}
-                max={limits.maxQuestionsPerTest}
+                max={limits.noLimitQuestionsPerTest ? null : limits.maxQuestionsPerTest}
                 step={5}
                 onChange={(v) => update({ questionsPerTest: v })}
               />
             </Section>
 
             {/* Estimated Minutes */}
-            <Section title="⏱ Estimated Minutes" subtitle="Your target study time per test">
+            <Section title="⏱ Estimated Minutes" subtitle={limits.noLimitEstimatedMinutes ? "No upper limit set by admin" : "Your target study time per test"}>
               <NumberStepper
                 value={settings.estimatedMinutes}
                 min={limits.minEstimatedMinutes}
-                max={limits.maxEstimatedMinutes}
+                max={limits.noLimitEstimatedMinutes ? null : limits.maxEstimatedMinutes}
                 step={5}
                 onChange={(v) => update({ estimatedMinutes: v })}
               />
@@ -425,12 +425,14 @@ function NumberStepper({
 }: {
   value: number;
   min: number;
-  max: number;
+  /** Pass null for no upper limit. */
+  max: number | null;
   step?: number;
   onChange: (v: number) => void;
 }) {
   const dec = () => onChange(Math.max(min, value - step));
-  const inc = () => onChange(Math.min(max, value + step));
+  const inc = () => onChange(max === null ? value + step : Math.min(max, value + step));
+  const atMax = max !== null && value >= max;
 
   return (
     <div className="flex items-center gap-3">
@@ -444,11 +446,14 @@ function NumberStepper({
       </button>
       <div className="flex-1 rounded-2xl bg-slate-50 px-4 py-3 text-center">
         <span className="text-2xl font-black text-slate-900">{value}</span>
+        {max === null && (
+          <span className="ml-1 text-xs font-medium text-amber-500">∞</span>
+        )}
       </div>
       <button
         type="button"
         onClick={inc}
-        disabled={value >= max}
+        disabled={atMax}
         className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-lg font-bold text-slate-600 transition active:bg-slate-50 disabled:opacity-40"
       >
         +
