@@ -11,10 +11,68 @@
 import type { ParsedQuestion } from "./bulkParser";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
-const DEFAULT_MODEL = "gemini-2.0-flash";
+
+/**
+ * Current default model.
+ *
+ * Google retired `gemini-2.0-flash` (and the other 1.5/2.x aliases) — calling
+ * them now returns 404 "This model is no longer available", which used to push
+ * the admin panel silently onto the offline generator. Keep this pointed at a
+ * live model.
+ */
+export const DEFAULT_MODEL = "gemini-3.6-flash";
+
+/** Models offered in the admin dropdown (newest first). */
+export const MODEL_OPTIONS: { value: string; label: string }[] = [
+  { value: "gemini-3.7-flash", label: "Gemini 3.7 Flash — newest, best reasoning" },
+  { value: "gemini-3.6-flash", label: "Gemini 3.6 Flash — recommended default" },
+  { value: "gemini-3.5-flash", label: "Gemini 3.5 Flash" },
+  { value: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite — fastest / cheapest" },
+  { value: "gemini-flash-latest", label: "Gemini Flash (latest alias)" },
+];
+
+/**
+ * Models that Google has retired. Anything stored in an admin's browser from
+ * an older build is silently upgraded to DEFAULT_MODEL instead of 404-ing.
+ */
+const RETIRED_MODEL_PATTERNS: RegExp[] = [
+  /^models\//i, // stored with the "models/" prefix — normalised away below
+  /^gemini-1\.0/i,
+  /^gemini-1\.5/i,
+  /^gemini-2\.0/i,
+  /^gemini-2\.5/i,
+  /^gemini-pro$/i,
+  /^gemini-pro-vision$/i,
+];
 
 const STORAGE_KEY = "dc_gemini_api_key";
 const MODEL_STORAGE_KEY = "dc_gemini_model";
+
+/** Strip an accidental "models/" prefix and surrounding whitespace. */
+function normalizeModelName(model: string): string {
+  return model.trim().replace(/^models\//i, "").trim();
+}
+
+/** True when the model id is a known-retired one that would 404. */
+export function isRetiredModel(model: string): boolean {
+  const name = model.trim();
+  if (!name) return true;
+  const bare = normalizeModelName(name);
+  if (!bare) return true;
+  return RETIRED_MODEL_PATTERNS.some((re) => re.test(name) || re.test(bare)) && !/^gemini-3/i.test(bare);
+}
+
+/**
+ * Google's 404 body tells us exactly what to migrate to:
+ *   "models/gemini-2.0-flash is no longer available. Please update your code
+ *    to use models/gemini-3.6-flash …"
+ * Pull that replacement out so we can retry automatically.
+ */
+export function extractSuggestedModel(detail: string): string | null {
+  const match = detail.match(/use\s+models\/([a-z0-9._-]+)/i);
+  if (match?.[1]) return normalizeModelName(match[1]);
+  return null;
+}
 
 export function getGeminiKey(): string | null {
   try {
@@ -36,7 +94,15 @@ export function setGeminiKey(key: string): void {
 
 export function getGeminiModel(): string {
   try {
-    return localStorage.getItem(MODEL_STORAGE_KEY)?.trim() || DEFAULT_MODEL;
+    const stored = normalizeModelName(localStorage.getItem(MODEL_STORAGE_KEY) ?? "");
+    if (!stored) return DEFAULT_MODEL;
+    // An older build defaulted to gemini-2.0-flash and persisted it — upgrade
+    // that stale value instead of failing every generation with a 404.
+    if (isRetiredModel(stored)) {
+      setGeminiModel(DEFAULT_MODEL);
+      return DEFAULT_MODEL;
+    }
+    return stored;
   } catch {
     return DEFAULT_MODEL;
   }
@@ -44,7 +110,7 @@ export function getGeminiModel(): string {
 
 export function setGeminiModel(model: string): void {
   try {
-    const trimmed = model.trim();
+    const trimmed = normalizeModelName(model);
     if (trimmed) localStorage.setItem(MODEL_STORAGE_KEY, trimmed);
     else localStorage.removeItem(MODEL_STORAGE_KEY);
   } catch {
@@ -142,7 +208,6 @@ export async function generateWithGeminiClient(input: GenerateInput): Promise<Pa
   const apiKey = getGeminiKey();
   if (!apiKey) throw new Error("No Gemini API key configured.");
 
-  const model = getGeminiModel();
   const userPrompt = [
     `Generate ${input.count} multiple-choice questions for a revision test.`,
     `Subject: ${input.subject || "General"}`,
@@ -151,21 +216,51 @@ export async function generateWithGeminiClient(input: GenerateInput): Promise<Pa
     `Make every question distinct. Prefer clear, unambiguous options and a single correct answer.`,
   ].join("\n");
 
-  const res = await fetch(`${GEMINI_ENDPOINT}/${model}:generateContent`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: systemPrompt() }] },
+    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      temperature: 0.7,
     },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemPrompt() }] },
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.7,
-      },
-    }),
   });
+
+  const call = (model: string) =>
+    fetch(`${GEMINI_ENDPOINT}/${model}:generateContent`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body,
+    });
+
+  let model = getGeminiModel();
+  let res = await call(model);
+
+  // A retired model answers 404 and names its replacement — switch to it,
+  // remember the choice, and retry once so the admin never has to hand-edit
+  // the model field.
+  if (res.status === 404) {
+    const detail = await res.text().catch(() => "");
+    const suggested = extractSuggestedModel(detail);
+    const fallback = suggested && suggested !== model ? suggested : model !== DEFAULT_MODEL ? DEFAULT_MODEL : null;
+    if (fallback) {
+      const retry = await call(fallback);
+      if (retry.ok) {
+        setGeminiModel(fallback);
+        model = fallback;
+        res = retry;
+      } else {
+        const retryDetail = await retry.text().catch(() => "");
+        throw new Error(
+          `Gemini returned ${retry.status} for both ${model} and ${fallback}. Check your API key and model. ${retryDetail.slice(0, 240)}`,
+        );
+      }
+    } else {
+      throw new Error(`Gemini returned 404. Check your API key and model (${model}). ${detail.slice(0, 240)}`);
+    }
+  }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");

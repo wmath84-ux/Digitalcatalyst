@@ -28,6 +28,8 @@ import {
 import { parseQuestionText, type ParsedQuestion } from "@/revision/engine/bulkParser";
 import { generateOfflineQuestions } from "@/revision/engine/offlineGenerator";
 import {
+  DEFAULT_MODEL as DEFAULT_GEMINI_MODEL,
+  MODEL_OPTIONS as GEMINI_MODEL_OPTIONS,
   generateWithGeminiClient,
   getGeminiKey,
   getGeminiModel,
@@ -663,6 +665,9 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
           difficulty,
           count,
         });
+        // generateWithGeminiClient may auto-upgrade a retired model — mirror
+        // whatever it settled on back into the form.
+        setModel(getGeminiModel());
         if (questions.length > 0) {
           generated = questions.map((q) => ({
             prompt: q.prompt,
@@ -676,6 +681,7 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
           source = "offline";
         }
       } catch (err) {
+        setModel(getGeminiModel());
         setNotice(`${err instanceof Error ? err.message : "Gemini request failed"} — used the built-in offline generator instead.`);
         source = "offline";
       }
@@ -747,13 +753,22 @@ function AiTab({ catalog, update, persist, notify }: TabProps) {
           />
         </Field>
         <div className="mt-2">
-          <Field label="Model" hint="Optional — defaults to gemini-2.0-flash.">
-            <input
-              className={inputClass}
-              placeholder="gemini-2.0-flash"
+          <Field label="Model" hint={`Defaults to ${DEFAULT_GEMINI_MODEL} — the current Gemini Flash model. Older 1.5/2.x models were retired by Google and now return 404.`}>
+            <select
+              className={selectClass}
               value={model}
-              onChange={(e) => setModel(e.target.value)}
-            />
+              onChange={(e) => {
+                setModel(e.target.value);
+                setGeminiModel(e.target.value);
+              }}
+            >
+              {GEMINI_MODEL_OPTIONS.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+              {!GEMINI_MODEL_OPTIONS.some((m) => m.value === model) && (
+                <option value={model}>{model} (custom)</option>
+              )}
+            </select>
           </Field>
         </div>
       </SectionCard>
