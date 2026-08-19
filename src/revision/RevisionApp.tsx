@@ -18,17 +18,16 @@ import { useAuth } from "../context/AuthContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useRevisionAccess } from "../hooks/useRevisionAccess";
 import { syncRevisionCatalog } from "./engine/catalogService";
-import PremiumGate from "../components/subscription/PremiumGate";
+import RevisionLockScreen from "./components/RevisionLockScreen";
 
 /**
- * Daily Test & Revision feature shell – updated flow:
- * - Dashboard / Bank / Weak Topics / Progress / Profile are ALWAYS visible
- *   even without a subscription (so user can explore the product)
- * - Subscription gate appears ONLY when the user tries to DO an activity:
- *   Start test, Start revision session, Revise Now, Continue test etc.
- * - Direct deep-link to a protected player (#/revision/test/play or
- *   #/revision/session/:id) also triggers the gate and redirects back to
- *   dashboard instead of hard-locking the whole feature.
+ * Daily Test & Revision feature shell:
+ * - While access is loading a spinner is shown.
+ * - When the subscription gate applies (the `revision` feature doc exists
+ *   and is active but the user's membership does not include it), the full
+ *   RevisionLockScreen paywall is shown in place of the app.
+ * - Otherwise the app renders normally — dashboard, bank, weak topics,
+ *   progress, profile and the test/session players are all usable.
  */
 
 export default function RevisionApp() {
@@ -37,7 +36,6 @@ export default function RevisionApp() {
   const { hasAccess: hasRevisionAccess, loading: revisionAccessLoading } = useRevisionAccess();
   const [route, setRoute] = useState(() => window.location.hash);
   const [syncKey, setSyncKey] = useState(0);
-  const [gateOpen, setGateOpen] = useState(false);
 
   useEffect(() => {
     const onHashChange = () => setRoute(window.location.hash);
@@ -59,9 +57,9 @@ export default function RevisionApp() {
   }, [uid]);
 
   const requireAccess = useCallback(() => {
-    if (hasRevisionAccess) return true;
-    setGateOpen(true);
-    return false;
+    // Only reachable from pages, which only render while the user has
+    // access — the lock screen covers everyone the gate applies to.
+    return hasRevisionAccess;
   }, [hasRevisionAccess]);
 
   // Strip query params so deep links like #/revision?x=1 still route.
@@ -70,23 +68,6 @@ export default function RevisionApp() {
   const sessionMatch = path.match(/^#\/revision\/session\/(\d+)(\/result)?$/);
   const resultMatch = path.match(/^#\/revision\/test\/result\/(\d+)$/);
   const reviewMatch = path.match(/^#\/revision\/test\/review\/(\d+)$/);
-
-  const isPlayAttempt = path === "#/revision/test/play";
-  const isSessionPlayAttempt = Boolean(sessionMatch && !sessionMatch[2]); // /session/:id (without /result)
-
-  // If user directly lands on a protected player without access, intercept:
-  // show gate and bounce to dashboard after a tick.
-  useEffect(() => {
-    if (revisionAccessLoading) return;
-    if (!hasRevisionAccess && (isPlayAttempt || isSessionPlayAttempt)) {
-      setGateOpen(true);
-      // Keep URL clean – push user back to dashboard after gate opens
-      // so back button does not loop on protected route.
-      if (window.location.hash !== "#/revision") {
-        window.location.hash = "#/revision";
-      }
-    }
-  }, [revisionAccessLoading, hasRevisionAccess, isPlayAttempt, isSessionPlayAttempt, path]);
 
   let page: ReactNode;
 
@@ -184,22 +165,12 @@ export default function RevisionApp() {
                 <p className="text-xs font-semibold">Checking your membership…</p>
               </div>
             </div>
+          ) : !hasRevisionAccess ? (
+            <RevisionLockScreen userName={userName} />
           ) : (
             <Fragment key={syncKey}>{page}</Fragment>
           )}
         </ExitGuardProvider>
-
-        {/* Subscription gate that appears ONLY on activity attempt */}
-        <PremiumGate
-          variant="revision"
-          userName={userName}
-          open={gateOpen}
-          onClose={() => setGateOpen(false)}
-          onViewSubscription={() => {
-            setGateOpen(false);
-            window.location.hash = "#/subscription";
-          }}
-        />
       </div>
     </div>
   );

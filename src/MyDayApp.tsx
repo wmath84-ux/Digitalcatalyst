@@ -604,6 +604,7 @@ export default function App() {
           setPaywallOpen(false);
           window.location.hash = "#/subscription";
         }}
+        subtitle="Cloud saving has ongoing server costs. Subscribe to save tasks, schedules and notes."
       />
 
       <Toast toasts={toasts} onRemove={removeToast} />

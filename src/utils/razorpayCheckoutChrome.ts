@@ -76,16 +76,37 @@ const NOOP_CONTROLLER: CheckoutChromeController = {
   dismissExitPrompt: () => undefined,
 };
 
+// Options for the NEXT reveal. Kept module-scoped so callers can always write
+// `unpinChromeRef.current = revealCheckoutChromeOverRazorpay()` and never have
+// to hold the controller while the options are assembled. The options are
+// consumed (and reset) by the reveal call itself.
+let pendingOptions: CheckoutChromeOptions = {};
+
+/**
+ * Register the label / onCancel behaviour for the next
+ * `revealCheckoutChromeOverRazorpay()` call. The options are read once by
+ * that call and then cleared, so a later reveal without a fresh
+ * `prepareCheckoutChrome` falls back to the neutral defaults.
+ */
+export const prepareCheckoutChrome = (options: CheckoutChromeOptions) => {
+  pendingOptions = options;
+};
+
 /**
  * Keep the site header visible while Razorpay Checkout is open, with the
  * payment frame inset below it and the dimming backdrop underneath both.
  * Also mounts an always-visible "Cancel payment" bar + confirmation sheet.
  * Returns a controller that can open that sheet and restore the chrome.
+ *
+ * The label and onCancel behaviour come from the most recent
+ * `prepareCheckoutChrome()` call (or from the optional `options` argument
+ * for direct callers).
  */
-export const revealCheckoutChromeOverRazorpay = (options: CheckoutChromeOptions = {}): CheckoutChromeController => {
+export const revealCheckoutChromeOverRazorpay = (options: CheckoutChromeOptions = pendingOptions): CheckoutChromeController => {
   if (typeof document === "undefined") return NOOP_CONTROLLER;
 
   const { onCancel, label } = options;
+  pendingOptions = {};
 
   document.body.classList.add(OPEN_CLASS);
   document.body.setAttribute("data-eduvora-razorpay-open", "true");

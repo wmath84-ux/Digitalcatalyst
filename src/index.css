@@ -250,9 +250,12 @@ body.eduvora-razorpay-open [data-site-header] {
 body.eduvora-razorpay-open .razorpay-container,
 body.eduvora-razorpay-open .razorpay-checkout-frame {
   position: fixed !important;
-  /* --eduvora-razorpay-top is measured live (header + our Cancel-payment bar);
-     the header-only value is the fallback before the first measurement. */
-  top: var(--eduvora-razorpay-top, var(--eduvora-header-h, 64px)) !important;
+  /* The frame is anchored below the header (top + bottom, never a
+     pre-computed height) so the payment page always gets the full remaining
+     viewport and scrolls internally. The JS chrome utility overrides `top`
+     inline with the live measured offset (header + Cancel-payment bar); this
+     is the static fallback before the first measurement. */
+  top: var(--eduvora-header-h, 64px) !important;
   bottom: 0 !important;
   height: auto !important;
   max-height: none !important;

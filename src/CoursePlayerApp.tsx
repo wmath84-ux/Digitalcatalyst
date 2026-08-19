@@ -191,11 +191,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // Two independent direct toggles live in the header, just like the theme
   // button. One hides the resource header/footer; the other hides the Course
   // Player's own header + bottom dock. No dropdown is needed.
-  // The resource header (Download) and footer (Mark complete) start HIDDEN so
-  // every lesson opens as a clean, full-bleed reading/viewing surface. That
-  // means the header's "file bars" toggle is ON (active) by default; one tap
-  // brings the two bars back.
-  const [fileBarsHidden, setFileBarsHidden] = useState(true);
+  // The resource header (Download) and footer (Mark complete) start VISIBLE;
+  // one tap on the "file bars" toggle hides them for a full-bleed viewing
+  // surface, and the same toggle (or Escape) brings them back.
+  const [fileBarsHidden, setFileBarsHidden] = useState(false);
   const [playerChromeHidden, setPlayerChromeHidden] = useState(false);
   // Desktop request mode for embedded documents — a Google Doc / Sheet /
   // Slides deck rendered at desktop width is unreadable on a phone, so the
@@ -594,10 +593,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
       data-course-viewport-toggle
       data-mode={desktopView ? "desktop" : "mobile"}
     >
-      {/* The icon shows the mode the document is CURRENTLY in (monitor =
-          desktop site, phone = mobile site), like a browser's own indicator.
-          The tooltip/aria-label still describe what the next tap will do. */}
-      {desktopView ? <Monitor size={17} /> : <Smartphone size={17} />}
+      {/* The icon announces what the next tap will do, matching the
+          aria-label/title: a phone means "switch to the mobile rendering", a
+          monitor means "switch to the desktop rendering". */}
+      {desktopView ? <Smartphone size={17} /> : <Monitor size={17} />}
     </button>
   );
 

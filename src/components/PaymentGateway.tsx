@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, CreditCard, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import { auth } from "../../firebase";
-import { revealCheckoutChromeOverRazorpay, type CheckoutChromeController } from "../utils/razorpayCheckoutChrome";
+import { prepareCheckoutChrome, revealCheckoutChromeOverRazorpay, type CheckoutChromeController } from "../utils/razorpayCheckoutChrome";
 import { playPaymentSuccessChime, preparePaymentSound } from "../utils/paymentSounds";
 import { formatPaise } from "../utils/money";
 
@@ -154,15 +154,17 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
   const [error, setError] = useState("");
   const razorpayRef = useRef<RazorpayInstance | null>(null);
-  const chromeRef = useRef<CheckoutChromeController | null>(null);
+  // Holds the checkout-chrome controller while the Razorpay frame is open so
+  // the pinned site header / exit bar are released exactly when payment ends.
+  const unpinChromeRef = useRef<CheckoutChromeController | null>(null);
   const razorpayHistoryPushedRef = useRef(false);
   const goBackRef = useRef(onGoBack);
   goBackRef.current = onGoBack;
   const displayAmount = formatPaise(finalPrice);
 
   const releaseCheckoutChrome = () => {
-    chromeRef.current?.release();
-    chromeRef.current = null;
+    unpinChromeRef.current?.release();
+    unpinChromeRef.current = null;
   };
 
   const consumeRazorpayHistory = () => {
@@ -211,12 +213,12 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
     // instead, and immediately re-arm the history entry so the guard keeps
     // working for repeated back presses.
     const onPopState = () => {
-      if (!razorpayRef.current || !chromeRef.current) return;
+      if (!razorpayRef.current || !unpinChromeRef.current) return;
       if (typeof window !== "undefined") {
         window.history.pushState({ eduvoraRazorpayOpen: true }, "");
         razorpayHistoryPushedRef.current = true;
       }
-      chromeRef.current.requestExit();
+      unpinChromeRef.current.requestExit();
     };
     window.addEventListener("popstate", onPopState);
     return () => {
@@ -350,10 +352,15 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
         razorpayHistoryPushedRef.current = true;
       }
       checkout.open();
-      chromeRef.current = revealCheckoutChromeOverRazorpay({
+      // Tell the chrome module what the exit bar should show and what
+      // "Cancel payment" should do, then pin the site header above the
+      // Razorpay frame. The controller is kept on the ref so every exit
+      // path (dismiss, payment.failed, handler, unmount) releases it.
+      prepareCheckoutChrome({
         label: order.productName || productName,
         onCancel: abandonPayment,
       });
+      unpinChromeRef.current = revealCheckoutChromeOverRazorpay();
     } catch (paymentError) {
       setPaymentState("error");
       setError(paymentError instanceof Error ? paymentError.message : "Could not start secure payment.");

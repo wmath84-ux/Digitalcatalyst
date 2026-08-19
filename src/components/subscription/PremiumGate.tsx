@@ -23,6 +23,8 @@ type Props = {
   onViewSubscription: () => void;
   /** when true renders as page (flex-1) not modal overlay – used for legacy full block */
   asPage?: boolean;
+  /** Optional one-liner shown under the heading, e.g. why access is needed. */
+  subtitle?: string;
 };
 
 type Perk = {
@@ -96,6 +98,7 @@ function GateContent({
   onClose,
   onViewSubscription,
   asPage,
+  subtitle,
 }: Omit<Props, "open">) {
   const isMyDay = variant === "myday";
   const perks = isMyDay ? MYDAY_PERKS : REVISION_PERKS;
@@ -151,7 +154,9 @@ function GateContent({
           </h1>
 
           <p className="mt-2 text-sm leading-relaxed text-slate-500">
-            {isMyDay ? (
+            {subtitle ? (
+              subtitle
+            ) : isMyDay ? (
               <>
                 <span className="font-semibold text-slate-700">My Day</span> me tasks, schedule, reminders aur quick notes — sab kuch cloud-synced aur premium timeline ke saath.
                 Ab har din zyada organized, har goal zyada clear.
@@ -230,6 +235,7 @@ export default function PremiumGate({
   onClose,
   onViewSubscription,
   asPage = false,
+  subtitle,
 }: Props) {
   if (!open) return null;
 
@@ -241,6 +247,7 @@ export default function PremiumGate({
         onClose={onClose}
         onViewSubscription={onViewSubscription}
         asPage
+        subtitle={subtitle}
       />
     );
   }
@@ -260,6 +267,7 @@ export default function PremiumGate({
           onClose={onClose}
           onViewSubscription={onViewSubscription}
           asPage={false}
+          subtitle={subtitle}
         />
       </div>
     </div>
