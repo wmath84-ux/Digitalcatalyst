@@ -20,9 +20,12 @@ import { adminFetch } from "@/lib/admin/client";
 import { type RevisionCatalog } from "@/revision/engine/catalogService";
 import {
   DEFAULT_SETTINGS,
+  DEFAULT_CUSTOMIZATION_LIMITS,
+  type CatalogClass,
   type CatalogQuestion,
   type CatalogSubject,
   type CatalogTopic,
+  type CustomizationLimits,
   type RevisionSettings,
 } from "@/revision/engine/store";
 import { parseQuestionText, type ParsedQuestion } from "@/revision/engine/bulkParser";
@@ -41,6 +44,8 @@ const REVISION_TABS = [
   { key: "settings", label: "Settings" },
   { key: "questions", label: "Questions" },
   { key: "subjects", label: "Subjects & Topics" },
+  { key: "classes", label: "Classes" },
+  { key: "customization", label: "Customization" },
   { key: "ai", label: "AI Generate" },
   { key: "bulk", label: "Bulk Import" },
 ];
@@ -131,6 +136,8 @@ export default function RevisionPage() {
         {tab === "settings" && <SettingsTab {...props} />}
         {tab === "questions" && <QuestionsTab {...props} />}
         {tab === "subjects" && <SubjectsTab {...props} />}
+        {tab === "classes" && <ClassesTab {...props} />}
+        {tab === "customization" && <CustomizationTab {...props} />}
         {tab === "ai" && <AiTab {...props} />}
         {tab === "bulk" && <BulkTab {...props} />}
       </div>
@@ -144,6 +151,7 @@ export default function RevisionPage() {
 
 function SettingsTab({ catalog, saving, update, persist }: TabProps) {
   const settings = catalog.settings;
+  const limits = catalog.customizationLimits ?? { ...DEFAULT_CUSTOMIZATION_LIMITS };
   const patch = (partial: Partial<RevisionSettings>) => update({ settings: { ...settings, ...partial } });
 
   const num = (v: string, fallback: number) => {
@@ -191,10 +199,70 @@ function SettingsTab({ catalog, saving, update, persist }: TabProps) {
         </div>
       </SectionCard>
 
+      <SectionCard
+        title="User customization limits"
+        description="Control what users can customize on their revision plan."
+      >
+        <div className="space-y-3">
+          <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <input
+              type="checkbox"
+              checked={limits.allowUserCustomization}
+              onChange={(e) => update({ customizationLimits: { ...limits, allowUserCustomization: e.target.checked } })}
+              className="h-4 w-4 accent-indigo-600"
+            />
+            <div>
+              <span className="text-sm font-medium text-slate-900">Allow user customization</span>
+              <p className="text-xs text-slate-500">Users can override default test settings</p>
+            </div>
+          </label>
+          <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <input
+              type="checkbox"
+              checked={limits.requireClassSelection}
+              onChange={(e) => update({ customizationLimits: { ...limits, requireClassSelection: e.target.checked } })}
+              className="h-4 w-4 accent-indigo-600"
+            />
+            <div>
+              <span className="text-sm font-medium text-slate-900">Require class selection</span>
+              <p className="text-xs text-slate-500">Users must pick a class before customizing</p>
+            </div>
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Min tests/day">
+              <input className={inputClass} type="number" min={1} max={10} value={limits.minTestsPerDay}
+                onChange={(e) => update({ customizationLimits: { ...limits, minTestsPerDay: num(e.target.value, 1) } })} />
+            </Field>
+            <Field label={limits.noLimitTestsPerDay ? "Max (unlimited)" : "Max tests/day"}>
+              <input className={inputClass} type="number" min={1} max={20} value={limits.maxTestsPerDay} disabled={limits.noLimitTestsPerDay}
+                onChange={(e) => update({ customizationLimits: { ...limits, maxTestsPerDay: num(e.target.value, 5) } })} />
+            </Field>
+            <Field label="Min questions/test">
+              <input className={inputClass} type="number" min={1} max={50} value={limits.minQuestionsPerTest}
+                onChange={(e) => update({ customizationLimits: { ...limits, minQuestionsPerTest: num(e.target.value, 5) } })} />
+            </Field>
+            <Field label={limits.noLimitQuestionsPerTest ? "Max (unlimited)" : "Max questions/test"}>
+              <input className={inputClass} type="number" min={1} max={100} value={limits.maxQuestionsPerTest} disabled={limits.noLimitQuestionsPerTest}
+                onChange={(e) => update({ customizationLimits: { ...limits, maxQuestionsPerTest: num(e.target.value, 50) } })} />
+            </Field>
+            <Field label="Min minutes">
+              <input className={inputClass} type="number" min={1} max={60} value={limits.minEstimatedMinutes}
+                onChange={(e) => update({ customizationLimits: { ...limits, minEstimatedMinutes: num(e.target.value, 5) } })} />
+            </Field>
+            <Field label={limits.noLimitEstimatedMinutes ? "Max (unlimited)" : "Max minutes"}>
+              <input className={inputClass} type="number" min={5} max={240} value={limits.maxEstimatedMinutes} disabled={limits.noLimitEstimatedMinutes}
+                onChange={(e) => update({ customizationLimits: { ...limits, maxEstimatedMinutes: num(e.target.value, 120) } })} />
+            </Field>
+          </div>
+          <p className="text-[11px] text-slate-400">For detailed per-field No Limit toggles, use the Customization tab.</p>
+        </div>
+      </SectionCard>
+
       <SectionCard title="Bank overview">
         <div className="grid grid-cols-2 gap-2">
           <MiniStat label="Subjects" value={catalog.subjects.length} />
           <MiniStat label="Topics" value={catalog.topics.length} />
+          <MiniStat label="Classes" value={(catalog.classes ?? []).length} />
           <MiniStat label="Total questions" value={catalog.questions.length} />
           <MiniStat label="Active questions" value={catalog.questions.filter((q) => q.isActive).length} />
         </div>
@@ -607,6 +675,335 @@ function SubjectsTab({ catalog, update, persist, notify }: TabProps) {
           );
         })
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Classes                                                             */
+/* ------------------------------------------------------------------ */
+
+function ClassesTab({ catalog, update, persist, notify }: TabProps) {
+  const [newClassName, setNewClassName] = useState("");
+  const [newClassIcon, setNewClassIcon] = useState("🎓");
+  const [editingClass, setEditingClass] = useState<CatalogClass | null>(null);
+
+  const classes = catalog.classes ?? [];
+
+  const addClass = () => {
+    const name = newClassName.trim();
+    if (!name) return;
+    if (classes.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      notify("error", "That class already exists.");
+      return;
+    }
+    const next: CatalogClass = { name, slug: slugify(name), icon: newClassIcon, subjectSlugs: [] };
+    const updated = { ...catalog, classes: [...classes, next] };
+    void persist(updated);
+    update(updated);
+    setNewClassName("");
+    setNewClassIcon("🎓");
+  };
+
+  const removeClass = (slug: string) => {
+    const updated = { ...catalog, classes: classes.filter((c) => c.slug !== slug) };
+    void persist(updated);
+    update(updated);
+  };
+
+  const toggleSubjectForClass = (classSlug: string, subjectSlug: string) => {
+    const updated = {
+      ...catalog,
+      classes: classes.map((c) => {
+        if (c.slug !== classSlug) return c;
+        const has = c.subjectSlugs.includes(subjectSlug);
+        return {
+          ...c,
+          subjectSlugs: has
+            ? c.subjectSlugs.filter((s) => s !== subjectSlug)
+            : [...c.subjectSlugs, subjectSlug],
+        };
+      }),
+    };
+    void persist(updated);
+    update(updated);
+  };
+
+  const CLASS_ICONS = ["🎓", "📚", "🏫", "🎒", "✏️", "📖", "🎒", "🔟", "⓫", "⓬"];
+
+  return (
+    <div className="space-y-3">
+      <SectionCard
+        title="Add class"
+        description="Classes are academic levels (e.g., Class 9, Class 10). Users can select which class they belong to."
+      >
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <select
+              className={selectClass + " w-20"}
+              value={newClassIcon}
+              onChange={(e) => setNewClassIcon(e.target.value)}
+            >
+              {CLASS_ICONS.map((ic) => (
+                <option key={ic} value={ic}>{ic}</option>
+              ))}
+            </select>
+            <input
+              className={inputClass}
+              placeholder="e.g., Class 10"
+              value={newClassName}
+              onChange={(e) => setNewClassName(e.target.value)}
+            />
+            <SecondaryButton onClick={addClass}>Add</SecondaryButton>
+          </div>
+        </div>
+      </SectionCard>
+
+      {classes.length === 0 ? (
+        <EmptyState title="No classes yet" description="Add a class to let users filter by academic level." />
+      ) : (
+        classes.map((cls) => {
+          const assignedSubjects = catalog.subjects.filter((s) => cls.subjectSlugs.includes(s.slug));
+          return (
+            <SectionCard
+              key={cls.slug}
+              title={`${cls.icon} ${cls.name}`}
+              description={`${assignedSubjects.length} subjects assigned`}
+              action={
+                <div className="flex gap-1">
+                  <SecondaryButton className="h-8 text-xs" onClick={() => setEditingClass(editingClass?.slug === cls.slug ? null : cls)}>
+                    {editingClass?.slug === cls.slug ? "Close" : "Edit"}
+                  </SecondaryButton>
+                  <button
+                    type="button"
+                    onClick={() => removeClass(cls.slug)}
+                    className="h-8 rounded-lg border border-red-200 px-2 text-xs font-medium text-red-600 active:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                </div>
+              }
+            >
+              {editingClass?.slug === cls.slug && (
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                  {catalog.subjects.map((s) => {
+                    const assigned = cls.subjectSlugs.includes(s.slug);
+                    return (
+                      <button
+                        key={s.slug}
+                        type="button"
+                        onClick={() => toggleSubjectForClass(cls.slug, s.slug)}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                          assigned
+                            ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                            : "border-slate-200 bg-white text-slate-500"
+                        }`}
+                      >
+                        {assigned ? "✓ " : ""}{s.icon} {s.name}
+                      </button>
+                    );
+                  })}
+                  {catalog.subjects.length === 0 && (
+                    <p className="text-xs text-slate-400">Add subjects first in the Subjects tab.</p>
+                  )}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                {assignedSubjects.map((s) => (
+                  <span key={s.slug} className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+                    {s.icon} {s.name}
+                  </span>
+                ))}
+                {assignedSubjects.length === 0 && (
+                  <p className="text-xs text-slate-400">Click Edit to assign subjects to this class.</p>
+                )}
+              </div>
+            </SectionCard>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Customization (admin control panel)                                 */
+/* ------------------------------------------------------------------ */
+
+function CustomizationTab({ catalog, saving, update, persist }: TabProps) {
+  const limits = catalog.customizationLimits ?? { ...DEFAULT_CUSTOMIZATION_LIMITS };
+
+  const patchLimits = (partial: Partial<CustomizationLimits>) => {
+    update({ customizationLimits: { ...limits, ...partial } });
+  };
+
+  return (
+    <div className="space-y-3">
+      <SectionCard
+        title="User Customization Control"
+        description="Configure how much control users have over their revision plan. Changes here affect what users see in their Customization page."
+      >
+        <div className="space-y-3">
+          <label className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div>
+              <span className="text-sm font-medium text-slate-900">Enable User Customization</span>
+              <p className="text-xs text-slate-500">Allow users to override admin defaults</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={limits.allowUserCustomization}
+              onClick={() => patchLimits({ allowUserCustomization: !limits.allowUserCustomization })}
+              className={`relative h-7 w-12 rounded-full ${limits.allowUserCustomization ? "bg-indigo-600" : "bg-slate-300"}`}
+            >
+              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${limits.allowUserCustomization ? "translate-x-5" : "translate-x-0.5"}`} />
+            </button>
+          </label>
+
+          <label className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div>
+              <span className="text-sm font-medium text-slate-900">Require Class Selection</span>
+              <p className="text-xs text-slate-500">Force users to pick a class before customizing</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={limits.requireClassSelection}
+              onClick={() => patchLimits({ requireClassSelection: !limits.requireClassSelection })}
+              className={`relative h-7 w-12 rounded-full ${limits.requireClassSelection ? "bg-indigo-600" : "bg-slate-300"}`}
+            >
+              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${limits.requireClassSelection ? "translate-x-5" : "translate-x-0.5"}`} />
+            </button>
+          </label>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Range Limits"
+        description="Define the min and max values users can set for each parameter. Toggle 'No Limit' to remove the max cap for individual fields."
+      >
+        <div className="space-y-5">
+          {/* Tests Per Day */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tests Per Day</h4>
+              <label className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-slate-500">No Limit</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={limits.noLimitTestsPerDay}
+                  onClick={() => patchLimits({ noLimitTestsPerDay: !limits.noLimitTestsPerDay })}
+                  className={`relative h-6 w-10 rounded-full transition-colors ${limits.noLimitTestsPerDay ? "bg-amber-500" : "bg-slate-300"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${limits.noLimitTestsPerDay ? "translate-x-[18px]" : "translate-x-0.5"}`} />
+                </button>
+              </label>
+            </div>
+            <div className={`grid gap-2 ${limits.noLimitTestsPerDay ? "grid-cols-1" : "grid-cols-2"}`}>
+              <Field label="Minimum">
+                <input className={inputClass} type="number" min={1} max={10} value={limits.minTestsPerDay}
+                  onChange={(e) => patchLimits({ minTestsPerDay: Math.max(1, Math.round(Number(e.target.value) || 1)) })} />
+              </Field>
+              {!limits.noLimitTestsPerDay && (
+                <Field label="Maximum">
+                  <input className={inputClass} type="number" min={1} max={20} value={limits.maxTestsPerDay}
+                    onChange={(e) => patchLimits({ maxTestsPerDay: Math.max(1, Math.round(Number(e.target.value) || 5)) })} />
+                </Field>
+              )}
+            </div>
+            {limits.noLimitTestsPerDay && (
+              <p className="mt-1 text-[11px] font-medium text-amber-600">∞ Users can set any number of tests per day.</p>
+            )}
+          </div>
+
+          {/* Questions Per Test */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Questions Per Test</h4>
+              <label className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-slate-500">No Limit</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={limits.noLimitQuestionsPerTest}
+                  onClick={() => patchLimits({ noLimitQuestionsPerTest: !limits.noLimitQuestionsPerTest })}
+                  className={`relative h-6 w-10 rounded-full transition-colors ${limits.noLimitQuestionsPerTest ? "bg-amber-500" : "bg-slate-300"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${limits.noLimitQuestionsPerTest ? "translate-x-[18px]" : "translate-x-0.5"}`} />
+                </button>
+              </label>
+            </div>
+            <div className={`grid gap-2 ${limits.noLimitQuestionsPerTest ? "grid-cols-1" : "grid-cols-2"}`}>
+              <Field label="Minimum">
+                <input className={inputClass} type="number" min={1} max={50} value={limits.minQuestionsPerTest}
+                  onChange={(e) => patchLimits({ minQuestionsPerTest: Math.max(1, Math.round(Number(e.target.value) || 5)) })} />
+              </Field>
+              {!limits.noLimitQuestionsPerTest && (
+                <Field label="Maximum">
+                  <input className={inputClass} type="number" min={1} max={100} value={limits.maxQuestionsPerTest}
+                    onChange={(e) => patchLimits({ maxQuestionsPerTest: Math.max(1, Math.round(Number(e.target.value) || 50)) })} />
+                </Field>
+              )}
+            </div>
+            {limits.noLimitQuestionsPerTest && (
+              <p className="mt-1 text-[11px] font-medium text-amber-600">∞ Users can set any number of questions per test.</p>
+            )}
+          </div>
+
+          {/* Estimated Minutes */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Estimated Minutes</h4>
+              <label className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-slate-500">No Limit</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={limits.noLimitEstimatedMinutes}
+                  onClick={() => patchLimits({ noLimitEstimatedMinutes: !limits.noLimitEstimatedMinutes })}
+                  className={`relative h-6 w-10 rounded-full transition-colors ${limits.noLimitEstimatedMinutes ? "bg-amber-500" : "bg-slate-300"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${limits.noLimitEstimatedMinutes ? "translate-x-[18px]" : "translate-x-0.5"}`} />
+                </button>
+              </label>
+            </div>
+            <div className={`grid gap-2 ${limits.noLimitEstimatedMinutes ? "grid-cols-1" : "grid-cols-2"}`}>
+              <Field label="Minimum">
+                <input className={inputClass} type="number" min={1} max={60} value={limits.minEstimatedMinutes}
+                  onChange={(e) => patchLimits({ minEstimatedMinutes: Math.max(1, Math.round(Number(e.target.value) || 5)) })} />
+              </Field>
+              {!limits.noLimitEstimatedMinutes && (
+                <Field label="Maximum">
+                  <input className={inputClass} type="number" min={5} max={240} value={limits.maxEstimatedMinutes}
+                    onChange={(e) => patchLimits({ maxEstimatedMinutes: Math.max(1, Math.round(Number(e.target.value) || 120)) })} />
+                </Field>
+              )}
+            </div>
+            {limits.noLimitEstimatedMinutes && (
+              <p className="mt-1 text-[11px] font-medium text-amber-600">∞ Users can set any duration without a cap.</p>
+            )}
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Current Classes" description="Classes available for user selection. Manage them in the Classes tab.">
+        {(catalog.classes ?? []).length === 0 ? (
+          <p className="text-xs text-slate-400">No classes configured. Add classes in the Classes tab.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {(catalog.classes ?? []).map((c) => (
+              <span key={c.slug} className="rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700">
+                {c.icon} {c.name} ({c.subjectSlugs.length} subjects)
+              </span>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+
+      <PrimaryButton className="w-full" loading={saving} onClick={() => persist(catalog)}>
+        Save customization settings
+      </PrimaryButton>
     </div>
   );
 }

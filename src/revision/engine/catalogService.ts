@@ -12,11 +12,14 @@ import { SEED_QUESTIONS, SEED_SUBJECTS, SEED_TOPICS } from "../data/seedData";
 import {
   applyCatalog,
   buildDbFromCatalog,
+  DEFAULT_CUSTOMIZATION_LIMITS,
   DEFAULT_SETTINGS,
   loadDb,
+  type CatalogClass,
   type CatalogQuestion,
   type CatalogSubject,
   type CatalogTopic,
+  type CustomizationLimits,
   type RevisionCatalogInput,
   type RevisionSettings,
 } from "./store";
@@ -26,6 +29,8 @@ export const REVISION_CATALOG_DOC_ID = "revisionCatalog";
 export type RevisionCatalog = {
   version: number;
   settings: RevisionSettings;
+  classes: CatalogClass[];
+  customizationLimits: CustomizationLimits;
   subjects: CatalogSubject[];
   topics: CatalogTopic[];
   questions: CatalogQuestion[];
@@ -35,6 +40,8 @@ export function defaultCatalog(): RevisionCatalog {
   return {
     version: 0,
     settings: { ...DEFAULT_SETTINGS },
+    classes: [],
+    customizationLimits: { ...DEFAULT_CUSTOMIZATION_LIMITS },
     subjects: SEED_SUBJECTS.map((s) => ({ ...s })),
     topics: SEED_TOPICS.map((t) => ({ ...t })),
     questions: SEED_QUESTIONS.map((q) => ({ ...q, isActive: true })),
@@ -100,9 +107,30 @@ export function normalizeCatalog(data: unknown): RevisionCatalog | null {
     ...(typeof raw.settings === "object" && raw.settings ? (raw.settings as Partial<RevisionSettings>) : {}),
   };
 
+  const classes: CatalogClass[] = Array.isArray(raw.classes)
+    ? raw.classes.map((c) => {
+        const item = (c ?? {}) as Record<string, unknown>;
+        return {
+          name: cleanStr(item.name, "Class"),
+          slug: cleanStr(item.slug, `class-${Math.random().toString(36).slice(2, 8)}`),
+          icon: cleanStr(item.icon, "🎓"),
+          subjectSlugs: Array.isArray(item.subjectSlugs) ? item.subjectSlugs.map((s) => cleanStr(s)).filter(Boolean) : [],
+        };
+      })
+    : [];
+
+  const customizationLimits: CustomizationLimits = {
+    ...DEFAULT_CUSTOMIZATION_LIMITS,
+    ...(typeof raw.customizationLimits === "object" && raw.customizationLimits
+      ? (raw.customizationLimits as Partial<CustomizationLimits>)
+      : {}),
+  };
+
   return {
     version: Math.max(0, Math.round(Number(raw.version ?? 0) || 0)),
     settings,
+    classes,
+    customizationLimits,
     subjects,
     topics,
     questions,
@@ -113,6 +141,8 @@ export function normalizeCatalog(data: unknown): RevisionCatalog | null {
 export function catalogToInput(catalog: RevisionCatalog): RevisionCatalogInput {
   return {
     settings: catalog.settings,
+    classes: catalog.classes ?? [],
+    customizationLimits: catalog.customizationLimits ?? {},
     subjects: catalog.subjects,
     topics: catalog.topics,
     questions: catalog.questions,
@@ -140,6 +170,8 @@ export async function saveRemoteCatalog(catalog: RevisionCatalog): Promise<Revis
   const payload = {
     version: nextVersion,
     settings: { ...DEFAULT_SETTINGS, ...catalog.settings },
+    classes: catalog.classes ?? [],
+    customizationLimits: { ...DEFAULT_CUSTOMIZATION_LIMITS, ...catalog.customizationLimits },
     subjects: catalog.subjects,
     topics: catalog.topics,
     questions: catalog.questions,
@@ -162,6 +194,8 @@ export async function syncRevisionCatalog(uid: string): Promise<boolean> {
     uid,
     {
       settings: remote.settings,
+      classes: remote.classes ?? [],
+      customizationLimits: remote.customizationLimits ?? {},
       subjects: remote.subjects,
       topics: remote.topics,
       questions: remote.questions,

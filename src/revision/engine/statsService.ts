@@ -249,7 +249,7 @@ export function getDashboardData(uid: string) {
   const db = loadDb(uid);
   const dateStr = todayDateStr();
   markExpiredAttempts(db, dateStr);
-  const todaysTests = getOrCreateDailyTests(db, dateStr);
+  const todaysTests = getOrCreateDailyTests(db, dateStr, uid);
   saveDb(uid, db);
 
   // The next test to offer is the first slot without a completed attempt.

@@ -13,6 +13,8 @@ import {
   todayDateStr,
   ServiceError,
   DEFAULT_SETTINGS,
+  getEffectiveSettings,
+  loadUserCustomSettings,
   type DailyTestRow,
   type RevisionDb,
   type TestAttemptRow,
@@ -49,9 +51,40 @@ function clampInt(value: number, min: number, max: number): number {
 }
 
 /** Deterministic, subject-round-robin ordering of every active question,
- *  seeded by date so the daily tests stay stable across reloads. */
-function buildQuestionOrder(db: RevisionDb, dateStr: string): number[] {
-  const allQuestions = db.questions.filter((q) => q.isActive);
+ *  seeded by date so the daily tests stay stable across reloads.
+ *  When uid is provided and user has custom settings, applies filters. */
+function buildQuestionOrder(db: RevisionDb, dateStr: string, uid?: string): number[] {
+  let allQuestions = db.questions.filter((q) => q.isActive);
+
+  // Apply user custom filters
+  if (uid) {
+    const custom = loadUserCustomSettings(uid);
+    if (custom.enabled) {
+      // Filter by difficulty
+      if (custom.difficulty !== "mixed") {
+        allQuestions = allQuestions.filter((q) => q.difficulty === custom.difficulty);
+      }
+      // Filter by subjects
+      if (custom.subjectSlugs.length > 0) {
+        const subjectIds = new Set(
+          db.subjects.filter((s) => custom.subjectSlugs.includes(s.slug)).map((s) => s.id),
+        );
+        allQuestions = allQuestions.filter((q) => subjectIds.has(q.subjectId));
+      }
+      // Filter by topics
+      if (custom.topicSlugs.length > 0) {
+        const topicIds = new Set(
+          db.topics.filter((t) => custom.topicSlugs.includes(t.slug)).map((t) => t.id),
+        );
+        allQuestions = allQuestions.filter((q) => topicIds.has(q.topicId));
+      }
+      // Filter by class (if class has subject mapping)
+      if (custom.classSlug) {
+        // Class filtering is done via subjectSlugs above when class is selected
+        // in the UI, so no additional filter needed here
+      }
+    }
+  }
   const rng = mulberry32(hashString(dateStr));
   const bySubject = new Map<number, number[]>();
   for (const q of allQuestions) {
@@ -86,8 +119,8 @@ function buildQuestionOrder(db: RevisionDb, dateStr: string): number[] {
 }
 
 /** Ensure every slot of today's tests exists, then return them (sorted by slot). */
-export function getOrCreateDailyTests(db: RevisionDb, dateStr: string): DailyTestRow[] {
-  const settings = getSettings(db);
+export function getOrCreateDailyTests(db: RevisionDb, dateStr: string, uid?: string): DailyTestRow[] {
+  const settings = uid ? getEffectiveSettings(uid, db) : getSettings(db);
   const testsPerDay = clampInt(settings.testsPerDay, 1, 20);
   const perTest = clampInt(settings.questionsPerTest, 1, 100);
   const estimatedMinutes = clampInt(settings.estimatedMinutes, 1, 240);
@@ -98,7 +131,7 @@ export function getOrCreateDailyTests(db: RevisionDb, dateStr: string): DailyTes
 
   if (existing.length >= testsPerDay) return existing.slice(0, testsPerDay);
 
-  const order = buildQuestionOrder(db, dateStr);
+  const order = buildQuestionOrder(db, dateStr, uid);
   if (order.length === 0) {
     throw new ServiceError("NO_QUESTIONS", "No questions available to build a test.");
   }
@@ -125,8 +158,8 @@ export function getOrCreateDailyTests(db: RevisionDb, dateStr: string): DailyTes
 }
 
 /** Backwards-compatible helper: the first (slot 0) test of the day. */
-export function getOrCreateDailyTest(db: RevisionDb, dateStr: string): DailyTestRow {
-  return getOrCreateDailyTests(db, dateStr)[0];
+export function getOrCreateDailyTest(db: RevisionDb, dateStr: string, uid?: string): DailyTestRow {
+  return getOrCreateDailyTests(db, dateStr, uid)[0];
 }
 
 export function markExpiredAttempts(db: RevisionDb, dateStr: string) {
@@ -144,7 +177,7 @@ export function getTodayTestState(uid: string) {
   const db = loadDb(uid);
   const dateStr = todayDateStr();
   markExpiredAttempts(db, dateStr);
-  const tests = getOrCreateDailyTests(db, dateStr);
+  const tests = getOrCreateDailyTests(db, dateStr, uid);
 
   // The next test to offer is the first slot without a completed attempt.
   const dailyTest =
@@ -194,7 +227,7 @@ export function startOrResumeAttempt(uid: string) {
   const db = loadDb(uid);
   const dateStr = todayDateStr();
   markExpiredAttempts(db, dateStr);
-  const tests = getOrCreateDailyTests(db, dateStr);
+  const tests = getOrCreateDailyTests(db, dateStr, uid);
 
   // Pick the first slot that has no completed attempt yet.
   const dailyTest = tests.find((t) => {

@@ -7,18 +7,21 @@ import {
   CheckIcon,
   ChevronRightIcon,
   FlameIcon,
+  SlidersIcon,
   TargetIcon,
   TrophyIcon,
   UserIcon,
 } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { getDashboardData, getProgressData, getWeakTopics } from "../engine/statsService";
+import { loadUserCustomSettings } from "../engine/store";
 
 export default function RevisionProfilePage({ uid, route, userName }: { uid: string; route: string; userName: string }) {
   const { navigate } = useExitGuard();
   const dashboard = useMemo(() => getDashboardData(uid), [uid]);
   const progress = useMemo(() => getProgressData(uid), [uid]);
   const weakTopics = useMemo(() => getWeakTopics(uid), [uid]);
+  const customSettings = useMemo(() => loadUserCustomSettings(uid), [uid]);
 
   return (
     <PageShell route={route} title="Profile">
@@ -35,6 +38,45 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
             </div>
           </div>
         </Card>
+
+        {/* Revision Customization Button */}
+        <button
+          type="button"
+          onClick={() => navigate("#/revision/customize")}
+          className="group relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-600 p-5 text-left shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]"
+        >
+          <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10" />
+          <div className="absolute -bottom-6 -left-6 h-20 w-20 rounded-full bg-white/5" />
+          <div className="relative flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur">
+              <SlidersIcon className="h-7 w-7 text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-bold text-white">Customize Revision Plan</h3>
+              <p className="mt-0.5 text-xs text-indigo-100">
+                {customSettings.enabled
+                  ? `Custom mode active · ${customSettings.questionsPerTest} Q/test · ${customSettings.testsPerDay} test${customSettings.testsPerDay > 1 ? "s" : ""}/day`
+                  : "Set tests/day, questions, difficulty & more"}
+              </p>
+            </div>
+            <ChevronRightIcon className="h-6 w-6 text-white/70" />
+          </div>
+          {customSettings.enabled && (
+            <div className="relative mt-3 flex flex-wrap gap-1.5">
+              <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">
+                {customSettings.difficulty === "mixed" ? "All levels" : customSettings.difficulty}
+              </span>
+              <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">
+                ~{customSettings.estimatedMinutes} min
+              </span>
+              {customSettings.subjectSlugs.length > 0 && (
+                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">
+                  {customSettings.subjectSlugs.length} subject{customSettings.subjectSlugs.length > 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+          )}
+        </button>
 
         <div>
           <h3 className="mb-2 px-1 text-[13px] font-semibold uppercase tracking-wide text-slate-400">Today</h3>
