@@ -9,7 +9,7 @@
 //   2. "Mark complete" is a reversible TOGGLE, so an accidental / test tap
 //      can be undone and the tracked progress stays honest.
 //   3. Notes open in a LARGE rich-text editor, collapse back to the same
-//      thin strip once saved, and keep the exact formatting of anything
+//      square grid card once saved, and keep the exact formatting of anything
 //      pasted in (emoji, text, code, tables, links, colours…).
 
 import test from "node:test";
@@ -155,7 +155,7 @@ test("Un-completing plays the remove cue and keeps progress honest", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. Notes — big editor, thin saved strip, exact pasted formatting
+// 3. Notes — big editor, square saved cards, exact pasted formatting
 // ---------------------------------------------------------------------------
 
 test("The notes editor is a large rich-text surface", () => {
@@ -170,11 +170,15 @@ test("The notes editor is a large rich-text surface", () => {
   assert.match(overlay, /onEditorOpenChange=\{setNotesEditorOpen\}/);
 });
 
-test("A saved note still collapses back to the same thin one-line strip", () => {
+test("A saved note still collapses back to a square card in a grid", () => {
   assert.match(notesPanel, /data-course-notes-list/);
-  assert.match(notesPanel, /min-w-0 flex-1 truncate text-xs/);
+  assert.match(notesPanel, /data-course-notes-grid/);
+  assert.match(notesPanel, /aspect-square/);
+  assert.match(notesPanel, /grid-cols-2/);
   assert.match(notesPanel, /const notePreview = \(note: CoursePlayerNote\)/);
   assert.match(notesPanel, /richTextToPlain/);
+  assert.match(styles, /\[data-course-notes-grid\] \[data-course-note\]/);
+  assert.match(styles, /rgb\(37 99 235/);
 });
 
 test("Pasting from anywhere keeps the exact formatting", () => {

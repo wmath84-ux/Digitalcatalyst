@@ -41,6 +41,8 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     // Course Player
     "data-course-player",
     "data-course-back",
+    "data-course-logo-back",
+    "data-course-logo",
     "data-course-product-title",
     "data-course-progress-summary",
     "data-course-progress-bar",

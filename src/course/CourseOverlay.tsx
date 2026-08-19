@@ -6,7 +6,7 @@
 // tapping a button opens a dropdown overlay with the matching content:
 //
 //   - Modules   → every available module (expandable to its files).
-//   - Resources → only files, grouped under the modules that have files.
+//   - Resources → only non-paid files, grouped under modules that have them.
 //   - Notes     → the notes panel, sized to half the screen.
 //   - Paid      → only paid modules / updates, with a purchase CTA.
 //
@@ -62,6 +62,9 @@ const flattenModules = (modules: CourseModule[], depth = 0): FlatModule[] =>
 
 const isVisibleFile = (file: CourseFile) =>
   file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId);
+
+/** Paid modules / paid files already live in the dedicated Paid tab. */
+const isPaidContent = (item: { accessLevel?: string }) => item.accessLevel === "paidUpdate";
 
 const fileIcon = (file: CourseFile) => {
   if (file.type === "youtube" || file.type === "video" || file.type === "audio") return PlayCircle;
@@ -126,7 +129,7 @@ interface CourseOverlayProps {
 
 const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; icon: (active: boolean) => ReactNode }> = [
   { key: "modules", label: "Module", heading: "Modules", hint: "Lessons on a connected path", icon: () => <BookOpen size={18} /> },
-  { key: "resources", label: "Resource", heading: "Resources", hint: "Every file in this course", icon: () => <FileText size={18} /> },
+  { key: "resources", label: "Resource", heading: "Resources", hint: "Course files (paid modules live in Paid)", icon: () => <FileText size={18} /> },
   { key: "notes", label: "Note", heading: "Notes", hint: "Your private writing pad", icon: () => <NotebookPen size={18} /> },
   { key: "paid", label: "Paid", heading: "Paid content", hint: "Upgrades still locked", icon: () => <ShoppingBag size={18} /> },
 ];
@@ -292,11 +295,16 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // Modules mode: only unlocked modules are shown — locked / paid modules
-  // live in the dedicated "Paid" tab. Resources mode: only modules that
-  // actually contain files are shown.
+  // live in the dedicated "Paid" tab. Resources mode: only NON-PAID modules
+  // that actually contain non-paid files are shown, so paid content is never
+  // listed twice.
   const visible = useMemo(() => {
     if (mode === "resources") {
-      return flatModules.filter(({ module }) => module.accessLevel !== "hidden" && moduleFiles(module).some(isVisibleFile));
+      return flatModules.filter(({ module }) =>
+        module.accessLevel !== "hidden" &&
+        !isPaidContent(module) &&
+        moduleFiles(module).some((file) => isVisibleFile(file) && !isPaidContent(file)),
+      );
     }
     const unlocked = unlockedModuleIds(props.modules, props.accessibleModuleIds, props.ownedUpdateIds);
     return flatModules.filter(({ module }) => unlocked.has(String(module.id)));
@@ -318,7 +326,9 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
     <div className="h-full overflow-y-auto overscroll-contain px-3 py-4 pb-8" data-course-overlay-list data-mode={mode} data-course-overlay-wire="true">
       <div className="relative">
         {visible.map(({ module, depth }, index) => {
-          const files = moduleFiles(module).filter(isVisibleFile);
+          const files = moduleFiles(module).filter((file) =>
+            isVisibleFile(file) && (mode !== "resources" || !isPaidContent(file)),
+          );
           const moduleId = String(module.id);
           const accessible = props.accessibleModuleIds.has(moduleId);
           const preview = props.previewModuleIds.has(moduleId);

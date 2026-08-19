@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { ArrowLeft, CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Minimize, Minimize2, Monitor, Moon, RotateCw, Smartphone, Sun } from "lucide-react";
+import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Minimize, Minimize2, Monitor, Moon, RotateCw, Smartphone, Sun } from "lucide-react";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer from "./course/ResourceViewer";
@@ -616,6 +616,22 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     </button>
   );
 
+  // Website logo sits in the old back-button slot and reuses the same
+  // `onBack` handler so a tap still returns the learner to Purchases.
+  const logoBackButton = (
+    <button
+      type="button"
+      onClick={onBack}
+      className="course-icon-button grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-transparent transition hover:opacity-90"
+      aria-label="Back to purchases"
+      title="Back to purchases"
+      data-course-back
+      data-course-logo-back
+    >
+      <img src="/icons/icon-192x192.svg" alt="Eduvora" className="h-10 w-10" data-course-logo />
+    </button>
+  );
+
   const markCompleteBar = selectedFile && !fileBarsHidden ? (
     <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--course-border)] bg-[var(--course-surface)] px-4 py-2.5" data-course-mark-complete-bar>
       <div className="min-w-0">
@@ -741,7 +757,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
         data-course-landscape-header
         data-course-mobile-landscape-header={mobileRotated ? "true" : undefined}
       >
-        <button onClick={onBack} className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]" aria-label="Back" data-course-back><ArrowLeft size={18} /></button>
+        {logoBackButton}
         {fileBarsToggle}
         {playerChromeToggle}
         {showViewportToggle ? viewportToggle : null}
@@ -826,7 +842,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
         style={{ paddingTop: "calc(0.625rem + env(safe-area-inset-top, 0px))" }}
         data-course-header
       >
-        <button onClick={onBack} className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]" aria-label="Back" data-course-back><ArrowLeft size={18} /></button>
+        {logoBackButton}
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-black sm:text-base" data-course-product-title>{product.title}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1" data-course-progress-summary>
