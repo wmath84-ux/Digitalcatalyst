@@ -34,6 +34,20 @@ export const getCourseEmbedProxyUrl = (value: string): string =>
 
 export const getCourseFileUrl = (file: CourseFile) => safeUrl(file.embedUrl || file.youtubeUrl || file.url);
 
+/**
+ * Return a top-level YouTube URL for the escape hatch next to an embedded
+ * player. A `youtube-nocookie.com/embed/...` URL is correct for the iframe,
+ * but it is the wrong destination for a sign-in flow: YouTube deliberately
+ * refuses to render its account page inside a cross-origin frame. Opening the
+ * normal watch URL in a new tab gives YouTube a top-level browsing context,
+ * where its own sign-in / bot check can complete.
+ */
+export const getYouTubeWatchUrl = (file: CourseFile): string => {
+  const raw = getCourseFileUrl(file);
+  const id = extractYouTubeId(file.youtubeVideoId || raw);
+  return id ? `https://www.youtube.com/watch?v=${encodeURIComponent(id)}` : raw;
+};
+
 export const extractYouTubeId = (value = "") => {
   if (fileIdLike(value)) return value;
   try {
@@ -355,7 +369,7 @@ export const getCourseEmbed = (file: CourseFile, options: CourseEmbedOptions = {
   }
   if (file.type === "youtube" || file.youtubeVideoId || /youtu(?:\.be|be\.com)/i.test(raw)) {
     const id = file.youtubeVideoId || extractYouTubeId(raw);
-    return id ? { url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?rel=0&modestbranding=1&playsinline=1&controls=1&fs=1`, kind: "youtube" } : { url: "", kind: "none" };
+    return id ? { url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?rel=0&modestbranding=1&playsinline=1&controls=1&fs=1&enablejsapi=1`, kind: "youtube" } : { url: "", kind: "none" };
   }
   const google = googleParts(raw);
   if (file.type === "google_form" || google?.kind === "forms" || /(^|\/\/)forms\.gle\//i.test(raw)) {

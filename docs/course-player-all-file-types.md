@@ -30,9 +30,10 @@ Every course in the app now includes a comprehensive demo module system with **a
 ## How Each File Type Works in the Course Player
 
 ### 1. YouTube (`type: "youtube"`)
-- **Embed URL**: `https://www.youtube-nocookie.com/embed/{videoId}?rel=0&modestbranding=1&playsinline=1&controls=1&fs=1`
+- **Embed URL**: `https://www.youtube-nocookie.com/embed/{videoId}?rel=0&modestbranding=1&playsinline=1&controls=1&fs=1&enablejsapi=1`
 - **Source**: Any public YouTube video URL or 11-character video ID
-- **Viewer**: Sandboxed, full-height iframe with native controls. The iframe is strictly contained between the side rails, so it cannot extend below the short mobile-landscape viewport; the available height also keeps YouTube's settings/quality menu visible and easy to dismiss.
+- **Viewer**: Privacy-enhanced, full-height iframe controlled through the IFrame API. The iframe is strictly contained between the side rails, so it cannot extend below the short mobile-landscape viewport; the available height also keeps YouTube's settings/quality menu visible and easy to dismiss.
+- **Bot-check / sign-in fallback**: YouTube can reject an embed for a flagged IP, VPN, ad blocker, privacy setting, or an age-restricted video. Its sign-in page cannot be rendered inside a cross-origin iframe, so the viewer's **YouTube** button opens the normal `youtube.com/watch?v=...` URL in a top-level tab. The API also times out into the plain embed instead of leaving an infinite spinner.
 - **Demo URLs**: Khan Academy, 3Blue1Brown educational videos
 
 ### 2. Video (`type: "video"`)

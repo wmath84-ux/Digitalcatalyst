@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
+import { getCourseEmbed, getYouTubeWatchUrl } from "../src/utils/courseEmbed.ts";
 
 const coursePlayer = fs.readFileSync("src/CoursePlayerApp.tsx", "utf8");
 const resourceViewer = fs.readFileSync("src/course/ResourceViewer.tsx", "utf8");
@@ -41,4 +42,14 @@ test("YouTube stays strictly contained in the mobile landscape viewport", () => 
   assert.doesNotMatch(resourceViewer, /aspect-video max-h-full/);
   assert.match(resourceViewer, /settings \/ quality menus get enough vertical room/);
   assert.match(courseEmbed, /playsinline=1&controls=1&fs=1/);
+});
+
+test("YouTube auth fallback opens the original watch page instead of nesting sign-in", () => {
+  const file = { id: "yt", name: "Lesson", type: "youtube", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" };
+  assert.equal(getYouTubeWatchUrl(file), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.match(resourceViewer, /getYouTubeWatchUrl\(file\)/);
+  assert.match(resourceViewer, /target="_blank"/);
+  assert.match(resourceViewer, /ERR_BLOCKED_BY_RESPONSE/);
+  assert.match(resourceViewer, /readyTimeout/);
+  assert.match(resourceViewer, /standardFallbackUrl/);
 });
