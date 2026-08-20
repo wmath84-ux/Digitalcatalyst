@@ -1,23 +1,29 @@
 // src/utils/courseStatusBar.ts
 //
 // Hides the phone's status bar while the Course Player runs in landscape
-// (or the quarter-turned immersive) mode on a mobile device. This is fully
-// automatic and default-on — there is deliberately NO user-facing toggle:
-// while learning in landscape the bar is simply always off, and it comes
-// back the moment the player leaves landscape or unmounts.
+// (or the quarter-turned immersive) mode on a mobile device.
 //
-// Three best-effort layers, because no single web API is universal:
+// ── WHY THE BAR WON'T HIDE WITHOUT A TAP (the honest truth) ─────────────
+// The ONLY web API that can truly hide the phone's status bar is the
+// Fullscreen API, and on Android Chrome / installed PWAs it is only honoured
+// when the request rides a REAL user gesture (a tap). A physical rotation is
+// NOT a gesture, so a gesture-less `requestFullscreen()` is rejected by the
+// browser and the bar stays — that is a browser security rule, not a bug in
+// this code. iOS Safari / PWA never hides the bar at all (OS restriction).
 //
-//   1. Fullscreen API — the only way to truly hide the bar. It is granted
-//      when the request rides a real user gesture (the "Rotate to
-//      fullscreen" tap on Android Chrome / installed PWA); browsers that
-//      block a gesture-less request (a physical rotation) reject it and we
-//      carry on with the two visual layers below.
-//   2. theme-color — paints the bar the player's own background colour so
-//      it blends into the edge-to-edge player surface instead of rendering
-//      as a bright strip above the content.
+// So we hide it in layers:
+//
+//   1. Fullscreen API — called from (a) a dedicated "hide status bar" button
+//      in the landscape rail and (b) the first touch on the landscape player.
+//      Both are real gestures, so Android reliably hides the bar (and, with
+//      `navigationUI: "hide"`, the gesture navigation bar too).
+//   2. theme-color — paints the bar the player's own background colour so it
+//      blends edge-to-edge even before (or without) fullscreen.
 //   3. black-translucent iOS meta — lets the player draw underneath a
 //      translucent status bar (iOS PWA / Safari home-screen mode).
+//
+// The bar is restored the moment the player leaves landscape/immersive or
+// unmounts.
 
 import { setThemeColor } from "./themeColor";
 
@@ -32,6 +38,8 @@ let landscapeChromeActive = false;
 let fullscreenEnteredByPlayer = false;
 /** Guards against double fullscreen requests from tap + effect. */
 let fullscreenRequestPending = false;
+/** Listeners for the fullscreen state (the rail button mirrors the icon). */
+const fullscreenListeners = new Set<() => void>();
 
 /** Touch-first devices only — a desktop browser never loses its chrome. */
 export const isMobileDevice = (): boolean => {
@@ -47,6 +55,12 @@ export const isMobileDevice = (): boolean => {
   }
 };
 
+/** iOS can never hide its status bar from a web page — fullscreen is Android-only. */
+export const isIOSDevice = (): boolean => {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+};
+
 const applyCourseStatusBarMeta = (playerBackground: string): void => {
   if (typeof document === "undefined") return;
   const themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
@@ -57,13 +71,25 @@ const applyCourseStatusBarMeta = (playerBackground: string): void => {
   if (styleMeta) styleMeta.content = "black-translucent";
 };
 
+const notifyFullscreenChange = (): void => {
+  for (const listener of fullscreenListeners) listener();
+};
+
+// `navigationUI: "hide"` makes Android's fullscreen "immersive" — the gesture
+// navigation bar is hidden too, leaving only the player edge-to-edge.
+const FULLSCREEN_OPTIONS: FullscreenOptions = { navigationUI: "hide" };
+
 const requestPlayerFullscreen = (): void => {
   if (typeof document === "undefined") return;
+  // iOS has no usable document-level fullscreen — never attempt it there.
+  if (isIOSDevice()) return;
   if (document.fullscreenElement || fullscreenRequestPending) return;
-  if (typeof document.documentElement.requestFullscreen !== "function") return;
+  const root = document.documentElement;
+  const requestFs = root.requestFullscreen?.bind(root);
+  if (typeof requestFs !== "function") return;
   fullscreenRequestPending = true;
   try {
-    const request = document.documentElement.requestFullscreen() as unknown as Promise<void> | undefined;
+    const request = requestFs(FULLSCREEN_OPTIONS);
     if (request && typeof request.then === "function") {
       request
         .then(() => {
@@ -76,16 +102,28 @@ const requestPlayerFullscreen = (): void => {
         })
         .finally(() => {
           fullscreenRequestPending = false;
+          notifyFullscreenChange();
         });
     } else {
       fullscreenEnteredByPlayer = true;
       fullscreenRequestPending = false;
+      notifyFullscreenChange();
     }
   } catch {
     fullscreenEnteredByPlayer = false;
     fullscreenRequestPending = false;
+    notifyFullscreenChange();
   }
 };
+
+// Keep the module's notion of "who entered fullscreen" honest whenever the
+// browser leaves fullscreen on its own (Android swipe-down / Escape).
+if (typeof document !== "undefined") {
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement) fullscreenEnteredByPlayer = false;
+    notifyFullscreenChange();
+  });
+}
 
 /**
  * Hide the status bar for landscape learning. Idempotent: calling it from
@@ -97,6 +135,34 @@ export const enterCourseLandscapeChrome = (playerBackground: string): void => {
   landscapeChromeActive = true;
   applyCourseStatusBarMeta(playerBackground);
   requestPlayerFullscreen();
+};
+
+/** Gesture-driven fullscreen for the landscape "hide status bar" button. */
+export const enterCoursePlayerFullscreen = (): void => {
+  if (typeof document === "undefined" || !isMobileDevice()) return;
+  landscapeChromeActive = true;
+  requestPlayerFullscreen();
+};
+
+/** Leave fullscreen but stay in the landscape player (the bar blends again). */
+export const exitCoursePlayerFullscreen = (): void => {
+  if (typeof document === "undefined") return;
+  fullscreenEnteredByPlayer = false;
+  if (document.fullscreenElement && typeof document.exitFullscreen === "function") {
+    void document.exitFullscreen();
+  }
+};
+
+/** Whether the document is currently fullscreen (any element). */
+export const isCoursePlayerFullscreen = (): boolean =>
+  typeof document !== "undefined" && Boolean(document.fullscreenElement);
+
+/** Subscribe to fullscreen state changes (the rail button mirrors the icon). */
+export const onCourseFullscreenChange = (listener: () => void): (() => void) => {
+  fullscreenListeners.add(listener);
+  return () => {
+    fullscreenListeners.delete(listener);
+  };
 };
 
 /**
@@ -130,4 +196,5 @@ export const restoreStatusBarFromCoursePlayer = (): void => {
   fullscreenEnteredByPlayer = false;
   originalThemeColor = null;
   originalStatusBarStyle = null;
+  notifyFullscreenChange();
 };

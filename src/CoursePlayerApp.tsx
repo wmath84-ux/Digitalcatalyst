@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Minimize, Minimize2, Monitor, Moon, RotateCw, Smartphone, Sun } from "lucide-react";
+import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Maximize2, Minimize, Minimize2, Monitor, Moon, RotateCw, Smartphone, Sun } from "lucide-react";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer from "./course/ResourceViewer";
@@ -11,7 +11,17 @@ import { useAuth } from "./context/AuthContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
 import { isEmptyRichText, richTextToPlain, sanitizeRichText } from "./utils/richText";
 import { useRotatedScroll } from "./course/useRotatedScroll";
-import { enterCourseLandscapeChrome, restoreStatusBarFromCoursePlayer, syncCourseLandscapeChromeColor } from "./utils/courseStatusBar";
+import {
+  enterCourseLandscapeChrome,
+  enterCoursePlayerFullscreen,
+  exitCoursePlayerFullscreen,
+  isCoursePlayerFullscreen,
+  isIOSDevice,
+  isMobileDevice,
+  onCourseFullscreenChange,
+  restoreStatusBarFromCoursePlayer,
+  syncCourseLandscapeChromeColor,
+} from "./utils/courseStatusBar";
 import { enterCoursePlayerRotation, exitCoursePlayerRotation } from "./utils/appOrientation";
 import { getCourseEmbed, VIEWPORT_AWARE_KINDS } from "./utils/courseEmbed";
 import { applyDocumentViewportMode, isBrowserDesktopSiteMode, resetDocumentViewportMode } from "./utils/documentViewportMode";
@@ -186,6 +196,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // Immersive mode: rotates the viewer a quarter-turn so a portrait-locked
   // phone can still watch a video / read a wide sheet edge-to-edge.
   const [immersive, setImmersive] = useState(false);
+  // True while the document is actually in fullscreen — i.e. the Android
+  // status bar is really hidden. Mirrors the live document state so the rail
+  // button stays correct even when the learner swipes out of fullscreen.
+  const [courseFullscreen, setCourseFullscreen] = useState<boolean>(() => isCoursePlayerFullscreen());
   const [theme, setTheme] = useState<CoursePlayerTheme>(loadCourseTheme);
   // ── Chrome visibility ───────────────────────────────────────────────────
   // Two independent direct toggles live in the header, just like the theme
@@ -200,6 +214,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // Slides deck rendered at desktop width is unreadable on a phone, so the
   // learner can flip the same embed to its mobile rendering.
   const [desktopView, setDesktopView] = useState<boolean>(loadDesktopViewPreference);
+  // Android-only capability: iOS can never hide its status bar and desktop
+  // browsers don't need to. Gates both the rail button and the auto-hide.
+  const canFullscreen = useMemo(() => isMobileDevice() && !isIOSDevice(), []);
   const immersiveRootRef = useRef<HTMLDivElement>(null);
   const ownedUpdateIds = resolution.ownedUpdateIds;
   const updates = useMemo(() => collectUpdates(modules).filter((update) => !ownedUpdateIds.has(update.id)), [modules, ownedUpdateIds]);
@@ -265,6 +282,37 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
   // Whatever happens, unmounting the player puts the phone chrome back.
   useEffect(() => () => restoreStatusBarFromCoursePlayer(), []);
+
+  // Keep the rail button icon in lock-step with the real document fullscreen
+  // state (covers the Android swipe-down / Escape exits too).
+  useEffect(() => {
+    const sync = () => setCourseFullscreen(isCoursePlayerFullscreen());
+    sync();
+    const unsubscribe = onCourseFullscreenChange(sync);
+    return unsubscribe;
+  }, []);
+
+  // Android: the status bar can only be hidden from a real user gesture, so
+  // the first touch anywhere on the landscape player requests fullscreen.
+  // The rail button is the explicit control; this makes the same thing happen
+  // automatically the moment the learner interacts with the landscape screen.
+  useEffect(() => {
+    if (!canFullscreen || !(isLandscape || immersive) || courseFullscreen) return undefined;
+    const tryHide = (event: Event) => {
+      // Never hijack the fullscreen button itself — its onClick toggles
+      // cleanly between hide/show without a race.
+      const target = event.target as Element | null;
+      if (target && typeof target.closest === "function" && target.closest("[data-course-toggle-fullscreen]")) return;
+      if (isCoursePlayerFullscreen()) return;
+      enterCoursePlayerFullscreen();
+    };
+    window.addEventListener("pointerdown", tryHide, { capture: true });
+    window.addEventListener("touchstart", tryHide, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", tryHide, { capture: true });
+      window.removeEventListener("touchstart", tryHide, { capture: true });
+    };
+  }, [canFullscreen, isLandscape, immersive, courseFullscreen]);
 
   // The preference is scoped to the Course Player and restored on the next
   // visit without changing the theme of the rest of the application.
@@ -577,6 +625,31 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     </button>
   );
 
+  // Android-only: the one reliable way to hide the phone's status bar is the
+  // Fullscreen API called from a real tap. This lives in the landscape rail
+  // so a physical rotation can always be followed by one tap to hide it.
+  const fullscreenToggle = canFullscreen ? (
+    <button
+      type="button"
+      onClick={() => {
+        if (isCoursePlayerFullscreen()) exitCoursePlayerFullscreen();
+        else enterCoursePlayerFullscreen();
+      }}
+      className={`course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl transition ${
+        courseFullscreen
+          ? "bg-emerald-500 text-white"
+          : "bg-violet-500/15 text-violet-200 ring-1 ring-inset ring-violet-400/40 hover:bg-violet-500/25"
+      }`}
+      aria-label={courseFullscreen ? "Show status bar" : "Hide status bar"}
+      title={courseFullscreen ? "Show status bar (exit fullscreen)" : "Hide status bar (fullscreen)"}
+      aria-pressed={courseFullscreen}
+      data-course-toggle-fullscreen
+      data-active={courseFullscreen ? "true" : "false"}
+    >
+      {courseFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+    </button>
+  ) : null;
+
   // Flip an embedded document between its desktop and mobile rendering.
   const viewportToggle = (
     <button
@@ -752,17 +825,18 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     <>
       {playerChromeHidden ? null : (
       <header
-        className={`sticky left-0 top-0 z-50 flex h-full w-14 shrink-0 flex-col items-center border-r border-[var(--course-border)] bg-[var(--course-surface)] py-2 ${mobileRotated ? "gap-2" : "gap-3"}`}
+        className="sticky left-0 top-0 z-50 flex h-full min-h-0 w-14 shrink-0 flex-col items-center gap-2 overflow-y-auto no-scrollbar overscroll-contain border-r border-[var(--course-border)] bg-[var(--course-surface)] py-2"
         style={{ paddingLeft: mobileRotated ? "0px" : "env(safe-area-inset-left, 0px)" }}
         data-course-landscape-header
         data-course-mobile-landscape-header={mobileRotated ? "true" : undefined}
       >
         {logoBackButton}
+        {fullscreenToggle}
         {fileBarsToggle}
         {playerChromeToggle}
         {showViewportToggle ? viewportToggle : null}
         {!mobileRotated ? themeToggle : null}
-        <div className="flex min-h-0 flex-1 items-center justify-center">
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
           <span className="line-clamp-1 max-h-full text-xs font-black [writing-mode:vertical-rl] rotate-180" data-course-product-title>{product.title}</span>
         </div>
         {!mobileRotated && hasActiveSubscription ? (
