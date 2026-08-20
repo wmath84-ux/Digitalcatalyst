@@ -245,6 +245,35 @@ function getCurrentStreak(uid: string) {
   return streak;
 }
 
+/**
+ * Revision-only dashboard metrics. Unlike the legacy daily dashboard this
+ * function never creates a random daily test as a side effect. The learner's
+ * dashboard is driven exclusively by plans they explicitly generated/imported.
+ */
+export function getRevisionOverview(uid: string) {
+  const db = loadDb(uid);
+  const completed = db.testAttempts.filter((attempt) => attempt.status === "completed");
+  const totals = completed.map((attempt) => ({
+    correct: attempt.correctCount,
+    questions: db.dailyTests.find((test) => test.id === attempt.dailyTestId)?.totalQuestions ?? 0,
+  }));
+  const totalQuestions = totals.reduce((sum, item) => sum + item.questions, 0);
+  const totalCorrect = totals.reduce((sum, item) => sum + item.correct, 0);
+
+  return {
+    quickStats: {
+      testsCompleted: completed.length,
+      overallAccuracy: totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0,
+      streak: getCurrentStreak(uid),
+    },
+    weakTopicSummary: getWeakTopics(uid).weakestTopics.slice(0, 3),
+    revisionBankSummary: getRevisionSummary(uid),
+  };
+}
+
+export type RevisionOverview = ReturnType<typeof getRevisionOverview>;
+
+/** @deprecated Kept for old deep links; the Revision dashboard no longer calls this. */
 export function getDashboardData(uid: string) {
   const db = loadDb(uid);
   const dateStr = todayDateStr();

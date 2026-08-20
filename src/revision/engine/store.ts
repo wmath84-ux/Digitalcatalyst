@@ -176,6 +176,14 @@ export type DailyTestRow = {
   kind?: "daily" | "custom";
   /** Where a custom test came from ("ai" | "bulk"). */
   source?: string;
+  /** Exact learner selections used to create an AI revision plan. */
+  planDetails?: {
+    classNames: string[];
+    subjectNames: string[];
+    chapterNames: string[];
+    topicNames: string[];
+    difficulty: Difficulty | "mixed";
+  };
 };
 export type TestAttemptRow = {
   id: number;
