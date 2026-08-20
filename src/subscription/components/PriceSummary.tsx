@@ -4,9 +4,18 @@
 // numbers all come from the server (or, when the user is on the
 // subscription page, from the preflight quote). All amounts are in
 // **paise** (integer); the component formats to rupees for display.
+//
+// Every row now carries the NAMES of what was selected (features and
+// bonus products) in addition to the counts, so the buyer can verify
+// the exact package — not just aggregate numbers — before checkout.
 
 import { Receipt } from "lucide-react";
 import type { SubscriptionPlanDoc } from "../utils/subscriptionCatalog";
+
+export interface SummaryProduct {
+  id: string;
+  title: string;
+}
 
 interface Props {
   plan: SubscriptionPlanDoc | null;
@@ -19,6 +28,12 @@ interface Props {
   includedFeatureCount: number;
   productsCount: number;
   productsTotalPaise: number;
+  /** Names of the paid (chargeable) features, in the order they were selected. */
+  featureTitles?: string[];
+  /** Names of the plan-included features. */
+  includedFeatureTitles?: string[];
+  /** Selected bonus products (title shown next to the count). */
+  products?: SummaryProduct[];
   couponDiscountPaise: number;
   couponCode: string | null;
   discountLabel?: string;
@@ -39,6 +54,9 @@ export default function PriceSummary({
   includedFeatureCount,
   productsCount,
   productsTotalPaise,
+  featureTitles = [],
+  includedFeatureTitles = [],
+  products = [],
   couponDiscountPaise,
   couponCode,
   discountLabel = "Coupon discount",
@@ -75,26 +93,62 @@ export default function PriceSummary({
             )}
           </div>
 
-          {/* Features (paid add-ons) */}
+          {/* Features (paid add-ons) — names + count so the buyer sees exactly
+              which features are being paid for. */}
           {featuresCount > 0 ? (
-            <div className="flex justify-between text-slate-500" data-subscription-row="features">
-              <span>Premium features ({featuresCount})</span>
-              <span className="font-medium text-slate-700">{formatRupee(featuresTotalPaise)}</span>
+            <div data-subscription-row="features">
+              <div className="flex justify-between text-slate-500">
+                <span>Premium features ({featuresCount})</span>
+                <span className="font-medium text-slate-700">{formatRupee(featuresTotalPaise)}</span>
+              </div>
+              {featureTitles.length > 0 ? (
+                <ul className="mt-1.5 space-y-1 pl-4" data-subscription-feature-names>
+                  {featureTitles.map((title) => (
+                    <li key={title} className="list-disc text-xs font-medium text-slate-600">
+                      {title}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
 
           {/* Included features (free with the plan) */}
           {includedFeatureCount > 0 ? (
-            <div className="flex justify-between text-emerald-700" data-subscription-row="included">
-              <span>Included features ({includedFeatureCount})</span>
-              <span className="font-medium">Free</span>
+            <div data-subscription-row="included">
+              <div className="flex justify-between text-emerald-700">
+                <span>Included features ({includedFeatureCount})</span>
+                <span className="font-medium">Free</span>
+              </div>
+              {includedFeatureTitles.length > 0 ? (
+                <ul className="mt-1.5 space-y-1 pl-4" data-subscription-included-feature-names>
+                  {includedFeatureTitles.map((title) => (
+                    <li key={title} className="list-disc text-xs font-medium text-emerald-700/80">
+                      {title}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
 
+          {/* Bonus products — names + count so the buyer sees exactly which
+              products were selected and how many. */}
           {productsCount > 0 ? (
-            <div className="flex justify-between text-slate-500" data-subscription-row="products">
-              <span>Bonus products ({productsCount})</span>
-              <span className="font-medium text-slate-700">{formatRupee(productsTotalPaise)}</span>
+            <div data-subscription-row="products">
+              <div className="flex justify-between text-slate-500">
+                <span>Bonus products ({productsCount})</span>
+                <span className="font-medium text-slate-700">{formatRupee(productsTotalPaise)}</span>
+              </div>
+              {products.length > 0 ? (
+                <ul className="mt-1.5 space-y-1 pl-4" data-subscription-product-names>
+                  {products.map((product) => (
+                    <li key={product.id} className="list-disc text-xs font-medium text-slate-600">
+                      {product.title}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
 

@@ -484,7 +484,12 @@ export default function ProfileApp() {
               />
             ) : null}
 
-            <AiQuotaCard uid={user.id} />
+            {/* AI usage limits are a subscription benefit. The card is hidden
+                for users who have not purchased a subscription yet — showing
+                usage limits before any plan exists would display limits that
+                do not apply to them. It appears once a subscription exists
+                (active or expired — they did purchase). */}
+            {membership.subscriber ? <AiQuotaCard uid={user.id} /> : null}
 
             {referralCode && (
               <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">

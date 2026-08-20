@@ -366,6 +366,18 @@ export default function SubscriptionPage({
     return availableProducts.filter((product) => productHasId(product, chargeable));
   }, [availableProducts, chargeableCourseIds]);
 
+  // Names for the order summary: paid features (excluding plan-included ones)
+  // and the selected bonus products, so the summary lists exactly what the
+  // buyer picked — not just aggregate counts.
+  const chargeableFeatureRecords = useMemo(
+    () =>
+      features.filter(
+        (feature) =>
+          chargeableFeatureIds.includes(feature.id) && !includedFeatureIds.has(feature.id),
+      ),
+    [features, chargeableFeatureIds, includedFeatureIds],
+  );
+
   // Resolve subscriptionProducts (new per-plan / duration priced add-ons) into selectable records
   // These can be used to override prices of catalog products when selected via subscription.
   const resolvedSubscriptionProducts = useMemo(() => {
@@ -936,6 +948,12 @@ export default function SubscriptionPage({
           includedFeatureCount={includedFeatureIds.size}
           productsCount={chargeableProductRecords.length}
           productsTotalPaise={productsTotalPaise}
+          featureTitles={chargeableFeatureRecords.map((feature) => feature.name)}
+          includedFeatureTitles={includedFeatureRecords.map((feature) => feature.name)}
+          products={chargeableProductRecords.map((product) => ({
+            id: String(product.documentId || product.id),
+            title: String(product.title || ""),
+          }))}
           couponDiscountPaise={couponDiscountPaise}
           couponCode={appliedReferral?.code ?? appliedCoupon?.code ?? null}
           discountLabel={appliedReferral ? "Referral discount" : "Coupon discount"}

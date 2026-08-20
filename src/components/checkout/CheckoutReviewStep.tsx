@@ -14,11 +14,12 @@
 //   - navigation: back to source, edit selection, refresh quote, proceed
 //   - safe recovery UI when the quote is invalid / expired / failed
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
   BadgeCheck,
+  CalendarDays,
   ChevronRight,
   Info,
   LoaderCircle,
@@ -34,7 +35,8 @@ import {
 } from "lucide-react";
 import { useCheckout } from "../../checkout/CheckoutContext";
 import { useAuth } from "../../context/AuthContext";
-import type { CheckoutLineItem } from "../../types/commerce";
+import { useCatalog } from "../../context/CatalogContext";
+import type { CheckoutLineItem, ServerPriceQuote } from "../../types/commerce";
 import CheckoutLineItemCard from "./CheckoutLineItemCard";
 import { formatPaise } from "../../utils/money";
 import { payableBeforeCouponPaise, shouldShowCouponInput } from "../../../utils/couponVisibility";
@@ -81,9 +83,11 @@ const RESOURCE_TYPE_LABEL: Record<string, string> = {
 export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: () => void; onEdit: () => void }) {
   const checkout = useCheckout();
   const { user } = useAuth();
+  const { products: catalogProducts } = useCatalog();
   const [showDetails, setShowDetails] = useState<boolean>(true);
 
   const kind = checkout.selection?.purchaseKind || "";
+  const isSubscriptionPurchase = kind === "subscription" || kind === "subscription_features";
   const purchaseTypeLabel = PURCHASE_TYPE_LABEL[kind] || "Checkout";
   const PurchaseTypeIcon = PURCHASE_TYPE_ICON[kind] || ShoppingBag;
 
@@ -156,6 +160,14 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
 
       {/* Buyer card */}
       <BuyerCard buyer={checkout.buyer} authUid={user?.id} />
+
+      {/* Subscription purchases get a plain-language "What you'll get"
+          card. Everything in it is derived live from the verified quote
+          (the exact plan / cycle / features / products the buyer selected
+          on the subscription page) — nothing here is fixed copy. */}
+      {isSubscriptionPurchase ? (
+        <SubscriptionUnlocksCard quote={quote} products={catalogProducts} />
+      ) : null}
 
       {/* Itemised line items */}
       <section data-checkout-line-items className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
@@ -389,6 +401,296 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
         </p>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Subscription "What you'll get" card. Rendered ONLY for subscription /
+// subscription_features checkouts. Every row is derived from the verified
+// quote for the exact plan / cycle / features / products the buyer selected
+// on the subscription page — there is no fixed copy. The optional catalog
+// fetch only enriches names + descriptions; the server stays the authority
+// for pricing and activation.
+// ---------------------------------------------------------------------------
+// Display-only fallbacks used when the live subscription catalog cannot be
+// reached from the checkout page (names are otherwise resolved server-side
+// in the quote line items or from the catalog endpoint).
+const FALLBACK_PLAN_NAMES: Record<string, string> = {
+  basic: "Basic",
+  premium: "Premium",
+  pro: "Pro",
+};
+const FALLBACK_FEATURE_NAMES: Record<string, string> = {
+  "my-day": "My Day cloud saving",
+  revision: "Revision Studio",
+};
+
+export function SubscriptionUnlocksCard({
+  quote,
+  products: catalogProducts = [],
+}: {
+  quote: ServerPriceQuote;
+  products?: Array<{ id: string; documentId?: string; title: string }>;
+}) {
+  const [catalog, setCatalog] = useState<{
+    plans: Array<{ id: string; name: string; description: string }>;
+    features: Array<{ id: string; name: string; description: string }>;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/subscription-catalog", { headers: { Accept: "application/json" } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { ok?: boolean; catalog?: { plans?: unknown; features?: unknown } } | null) => {
+        if (cancelled || !data || !data.ok || !data.catalog) return;
+        setCatalog({
+          plans: (Array.isArray(data.catalog.plans) ? data.catalog.plans : [])
+            .map((plan) => {
+              const raw = plan as { id?: unknown; name?: unknown; description?: unknown };
+              return {
+                id: String(raw.id || ""),
+                name: String(raw.name || ""),
+                description: String(raw.description || ""),
+              };
+            })
+            .filter((plan) => plan.id),
+          features: (Array.isArray(data.catalog.features) ? data.catalog.features : [])
+            .map((feature) => {
+              const raw = feature as { id?: unknown; name?: unknown; description?: unknown };
+              return {
+                id: String(raw.id || ""),
+                name: String(raw.name || ""),
+                description: String(raw.description || ""),
+              };
+            })
+            .filter((feature) => feature.id),
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const lineItems: CheckoutLineItem[] = Array.isArray(quote.verifiedLineItems)
+    ? quote.verifiedLineItems
+    : [];
+  const planId = String(quote.subscriptionPlanId || "");
+  const planLine = lineItems.find((line) => line.kind === "subscription") || null;
+  const catalogPlan = catalog?.plans.find((plan) => plan.id === planId) || null;
+  const planName =
+    catalogPlan?.name ||
+    planLine?.title ||
+    FALLBACK_PLAN_NAMES[planId] ||
+    planId ||
+    "Subscription plan";
+  const planDescription = catalogPlan?.description || planLine?.parentTitle || "";
+  const cycleLabel = quote.subscriptionCycle === "yearly"
+    ? "Yearly"
+    : quote.subscriptionCycle === "monthly"
+      ? "Monthly"
+      : null;
+  const expiresAt = Number(quote.subscriptionExpiresAt || 0);
+  const expiryLabel = expiresAt > 0
+    ? new Date(expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
+    : "";
+
+  // Features. `subscriptionFeatureIds` is the authoritative selected list and
+  // includes plan-included / free features that produce no priced line item —
+  // exactly the features the buyer will unlock after payment.
+  const pricedLineByFeature = new Map<string, CheckoutLineItem>();
+  for (const line of lineItems) {
+    if (line.featureId && !pricedLineByFeature.has(String(line.featureId))) {
+      pricedLineByFeature.set(String(line.featureId), line);
+    }
+  }
+  const featureIds = Array.isArray(quote.subscriptionFeatureIds)
+    ? quote.subscriptionFeatureIds.map(String).filter(Boolean)
+    : [];
+  const featureRows = featureIds.map((id) => {
+    const pricedLine = pricedLineByFeature.get(id) || null;
+    const catalogFeature = catalog?.features.find((feature) => feature.id === id) || null;
+    return {
+      id,
+      name: catalogFeature?.name || pricedLine?.title || FALLBACK_FEATURE_NAMES[id] || id,
+      description: catalogFeature?.description || "",
+      pricePaise: pricedLine ? pricedLine.effectivePrice : null,
+      included: !pricedLine,
+    };
+  });
+
+  // Products. Selected bonus products and plan-included unlocks arrive as
+  // verified line items with server-resolved titles, so the checkout page
+  // always mirrors the exact products the buyer picked on the subscription
+  // page (and how many).
+  const productNameFor = (id: string, fallback: string): string => {
+    const match = catalogProducts.find(
+      (product) =>
+        String(product.id) === id ||
+        (product.documentId ? String(product.documentId) === id : false),
+    );
+    return match?.title || fallback;
+  };
+  const selectedProductLines = lineItems.filter(
+    (line) =>
+      line.kind === "subscription_features" &&
+      Boolean(line.productId) &&
+      !line.featureId &&
+      !/^Plan unlock:/.test(line.title || ""),
+  );
+  const planUnlockLines = lineItems.filter(
+    (line) =>
+      line.kind === "subscription_features" &&
+      Boolean(line.productId) &&
+      !line.featureId &&
+      /^Plan unlock:/.test(line.title || ""),
+  );
+  const selectedProductRows = selectedProductLines.map((line) => ({
+    id: `product:${String(line.productId || line.id)}`,
+    name: productNameFor(String(line.productId || ""), line.title || "Bonus product"),
+    pricePaise: line.effectivePrice,
+  }));
+  const planUnlockRows = planUnlockLines.map((line) => ({
+    id: `unlock:${String(line.productId || line.id)}`,
+    name: productNameFor(
+      String(line.productId || ""),
+      String(line.title || "").replace(/^Plan unlock:\s*/i, ""),
+    ),
+  }));
+
+  const featureLabel = (row: { included: boolean; pricePaise: number | null }): string => {
+    if (!row.included && typeof row.pricePaise === "number") return formatRupee(row.pricePaise);
+    return quote.subscriptionAddOn ? "Already in your membership" : "Included with plan";
+  };
+
+  return (
+    <section
+      data-checkout-subscription-unlocks
+      className="rounded-3xl border border-violet-200 bg-gradient-to-br from-white via-violet-50/70 to-indigo-50 p-4 shadow-sm"
+    >
+      <header className="flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-xl bg-violet-600 text-white">
+          <Unlock size={14} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-black text-slate-900">What you&apos;ll get</h2>
+          <p className="text-[11px] text-slate-500">Unlocks after your payment is verified.</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-violet-700">
+          {cycleLabel ? `${cycleLabel} membership` : "Membership"}
+        </span>
+      </header>
+
+      {/* Membership row */}
+      <div className="mt-3 rounded-2xl border border-violet-100 bg-white/80 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-black text-slate-900" data-checkout-subscription-plan-name>
+              {planName}
+            </p>
+            {planDescription ? (
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">{planDescription}</p>
+            ) : null}
+          </div>
+          {quote.subscriptionAddOn ? (
+            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+              Add-on
+            </span>
+          ) : null}
+        </div>
+        {expiryLabel ? (
+          <p
+            data-checkout-subscription-expiry
+            className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-violet-700"
+          >
+            <CalendarDays size={12} />
+            {quote.subscriptionAddOn
+              ? `Your current expiry stays unchanged — ${expiryLabel}`
+              : `Access until ${expiryLabel}`}
+          </p>
+        ) : null}
+      </div>
+
+      {/* Features unlocked */}
+      <div className="mt-3">
+        <h3
+          className="text-[11px] font-black uppercase tracking-wider text-slate-400"
+          data-checkout-subscription-features-count={featureRows.length}
+        >
+          Features ({featureRows.length})
+        </h3>
+        {featureRows.length === 0 ? (
+          <p className="mt-1.5 text-xs italic text-slate-400">No features in this selection.</p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {featureRows.map((row) => (
+              <li
+                key={`feature:${row.id}`}
+                data-checkout-subscription-feature={row.id}
+                className="flex items-start justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-2.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-black text-slate-900">{row.name}</p>
+                  {row.description ? (
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">{row.description}</p>
+                  ) : null}
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
+                    row.included ? "bg-emerald-100 text-emerald-700" : "bg-violet-100 text-violet-700"
+                  }`}
+                >
+                  {featureLabel(row)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Products included */}
+      <div className="mt-3">
+        <h3
+          className="text-[11px] font-black uppercase tracking-wider text-slate-400"
+          data-checkout-subscription-products-count={selectedProductRows.length}
+        >
+          Products ({selectedProductRows.length}{planUnlockRows.length > 0 ? ` + ${planUnlockRows.length} included` : ""})
+        </h3>
+        {selectedProductRows.length === 0 && planUnlockRows.length === 0 ? (
+          <p className="mt-1.5 text-xs italic text-slate-400">No products in this selection.</p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {selectedProductRows.map((row) => (
+              <li
+                key={row.id}
+                data-checkout-subscription-product={row.id}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-2.5"
+              >
+                <span className="min-w-0 flex-1 text-xs font-bold text-slate-800">{row.name}</span>
+                <span className="shrink-0 text-xs font-black text-violet-700">{formatRupee(row.pricePaise)}</span>
+              </li>
+            ))}
+            {planUnlockRows.map((row) => (
+              <li
+                key={row.id}
+                data-checkout-subscription-plan-unlock={row.id}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-2.5"
+              >
+                <span className="min-w-0 flex-1 text-xs font-bold text-emerald-900">{row.name}</span>
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                  Included with plan
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <p className="mt-3 text-[10px] leading-relaxed text-slate-400">
+        This list matches the plan, features and products you selected on the
+        subscription page. Renewal always requires your confirmation.
+      </p>
+    </section>
   );
 }
 
