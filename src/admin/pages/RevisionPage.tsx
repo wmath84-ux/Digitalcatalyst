@@ -22,6 +22,7 @@ import { useToast } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
 import { type RevisionCatalog } from "@/revision/engine/catalogService";
 import AiConfigForm from "@/revision/components/AiConfigForm";
+import RevisionCurriculumSection from "@/admin/pages/RevisionCurriculumSection";
 import {
   defaultCatalogAiSettings,
   getProvider,
@@ -135,7 +136,7 @@ export default function RevisionPage() {
     <div className="space-y-3 pb-6">
       <SectionCard
         title="AI Configuration"
-        description="This is the only admin control for the revision system. Users generate their own questions and import their own tests directly from their profile — you just publish the default AI they can use."
+        description="Publish the default AI students can use, and keep the Class → Subject → Chapter → Concept lists on the latest exam year."
       >
         <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs leading-relaxed text-indigo-700">
           ✨ Question generation, class/subject/chapter/topic selection and bulk import now live on the
@@ -249,6 +250,12 @@ export default function RevisionPage() {
           📢 Publish default for all users
         </PrimaryButton>
       </SectionCard>
+
+      <RevisionCurriculumSection
+        catalog={catalog}
+        adminConfig={adminCfg.config}
+        onCatalog={setCatalog}
+      />
     </div>
   );
 }

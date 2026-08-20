@@ -1,6 +1,7 @@
 import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from "./_lib/firebaseAdmin.js";
 import { referralCodeForUid, runReferralRepairOnce } from "./_lib/referrals.js";
 import { handleEmbedProxy } from "./_lib/embedProxy.js";
+import { handleRevisionGenerate } from "./_lib/revisionGenerate.js";
 
 type SubscriberRow = {
   uid: string;
@@ -74,6 +75,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // the private `_lib/embedProxy` helper so no extra function is deployed.
   if (req.method === "GET" && req.query?.url) {
     return handleEmbedProxy(req, res);
+  }
+  // Revision AI generation. `/api/revision/generate` rewrites here for the
+  // same 12-function cap. POST is otherwise unused on this route.
+  if (req.method === "POST") {
+    return handleRevisionGenerate(req, res);
   }
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {

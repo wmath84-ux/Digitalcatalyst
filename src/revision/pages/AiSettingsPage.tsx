@@ -1,23 +1,26 @@
 // Student-facing AI Configuration.
 //
-// Deliberately simple, top-to-bottom flow (logic unchanged):
-//   • Current setup   — what AI is active right now, at a glance.
-//   • Choose source   — my own key / school-provided / offline.
-//   • 3-step connect  — provider → API key → model (only when "own key").
-//
-// Storage, provider calls, model fetching and the effective-AI resolution
-// all reuse the exact same engine functions as before.
+// Configuration only — no generate CTA. Three sources, each wired correctly:
+//   • School-provided AI  — the admin panel's published catalog (provider,
+//     model, shared key). Never leaked onto the own-key form.
+//   • My own API key      — blank API box + empty model list until the
+//     student pastes their own key.
+//   • No AI (offline)     — jumps straight to bulk import so they can paste
+//     a full revision plan (questions + answers) in one go.
 
 import { useEffect, useMemo, useState } from "react";
 import PageShell from "../components/PageShell";
 import AiConfigForm from "../components/AiConfigForm";
-import { Card, PrimaryButton } from "../components/ui";
-import { CheckIcon, SparklesIcon } from "../components/icons";
+import { Card } from "../components/ui";
+import { CheckIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { fetchRemoteCatalog, type RevisionCatalog } from "../engine/catalogService";
 import {
+  blankOwnAiConfig,
   getProvider,
   hasStoredUserAiConfig,
+  isSchoolAiAvailable,
+  isSchoolAiPublished,
   loadUserAiConfig,
   resolveEffectiveAi,
   saveUserAiConfig,
@@ -50,6 +53,7 @@ function SourceOption({
       type="button"
       disabled={disabled}
       onClick={() => onSelect(value)}
+      data-ai-source={value}
       className={`flex w-full items-start gap-3 rounded-2xl border p-3.5 text-left transition ${
         selected
           ? "border-indigo-300 bg-indigo-50/70 ring-2 ring-indigo-200"
@@ -79,53 +83,100 @@ function SourceOption({
 export default function AiSettingsPage({ uid, route }: Props) {
   const { navigate } = useExitGuard();
   const [catalog, setCatalog] = useState<RevisionCatalog | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [userCfg, setUserCfg] = useState<UserAiConfig>(() => loadUserAiConfig(uid));
   const [savedFlash, setSavedFlash] = useState(false);
 
   useEffect(() => {
-    void fetchRemoteCatalog().then((c) => setCatalog(c));
+    let cancelled = false;
+    void fetchRemoteCatalog()
+      .then((c) => {
+        if (!cancelled) setCatalog(c);
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const adminSettings = catalog?.aiSettings ?? null;
-  const adminPublished = Boolean(adminSettings?.updatedAt);
+  const schoolReady = isSchoolAiAvailable(adminSettings);
+  const schoolPublished = isSchoolAiPublished(adminSettings);
 
-  // When the school shared a key and the student never picked a preference,
-  // turn the school-provided AI on automatically — AI questions just work.
+  // First visit + school AI is live → turn it on. Never copy school values
+  // into the own-key form, and never override an explicit student choice.
   useEffect(() => {
-    if (!adminSettings?.sharedApiKey) return;
+    if (!schoolReady) return;
     if (hasStoredUserAiConfig(uid)) return;
-    setUserCfg((prev) => (prev.source === "offline" ? { ...prev, source: "default" } : prev));
-  }, [adminSettings?.sharedApiKey, uid]);
-
-  // Prefill the user's provider form with the school's recommendation the
-  // first time they open their own-key panel after a publish.
-  useEffect(() => {
-    if (!adminSettings?.model || userCfg.config.model) return;
-    setUserCfg((prev) => ({
-      ...prev,
-      config: {
-        ...prev.config,
-        provider: adminSettings.provider,
-        model: adminSettings.model,
-      },
-    }));
-  }, [adminSettings?.model, adminSettings?.provider, userCfg.config.model]);
+    setUserCfg((prev) => {
+      if (prev.source !== "offline") return prev;
+      const next: UserAiConfig = { ...prev, source: "default" };
+      saveUserAiConfig(uid, next);
+      return next;
+    });
+  }, [schoolReady, uid]);
 
   const updateConfig = (next: UserAiConfig) => {
     setUserCfg(next);
     saveUserAiConfig(uid, next);
     setSavedFlash(true);
-    setTimeout(() => setSavedFlash(false), 1600);
+    window.setTimeout(() => setSavedFlash(false), 1600);
+  };
+
+  const selectSource = (source: AiSource) => {
+    if (source === "offline") {
+      updateConfig({ ...userCfg, source: "offline" });
+      navigate("#/revision/bulk-import");
+      return;
+    }
+    if (source === "own") {
+      const keepOwn = userCfg.config.apiKey.trim().length > 0;
+      updateConfig({ source: "own", config: keepOwn ? userCfg.config : blankOwnAiConfig() });
+      return;
+    }
+    updateConfig({ ...userCfg, source: "default" });
   };
 
   const effective = useMemo(() => resolveEffectiveAi(userCfg, adminSettings), [userCfg, adminSettings]);
   const effProvider = effective.config ? getProvider(effective.config.provider) : null;
   const schoolProvider = adminSettings ? getProvider(adminSettings.provider) : null;
 
+  const ownFormValue: AiConfig = userCfg.config.apiKey.trim() ? userCfg.config : blankOwnAiConfig();
+
+  const schoolDescription = catalogLoading
+    ? "Loading your school's published AI…"
+    : schoolReady
+      ? `Works instantly with the shared key · ${schoolProvider?.name} · ${adminSettings?.model}`
+      : schoolPublished && adminSettings
+        ? `Your school published ${schoolProvider?.name} · ${adminSettings.model}, but hasn't shared a key yet.`
+        : "Not available yet — your school hasn't published an AI.";
+
+  const currentTitle = catalogLoading
+    ? "Loading school AI…"
+    : userCfg.source === "own" && !userCfg.config.apiKey.trim()
+      ? "Add your API key below"
+      : userCfg.source === "default" && !schoolReady
+        ? schoolPublished
+          ? "School AI published — waiting for a shared key"
+          : "School AI not published yet"
+        : effective.config
+          ? `${effProvider?.name} · ${effective.config.model}`
+          : "Offline question bank";
+
+  const currentLabel =
+    userCfg.source === "own"
+      ? userCfg.config.apiKey.trim()
+        ? "Your own API key"
+        : "My own API key — not connected yet"
+      : userCfg.source === "default"
+        ? "School-provided AI"
+        : "No AI (offline)";
+
   return (
     <PageShell route={route} title="AI Configuration" subtitle="Set up in under a minute" backHref="#/revision/profile">
       <div className="animate-fade-in space-y-4 px-4 py-4 pb-10">
-        {/* Current setup — always visible at the top */}
         <Card>
           <div className="flex items-center justify-between">
             <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-400">Current setup</h3>
@@ -138,16 +189,16 @@ export default function AiSettingsPage({ uid, route }: Props) {
           <div className="mt-2.5 flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
             <span
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-black text-white ${
-                effProvider?.gradient ?? "from-slate-400 to-slate-600"
+                userCfg.source === "default" && schoolProvider
+                  ? schoolProvider.gradient
+                  : (effProvider?.gradient ?? "from-slate-400 to-slate-600")
               }`}
             >
-              {effProvider?.mark ?? "▦"}
+              {userCfg.source === "default" && schoolProvider ? schoolProvider.mark : (effProvider?.mark ?? "▦")}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-bold text-slate-900">
-                {effective.config ? `${effProvider?.name} · ${effective.config.model}` : "Offline question bank"}
-              </p>
-              <p className="text-xs text-slate-500">{effective.label}</p>
+              <p className="truncate text-[13px] font-bold text-slate-900">{currentTitle}</p>
+              <p className="text-xs text-slate-500">{currentLabel}</p>
             </div>
             <span
               className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${
@@ -159,7 +210,6 @@ export default function AiSettingsPage({ uid, route }: Props) {
           </div>
         </Card>
 
-        {/* Step 1 — pick the source */}
         <Card>
           <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-400">1 · Where should AI come from?</h3>
           <div className="mt-3 space-y-2">
@@ -167,45 +217,62 @@ export default function AiSettingsPage({ uid, route }: Props) {
               value="default"
               selected={userCfg.source === "default"}
               title="School-provided AI"
-              badge={adminSettings?.sharedApiKey ? "Ready — no key needed" : undefined}
-              description={
-                adminSettings?.sharedApiKey
-                  ? `Works instantly with the shared key · ${schoolProvider?.name} ${adminSettings.model}`
-                  : adminPublished && adminSettings
-                    ? `Your school recommends ${schoolProvider?.name} · ${adminSettings.model}, but hasn't shared a key — use your own key below.`
-                    : "Not available yet — your school hasn't published an AI."
-              }
-              disabled={!adminSettings?.sharedApiKey}
-              onSelect={(v) => updateConfig({ ...userCfg, source: v })}
+              badge={schoolReady ? "Ready — no key needed" : catalogLoading ? "Loading" : undefined}
+              description={schoolDescription}
+              disabled={!catalogLoading && !schoolReady}
+              onSelect={selectSource}
             />
             <SourceOption
               value="own"
               selected={userCfg.source === "own"}
               title="My own API key"
-              description="Connect Gemini, ChatGPT, Claude, Groq, OpenRouter or any custom API. Your key stays in this browser."
-              onSelect={(v) => updateConfig({ ...userCfg, source: v })}
+              description="Blank form — paste your own key. School settings never appear here."
+              onSelect={selectSource}
             />
             <SourceOption
               value="offline"
               selected={userCfg.source === "offline"}
               title="No AI (offline)"
-              description="Use only the built-in question bank."
-              onSelect={(v) => updateConfig({ ...userCfg, source: v })}
+              description="Opens bulk import so you can paste a full revision plan with questions and answers."
+              onSelect={selectSource}
             />
           </div>
         </Card>
 
-        {/* Step 2 — connect own provider (only when needed) */}
+        {userCfg.source === "default" && schoolReady && adminSettings && schoolProvider && (
+          <Card data-school-ai-preview>
+            <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-400">2 · School AI</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              This is the configuration published from the admin panel. You don't need an API key.
+            </p>
+            <div className="mt-3 flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
+              <span
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-black text-white ${schoolProvider.gradient}`}
+              >
+                {schoolProvider.mark}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-bold text-slate-900">{schoolProvider.name}</p>
+                <p className="truncate font-mono text-xs text-slate-500">{adminSettings.model}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
+                Shared key
+              </span>
+            </div>
+          </Card>
+        )}
+
         {userCfg.source === "own" && (
           <Card>
             <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-400">2 · Connect your provider</h3>
             <p className="mt-1 text-xs text-slate-500">
-              Pick a provider → paste your API key → choose a model. Everything saves automatically.
+              Pick a provider → paste your API key → models appear after the key loads. The API box starts empty.
             </p>
             <div className="mt-3">
               <AiConfigForm
                 card={false}
-                value={userCfg.config}
+                liveModelsOnly
+                value={ownFormValue}
                 onChange={(config: AiConfig) => updateConfig({ ...userCfg, source: "own", config })}
                 title=""
                 description=""
@@ -213,11 +280,6 @@ export default function AiSettingsPage({ uid, route }: Props) {
             </div>
           </Card>
         )}
-
-        {/* Done — go generate */}
-        <PrimaryButton onClick={() => navigate("#/revision/ai-generate")}>
-          <SparklesIcon className="h-4 w-4" /> Generate questions with this AI
-        </PrimaryButton>
       </div>
     </PageShell>
   );

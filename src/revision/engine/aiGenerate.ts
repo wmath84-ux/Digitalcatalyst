@@ -123,7 +123,20 @@ export type GenerateInput = {
   topic: string;
   difficulty: "easy" | "medium" | "hard";
   count: number;
+  classNames?: string[];
+  subjectNames?: string[];
+  chapterNames?: string[];
+  topicNames?: string[];
+  minutes?: number;
 };
+
+/** Resolve `…/v1beta/models/{model}:generateContent` even if baseUrl omitted `/models`. */
+export function geminiGenerateUrl(baseUrl: string | undefined, model: string): string {
+  const root = String(baseUrl || GEMINI_ENDPOINT).replace(/\/+$/, "");
+  const modelsRoot = /\/models$/i.test(root) ? root : `${root}/models`;
+  const id = normalizeModelName(model) || DEFAULT_MODEL;
+  return `${modelsRoot}/${id}:generateContent`;
+}
 
 type RawGenerated = {
   prompt: string;
@@ -215,21 +228,29 @@ export type GeminiRuntimeConfig = {
 
 /** Build the user prompt that asks the model for MCQs. */
 export function buildUserPrompt(input: GenerateInput): string {
-  return [
+  const classes = (input.classNames ?? []).filter(Boolean);
+  const subjects = (input.subjectNames ?? []).filter(Boolean);
+  const chapters = (input.chapterNames ?? []).filter(Boolean);
+  const topics = (input.topicNames ?? []).filter(Boolean);
+  const lines = [
     `Generate ${input.count} multiple-choice questions for a revision test.`,
-    `Subject: ${input.subject || "General"}`,
-    `Topic: ${input.topic || "General"}`,
+    `Class: ${classes.join(", ") || "General"}`,
+    `Subject: ${subjects.join(", ") || input.subject || "General"}`,
+    `Chapter: ${chapters.join(", ") || "General"}`,
+    `Concepts / topics: ${topics.join(", ") || input.topic || "General"}`,
     `Difficulty: ${input.difficulty}`,
-    `Make every question distinct. Prefer clear, unambiguous options and a single correct answer.`,
-  ].join("\n");
+  ];
+  if (input.minutes && input.minutes > 0) {
+    lines.push(`Exam duration to keep in mind: ${input.minutes} minutes`);
+  }
+  lines.push("Cover the listed concepts at the given class level. Every question must be distinct, unambiguous, and have one correct answer.");
+  return lines.join("\n");
 }
 
 /** Call the Gemini generateContent endpoint directly from the browser. */
 export async function generateWithGemini(config: GeminiRuntimeConfig, input: GenerateInput): Promise<ParsedQuestion[]> {
   const apiKey = config.apiKey.trim();
   if (!apiKey) throw new Error("No Gemini API key configured.");
-
-  const endpointBase = (config.baseUrl || GEMINI_ENDPOINT).replace(/\/+$/, "");
 
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: systemPrompt() }] },
@@ -241,7 +262,7 @@ export async function generateWithGemini(config: GeminiRuntimeConfig, input: Gen
   });
 
   const call = (model: string) =>
-    fetch(`${endpointBase}/${model}:generateContent`, {
+    fetch(geminiGenerateUrl(config.baseUrl, model), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

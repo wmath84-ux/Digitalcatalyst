@@ -9,6 +9,10 @@
     {
       "source": "/api/embed-proxy",
       "destination": "/api/referral-leaderboard"
+    },
+    {
+      "source": "/api/revision/generate",
+      "destination": "/api/referral-leaderboard"
     }
   ]
 }

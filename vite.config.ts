@@ -21,6 +21,11 @@ export default defineConfig({
     {
       name: "embed-proxy-dev-stub",
       configureServer(server) {
+        server.middlewares.use("/api/revision/generate", (_req, res) => {
+          res.statusCode = 501;
+          res.setHeader("content-type", "application/json; charset=utf-8");
+          res.end(JSON.stringify({ ok: false, code: "dev_no_api", error: "Local dev has no serverless AI proxy." }));
+        });
         server.middlewares.use("/api/embed-proxy", (req, res) => {
           const safe = (new URL(req.url || "/", "http://localhost").searchParams.get("url") || "").trim();
           const link = safe.startsWith("https://")

@@ -29,6 +29,11 @@ export type AiConfigFormProps = {
   description?: string;
   /** Called with the freshly fetched model list so parents can reuse it. */
   onModelsChange?: (models: ProviderModel[]) => void;
+  /**
+   * Student "My own API key" mode: keep the model dropdown empty until the
+   * key actually loads live models. No school/admin known-model fallback.
+   */
+  liveModelsOnly?: boolean;
 };
 
 function ProviderTile({
@@ -76,6 +81,7 @@ export default function AiConfigForm({
   title = "Connect your AI provider",
   description = "Choose a provider, paste your API key and all its available models will appear below. Your key is stored only in this browser and sent directly to the provider.",
   onModelsChange,
+  liveModelsOnly = false,
 }: AiConfigFormProps) {
   const [models, setModels] = useState<ProviderModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -90,8 +96,11 @@ export default function AiConfigForm({
   const provider = useMemo(() => AI_PROVIDERS.find((p) => p.id === value.provider) ?? AI_PROVIDERS[0], [value.provider]);
   const hasKey = value.apiKey.trim().length > 0;
 
-  /** Keep the model dropdown populated: fetched models first, then known ones. */
-  const allModels = useMemo(() => mergeModelLists(value.provider, models), [models, value.provider]);
+  /** Admin form keeps known-model fallbacks; own-key stays empty until fetch. */
+  const allModels = useMemo(
+    () => (liveModelsOnly ? models.filter((m) => m.id) : mergeModelLists(value.provider, models)),
+    [liveModelsOnly, models, value.provider],
+  );
   const modelKnown = allModels.some((m) => m.id === value.model);
 
   const refreshModels = async (silent = false) => {
@@ -112,6 +121,9 @@ export default function AiConfigForm({
       if (requestSeq.current !== seq) return;
       setModels(list);
       onModelsChange?.(list);
+      if (liveModelsOnly && list.length > 0 && !value.model.trim()) {
+        onChange({ ...value, model: list[0].id });
+      }
       setStatus({
         tone: "ok",
         text: `${list.length} model${list.length === 1 ? "" : "s"} found${list.length > 0 ? " — pick one below" : ""}.`,
@@ -173,7 +185,11 @@ export default function AiConfigForm({
               meta={p}
               selected={value.provider === p.id}
               onSelect={() =>
-                onChange({ ...value, provider: p.id as AIProviderId, model: mergeModelLists(p.id as AIProviderId, [])[0]?.id ?? value.model })
+                onChange({
+                  ...value,
+                  provider: p.id as AIProviderId,
+                  model: liveModelsOnly ? "" : (mergeModelLists(p.id as AIProviderId, [])[0]?.id ?? value.model),
+                })
               }
             />
           ))}
@@ -301,7 +317,11 @@ export default function AiConfigForm({
           disabled={allModels.length === 0}
           onChange={(e) => onChange({ ...value, model: e.target.value })}
         >
-          {allModels.length === 0 && <option value="">{hasKey ? "Loading models…" : "Add an API key to see models"}</option>}
+          {allModels.length === 0 && (
+            <option value="">
+              {hasKey ? (loadingModels ? "Loading models…" : "No models — load available models") : "Add an API key to see models"}
+            </option>
+          )}
           {allModels.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}

@@ -334,8 +334,9 @@ async function revisionRequest(init?: RequestInit) {
   const ref = doc(db, "settings", REVISION_CATALOG_DOC_ID);
   if ((init?.method || "GET") === "GET") {
     const snap = await getDoc(ref);
-    const catalog = snap.exists() ? normalizeCatalog(snap.data()) : null;
-    return { catalog: catalog ?? defaultCatalog(), isDefault: !snap.exists() };
+    if (!snap.exists()) return { catalog: defaultCatalog(), isDefault: true };
+    const catalog = normalizeCatalog(snap.data()) ?? defaultCatalog();
+    return { catalog, isDefault: false };
   }
   const body = bodyOf(init);
   const incoming = normalizeCatalog(body);
@@ -350,6 +351,7 @@ async function revisionRequest(init?: RequestInit) {
     topics: incoming.topics,
     questions: incoming.questions,
     aiSettings: incoming.aiSettings ?? {},
+    planningCurriculum: incoming.planningCurriculum ?? null,
     updatedAt: serverTimestamp(),
   };
   await setDoc(ref, payload, { merge: true });
