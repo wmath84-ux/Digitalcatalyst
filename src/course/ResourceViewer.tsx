@@ -40,7 +40,7 @@ import { AlertTriangle, Download, ExternalLink, Eye, FileQuestion, FileStack, Ma
 import type { CourseFile } from "../types/course";
 import ImageViewer from "./ImageViewer";
 import AudioPlayer from "./AudioPlayer";
-import { buildPersonalCopyUrl, editableGoogleKind, getCourseDownload, getCourseEmbed, getDriveSourceFileId, getGoogleEditorUrl, hasNativeMobileRendering, isEditableGoogleFile, personalCopyKind, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
+import { buildPersonalCopyUrl, editableGoogleKind, getCourseDownload, getCourseEmbed, getDriveSourceFileId, getGoogleEditorUrl, getYouTubeWatchUrl, hasNativeMobileRendering, isEditableGoogleFile, personalCopyKind, VIEWPORT_AWARE_KINDS, type CourseDownload, type DocsEditorChrome } from "../utils/courseEmbed";
 import { useDocsEditorAccess } from "../hooks/useDocsEditorAccess";
 import { usePersonalDriveCopy } from "../hooks/usePersonalDriveCopy";
 import { useAuth } from "../context/AuthContext";
@@ -238,6 +238,7 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
         <ViewerHeader
           file={file}
           embed={embed}
+          externalUrl={embed.kind === "youtube" ? getYouTubeWatchUrl(file) : embed.url}
           download={download}
           canEditInline={canEditInline && !showPersonalCopy}
           editMode={canEditInline && editMode && !showPersonalCopy}
@@ -310,6 +311,7 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
             {embed.kind === "youtube" ? (
               <YouTubeFrame
                 url={embed.url}
+                watchUrl={getYouTubeWatchUrl(file)}
                 title={file.name}
                 active={active}
                 resumeAt={resumePosition(entry)}
@@ -403,7 +405,7 @@ const loadYouTubeApi = (): Promise<YouTubeApiWindow["YT"]> => {
   return youtubeApiPromise;
 };
 
-function YouTubeFrame({ url, title, active, resumeAt, onProgress }: { url: string; title: string; active: boolean; resumeAt: number; onProgress: (position: number, duration: number) => void }) {
+function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { url: string; watchUrl: string; title: string; active: boolean; resumeAt: number; onProgress: (position: number, duration: number) => void }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayer | null>(null);
   const [loading, setLoading] = useState(true);
@@ -420,25 +422,56 @@ function YouTubeFrame({ url, title, active, resumeAt, onProgress }: { url: strin
   useEffect(() => {
     let cancelled = false;
     let poll: ReturnType<typeof setInterval> | null = null;
+    let readyTimeout: ReturnType<typeof setTimeout> | null = null;
+    const ready = { value: false };
     if (!videoId) return undefined;
+
+    // A bot-check / sign-in response can load inside YouTube's iframe without
+    // ever firing the IFrame API's `onReady`. Without a timeout the viewer
+    // would sit behind a spinner forever, and the learner would be pushed into
+    // clicking YouTube's sign-in link inside the iframe (which Chrome blocks
+    // with ERR_BLOCKED_BY_RESPONSE). Fall back to the plain embed and keep a
+    // top-level YouTube escape hatch visible instead.
+    readyTimeout = setTimeout(() => {
+      if (cancelled || ready.value) return;
+      try { playerRef.current?.destroy(); } catch { /* player may not exist */ }
+      playerRef.current = null;
+      setApiFailed(true);
+      setLoading(false);
+    }, 12000);
 
     void loadYouTubeApi().then((YT) => {
       if (cancelled) return;
       const host = hostRef.current;
-      if (!YT?.Player || !host) { setApiFailed(true); setLoading(false); return; }
+      if (!YT?.Player || !host) {
+        if (readyTimeout) clearTimeout(readyTimeout);
+        setApiFailed(true);
+        setLoading(false);
+        return;
+      }
       playerRef.current = new YT.Player(host, {
         videoId,
         // `start` resumes at the stored second even before the API is polled,
         // so the very first frame is already the right one.
         playerVars: {
           rel: 0, modestbranding: 1, playsinline: 1, controls: 1, fs: 1,
+          enablejsapi: 1,
           start: Math.floor(resumeRef.current) || 0,
           origin: window.location.origin,
+          widget_referrer: window.location.href,
         },
         host: "https://www.youtube-nocookie.com",
         events: {
-          onReady: () => { if (!cancelled) setLoading(false); },
-          onError: () => { if (!cancelled) { setApiFailed(true); setLoading(false); } },
+          onReady: () => {
+            ready.value = true;
+            if (readyTimeout) clearTimeout(readyTimeout);
+            if (!cancelled) setLoading(false);
+          },
+          onError: () => {
+            ready.value = true;
+            if (readyTimeout) clearTimeout(readyTimeout);
+            if (!cancelled) { setApiFailed(true); setLoading(false); }
+          },
         },
       });
       // Bank the position every second so an abrupt exit loses at most 1s.
@@ -454,6 +487,7 @@ function YouTubeFrame({ url, title, active, resumeAt, onProgress }: { url: strin
     return () => {
       cancelled = true;
       if (poll) clearInterval(poll);
+      if (readyTimeout) clearTimeout(readyTimeout);
       try { playerRef.current?.destroy(); } catch { /* already gone */ }
       playerRef.current = null;
     };
@@ -477,7 +511,12 @@ function YouTubeFrame({ url, title, active, resumeAt, onProgress }: { url: strin
   if (apiFailed || !videoId) {
     const separator = url.includes("?") ? "&" : "?";
     const fallbackUrl = resumeRef.current > 0 ? `${url}${separator}start=${Math.floor(resumeRef.current)}` : url;
-    return <EmbedFrame url={fallbackUrl} title={title} kind="youtube" supported />;
+    // If the privacy-enhanced host is the one being filtered by a browser,
+    // give the ordinary player one chance to use an existing YouTube session.
+    // This is still only an iframe fallback; authentication is never attempted
+    // inside it. The visible top-level watch link remains the reliable path.
+    const standardFallbackUrl = fallbackUrl.replace("www.youtube-nocookie.com", "www.youtube.com");
+    return <EmbedFrame url={standardFallbackUrl} originalUrl={watchUrl} title={title} kind="youtube" supported />;
   }
 
   return (
@@ -495,9 +534,10 @@ function YouTubeFrame({ url, title, active, resumeAt, onProgress }: { url: strin
   );
 }
 
-function ViewerHeader({ file, embed, download, canEditInline = false, editMode = false, onToggleEditMode, personalCopyEnabled = false, personalCopyActive = false, personalCopyBusy = false, onTogglePersonalCopy }: { file: CourseFile; embed: { url: string; kind: string }; download: CourseDownload; canEditInline?: boolean; editMode?: boolean; onToggleEditMode?: () => void; personalCopyEnabled?: boolean; personalCopyActive?: boolean; personalCopyBusy?: boolean; onTogglePersonalCopy?: () => void }) {
+function ViewerHeader({ file, embed, externalUrl = embed.url, download, canEditInline = false, editMode = false, onToggleEditMode, personalCopyEnabled = false, personalCopyActive = false, personalCopyBusy = false, onTogglePersonalCopy }: { file: CourseFile; embed: { url: string; kind: string }; externalUrl?: string; download: CourseDownload; canEditInline?: boolean; editMode?: boolean; onToggleEditMode?: () => void; personalCopyEnabled?: boolean; personalCopyActive?: boolean; personalCopyBusy?: boolean; onTogglePersonalCopy?: () => void }) {
   const kindLabel = embed.kind === "none" ? "No preview" : embed.kind === "direct" ? file.type : embed.kind;
-  const isMedia = embed.kind === "youtube" || file.type === "video" || file.type === "audio";
+  const isYouTube = embed.kind === "youtube";
+  const isMedia = isYouTube || file.type === "video" || file.type === "audio";
   const toggleFullscreen = () => {
     const root = document.querySelector("[data-course-viewer][data-active=\"true\"]") || document.querySelector("[data-course-viewer]");
     if (!root) return;
@@ -576,14 +616,16 @@ function ViewerHeader({ file, embed, download, canEditInline = false, editMode =
       ) : null}
       {embed.url ? (
         <a
-          href={embed.url}
+          href={externalUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="grid h-9 w-9 place-items-center rounded-lg bg-[var(--course-soft)] hover:bg-[var(--course-soft-hover)]"
+          className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--course-soft)] px-2.5 text-[11px] font-bold hover:bg-[var(--course-soft-hover)] sm:px-3 sm:text-xs"
           aria-label="Open preview in new tab"
+          title={isYouTube ? "Open in YouTube (use this if embedded playback is blocked)" : "Open preview in new tab"}
           data-course-viewer-external
         >
-          <Maximize2 size={15} />
+          <ExternalLink size={15} />
+          <span className={isYouTube ? "inline" : "hidden sm:inline"}>{isYouTube ? "YouTube" : "Open"}</span>
         </a>
       ) : null}
     </div>
@@ -618,6 +660,8 @@ function MissingEmbedState({ file, download }: { file: CourseFile; download: Cou
 
 interface EmbedFrameProps {
   url: string;
+  /** Top-level source URL used when the host refuses to be framed. */
+  originalUrl?: string;
   title: string;
   kind: string;
   supported: boolean;
@@ -676,7 +720,7 @@ const EDITOR_VIEWPORT_WIDTHS: Record<string, number> = {
   slides: 860,
 };
 
-function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editMode = false, editorOriginalUrl = "" }: EmbedFrameProps) {
+function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocument = false, editMode = false, editorOriginalUrl = "" }: EmbedFrameProps) {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -762,6 +806,11 @@ function EmbedFrame({ url, title, kind, supported, mobileDocument = false, editM
   // panel's "Open original" link and Source line must point at the REAL host,
   // not at the app's proxy path.
   const openOriginalHref = (() => {
+    // YouTube's sign-in / bot-check page cannot be framed by design. The
+    // caller supplies the normal watch URL so this action opens YouTube in a
+    // real top-level tab rather than trying to navigate www.youtube.com from
+    // inside the iframe (which Chromium reports as ERR_BLOCKED_BY_RESPONSE).
+    if (originalUrl) return originalUrl;
     try {
       const parsed = new URL(url, "https://x");
       if (parsed.pathname === "/api/embed-proxy") {
