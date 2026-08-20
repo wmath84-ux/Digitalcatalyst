@@ -20,12 +20,12 @@ import {
   UserIcon,
 } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
-import { getDashboardData } from "../engine/statsService";
+import { getRevisionOverview } from "../engine/statsService";
 import AiQuotaCard from "../../components/AiQuotaCard";
 
 export default function RevisionProfilePage({ uid, route, userName }: { uid: string; route: string; userName: string }) {
   const { navigate } = useExitGuard();
-  const dashboard = useMemo(() => getDashboardData(uid), [uid]);
+  const dashboard = useMemo(() => getRevisionOverview(uid), [uid]);
 
   return (
     <PageShell route={route} title="Profile">

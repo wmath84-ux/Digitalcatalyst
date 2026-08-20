@@ -31,11 +31,21 @@ export type CustomTestQuestion = {
   topicName: string;
 };
 
+export type RevisionPlanDetails = {
+  classNames: string[];
+  subjectNames: string[];
+  chapterNames: string[];
+  topicNames: string[];
+  difficulty: Difficulty | "mixed";
+};
+
 export type CreateCustomTestInput = {
   title: string;
   estimatedMinutes: number;
   source: "ai" | "bulk";
   questions: CustomTestQuestion[];
+  /** Stored separately so the dashboard never has to guess a plan's syllabus. */
+  planDetails?: RevisionPlanDetails;
 };
 
 const slugify = (s: string) =>
@@ -129,6 +139,15 @@ export function createCustomTest(uid: string, input: CreateCustomTestInput): { t
     estimatedMinutes: Math.max(1, Math.min(240, Math.round(input.estimatedMinutes) || 5)),
     kind: "custom",
     source: input.source,
+    planDetails: input.planDetails
+      ? {
+          classNames: [...input.planDetails.classNames],
+          subjectNames: [...input.planDetails.subjectNames],
+          chapterNames: [...input.planDetails.chapterNames],
+          topicNames: [...input.planDetails.topicNames],
+          difficulty: input.planDetails.difficulty,
+        }
+      : undefined,
   };
   db.dailyTests.push(test);
   saveDb(uid, db);
@@ -146,6 +165,7 @@ export type CustomTestListItem = {
   attemptId: number | null;
   score: number | null;
   currentIndex: number;
+  planDetails: RevisionPlanDetails;
 };
 
 /** All custom tests (newest first) with their attempt state for the dashboard. */
@@ -158,6 +178,22 @@ export function listCustomTests(uid: string): CustomTestListItem[] {
       const attempt = db.testAttempts.find((a) => a.dailyTestId === t.id) ?? null;
       const status: CustomTestListItem["status"] =
         attempt?.status === "completed" ? "completed" : attempt?.status === "in_progress" ? "in_progress" : "available";
+      const subjects = Array.from(
+        new Set(
+          t.questionIds
+            .map((questionId) => db.questions.find((q) => q.id === questionId)?.subjectId)
+            .map((subjectId) => db.subjects.find((s) => s.id === subjectId)?.name)
+            .filter((name): name is string => Boolean(name)),
+        ),
+      );
+      const topics = Array.from(
+        new Set(
+          t.questionIds
+            .map((questionId) => db.questions.find((q) => q.id === questionId)?.topicId)
+            .map((topicId) => db.topics.find((topic) => topic.id === topicId)?.name)
+            .filter((name): name is string => Boolean(name)),
+        ),
+      );
       return {
         id: t.id,
         title: t.title,
@@ -169,6 +205,15 @@ export function listCustomTests(uid: string): CustomTestListItem[] {
         attemptId: attempt?.id ?? null,
         score: attempt?.status === "completed" ? attempt.score : null,
         currentIndex: attempt?.currentIndex ?? 0,
+        // Old saved tests did not have planDetails. Derive honest labels from
+        // their questions instead of displaying made-up/random syllabus text.
+        planDetails: t.planDetails ?? {
+          classNames: [],
+          subjectNames: subjects,
+          chapterNames: topics,
+          topicNames: [],
+          difficulty: "mixed",
+        },
       };
     });
 }
