@@ -152,7 +152,10 @@ export default function RevisionPage() {
         <AiConfigForm
           value={adminCfg.config}
           onChange={(config) => {
-            if (config.provider !== adminCfg.config.provider) setFetchedModels([]);
+            if (config.provider !== adminCfg.config.provider) {
+              setFetchedModels([]);
+              if (config.provider === "custom") setPublishModel("");
+            }
             persistAdminCfg({ ...adminCfg, source: "own", config });
           }}
           title="Your AI provider (admin)"

@@ -37,6 +37,16 @@ test("own API key starts as a blank form with no school models", () => {
   assert.match(form, /Add an API key to see models/);
 });
 
+test("admin Custom API selection clears key, base URL and model lists", () => {
+  assert.match(form, /provider: \"custom\"/);
+  assert.match(form, /apiKey: \"\"/);
+  assert.match(form, /baseUrl: \"\"/);
+  assert.match(form, /model: \"\"/);
+  assert.match(form, /value.provider === \"custom\"/);
+  assert.match(adminPage, /config.provider === \"custom\"/);
+  assert.match(adminPage, /setPublishModel\(\"\"\)/);
+});
+
 test("offline mode navigates to bulk import so the student can paste a full plan", () => {
   assert.match(aiSettingsPage, /source === \"offline\"/);
   assert.match(aiSettingsPage, /#\/revision\/bulk-import/);

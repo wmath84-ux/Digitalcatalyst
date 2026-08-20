@@ -95,11 +95,13 @@ export default function AiConfigForm({
 
   const provider = useMemo(() => AI_PROVIDERS.find((p) => p.id === value.provider) ?? AI_PROVIDERS[0], [value.provider]);
   const hasKey = value.apiKey.trim().length > 0;
+  const hasCustomEndpoint = value.provider !== "custom" || value.baseUrl.trim().length > 0;
 
   /** Admin form keeps known-model fallbacks; own-key stays empty until fetch. */
+  const liveOnly = liveModelsOnly || value.provider === "custom";
   const allModels = useMemo(
-    () => (liveModelsOnly ? models.filter((m) => m.id) : mergeModelLists(value.provider, models)),
-    [liveModelsOnly, models, value.provider],
+    () => (liveOnly ? models.filter((m) => m.id) : mergeModelLists(value.provider, models)),
+    [liveOnly, models, value.provider],
   );
   const modelKnown = allModels.some((m) => m.id === value.model);
 
@@ -121,7 +123,7 @@ export default function AiConfigForm({
       if (requestSeq.current !== seq) return;
       setModels(list);
       onModelsChange?.(list);
-      if (liveModelsOnly && list.length > 0 && !value.model.trim()) {
+      if (liveOnly && list.length > 0 && !value.model.trim()) {
         onChange({ ...value, model: list[0].id });
       }
       setStatus({
@@ -144,7 +146,7 @@ export default function AiConfigForm({
   // Auto-load models shortly after the key / endpoint changes — the
   // "connect an API and every available model appears" experience.
   useEffect(() => {
-    if (!hasKey) {
+    if (!hasKey || !hasCustomEndpoint) {
       setDidAutoFetch(false);
       setModels([]);
       return;
@@ -158,7 +160,7 @@ export default function AiConfigForm({
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value.provider, value.apiKey, value.baseUrl, hasKey]);
+  }, [value.provider, value.apiKey, value.baseUrl, hasKey, hasCustomEndpoint]);
 
   const runTest = async () => {
     if (!hasKey) {
@@ -184,13 +186,23 @@ export default function AiConfigForm({
               key={p.id}
               meta={p}
               selected={value.provider === p.id}
-              onSelect={() =>
+              onSelect={() => {
+                if (p.id === value.provider) return;
+                if (p.id === "custom") {
+                  setModels([]);
+                  setStatus(null);
+                  setShowAdvanced(true);
+                  onModelsChange?.([]);
+                  onChange({ provider: "custom", apiKey: "", baseUrl: "", model: "" });
+                  return;
+                }
                 onChange({
                   ...value,
                   provider: p.id as AIProviderId,
-                  model: liveModelsOnly ? "" : (mergeModelLists(p.id as AIProviderId, [])[0]?.id ?? value.model),
-                })
-              }
+                  model: liveModelsOnly ? "" : (mergeModelLists(p.id as AIProviderId, [])[0]?.id ?? ""),
+                  ...(value.provider === "custom" ? { baseUrl: "" } : {}),
+                });
+              }}
             />
           ))}
         </div>
@@ -249,17 +261,19 @@ export default function AiConfigForm({
         </p>
       </div>
 
-      {/* Advanced: base URL (custom providers need it) */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setShowAdvanced((s) => !s)}
-          className={`text-[11px] font-semibold underline-offset-2 hover:underline ${provider.accentText}`}
-        >
-          {showAdvanced ? "Hide" : "Show"} API base URL (advanced)
-        </button>
-      </div>
-      {showAdvanced && (
+      {/* Advanced: base URL — always visible (and empty) for Custom API */}
+      {provider.id !== "custom" && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((s) => !s)}
+            className={`text-[11px] font-semibold underline-offset-2 hover:underline ${provider.accentText}`}
+          >
+            {showAdvanced ? "Hide" : "Show"} API base URL (advanced)
+          </button>
+        </div>
+      )}
+      {(showAdvanced || provider.id === "custom") && (
         <div>
           <label className="text-xs font-semibold text-slate-700">Base URL</label>
           <input
@@ -269,7 +283,9 @@ export default function AiConfigForm({
             spellCheck={false}
             onChange={(e) => onChange({ ...value, baseUrl: e.target.value })}
           />
-          {provider.id !== "custom" && (
+          {provider.id === "custom" ? (
+            <p className="mt-1 text-[11px] text-slate-400">Required for a custom OpenAI-compatible endpoint. Starts empty.</p>
+          ) : (
             <p className="mt-1 text-[11px] text-slate-400">Leave empty to use {provider.name}&apos;s default endpoint.</p>
           )}
         </div>
@@ -280,7 +296,7 @@ export default function AiConfigForm({
         <button
           type="button"
           onClick={() => void refreshModels(false)}
-          disabled={!hasKey || loadingModels}
+          disabled={!hasKey || !hasCustomEndpoint || loadingModels}
           className={`flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border text-[13px] font-bold transition active:scale-[0.98] disabled:opacity-50 ${
             hasKey
               ? `${provider.accentBg} ${provider.accentText} border-transparent`
@@ -293,7 +309,7 @@ export default function AiConfigForm({
         <button
           type="button"
           onClick={() => void runTest()}
-          disabled={!hasKey || testing}
+          disabled={!hasKey || !hasCustomEndpoint || testing}
           className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-[13px] font-bold text-slate-700 transition active:scale-[0.98] disabled:opacity-50"
         >
           {testing ? <Spinner className="h-4 w-4" /> : "✓"}
