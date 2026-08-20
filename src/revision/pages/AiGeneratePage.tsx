@@ -12,17 +12,15 @@ import PageShell from "../components/PageShell";
 import { Card, PrimaryButton } from "../components/ui";
 import { CheckIcon, ChevronRightIcon, ClockIcon, SparklesIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
-import { CURRICULUM } from "../data/curriculum";
+import { CURRICULUM, type CurriculumClass } from "../data/curriculum";
 import { fetchRemoteCatalog } from "../engine/catalogService";
 import {
-  defaultCatalogAiSettings,
-  generateQuestionsWithAi,
+  generateRevisionQuestions,
   getProvider,
   loadUserAiConfig,
   resolveEffectiveAi,
   type CatalogAiSettings,
 } from "../engine/aiConfig";
-import { consumeAiGeneration } from "../engine/aiUsage";
 import { generateOfflineQuestions } from "../engine/offlineGenerator";
 import { createCustomTest, type CustomTestQuestion } from "../engine/customTestService";
 import type { Difficulty } from "../engine/store";
@@ -191,10 +189,17 @@ export default function AiGeneratePage({ uid, route }: Props) {
 
   // AI config (own key or admin-published default)
   const [aiSettings, setAiSettings] = useState<CatalogAiSettings | null>(null);
+  const [curriculum, setCurriculum] = useState<CurriculumClass[]>(CURRICULUM);
+  const [curriculumMeta, setCurriculumMeta] = useState<{ board: string; yearLabel: string } | null>(null);
   useEffect(() => {
     let cancelled = false;
     void fetchRemoteCatalog().then((c) => {
-      if (!cancelled) setAiSettings(c?.aiSettings ?? null);
+      if (cancelled) return;
+      if (c?.aiSettings) setAiSettings(c.aiSettings);
+      if (c?.planningCurriculum?.classes?.length) {
+        setCurriculum(c.planningCurriculum.classes);
+        setCurriculumMeta({ board: c.planningCurriculum.board, yearLabel: c.planningCurriculum.yearLabel });
+      }
     });
     return () => {
       cancelled = true;
@@ -224,11 +229,11 @@ export default function AiGeneratePage({ uid, route }: Props) {
   /* ------------------------- cascading options ------------------------- */
 
   const classOptions: Option[] = useMemo(
-    () => CURRICULUM.map((c) => ({ key: c.key, name: c.name, icon: c.icon })),
-    [],
+    () => curriculum.map((c) => ({ key: c.key, name: c.name, icon: c.icon })),
+    [curriculum],
   );
 
-  const selectedClasses = useMemo(() => CURRICULUM.filter((c) => classSel.has(c.key)), [classSel]);
+  const selectedClasses = useMemo(() => curriculum.filter((c) => classSel.has(c.key)), [classSel, curriculum]);
 
   // Subjects: union across selected classes, deduped by subject name.
   const subjectOptions: Option[] = useMemo(() => {
@@ -333,120 +338,80 @@ export default function AiGeneratePage({ uid, route }: Props) {
       }
     }
 
-    // Group rows per subject+chapter so each AI call stays focused; cap the
-    // number of calls and distribute the requested question count.
-    const groupsMap = new Map<string, Row[]>();
-    for (const r of rows) {
-      const k = `${r.subjectName}|${r.chapterName}`;
-      const arr = groupsMap.get(k) ?? [];
-      arr.push(r);
-      groupsMap.set(k, arr);
-    }
-    let groups = Array.from(groupsMap.values());
-    const MAX_CALLS = 6;
-    if (groups.length > MAX_CALLS) {
-      // Merge extra chapter groups by subject to stay under the call cap.
-      const bySubject = new Map<string, Row[]>();
-      for (const r of rows) {
-        const arr = bySubject.get(r.subjectName) ?? [];
-        arr.push(r);
-        bySubject.set(r.subjectName, arr);
-      }
-      groups = Array.from(bySubject.values()).slice(0, MAX_CALLS);
-    }
-
-    const total = Math.max(1, Math.min(50, Math.round(totalQuestions)));
-    const totalRows = groups.reduce((n, g) => n + g.length, 0) || 1;
-    const counts = groups.map((g) => Math.max(1, Math.round((g.length / totalRows) * total)));
-    // Adjust rounding drift so the counts sum to the requested total.
-    let drift = counts.reduce((a, b) => a + b, 0) - total;
-    for (let i = 0; drift !== 0 && i < counts.length * 4; i++) {
-      const idx = i % counts.length;
-      if (drift > 0 && counts[idx] > 1) {
-        counts[idx]--;
-        drift--;
-      } else if (drift < 0) {
-        counts[idx]++;
-        drift++;
-      }
-    }
-
-    const pickDifficulty = (i: number): Difficulty =>
-      difficulty === "mixed" ? (["easy", "medium", "hard"] as Difficulty[])[i % 3] : difficulty;
+    const classNames = Array.from(new Set(rows.map((row) => row.className)));
+    const subjectNames = Array.from(new Set(rows.map((row) => row.subjectName)));
+    const chapterNames = Array.from(new Set(rows.map((row) => row.chapterName)));
+    const topicNames = Array.from(new Set(rows.map((row) => row.topicName)));
+    const total = Math.max(1, Math.min(20, Math.round(totalQuestions)));
+    const pickDifficulty = (): Difficulty =>
+      difficulty === "mixed" ? "medium" : difficulty;
 
     const collected: CustomTestQuestion[] = [];
     let usedAi = false;
+    const liveCfg = loadUserAiConfig(uid);
+    const liveEffective = resolveEffectiveAi(liveCfg, aiSettings);
+    const liveConfig = liveEffective.config;
 
     try {
-      if (activeConfig) {
-        // Reserve one generation slot against the published usage caps.
-        await consumeAiGeneration(uid, aiSettings ?? defaultCatalogAiSettings());
-        const results = await Promise.allSettled(
-          groups.map((g, i) => {
-            const classNames = Array.from(new Set(g.map((r) => r.className))).join(", ");
-            const subjectName = g[0].subjectName;
-            const chapters = Array.from(new Set(g.map((r) => r.chapterName)));
-            const topicText = `${chapters.join(", ")} — focus on: ${g.map((r) => r.topicName).join(", ")} (${classNames} level)`;
-            return generateQuestionsWithAi(activeConfig, {
-              subject: `${subjectName} (${classNames})`,
-              topic: topicText,
-              difficulty: pickDifficulty(i),
-              count: counts[i],
-            }).then((qs) =>
-              qs.map<CustomTestQuestion>((q) => ({
-                prompt: q.prompt,
-                options: q.options,
-                correctIndex: Math.max(0, q.correctIndex),
-                explanation: q.explanation,
-                difficulty: pickDifficulty(i),
-                subjectName,
-                topicName: chapters[0] ?? subjectName,
-              })),
-            );
-          }),
-        );
-        for (const r of results) {
-          if (r.status === "fulfilled") collected.push(...r.value);
-        }
-        usedAi = collected.length > 0;
-        if (collected.length === 0) {
-          const firstErr = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
-          if (firstErr) {
-            setNotice(
-              `${firstErr.reason instanceof Error ? firstErr.reason.message : "AI request failed"} — built your test with the offline engine instead.`,
-            );
-          }
-        }
-      }
-    } catch (err) {
-      setNotice(
-        `${err instanceof Error ? err.message : "AI request failed"} — built your test with the offline engine instead.`,
-      );
-    }
-
-    // Offline fallback keeps the button always working.
-    if (collected.length === 0) {
-      groups.forEach((g, i) => {
-        const subjectName = g[0].subjectName;
-        const chapterName = g[0].chapterName;
-        const qs = generateOfflineQuestions({
-          subjectName,
-          topicName: g.map((r) => r.topicName).join(", "),
-          count: counts[i],
-          difficulty: pickDifficulty(i) as "easy" | "medium" | "hard",
+      if (liveEffective.mode === "own" || liveEffective.mode === "default") {
+        const parsed = await generateRevisionQuestions({
+          source: liveEffective.mode,
+          config: liveConfig,
+          syllabus: {
+            classNames,
+            subjectNames,
+            chapterNames,
+            topicNames,
+            difficulty,
+            count: total,
+            minutes: totalMinutes,
+          },
         });
+        const labelSubject = subjectNames[0] || "General";
+        const labelTopic = chapterNames[0] || topicNames[0] || labelSubject;
         collected.push(
-          ...qs.map<CustomTestQuestion>((q) => ({
+          ...parsed.map<CustomTestQuestion>((q) => ({
             prompt: q.prompt,
             options: q.options,
             correctIndex: Math.max(0, q.correctIndex),
             explanation: q.explanation,
-            difficulty: pickDifficulty(i),
-            subjectName,
-            topicName: chapterName,
+            difficulty: pickDifficulty(),
+            subjectName: labelSubject,
+            topicName: labelTopic,
           })),
         );
+        usedAi = collected.length > 0;
+        if (collected.length === 0) {
+          setNotice("The AI returned no usable questions. Check your key and try again.");
+          setPhase("idle");
+          return;
+        }
+      }
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "AI request failed. Check your configuration and try again.");
+      setPhase("idle");
+      return;
+    }
+
+    // Offline engine only when the student explicitly chose No AI.
+    if (collected.length === 0) {
+      const qs = generateOfflineQuestions({
+        subjectName: subjectNames[0] || "General",
+        topicName: topicNames.join(", ") || chapterNames[0] || "General",
+        count: total,
+        difficulty: pickDifficulty() as "easy" | "medium" | "hard",
       });
+      collected.push(
+        ...qs.map<CustomTestQuestion>((q) => ({
+          prompt: q.prompt,
+          options: q.options,
+          correctIndex: Math.max(0, q.correctIndex),
+          explanation: q.explanation,
+          difficulty: pickDifficulty(),
+          subjectName: subjectNames[0] || "General",
+          topicName: chapterNames[0] || topicNames[0] || "General",
+        })),
+      );
     }
 
     // Trim overshoot (AI sometimes returns extras).
@@ -526,6 +491,11 @@ export default function AiGeneratePage({ uid, route }: Props) {
               <p className="mt-0.5 text-[11px] text-slate-400">
                 Each list filters the next: Class → Subject → Chapter → Topic
               </p>
+              {curriculumMeta && (
+                <p className="mt-1 text-[11px] font-semibold text-indigo-600">
+                  {curriculumMeta.board} · {curriculumMeta.yearLabel} included syllabus
+                </p>
+              )}
               <div className="mt-3 grid grid-cols-4 gap-1.5">
                 {pickers.map((p) => (
                   <PickerButton
@@ -610,9 +580,9 @@ export default function AiGeneratePage({ uid, route }: Props) {
                     <input
                       type="number"
                       min={1}
-                      max={50}
+                      max={20}
                       value={totalQuestions}
-                      onChange={(e) => setTotalQuestions(Math.max(1, Math.min(50, Math.round(Number(e.target.value) || 1))))}
+                      onChange={(e) => setTotalQuestions(Math.max(1, Math.min(20, Math.round(Number(e.target.value) || 1))))}
                       className="h-9 w-20 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm font-bold text-slate-900 outline-none focus:border-indigo-400"
                     />
                   </div>

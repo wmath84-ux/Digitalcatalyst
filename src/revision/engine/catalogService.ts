@@ -28,6 +28,7 @@ import {
   normalizeCatalogAiSettings,
   type CatalogAiSettings,
 } from "./aiConfig";
+import { normalizePlanningCurriculum, type PlanningCurriculum } from "./curriculumCatalog";
 
 export const REVISION_CATALOG_DOC_ID = "revisionCatalog";
 
@@ -41,6 +42,8 @@ export type RevisionCatalog = {
   questions: CatalogQuestion[];
   /** AI provider + default model the admin publishes for every user. */
   aiSettings: CatalogAiSettings;
+  /** Latest-year Class → Subject → Chapter → Concept tree for the planner. */
+  planningCurriculum: PlanningCurriculum | null;
 };
 
 export function defaultCatalog(): RevisionCatalog {
@@ -53,6 +56,7 @@ export function defaultCatalog(): RevisionCatalog {
     topics: SEED_TOPICS.map((t) => ({ ...t })),
     questions: SEED_QUESTIONS.map((q) => ({ ...q, isActive: true })),
     aiSettings: defaultCatalogAiSettings(),
+    planningCurriculum: null,
   };
 }
 
@@ -62,13 +66,16 @@ function cleanStr(value: unknown, fallback = ""): string {
 
 /** Sanitize a Firestore document into a usable RevisionCatalog (or null). */
 export function normalizeCatalog(data: unknown): RevisionCatalog | null {
-  if (!data || typeof data !== "object") return null;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const raw = data as Record<string, unknown>;
-  if (!Array.isArray(raw.subjects) || !Array.isArray(raw.topics) || !Array.isArray(raw.questions)) {
-    return null;
-  }
 
-  const subjects: CatalogSubject[] = raw.subjects.map((s) => {
+  // AI settings must still parse even when the question bank arrays are
+  // missing — otherwise School-provided AI stays disabled after a publish.
+  const subjectRows = Array.isArray(raw.subjects) ? raw.subjects : [];
+  const topicRows = Array.isArray(raw.topics) ? raw.topics : [];
+  const questionRows = Array.isArray(raw.questions) ? raw.questions : [];
+
+  const subjects: CatalogSubject[] = subjectRows.map((s) => {
     const item = (s ?? {}) as Record<string, unknown>;
     return {
       name: cleanStr(item.name, "Subject"),
@@ -78,7 +85,7 @@ export function normalizeCatalog(data: unknown): RevisionCatalog | null {
     };
   });
 
-  const topics: CatalogTopic[] = raw.topics.map((t) => {
+  const topics: CatalogTopic[] = topicRows.map((t) => {
     const item = (t ?? {}) as Record<string, unknown>;
     return {
       subjectSlug: cleanStr(item.subjectSlug),
@@ -87,7 +94,7 @@ export function normalizeCatalog(data: unknown): RevisionCatalog | null {
     };
   });
 
-  const questions: CatalogQuestion[] = raw.questions
+  const questions: CatalogQuestion[] = questionRows
     .map((q) => {
       const item = (q ?? {}) as Record<string, unknown>;
       const options = Array.isArray(item.options)
@@ -143,6 +150,7 @@ export function normalizeCatalog(data: unknown): RevisionCatalog | null {
     topics,
     questions,
     aiSettings: normalizeCatalogAiSettings(raw.aiSettings),
+    planningCurriculum: normalizePlanningCurriculum(raw.planningCurriculum),
   };
 }
 
@@ -167,7 +175,14 @@ export async function fetchRemoteCatalog(): Promise<RevisionCatalog | null> {
   try {
     const snap = await getDoc(doc(db, "settings", REVISION_CATALOG_DOC_ID));
     if (!snap.exists()) return null;
-    return normalizeCatalog(snap.data());
+    const data = snap.data();
+    const catalog = normalizeCatalog(data);
+    if (catalog) return catalog;
+    const fallback = defaultCatalog();
+    fallback.aiSettings = normalizeCatalogAiSettings((data as { aiSettings?: unknown } | undefined)?.aiSettings);
+    fallback.planningCurriculum = normalizePlanningCurriculum((data as { planningCurriculum?: unknown } | undefined)?.planningCurriculum);
+    fallback.version = Math.max(0, Math.round(Number((data as { version?: unknown } | undefined)?.version ?? 0) || 0));
+    return fallback;
   } catch {
     return null;
   }
@@ -185,6 +200,7 @@ export async function saveRemoteCatalog(catalog: RevisionCatalog): Promise<Revis
     topics: catalog.topics,
     questions: catalog.questions,
     aiSettings: catalog.aiSettings ?? defaultCatalogAiSettings(),
+    planningCurriculum: catalog.planningCurriculum ?? null,
     updatedAt: serverTimestamp(),
   };
   await setDoc(doc(db, "settings", REVISION_CATALOG_DOC_ID), payload, { merge: true });

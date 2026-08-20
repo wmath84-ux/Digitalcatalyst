@@ -101,7 +101,7 @@ export default function BulkImportPage({ uid, route }: Props) {
   };
 
   return (
-    <PageShell route={route} title="Bulk Import" subtitle="Paste questions → get a test" backHref="#/revision/profile">
+    <PageShell route={route} title="Bulk Import" subtitle="Paste a full revision plan" backHref="#/revision/profile">
       <div className="animate-fade-in space-y-4 px-4 py-4 pb-10">
         {ready ? (
           <Card className="overflow-hidden border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50">
@@ -137,9 +137,10 @@ export default function BulkImportPage({ uid, route }: Props) {
                   <BookOpenIcon className="h-6 w-6" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-[15px] font-bold text-slate-900">Import from plain text</h2>
+                  <h2 className="text-[15px] font-bold text-slate-900">Paste your revision plan</h2>
                   <p className="text-xs text-slate-500">
-                    Options & correct answers are detected automatically — a new test is created directly.
+                    Drop in a complete test — questions, options and correct answers. Generate them in ChatGPT,
+                    Claude or anywhere else, then paste here to create a revision plan in one go.
                   </p>
                 </div>
               </div>

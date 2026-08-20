@@ -11,16 +11,20 @@
 // (localStorage) and requests go straight to the chosen provider. Keys are
 // never baked into the public bundle.
 
+import { auth } from "../../../firebase";
 import type { ParsedQuestion } from "./bulkParser";
 import {
   buildUserPrompt,
   DEFAULT_MODEL,
+  extractGeminiText,
   extractJson,
+  geminiGenerateUrl,
   generateWithGemini,
   normalizeQuestions,
   systemPrompt,
   type GenerateInput,
 } from "./aiGenerate";
+import { CURRICULUM_SYSTEM_PROMPT, normalizeCurriculumClass, type CurriculumClass } from "./curriculumCatalog";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -261,18 +265,31 @@ function emptyConfig(): AiConfig {
   return { provider: "gemini", apiKey: "", baseUrl: "", model: DEFAULT_MODEL };
 }
 
+/** Blank slate for "My own API key" — no school values, no pre-filled model. */
+export function blankOwnAiConfig(): AiConfig {
+  return { provider: "gemini", apiKey: "", baseUrl: "", model: "" };
+}
+
 function emptyUserConfig(): UserAiConfig {
-  return { source: "offline", config: emptyConfig() };
+  return { source: "offline", config: blankOwnAiConfig() };
+}
+
+function emptyAdminConfig(): UserAiConfig {
+  return { source: "own", config: emptyConfig() };
 }
 
 function sanitizeConfig(raw: unknown): AiConfig {
   const r = (raw ?? {}) as Record<string, unknown>;
   const provider = AI_PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as AIProviderId) : "gemini";
   const known = mergeModelLists(provider, []);
-  const model = String(r.model ?? "").trim() || known[0]?.id || DEFAULT_MODEL;
+  const apiKey = String(r.apiKey ?? "").trim();
+  // Own-key with no secret stays model-empty so the student form does not
+  // inherit the school's published model. A key without a model still gets a
+  // sensible fallback so generation can run.
+  const model = String(r.model ?? "").trim() || (apiKey ? known[0]?.id || DEFAULT_MODEL : "");
   return {
     provider,
-    apiKey: String(r.apiKey ?? "").trim(),
+    apiKey,
     baseUrl: String(r.baseUrl ?? "").trim().replace(/\/+$/, ""),
     model,
   };
@@ -342,7 +359,7 @@ export function loadAdminAiConfig(): UserAiConfig {
   } catch {
     // fall through
   }
-  return emptyUserConfig();
+  return emptyAdminConfig();
 }
 
 export function saveAdminAiConfig(cfg: UserAiConfig): void {
@@ -363,21 +380,37 @@ export type EffectiveAi = {
   label: string;
 };
 
+/** True when the admin has published a usable school-provided AI (shared key + model). */
+export function isSchoolAiAvailable(settings: CatalogAiSettings | null | undefined): boolean {
+  return Boolean(settings?.sharedApiKey?.trim() && settings?.model?.trim());
+}
+
+/** True when the admin has published *something* the school option can display. */
+export function isSchoolAiPublished(settings: CatalogAiSettings | null | undefined): boolean {
+  if (!settings) return false;
+  // Default catalog always has a fallback model id — only updatedAt / a shared
+  // key prove the admin actually published.
+  return Boolean(settings.updatedAt?.trim() || settings.sharedApiKey?.trim());
+}
+
+/** Runtime config learners use when they pick School-provided AI. */
+export function schoolAiConfig(settings: CatalogAiSettings | null | undefined): AiConfig | null {
+  if (!isSchoolAiAvailable(settings) || !settings) return null;
+  return {
+    provider: settings.provider,
+    apiKey: settings.sharedApiKey,
+    baseUrl: getProvider(settings.provider).baseUrl,
+    model: settings.model,
+  };
+}
+
 export function resolveEffectiveAi(userCfg: UserAiConfig, adminSettings: CatalogAiSettings | null): EffectiveAi {
   if (userCfg.source === "own" && userCfg.config.apiKey.trim()) {
     return { mode: "own", config: { ...userCfg.config }, label: "Your own API key" };
   }
-  if (userCfg.source === "default" && adminSettings?.sharedApiKey?.trim() && adminSettings.model) {
-    return {
-      mode: "default",
-      config: {
-        provider: adminSettings.provider,
-        apiKey: adminSettings.sharedApiKey,
-        baseUrl: getProvider(adminSettings.provider).baseUrl,
-        model: adminSettings.model,
-      },
-      label: "App-provided key (set by your school)",
-    };
+  const school = schoolAiConfig(adminSettings);
+  if (userCfg.source === "default" && school) {
+    return { mode: "default", config: school, label: "School-provided AI" };
   }
   return { mode: "offline", config: null, label: "Offline question bank" };
 }
@@ -503,7 +536,7 @@ async function generateOpenAiCompatible(config: AiConfig, input: GenerateInput):
     Authorization: `Bearer ${config.apiKey.trim()}`,
   };
   if (config.provider === "openrouter") {
-    headers["HTTP-Referer"] = window.location.origin;
+    headers["HTTP-Referer"] = typeof window !== "undefined" ? window.location.origin : "https://eduvora.app";
     headers["X-Title"] = "Digital Catalyst";
   }
   const messages = [
@@ -579,7 +612,7 @@ async function generateAnthropic(config: AiConfig, input: GenerateInput): Promis
   return parseModelOutput(text, input);
 }
 
-/** Generate MCQs using whatever provider the user configured. */
+/** Generate MCQs using whatever provider the user configured (direct, browser). */
 export async function generateQuestionsWithAi(config: AiConfig, input: GenerateInput): Promise<ParsedQuestion[]> {
   if (!config.apiKey.trim()) throw new Error("No API key configured.");
   if (!config.model.trim()) throw new Error("Choose a model first.");
@@ -592,6 +625,110 @@ export async function generateQuestionsWithAi(config: AiConfig, input: GenerateI
   }
   if (config.provider === "anthropic") return generateAnthropic(config, input);
   return generateOpenAiCompatible(config, input);
+}
+
+export type RevisionSyllabus = {
+  classNames: string[];
+  subjectNames: string[];
+  chapterNames: string[];
+  topicNames: string[];
+  difficulty: "easy" | "medium" | "hard" | "mixed";
+  count: number;
+  minutes: number;
+};
+
+export type RevisionGenerateArgs = {
+  source: AiSource;
+  config: AiConfig | null;
+  syllabus: RevisionSyllabus;
+};
+
+function syllabusToInput(syllabus: RevisionSyllabus): GenerateInput {
+  const difficulty = syllabus.difficulty === "mixed" ? "medium" : syllabus.difficulty;
+  return {
+    subject: syllabus.subjectNames.join(", ") || "General",
+    topic: `${syllabus.chapterNames.join(", ")} — ${syllabus.topicNames.join(", ")}`,
+    difficulty,
+    count: syllabus.count,
+    classNames: syllabus.classNames,
+    subjectNames: syllabus.subjectNames,
+    chapterNames: syllabus.chapterNames,
+    topicNames: syllabus.topicNames,
+    minutes: syllabus.minutes,
+  };
+}
+
+function isSpaFallback(res: Response, text: string): boolean {
+  if (res.status === 404 || res.status === 501) return true;
+  const type = res.headers.get("content-type") || "";
+  if (type.includes("text/html")) return true;
+  return /^\s*<!doctype html/i.test(text) || /^\s*<html/i.test(text);
+}
+
+async function generateViaServer(args: RevisionGenerateArgs): Promise<ParsedQuestion[]> {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) throw Object.assign(new Error("Please log in to generate with AI."), { code: "auth" });
+  const token = await firebaseUser.getIdToken(true);
+  const res = await fetch("/api/revision/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      action: "revision.generate",
+      source: args.source === "own" ? "own" : "default",
+      config: args.source === "own" && args.config
+        ? {
+            provider: args.config.provider,
+            apiKey: args.config.apiKey,
+            baseUrl: args.config.baseUrl,
+            model: args.config.model,
+          }
+        : undefined,
+      syllabus: args.syllabus,
+    }),
+  });
+  const raw = await res.text();
+  if (isSpaFallback(res, raw)) {
+    throw Object.assign(new Error("AI proxy is not available in this environment."), { code: "no_proxy" });
+  }
+  let payload: { ok?: boolean; error?: string; questions?: unknown } = {};
+  try {
+    payload = JSON.parse(raw) as { ok?: boolean; error?: string; questions?: unknown };
+  } catch {
+    throw new Error("AI server returned an invalid response.");
+  }
+  if (!res.ok || !payload.ok) {
+    throw Object.assign(new Error(payload.error || `AI server returned ${res.status}.`), { code: "provider", status: res.status });
+  }
+  const parsed = normalizeQuestions(payload.questions, args.syllabus.difficulty === "mixed" ? "medium" : args.syllabus.difficulty);
+  if (!parsed.length) throw new Error("The AI returned no usable questions. Try again.");
+  return parsed.map((q) => ({
+    prompt: q.prompt,
+    options: q.options,
+    correctIndex: q.correctIndex,
+    explanation: q.explanation,
+    detected: true,
+  }));
+}
+
+/**
+ * Real generation path used by the student generator.
+ * Prefers the server proxy (no CORS, school key stays server-side, custom
+ * OpenAI-compatible endpoints work). Falls back to a direct browser call
+ * only when the serverless route is missing (local Vite).
+ */
+export async function generateRevisionQuestions(args: RevisionGenerateArgs): Promise<ParsedQuestion[]> {
+  const count = Math.max(1, Math.min(20, Math.round(args.syllabus.count || 10)));
+  const syllabus = { ...args.syllabus, count };
+  try {
+    return await generateViaServer({ ...args, syllabus });
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code || "") : "";
+    if (code !== "no_proxy") throw err;
+  }
+  if (!args.config?.apiKey.trim()) {
+    throw new Error("No API key configured. Add your own key or wait for school-provided AI.");
+  }
+  return generateQuestionsWithAi(args.config, syllabusToInput(syllabus));
 }
 
 /* ------------------------------------------------------------------ */
@@ -613,6 +750,21 @@ export function defaultCatalogAiSettings(): CatalogAiSettings {
 
 function cleanStr(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
+}
+
+function cleanUpdatedAt(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (value && typeof value === "object") {
+    const v = value as { toDate?: () => Date };
+    if (typeof v.toDate === "function") {
+      try {
+        return v.toDate().toISOString();
+      } catch {
+        return "";
+      }
+    }
+  }
+  return "";
 }
 
 /** Sanitize a Firestore `aiSettings` field into a usable shape. */
@@ -641,7 +793,7 @@ export function normalizeCatalogAiSettings(raw: unknown): CatalogAiSettings {
     model: cleanStr(r.model).trim() || models[0]?.id || d.model,
     models: models.length > 0 ? models : [...KNOWN_MODELS[provider]],
     sharedApiKey: cleanStr(r.sharedApiKey),
-    updatedAt: cleanStr(r.updatedAt),
+    updatedAt: cleanUpdatedAt(r.updatedAt),
     dailyLimit,
     windowHours,
     windowLimit,
@@ -652,4 +804,146 @@ function clampLimit(value: unknown, fallback: number, min: number, max: number):
   const n = Math.round(Number(value));
   if (!Number.isFinite(n)) return fallback;
   return Math.max(min, Math.min(max, n));
+}
+
+/* ------------------------------------------------------------------ */
+/* Admin: latest-year planning curriculum                              */
+/* ------------------------------------------------------------------ */
+
+async function completeJsonViaServer(config: AiConfig, system: string, user: string, className: string): Promise<unknown> {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) throw Object.assign(new Error("Please log in as admin."), { code: "auth" });
+  const token = await firebaseUser.getIdToken(true);
+  const res = await fetch("/api/revision/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      action: "revision.curriculum",
+      source: "own",
+      config: { provider: config.provider, apiKey: config.apiKey, baseUrl: config.baseUrl, model: config.model },
+      system,
+      prompt: user,
+      className,
+    }),
+  });
+  const raw = await res.text();
+  if (isSpaFallback(res, raw)) throw Object.assign(new Error("AI proxy is not available in this environment."), { code: "no_proxy" });
+  let payload: { ok?: boolean; error?: string; json?: unknown; class?: unknown } = {};
+  try {
+    payload = JSON.parse(raw) as typeof payload;
+  } catch {
+    throw new Error("AI server returned an invalid response.");
+  }
+  if (!res.ok || !payload.ok) {
+    throw Object.assign(new Error(payload.error || `AI server returned ${res.status}.`), { code: "provider", status: res.status });
+  }
+  return payload.class ?? payload.json;
+}
+
+async function completeJsonDirect(config: AiConfig, system: string, user: string): Promise<unknown> {
+  if (!config.apiKey.trim() || !config.model.trim()) throw new Error("Connect an AI provider and pick a model first.");
+  const meta = getProvider(config.provider);
+  if (config.provider === "gemini") {
+    const res = await fetchWithTimeout(
+      geminiGenerateUrl(config.baseUrl, config.model),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": config.apiKey.trim() },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: [{ text: user }] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+        }),
+      },
+      45000,
+    );
+    if (!res.ok) throw new Error(`Gemini returned ${res.status}. ${(await res.text().catch(() => "")).slice(0, 200)}`);
+    const text = extractGeminiText(await res.json());
+    if (!text) throw new Error("Gemini returned an empty response.");
+    return extractJson(text);
+  }
+  if (config.provider === "anthropic") {
+    const base = (config.baseUrl || meta.baseUrl).replace(/\/+$/, "");
+    const res = await fetchWithTimeout(
+      `${base}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": config.apiKey.trim(),
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: config.model,
+          max_tokens: 8192,
+          system,
+          messages: [{ role: "user", content: user }],
+        }),
+      },
+      45000,
+    );
+    if (!res.ok) throw new Error(`Anthropic returned ${res.status}. ${(await res.text().catch(() => "")).slice(0, 200)}`);
+    const payload = (await res.json()) as { content?: Array<{ text?: string }> };
+    const text = Array.isArray(payload.content) ? payload.content.map((p) => p.text ?? "").join("") : "";
+    if (!text) throw new Error("Anthropic returned an empty response.");
+    return extractJson(text);
+  }
+  const base = (config.baseUrl || meta.baseUrl).replace(/\/+$/, "");
+  if (!base) throw new Error("Enter your custom API base URL first.");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${config.apiKey.trim()}`,
+  };
+  if (config.provider === "openrouter") {
+    headers["HTTP-Referer"] = typeof window !== "undefined" ? window.location.origin : "https://eduvora.app";
+    headers["X-Title"] = "Digital Catalyst";
+  }
+  const call = (withJson: boolean) =>
+    fetchWithTimeout(
+      `${base}/chat/completions`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: config.model,
+          temperature: 0.2,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          ...(withJson ? { response_format: { type: "json_object" } } : {}),
+        }),
+      },
+      45000,
+    );
+  let res = await call(true);
+  if (res.status === 400) {
+    const detail = await res.text().catch(() => "");
+    if (/response_format|json_object/i.test(detail)) res = await call(false);
+    else throw new Error(`${meta.name} returned 400. ${detail.slice(0, 200)}`);
+  }
+  if (!res.ok) throw new Error(`${meta.name} returned ${res.status}. ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  const payload = (await res.json()) as unknown;
+  const text = normalizeOpenAiChoice(payload);
+  if (!text) throw new Error(`${meta.name} returned an empty response.`);
+  return extractJson(text);
+}
+
+export async function generatePlanningCurriculumClass(args: {
+  config: AiConfig;
+  prompt: string;
+  className: string;
+}): Promise<CurriculumClass> {
+  let json: unknown;
+  try {
+    json = await completeJsonViaServer(args.config, CURRICULUM_SYSTEM_PROMPT, args.prompt, args.className);
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code || "") : "";
+    if (code !== "no_proxy") throw err;
+    json = await completeJsonDirect(args.config, CURRICULUM_SYSTEM_PROMPT, args.prompt);
+  }
+  const parsed = normalizeCurriculumClass(json, args.className);
+  if (!parsed) throw new Error(`AI did not return a usable syllabus for ${args.className}. Try again or edit the prompt.`);
+  const key = args.className.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || parsed.key;
+  return { ...parsed, name: args.className, key };
 }

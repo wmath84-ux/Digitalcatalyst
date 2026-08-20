@@ -127,7 +127,8 @@ test("the admin connects any provider and picks the default model from a dropdow
   assert.match(revisionPage, /AiConfigForm/);
   assert.match(revisionPage, /loadAdminAiConfig/);
   assert.match(revisionPage, /saveAdminAiConfig/);
-  assert.match(revisionPage, /generateQuestionsWithAi/);
+  // Admin page is configuration-only — generation lives on the student profile.
+  assert.doesNotMatch(revisionPage, /generateQuestionsWithAi/);
   // "Default for all users" section: model chosen from the published list.
   assert.match(revisionPage, /Default for all users/);
   assert.match(revisionPage, /publishModels\.map/);
@@ -174,4 +175,6 @@ test("students can configure their own custom API in the app", () => {
   assert.match(aiSettingsPage, /saveUserAiConfig/);
   assert.match(aiSettingsPage, /AiConfigForm/);
   assert.match(aiSettingsPage, /resolveEffectiveAi/);
+  assert.match(aiSettingsPage, /liveModelsOnly/);
+  assert.match(aiSettingsPage, /blankOwnAiConfig/);
 });
