@@ -18,7 +18,7 @@ import {
   inputClass,
   selectClass,
 } from "@/components/admin/ui";
-import { useToast } from "@/components/admin/AdminProviders";
+import { useConfirm, useToast } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
 import { type RevisionCatalog } from "@/revision/engine/catalogService";
 import AiConfigForm from "@/revision/components/AiConfigForm";
@@ -26,6 +26,8 @@ import RevisionCurriculumSection from "@/admin/pages/RevisionCurriculumSection";
 import {
   defaultCatalogAiSettings,
   getProvider,
+  isSchoolAiAvailable,
+  isSchoolAiPublished,
   loadAdminAiConfig,
   mergeModelLists,
   saveAdminAiConfig,
@@ -36,6 +38,7 @@ import {
 
 export default function RevisionPage() {
   const { notify } = useToast();
+  const confirm = useConfirm();
   const [catalog, setCatalog] = useState<RevisionCatalog | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,6 +108,12 @@ export default function RevisionPage() {
   const publishModels = mergeModelLists(publishProvider, fetchedModels);
   const publishProviderMeta = getProvider(publishProvider);
 
+  // What students see RIGHT NOW on their AI Configuration page. Same
+  // predicates the student page uses, so this status can never drift from
+  // the real "School-provided AI" button state.
+  const studentSchoolReady = isSchoolAiAvailable(published);
+  const studentSchoolPublished = isSchoolAiPublished(published);
+
   const publishDefault = async () => {
     if (!publishModel) {
       notify("error", "Pick a default model first.");
@@ -113,6 +122,19 @@ export default function RevisionPage() {
     if (shareKey && !adminCfg.config.apiKey.trim()) {
       notify("error", "Enter your API key before sharing it with users.");
       return;
+    }
+    if (!shareKey) {
+      // Publishing without a shared key leaves every student's
+      // "School-provided AI" option DISABLED — the old success toast hid
+      // that, so make the admin confirm the exact consequence first.
+      const { confirmed } = await confirm({
+        title: "Publish without a shared key?",
+        description: studentSchoolReady
+          ? "Students are currently USING your shared key. This publish will REMOVE it from the catalog, so \"School-provided AI\" becomes disabled for every learner until you share a key again."
+          : "Students will see your provider & model, but \"School-provided AI\" stays DISABLED for them — every learner will need their own API key.",
+        confirmLabel: "Publish anyway",
+      });
+      if (!confirmed) return;
     }
     const nextSettings: CatalogAiSettings = {
       provider: publishProvider,
@@ -132,12 +154,16 @@ export default function RevisionPage() {
         body: JSON.stringify(next),
       });
       setCatalog(res.catalog);
-      notify(
-        "success",
-        shareKey
-          ? "Published — users can now generate with your shared key."
-          : "Published — users now see this provider & model as the default.",
-      );
+      if (shareKey) {
+        notify("success", "Published — users can now generate with your shared key.");
+      } else {
+        // No key shared → the publish succeeded, but the student option is
+        // NOT usable. Never show a plain success toast in that case.
+        notify(
+          "warning",
+          "Published — but School-provided AI is NOT ready for students (no shared key). Turn on “Share my API key” and publish again to enable it.",
+        );
+      }
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "Failed to publish.");
     } finally {
@@ -217,6 +243,56 @@ export default function RevisionPage() {
           </div>
         </div>
 
+        {/* Live student view — exactly what the student AI Configuration
+            page shows for the "School-provided AI" option right now. */}
+        <div
+          data-student-ai-status
+          className={`mt-3 flex items-start gap-2.5 rounded-xl border p-3 ${
+            studentSchoolReady
+              ? "border-emerald-200 bg-emerald-50"
+              : studentSchoolPublished
+                ? "border-amber-300 bg-amber-50"
+                : "border-slate-200 bg-slate-50"
+          }`}
+        >
+          <span className="mt-0.5 text-base leading-none" aria-hidden>
+            {studentSchoolReady ? "✅" : studentSchoolPublished ? "❌" : "⏳"}
+          </span>
+          <div className="min-w-0 flex-1 text-xs leading-relaxed">
+            <p
+              className={`font-bold ${
+                studentSchoolReady
+                  ? "text-emerald-800"
+                  : studentSchoolPublished
+                    ? "text-amber-800"
+                    : "text-slate-600"
+              }`}
+            >
+              Students currently see “School-provided AI” as:{" "}
+              {studentSchoolReady
+                ? "ready — no key needed"
+                : studentSchoolPublished
+                  ? "disabled (no shared key)"
+                  : "not published yet"}
+            </p>
+            <p
+              className={`mt-0.5 ${
+                studentSchoolReady
+                  ? "text-emerald-700"
+                  : studentSchoolPublished
+                    ? "text-amber-700"
+                    : "text-slate-500"
+              }`}
+            >
+              {studentSchoolReady
+                ? "Any learner can switch it on and generate questions instantly with your shared key."
+                : studentSchoolPublished
+                  ? `You published ${getProvider(published.provider).name} · ${published.model}, but no key reached the students. Turn on “Share my API key with users” below and publish again to enable it.`
+                  : "Nothing has reached students yet — pick a default model, choose whether to share your key, then press Publish."}
+            </p>
+          </div>
+        </div>
+
         <div className="mt-3">
           <Field
             label="Default model for users"
@@ -264,6 +340,31 @@ export default function RevisionPage() {
             Anyone with the catalog can read it — only enable this for keys with strict spending limits.
           </p>
         )}
+
+        {/* Preview of what the NEXT publish will do — removes the "Published ✓"
+            surprise where students' School-provided AI stayed disabled. */}
+        <p
+          data-publish-preview
+          className={`mt-2 rounded-lg px-3 py-2 text-xs leading-relaxed ${
+            shareKey ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"
+          }`}
+        >
+          {shareKey ? (
+            <>
+              ✅ If you publish now, your key is included — students&apos; “School-provided AI”
+              becomes <span className="font-semibold">ready instantly</span>, no key needed on their side.
+            </>
+          ) : (
+            <>
+              ❌ If you publish now, <span className="font-semibold">no key goes out</span> — students&apos;
+              “School-provided AI” stays <span className="font-semibold">disabled</span> and every learner
+              must use their own key.
+              {studentSchoolReady && (
+                <> ⚠️ It will also <span className="font-semibold">remove</span> the shared key students are currently using.</>
+              )}
+            </>
+          )}
+        </p>
 
         <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
           <p className="text-sm font-semibold text-slate-900">Usage limits for every user</p>
