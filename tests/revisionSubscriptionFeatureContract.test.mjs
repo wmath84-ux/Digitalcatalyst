@@ -1,9 +1,11 @@
 // tests/revisionSubscriptionFeatureContract.test.mjs
 //
 // Contract for Revision as a subscription feature:
-//   · frontend — the Revision route is gated by the `revision` catalog
-//     feature (same rule as My Day: gate only exists while the feature doc
-//     is present and active);
+//   · frontend — Revision access mirrors the My Day gate against the
+//     `revision` catalog feature (gate only exists while the feature doc
+//     is present and active); the app is always browsable and the gate
+//     appears as a floating PremiumGate modal when a paywalled action is
+//     attempted (same behaviour as My Day — no upfront lock screen);
 //   · subscription page — Revision is a first-class feature: default
 //     selection, member-view navigation;
 //   · backend — one-time feature seeding, generic quote/entitlement flow;
@@ -14,7 +16,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const revisionApp = fs.readFileSync("src/revision/RevisionApp.tsx", "utf8");
-const lockScreen = fs.readFileSync("src/revision/components/RevisionLockScreen.tsx", "utf8");
+const premiumGate = fs.readFileSync("src/components/subscription/PremiumGate.tsx", "utf8");
 const useRevisionAccess = fs.readFileSync("src/hooks/useRevisionAccess.ts", "utf8");
 const fallback = fs.readFileSync("src/subscription/data/fallbackCatalog.ts", "utf8");
 const subscriptionPage = fs.readFileSync("src/subscription/components/SubscriptionPage.tsx", "utf8");
@@ -38,22 +40,39 @@ test("revision access mirrors the My Day gate against the revision feature doc",
   assert.match(useRevisionAccess, /featureConfigured = snapshot\.exists\(\) && \(snapshot\.data\(\)\?\.active !== false\)/);
 });
 
-test("RevisionApp shows the lock screen only when the gate applies", () => {
+test("RevisionApp gates paywalled actions with the floating premium gate", () => {
   assert.match(revisionApp, /useRevisionAccess/);
   assert.match(revisionApp, /hasRevisionAccess/);
   assert.match(revisionApp, /revisionAccessLoading/);
-  assert.match(revisionApp, /<RevisionLockScreen userName=\{userName\} \/>/);
   assert.match(revisionApp, /data-revision-access-loading/);
+  // No upfront lock screen: the app always renders so learners can browse,
+  // and the unified PremiumGate modal (same behaviour as My Day) opens only
+  // when a paywalled action is attempted.
+  assert.match(revisionApp, /<PremiumGate/);
+  assert.match(revisionApp, /variant="revision"/);
+  assert.match(revisionApp, /userName=\{userName\}/);
+  assert.match(revisionApp, /open=\{paywallOpen\}/);
+  assert.match(revisionApp, /if \(hasRevisionAccess\) return true;/);
+  assert.match(revisionApp, /setPaywallOpen\(true\)/);
+  assert.match(revisionApp, /onRequireAccess=\{requireAccess\}/);
+  // Deep links into paywalled screens fall back to a gated page instead of
+  // rendering the protected player/session without access.
+  assert.match(revisionApp, /if \(!revisionAccessLoading && !hasRevisionAccess\)/);
   // The gate lives on the existing route — #/revision still mounts the app.
   assert.match(main, /hash\.startsWith\(REVISION_HASH\)\) return <RevisionApp \/>/);
 });
 
-test("the lock screen pushes buyers to the subscription page", () => {
-  assert.match(lockScreen, /data-revision-lock/);
-  assert.match(lockScreen, /data-revision-lock-cta/);
-  assert.match(lockScreen, /navigate\("#\/subscription"\)/);
-  assert.match(lockScreen, /navigate\("#\/home"\)/);
-  assert.match(lockScreen, /Revision Studio/);
+test("the premium gate pushes buyers to the subscription page", () => {
+  // The unified gate carries the Revision Studio branding and hands the
+  // navigation decision to its caller.
+  assert.match(premiumGate, /Revision Studio/);
+  assert.match(premiumGate, /onClick=\{onViewSubscription\}/);
+  assert.match(premiumGate, /View subscription/);
+  // Modal mode stays dismissible ("Maybe later") so browsing is never blocked.
+  assert.match(premiumGate, /Maybe later/);
+  assert.match(premiumGate, /if \(!open\) return null;/);
+  // RevisionApp wires the CTA to the subscription page.
+  assert.match(revisionApp, /window\.location\.hash = "#\/subscription"/);
 });
 
 // ---------------------------------------------------------------------------
