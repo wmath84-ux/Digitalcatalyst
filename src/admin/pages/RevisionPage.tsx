@@ -45,6 +45,10 @@ export default function RevisionPage() {
 
   // Published default that every user sees.
   const [publishModel, setPublishModel] = useState("");
+  // True once the admin manually picks the default model in the "Default for
+  // all users" picker — from then on we stop auto-following the model chosen
+  // in the "Connect an AI provider" form.
+  const [publishModelOverridden, setPublishModelOverridden] = useState(false);
   const [shareKey, setShareKey] = useState(false);
   const [dailyLimit, setDailyLimit] = useState(20);
   const [windowHours, setWindowHours] = useState(5);
@@ -57,7 +61,16 @@ export default function RevisionPage() {
       const res = await adminFetch<{ catalog: RevisionCatalog; isDefault: boolean }>("/api/admin/revision");
       setCatalog(res.catalog);
       const published = res.catalog.aiSettings ?? defaultCatalogAiSettings();
-      setPublishModel(published.model);
+      // The published default model must belong to the provider the admin is
+      // currently connected to. Otherwise the picker starts with a model from
+      // a different provider and publishing it would silently break every
+      // student's "School-provided AI" generation.
+      setPublishModel(
+        published.provider === adminCfg.config.provider && published.model
+          ? published.model
+          : (mergeModelLists(adminCfg.config.provider, [])[0]?.id ?? ""),
+      );
+      setPublishModelOverridden(false);
       setShareKey(Boolean(published.sharedApiKey));
       setDailyLimit(published.dailyLimit ?? 20);
       setWindowHours(published.windowHours ?? 5);
@@ -154,7 +167,23 @@ export default function RevisionPage() {
           onChange={(config) => {
             if (config.provider !== adminCfg.config.provider) {
               setFetchedModels([]);
-              if (config.provider === "custom") setPublishModel("");
+              // Keep the published default in lockstep with the connected
+              // provider so "School-provided AI" is never published with a
+              // model that belongs to a different provider.
+              if (config.provider === "custom") {
+                setPublishModel("");
+              } else {
+                setPublishModel(mergeModelLists(config.provider, [])[0]?.id ?? "");
+              }
+              setPublishModelOverridden(false);
+            } else if (
+              config.model &&
+              config.model !== adminCfg.config.model &&
+              !publishModelOverridden
+            ) {
+              // The admin just picked a model — mirror it into the published
+              // default so the school AI matches what they actually connected.
+              setPublishModel(config.model);
             }
             persistAdminCfg({ ...adminCfg, source: "own", config });
           }}
@@ -193,7 +222,14 @@ export default function RevisionPage() {
             label="Default model for users"
             hint="Open the dropdown — every model this provider exposes (plus known models) is listed. Pick the one you want to fix for all learners."
           >
-            <select className={selectClass} value={publishModel} onChange={(e) => setPublishModel(e.target.value)}>
+            <select
+              className={selectClass}
+              value={publishModel}
+              onChange={(e) => {
+                setPublishModel(e.target.value);
+                setPublishModelOverridden(true);
+              }}
+            >
               {publishModels.length === 0 && <option value="">No models — connect a provider above</option>}
               {publishModels.map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
@@ -208,7 +244,9 @@ export default function RevisionPage() {
         <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
           <div>
             <p className="text-sm font-medium text-slate-900">Share my API key with users</p>
-            <p className="text-xs text-slate-500">Users can then generate questions without their own key.</p>
+            <p className="text-xs text-slate-500">
+              Makes “School-provided AI” ready to use — students generate questions without their own key.
+            </p>
           </div>
           <button
             type="button"
@@ -252,6 +290,11 @@ export default function RevisionPage() {
         <PrimaryButton className="mt-3 w-full" loading={publishing} onClick={() => void publishDefault()}>
           📢 Publish default for all users
         </PrimaryButton>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+          Students see this in their AI Configuration as{" "}
+          <span className="font-semibold text-slate-500">“School-provided AI”</span>. It is instantly usable
+          (no key needed) once you turn on <span className="font-semibold text-slate-500">Share my API key</span> above.
+        </p>
       </SectionCard>
 
       <RevisionCurriculumSection

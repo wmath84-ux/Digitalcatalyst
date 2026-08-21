@@ -70,3 +70,18 @@ test("catalog parse keeps aiSettings even when question-bank arrays are missing"
   assert.match(catalogService, /subjectRows/);
   assert.match(catalogService, /normalizeCatalogAiSettings\(raw\.aiSettings\)/);
 });
+
+test("admin published default model stays in sync with the connected provider", () => {
+  // The published "Default for all users" model must never belong to a
+  // different provider than the one the admin connected — that used to leave
+  // a stale model (e.g. gemini-3.6-flash) published under OpenAI, so the
+  // student's School-provided AI looked unconfigured / never generated.
+  assert.match(adminPage, /published\.provider === adminCfg\.config\.provider/);
+  assert.match(adminPage, /mergeModelLists\(adminCfg\.config\.provider, \[\]\)/);
+  assert.match(adminPage, /setPublishModel\(mergeModelLists\(config\.provider, \[\]\)\[0\]\?\.id \?\? ""\)/);
+  assert.match(adminPage, /publishModelOverridden/);
+  // Connecting a model mirrors it into the published default unless the admin
+  // explicitly overrode the default picker.
+  assert.match(adminPage, /!publishModelOverridden/);
+  assert.match(adminPage, /School-provided AI/);
+});
