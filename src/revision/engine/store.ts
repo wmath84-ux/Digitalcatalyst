@@ -183,6 +183,7 @@ export type DailyTestRow = {
     chapterNames: string[];
     topicNames: string[];
     difficulty: Difficulty | "mixed";
+    questionMode?: "mixed" | "theory" | "application";
   };
 };
 export type TestAttemptRow = {

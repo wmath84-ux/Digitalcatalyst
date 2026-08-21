@@ -118,6 +118,17 @@ export function setGeminiModel(model: string): void {
   }
 }
 
+/**
+ * Question style chosen by the learner in the AI Revision Generator
+ * (the "Mixed" dropdown in the difficulty row):
+ *   - mixed       → blend of theory + application (default)
+ *   - theory      → only theoretical/concept questions (definitions,
+ *                   formulas, units, laws, concept recall)
+ *   - application → only application-based questions (numerical &
+ *                   real-world problems that use the concept)
+ */
+export type QuestionMode = "mixed" | "theory" | "application";
+
 export type GenerateInput = {
   subject: string;
   topic: string;
@@ -128,6 +139,7 @@ export type GenerateInput = {
   chapterNames?: string[];
   topicNames?: string[];
   minutes?: number;
+  questionMode?: QuestionMode;
 };
 
 /** Resolve `…/v1beta/models/{model}:generateContent` even if baseUrl omitted `/models`. */
@@ -226,6 +238,25 @@ export type GeminiRuntimeConfig = {
   onModelMigrated?: (model: string) => void;
 };
 
+/** Question-style instructions appended to the prompt ("" for the default blend). */
+export function questionStyleLines(mode: QuestionMode | undefined): string[] {
+  if (mode === "theory") {
+    return [
+      "Question style: THEORETICAL / CONCEPT-BASED ONLY.",
+      "- Every question must test theory: definitions, concepts, laws, formulas, units, naming, symbols and conceptual comparisons.",
+      "- Do NOT include numerical problems or long application-based word problems.",
+    ];
+  }
+  if (mode === "application") {
+    return [
+      "Question style: APPLICATION-BASED ONLY.",
+      "- Every question must be an application problem: numerical calculations, real-world scenarios and situational questions that require using the listed concepts.",
+      "- Do NOT include pure definition, naming or formula-recall questions.",
+    ];
+  }
+  return [];
+}
+
 /** Build the user prompt that asks the model for MCQs. */
 export function buildUserPrompt(input: GenerateInput): string {
   const classes = (input.classNames ?? []).filter(Boolean);
@@ -239,6 +270,7 @@ export function buildUserPrompt(input: GenerateInput): string {
     `Chapter: ${chapters.join(", ") || "General"}`,
     `Concepts / topics: ${topics.join(", ") || input.topic || "General"}`,
     `Difficulty: ${input.difficulty}`,
+    ...questionStyleLines(input.questionMode),
   ];
   if (input.minutes && input.minutes > 0) {
     lines.push(`Exam duration to keep in mind: ${input.minutes} minutes`);

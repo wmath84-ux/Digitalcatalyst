@@ -34,6 +34,8 @@ export type RevisionSyllabus = {
   chapterNames: string[];
   topicNames: string[];
   difficulty: "easy" | "medium" | "hard" | "mixed";
+  /** Question style from the "Mixed" dropdown (default "mixed" = blend). */
+  questionMode?: "mixed" | "theory" | "application";
   count: number;
   minutes: number;
 };
@@ -119,6 +121,25 @@ export function systemPrompt(): string {
   ].join("\n");
 }
 
+/** Question-style instructions appended to the prompt ("" for the default blend). */
+function questionStyleLines(mode: RevisionSyllabus["questionMode"]): string[] {
+  if (mode === "theory") {
+    return [
+      "Question style: THEORETICAL / CONCEPT-BASED ONLY.",
+      "- Every question must test theory: definitions, concepts, laws, formulas, units, naming, symbols and conceptual comparisons.",
+      "- Do NOT include numerical problems or long application-based word problems.",
+    ];
+  }
+  if (mode === "application") {
+    return [
+      "Question style: APPLICATION-BASED ONLY.",
+      "- Every question must be an application problem: numerical calculations, real-world scenarios and situational questions that require using the listed concepts.",
+      "- Do NOT include pure definition, naming or formula-recall questions.",
+    ];
+  }
+  return [];
+}
+
 export function buildSyllabusPrompt(syllabus: RevisionSyllabus): string {
   const difficulty =
     syllabus.difficulty === "mixed" ? "a mix of easy, medium and hard" : syllabus.difficulty;
@@ -129,6 +150,7 @@ export function buildSyllabusPrompt(syllabus: RevisionSyllabus): string {
     `Chapter: ${syllabus.chapterNames.join(", ") || "General"}`,
     `Concepts / topics: ${syllabus.topicNames.join(", ") || "General"}`,
     `Difficulty: ${difficulty}`,
+    ...questionStyleLines(syllabus.questionMode),
     `Exam duration to keep in mind: ${syllabus.minutes} minutes`,
     "Cover the listed concepts at the given class level. Every question must be distinct, unambiguous, and have one correct answer.",
   ].join("\n");
@@ -254,6 +276,8 @@ function parseSyllabus(raw: unknown): RevisionSyllabus {
   const difficulty = (["easy", "medium", "hard", "mixed"].includes(difficultyRaw) ? difficultyRaw : "medium") as RevisionSyllabus["difficulty"];
   const count = Math.max(1, Math.min(MAX_COUNT, Math.round(Number(r.count) || 10)));
   const minutes = Math.max(1, Math.min(240, Math.round(Number(r.minutes) || 10)));
+  const modeRaw = String(r.questionMode || "mixed");
+  const questionMode = (["mixed", "theory", "application"].includes(modeRaw) ? modeRaw : "mixed") as RevisionSyllabus["questionMode"];
   const classNames = cleanList(r.classNames);
   const subjectNames = cleanList(r.subjectNames);
   const chapterNames = cleanList(r.chapterNames);
@@ -261,7 +285,7 @@ function parseSyllabus(raw: unknown): RevisionSyllabus {
   if (!classNames.length || !subjectNames.length || !chapterNames.length || !topicNames.length) {
     throw Object.assign(new Error("Select class, subject, chapter and topic before generating."), { statusCode: 400 });
   }
-  return { classNames, subjectNames, chapterNames, topicNames, difficulty, count, minutes };
+  return { classNames, subjectNames, chapterNames, topicNames, difficulty, questionMode, count, minutes };
 }
 
 function parseOwnConfig(raw: unknown): AiConfig | null {

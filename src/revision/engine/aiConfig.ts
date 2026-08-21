@@ -23,6 +23,7 @@ import {
   normalizeQuestions,
   systemPrompt,
   type GenerateInput,
+  type QuestionMode,
 } from "./aiGenerate";
 import { CURRICULUM_SYSTEM_PROMPT, normalizeCurriculumClass, type CurriculumClass } from "./curriculumCatalog";
 
@@ -633,6 +634,8 @@ export type RevisionSyllabus = {
   chapterNames: string[];
   topicNames: string[];
   difficulty: "easy" | "medium" | "hard" | "mixed";
+  /** Question style from the "Mixed" dropdown (default "mixed" = blend). */
+  questionMode?: QuestionMode;
   count: number;
   minutes: number;
 };
@@ -655,6 +658,7 @@ function syllabusToInput(syllabus: RevisionSyllabus): GenerateInput {
     chapterNames: syllabus.chapterNames,
     topicNames: syllabus.topicNames,
     minutes: syllabus.minutes,
+    questionMode: syllabus.questionMode,
   };
 }
 
