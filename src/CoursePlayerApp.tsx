@@ -215,7 +215,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // learner can flip the same embed to its mobile rendering.
   const [desktopView, setDesktopView] = useState<boolean>(loadDesktopViewPreference);
   // Android-only capability: iOS can never hide its status bar and desktop
-  // browsers don't need to. Gates both the rail button and the auto-hide.
+  // browsers don't need to. Gates the "Hide status bar" rail button.
   const canFullscreen = useMemo(() => isMobileDevice() && !isIOSDevice(), []);
   const immersiveRootRef = useRef<HTMLDivElement>(null);
   const ownedUpdateIds = resolution.ownedUpdateIds;
@@ -259,19 +259,22 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   }, []);
 
   // ── Status bar (phone chrome) ───────────────────────────────────────────
-  // On mobile the phone's status bar is hidden BY DEFAULT while the player
-  // is in landscape or the quarter-turned immersive view. There is no user
-  // option for this — it is simply always off during landscape learning
-  // and restored the moment the player leaves landscape or unmounts.
+  // The ONLY web API that can truly hide the phone's status bar is the
+  // Fullscreen API, and Android honours it ONLY when the request rides a
+  // REAL user gesture — a gesture-less request right after rotation is
+  // rejected by the browser and the bar stays. Hiding therefore can never
+  // be automatic: the learner hides/restores the bar explicitly with the
+  // "Hide status bar" rail button (Android only), and the rotate-to-
+  // fullscreen tap is the other gesture path. Whatever the learner did,
+  // the chrome is restored the moment the player leaves landscape /
+  // immersive or unmounts.
   const courseBackgroundForStatusBar = theme === "dark" ? "#090912" : "#f1f5f9";
   useEffect(() => {
     if (isLandscape || immersive) {
-      enterCourseLandscapeChrome(courseBackgroundForStatusBar);
       return () => restoreStatusBarFromCoursePlayer();
     }
     restoreStatusBarFromCoursePlayer();
     return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLandscape, immersive]);
 
   // Theme flips while already in landscape only re-blend the bar colour —
@@ -291,28 +294,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     const unsubscribe = onCourseFullscreenChange(sync);
     return unsubscribe;
   }, []);
-
-  // Android: the status bar can only be hidden from a real user gesture, so
-  // the first touch anywhere on the landscape player requests fullscreen.
-  // The rail button is the explicit control; this makes the same thing happen
-  // automatically the moment the learner interacts with the landscape screen.
-  useEffect(() => {
-    if (!canFullscreen || !(isLandscape || immersive) || courseFullscreen) return undefined;
-    const tryHide = (event: Event) => {
-      // Never hijack the fullscreen button itself — its onClick toggles
-      // cleanly between hide/show without a race.
-      const target = event.target as Element | null;
-      if (target && typeof target.closest === "function" && target.closest("[data-course-toggle-fullscreen]")) return;
-      if (isCoursePlayerFullscreen()) return;
-      enterCoursePlayerFullscreen();
-    };
-    window.addEventListener("pointerdown", tryHide, { capture: true });
-    window.addEventListener("touchstart", tryHide, { capture: true, passive: true });
-    return () => {
-      window.removeEventListener("pointerdown", tryHide, { capture: true });
-      window.removeEventListener("touchstart", tryHide, { capture: true });
-    };
-  }, [canFullscreen, isLandscape, immersive, courseFullscreen]);
 
   // The preference is scoped to the Course Player and restored on the next
   // visit without changing the theme of the rest of the application.
@@ -719,8 +700,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
             type="button"
             onClick={() => {
               // The tap is a real user gesture — hide the phone status bar
-              // (true fullscreen) before the rotated view renders. Calling
-              // this again from the landscape effect is a safe no-op.
+              // (true fullscreen) before the rotated view renders. Idempotent
+              // if the learner already hid the bar with the rail button.
               enterCourseLandscapeChrome(courseBackgroundForStatusBar);
               setImmersive(true);
             }}
@@ -883,7 +864,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // phone. Both side rails rotate with the viewer and remain interactive.
   if (immersive && !isLandscape) {
     return (
-      <div className="fixed inset-0 z-[100] overflow-hidden bg-black" data-course-mobile-landscape-viewport data-course-statusbar-hidden="true">
+      <div className="fixed inset-0 z-[100] overflow-hidden bg-black" data-course-mobile-landscape-viewport data-course-statusbar-hidden={courseFullscreen ? "true" : "false"}>
         <div
           ref={immersiveRootRef}
           className="course-rotated-surface absolute left-1/2 top-1/2 origin-center overflow-hidden"
@@ -901,7 +882,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // ── Landscape: header rail left, content centre, toggle rail right ──
   if (isLandscape) {
     return (
-      <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" data-course-statusbar-hidden="true" style={{ colorScheme: browserColorScheme }}>
+      <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" data-course-statusbar-hidden={courseFullscreen ? "true" : "false"} style={{ colorScheme: browserColorScheme }}>
         {landscapeLayout(false)}
       </div>
     );
