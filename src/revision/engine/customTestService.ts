@@ -18,6 +18,7 @@ import {
   type RevisionDb,
   type TestAttemptRow,
 } from "./store";
+import type { QuestionMode } from "./aiGenerate";
 
 export type CustomTestQuestion = {
   prompt: string;
@@ -37,6 +38,7 @@ export type RevisionPlanDetails = {
   chapterNames: string[];
   topicNames: string[];
   difficulty: Difficulty | "mixed";
+  questionMode?: QuestionMode;
 };
 
 export type CreateCustomTestInput = {
@@ -146,6 +148,7 @@ export function createCustomTest(uid: string, input: CreateCustomTestInput): { t
           chapterNames: [...input.planDetails.chapterNames],
           topicNames: [...input.planDetails.topicNames],
           difficulty: input.planDetails.difficulty,
+          questionMode: input.planDetails.questionMode,
         }
       : undefined,
   };
