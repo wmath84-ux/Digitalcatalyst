@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Minimize, Minimize2, Monitor, Moon, RotateCw, Smartphone, Sun } from "lucide-react";
+import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Maximize2, Minimize, Minimize2, Monitor, Moon, RotateCw, Smartphone, Sun } from "lucide-react";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer from "./course/ResourceViewer";
@@ -14,9 +14,11 @@ import { useRotatedScroll } from "./course/useRotatedScroll";
 import {
   enterCourseLandscapeChrome,
   enterCoursePlayerFullscreen,
+  exitCoursePlayerFullscreen,
   isCoursePlayerFullscreen,
   isIOSDevice,
   isMobileDevice,
+  onCourseFullscreenChange,
   restoreStatusBarFromCoursePlayer,
   syncCourseLandscapeChromeColor,
 } from "./utils/courseStatusBar";
@@ -194,6 +196,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // Immersive mode: rotates the viewer a quarter-turn so a portrait-locked
   // phone can still watch a video / read a wide sheet edge-to-edge.
   const [immersive, setImmersive] = useState(false);
+  // True while the document is actually in fullscreen — i.e. the Android
+  // status bar is really hidden. Mirrors the live document state so the rail
+  // button stays correct even when the learner swipes out of fullscreen.
+  const [courseFullscreen, setCourseFullscreen] = useState<boolean>(() => isCoursePlayerFullscreen());
   const [theme, setTheme] = useState<CoursePlayerTheme>(loadCourseTheme);
   // ── Chrome visibility ───────────────────────────────────────────────────
   // Two independent direct toggles live in the header, just like the theme
@@ -209,7 +215,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // learner can flip the same embed to its mobile rendering.
   const [desktopView, setDesktopView] = useState<boolean>(loadDesktopViewPreference);
   // Android-only capability: iOS can never hide its status bar and desktop
-  // browsers don't need to. Gates the automatic landscape hide.
+  // browsers don't need to. Gates the "Hide status bar" rail button.
   const canFullscreen = useMemo(() => isMobileDevice() && !isIOSDevice(), []);
   const immersiveRootRef = useRef<HTMLDivElement>(null);
   const ownedUpdateIds = resolution.ownedUpdateIds;
@@ -253,19 +259,22 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   }, []);
 
   // ── Status bar (phone chrome) ───────────────────────────────────────────
-  // On mobile the phone's status bar is hidden BY DEFAULT while the player
-  // is in landscape or the quarter-turned immersive view. There is no user
-  // option for this — it is simply always off during landscape learning
-  // and restored the moment the player leaves landscape or unmounts.
+  // The ONLY web API that can truly hide the phone's status bar is the
+  // Fullscreen API, and Android honours it ONLY when the request rides a
+  // REAL user gesture — a gesture-less request right after rotation is
+  // rejected by the browser and the bar stays. Hiding therefore can never
+  // be automatic: the learner hides/restores the bar explicitly with the
+  // "Hide status bar" rail button (Android only), and the rotate-to-
+  // fullscreen tap is the other gesture path. Whatever the learner did,
+  // the chrome is restored the moment the player leaves landscape /
+  // immersive or unmounts.
   const courseBackgroundForStatusBar = theme === "dark" ? "#090912" : "#f1f5f9";
   useEffect(() => {
     if (isLandscape || immersive) {
-      enterCourseLandscapeChrome(courseBackgroundForStatusBar);
       return () => restoreStatusBarFromCoursePlayer();
     }
     restoreStatusBarFromCoursePlayer();
     return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLandscape, immersive]);
 
   // Theme flips while already in landscape only re-blend the bar colour —
@@ -277,24 +286,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // Whatever happens, unmounting the player puts the phone chrome back.
   useEffect(() => () => restoreStatusBarFromCoursePlayer(), []);
 
-  // Android: the status bar can only be hidden from a real user gesture, so
-  // the first touch anywhere on the landscape player requests fullscreen.
-  // Hiding is the DEFAULT landscape behaviour — there is deliberately no
-  // toggle for it, so the bar simply goes away the moment the learner
-  // interacts with the landscape screen.
+  // Keep the rail button icon in lock-step with the real document fullscreen
+  // state (covers the Android swipe-down / Escape exits too).
   useEffect(() => {
-    if (!canFullscreen || !(isLandscape || immersive)) return undefined;
-    const tryHide = () => {
-      if (isCoursePlayerFullscreen()) return;
-      enterCoursePlayerFullscreen();
-    };
-    window.addEventListener("pointerdown", tryHide, { capture: true });
-    window.addEventListener("touchstart", tryHide, { capture: true, passive: true });
-    return () => {
-      window.removeEventListener("pointerdown", tryHide, { capture: true });
-      window.removeEventListener("touchstart", tryHide, { capture: true });
-    };
-  }, [canFullscreen, isLandscape, immersive]);
+    const sync = () => setCourseFullscreen(isCoursePlayerFullscreen());
+    sync();
+    const unsubscribe = onCourseFullscreenChange(sync);
+    return unsubscribe;
+  }, []);
 
   // The preference is scoped to the Course Player and restored on the next
   // visit without changing the theme of the rest of the application.
@@ -607,6 +606,31 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     </button>
   );
 
+  // Android-only: the one reliable way to hide the phone's status bar is the
+  // Fullscreen API called from a real tap. This lives in the landscape rail
+  // so a physical rotation can always be followed by one tap to hide it.
+  const fullscreenToggle = canFullscreen ? (
+    <button
+      type="button"
+      onClick={() => {
+        if (isCoursePlayerFullscreen()) exitCoursePlayerFullscreen();
+        else enterCoursePlayerFullscreen();
+      }}
+      className={`course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl transition ${
+        courseFullscreen
+          ? "bg-emerald-500 text-white"
+          : "bg-violet-500/15 text-violet-200 ring-1 ring-inset ring-violet-400/40 hover:bg-violet-500/25"
+      }`}
+      aria-label={courseFullscreen ? "Show status bar" : "Hide status bar"}
+      title={courseFullscreen ? "Show status bar (exit fullscreen)" : "Hide status bar (fullscreen)"}
+      aria-pressed={courseFullscreen}
+      data-course-toggle-fullscreen
+      data-active={courseFullscreen ? "true" : "false"}
+    >
+      {courseFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+    </button>
+  ) : null;
+
   // Flip an embedded document between its desktop and mobile rendering.
   const viewportToggle = (
     <button
@@ -676,8 +700,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
             type="button"
             onClick={() => {
               // The tap is a real user gesture — hide the phone status bar
-              // (true fullscreen) before the rotated view renders. Calling
-              // this again from the landscape effect is a safe no-op.
+              // (true fullscreen) before the rotated view renders. Idempotent
+              // if the learner already hid the bar with the rail button.
               enterCourseLandscapeChrome(courseBackgroundForStatusBar);
               setImmersive(true);
             }}
@@ -788,6 +812,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
         data-course-mobile-landscape-header={mobileRotated ? "true" : undefined}
       >
         {logoBackButton}
+        {fullscreenToggle}
         {fileBarsToggle}
         {playerChromeToggle}
         {showViewportToggle ? viewportToggle : null}
@@ -839,7 +864,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // phone. Both side rails rotate with the viewer and remain interactive.
   if (immersive && !isLandscape) {
     return (
-      <div className="fixed inset-0 z-[100] overflow-hidden bg-black" data-course-mobile-landscape-viewport data-course-statusbar-hidden="true">
+      <div className="fixed inset-0 z-[100] overflow-hidden bg-black" data-course-mobile-landscape-viewport data-course-statusbar-hidden={courseFullscreen ? "true" : "false"}>
         <div
           ref={immersiveRootRef}
           className="course-rotated-surface absolute left-1/2 top-1/2 origin-center overflow-hidden"
@@ -857,7 +882,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // ── Landscape: header rail left, content centre, toggle rail right ──
   if (isLandscape) {
     return (
-      <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" data-course-statusbar-hidden="true" style={{ colorScheme: browserColorScheme }}>
+      <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" data-course-statusbar-hidden={courseFullscreen ? "true" : "false"} style={{ colorScheme: browserColorScheme }}>
         {landscapeLayout(false)}
       </div>
     );

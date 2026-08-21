@@ -1,9 +1,20 @@
 // tests/coursePlayerLandscapeStatusBarContract.test.mjs
 //
-// Contract for the mobile Course Player status-bar behaviour: in landscape
-// (physical or quarter-turned immersive) mode the phone's status bar is
-// hidden BY DEFAULT with no user-facing toggle, and restored the moment the
-// player leaves landscape or unmounts.
+// Contract for the mobile Course Player status-bar behaviour.
+//
+// The honest truth (documented in courseStatusBar.ts): the ONLY web API that
+// can truly hide the phone's status bar is the Fullscreen API, and Android
+// honours it ONLY when the request rides a REAL user gesture. A gesture-less
+// request — e.g. right after a physical rotation or from a layout effect —
+// is rejected by the browser and the bar stays. That is a browser security
+// rule, which is why the old "hide automatically on landscape" behaviour
+// never worked on real devices.
+//
+// So hiding is never automatic: the learner hides/restores the bar with the
+// explicit "Hide status bar" rail button (Android only), and the rotate-to-
+// fullscreen tap is the second gesture path. Whatever the learner did, the
+// chrome is restored the moment the player leaves landscape/immersive or
+// unmounts.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -12,25 +23,56 @@ import fs from "node:fs";
 const player = fs.readFileSync("src/CoursePlayerApp.tsx", "utf8");
 const statusBar = fs.readFileSync("src/utils/courseStatusBar.ts", "utf8");
 
-test("mobile landscape hides the status bar automatically, with no user toggle", () => {
-  assert.match(player, /enterCourseLandscapeChrome/);
-  assert.match(player, /restoreStatusBarFromCoursePlayer/);
-  assert.match(player, /if \(isLandscape \|\| immersive\)/);
-  // The hide is default behaviour, not an opt-in: there is no toggle,
-  // switch or label anywhere that lets the learner keep the bar.
-  assert.doesNotMatch(player, /hide status bar/i);
-  assert.doesNotMatch(player, /data-course-toggle-status/);
+test("status bar hiding is the explicit rail button because auto-hide cannot be gesture-less", () => {
+  // Android-only button: iOS can never hide the bar and desktop browsers
+  // don't need to.
+  assert.match(player, /isMobileDevice\(\) && !isIOSDevice\(\)/);
+  assert.match(player, /data-course-toggle-fullscreen/);
+  assert.match(player, /Hide status bar/);
+  assert.match(player, /Show status bar/);
+  // The button toggles true fullscreen — a tap to hide, a tap to restore.
+  assert.match(
+    player,
+    /if \(isCoursePlayerFullscreen\(\)\) exitCoursePlayerFullscreen\(\);\s*else enterCoursePlayerFullscreen\(\);/,
+  );
 });
 
-test("the hide rides the rotate tap so true fullscreen is gesture-granted", () => {
-  // The "Rotate to fullscreen" button calls the hide synchronously inside
-  // the click handler, then flips immersive state.
-  assert.match(player, /onClick=\{\(\) => \{[\s\S]*?enterCourseLandscapeChrome\(courseBackgroundForStatusBar\);[\s\S]*?setImmersive\(true\);[\s\S]*?\}\}/);
+test("the button icon mirrors the live document fullscreen state", () => {
+  // Swipe-down / Escape exits on Android flip the icon back without a tap.
+  assert.match(
+    player,
+    /const \[courseFullscreen, setCourseFullscreen\] = useState<boolean>\(\(\) => isCoursePlayerFullscreen\(\)\)/,
+  );
+  assert.match(player, /onCourseFullscreenChange\(sync\)/);
+  assert.match(player, /aria-pressed=\{courseFullscreen\}/);
 });
 
-test("both landscape shells declare the bar as hidden for QA/integration", () => {
-  assert.match(player, /data-course-statusbar-hidden="true"/);
-  assert.match(player, /data-course-mobile-landscape-viewport data-course-statusbar-hidden="true"/);
+test("no gesture-less automatic hide is left (Android rejects it anyway)", () => {
+  // The old landscape-entry effect requested fullscreen without a gesture —
+  // the browser blocked it, so it was dead weight that pretended to hide.
+  assert.doesNotMatch(player, /if \(isLandscape \|\| immersive\) \{\s*enterCourseLandscapeChrome/);
+  // No first-touch auto-fullscreen listeners either.
+  assert.doesNotMatch(player, /addEventListener\("pointerdown"/);
+  assert.doesNotMatch(player, /addEventListener\("touchstart"/);
+});
+
+test("the rotate tap stays the second gesture path into fullscreen", () => {
+  // "Rotate to fullscreen" hides the bar synchronously inside the click
+  // handler, then flips immersive state.
+  assert.match(
+    player,
+    /onClick=\{\(\) => \{[\s\S]*?enterCourseLandscapeChrome\(courseBackgroundForStatusBar\);[\s\S]*?setImmersive\(true\);[\s\S]*?\}\}/,
+  );
+});
+
+test("both landscape shells report the live bar state for QA/integration", () => {
+  // The attribute mirrors the real fullscreen state instead of claiming a
+  // static hide.
+  assert.match(
+    player,
+    /data-course-mobile-landscape-viewport data-course-statusbar-hidden=\{courseFullscreen \? "true" : "false"\}/,
+  );
+  assert.match(player, /data-course-statusbar-hidden=\{courseFullscreen \? "true" : "false"\}/);
 });
 
 test("status bar hiding combines fullscreen with a blended theme-color", () => {
@@ -40,6 +82,9 @@ test("status bar hiding combines fullscreen with a blended theme-color", () => {
   assert.match(statusBar, /setThemeColor/);
   assert.match(statusBar, /\(pointer: coarse\)/);
   assert.match(statusBar, /navigator\.maxTouchPoints/);
+  // navigationUI: "hide" makes Android's fullscreen immersive — the gesture
+  // navigation bar goes too.
+  assert.match(statusBar, /navigationUI: "hide"/);
 });
 
 test("the bar is restored when leaving landscape or unmounting the player", () => {
