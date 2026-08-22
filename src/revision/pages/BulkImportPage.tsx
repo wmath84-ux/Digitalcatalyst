@@ -13,9 +13,9 @@ import { useExitGuard } from "../components/ExitGuardContext";
 import { parseQuestionText, type ParsedQuestion } from "../engine/bulkParser";
 import { createCustomTest, deleteCustomTestLocal } from "../engine/customTestService";
 import {
-  commitCustomTestToCloud,
+  persistCustomTestToBank,
   releaseRevisionTestSlot,
-  reserveRevisionTestSlot,
+  reserveRevisionTestSlotOrOffline,
   RevisionCloudError,
   type RevisionBankStatus,
 } from "../engine/cloudRevisionService";
@@ -49,7 +49,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
   const [noticeTone, setNoticeTone] = useState<"info" | "err">("info");
   const [saving, setSaving] = useState(false);
   const [bankGate, setBankGate] = useState<RevisionBankStatus | null>(null);
-  const [ready, setReady] = useState<{ testId: number; count: number } | null>(null);
+  const [ready, setReady] = useState<{ testId: number; count: number; pendingSync: boolean } | null>(null);
 
   const undetected = useMemo(() => preview.filter((p) => p.correctIndex < 0).length, [preview]);
 
@@ -95,7 +95,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
     let reservationId = "";
     let createdTestId: number | null = null;
     try {
-      const reservation = await reserveRevisionTestSlot(uid);
+      const reservation = await reserveRevisionTestSlotOrOffline(uid);
       reservationId = reservation.reservationId;
       const cleanTitle = title.trim() || "My Imported Test";
       const created = createCustomTest(uid, {
@@ -113,8 +113,8 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
         })),
       });
       createdTestId = created.testId;
-      await commitCustomTestToCloud(uid, created.testId, reservationId);
-      setReady({ testId: created.testId, count: preview.length });
+      const persisted = await persistCustomTestToBank(uid, created.testId, reservationId);
+      setReady({ testId: created.testId, count: preview.length, pendingSync: persisted.status === "local" });
       setPreview([]);
       setText("");
       setNotice(null);
@@ -143,7 +143,12 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
               </span>
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Test created! 🎉</h2>
-                <p className="mt-1 text-xs text-slate-500">{ready.count} questions imported — it's live on your dashboard.</p>
+                <p className="mt-1 text-xs text-slate-500">{ready.count} questions imported — saved to your Test Bank and live on your dashboard.</p>
+                {ready.pendingSync && (
+                  <p className="mt-1 text-[11px] font-semibold text-amber-700">
+                    Saved on this device. Cloud sync will finish automatically when you are online.
+                  </p>
+                )}
               </div>
               <button
                 type="button"
@@ -151,6 +156,13 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                 className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-[15px] font-bold text-white shadow-lg shadow-emerald-200 transition active:scale-[0.98]"
               >
                 Click & submit your score <ChevronRightIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("#/revision/bank")}
+                className="flex min-h-[44px] w-full items-center justify-center rounded-2xl bg-white text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
+              >
+                Open Test Bank
               </button>
               <button
                 type="button"

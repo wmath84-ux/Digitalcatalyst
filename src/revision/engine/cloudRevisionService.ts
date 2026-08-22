@@ -55,6 +55,39 @@ export class RevisionCloudError extends Error {
   }
 }
 
+const BLOCKING_BANK_CODES = new Set(["TEST_BANK_FULL", "TEST_DELETED", "PLAN_REQUIRED", "AUTH_REQUIRED"]);
+
+/** Capacity / entitlement failures must roll back a new test. Everything else keeps the local copy. */
+export function isBlockingBankError(error: unknown): error is RevisionCloudError {
+  if (!(error instanceof RevisionCloudError)) return false;
+  if (BLOCKING_BANK_CODES.has(error.code)) return true;
+  return error.status === 401;
+}
+
+/** Network / 5xx / local-dev 501 / expired reservation — keep the local Test Bank row and retry migrate. */
+export function isTransientRevisionCloudError(error: unknown): boolean {
+  if (isBlockingBankError(error)) return false;
+  if (!(error instanceof RevisionCloudError)) return true;
+  if (error.status === 401 || error.status === 403) return false;
+  return true;
+}
+
+/** Stable identity for a saved test so remigrating the same paper cannot create a second cloud row. */
+export function testContentFingerprint(test: DailyTestRow, questions: Array<{ id: number; prompt: string; options: string[]; correctIndex: number }>): string {
+  const byId = new Map(questions.map((question) => [question.id, question]));
+  const body = test.questionIds
+    .map((id) => {
+      const question = byId.get(id);
+      if (!question) return "";
+      const options = question.options.map((option) => String(option ?? "").trim().toLowerCase()).join("~");
+      return `${String(question.prompt ?? "").trim().toLowerCase()}|${options}|${question.correctIndex}`;
+    })
+    .filter(Boolean)
+    .sort()
+    .join("\n");
+  return `${String(test.title ?? "").trim().toLowerCase()}::${body}`;
+}
+
 export type TestSlotReservation = {
   reservationId: string;
   expiresAt: number;
@@ -143,6 +176,21 @@ export async function reserveRevisionTestSlot(uid: string): Promise<TestSlotRese
   return { reservationId: result.reservationId, expiresAt: result.expiresAt, bank: result.bank };
 }
 
+/**
+ * Reserve a cloud slot when the Test Bank API is reachable. A transient outage
+ * (including the local Vite 501 stub) must not block generating/importing — the
+ * test is stored in the local fallback and migrated later without duplicates.
+ */
+export async function reserveRevisionTestSlotOrOffline(uid: string): Promise<{ reservationId: string; offline: boolean; bank?: RevisionBankStatus }> {
+  try {
+    const reservation = await reserveRevisionTestSlot(uid);
+    return { reservationId: reservation.reservationId, offline: false, bank: reservation.bank };
+  } catch (error) {
+    if (!isTransientRevisionCloudError(error)) throw error;
+    return { reservationId: "", offline: true };
+  }
+}
+
 export async function releaseRevisionTestSlot(uid: string, reservationId: string): Promise<void> {
   if (!reservationId) return;
   try {
@@ -167,6 +215,39 @@ export function buildCustomTestBundle(uid: string, testId: number): TestBundle {
     subjects: structuredClone(local.subjects.filter((subject) => subjectSet.has(subject.id))),
     topics: structuredClone(local.topics.filter((topic) => topicSet.has(topic.id))),
     createdAtMs: Date.now(),
+  };
+}
+
+export type PersistCustomTestResult = {
+  status: "cloud" | "local";
+  bank?: RevisionBankStatus;
+  message?: string;
+};
+
+/**
+ * Durable save for an AI / imported test. The local Test Bank row is already
+ * written; this commits it to the learner's cloud bank when possible and
+ * otherwise leaves the offline copy in place for later idempotent migration.
+ */
+export async function persistCustomTestToBank(uid: string, testId: number, reservationId: string): Promise<PersistCustomTestResult> {
+  if (reservationId) {
+    try {
+      const bank = await commitCustomTestToCloud(uid, testId, reservationId);
+      return { status: "cloud", bank };
+    } catch (error) {
+      await releaseRevisionTestSlot(uid, reservationId);
+      if (!isTransientRevisionCloudError(error)) throw error;
+    }
+  }
+  const migrated = await migrateOneLocalTest(uid, testId);
+  if (migrated) {
+    try { return { status: "cloud", bank: await fetchRevisionBankStatus(uid) }; } catch {
+      return { status: "cloud" };
+    }
+  }
+  return {
+    status: "local",
+    message: "Saved to this device. It will sync to your cloud Test Bank when you are back online.",
   };
 }
 
@@ -391,8 +472,14 @@ function mergeCloudIntoLocal(
   const local = loadDb(uid);
   const bundles = testDocs.map(dataOf).filter((data) => data?.test?.kind === "custom") as TestBundle[];
   const cloudTestIds = new Set(bundles.map((bundle) => Number(bundle.test.id)));
+  const cloudFingerprints = new Set(bundles.map((bundle) => testContentFingerprint(bundle.test, bundle.questions ?? [])));
   const existingCustomTests = local.dailyTests.filter((test) => test.kind === "custom");
-  const localOnlyTests = existingCustomTests.filter((test) => !cloudTestIds.has(test.id));
+  const localOnlyTests = existingCustomTests.filter((test) => {
+    if (cloudTestIds.has(test.id)) return false;
+    // Drop a local-only row that is the same paper as a cloud test so remigrate
+    // / multi-device sync cannot show the same exam twice in the Test Bank.
+    return !cloudFingerprints.has(testContentFingerprint(test, local.questions));
+  });
 
   const cloudQuestions = bundles.flatMap((bundle) => Array.isArray(bundle.questions) ? bundle.questions : []);
   const cloudSubjects = bundles.flatMap((bundle) => Array.isArray(bundle.subjects) ? bundle.subjects : []);
@@ -565,26 +652,36 @@ async function readCloud(uid: string) {
   }
 }
 
-async function migrateMissingLocalTests(uid: string, cloudIds: Set<number>) {
+async function migrateOneLocalTest(uid: string, testId: number): Promise<boolean> {
+  try {
+    await callRevisionData(uid, { action: "revision.data.migrate", bundle: buildCustomTestBundle(uid, testId) });
+    cloudTestIdsFor(uid).add(testId);
+    await persistRevisionProgressNow(uid);
+    return true;
+  } catch (error) {
+    if (error instanceof RevisionCloudError && error.code === "TEST_DELETED") {
+      // A deletion tombstone is authoritative across devices. Removing the
+      // stale local snapshot prevents an offline device from resurrecting a
+      // permanently deleted test during migration.
+      deleteCustomTestLocal(uid, testId);
+    }
+    return false;
+  }
+}
+
+async function migrateMissingLocalTests(uid: string, testDocs: QueryDocumentSnapshot<DocumentData>[]) {
   const local = loadDb(uid);
+  const bundles = testDocs.map(dataOf).filter((data) => data?.test?.kind === "custom") as TestBundle[];
+  const cloudIds = new Set(bundles.map((bundle) => Number(bundle.test.id)).filter(Number.isFinite));
+  const cloudFingerprints = new Set(bundles.map((bundle) => testContentFingerprint(bundle.test, bundle.questions ?? [])));
   const missing = local.dailyTests.filter((test) => test.kind === "custom" && !cloudIds.has(test.id));
   for (const test of missing) {
-    try {
-      await callRevisionData(uid, { action: "revision.data.migrate", bundle: buildCustomTestBundle(uid, test.id) });
-    } catch (error) {
-      if (error instanceof RevisionCloudError && error.code === "TEST_DELETED") {
-        // A deletion tombstone is authoritative across devices. Removing the
-        // stale local snapshot prevents an offline device from resurrecting a
-        // permanently deleted test during migration.
-        deleteCustomTestLocal(uid, test.id);
-        continue;
-      }
-      // Keep the local copy available. Capacity/entitlement failures can be
-      // resolved later, while an oversized or malformed legacy snapshot must
-      // never block hydration of every other valid cloud test.
-      const safelyRetained = ["TEST_BANK_FULL", "PLAN_REQUIRED", "TEST_TOO_LARGE", "NO_QUESTIONS"];
-      if (!(error instanceof RevisionCloudError) || !safelyRetained.includes(error.code)) throw error;
-    }
+    // Same paper already lives in the cloud under another row id — do not
+    // upload it again. The merge step drops this local-only duplicate.
+    if (cloudFingerprints.has(testContentFingerprint(test, local.questions))) continue;
+    // Never abort hydration: a single un-migratable legacy snapshot must not
+    // hide every other valid cloud test from this device.
+    await migrateOneLocalTest(uid, test.id);
   }
 }
 
@@ -594,8 +691,7 @@ export async function hydrateRevisionFromCloud(uid: string): Promise<void> {
   hydrationDepth += 1;
   try {
     let cloud = await readCloud(uid);
-    const cloudIds = new Set(cloud.tests.map((snapshot) => Number(dataOf(snapshot)?.test?.id)).filter(Number.isFinite));
-    await migrateMissingLocalTests(uid, cloudIds);
+    await migrateMissingLocalTests(uid, cloud.tests);
     cloud = await readCloud(uid);
     const durable = cloudTestIdsFor(uid);
     durable.clear();

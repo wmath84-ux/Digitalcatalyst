@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import PageShell from "../components/PageShell";
 import { Card, PrimaryButton, ProgressBar } from "../components/ui";
@@ -39,8 +39,17 @@ type DashboardPageProps = {
 
 export default function DashboardPage({ uid, route, userName, hasAccess = true, onRequireAccess }: DashboardPageProps) {
   const { navigate } = useExitGuard();
-  const data = getRevisionOverview(uid);
-  const revisionPlans = listCustomTests(uid);
+  const [dataVersion, setDataVersion] = useState(0);
+  useEffect(() => {
+    const refresh = (event: Event) => {
+      const detail = (event as CustomEvent<{ uid?: string }>).detail;
+      if (!detail?.uid || detail.uid === uid) setDataVersion((version) => version + 1);
+    };
+    window.addEventListener("revision-db-changed", refresh);
+    return () => window.removeEventListener("revision-db-changed", refresh);
+  }, [uid]);
+  const data = useMemo(() => getRevisionOverview(uid), [uid, dataVersion]);
+  const revisionPlans = useMemo(() => listCustomTests(uid), [uid, dataVersion]);
 
   const requirePaidAccess = () => {
     if (onRequireAccess && !onRequireAccess()) return false;

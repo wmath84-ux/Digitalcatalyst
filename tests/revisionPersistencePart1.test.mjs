@@ -17,6 +17,10 @@ const cloudSource = read("src/revision/engine/cloudRevisionService.ts");
 const appSource = read("src/revision/RevisionApp.tsx");
 const rulesSource = read("firestore.rules");
 const bankSource = read("src/revision/pages/RevisionBankPage.tsx");
+const generateSource = read("src/revision/pages/AiGeneratePage.tsx");
+const importSource = read("src/revision/pages/BulkImportPage.tsx");
+const dashboardSource = read("src/revision/pages/DashboardPage.tsx");
+const storeSource = read("src/revision/engine/store.ts");
 
 class MemoryStorage {
   #values = new Map();
@@ -68,6 +72,32 @@ const question = (prompt, correctIndex = 0) => ({
   difficulty: "medium",
   subjectName: "Mathematics",
   topicName: "Algebra",
+});
+
+test("AI-generated and imported tests persist in the same local Test Bank", async (t) => {
+  const { root, custom } = await revisionEngine();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const uid = "learner-bank";
+  const ai = custom.createCustomTest(uid, {
+    title: "AI Algebra Paper",
+    estimatedMinutes: 8,
+    source: "ai",
+    questions: [question("AI prompt one"), question("AI prompt two")],
+  });
+  const imported = custom.createCustomTest(uid, {
+    title: "Imported Chemistry Paper",
+    estimatedMinutes: 6,
+    source: "bulk",
+    questions: [question("Import prompt one"), question("Import prompt two")],
+  });
+  const raw = localStorage.getItem(`revision_db_${uid}`);
+  assert.ok(raw?.includes("AI Algebra Paper"));
+  assert.ok(raw?.includes("Imported Chemistry Paper"));
+  const listed = custom.listCustomTests(uid);
+  assert.equal(listed.length, 2);
+  assert.equal(listed.find((row) => row.id === ai.testId)?.source, "ai");
+  assert.equal(listed.find((row) => row.id === imported.testId)?.source, "bulk");
+  assert.deepEqual(new Set(listed.map((row) => row.id)).size, 2);
 });
 
 test("saved tests recover from storage and keep immutable full/skipped attempt history", async (t) => {
@@ -148,18 +178,41 @@ test("migration, deletion tombstones, recovery, and central progress mirroring a
   assert.match(appSource, /revision-db-changed/);
   assert.match(appSource, /queueRevisionCloudPersistence\(uid\)/);
   assert.match(cloudSource, /migrateMissingLocalTests/);
+  assert.match(cloudSource, /migrateOneLocalTest/);
   assert.match(cloudSource, /TEST_DELETED/);
-  assert.match(cloudSource, /deleteCustomTestLocal\(uid, test\.id\)/);
+  assert.match(cloudSource, /deleteCustomTestLocal\(uid, testId\)/);
+  assert.match(cloudSource, /Never abort hydration/);
   assert.match(cloudSource, /persistRevisionProgressNow\(uid\)/);
   assert.match(cloudSource, /item\.questionId/);
   assert.match(cloudSource, /SYNC_TIMEOUT/);
   assert.match(apiSource, /revisionDeletedTests/);
   assert.match(apiSource, /tx\.set\(deletedRef/);
+  assert.match(apiSource, /if \(testSnap\.exists\)/);
+  assert.match(apiSource, /return \{ duplicate: true/);
   assert.match(apiSource, /revisionAttempts/);
   assert.match(apiSource, /revisionSessions/);
   assert.match(apiSource, /revisionItems/);
   assert.match(rulesSource, /match \/revisionDeletedTests\/\{testId\}/);
   assert.match(rulesSource, /revisionDeletedTests\/\$\(request\.resource\.data\.testKey\)/);
+});
+
+test("AI and imported tests save to the cloud Test Bank with an offline local fallback", () => {
+  assert.match(generateSource, /persistCustomTestToBank/);
+  assert.match(generateSource, /reserveRevisionTestSlotOrOffline/);
+  assert.match(generateSource, /saved to your Test Bank/);
+  assert.match(importSource, /persistCustomTestToBank/);
+  assert.match(importSource, /reserveRevisionTestSlotOrOffline/);
+  assert.match(importSource, /saved to your Test Bank/);
+  assert.match(cloudSource, /export async function persistCustomTestToBank/);
+  assert.match(cloudSource, /export async function reserveRevisionTestSlotOrOffline/);
+  assert.match(cloudSource, /isTransientRevisionCloudError/);
+  assert.match(cloudSource, /testContentFingerprint/);
+  assert.match(cloudSource, /status: "local"/);
+  assert.match(dashboardSource, /revision-db-changed/);
+  assert.match(dashboardSource, /listCustomTests\(uid\)/);
+  assert.match(storeSource, /revision_db_\$\{uid\}/);
+  assert.match(storeSource, /test\.source === "ai" \|\| test\.source === "bulk"/);
+  assert.match(bankSource, /pending cloud sync/);
 });
 
 test("expiry blocks only creation while saved tests and Smart Revision remain routable", () => {
