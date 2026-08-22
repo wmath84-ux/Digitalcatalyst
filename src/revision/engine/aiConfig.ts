@@ -25,7 +25,8 @@ import {
   type GenerateInput,
   type QuestionMode,
 } from "./aiGenerate";
-import { CURRICULUM_SYSTEM_PROMPT, normalizeCurriculumClass, type CurriculumClass } from "./curriculumCatalog";
+import { CURRICULUM_SYSTEM_PROMPT, normalizeCurriculumClass } from "./curriculumCatalog";
+import type { CurriculumClass } from "../data/curriculum";
 import { normalizeAiModelPricing, type AiModelPrice } from "../../../utils/aiPolicy.js";
 
 export type { AiModelPrice } from "../../../utils/aiPolicy.js";
