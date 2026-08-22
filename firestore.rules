@@ -206,6 +206,16 @@ service cloud.firestore {
           && request.resource.data.testKey.size() > 0
           && request.resource.data.testKey.size() <= 40
           && !exists(/databases/$(database)/documents/users/$(uid)/revisionDeletedTests/$(request.resource.data.testKey))
+          && (!('parentTestKeys' in request.resource.data)
+            || (request.resource.data.parentTestKeys is list
+              && request.resource.data.parentTestKeys.size() > 0
+              && request.resource.data.parentTestKeys.size() <= 40
+              && request.resource.data.parentTestKeys.all(k =>
+                k is string
+                && k.size() > 0
+                && k.size() <= 40
+                && !exists(/databases/$(database)/documents/users/$(uid)/revisionDeletedTests/$(k))
+              )))
           && request.resource.data.session is map
           && request.resource.data.answers is list
           && request.resource.data.answers.size() <= 100

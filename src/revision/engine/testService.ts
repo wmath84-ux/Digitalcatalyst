@@ -302,10 +302,11 @@ export function getAttemptForPlayer(uid: string, attemptId: number) {
   const ordered: PlayerQuestion[] = ids
     .map((id) => db.questions.find((q) => q.id === id))
     .filter((q): q is NonNullable<typeof q> => Boolean(q))
-    .map((q) => {
-      const topic = db.topics.find((t) => t.id === q.topicId)!;
-      const subject = db.subjects.find((s) => s.id === q.subjectId)!;
-      return {
+    .flatMap((q) => {
+      const topic = db.topics.find((t) => t.id === q.topicId);
+      const subject = db.subjects.find((s) => s.id === q.subjectId);
+      if (!topic || !subject) return [];
+      const row: PlayerQuestion = {
         id: q.id,
         prompt: q.prompt,
         options: q.options,
@@ -317,6 +318,7 @@ export function getAttemptForPlayer(uid: string, attemptId: number) {
         topicName: topic.name,
         selectedIndex: answerByQ.get(q.id)?.selectedIndex ?? null,
       };
+      return [row];
     });
 
   return {
@@ -517,8 +519,11 @@ export function getTestResult(uid: string, attemptId: number) {
   for (const a of answers) {
     const q = db.questions.find((row) => row.id === a.questionId);
     if (!q) continue;
-    const topic = db.topics.find((t) => t.id === q.topicId)!;
-    const subject = db.subjects.find((s) => s.id === q.subjectId)!;
+    const topic = db.topics.find((t) => t.id === q.topicId);
+    const subject = db.subjects.find((s) => s.id === q.subjectId);
+    // A stale/orphan question must never crash a result screen; the rest of
+    // the attempt's healthy topic breakdown stays visible.
+    if (!topic || !subject) continue;
     const entry = topicMap.get(topic.id) ?? {
       topicId: topic.id,
       topicName: topic.name,
@@ -579,13 +584,14 @@ export function getTestReview(uid: string, attemptId: number): ReviewQuestion[] 
 
   const questionIds = attempt.questionIds?.length ? attempt.questionIds : dailyTest.questionIds;
   return questionIds
-    .map((id) => {
+    .flatMap((id) => {
       const q = db.questions.find((row) => row.id === id);
       const a = answerByQ.get(id);
-      if (!q) return null;
-      const topic = db.topics.find((t) => t.id === q.topicId)!;
-      const subject = db.subjects.find((s) => s.id === q.subjectId)!;
-      return {
+      if (!q) return [];
+      const topic = db.topics.find((t) => t.id === q.topicId);
+      const subject = db.subjects.find((s) => s.id === q.subjectId);
+      if (!topic || !subject) return [];
+      return [{
         id: q.id,
         prompt: q.prompt,
         options: q.options,
@@ -598,7 +604,6 @@ export function getTestReview(uid: string, attemptId: number): ReviewQuestion[] 
         selectedIndex: a?.selectedIndex ?? null,
         isCorrect: a?.isCorrect ?? null,
         isSkipped: a?.isSkipped ?? true,
-      };
-    })
-    .filter((r): r is ReviewQuestion => Boolean(r));
+      }];
+    });
 }

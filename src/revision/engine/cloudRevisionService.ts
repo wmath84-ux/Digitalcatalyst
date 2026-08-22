@@ -115,6 +115,10 @@ type CloudSession = {
   uid: string;
   testId: number;
   testKey: string;
+  /** Every custom-test parent referenced by this session. A session that spans
+   *  multiple saved tests is stored once under the root `revisionSessions`
+   *  collection (testId/testKey = 0) and is never duplicated under each parent. */
+  parentTestKeys: string[];
   session: RevisionSessionRow;
   answers: RevisionSessionAnswerRow[];
   updatedAtMs: number;
@@ -361,11 +365,16 @@ async function flushBatch(uid: string, writes: ProgressWrite[]) {
         await batch.commit();
         chunk.forEach((write) => fingerprint.set(write.key, write.signature));
       } catch (error) {
-        if (testKey !== "__mixed__") {
+        // Mixed Smart Revision sessions are stored once under the synthetic
+        // parent `0`, so there is no single test document whose disappearance
+        // would make the whole group stale. Only single-parent groups may be
+        // silently skipped when their parent was deleted on another device.
+        const parentId = /^\d+$/.test(testKey) ? Number(testKey) : null;
+        if (parentId !== null && parentId > 0 && testKey !== "__mixed__") {
           try {
             const parent = await getDoc(doc(firestore, "users", uid, "revisionTests", testKey));
             if (!parent.exists()) {
-              cloudTestIdsFor(uid).delete(Number(testKey));
+              cloudTestIdsFor(uid).delete(parentId);
               continue;
             }
           } catch {
@@ -416,16 +425,19 @@ export async function persistRevisionProgressNow(uid: string): Promise<void> {
 
     for (const session of local.revisionSessions) {
       const testIds = new Set(session.questionIds.map((questionId) => inferTestIdForQuestion(local, questionId)).filter((id): id is number => Boolean(id)));
-      // A cloud session must have one authoritative parent test. Mixed Smart
-      // Revision sessions remain safely in the local compatibility store;
-      // persisting them under one parent would let a deleted test's progress
-      // be resurrected through a different surviving parent.
-      if (testIds.size !== 1 || Array.from(testIds).some((testId) => !durable.has(testId))) continue;
-      const onlyTestId = Array.from(testIds)[0];
+      const parentTestIds = Array.from(testIds).sort((a, b) => a - b);
+      if (parentTestIds.length === 0 || parentTestIds.some((testId) => !durable.has(testId))) continue;
+      const parentTestKeys = parentTestIds.map(String);
+      // Single-parent sessions keep the parent id as the authoritative cloud
+      // parent. Mixed Smart Revision sessions are written exactly once under
+      // the synthetic parent `0` (one root document, never one per parent) so
+      // the same session can never appear as multiple cloud rows.
+      const onlyTestId = parentTestIds.length === 1 ? parentTestIds[0] : 0;
       const payload: CloudSession = {
         uid,
         testId: onlyTestId,
         testKey: String(onlyTestId),
+        parentTestKeys,
         session: structuredClone(session),
         answers: structuredClone(local.revisionSessionAnswers.filter((answer) => answer.sessionId === session.id)),
         updatedAtMs: Date.now(),
@@ -620,6 +632,7 @@ function mergeCloudIntoLocal(
       uid: data.uid,
       testId: data.testId ?? null,
       testKey: data.testKey ?? (data.testId == null ? null : String(data.testId)),
+      parentTestKeys: Array.isArray(data.parentTestKeys) ? data.parentTestKeys : [],
       session: data.session,
       answers: Array.isArray(data.answers) ? data.answers : [],
       updatedAtMs: 0,
