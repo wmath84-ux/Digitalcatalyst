@@ -14,6 +14,7 @@ import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type V
 import { normalisePlanDoc } from "../../utils/subscriptions.js";
 import { aiAllowanceForCycle } from "../../utils/aiAllowances.js";
 import { calculateAiCostMicros, estimateTokensFromText, findAiModelPrice, normalizeAiModelPricing, type AiModelPrice } from "../../utils/aiPolicy.js";
+import { normalizeCompleteAiQuestions } from "../../utils/aiGeneratedTest.js";
 
 const PROVIDERS = ["gemini", "openai", "openrouter", "anthropic", "groq", "custom"] as const;
 type ProviderId = (typeof PROVIDERS)[number];
@@ -131,10 +132,20 @@ const firstHeader = (headers: VercelRequest["headers"] | undefined, name: string
   return Array.isArray(value) ? String(value[0] || "") : String(value || "");
 };
 
+const normalizedTimezoneOffset = (tzOffsetMinutes = 0): number =>
+  Math.max(-840, Math.min(840, Math.round(Number(tzOffsetMinutes) || 0)));
+
 const dayKey = (now = Date.now(), tzOffsetMinutes = 0): string => {
-  const offset = Math.max(-840, Math.min(840, Math.round(Number(tzOffsetMinutes) || 0)));
+  const offset = normalizedTimezoneOffset(tzOffsetMinutes);
   const d = new Date(now - offset * 60_000);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+};
+
+/** Next midnight in the learner timezone represented by JS getTimezoneOffset(). */
+const nextDayResetAt = (now = Date.now(), tzOffsetMinutes = 0): number => {
+  const offset = normalizedTimezoneOffset(tzOffsetMinutes);
+  const local = new Date(now - offset * 60_000);
+  return Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1) + offset * 60_000;
 };
 
 const millis = (value: unknown): number => {
@@ -222,31 +233,7 @@ export function extractJson(text: string): unknown {
 }
 
 export function normalizeQuestions(raw: unknown, requestedDifficulty: string): GeneratedQuestion[] {
-  const source = Array.isArray(raw)
-    ? raw
-    : Array.isArray(asRecord(raw).questions)
-      ? (asRecord(raw).questions as unknown[])
-      : [];
-  const out: GeneratedQuestion[] = [];
-  for (const item of source) {
-    const row = asRecord(item);
-    const options = (Array.isArray(row.options) ? row.options.map((o) => String(o ?? "").trim()) : []).filter((o) => o.length > 0);
-    if (options.length < 2) continue;
-    const prompt = String(row.prompt ?? "").trim().slice(0, 600);
-    if (!prompt) continue;
-    const correctIndex = Math.max(0, Math.min(options.length - 1, Math.round(Number(row.correctIndex ?? 0) || 0)));
-    const difficulty = ["easy", "medium", "hard"].includes(String(row.difficulty))
-      ? String(row.difficulty)
-      : (["easy", "medium", "hard"].includes(requestedDifficulty) ? requestedDifficulty : "medium");
-    out.push({
-      prompt,
-      options: options.slice(0, 6),
-      correctIndex,
-      explanation: String(row.explanation ?? "").trim().slice(0, 600),
-      difficulty,
-    });
-  }
-  return out;
+  return normalizeCompleteAiQuestions(raw, requestedDifficulty);
 }
 
 function extractGeminiText(payload: unknown): string {
@@ -385,10 +372,13 @@ async function resolveEffectiveAiPolicy(uid: string, settingsInput?: Record<stri
   const features = Array.isArray(subscription.features) ? subscription.features.map(String) : [];
   const featureConfigured = featureSnap.exists && featureSnap.data()?.active !== false;
   const hasAccess = !featureConfigured || (active && features.includes("revision"));
-  const planId = String(subscription.planId || "basic").trim() || "basic";
+  const storedPlanId = String(subscription.planId || "").trim();
+  const planId = active ? (storedPlanId || "basic") : "free";
   const cycle = subscription.cycle === "yearly" ? "yearly" : "monthly";
-  const planSnap = await db.collection("subscriptionPlans").doc(planId).get();
-  const plan = planSnap.exists ? normalisePlanDoc(planSnap.data() || {}, planSnap.id) : null;
+  const planSnap = active
+    ? await db.collection("subscriptionPlans").doc(planId).get()
+    : null;
+  const plan = planSnap?.exists ? normalisePlanDoc(planSnap.data() || {}, planSnap.id) : null;
   const currentAllowance = aiAllowanceForCycle(plan ?? { aiAllowances: null }, cycle);
   const fallbackDaily = Math.max(0, Math.min(10_000, Math.round(Number(settings.dailyLimit ?? 20) || 0)));
   const snapshotDailyRaw = Number(subscription.aiDailyGenerationLimit);
@@ -423,7 +413,7 @@ async function resolveEffectiveAiPolicy(uid: string, settingsInput?: Record<stri
   return {
     hasAccess,
     planId,
-    planName: String(plan?.name || planId || "Basic"),
+    planName: active ? String(plan?.name || planId || "Basic") : "Free learner",
     cycle,
     dailyLimit,
     windowHours,
@@ -482,6 +472,7 @@ function usageSnapshot(
     dailyUsed: dayCount,
     dailyRemaining: policy.dailyLimit <= 0 ? null : Math.max(0, policy.dailyLimit - dailyUsed),
     dailyUnlimited: policy.dailyLimit <= 0,
+    dailyResetsAt: nextDayResetAt(now, tzOffsetMinutes),
     windowHours: policy.windowHours,
     windowLimit: effectiveWindowLimit,
     windowUsed: stamps.length,
@@ -951,9 +942,21 @@ export async function handleRevisionGenerate(req: VercelRequest, res: VercelResp
       throw error;
     }
 
-    const allowance = reservation
-      ? await finalizeUsage(user.uid, policy, reservation, generated.usage, price, config, tzOffsetMinutes)
-      : { unmetered: true, source: "own", message: "Your API key does not use the school/plan AI allowance." };
+    let allowance: Awaited<ReturnType<typeof finalizeUsage>> | { unmetered: true; source: "own"; message: string };
+    if (reservation) {
+      try {
+        allowance = await finalizeUsage(user.uid, policy, reservation, generated.usage, price, config, tzOffsetMinutes);
+      } catch (error) {
+        // A provider-complete test is not delivered unless its authoritative
+        // usage transaction also completes. Best-effort release prevents a
+        // failed finalisation from leaving a phantom in-flight generation that
+        // temporarily reduces the learner's remaining allowance.
+        await releaseUsage(user.uid, reservation.id).catch(() => undefined);
+        throw error;
+      }
+    } else {
+      allowance = { unmetered: true, source: "own", message: "Your API key does not use the school/plan AI allowance." };
+    }
     res.status(200).json({
       ok: true,
       provider: config.provider,

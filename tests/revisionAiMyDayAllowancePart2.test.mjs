@@ -11,6 +11,7 @@ import {
   findAiModelPrice,
   normalizeAiModelPricing,
 } from "../utils/aiPolicy.js";
+import { normalizeCompleteAiQuestions } from "../utils/aiGeneratedTest.js";
 
 const read = (path) => fs.readFileSync(path, "utf8");
 
@@ -46,15 +47,65 @@ test("dynamic model pricing calculates deterministic input and output token cost
   assert.equal(findAiModelPrice(pricing, "openai", "new-model"), null);
 });
 
+test("only complete four-option AI tests are eligible to consume an allowance", () => {
+  const complete = {
+    prompt: "Which value is prime?",
+    options: ["4", "5", "6", "8"],
+    correctIndex: 1,
+    explanation: "Five has exactly two factors.",
+    difficulty: "easy",
+  };
+  const normalized = normalizeCompleteAiQuestions({ questions: [
+    complete,
+    { ...complete, prompt: "Only two options", options: ["A", "B"] },
+    { ...complete, prompt: "Duplicate options", options: ["A", "A", "B", "C"] },
+    { ...complete, prompt: "No explanation", explanation: "" },
+    { ...complete, prompt: "Invalid answer", correctIndex: 7 },
+    { ...complete }, // duplicate prompt is not a distinct test question
+  ] }, "medium");
+  assert.deepEqual(normalized, [complete]);
+});
+
 test("school AI usage is transactional while own-key generation bypasses plan consumption", () => {
   const backend = read("api/_lib/revisionGenerate.ts");
+  const browserUsage = read("src/revision/engine/aiUsage.ts");
+  const rules = read("firestore.rules");
   assert.match(backend, /runTransaction/);
   assert.match(backend, /normalizedReservations/);
   assert.match(backend, /if \(source !== "own"\)/);
   assert.match(backend, /finalizeUsage/);
   assert.match(backend, /INCOMPLETE_AI_TEST/);
+  assert.match(backend, /releaseUsage\(user\.uid, reservation\.id\)/);
   assert.match(backend, /Your API key does not use the school\/plan AI allowance/);
-  assert.doesNotMatch(read("src/revision/engine/aiUsage.ts"), /setDoc\(usageDocRef/);
+  assert.doesNotMatch(browserUsage, /setDoc\(usageDocRef/);
+  assert.match(rules, /match \/aiUsage\/\{documentId\}[\s\S]*?allow create, update, delete: if false;/);
+});
+
+test("profile uses the authenticated status response and exposes live reset information", () => {
+  const usage = read("src/revision/engine/aiUsage.ts");
+  const card = read("src/components/AiQuotaCard.tsx");
+  const backend = read("api/_lib/revisionGenerate.ts");
+  assert.match(usage, /return parseAiUsageSnapshot\(payload\.usage\)/);
+  assert.match(usage, /AiUsageSubscriptionState/);
+  assert.match(backend, /dailyResetsAt: nextDayResetAt/);
+  assert.match(card, /data-ai-quota-refresh/);
+  assert.match(card, /dailyResetIn/);
+  assert.match(card, /snap\.planName/);
+  assert.match(card, /formatCycle\(snap\.cycle\)/);
+  assert.match(card, /Provider failure, incomplete output and your own API key do not use this allowance/);
+});
+
+test("AI allowance card is imported, rendered and reachable from both profile routes", () => {
+  const main = read("src/main.tsx");
+  const profile = read("src/profile/App.tsx");
+  const revisionApp = read("src/revision/RevisionApp.tsx");
+  const revisionProfile = read("src/revision/pages/RevisionProfilePage.tsx");
+  assert.match(main, /hash\.startsWith\(PROFILE_HASH\)[\s\S]*?<ProfileApp/);
+  assert.match(profile, /import AiQuotaCard/);
+  assert.match(profile, /membership\.subscriber \? <AiQuotaCard uid=\{user\.id\}/);
+  assert.match(revisionApp, /path\.startsWith\("#\/revision\/profile"\)[\s\S]*?<RevisionProfilePage/);
+  assert.match(revisionProfile, /import AiQuotaCard/);
+  assert.match(revisionProfile, /<AiQuotaCard uid=\{uid\} \/>/);
 });
 
 test("provider metadata supports actual usage with an estimate fallback", () => {

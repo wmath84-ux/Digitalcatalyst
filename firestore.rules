@@ -225,10 +225,11 @@ service cloud.firestore {
 
       match /aiUsage/{documentId} {
         // Usage, in-flight reservations, plan snapshots and token-cost totals
-        // are written only by the transactional Admin-SDK generation API.
-        // Learners can watch their own live allowance but cannot mint quota.
+        // are written only by the transactional Admin SDK generation API.
+        // The Admin SDK bypasses Firestore rules; no browser client (including
+        // an admin session) may mint, refund or otherwise manipulate quota.
         allow read: if documentId == 'current' && (isOwner(uid) || isAdmin());
-        allow create, update, delete: if isAdmin();
+        allow create, update, delete: if false;
       }
 
       match /aiMentorChats/{chatId} {
