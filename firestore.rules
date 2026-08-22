@@ -69,6 +69,11 @@ service cloud.firestore {
         allow read: if isOwner(uid) || isAdmin();
         allow update: if documentId == 'current' && isOwner(uid)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['renewalReminderOptOut']);
+        // Admin-only adjust path: lets support raise (or cap) an existing
+        // subscriber's cloud Test Bank capacity mid-term. The owner can only
+        // ever change the reminder flag; everything else stays admin/server
+        // controlled.
+        allow update: if documentId == 'current' && isAdmin();
         allow create, delete: if isAdmin();
       }
 
