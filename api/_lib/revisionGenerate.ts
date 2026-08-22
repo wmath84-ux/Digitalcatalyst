@@ -38,7 +38,7 @@ export type RevisionSyllabus = {
   chapterNames: string[];
   topicNames: string[];
   difficulty: "easy" | "medium" | "hard" | "mixed";
-  /** Question style from the "Mixed" dropdown (default "mixed" = blend). */
+  /** AI question type, separate from difficulty (default "mixed" = theory + application). */
   questionMode?: "mixed" | "theory" | "application";
   count: number;
   minutes: number;
@@ -168,7 +168,7 @@ export function systemPrompt(): string {
   ].join("\n");
 }
 
-/** Question-style instructions appended to the prompt ("" for the default blend). */
+/** Question-style instructions appended to the prompt. */
 function questionStyleLines(mode: RevisionSyllabus["questionMode"]): string[] {
   if (mode === "theory") {
     return [
@@ -184,7 +184,10 @@ function questionStyleLines(mode: RevisionSyllabus["questionMode"]): string[] {
       "- Do NOT include pure definition, naming or formula-recall questions.",
     ];
   }
-  return [];
+  return [
+    "Question style: MIXED THEORY + APPLICATION.",
+    "- Include a balanced blend of theory/concept questions and application/problem-based questions.",
+  ];
 }
 
 export function buildSyllabusPrompt(syllabus: RevisionSyllabus): string {

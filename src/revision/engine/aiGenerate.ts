@@ -238,7 +238,7 @@ export type GeminiRuntimeConfig = {
   onModelMigrated?: (model: string) => void;
 };
 
-/** Question-style instructions appended to the prompt ("" for the default blend). */
+/** Question-style instructions appended to the prompt. */
 export function questionStyleLines(mode: QuestionMode | undefined): string[] {
   if (mode === "theory") {
     return [
@@ -254,7 +254,10 @@ export function questionStyleLines(mode: QuestionMode | undefined): string[] {
       "- Do NOT include pure definition, naming or formula-recall questions.",
     ];
   }
-  return [];
+  return [
+    "Question style: MIXED THEORY + APPLICATION.",
+    "- Include a balanced blend of theory/concept questions and application/problem-based questions.",
+  ];
 }
 
 /** Build the user prompt that asks the model for MCQs. */

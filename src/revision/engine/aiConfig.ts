@@ -646,7 +646,7 @@ export type RevisionSyllabus = {
   chapterNames: string[];
   topicNames: string[];
   difficulty: "easy" | "medium" | "hard" | "mixed";
-  /** Question style from the "Mixed" dropdown (default "mixed" = blend). */
+  /** AI question type, separate from difficulty (default "mixed" = theory + application). */
   questionMode?: QuestionMode;
   count: number;
   minutes: number;

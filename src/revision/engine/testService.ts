@@ -21,6 +21,9 @@ import {
   type RevisionSettings,
 } from "./store";
 
+const normalizeQuestionMode = (value: unknown): "mixed" | "theory" | "application" =>
+  value === "theory" || value === "application" || value === "mixed" ? value : "mixed";
+
 function mulberry32(seed: number) {
   return function () {
     seed |= 0;
@@ -537,6 +540,16 @@ export function getTestResult(uid: string, attemptId: number) {
     isCustom: dailyTest.kind === "custom",
     attemptKind: attempt.attemptKind ?? "full",
     testDate: dailyTest.testDate,
+    planDetails: dailyTest.planDetails
+      ? {
+          classNames: Array.isArray(dailyTest.planDetails.classNames) ? [...dailyTest.planDetails.classNames] : [],
+          subjectNames: Array.isArray(dailyTest.planDetails.subjectNames) ? [...dailyTest.planDetails.subjectNames] : [],
+          chapterNames: Array.isArray(dailyTest.planDetails.chapterNames) ? [...dailyTest.planDetails.chapterNames] : [],
+          topicNames: Array.isArray(dailyTest.planDetails.topicNames) ? [...dailyTest.planDetails.topicNames] : [],
+          difficulty: dailyTest.planDetails.difficulty,
+          questionMode: normalizeQuestionMode(dailyTest.planDetails.questionMode),
+        }
+      : null,
     totalQuestions: attemptQuestionIds.length,
     correctCount: attempt.correctCount,
     wrongCount: attempt.wrongCount,

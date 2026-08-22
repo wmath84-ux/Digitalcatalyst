@@ -7,10 +7,10 @@
 // model works, and the finished exam lands on the dashboard as a ready-to-take
 // test.
 //
-// The 4th slot of the difficulty row is a small overlay dropdown (default:
-// "Mixed") that switches the AI's question style — Mixed (theory +
-// application), Only theoretical concept (definitions/formulas/units), or
-// Only application based (concept-based problems). The choice is appended to
+// Difficulty and question type are separate planning settings. Question type
+// defaults to Mixed and switches the AI's style — Mixed (theory + application),
+// Theory only (definitions/concepts/formulas/units), or Application only
+// (numerical/problem-based/situational questions). The choice is appended to
 // the AI prompt, so the model itself follows it.
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -44,41 +44,38 @@ type Props = { uid: string; route: string; hasAccess?: boolean; onRequireAccess?
 
 type Option = { key: string; name: string; icon?: string };
 
-const DIFFICULTY_OPTIONS: { value: Difficulty; label: string; emoji: string }[] = [
-  { value: "easy", label: "Easy", emoji: "🌱" },
-  { value: "medium", label: "Medium", emoji: "⚡" },
-  { value: "hard", label: "Hard", emoji: "🔥" },
+const DIFFICULTY_OPTIONS: { value: Difficulty | "mixed"; label: string; emoji: string; desc: string }[] = [
+  { value: "mixed", label: "Mixed", emoji: "🎚️", desc: "Balanced easy, medium and hard" },
+  { value: "easy", label: "Easy", emoji: "🌱", desc: "Confidence-building questions" },
+  { value: "medium", label: "Medium", emoji: "⚡", desc: "Standard exam practice" },
+  { value: "hard", label: "Hard", emoji: "🔥", desc: "Challenging questions" },
 ];
 
 /**
- * The 4th slot of the difficulty row is now a small overlay dropdown
- * (default: "Mixed") that picks the AI's question style:
- *   - mixed       → blend of theory + application (old default behaviour)
+ * AI question style is intentionally separate from difficulty:
+ *   - mixed       → blend of theory + application (default)
  *   - theory      → only theoretical concept questions (definitions,
  *                   formulas, units, laws, concept recall)
  *   - application → only application-based problems on the concept
  */
-const QUESTION_MODE_OPTIONS: { value: QuestionMode; label: string; tileLabel: string; emoji: string; desc: string }[] = [
+const QUESTION_MODE_OPTIONS: { value: QuestionMode; label: string; emoji: string; desc: string }[] = [
   {
     value: "mixed",
     label: "Mixed",
-    tileLabel: "Mixed",
     emoji: "🎲",
-    desc: "Blend of theory + application questions (default)",
+    desc: "Theory + application questions (default)",
   },
   {
     value: "theory",
-    label: "Only theoretical concept",
-    tileLabel: "Theory only",
+    label: "Theory only",
     emoji: "📖",
-    desc: "Definitions, formulas, units, laws & concept recall",
+    desc: "Definitions, concepts, laws, formulas, units & conceptual questions",
   },
   {
     value: "application",
-    label: "Only application based",
-    tileLabel: "Application only",
+    label: "Application only",
     emoji: "🧮",
-    desc: "Numerical & real-world problems that use the concept",
+    desc: "Numerical, solution/problem-based, real-world & situational questions",
   },
 ];
 
@@ -226,7 +223,6 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
 
   const [difficulty, setDifficulty] = useState<Difficulty | "mixed">("mixed");
   const [questionMode, setQuestionMode] = useState<QuestionMode>("mixed");
-  const [modeOpen, setModeOpen] = useState(false);
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [totalMinutes, setTotalMinutes] = useState(10);
 
@@ -369,7 +365,6 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
     setNotice(null);
     setReadyInfo(null);
     setOpenPicker(null);
-    setModeOpen(false);
 
     // Reserve cloud capacity before calling a paid AI provider. This prevents
     // a full Test Bank from consuming AI quota/cost for a test that cannot be
@@ -640,9 +635,12 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
               )}
             </Card>
 
-            {/* Step 2 — difficulty + question style (4th slot is the "Mixed" dropdown) */}
+            {/* Step 2 — difficulty and question type are separate settings */}
             <Card>
-              <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-400">2 · Difficulty & question type</h3>
+              <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-400">2 · Difficulty</h3>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                Difficulty controls level only. Question type is selected separately below.
+              </p>
               <div className="mt-3 grid grid-cols-4 gap-1.5">
                 {DIFFICULTY_OPTIONS.map((d) => (
                   <button
@@ -650,7 +648,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                     type="button"
                     disabled={phase === "generating"}
                     onClick={() => setDifficulty(d.value)}
-                    className={`flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl border text-center transition active:scale-[0.97] ${
+                    className={`flex min-h-[58px] flex-col items-center justify-center gap-0.5 rounded-xl border px-1 text-center transition active:scale-[0.97] ${
                       phase === "generating" ? "opacity-40" : ""
                     } ${
                       difficulty === d.value
@@ -662,67 +660,44 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                     <span className={`text-[11px] font-bold ${difficulty === d.value ? "text-indigo-700" : "text-slate-600"}`}>
                       {d.label}
                     </span>
+                    <span className="line-clamp-1 text-[9px] font-medium text-slate-400">{d.desc}</span>
                   </button>
                 ))}
+              </div>
 
-                {/* 4th slot — question-style dropdown (Mixed / Theory only / Application only) */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    disabled={phase === "generating"}
-                    onClick={() => setModeOpen((o) => !o)}
-                    aria-expanded={modeOpen}
-                    className={`flex min-h-[52px] w-full flex-col items-center justify-center gap-0.5 rounded-xl border text-center transition active:scale-[0.97] ${
-                      phase === "generating" ? "opacity-40" : ""
-                    } ${
-                      modeOpen
-                        ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200"
-                        : "border-slate-200 bg-white"
-                    }`}
-                  >
-                    <span className="text-sm">{modeOption.emoji}</span>
-                    <span className={`text-[11px] leading-tight font-bold ${modeOpen ? "text-indigo-700" : "text-slate-600"}`}>
-                      {modeOption.tileLabel} <span className="text-[9px]">▾</span>
-                    </span>
-                  </button>
-
-                  {modeOpen && (
-                    <>
-                      {/* Click-away backdrop */}
-                      <button
-                        type="button"
-                        tabIndex={-1}
-                        aria-hidden
-                        className="fixed inset-0 z-10 cursor-default"
-                        onClick={() => setModeOpen(false)}
-                      />
-                      {/* Small overlay dropdown */}
-                      <div className="animate-fade-in absolute right-0 top-[calc(100%+6px)] z-20 w-60 overflow-hidden rounded-2xl border border-indigo-100 bg-white p-1.5 shadow-xl shadow-indigo-200/50">
-                        <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                          Question type
-                        </p>
-                        {QUESTION_MODE_OPTIONS.map((m) => (
-                          <button
-                            key={m.value}
-                            type="button"
-                            onClick={() => {
-                              setQuestionMode(m.value);
-                              if (m.value === "mixed") setDifficulty("mixed");
-                              setModeOpen(false);
-                            }}
-                            className="flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition active:bg-indigo-50"
-                          >
-                            <span className="mt-0.5 text-base leading-none">{m.emoji}</span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-[12px] font-bold text-slate-800">{m.label}</span>
-                              <span className="mt-0.5 block text-[10px] leading-snug text-slate-400">{m.desc}</span>
-                            </span>
-                            {questionMode === m.value && <CheckIcon className="mt-1 h-3.5 w-3.5 shrink-0 text-indigo-600" />}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
+              <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-[12px] font-bold uppercase tracking-wide text-slate-500">Question type</h4>
+                    <p className="mt-0.5 text-[11px] leading-snug text-slate-400">
+                      Default is Mixed. This strict mode applies to AI-generated tests; offline built-in questions are not dynamically transformed.
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-indigo-600 shadow-sm">
+                    {modeOption.label}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-1.5">
+                  {QUESTION_MODE_OPTIONS.map((m) => (
+                    <button
+                      key={m.value}
+                      type="button"
+                      disabled={phase === "generating"}
+                      onClick={() => setQuestionMode(m.value)}
+                      aria-pressed={questionMode === m.value}
+                      className={`flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-xl border px-2 text-center transition active:scale-[0.97] ${
+                        phase === "generating" ? "opacity-40" : ""
+                      } ${
+                        questionMode === m.value
+                          ? "border-indigo-500 bg-white text-indigo-700 ring-2 ring-indigo-200"
+                          : "border-slate-200 bg-white/80 text-slate-600"
+                      }`}
+                    >
+                      <span className="text-base">{m.emoji}</span>
+                      <span className="text-[11px] font-extrabold leading-tight">{m.label}</span>
+                      <span className="line-clamp-2 text-[9px] font-medium leading-tight text-slate-400">{m.desc}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             </Card>
