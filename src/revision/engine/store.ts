@@ -389,6 +389,7 @@ function normalizeDb(db: RevisionDb): RevisionDb {
   if (!db.nextIds || typeof db.nextIds !== "object") db.nextIds = {};
   for (const test of db.dailyTests ?? []) {
     if (typeof test.slot !== "number") test.slot = 0;
+    if (!test.kind && (test.source === "ai" || test.source === "bulk")) test.kind = "custom";
     if (test.planDetails) {
       const mode = String(test.planDetails.questionMode || "mixed");
       test.planDetails.questionMode = (["mixed", "theory", "application"].includes(mode) ? mode : "mixed") as "mixed" | "theory" | "application";
