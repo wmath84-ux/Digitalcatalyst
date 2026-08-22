@@ -55,6 +55,9 @@ const slugify = (s: string) =>
   s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") ||
   `item-${Date.now().toString(36)}`;
 
+const normalizeQuestionMode = (value: unknown): QuestionMode =>
+  value === "theory" || value === "application" || value === "mixed" ? value : "mixed";
+
 /** Collision-safe id: always one past the current max in the table. */
 function maxId(rows: Array<{ id: number }>): number {
   let max = 0;
@@ -151,7 +154,7 @@ export function createCustomTest(uid: string, input: CreateCustomTestInput): { t
           chapterNames: [...input.planDetails.chapterNames],
           topicNames: [...input.planDetails.topicNames],
           difficulty: input.planDetails.difficulty,
-          questionMode: input.planDetails.questionMode,
+          questionMode: normalizeQuestionMode(input.planDetails.questionMode),
         }
       : undefined,
   };
@@ -178,6 +181,21 @@ export type CustomTestListItem = {
   completedAt: string | null;
   planDetails: RevisionPlanDetails;
 };
+
+function normalizePlanDetails(
+  plan: DailyTestRow["planDetails"] | undefined,
+  fallback: Omit<RevisionPlanDetails, "questionMode">,
+): RevisionPlanDetails {
+  if (!plan) return { ...fallback, questionMode: "mixed" };
+  return {
+    classNames: Array.isArray(plan.classNames) ? [...plan.classNames] : [],
+    subjectNames: Array.isArray(plan.subjectNames) ? [...plan.subjectNames] : fallback.subjectNames,
+    chapterNames: Array.isArray(plan.chapterNames) ? [...plan.chapterNames] : fallback.chapterNames,
+    topicNames: Array.isArray(plan.topicNames) ? [...plan.topicNames] : fallback.topicNames,
+    difficulty: ["easy", "medium", "hard", "mixed"].includes(String(plan.difficulty)) ? plan.difficulty : fallback.difficulty,
+    questionMode: normalizeQuestionMode(plan.questionMode),
+  };
+}
 
 /** All custom tests (newest first) with their attempt state for the dashboard. */
 export function listCustomTests(uid: string): CustomTestListItem[] {
@@ -228,13 +246,15 @@ export function listCustomTests(uid: string): CustomTestListItem[] {
         completedAt: latestCompleted?.completedAt ?? null,
         // Old saved tests did not have planDetails. Derive honest labels from
         // their questions instead of displaying made-up/random syllabus text.
-        planDetails: t.planDetails ?? {
+        // Existing plans that pre-date questionMode get an explicit Mixed
+        // default, so cloud hydration/migration never drops the field again.
+        planDetails: normalizePlanDetails(t.planDetails, {
           classNames: [],
           subjectNames: subjects,
           chapterNames: topics,
           topicNames: [],
           difficulty: "mixed",
-        },
+        }),
       };
     });
 }

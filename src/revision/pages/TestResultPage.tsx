@@ -6,6 +6,7 @@ import { CheckIcon, ClockIcon, SparklesIcon, XIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { getTestResult } from "../engine/testService";
 import { startCustomTestRetake, startSkippedQuestionsRetake } from "../engine/customTestService";
+import { questionModeLabel } from "../engine/questionMode";
 import { ServiceError } from "../engine/store";
 
 function formatDuration(seconds: number) {
@@ -69,6 +70,22 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
             <ResultChip icon={<SparklesIcon className="h-5 w-5 text-slate-500" />} label="Skipped" value={data.skippedCount} tone="bg-slate-50" />
           </div>
 
+          {data.planDetails && (
+            <Card>
+              <h2 className="mb-3 text-[15px] font-semibold text-slate-900">Saved Test Plan</h2>
+              <div className="space-y-1.5 rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
+                {data.planDetails.classNames.length > 0 && <PlanDetail label="Class" value={displayList(data.planDetails.classNames, "")} />}
+                <PlanDetail label="Subject" value={displayList(data.planDetails.subjectNames, "Subject not labelled")} />
+                <PlanDetail label="Chapter" value={displayList(data.planDetails.chapterNames, "Chapter not labelled")} />
+                <PlanDetail label="Topics" value={displayList(data.planDetails.topicNames, "All selected chapter topics")} />
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-600">{questionModeLabel(data.planDetails.questionMode)}</span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold capitalize text-slate-600">{data.planDetails.difficulty} difficulty</span>
+              </div>
+            </Card>
+          )}
+
           <Card>
             <div className="flex items-center justify-between">
               <h2 className="text-[15px] font-semibold text-slate-900">Accuracy</h2>
@@ -119,6 +136,16 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
       )}
     </PageShell>
   );
+}
+
+function displayList(items: string[], fallback: string) {
+  if (items.length === 0) return fallback;
+  if (items.length <= 2) return items.join(" · ");
+  return `${items.slice(0, 2).join(" · ")} +${items.length - 2}`;
+}
+
+function PlanDetail({ label, value }: { label: string; value: string }) {
+  return <p className="line-clamp-1"><span className="font-bold text-slate-500">{label}:</span> <span>{value}</span></p>;
 }
 
 function ResultChip({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: number; tone: string }) {

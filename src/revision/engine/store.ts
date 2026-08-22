@@ -389,6 +389,12 @@ function normalizeDb(db: RevisionDb): RevisionDb {
   if (!db.nextIds || typeof db.nextIds !== "object") db.nextIds = {};
   for (const test of db.dailyTests ?? []) {
     if (typeof test.slot !== "number") test.slot = 0;
+    if (test.planDetails) {
+      const mode = String(test.planDetails.questionMode || "mixed");
+      test.planDetails.questionMode = (["mixed", "theory", "application"].includes(mode) ? mode : "mixed") as "mixed" | "theory" | "application";
+      const difficulty = String(test.planDetails.difficulty || "mixed");
+      test.planDetails.difficulty = (["easy", "medium", "hard", "mixed"].includes(difficulty) ? difficulty : "mixed") as Difficulty | "mixed";
+    }
   }
   return db;
 }

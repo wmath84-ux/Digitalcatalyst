@@ -37,6 +37,7 @@ import {
   fetchRevisionBankStatus,
   type RevisionBankStatus,
 } from "../engine/cloudRevisionService";
+import { questionModeLabel } from "../engine/questionMode";
 
 type ViewTab = "tests" | "smart";
 type StatusTab = "active" | "learning" | "improving" | "mastered" | "all";
@@ -438,7 +439,11 @@ function SavedTestCard({
           </div>
         </div>
 
-        {labels.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{labels.map((label) => <span key={label} className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">{label}</span>)}</div>}
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {labels.map((label) => <span key={label} className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">{label}</span>)}
+          <span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-600">{questionModeLabel(test.planDetails.questionMode)}</span>
+          <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold capitalize text-slate-500">{test.planDetails.difficulty}</span>
+        </div>
 
         {test.status === "in_progress" && (
           <div className="mt-3 rounded-xl bg-indigo-50 p-3">

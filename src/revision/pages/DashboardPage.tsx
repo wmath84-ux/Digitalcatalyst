@@ -17,6 +17,7 @@ import {
 } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { getRevisionOverview } from "../engine/statsService";
+import { questionModeLabel } from "../engine/questionMode";
 import { listCustomTests, type CustomTestListItem } from "../engine/customTestService";
 
 const SWIPE_DISTANCE = 65;
@@ -257,10 +258,11 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
           <PlanRow label="Topics" value={topics} />
         </div>
 
-        <div className="mt-3 flex items-center gap-3 text-xs font-semibold text-indigo-100">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-indigo-100">
           <span className="flex items-center gap-1"><BankIcon className="h-4 w-4" /> {plan.totalQuestions} questions</span>
           <span className="flex items-center gap-1"><ClockIcon className="h-4 w-4" /> {plan.estimatedMinutes} min</span>
-          <span className="capitalize">{details.difficulty}</span>
+          <span className="rounded-full bg-white/10 px-2 py-1 capitalize">{details.difficulty} difficulty</span>
+          <span className="rounded-full bg-white/10 px-2 py-1">{questionModeLabel(details.questionMode)}</span>
         </div>
 
         <button type="button" onClick={onOpen} className="mt-auto flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl bg-white text-sm font-extrabold text-indigo-800 shadow-sm transition active:scale-[0.98]">

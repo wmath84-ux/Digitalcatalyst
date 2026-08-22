@@ -98,6 +98,7 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
                 <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">Chapter</span>
                 <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">Topic</span>
                 <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">Difficulty</span>
+                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">Question type</span>
                 <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">Questions & time</span>
               </div>
             </button>
