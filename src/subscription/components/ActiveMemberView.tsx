@@ -77,6 +77,16 @@ export default function ActiveMemberView({
                 {unlockedProductTitles.length} course{unlockedProductTitles.length === 1 ? "" : "s"} included
               </span>
             ) : null}
+            {plan?.revisionTestBankLimits ? (
+              <span
+                data-member-test-bank-capacity
+                className="rounded-xl bg-white/15 px-3 py-1.5 text-[11px] font-bold backdrop-blur"
+              >
+                {plan.revisionTestBankLimits?.[cycle] === -1
+                  ? "Unlimited Test Bank"
+                  : `Test Bank: save up to ${plan.revisionTestBankLimits?.[cycle] ?? 20} tests`}
+              </span>
+            ) : null}
           </div>
         </div>
       </section>

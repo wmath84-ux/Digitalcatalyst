@@ -318,13 +318,31 @@ async function subscriptionPlanProductsRequest(init?: RequestInit) {
 
 async function customersRequest(url: URL, init?: RequestInit) {
   const parts=url.pathname.split("/").filter(Boolean); const uid=parts[3];
-  if(uid){const ref=doc(db,"users",uid); const snap=await getDoc(ref); if(!snap.exists())throw new ApiError("Customer not found",404); let data=snap.data();
-    if(init?.method==="PATCH"){const b=bodyOf(init);await updateDoc(ref,{status:b.status,blocked:b.status==="blocked",updatedAt:serverTimestamp()});data={...data,status:b.status};}
+  if(uid){
+    const ref=doc(db,"users",uid); const snap=await getDoc(ref); if(!snap.exists())throw new ApiError("Customer not found",404); let data=snap.data();
+    const subRef=doc(db,"users",uid,"subscription","current"); const subSnap=await getDoc(subRef);
+    let sub: Record<string, any> | null = subSnap.exists() ? (subSnap.data() || {}) : null;
+    if(init?.method==="PATCH"){
+      const b=bodyOf(init);
+      await updateDoc(ref,{status:b.status,blocked:b.status==="blocked",updatedAt:serverTimestamp()});
+      data={...data,status:b.status};
+      // Support-only capacity override: raise (or cap) the stored Test Bank
+      // snapshot for an existing subscriber. -1 = unlimited. The server keeps
+      // the higher of this snapshot and the plan limit, so a bump is never
+      // silently erased by a plan edit and a purchased benefit is never reduced.
+      if(b.revisionTestBankLimit !== undefined && b.revisionTestBankLimit !== null && sub){
+        const raw=Number(b.revisionTestBankLimit);
+        if(!Number.isFinite(raw)) throw new ApiError("Test Bank capacity must be a number.",400);
+        const safe=Math.round(raw)===-1?-1:Math.max(0,Math.min(1000,Math.round(raw)));
+        await updateDoc(subRef,{revisionTestBankLimit:safe,revisionTestBankLimitUpdatedAt:serverTimestamp()});
+        sub={...sub,revisionTestBankLimit:safe};
+      }
+    }
     const orders=(await getDocs(collection(db,"siteOrders"))).docs.map(d=>({id:d.id,...d.data()})).filter((o:any)=>o.customerUid===uid).map(mapOrder);
-    return {customer:mapCustomer(uid,data),orders,reviews:[]};}
+    return {customer:mapCustomer(uid,data,sub),orders,reviews:[]};}
   let rows=(await getDocs(collection(db,"users"))).docs.map(d=>mapCustomer(d.id,d.data())); const q=(url.searchParams.get("q")||"").toLowerCase();if(q)rows=rows.filter((r:any)=>`${r.uid} ${r.name} ${r.email}`.toLowerCase().includes(q));const s=url.searchParams.get("status");if(s)rows=rows.filter((r:any)=>r.status===s);const p=url.searchParams.get("provider");if(p && p !== null)rows=rows.filter((r:any)=>r.provider===p);return {customers:rows};
 }
-const mapCustomer=(uid:string,d:any)=>({uid,name:d.name||null,email:d.email||"",mobile:d.mobile||null,provider:d.authProvider||"password",role:d.role||"user",status:d.status||"active",subscriptionId:d.subscriptionPlanId||null,purchaseCount:Array.isArray(d.purchasedProductIds)?d.purchasedProductIds.length:0,wishlist:d.wishlistProductIds||[],cart:d.cartProductIds||[],joinedAt:asDate(d.createdAt),lastLoginAt:asDate(d.lastLoginAt||d.updatedAt||d.createdAt)});
+const mapCustomer=(uid:string,d:any,sub:Record<string, any>|null=null)=>({uid,name:d.name||null,email:d.email||"",mobile:d.mobile||null,provider:d.authProvider||"password",role:d.role||"user",status:d.status||"active",subscriptionId:d.subscriptionPlanId||sub?.planId||null,subscriptionCycle:sub?.cycle||null,subscriptionStatus:sub?.status||null,subscriptionExpiresAt:sub?.expiresAt?asDate(sub.expiresAt):null,revisionTestBankLimit:sub&&sub.revisionTestBankLimit!==undefined&&sub.revisionTestBankLimit!==null?Number(sub.revisionTestBankLimit):null,purchaseCount:Array.isArray(d.purchasedProductIds)?d.purchasedProductIds.length:0,wishlist:d.wishlistProductIds||[],cart:d.cartProductIds||[],joinedAt:asDate(d.createdAt),lastLoginAt:asDate(d.lastLoginAt||d.updatedAt||d.createdAt)});
 const mapOrder=(d:any)=>({id:String(d.id||""),customerId:d.customerUid||"",customerName:d.customerName||null,customerEmail:d.customerEmail||null,purchaseKind:d.checkoutType||d.purchaseKind||"product",items:(d.items||[]).map((i:any,index:number)=>({id:String(i.id||index),kind:i.kind||"product",refId:String(i.id||""),title:i.name||i.title||"Item",price:money(i.price)})),couponCode:d.couponCode||null,discountAmount:String(d.discountAmount||0),cashPaid:String(d.amountPaise?d.amountPaise/100:money(d.total)),finalAmount:String(d.amountPaise?d.amountPaise/100:money(d.total)),paymentStatus:String(d.paymentStatus||d.status||"verified").toLowerCase(),entitlementStatus:d.entitlementStatus||"access_granted",gatewayOrderId:d.gatewayOrderId||d.id||null,gatewayPaymentId:d.paymentId||null,grantedEntitlementIds:d.grantedEntitlementIds||[],failureReason:d.failureReason||null,createdAt:asDate(d.createdAt||d.date),verifiedAt:asDate(d.verifiedAt||d.createdAt||d.date)});
 
 async function ordersRequest(url:URL){const match=url.pathname.match(/\/orders\/([^/]+)$/);const snap=await getDocs(collection(db,"siteOrders"));const rows=snap.docs.map(d=>mapOrder({id:d.id,...d.data()}));if(match){const order=rows.find(o=>o.id===decodeURIComponent(match[1]));if(!order)throw new ApiError("Order not found",404);return {order};}let result=rows;const q=(url.searchParams.get("q")||"").toLowerCase();if(q)result=result.filter(o=>`${o.id} ${o.customerName} ${o.customerEmail}`.toLowerCase().includes(q));const status=url.searchParams.get("status");if(status)result=result.filter(o=>o.paymentStatus===status);const kind=url.searchParams.get("kind");if(kind)result=result.filter(o=>o.purchaseKind===kind);return {orders:result};}
