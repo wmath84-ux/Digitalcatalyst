@@ -29,10 +29,18 @@ import {
 } from "../engine/aiConfig";
 import type { QuestionMode } from "../engine/aiGenerate";
 import { generateOfflineQuestions } from "../engine/offlineGenerator";
-import { createCustomTest, type CustomTestQuestion } from "../engine/customTestService";
+import { createCustomTest, deleteCustomTestLocal, type CustomTestQuestion } from "../engine/customTestService";
+import {
+  commitCustomTestToCloud,
+  releaseRevisionTestSlot,
+  reserveRevisionTestSlot,
+  RevisionCloudError,
+  type RevisionBankStatus,
+} from "../engine/cloudRevisionService";
+import TestBankLimitGate from "../components/TestBankLimitGate";
 import type { Difficulty } from "../engine/store";
 
-type Props = { uid: string; route: string };
+type Props = { uid: string; route: string; hasAccess?: boolean; onRequireAccess?: () => boolean };
 
 type Option = { key: string; name: string; icon?: string };
 
@@ -206,7 +214,7 @@ function PickerPanel({
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 
-export default function AiGeneratePage({ uid, route }: Props) {
+export default function AiGeneratePage({ uid, route, hasAccess = true, onRequireAccess }: Props) {
   const { navigate } = useExitGuard();
 
   // Selections (keys)
@@ -225,6 +233,7 @@ export default function AiGeneratePage({ uid, route }: Props) {
   const [phase, setPhase] = useState<"idle" | "generating" | "ready">("idle");
   const [genMessage, setGenMessage] = useState(GENERATING_MESSAGES[0]);
   const [notice, setNotice] = useState<string | null>(null);
+  const [bankGate, setBankGate] = useState<RevisionBankStatus | null>(null);
   const [readyInfo, setReadyInfo] = useState<{ testId: number; count: number; usedAi: boolean } | null>(null);
 
   // AI config (own key or admin-published default)
@@ -354,11 +363,30 @@ export default function AiGeneratePage({ uid, route }: Props) {
 
   const runGenerate = async () => {
     if (!canGenerate) return;
+    if (onRequireAccess && !onRequireAccess()) return;
+    if (!hasAccess) return;
     setPhase("generating");
     setNotice(null);
     setReadyInfo(null);
     setOpenPicker(null);
     setModeOpen(false);
+
+    // Reserve cloud capacity before calling a paid AI provider. This prevents
+    // a full Test Bank from consuming AI quota/cost for a test that cannot be
+    // saved, and the server transaction prevents multi-device overbooking.
+    let reservationId = "";
+    try {
+      const reservation = await reserveRevisionTestSlot(uid);
+      reservationId = reservation.reservationId;
+    } catch (error) {
+      if (error instanceof RevisionCloudError && error.code === "TEST_BANK_FULL" && error.bank) {
+        setBankGate(error.bank);
+      } else {
+        setNotice(error instanceof Error ? error.message : "Could not reserve cloud space for this test.");
+      }
+      setPhase("idle");
+      return;
+    }
 
     // Resolve selections into { className, subjectName, chapterName, topicName } rows.
     type Row = { className: string; subjectName: string; chapterName: string; topicName: string };
@@ -424,46 +452,56 @@ export default function AiGeneratePage({ uid, route }: Props) {
         );
         usedAi = collected.length > 0;
         if (collected.length === 0) {
+          await releaseRevisionTestSlot(uid, reservationId);
           setNotice("The AI returned no usable questions. Check your key and try again.");
           setPhase("idle");
           return;
         }
       }
     } catch (err) {
+      await releaseRevisionTestSlot(uid, reservationId);
       setNotice(err instanceof Error ? err.message : "AI request failed. Check your configuration and try again.");
       setPhase("idle");
       return;
     }
 
     // Offline engine only when the student explicitly chose No AI.
-    if (collected.length === 0) {
-      const qs = generateOfflineQuestions({
-        subjectName: subjectNames[0] || "General",
-        topicName: topicNames.join(", ") || chapterNames[0] || "General",
-        count: total,
-        difficulty: pickDifficulty() as "easy" | "medium" | "hard",
-      });
-      collected.push(
-        ...qs.map<CustomTestQuestion>((q) => ({
-          prompt: q.prompt,
-          options: q.options,
-          correctIndex: Math.max(0, q.correctIndex),
-          explanation: q.explanation,
-          difficulty: pickDifficulty(),
+    try {
+      if (collected.length === 0) {
+        const qs = generateOfflineQuestions({
           subjectName: subjectNames[0] || "General",
-          topicName: chapterNames[0] || topicNames[0] || "General",
-        })),
-      );
+          topicName: topicNames.join(", ") || chapterNames[0] || "General",
+          count: total,
+          difficulty: pickDifficulty() as "easy" | "medium" | "hard",
+        });
+        collected.push(
+          ...qs.map<CustomTestQuestion>((q) => ({
+            prompt: q.prompt,
+            options: q.options,
+            correctIndex: Math.max(0, q.correctIndex),
+            explanation: q.explanation,
+            difficulty: pickDifficulty(),
+            subjectName: subjectNames[0] || "General",
+            topicName: chapterNames[0] || topicNames[0] || "General",
+          })),
+        );
+      }
+    } catch (error) {
+      await releaseRevisionTestSlot(uid, reservationId);
+      setNotice(error instanceof Error ? error.message : "Could not prepare the test questions.");
+      setPhase("idle");
+      return;
     }
 
     // Trim overshoot (AI sometimes returns extras).
     const finalQuestions = collected.slice(0, total);
 
+    let createdTestId: number | null = null;
     try {
       const subjectNames = Array.from(new Set(finalQuestions.map((q) => q.subjectName)));
       const title =
         subjectNames.length === 1 ? `Revision · ${subjectNames[0]}` : `Revision · ${subjectNames.length} subjects`;
-      const { testId } = createCustomTest(uid, {
+      const created = createCustomTest(uid, {
         title,
         estimatedMinutes: Math.max(1, Math.min(240, Math.round(totalMinutes))),
         source: "ai",
@@ -477,10 +515,18 @@ export default function AiGeneratePage({ uid, route }: Props) {
           questionMode,
         },
       });
-      setReadyInfo({ testId, count: finalQuestions.length, usedAi });
+      createdTestId = created.testId;
+      await commitCustomTestToCloud(uid, created.testId, reservationId);
+      setReadyInfo({ testId: created.testId, count: finalQuestions.length, usedAi });
       setPhase("ready");
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Could not create the test. Try again.");
+      if (createdTestId !== null) deleteCustomTestLocal(uid, createdTestId);
+      await releaseRevisionTestSlot(uid, reservationId);
+      if (err instanceof RevisionCloudError && err.code === "TEST_BANK_FULL" && err.bank) {
+        setBankGate(err.bank);
+      } else {
+        setNotice(err instanceof Error ? err.message : "Could not save the test securely. Try again.");
+      }
       setPhase("idle");
     }
   };
@@ -515,9 +561,11 @@ export default function AiGeneratePage({ uid, route }: Props) {
               {activeConfig ? `${providerMeta?.name} · ${activeConfig.model}` : "No AI connected"}
             </p>
             <p className="truncate text-[11px] text-slate-500">
-              {activeConfig
-                ? "Your selections below are sent to the AI"
-                : "Questions will use the built-in engine — connect AI for better results"}
+              {effective.mode === "own"
+                ? "Your provider account is used · school/plan AI allowance is not deducted"
+                : effective.mode === "default"
+                  ? "One complete test uses one school-AI generation and any enabled model-cost allowance"
+                  : "Questions will use the built-in engine — connect AI for better results"}
             </p>
           </div>
           <button
@@ -829,6 +877,13 @@ export default function AiGeneratePage({ uid, route }: Props) {
           </Card>
         )}
       </div>
+      <TestBankLimitGate
+        open={Boolean(bankGate)}
+        bank={bankGate}
+        onClose={() => setBankGate(null)}
+        onManageBank={() => navigate("#/revision/bank")}
+        onExplorePlans={() => navigate("#/subscription")}
+      />
     </PageShell>
   );
 }

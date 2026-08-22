@@ -55,9 +55,12 @@ test("RevisionApp gates paywalled actions with the floating premium gate", () =>
   assert.match(revisionApp, /if \(hasRevisionAccess\) return true;/);
   assert.match(revisionApp, /setPaywallOpen\(true\)/);
   assert.match(revisionApp, /onRequireAccess=\{requireAccess\}/);
-  // Deep links into paywalled screens fall back to a gated page instead of
-  // rendering the protected player/session without access.
-  assert.match(revisionApp, /if \(!revisionAccessLoading && !hasRevisionAccess\)/);
+  // Only new-test creation is gated. Existing player/session/result routes
+  // remain available after expiry or downgrade.
+  assert.match(revisionApp, /AiGeneratePage[\s\S]{0,180}onRequireAccess=\{requireAccess\}/);
+  assert.match(revisionApp, /BulkImportPage[\s\S]{0,180}onRequireAccess=\{requireAccess\}/);
+  assert.match(revisionApp, /Existing saved tests and in-progress attempts remain usable/);
+  assert.match(revisionApp, /Smart Revision sessions operate on existing learner-owned data/);
   // The gate lives on the existing route — #/revision still mounts the app.
   assert.match(main, /hash\.startsWith\(REVISION_HASH\)\) return <RevisionApp \/>/);
 });

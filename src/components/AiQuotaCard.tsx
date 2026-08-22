@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock3, Sparkles } from "lucide-react";
+import { Clock3, Coins, Sparkles } from "lucide-react";
 import { defaultCatalogAiSettings, type CatalogAiSettings } from "../revision/engine/aiConfig";
 import { fetchRemoteCatalog } from "../revision/engine/catalogService";
 import {
   computeUsageSnapshot,
   emptyUsage,
+  refreshAiUsageStatus,
   subscribeAiUsage,
   type AiUsageSnapshot,
 } from "../revision/engine/aiUsage";
@@ -52,6 +53,13 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
     };
   }, [uid]);
 
+  useEffect(() => {
+    if (record.termEndsAt <= Date.now()) return undefined;
+    const delay = Math.min(2_147_000_000, Math.max(1_000, record.termEndsAt - Date.now() + 1_000));
+    const timer = window.setTimeout(() => { void refreshAiUsageStatus(); }, delay);
+    return () => window.clearTimeout(timer);
+  }, [record.termEndsAt]);
+
   const snap: AiUsageSnapshot = useMemo(() => computeUsageSnapshot(record, settings, now), [record, settings, now]);
   const dailyLeftLabel = snap.dailyUnlimited ? "Unlimited" : `${snap.dailyRemaining} left`;
   const windowLeftLabel = snap.windowUnlimited ? "Unlimited" : `${snap.windowRemaining} left`;
@@ -68,7 +76,7 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">School AI allowance</p>
-              <h3 className="mt-1 text-lg font-black text-slate-950">AI usage limits</h3>
+              <h3 className="mt-1 text-lg font-black text-slate-950">{snap.planName} · {snap.cycle} AI</h3>
             </div>
           </div>
           <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${snap.allowed ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
@@ -82,6 +90,11 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
             <span className="text-violet-700">{dailyLeftLabel}</span>
           </div>
           <Bar used={snap.dailyUsed} limit={snap.dailyLimit} unlimited={snap.dailyUnlimited} tone="bg-violet-500" />
+          {!snap.dailyUnlimited && (
+            <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
+              Daily generation allowance resets at {new Date(new Date(now).setHours(24, 0, 0, 0)).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.
+            </p>
+          )}
         </div>
 
         <div className="mt-4">
@@ -98,11 +111,30 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
           )}
         </div>
 
+        {snap.costEnabled && (
+          <div className="mt-4 rounded-2xl border border-amber-100 bg-white/70 p-3">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+              <span className="inline-flex items-center gap-1">
+                <Coins className="h-3.5 w-3.5 text-amber-600" />
+                Model cost this term · {snap.costUnlimited ? "no cap" : `$${(snap.costUsedMicros / 1_000_000).toFixed(4)} / $${(snap.costBudgetMicros / 1_000_000).toFixed(2)}`}
+              </span>
+              <span className="text-amber-700">{snap.costUnlimited ? "Unlimited" : `$${(snap.costRemainingMicros / 1_000_000).toFixed(4)} left`}</span>
+            </div>
+            <Bar used={snap.costUsedMicros} limit={snap.costBudgetMicros} unlimited={snap.costUnlimited} tone="bg-amber-500" />
+            {snap.termEndsAt > now && <p className="mt-1.5 text-[11px] font-semibold text-slate-400">Budget term ends {new Date(snap.termEndsAt).toLocaleDateString()}.</p>}
+            {record.lastUsage && (
+              <p className="mt-1 text-[10px] leading-relaxed text-slate-400">
+                Last test: {record.lastUsage.totalTokens.toLocaleString()} tokens ({record.lastUsage.usageSource}) · {record.lastUsage.model} · ${(record.lastUsage.actualCostMicros / 1_000_000).toFixed(4)}
+              </p>
+            )}
+          </div>
+        )}
+
         {snap.blockedReason ? (
           <p className="mt-4 rounded-2xl bg-rose-50 px-3 py-2.5 text-xs font-semibold leading-5 text-rose-700">{snap.blockedReason}</p>
         ) : (
           <p className="mt-4 text-xs leading-5 text-slate-600">
-            Limits are set by your school for everyone. Progress updates live as you generate questions.
+            One complete school-AI test uses one generation. Provider token usage is shown when the hybrid policy is enabled. Your own API key is always outside this allowance.
           </p>
         )}
       </div>

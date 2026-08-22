@@ -28,6 +28,8 @@ export const FALLBACK_SUBSCRIPTION_CATALOG: SubscriptionCatalog = {
       trialDays: 0,
       autoRenewByDefault: true,
       sortOrder: 0,
+      revisionTestBankLimits: { monthly: 20, yearly: 20 },
+      aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } },
     },
     {
       id: "premium",
@@ -45,6 +47,8 @@ export const FALLBACK_SUBSCRIPTION_CATALOG: SubscriptionCatalog = {
       trialDays: 0,
       autoRenewByDefault: true,
       sortOrder: 1,
+      revisionTestBankLimits: { monthly: 50, yearly: 50 },
+      aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } },
     },
     {
       id: "pro",
@@ -62,6 +66,8 @@ export const FALLBACK_SUBSCRIPTION_CATALOG: SubscriptionCatalog = {
       trialDays: 0,
       autoRenewByDefault: true,
       sortOrder: 2,
+      revisionTestBankLimits: { monthly: 100, yearly: 100 },
+      aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } },
     },
   ],
   features: [
@@ -75,6 +81,7 @@ export const FALLBACK_SUBSCRIPTION_CATALOG: SubscriptionCatalog = {
       active: true,
       badge: "PAID",
       sortOrder: 0,
+      freeItemsPerDay: 1,
     },
     {
       id: "revision",

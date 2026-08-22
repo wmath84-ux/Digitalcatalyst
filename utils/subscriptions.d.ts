@@ -29,6 +29,10 @@ export interface SubscriptionPlanDoc {
   trialDays: number;
   autoRenewByDefault: boolean;
   sortOrder: number;
+  /** Maximum cloud-saved revision tests for each billing duration (-1 = unlimited). */
+  revisionTestBankLimits: { monthly: number; yearly: number };
+  /** School-AI daily generation and per-term model-cost allowances. */
+  aiAllowances: import("./aiAllowances.js").PlanAiAllowances;
 }
 
 /** Canonical subscription feature shape. */
@@ -49,6 +53,8 @@ export interface SubscriptionFeatureDoc {
   active: boolean;
   badge: string | null;
   sortOrder: number;
+  /** Non-subscriber daily item creations for My Day; null for other features. */
+  freeItemsPerDay?: number | null;
 }
 
 /** Plan-to-product unlock (Firestore `subscriptionPlanProductUnlocks`). */
@@ -116,6 +122,12 @@ export interface SubscriptionRecord {
   source: "razorpay" | "free" | "admin";
   /** Coupon applied to the original payment. */
   couponCode: string | null;
+  /** Purchased cloud Test Bank benefit snapshot for this term (-1 = unlimited). */
+  revisionTestBankLimit?: number;
+  /** Purchased school-AI successful-test daily cap snapshot (0 = unlimited). */
+  aiDailyGenerationLimit?: number;
+  /** Purchased school-AI model-cost budget snapshot in micro-USD (-1 = unlimited). */
+  aiCostBudgetMicros?: number;
 }
 
 export const normalisePlanDoc: (raw: unknown, id?: string) => SubscriptionPlanDoc | null;

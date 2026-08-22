@@ -52,7 +52,8 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
   };
 
   const openPlan = (plan: CustomTestListItem) => {
-    if (!requirePaidAccess()) return;
+    // Saved tests are owned learner data and remain usable after expiry or a
+    // downgrade. Only creating another test is a paid entitlement action.
     if (plan.status === "completed" && plan.attemptId) {
       navigate(`#/revision/test/result/${plan.attemptId}`);
       return;

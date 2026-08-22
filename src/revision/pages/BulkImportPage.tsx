@@ -11,9 +11,17 @@ import { Card, PrimaryButton, SecondaryButton } from "../components/ui";
 import { BookOpenIcon, CheckIcon, ChevronRightIcon, SparklesIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { parseQuestionText, type ParsedQuestion } from "../engine/bulkParser";
-import { createCustomTest } from "../engine/customTestService";
+import { createCustomTest, deleteCustomTestLocal } from "../engine/customTestService";
+import {
+  commitCustomTestToCloud,
+  releaseRevisionTestSlot,
+  reserveRevisionTestSlot,
+  RevisionCloudError,
+  type RevisionBankStatus,
+} from "../engine/cloudRevisionService";
+import TestBankLimitGate from "../components/TestBankLimitGate";
 
-type Props = { uid: string; route: string };
+type Props = { uid: string; route: string; hasAccess?: boolean; onRequireAccess?: () => boolean };
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 
@@ -32,13 +40,15 @@ D) Hydrogen`;
 
 type PreviewItem = ParsedQuestion & { key: string };
 
-export default function BulkImportPage({ uid, route }: Props) {
+export default function BulkImportPage({ uid, route, hasAccess = true, onRequireAccess }: Props) {
   const { navigate } = useExitGuard();
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [preview, setPreview] = useState<PreviewItem[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeTone, setNoticeTone] = useState<"info" | "err">("info");
+  const [saving, setSaving] = useState(false);
+  const [bankGate, setBankGate] = useState<RevisionBankStatus | null>(null);
   const [ready, setReady] = useState<{ testId: number; count: number } | null>(null);
 
   const undetected = useMemo(() => preview.filter((p) => p.correctIndex < 0).length, [preview]);
@@ -51,13 +61,17 @@ export default function BulkImportPage({ uid, route }: Props) {
       setNoticeTone("err");
       return;
     }
-    setPreview(parsed.map((p) => ({ ...p, key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` })));
-    const missing = parsed.filter((p) => !p.detected).length;
-    if (missing > 0) {
+    const accepted = parsed.slice(0, 100);
+    setPreview(accepted.map((p) => ({ ...p, key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` })));
+    const missing = accepted.filter((p) => !p.detected).length;
+    if (parsed.length > 100) {
+      setNotice(`The Test Bank supports up to 100 questions per saved test. The first 100 were imported for review.`);
+      setNoticeTone("info");
+    } else if (missing > 0) {
       setNotice(`${missing} question(s) had no detected correct answer — mark them below before creating the test.`);
       setNoticeTone("info");
     } else {
-      setNotice(`${parsed.length} questions parsed. Review below, then create your test.`);
+      setNotice(`${accepted.length} questions parsed. Review below, then create your test.`);
       setNoticeTone("info");
     }
   };
@@ -67,16 +81,24 @@ export default function BulkImportPage({ uid, route }: Props) {
   };
   const removeItem = (key: string) => setPreview((items) => items.filter((q) => q.key !== key));
 
-  const createTest = () => {
-    if (preview.length === 0) return;
+  const createTest = async () => {
+    if (preview.length === 0 || saving) return;
+    if (onRequireAccess && !onRequireAccess()) return;
+    if (!hasAccess) return;
     if (undetected > 0) {
       setNotice(`${undetected} question(s) still have no correct answer marked. Tap the right option on each.`);
       setNoticeTone("err");
       return;
     }
+    setSaving(true);
+    setNotice(null);
+    let reservationId = "";
+    let createdTestId: number | null = null;
     try {
+      const reservation = await reserveRevisionTestSlot(uid);
+      reservationId = reservation.reservationId;
       const cleanTitle = title.trim() || "My Imported Test";
-      const { testId } = createCustomTest(uid, {
+      const created = createCustomTest(uid, {
         title: cleanTitle,
         estimatedMinutes: Math.max(2, Math.ceil(preview.length * 0.75)),
         source: "bulk",
@@ -90,13 +112,23 @@ export default function BulkImportPage({ uid, route }: Props) {
           topicName: cleanTitle,
         })),
       });
-      setReady({ testId, count: preview.length });
+      createdTestId = created.testId;
+      await commitCustomTestToCloud(uid, created.testId, reservationId);
+      setReady({ testId: created.testId, count: preview.length });
       setPreview([]);
       setText("");
       setNotice(null);
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Could not create the test.");
-      setNoticeTone("err");
+      if (createdTestId !== null) deleteCustomTestLocal(uid, createdTestId);
+      if (reservationId) await releaseRevisionTestSlot(uid, reservationId);
+      if (err instanceof RevisionCloudError && err.code === "TEST_BANK_FULL" && err.bank) {
+        setBankGate(err.bank);
+      } else {
+        setNotice(err instanceof Error ? err.message : "Could not save the test securely.");
+        setNoticeTone("err");
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -247,14 +279,21 @@ export default function BulkImportPage({ uid, route }: Props) {
                     </div>
                   ))}
                 </div>
-                <PrimaryButton className="mt-3" disabled={preview.length === 0} onClick={createTest}>
-                  <CheckIcon className="h-4 w-4" /> Create test with {preview.length} question{preview.length === 1 ? "" : "s"}
+                <PrimaryButton className="mt-3" disabled={preview.length === 0 || saving} onClick={() => void createTest()}>
+                  <CheckIcon className="h-4 w-4" /> {saving ? "Saving securely…" : `Create test with ${preview.length} question${preview.length === 1 ? "" : "s"}`}
                 </PrimaryButton>
               </Card>
             )}
           </>
         )}
       </div>
+      <TestBankLimitGate
+        open={Boolean(bankGate)}
+        bank={bankGate}
+        onClose={() => setBankGate(null)}
+        onManageBank={() => navigate("#/revision/bank")}
+        onExplorePlans={() => navigate("#/subscription")}
+      />
     </PageShell>
   );
 }

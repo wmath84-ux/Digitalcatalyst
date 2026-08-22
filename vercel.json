@@ -13,6 +13,14 @@
     {
       "source": "/api/revision/generate",
       "destination": "/api/referral-leaderboard"
+    },
+    {
+      "source": "/api/revision/data",
+      "destination": "/api/referral-leaderboard"
+    },
+    {
+      "source": "/api/myday",
+      "destination": "/api/referral-leaderboard"
     }
   ]
 }

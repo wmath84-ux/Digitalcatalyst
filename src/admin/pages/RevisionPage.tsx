@@ -31,6 +31,7 @@ import {
   loadAdminAiConfig,
   mergeModelLists,
   saveAdminAiConfig,
+  type AiModelPrice,
   type CatalogAiSettings,
   type ProviderModel,
   type UserAiConfig,
@@ -56,6 +57,9 @@ export default function RevisionPage() {
   const [dailyLimit, setDailyLimit] = useState(20);
   const [windowHours, setWindowHours] = useState(5);
   const [windowLimit, setWindowLimit] = useState(10);
+  const [allowancePolicy, setAllowancePolicy] = useState<CatalogAiSettings["allowancePolicy"]>("generation-only");
+  const [modelPricing, setModelPricing] = useState<AiModelPrice[]>([]);
+  const [estimatedOutputTokensPerQuestion, setEstimatedOutputTokensPerQuestion] = useState(350);
   const [publishing, setPublishing] = useState(false);
 
   const load = async () => {
@@ -78,6 +82,9 @@ export default function RevisionPage() {
       setDailyLimit(published.dailyLimit ?? 20);
       setWindowHours(published.windowHours ?? 5);
       setWindowLimit(published.windowLimit ?? 10);
+      setAllowancePolicy(published.allowancePolicy ?? "generation-only");
+      setModelPricing(published.modelPricing ?? []);
+      setEstimatedOutputTokensPerQuestion(published.estimatedOutputTokensPerQuestion ?? 350);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load revision AI configuration.");
     }
@@ -123,6 +130,14 @@ export default function RevisionPage() {
       notify("error", "Enter your API key before sharing it with users.");
       return;
     }
+    if (publishProvider === "custom" && !adminCfg.config.baseUrl.trim()) {
+      notify("error", "Enter the custom provider API base URL before publishing it.");
+      return;
+    }
+    if (allowancePolicy === "hybrid" && !modelPricing.some((price) => price.provider === publishProvider && price.model === publishModel)) {
+      notify("error", "Add input and output token pricing for the published provider/model before enabling the hybrid cost policy.");
+      return;
+    }
     if (!shareKey) {
       // Publishing without a shared key leaves every student's
       // "School-provided AI" option DISABLED — the old success toast hid
@@ -139,12 +154,16 @@ export default function RevisionPage() {
     const nextSettings: CatalogAiSettings = {
       provider: publishProvider,
       model: publishModel,
+      baseUrl: adminCfg.config.baseUrl || publishProviderMeta.baseUrl,
       models: publishModels.slice(0, 300),
       sharedApiKey: shareKey ? adminCfg.config.apiKey.trim() : "",
       updatedAt: new Date().toISOString(),
       dailyLimit: Math.max(0, Math.round(Number(dailyLimit) || 0)),
       windowHours: Math.max(1, Math.min(24, Math.round(Number(windowHours) || 5))),
       windowLimit: Math.max(-1, Math.round(Number(windowLimit) || 0)),
+      allowancePolicy,
+      modelPricing: modelPricing.slice(0, 500),
+      estimatedOutputTokensPerQuestion: Math.max(50, Math.min(10_000, Math.round(Number(estimatedOutputTokensPerQuestion) || 350))),
     };
     setPublishing(true);
     try {
@@ -367,13 +386,12 @@ export default function RevisionPage() {
         </p>
 
         <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
-          <p className="text-sm font-semibold text-slate-900">Usage limits for every user</p>
+          <p className="text-sm font-semibold text-slate-900">Usage limits for every user · plan-aware school-AI policy</p>
           <p className="mt-0.5 text-xs text-slate-500">
-            These numbers appear on each learner&apos;s profile with a live progress bar. Set daily to 0 for unlimited.
-            Window limit −1 = unlimited window.
+            Daily successful-test allowances are configured independently on every plan&apos;s monthly/yearly settings. The fallback below supports legacy/free access; the rolling window remains a global safety guard. Window limit −1 means unlimited.
           </p>
           <div className="mt-3 grid grid-cols-3 gap-2">
-            <Field label="Daily generations">
+            <Field label="Legacy daily fallback" hint="Used only when a legacy subscription has no plan snapshot">
               <input className={inputClass} type="number" min={0} max={10000} value={dailyLimit}
                 onChange={(e) => setDailyLimit(Math.max(0, Math.round(Number(e.target.value) || 0)))} />
             </Field>
@@ -385,6 +403,67 @@ export default function RevisionPage() {
               <input className={inputClass} type="number" min={-1} max={10000} value={windowLimit}
                 onChange={(e) => setWindowLimit(Math.max(-1, Math.round(Number(e.target.value) || 0)))} />
             </Field>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-violet-200 bg-white p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Model-cost allowance policy</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                  Generation-only preserves the successful-test counter. Hybrid also deducts actual provider token usage—or a safe estimate when usage metadata is unavailable—from the learner&apos;s purchased plan budget.
+                </p>
+              </div>
+              <select className={selectClass} value={allowancePolicy} onChange={(e) => setAllowancePolicy(e.target.value === "hybrid" ? "hybrid" : "generation-only")}>
+                <option value="generation-only">Generation-only</option>
+                <option value="hybrid">Hybrid: generations + cost</option>
+              </select>
+            </div>
+            <div className="mt-3 max-w-xs">
+              <Field label="Estimated output tokens / question" hint="Used to reserve budget safely before the provider responds">
+                <input className={inputClass} type="number" min={50} max={10000} value={estimatedOutputTokensPerQuestion} onChange={(e) => setEstimatedOutputTokensPerQuestion(Math.max(50, Math.min(10_000, Math.round(Number(e.target.value) || 350))))} />
+              </Field>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-sky-200 bg-white p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Dynamic model token pricing</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                  Prices are published with the catalog, so changing models or provider rates never requires a source-code release. Enter USD per one million tokens.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="shrink-0 rounded-lg bg-sky-100 px-3 py-2 text-xs font-bold text-sky-700 hover:bg-sky-200"
+                onClick={() => {
+                  const model = publishModel.trim();
+                  if (!model || modelPricing.some((row) => row.provider === publishProvider && row.model === model)) return;
+                  setModelPricing((rows) => [...rows, { provider: publishProvider, model, inputUsdPerMillion: 0, outputUsdPerMillion: 0, updatedAt: new Date().toISOString() }]);
+                }}
+              >
+                + Add current model
+              </button>
+            </div>
+            {modelPricing.length === 0 ? (
+              <p className="mt-3 rounded-lg bg-slate-50 px-3 py-3 text-xs text-slate-500">No price rows yet. Add the current model, then enter its provider rates.</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {modelPricing.map((price, index) => (
+                  <div key={`${price.provider}:${price.model}:${index}`} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                    <div className="grid gap-2 sm:grid-cols-[130px_1fr_120px_120px_auto]">
+                      <select className={selectClass} value={price.provider} onChange={(e) => setModelPricing((rows) => rows.map((row, i) => i === index ? { ...row, provider: e.target.value as AiModelPrice["provider"], updatedAt: new Date().toISOString() } : row))}>
+                        <option value="gemini">Gemini</option><option value="openai">OpenAI</option><option value="openrouter">OpenRouter</option><option value="anthropic">Anthropic</option><option value="groq">Groq</option><option value="custom">Custom</option>
+                      </select>
+                      <input className={inputClass} aria-label="Model ID" placeholder="Model ID" value={price.model} onChange={(e) => setModelPricing((rows) => rows.map((row, i) => i === index ? { ...row, model: e.target.value, updatedAt: new Date().toISOString() } : row))} />
+                      <input className={inputClass} aria-label="Input USD per million" type="number" min={0} step="0.0001" placeholder="Input / 1M" value={price.inputUsdPerMillion} onChange={(e) => setModelPricing((rows) => rows.map((row, i) => i === index ? { ...row, inputUsdPerMillion: Math.max(0, Number(e.target.value) || 0), updatedAt: new Date().toISOString() } : row))} />
+                      <input className={inputClass} aria-label="Output USD per million" type="number" min={0} step="0.0001" placeholder="Output / 1M" value={price.outputUsdPerMillion} onChange={(e) => setModelPricing((rows) => rows.map((row, i) => i === index ? { ...row, outputUsdPerMillion: Math.max(0, Number(e.target.value) || 0), updatedAt: new Date().toISOString() } : row))} />
+                      <button type="button" className="rounded-lg px-2 text-xs font-bold text-rose-600 hover:bg-rose-50" onClick={() => setModelPricing((rows) => rows.filter((_, i) => i !== index))}>Remove</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

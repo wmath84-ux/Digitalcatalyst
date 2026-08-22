@@ -26,6 +26,9 @@ import {
   type QuestionMode,
 } from "./aiGenerate";
 import { CURRICULUM_SYSTEM_PROMPT, normalizeCurriculumClass, type CurriculumClass } from "./curriculumCatalog";
+import { normalizeAiModelPricing, type AiModelPrice } from "../../../utils/aiPolicy.js";
+
+export type { AiModelPrice } from "../../../utils/aiPolicy.js";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -58,6 +61,8 @@ export type ProviderModel = {
 export type CatalogAiSettings = {
   provider: AIProviderId;
   model: string;
+  /** Published API root, required for Admin-configured custom OpenAI-compatible providers. */
+  baseUrl: string;
   /** Models the admin saw when configuring — published so users see them too. */
   models: ProviderModel[];
   /** Optional key the admin explicitly chose to share with every user. */
@@ -69,6 +74,12 @@ export type CatalogAiSettings = {
   windowHours: number;
   /** Max AI generations inside the rolling window (0 = same as daily, -1 unlimited). */
   windowLimit: number;
+  /** Generation-only keeps legacy counting; hybrid also enforces the purchased term's model-cost budget. */
+  allowancePolicy: "generation-only" | "hybrid";
+  /** Admin-maintained dynamic pricing catalog. No source edit is needed when models or prices change. */
+  modelPricing: AiModelPrice[];
+  /** Conservative output-token reservation used before provider usage is available. */
+  estimatedOutputTokensPerQuestion: number;
 };
 
 /* ------------------------------------------------------------------ */
@@ -383,7 +394,8 @@ export type EffectiveAi = {
 
 /** True when the admin has published a usable school-provided AI (shared key + model). */
 export function isSchoolAiAvailable(settings: CatalogAiSettings | null | undefined): boolean {
-  return Boolean(settings?.sharedApiKey?.trim() && settings?.model?.trim());
+  const hasKeyAndModel = Boolean(settings?.sharedApiKey?.trim() && settings?.model?.trim());
+  return hasKeyAndModel && Boolean(settings?.provider !== "custom" || settings.baseUrl?.trim());
 }
 
 /** True when the admin has published *something* the school option can display. */
@@ -400,7 +412,7 @@ export function schoolAiConfig(settings: CatalogAiSettings | null | undefined): 
   return {
     provider: settings.provider,
     apiKey: settings.sharedApiKey,
-    baseUrl: getProvider(settings.provider).baseUrl,
+    baseUrl: settings.baseUrl || getProvider(settings.provider).baseUrl,
     model: settings.model,
   };
 }
@@ -688,6 +700,7 @@ async function generateViaServer(args: RevisionGenerateArgs): Promise<ParsedQues
           }
         : undefined,
       syllabus: args.syllabus,
+      tzOffsetMinutes: new Date().getTimezoneOffset(),
     }),
   });
   const raw = await res.text();
@@ -743,12 +756,16 @@ export function defaultCatalogAiSettings(): CatalogAiSettings {
   return {
     provider: "gemini",
     model: DEFAULT_MODEL,
+    baseUrl: getProvider("gemini").baseUrl,
     models: [...KNOWN_MODELS.gemini],
     sharedApiKey: "",
     updatedAt: "",
     dailyLimit: 20,
     windowHours: 5,
     windowLimit: 10,
+    allowancePolicy: "generation-only",
+    modelPricing: [],
+    estimatedOutputTokensPerQuestion: 350,
   };
 }
 
@@ -795,12 +812,21 @@ export function normalizeCatalogAiSettings(raw: unknown): CatalogAiSettings {
   return {
     provider,
     model: cleanStr(r.model).trim() || models[0]?.id || d.model,
+    baseUrl: cleanStr(r.baseUrl).trim() || getProvider(provider).baseUrl,
     models: models.length > 0 ? models : [...KNOWN_MODELS[provider]],
     sharedApiKey: cleanStr(r.sharedApiKey),
     updatedAt: cleanUpdatedAt(r.updatedAt),
     dailyLimit,
     windowHours,
     windowLimit,
+    allowancePolicy: r.allowancePolicy === "hybrid" ? "hybrid" : "generation-only",
+    modelPricing: normalizeAiModelPricing(r.modelPricing),
+    estimatedOutputTokensPerQuestion: clampLimit(
+      r.estimatedOutputTokensPerQuestion,
+      d.estimatedOutputTokensPerQuestion,
+      50,
+      10_000,
+    ),
   };
 }
 

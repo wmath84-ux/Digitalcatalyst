@@ -38,11 +38,9 @@ function TrendBadge({ trend }: { trend: string }) {
 type Props = {
   uid: string;
   route: string;
-  hasAccess?: boolean;
-  onRequireAccess?: () => boolean;
 };
 
-export default function WeakTopicsPage({ uid, route, hasAccess = true, onRequireAccess }: Props) {
+export default function WeakTopicsPage({ uid, route }: Props) {
   const { navigate } = useExitGuard();
   const [revisingTopicId, setRevisingTopicId] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -50,9 +48,8 @@ export default function WeakTopicsPage({ uid, route, hasAccess = true, onRequire
   const data = useMemo(() => getWeakTopics(uid), [uid]);
 
   const handleRevise = (topicId: number) => {
-    // Gate appears when user tries to revise a weak topic
-    if (onRequireAccess && !onRequireAccess()) return;
-    if (hasAccess === false) return;
+    // This revises already-owned weak-question data, so it remains available
+    // after subscription expiry/downgrade just like saved-test retakes.
     setErrorMsg(null);
     setRevisingTopicId(topicId);
     try {

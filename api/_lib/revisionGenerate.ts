@@ -9,7 +9,11 @@
 // vercel.json rewrite from `/api/revision/generate` — Hobby plan is already
 // at the 12-function cap, so we must not add a new serverless entry.
 
+import { randomUUID } from "node:crypto";
 import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./firebaseAdmin.js";
+import { normalisePlanDoc } from "../../utils/subscriptions.js";
+import { aiAllowanceForCycle } from "../../utils/aiAllowances.js";
+import { calculateAiCostMicros, estimateTokensFromText, findAiModelPrice, normalizeAiModelPricing, type AiModelPrice } from "../../utils/aiPolicy.js";
 
 const PROVIDERS = ["gemini", "openai", "openrouter", "anthropic", "groq", "custom"] as const;
 type ProviderId = (typeof PROVIDERS)[number];
@@ -55,6 +59,40 @@ type GeneratedQuestion = {
   difficulty: string;
 };
 
+type ProviderUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  source: "actual" | "estimated";
+};
+
+type ProviderGeneration = {
+  questions: GeneratedQuestion[];
+  usage: ProviderUsage;
+};
+
+type EffectiveAiPolicy = {
+  hasAccess: boolean;
+  planId: string;
+  planName: string;
+  cycle: "monthly" | "yearly";
+  dailyLimit: number;
+  windowHours: number;
+  windowLimit: number;
+  costEnabled: boolean;
+  costBudgetMicros: number;
+  termKey: string;
+  termStartsAt: number;
+  termEndsAt: number;
+  pricing: AiModelPrice[];
+  estimatedOutputTokensPerQuestion: number;
+};
+
+type UsageReservation = {
+  id: string;
+  estimatedCostMicros: number;
+};
+
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
@@ -93,9 +131,18 @@ const firstHeader = (headers: VercelRequest["headers"] | undefined, name: string
   return Array.isArray(value) ? String(value[0] || "") : String(value || "");
 };
 
-const dayKey = (now = Date.now()): string => {
-  const d = new Date(now);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const dayKey = (now = Date.now(), tzOffsetMinutes = 0): string => {
+  const offset = Math.max(-840, Math.min(840, Math.round(Number(tzOffsetMinutes) || 0)));
+  const d = new Date(now - offset * 60_000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+};
+
+const millis = (value: unknown): number => {
+  if (value && typeof value === "object" && "toMillis" in value && typeof (value as { toMillis?: unknown }).toMillis === "function") {
+    return (value as { toMillis: () => number }).toMillis();
+  }
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? number : 0;
 };
 
 export function geminiGenerateUrl(baseUrl: string, model: string): string {
@@ -307,48 +354,332 @@ async function loadSchoolConfig(): Promise<AiConfig> {
   if (!apiKey || !model) {
     throw Object.assign(new Error("School-provided AI is not published yet. Ask your school to share a key, or use your own API key."), { statusCode: 409 });
   }
-  return { provider, apiKey, baseUrl: DEFAULT_BASE[provider], model };
+  return { provider, apiKey, baseUrl: String(settings.baseUrl || DEFAULT_BASE[provider]).trim(), model };
 }
 
-async function consumeUsage(uid: string, settings: Record<string, unknown>, opts: { dryRun: boolean }): Promise<void> {
-  const dailyLimit = Math.max(0, Math.round(Number(settings.dailyLimit ?? 20) || 0));
+function normalizedReservations(raw: unknown, now = Date.now()): Record<string, Record<string, unknown>> {
+  const source = asRecord(raw);
+  const next: Record<string, Record<string, unknown>> = {};
+  for (const [id, value] of Object.entries(source).slice(0, 100)) {
+    const row = asRecord(value);
+    const expiresAt = Number(row.expiresAt || 0);
+    if (id && Number.isFinite(expiresAt) && expiresAt > now) next[id] = row;
+  }
+  return next;
+}
+
+async function resolveEffectiveAiPolicy(uid: string, settingsInput?: Record<string, unknown>): Promise<EffectiveAiPolicy> {
+  const db = adminDb();
+  const [featureSnap, subscriptionSnap, catalogSnap] = await Promise.all([
+    db.collection("subscriptionFeatures").doc("revision").get(),
+    db.collection("users").doc(uid).collection("subscription").doc("current").get(),
+    settingsInput ? Promise.resolve(null) : db.collection("settings").doc(REVISION_CATALOG_DOC).get(),
+  ]);
+  const settings = settingsInput ?? asRecord(asRecord(catalogSnap?.data()).aiSettings);
+  const subscription = asRecord(subscriptionSnap.data());
+  const now = Date.now();
+  const active = subscriptionSnap.exists && subscription.status === "active" && millis(subscription.expiresAt) > now;
+  const features = Array.isArray(subscription.features) ? subscription.features.map(String) : [];
+  const featureConfigured = featureSnap.exists && featureSnap.data()?.active !== false;
+  const hasAccess = !featureConfigured || (active && features.includes("revision"));
+  const planId = String(subscription.planId || "basic").trim() || "basic";
+  const cycle = subscription.cycle === "yearly" ? "yearly" : "monthly";
+  const planSnap = await db.collection("subscriptionPlans").doc(planId).get();
+  const plan = planSnap.exists ? normalisePlanDoc(planSnap.data() || {}, planSnap.id) : null;
+  const currentAllowance = aiAllowanceForCycle(plan ?? { aiAllowances: null }, cycle);
+  const fallbackDaily = Math.max(0, Math.min(10_000, Math.round(Number(settings.dailyLimit ?? 20) || 0)));
+  const snapshotDailyRaw = Number(subscription.aiDailyGenerationLimit);
+  const snapshotDaily = Number.isFinite(snapshotDailyRaw)
+    ? Math.max(0, Math.min(10_000, Math.round(snapshotDailyRaw)))
+    : currentAllowance.dailyGenerationLimit;
+  // A purchased benefit is never silently reduced mid-term. Admin increases
+  // become useful immediately; 0 is the explicit unlimited value.
+  const planDaily = snapshotDaily === 0 || currentAllowance.dailyGenerationLimit === 0
+    ? 0
+    : Math.max(snapshotDaily, currentAllowance.dailyGenerationLimit);
+  const dailyLimit = active && plan ? planDaily : fallbackDaily;
+
+  const snapshotCostRaw = Number(subscription.aiCostBudgetMicros);
+  const snapshotCost = Number.isFinite(snapshotCostRaw)
+    ? Math.max(-1, Math.min(1_000_000_000_000, Math.round(snapshotCostRaw)))
+    : currentAllowance.costBudgetMicros;
+  const currentCost = currentAllowance.costBudgetMicros;
+  const costBudgetMicros = !active || !plan || snapshotCost < 0 || currentCost < 0
+    ? -1
+    : Math.max(snapshotCost, currentCost);
+  const activatedAt = millis(subscription.activatedAt) || now;
+  const expiresAt = millis(subscription.expiresAt) || now;
+  const termKey = active
+    ? `${planId}:${cycle}:${Math.round(activatedAt)}:${Math.round(expiresAt)}`
+    : `free:${planId}:${cycle}`;
   const windowHours = Math.max(1, Math.min(24, Math.round(Number(settings.windowHours ?? 5) || 5)));
   const windowLimitRaw = Number(settings.windowLimit);
-  const windowLimit = Number.isFinite(windowLimitRaw) ? Math.max(-1, Math.min(10_000, Math.round(windowLimitRaw))) : 10;
-  const now = Date.now();
+  const windowLimit = Number.isFinite(windowLimitRaw)
+    ? Math.max(-1, Math.min(10_000, Math.round(windowLimitRaw)))
+    : 10;
+  return {
+    hasAccess,
+    planId,
+    planName: String(plan?.name || planId || "Basic"),
+    cycle,
+    dailyLimit,
+    windowHours,
+    windowLimit,
+    costEnabled: settings.allowancePolicy === "hybrid",
+    costBudgetMicros,
+    termKey,
+    termStartsAt: activatedAt,
+    termEndsAt: expiresAt,
+    pricing: normalizeAiModelPricing(settings.modelPricing),
+    estimatedOutputTokensPerQuestion: Math.max(50, Math.min(10_000, Math.round(Number(settings.estimatedOutputTokensPerQuestion ?? 350) || 350))),
+  };
+}
+
+function usageSnapshot(
+  dataInput: Record<string, unknown>,
+  policy: EffectiveAiPolicy,
+  tzOffsetMinutes = 0,
+  now = Date.now(),
+) {
+  const data = asRecord(dataInput);
+  const currentDay = dayKey(now, tzOffsetMinutes);
+  const dayCount = String(data.dayKey || "") === currentDay ? Math.max(0, Math.round(Number(data.dayCount) || 0)) : 0;
+  const windowMs = policy.windowHours * 60 * 60 * 1000;
+  const stamps = (Array.isArray(data.stamps) ? data.stamps : [])
+    .map(Number)
+    .filter((stamp) => Number.isFinite(stamp) && stamp > 0 && now - stamp < windowMs);
+  const reservations = normalizedReservations(data.reservations, now);
+  const pending = Object.values(reservations);
+  const pendingToday = pending.filter((row) => row.dayKey === currentDay).length;
+  const pendingWindow = pending.filter((row) => now - Number(row.createdAt || now) < windowMs).length;
+  const termCostMicros = String(data.termKey || "") === policy.termKey
+    ? Math.max(0, Math.round(Number(data.termCostMicros) || 0))
+    : 0;
+  const pendingCostMicros = pending
+    .filter((row) => row.termKey === policy.termKey)
+    .reduce((sum, row) => sum + Math.max(0, Math.round(Number(row.estimatedCostMicros) || 0)), 0);
+  const effectiveWindowLimit = policy.windowLimit === -1
+    ? -1
+    : policy.windowLimit > 0 ? policy.windowLimit : policy.dailyLimit > 0 ? policy.dailyLimit : -1;
+  const dailyUsed = dayCount + pendingToday;
+  const windowUsed = stamps.length + pendingWindow;
+  const costUsedMicros = termCostMicros + pendingCostMicros;
+  let blockedReason: string | null = null;
+  if (!policy.hasAccess) blockedReason = "An active Revision Studio subscription is required to generate a new test.";
+  else if (policy.dailyLimit > 0 && dailyUsed >= policy.dailyLimit) blockedReason = `Daily school-AI allowance reached (${policy.dailyLimit} successful tests). It resets tomorrow.`;
+  else if (effectiveWindowLimit >= 0 && windowUsed >= effectiveWindowLimit) blockedReason = `${policy.windowHours}-hour school-AI limit reached (${effectiveWindowLimit} tests). Try again later.`;
+  else if (policy.costEnabled && policy.costBudgetMicros >= 0 && costUsedMicros >= policy.costBudgetMicros) blockedReason = "Your school-AI model-cost allowance for this billing term has been used. Use your own API key or renew/upgrade your plan.";
+  const oldest = stamps.length ? Math.min(...stamps) : now;
+  return {
+    planId: policy.planId,
+    planName: policy.planName,
+    cycle: policy.cycle,
+    source: "school" as const,
+    dailyLimit: policy.dailyLimit,
+    dailyUsed: dayCount,
+    dailyRemaining: policy.dailyLimit <= 0 ? null : Math.max(0, policy.dailyLimit - dailyUsed),
+    dailyUnlimited: policy.dailyLimit <= 0,
+    windowHours: policy.windowHours,
+    windowLimit: effectiveWindowLimit,
+    windowUsed: stamps.length,
+    windowRemaining: effectiveWindowLimit < 0 ? null : Math.max(0, effectiveWindowLimit - windowUsed),
+    windowUnlimited: effectiveWindowLimit < 0,
+    windowResetsAt: stamps.length ? oldest + windowMs : now,
+    costEnabled: policy.costEnabled,
+    costBudgetMicros: policy.costBudgetMicros,
+    costUsedMicros: termCostMicros,
+    costRemainingMicros: policy.costBudgetMicros < 0 ? null : Math.max(0, policy.costBudgetMicros - costUsedMicros),
+    costUnlimited: policy.costBudgetMicros < 0,
+    termKey: policy.termKey,
+    termStartsAt: policy.termStartsAt,
+    termEndsAt: policy.termEndsAt,
+    allowed: !blockedReason,
+    blockedReason,
+  };
+}
+
+async function getUsageStatus(uid: string, policy: EffectiveAiPolicy, tzOffsetMinutes: number) {
   const ref = adminDb().collection("users").doc(uid).collection("aiUsage").doc("current");
   const snap = await ref.get();
   const data = asRecord(snap.data());
-  const currentDay = dayKey(now);
-  const storedDay = String(data.dayKey || "");
-  const dayCount = storedDay === currentDay ? Math.max(0, Math.round(Number(data.dayCount) || 0)) : 0;
-  const stamps = (Array.isArray(data.stamps) ? data.stamps : [])
-    .map((n) => Number(n))
-    .filter((n) => Number.isFinite(n) && n > 0);
-  const windowMs = windowHours * 60 * 60 * 1000;
-  const inWindow = stamps.filter((t) => now - t < windowMs);
-  const effectiveWindow = windowLimit === -1 ? -1 : windowLimit > 0 ? windowLimit : dailyLimit;
-  if (dailyLimit > 0 && dayCount >= dailyLimit) {
-    throw Object.assign(new Error(`Daily AI limit reached (${dailyLimit} generations). Resets tomorrow.`), { statusCode: 429 });
+  const status = usageSnapshot(data, policy, tzOffsetMinutes);
+  await ref.set({
+    uid,
+    reservations: normalizedReservations(data.reservations),
+    planId: policy.planId,
+    planName: policy.planName,
+    cycle: policy.cycle,
+    hasAccess: policy.hasAccess,
+    dailyLimit: policy.dailyLimit,
+    windowHours: policy.windowHours,
+    windowLimit: policy.windowLimit,
+    costEnabled: policy.costEnabled,
+    costBudgetMicros: policy.costBudgetMicros,
+    termKey: policy.termKey,
+    termStartsAt: policy.termStartsAt,
+    termEndsAt: policy.termEndsAt,
+    termCostMicros: String(data.termKey || "") === policy.termKey ? Math.max(0, Math.round(Number(data.termCostMicros) || 0)) : 0,
+    updatedAt: Date.now(),
+  }, { merge: true });
+  return status;
+}
+
+async function reserveUsage(
+  uid: string,
+  policy: EffectiveAiPolicy,
+  price: AiModelPrice | null,
+  estimatedInputTokens: number,
+  estimatedOutputTokens: number,
+  tzOffsetMinutes: number,
+): Promise<UsageReservation> {
+  if (!policy.hasAccess) throw Object.assign(new Error("An active Revision Studio subscription is required to generate a new test."), { statusCode: 403, code: "REVISION_SUBSCRIPTION_REQUIRED" });
+  if (policy.costEnabled && !price) {
+    throw Object.assign(new Error("School AI pricing is not configured for this model. Ask Admin to publish input/output token pricing, or use your own API key."), { statusCode: 409, code: "AI_MODEL_PRICE_MISSING" });
   }
-  if (effectiveWindow >= 0 && inWindow.length >= effectiveWindow) {
-    throw Object.assign(new Error(`${windowHours}-hour window limit reached (${effectiveWindow} generations). Try again later.`), { statusCode: 429 });
-  }
-  if (opts.dryRun) return;
-  const nextStamps = [...inWindow.filter((t) => now - t < windowMs * 2), now].slice(-MAX_STAMPS);
-  await ref.set(
-    {
+  const estimatedCostMicros = policy.costEnabled
+    ? calculateAiCostMicros(price, estimatedInputTokens, estimatedOutputTokens)
+    : 0;
+  const id = randomUUID();
+  const db = adminDb();
+  const ref = db.collection("users").doc(uid).collection("aiUsage").doc("current");
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const now = Date.now();
+    const data = asRecord(snap.data());
+    const status = usageSnapshot(data, policy, tzOffsetMinutes, now);
+    if (!status.allowed) throw Object.assign(new Error(status.blockedReason || "School AI allowance reached."), { statusCode: status.blockedReason?.includes("subscription") ? 403 : 429, code: "AI_ALLOWANCE_REACHED" });
+    if (policy.costEnabled && policy.costBudgetMicros >= 0 && estimatedCostMicros > Number(status.costRemainingMicros || 0)) {
+      throw Object.assign(new Error("This test's estimated model cost is above your remaining school-AI term allowance. Reduce the question count, use your own API key, or renew/upgrade."), { statusCode: 429, code: "AI_COST_ALLOWANCE_REACHED" });
+    }
+    const reservations = normalizedReservations(data.reservations, now);
+    reservations[id] = {
+      createdAt: now,
+      expiresAt: now + 10 * 60_000,
+      dayKey: dayKey(now, tzOffsetMinutes),
+      termKey: policy.termKey,
+      estimatedCostMicros,
+    };
+    tx.set(ref, {
+      uid,
+      reservations,
+      planId: policy.planId,
+      planName: policy.planName,
+      cycle: policy.cycle,
+      hasAccess: policy.hasAccess,
+      dailyLimit: policy.dailyLimit,
+      windowHours: policy.windowHours,
+      windowLimit: policy.windowLimit,
+      costEnabled: policy.costEnabled,
+      costBudgetMicros: policy.costBudgetMicros,
+      termKey: policy.termKey,
+      termStartsAt: policy.termStartsAt,
+      termEndsAt: policy.termEndsAt,
+      termCostMicros: String(data.termKey || "") === policy.termKey ? Math.max(0, Math.round(Number(data.termCostMicros) || 0)) : 0,
+      updatedAt: now,
+    }, { merge: true });
+  });
+  return { id, estimatedCostMicros };
+}
+
+async function releaseUsage(uid: string, reservationId: string): Promise<void> {
+  if (!reservationId) return;
+  const db = adminDb();
+  const ref = db.collection("users").doc(uid).collection("aiUsage").doc("current");
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const data = asRecord(snap.data());
+    const reservations = normalizedReservations(data.reservations);
+    if (!reservations[reservationId]) return;
+    delete reservations[reservationId];
+    tx.set(ref, { reservations, updatedAt: Date.now() }, { merge: true });
+  });
+}
+
+async function finalizeUsage(
+  uid: string,
+  policy: EffectiveAiPolicy,
+  reservation: UsageReservation,
+  usage: ProviderUsage,
+  price: AiModelPrice | null,
+  config: AiConfig,
+  tzOffsetMinutes: number,
+) {
+  const db = adminDb();
+  const ref = db.collection("users").doc(uid).collection("aiUsage").doc("current");
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const now = Date.now();
+    const data = asRecord(snap.data());
+    const reservations = normalizedReservations(data.reservations, now);
+    if (!reservations[reservation.id]) {
+      throw Object.assign(new Error("AI allowance reservation expired before completion. No additional generation was recorded."), { statusCode: 409, code: "AI_RESERVATION_EXPIRED" });
+    }
+    delete reservations[reservation.id];
+    const currentDay = dayKey(now, tzOffsetMinutes);
+    const dayCount = String(data.dayKey || "") === currentDay ? Math.max(0, Math.round(Number(data.dayCount) || 0)) : 0;
+    const windowMs = policy.windowHours * 60 * 60 * 1000;
+    const stamps = (Array.isArray(data.stamps) ? data.stamps : [])
+      .map(Number)
+      .filter((stamp) => Number.isFinite(stamp) && stamp > 0 && now - stamp < windowMs * 2);
+    const previousCost = String(data.termKey || "") === policy.termKey ? Math.max(0, Math.round(Number(data.termCostMicros) || 0)) : 0;
+    const actualCostMicros = policy.costEnabled
+      ? calculateAiCostMicros(price, usage.inputTokens, usage.outputTokens)
+      : 0;
+    tx.set(ref, {
       uid,
       dayKey: currentDay,
       dayCount: dayCount + 1,
-      stamps: nextStamps,
+      stamps: [...stamps, now].slice(-MAX_STAMPS),
+      reservations,
+      planId: policy.planId,
+      planName: policy.planName,
+      cycle: policy.cycle,
+      hasAccess: policy.hasAccess,
+      dailyLimit: policy.dailyLimit,
+      windowHours: policy.windowHours,
+      windowLimit: policy.windowLimit,
+      costEnabled: policy.costEnabled,
+      costBudgetMicros: policy.costBudgetMicros,
+      termKey: policy.termKey,
+      termStartsAt: policy.termStartsAt,
+      termEndsAt: policy.termEndsAt,
+      termCostMicros: previousCost + actualCostMicros,
+      lastUsage: {
+        provider: config.provider,
+        model: config.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
+        usageSource: usage.source,
+        estimatedReservedCostMicros: reservation.estimatedCostMicros,
+        actualCostMicros,
+        completedAt: now,
+      },
       updatedAt: now,
-    },
-    { merge: true },
-  );
+    }, { merge: true });
+  });
+  const snap = await ref.get();
+  return usageSnapshot(asRecord(snap.data()), policy, tzOffsetMinutes);
 }
 
-async function callGemini(config: AiConfig, syllabus: RevisionSyllabus): Promise<GeneratedQuestion[]> {
+function providerUsage(raw: unknown, fallbackInputText: string, fallbackOutputText: string, kind: ProviderId): ProviderUsage {
+  const payload = asRecord(raw);
+  const source = kind === "gemini" ? asRecord(payload.usageMetadata) : asRecord(payload.usage);
+  const input = Number(kind === "gemini" ? source.promptTokenCount : kind === "anthropic" ? source.input_tokens : source.prompt_tokens);
+  const output = Number(kind === "gemini" ? source.candidatesTokenCount : kind === "anthropic" ? source.output_tokens : source.completion_tokens);
+  const actual = Number.isFinite(input) && input >= 0 && Number.isFinite(output) && output >= 0;
+  const inputTokens = actual ? Math.round(input) : estimateTokensFromText(fallbackInputText);
+  const outputTokens = actual ? Math.round(output) : estimateTokensFromText(fallbackOutputText);
+  const totalRaw = Number(kind === "gemini" ? source.totalTokenCount : source.total_tokens);
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens: Number.isFinite(totalRaw) && totalRaw >= 0 ? Math.round(totalRaw) : inputTokens + outputTokens,
+    source: actual ? "actual" : "estimated",
+  };
+}
+
+async function callGemini(config: AiConfig, syllabus: RevisionSyllabus): Promise<ProviderGeneration> {
   const url = geminiGenerateUrl(config.baseUrl || DEFAULT_BASE.gemini, config.model);
   const res = await fetchWithTimeout(url, {
     method: "POST",
@@ -366,12 +697,16 @@ async function callGemini(config: AiConfig, syllabus: RevisionSyllabus): Promise
     const detail = (await res.text().catch(() => "")).slice(0, 240);
     throw Object.assign(new Error(`Gemini returned ${res.status}. Check the API key and model (${config.model}). ${detail}`), { statusCode: 502 });
   }
-  const text = extractGeminiText(await res.json());
+  const payload = await res.json();
+  const text = extractGeminiText(payload);
   if (!text) throw Object.assign(new Error("Gemini returned an empty response."), { statusCode: 502 });
-  return normalizeQuestions(extractJson(text), syllabus.difficulty === "mixed" ? "medium" : syllabus.difficulty);
+  return {
+    questions: normalizeQuestions(extractJson(text), syllabus.difficulty === "mixed" ? "medium" : syllabus.difficulty),
+    usage: providerUsage(payload, `${systemPrompt()}\n${buildSyllabusPrompt(syllabus)}`, text, "gemini"),
+  };
 }
 
-async function callAnthropic(config: AiConfig, syllabus: RevisionSyllabus): Promise<GeneratedQuestion[]> {
+async function callAnthropic(config: AiConfig, syllabus: RevisionSyllabus): Promise<ProviderGeneration> {
   const base = (config.baseUrl || DEFAULT_BASE.anthropic).replace(/\/+$/, "");
   const res = await fetchWithTimeout(`${base}/messages`, {
     method: "POST",
@@ -391,12 +726,16 @@ async function callAnthropic(config: AiConfig, syllabus: RevisionSyllabus): Prom
     const detail = (await res.text().catch(() => "")).slice(0, 240);
     throw Object.assign(new Error(`Anthropic returned ${res.status}. Check the API key and model (${config.model}). ${detail}`), { statusCode: 502 });
   }
-  const text = extractAnthropicText(await res.json());
+  const payload = await res.json();
+  const text = extractAnthropicText(payload);
   if (!text) throw Object.assign(new Error("Anthropic returned an empty response."), { statusCode: 502 });
-  return normalizeQuestions(extractJson(text), syllabus.difficulty === "mixed" ? "medium" : syllabus.difficulty);
+  return {
+    questions: normalizeQuestions(extractJson(text), syllabus.difficulty === "mixed" ? "medium" : syllabus.difficulty),
+    usage: providerUsage(payload, `${systemPrompt()}\n${buildSyllabusPrompt(syllabus)}`, text, "anthropic"),
+  };
 }
 
-async function callOpenAiCompatible(config: AiConfig, syllabus: RevisionSyllabus, origin: string): Promise<GeneratedQuestion[]> {
+async function callOpenAiCompatible(config: AiConfig, syllabus: RevisionSyllabus, origin: string): Promise<ProviderGeneration> {
   const base = assertSafeBaseUrl(config.baseUrl || DEFAULT_BASE[config.provider], config.provider);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -431,12 +770,16 @@ async function callOpenAiCompatible(config: AiConfig, syllabus: RevisionSyllabus
     const detail = (await res.text().catch(() => "")).slice(0, 240);
     throw Object.assign(new Error(`${config.provider} returned ${res.status}. Check the API key and model (${config.model}). ${detail}`), { statusCode: 502 });
   }
-  const text = extractOpenAiText(await res.json());
+  const payload = await res.json();
+  const text = extractOpenAiText(payload);
   if (!text) throw Object.assign(new Error("The model returned an empty response."), { statusCode: 502 });
-  return normalizeQuestions(extractJson(text), syllabus.difficulty === "mixed" ? "medium" : syllabus.difficulty);
+  return {
+    questions: normalizeQuestions(extractJson(text), syllabus.difficulty === "mixed" ? "medium" : syllabus.difficulty),
+    usage: providerUsage(payload, `${systemPrompt()}\n${buildSyllabusPrompt(syllabus)}`, text, config.provider),
+  };
 }
 
-async function generateWithProvider(config: AiConfig, syllabus: RevisionSyllabus, origin: string): Promise<GeneratedQuestion[]> {
+async function generateWithProvider(config: AiConfig, syllabus: RevisionSyllabus, origin: string): Promise<ProviderGeneration> {
   if (config.provider === "gemini") return callGemini(config, syllabus);
   if (config.provider === "anthropic") return callAnthropic(config, syllabus);
   return callOpenAiCompatible(config, syllabus, origin);
@@ -547,6 +890,13 @@ export async function handleRevisionGenerate(req: VercelRequest, res: VercelResp
       res.status(200).json({ ok: true, json, className, provider: own.provider, model: own.model });
       return;
     }
+    const tzOffsetMinutes = Math.max(-840, Math.min(840, Math.round(Number(body.tzOffsetMinutes) || 0)));
+    if (action === "revision.usage.status") {
+      const policy = await resolveEffectiveAiPolicy(user.uid);
+      const usage = await getUsageStatus(user.uid, policy, tzOffsetMinutes);
+      res.status(200).json({ ok: true, usage });
+      return;
+    }
     if (action && action !== "revision.generate") {
       res.status(400).json({ ok: false, error: "Unknown action." });
       return;
@@ -567,21 +917,48 @@ export async function handleRevisionGenerate(req: VercelRequest, res: VercelResp
 
     const catalogSnap = await adminDb().collection("settings").doc(REVISION_CATALOG_DOC).get();
     const aiSettings = asRecord(asRecord(catalogSnap.data()).aiSettings);
-    await consumeUsage(user.uid, aiSettings, { dryRun: true });
+    const policy = await resolveEffectiveAiPolicy(user.uid, aiSettings);
+    if (!policy.hasAccess) {
+      throw Object.assign(new Error("An active Revision Studio subscription is required to generate a new test. Your saved tests and results remain available."), { statusCode: 403, code: "REVISION_SUBSCRIPTION_REQUIRED" });
+    }
 
     const origin = firstHeader(req.headers, "origin") || firstHeader(req.headers, "referer") || "";
-    const questions = await generateWithProvider(config, syllabus, origin);
-    if (!questions.length) {
-      res.status(502).json({ ok: false, error: "The AI returned no usable questions. Try again." });
-      return;
+    const promptText = `${systemPrompt()}\n${buildSyllabusPrompt(syllabus)}`;
+    const price = findAiModelPrice(policy.pricing, config.provider, config.model);
+    let reservation: UsageReservation | null = null;
+    if (source !== "own") {
+      reservation = await reserveUsage(
+        user.uid,
+        policy,
+        price,
+        estimateTokensFromText(promptText),
+        syllabus.count * policy.estimatedOutputTokensPerQuestion,
+        tzOffsetMinutes,
+      );
     }
-    await consumeUsage(user.uid, aiSettings, { dryRun: false });
+
+    let generated: ProviderGeneration;
+    try {
+      generated = await generateWithProvider(config, syllabus, origin);
+      if (generated.questions.length < syllabus.count) {
+        throw Object.assign(new Error(`The AI returned only ${generated.questions.length} usable question(s), but a complete ${syllabus.count}-question test was requested. No generation allowance was used; please try again.`), { statusCode: 502, code: "INCOMPLETE_AI_TEST" });
+      }
+    } catch (error) {
+      if (reservation) await releaseUsage(user.uid, reservation.id).catch(() => undefined);
+      throw error;
+    }
+
+    const allowance = reservation
+      ? await finalizeUsage(user.uid, policy, reservation, generated.usage, price, config, tzOffsetMinutes)
+      : { unmetered: true, source: "own", message: "Your API key does not use the school/plan AI allowance." };
     res.status(200).json({
       ok: true,
       provider: config.provider,
       model: config.model,
       source,
-      questions: questions.slice(0, syllabus.count),
+      questions: generated.questions.slice(0, syllabus.count),
+      usage: generated.usage,
+      allowance,
     });
   } catch (error) {
     errorResponse(res, error, "Could not generate questions with AI.");

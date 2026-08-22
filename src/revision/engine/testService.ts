@@ -290,7 +290,7 @@ export function getAttemptForPlayer(uid: string, attemptId: number) {
     throw new ServiceError("INVALID_STATE", "This test is not in progress.");
   }
   const dailyTest = db.dailyTests.find((t) => t.id === attempt.dailyTestId)!;
-  const ids = dailyTest.questionIds;
+  const ids = attempt.questionIds?.length ? attempt.questionIds : dailyTest.questionIds;
 
   const answerByQ = new Map(
     db.testAnswers.filter((a) => a.attemptId === attemptId).map((a) => [a.questionId, a]),
@@ -325,9 +325,9 @@ export function getAttemptForPlayer(uid: string, attemptId: number) {
     },
     dailyTest: {
       id: dailyTest.id,
-      title: dailyTest.title,
-      totalQuestions: dailyTest.totalQuestions,
-      estimatedMinutes: dailyTest.estimatedMinutes,
+      title: attempt.attemptKind === "skipped" ? `${dailyTest.title} · Skipped Questions` : dailyTest.title,
+      totalQuestions: ids.length,
+      estimatedMinutes: Math.max(1, Math.min(dailyTest.estimatedMinutes, Math.ceil(ids.length * 0.75))),
     },
     questions: ordered,
   };
@@ -345,8 +345,9 @@ export function saveTestAnswer(
     throw new ServiceError("INVALID_STATE", "This test is not in progress.");
   }
   const dailyTest = db.dailyTests.find((t) => t.id === attempt.dailyTestId)!;
-  if (!dailyTest.questionIds.includes(questionId)) {
-    throw new ServiceError("INVALID_QUESTION", "Question does not belong to this test.");
+  const allowedQuestionIds = attempt.questionIds?.length ? attempt.questionIds : dailyTest.questionIds;
+  if (!allowedQuestionIds.includes(questionId)) {
+    throw new ServiceError("INVALID_QUESTION", "Question does not belong to this attempt.");
   }
   const question = db.questions.find((q) => q.id === questionId);
   if (!question) throw new ServiceError("NOT_FOUND", "Question not found.");
@@ -385,10 +386,14 @@ export function updateAttemptIndex(uid: string, attemptId: number, index: number
   if (attempt.status !== "in_progress") {
     throw new ServiceError("INVALID_STATE", "This test is not in progress.");
   }
-  attempt.currentIndex = index;
+  const test = db.dailyTests.find((row) => row.id === attempt.dailyTestId);
+  if (!test) throw new ServiceError("NOT_FOUND", "Test not found.");
+  const questionCount = attempt.questionIds?.length || test.questionIds.length;
+  const currentIndex = Math.max(0, Math.min(Math.max(0, questionCount - 1), Math.round(index)));
+  attempt.currentIndex = currentIndex;
   attempt.updatedAt = nowIso();
   saveDb(uid, db);
-  return { currentIndex: index };
+  return { currentIndex };
 }
 
 export function submitTestAttempt(uid: string, attemptId: number) {
@@ -401,7 +406,7 @@ export function submitTestAttempt(uid: string, attemptId: number) {
     throw new ServiceError("INVALID_STATE", "This test cannot be submitted.");
   }
   const dailyTest = db.dailyTests.find((t) => t.id === attempt.dailyTestId)!;
-  const ids = dailyTest.questionIds;
+  const ids = attempt.questionIds?.length ? attempt.questionIds : dailyTest.questionIds;
 
   const answerByQ = new Map(
     db.testAnswers.filter((a) => a.attemptId === attemptId).map((a) => [a.questionId, a]),
@@ -498,7 +503,9 @@ export function getTestResult(uid: string, attemptId: number) {
     throw new ServiceError("INVALID_STATE", "Test has not been completed yet.");
   }
   const dailyTest = db.dailyTests.find((t) => t.id === attempt.dailyTestId)!;
-  const answers = db.testAnswers.filter((a) => a.attemptId === attemptId);
+  const attemptQuestionIds = attempt.questionIds?.length ? attempt.questionIds : dailyTest.questionIds;
+  const allowedQuestionIds = new Set(attemptQuestionIds);
+  const answers = db.testAnswers.filter((a) => a.attemptId === attemptId && allowedQuestionIds.has(a.questionId));
 
   const topicMap = new Map<
     number,
@@ -522,11 +529,15 @@ export function getTestResult(uid: string, attemptId: number) {
     topicMap.set(topic.id, entry);
   }
 
-  const total = dailyTest.totalQuestions || 1;
+  const total = attemptQuestionIds.length || 1;
   return {
     attemptId: attempt.id,
+    testId: dailyTest.id,
+    testTitle: dailyTest.title,
+    isCustom: dailyTest.kind === "custom",
+    attemptKind: attempt.attemptKind ?? "full",
     testDate: dailyTest.testDate,
-    totalQuestions: dailyTest.totalQuestions,
+    totalQuestions: attemptQuestionIds.length,
     correctCount: attempt.correctCount,
     wrongCount: attempt.wrongCount,
     skippedCount: attempt.skippedCount,
@@ -553,7 +564,8 @@ export function getTestReview(uid: string, attemptId: number): ReviewQuestion[] 
     db.testAnswers.filter((a) => a.attemptId === attemptId).map((a) => [a.questionId, a]),
   );
 
-  return dailyTest.questionIds
+  const questionIds = attempt.questionIds?.length ? attempt.questionIds : dailyTest.questionIds;
+  return questionIds
     .map((id) => {
       const q = db.questions.find((row) => row.id === id);
       const a = answerByQ.get(id);

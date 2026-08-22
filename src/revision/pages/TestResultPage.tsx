@@ -1,9 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ListRestart, RotateCcw } from "lucide-react";
 import PageShell from "../components/PageShell";
 import { Card, ErrorState, PrimaryButton, ProgressBar, SecondaryButton } from "../components/ui";
 import { CheckIcon, ClockIcon, SparklesIcon, XIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { getTestResult } from "../engine/testService";
+import { startCustomTestRetake, startSkippedQuestionsRetake } from "../engine/customTestService";
 import { ServiceError } from "../engine/store";
 
 function formatDuration(seconds: number) {
@@ -22,6 +24,7 @@ function scoreMessage(score: number) {
 
 export default function TestResultPage({ uid, route, attemptId }: { uid: string; route: string; attemptId: number }) {
   const { navigate } = useExitGuard();
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const { data, error } = useMemo(() => {
     try {
@@ -31,13 +34,28 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
     }
   }, [uid, attemptId]);
 
+  const startRetake = (skippedOnly: boolean) => {
+    if (!data?.isCustom) return;
+    setActionError(null);
+    try {
+      const attempt = skippedOnly
+        ? startSkippedQuestionsRetake(uid, data.testId)
+        : startCustomTestRetake(uid, data.testId);
+      navigate(`#/revision/test/play-attempt/${attempt.id}`);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not start another attempt.");
+    }
+  };
+
   return (
     <PageShell route={route} title="Test Result" backHref="#/revision">
       {error && <ErrorState message={error} />}
       {data && (
         <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
           <Card className="bg-gradient-to-br from-indigo-600 to-violet-600 text-center text-white">
-            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-100">Your Score</p>
+            <p className="line-clamp-1 text-xs font-semibold text-indigo-100">{data.testTitle}</p>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-200">{data.attemptKind === "skipped" ? "Skipped-question attempt" : "Full attempt"}</p>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-indigo-100">Your Score</p>
             <p className="mt-1 text-5xl font-extrabold">{data.score}%</p>
             <p className="mt-1 text-sm text-indigo-100">{scoreMessage(data.score)}</p>
             <div className="mt-4 flex items-center justify-center gap-1.5 text-xs text-indigo-100">
@@ -88,7 +106,14 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
 
           <div className="space-y-3 pt-1">
             <PrimaryButton onClick={() => navigate(`#/revision/test/review/${attemptId}`)}>Review Answers</PrimaryButton>
-            <SecondaryButton onClick={() => navigate("#/revision/bank")}>Open Revision Bank</SecondaryButton>
+            {data.isCustom && (
+              <div className="grid grid-cols-2 gap-2">
+                <SecondaryButton onClick={() => startRetake(false)}><RotateCcw className="h-4 w-4" /> Revise Again</SecondaryButton>
+                <SecondaryButton disabled={data.skippedCount === 0} onClick={() => startRetake(true)}><ListRestart className="h-4 w-4" /> Revise Skipped</SecondaryButton>
+              </div>
+            )}
+            {actionError && <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">{actionError}</p>}
+            <SecondaryButton onClick={() => navigate("#/revision/bank")}>Open Test Bank & History</SecondaryButton>
           </div>
         </div>
       )}
