@@ -48,6 +48,8 @@ export type AiUsageSnapshot = {
   dailyUsed: number;
   dailyRemaining: number;
   dailyUnlimited: boolean;
+  /** Next learner-local midnight, supplied by the server status endpoint. */
+  dailyResetsAt: number;
   windowHours: number;
   windowLimit: number;
   windowUsed: number;
@@ -74,6 +76,12 @@ export function localDayKey(now = Date.now()): string {
   return `${y}-${m}-${day}`;
 }
 
+export function nextLocalDayResetAt(now = Date.now()): number {
+  const d = new Date(now);
+  d.setHours(24, 0, 0, 0);
+  return d.getTime();
+}
+
 export function usageDocRef(uid: string) {
   return doc(db, "users", uid, "aiUsage", "current");
 }
@@ -85,10 +93,10 @@ export function emptyUsage(uid: string, now = Date.now()): AiUsageRecord {
     dayCount: 0,
     stamps: [],
     updatedAt: now,
-    planId: "basic",
-    planName: "Basic",
+    planId: "free",
+    planName: "Free learner",
     cycle: "monthly",
-    hasAccess: true,
+    hasAccess: false,
     dailyLimit: null,
     windowHours: null,
     windowLimit: null,
@@ -187,6 +195,7 @@ export function computeUsageSnapshot(
     dailyUsed: dayCount,
     dailyRemaining: dailyUnlimited ? 0 : Math.max(0, dailyLimit - dayCount),
     dailyUnlimited,
+    dailyResetsAt: nextLocalDayResetAt(now),
     windowHours,
     windowLimit: windowUnlimited ? 0 : windowLimit,
     windowUsed: inWindow.length,
@@ -214,25 +223,80 @@ export async function fetchAiUsage(uid: string): Promise<AiUsageRecord> {
   }
 }
 
-/** Refresh effective plan/cycle limits on the server before listening live. */
-export async function refreshAiUsageStatus(): Promise<void> {
+const snapshotNumber = (value: unknown, fallback = 0): number => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
+/** Parse the authenticated server response instead of trusting a client value. */
+export function parseAiUsageSnapshot(raw: unknown, now = Date.now()): AiUsageSnapshot {
+  const row = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+  const dailyLimit = Math.max(0, Math.round(snapshotNumber(row.dailyLimit)));
+  const windowLimitRaw = Math.round(snapshotNumber(row.windowLimit, -1));
+  const costBudgetMicros = Math.max(-1, Math.round(snapshotNumber(row.costBudgetMicros, -1)));
+  const dailyUnlimited = row.dailyUnlimited === true || dailyLimit <= 0;
+  const windowUnlimited = row.windowUnlimited === true || windowLimitRaw < 0;
+  const costUnlimited = row.costUnlimited === true || costBudgetMicros < 0;
+  const blockedReason = typeof row.blockedReason === "string" && row.blockedReason.trim()
+    ? row.blockedReason.trim()
+    : null;
+  return {
+    planId: String(row.planId || "free"),
+    planName: String(row.planName || row.planId || "Free learner"),
+    cycle: row.cycle === "yearly" ? "yearly" : "monthly",
+    dailyLimit,
+    dailyUsed: Math.max(0, Math.round(snapshotNumber(row.dailyUsed))),
+    dailyRemaining: dailyUnlimited ? 0 : Math.max(0, Math.round(snapshotNumber(row.dailyRemaining))),
+    dailyUnlimited,
+    dailyResetsAt: Math.max(now, snapshotNumber(row.dailyResetsAt, nextLocalDayResetAt(now))),
+    windowHours: Math.max(1, Math.round(snapshotNumber(row.windowHours, 5))),
+    windowLimit: windowUnlimited ? 0 : Math.max(0, windowLimitRaw),
+    windowUsed: Math.max(0, Math.round(snapshotNumber(row.windowUsed))),
+    windowRemaining: windowUnlimited ? 0 : Math.max(0, Math.round(snapshotNumber(row.windowRemaining))),
+    windowUnlimited,
+    windowResetsAt: Math.max(now, snapshotNumber(row.windowResetsAt, now)),
+    costEnabled: row.costEnabled === true,
+    costBudgetMicros,
+    costUsedMicros: Math.max(0, Math.round(snapshotNumber(row.costUsedMicros))),
+    costRemainingMicros: costUnlimited ? 0 : Math.max(0, Math.round(snapshotNumber(row.costRemainingMicros))),
+    costUnlimited,
+    termEndsAt: Math.max(0, snapshotNumber(row.termEndsAt)),
+    allowed: row.allowed === true && !blockedReason,
+    blockedReason,
+  };
+}
+
+/**
+ * Refresh effective plan/cycle limits on the server and return that same
+ * authoritative snapshot. Returning it directly keeps the profile functional
+ * even while newly committed Firestore read rules are still being deployed.
+ */
+export async function refreshAiUsageStatus(): Promise<AiUsageSnapshot> {
   const user = auth.currentUser;
-  if (!user) return;
+  if (!user) throw new Error("Sign in to check the AI allowance.");
   const token = await user.getIdToken();
   const response = await fetch("/api/revision/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ action: "revision.usage.status", tzOffsetMinutes: new Date().getTimezoneOffset() }),
   });
-  if (!response.ok) throw new Error("Could not refresh AI allowance.");
+  const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (!response.ok) {
+    throw new Error(typeof payload.error === "string" && payload.error ? payload.error : "Could not refresh AI allowance.");
+  }
+  return parseAiUsageSnapshot(payload.usage);
 }
 
-export function subscribeAiUsage(uid: string, onNext: (record: AiUsageRecord) => void): () => void {
-  void refreshAiUsageStatus().catch(() => undefined);
+export type AiUsageSubscriptionState = { exists: boolean; error: boolean };
+
+export function subscribeAiUsage(
+  uid: string,
+  onNext: (record: AiUsageRecord, state: AiUsageSubscriptionState) => void,
+): () => void {
   return onSnapshot(
     usageDocRef(uid),
-    (snap) => onNext(snap.exists() ? parseUsage(uid, snap.data()) : emptyUsage(uid)),
-    () => onNext(emptyUsage(uid)),
+    (snap) => onNext(snap.exists() ? parseUsage(uid, snap.data()) : emptyUsage(uid), { exists: snap.exists(), error: false }),
+    () => onNext(emptyUsage(uid), { exists: false, error: true }),
   );
 }
 
