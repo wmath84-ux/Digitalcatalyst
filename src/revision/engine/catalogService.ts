@@ -170,10 +170,29 @@ export function buildLocalDbFromCatalog(catalog: RevisionCatalog) {
   return buildDbFromCatalog(catalogToInput(catalog));
 }
 
+// The catalog is an optimisation (the local seeded DB is always available), so
+// an unreachable Firestore must never leave the Revision page on its loading
+// screen. Bound the read the same way cloud hydration is bounded.
+const CATALOG_READ_TIMEOUT_MS = 5_000;
+
+async function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Catalog sync timed out.")), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /** Read the published catalog from Firestore (public read; null when absent). */
 export async function fetchRemoteCatalog(): Promise<RevisionCatalog | null> {
   try {
-    const snap = await getDoc(doc(db, "settings", REVISION_CATALOG_DOC_ID));
+    const snap = await withDeadline(getDoc(doc(db, "settings", REVISION_CATALOG_DOC_ID)), CATALOG_READ_TIMEOUT_MS);
     if (!snap.exists()) return null;
     const data = snap.data();
     const catalog = normalizeCatalog(data);
