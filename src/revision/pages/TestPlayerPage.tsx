@@ -18,7 +18,17 @@ const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 
 type PlayerData = ReturnType<typeof getAttemptForPlayer>;
 
-export default function TestPlayerPage({ uid, route, testId = null }: { uid: string; route: string; testId?: number | null }) {
+export default function TestPlayerPage({
+  uid,
+  route,
+  testId = null,
+  attemptId: requestedAttemptId = null,
+}: {
+  uid: string;
+  route: string;
+  testId?: number | null;
+  attemptId?: number | null;
+}) {
   const { navigate, setGuard } = useExitGuard();
 
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -28,6 +38,11 @@ export default function TestPlayerPage({ uid, route, testId = null }: { uid: str
 
   useEffect(() => {
     try {
+      if (requestedAttemptId) {
+        setPlayerData(getAttemptForPlayer(uid, requestedAttemptId));
+        setLoadError(null);
+        return;
+      }
       if (testId) {
         // Custom (user-generated) test: play this exact test.
         const existing = getCustomTestAttempt(uid, testId);
@@ -51,7 +66,7 @@ export default function TestPlayerPage({ uid, route, testId = null }: { uid: str
     } catch (err) {
       setLoadError(err instanceof ServiceError ? err.message : "We couldn't load the test. Please try again.");
     }
-  }, [uid, loadKey, testId]);
+  }, [uid, loadKey, requestedAttemptId, testId]);
 
   useEffect(() => {
     if (redirectAttemptId) {
@@ -68,12 +83,12 @@ export default function TestPlayerPage({ uid, route, testId = null }: { uid: str
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const initializedRef = useRef(false);
+  const initializedAttemptRef = useRef<number | null>(null);
   const touchStartXRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (playerData && !initializedRef.current) {
-      initializedRef.current = true;
+    if (playerData && initializedAttemptRef.current !== playerData.attempt.id) {
+      initializedAttemptRef.current = playerData.attempt.id;
       setCurrentIndex(playerData.attempt.currentIndex ?? 0);
       const initSel: Record<number, number | null> = {};
       playerData.questions.forEach((q) => {

@@ -213,7 +213,10 @@ export const errorResponse = (response: VercelResponse, error: unknown, fallback
     ? Number((error as { statusCode?: unknown }).statusCode) || 500
     : 500;
   const message = error instanceof Error ? error.message : fallback;
-  return response.status(statusCode).json({ ok: false, error: message || fallback });
+  const code = typeof error === 'object' && error && 'code' in error
+    ? String((error as { code?: unknown }).code || '').slice(0, 100)
+    : '';
+  return response.status(statusCode).json({ ok: false, ...(code ? { code } : {}), error: message || fallback });
 };
 
 export const parseProductPricePaise = (data: Record<string, unknown>): number => {

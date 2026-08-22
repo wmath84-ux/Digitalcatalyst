@@ -11,6 +11,8 @@ import {
 import { fullDemoCourseContent } from "../../data/demoCourseContent";
 import { defaultCatalog, normalizeCatalog, REVISION_CATALOG_DOC_ID } from "../../revision/engine/catalogService";
 import type { PaidUpdate, ProductModule } from "./types";
+import { normalizeRevisionTestBankLimits } from "../../../utils/revisionLimits.js";
+import { normalizePlanAiAllowances } from "../../../utils/aiAllowances.js";
 
 export class ApiError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status; } }
 const bodyOf = (init?: RequestInit) => init?.body ? JSON.parse(String(init.body)) as Record<string, any> : {};
@@ -210,7 +212,7 @@ async function subscriptionPlansRequest(init?: RequestInit) {
       return { id: item.id, name: data.name || "Plan", description: data.description || "", billingCycles: [
         { cycle: "monthly", label: "Monthly", price: money(data.monthlyPrice ?? data.priceMonthly ?? 0) },
         { cycle: "yearly", label: "Yearly", price: money(data.yearlyPrice ?? data.priceYearly ?? 0) },
-      ], accessTier: data.accessTier || item.id, badge: data.badge || null, cta: data.cta || "Subscribe", featured: Boolean(data.featured), active: data.active !== false };
+      ], revisionTestBankLimits: normalizeRevisionTestBankLimits(data.revisionTestBankLimits, item.id), aiAllowances: normalizePlanAiAllowances(data.aiAllowances), accessTier: data.accessTier || item.id, badge: data.badge || null, cta: data.cta || "Subscribe", featured: Boolean(data.featured), active: data.active !== false };
     }) };
   }
   const body = bodyOf(init); const recordId = String(body.id || id()); const ref = doc(db, "subscriptionPlans", recordId);
@@ -218,7 +220,7 @@ async function subscriptionPlansRequest(init?: RequestInit) {
   const cycles = Array.isArray(body.billingCycles) ? body.billingCycles : [];
   const monthly = cycles.find((cycle: any) => cycle.cycle === "monthly")?.price ?? 0;
   const yearly = cycles.find((cycle: any) => cycle.cycle === "yearly")?.price ?? 0;
-  await setDoc(ref, stripUndefinedDeep({ id: recordId, name: str(body.name, "Plan"), description: str(body.description), monthlyPrice: Number(monthly), yearlyPrice: Number(yearly), allowedCycles: ["monthly", "yearly"], accessTier: body.accessTier || "basic", badge: body.badge || null, cta: body.cta || "Subscribe", featured: Boolean(body.featured), active: body.active !== false, includedFeatureIds: [], updatedAt: serverTimestamp() }), { merge: true });
+  await setDoc(ref, stripUndefinedDeep({ id: recordId, name: str(body.name, "Plan"), description: str(body.description), monthlyPrice: Number(monthly), yearlyPrice: Number(yearly), allowedCycles: ["monthly", "yearly"], revisionTestBankLimits: normalizeRevisionTestBankLimits(body.revisionTestBankLimits, recordId), aiAllowances: normalizePlanAiAllowances(body.aiAllowances), accessTier: body.accessTier || "basic", badge: body.badge || null, cta: body.cta || "Subscribe", featured: Boolean(body.featured), active: body.active !== false, includedFeatureIds: [], updatedAt: serverTimestamp() }), { merge: true });
   return { plan: { ...body, id: recordId } };
 }
 
@@ -226,13 +228,13 @@ async function subscriptionFeaturesRequest(init?: RequestInit) {
   const method = init?.method || "GET";
   if (method === "GET") {
     const snap = await getDocs(collection(db, "subscriptionFeatures"));
-    return { features: snap.docs.map((item) => { const data = item.data() || {}; return { id: item.id, key: data.key || item.id, name: data.name || "Feature", description: data.description || "", individualPrice: String(money(data.price ?? data.individualPrice ?? 0)), monthlyPrice: data.monthlyPrice === undefined || data.monthlyPrice === null ? "" : String(money(data.monthlyPrice)), yearlyPrice: data.yearlyPrice === undefined || data.yearlyPrice === null ? "" : String(money(data.yearlyPrice)), planPricing: data.planPricing && typeof data.planPricing === "object" ? data.planPricing : {}, icon: data.icon || "sparkles", included: data.included === true, badge: data.badge || "", sortOrder: Number(data.sortOrder || 0), active: data.active !== false }; }) };
+    return { features: snap.docs.map((item) => { const data = item.data() || {}; return { id: item.id, key: data.key || item.id, name: data.name || "Feature", description: data.description || "", individualPrice: String(money(data.price ?? data.individualPrice ?? 0)), monthlyPrice: data.monthlyPrice === undefined || data.monthlyPrice === null ? "" : String(money(data.monthlyPrice)), yearlyPrice: data.yearlyPrice === undefined || data.yearlyPrice === null ? "" : String(money(data.yearlyPrice)), planPricing: data.planPricing && typeof data.planPricing === "object" ? data.planPricing : {}, icon: data.icon || "sparkles", included: data.included === true, badge: data.badge || "", sortOrder: Number(data.sortOrder || 0), freeItemsPerDay: Math.max(0, Math.min(100, Math.round(Number(data.freeItemsPerDay ?? 1) || 0))), active: data.active !== false }; }) };
   }
   const body = bodyOf(init); const recordId = String(body.id || body.key || id()); const ref = doc(db, "subscriptionFeatures", recordId);
   if (body.delete) { await deleteDoc(ref); return { ok: true }; }
   const optionalRupees = (value: unknown) => (value === "" || value === null || value === undefined ? null : Number(value));
   const defaultIcon = recordId === "my-day" ? "calendar" : recordId === "revision" ? "brain" : "sparkles";
-  await setDoc(ref, stripUndefinedDeep({ id: recordId, key: str(body.key, recordId), name: str(body.name, "Feature"), description: str(body.description), price: Number(body.individualPrice || 0), monthlyPrice: optionalRupees(body.monthlyPrice), yearlyPrice: optionalRupees(body.yearlyPrice), planPricing: body.planPricing && typeof body.planPricing === "object" ? body.planPricing : {}, icon: str(body.icon, defaultIcon), included: body.included === true, badge: str(body.badge), sortOrder: Math.floor(Number(body.sortOrder || 0)), active: body.active !== false, updatedAt: serverTimestamp() }), { merge: true });
+  await setDoc(ref, stripUndefinedDeep({ id: recordId, key: str(body.key, recordId), name: str(body.name, "Feature"), description: str(body.description), price: Number(body.individualPrice || 0), monthlyPrice: optionalRupees(body.monthlyPrice), yearlyPrice: optionalRupees(body.yearlyPrice), planPricing: body.planPricing && typeof body.planPricing === "object" ? body.planPricing : {}, icon: str(body.icon, defaultIcon), included: body.included === true, badge: str(body.badge), sortOrder: Math.floor(Number(body.sortOrder || 0)), freeItemsPerDay: recordId === "my-day" ? Math.max(0, Math.min(100, Math.round(Number(body.freeItemsPerDay ?? 1) || 0))) : null, active: body.active !== false, updatedAt: serverTimestamp() }), { merge: true });
   return { feature: { ...body, id: recordId } };
 }
 

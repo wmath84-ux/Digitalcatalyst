@@ -18,6 +18,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useRevisionAccess } from "../hooks/useRevisionAccess";
 import { syncRevisionCatalog } from "./engine/catalogService";
+import { hydrateRevisionFromCloud, queueRevisionCloudPersistence } from "./engine/cloudRevisionService";
 import PremiumGate from "../components/subscription/PremiumGate";
 
 /**
@@ -25,9 +26,9 @@ import PremiumGate from "../components/subscription/PremiumGate";
  *
  * Same behaviour as My Day: the app is always rendered so the learner can
  * browse, and the subscription gate only appears as a floating modal when a
- * paywalled action is attempted (starting a test, starting a revision
- * session, generating a set, etc.). The gate applies only while the
- * `revision` feature doc exists and is active in the subscription catalog.
+ * paid creation action is attempted. Saved tests, results, retakes and Smart
+ * Revision remain available after expiry/downgrade. The gate applies only
+ * while the `revision` feature doc is active in the subscription catalog.
  */
 
 export default function RevisionApp() {
@@ -36,6 +37,7 @@ export default function RevisionApp() {
   const { hasAccess: hasRevisionAccess, loading: revisionAccessLoading } = useRevisionAccess();
   const [route, setRoute] = useState(() => window.location.hash);
   const [syncKey, setSyncKey] = useState(0);
+  const [revisionDataLoading, setRevisionDataLoading] = useState(Boolean(user));
   const [paywallOpen, setPaywallOpen] = useState(false);
 
   useEffect(() => {
@@ -49,12 +51,40 @@ export default function RevisionApp() {
 
   useEffect(() => {
     let cancelled = false;
-    void syncRevisionCatalog(uid).then((changed) => {
-      if (!cancelled && changed) setSyncKey((k) => k + 1);
-    });
-    return () => {
-      cancelled = true;
+    setRevisionDataLoading(uid !== "guest");
+    void (async () => {
+      let changed = false;
+      if (uid !== "guest") {
+        try {
+          await hydrateRevisionFromCloud(uid);
+          changed = true;
+        } catch (error) {
+          // Keep the local cache usable during a temporary network outage. The
+          // next launch retries cloud hydration/migration automatically.
+          console.warn("[revision] cloud hydration skipped", error);
+        }
+      }
+      try {
+        changed = (await syncRevisionCatalog(uid)) || changed;
+      } catch {
+        // Catalog sync is independent of learner progress persistence.
+      }
+      if (!cancelled) {
+        if (changed) setSyncKey((key) => key + 1);
+        setRevisionDataLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [uid]);
+
+  useEffect(() => {
+    if (uid === "guest") return undefined;
+    const onRevisionChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ uid?: string }>).detail;
+      if (detail?.uid === uid) queueRevisionCloudPersistence(uid);
     };
+    window.addEventListener("revision-db-changed", onRevisionChange);
+    return () => window.removeEventListener("revision-db-changed", onRevisionChange);
   }, [uid]);
 
   const requireAccess = useCallback(() => {
@@ -71,25 +101,22 @@ export default function RevisionApp() {
   const sessionMatch = path.match(/^#\/revision\/session\/(\d+)(\/result)?$/);
   const resultMatch = path.match(/^#\/revision\/test\/result\/(\d+)$/);
   const reviewMatch = path.match(/^#\/revision\/test\/review\/(\d+)$/);
+  const attemptPlayMatch = path.match(/^#\/revision\/test\/play-attempt\/(\d+)$/);
   const playMatch = path.match(/^#\/revision\/test\/play(?:\/(\d+))?$/);
 
   let page: ReactNode;
 
-  if (playMatch) {
-    // If no access, still render dashboard (gate will overlay)
-    if (!revisionAccessLoading && !hasRevisionAccess) {
-      page = (
-        <DashboardPage
-          uid={uid}
-          route={"#/revision"}
-          userName={userName}
-          hasAccess={hasRevisionAccess}
-          onRequireAccess={requireAccess}
-        />
-      );
-    } else {
-      page = <TestPlayerPage uid={uid} route={path} testId={playMatch[1] ? Number(playMatch[1]) : null} />;
-    }
+  if (attemptPlayMatch || playMatch) {
+    // Existing saved tests and in-progress attempts remain usable after a
+    // downgrade or expiry. Entitlement is checked only when creating tests.
+    page = (
+      <TestPlayerPage
+        uid={uid}
+        route={path}
+        testId={playMatch?.[1] ? Number(playMatch[1]) : null}
+        attemptId={attemptPlayMatch?.[1] ? Number(attemptPlayMatch[1]) : null}
+      />
+    );
   } else if (resultMatch) {
     page = <TestResultPage uid={uid} route={path} attemptId={Number(resultMatch[1])} />;
   } else if (reviewMatch) {
@@ -97,18 +124,10 @@ export default function RevisionApp() {
   } else if (sessionMatch && sessionMatch[2]) {
     page = <RevisionSessionResultPage uid={uid} route={path} sessionId={Number(sessionMatch[1])} />;
   } else if (sessionMatch) {
-    if (!revisionAccessLoading && !hasRevisionAccess) {
-      page = (
-        <RevisionBankPage
-          uid={uid}
-          route={"#/revision/bank"}
-          hasAccess={hasRevisionAccess}
-          onRequireAccess={requireAccess}
-        />
-      );
-    } else {
-      page = <RevisionSessionPage uid={uid} route={path} sessionId={Number(sessionMatch[1])} />;
-    }
+    // Smart Revision sessions operate on existing learner-owned data and stay
+    // accessible after a downgrade/expiry, including sessions already in
+    // progress when the entitlement changed.
+    page = <RevisionSessionPage uid={uid} route={path} sessionId={Number(sessionMatch[1])} />;
   } else if (path.startsWith("#/revision/bank")) {
     page = (
       <RevisionBankPage
@@ -119,14 +138,7 @@ export default function RevisionApp() {
       />
     );
   } else if (path.startsWith("#/revision/weak-topics")) {
-    page = (
-      <WeakTopicsPage
-        uid={uid}
-        route={path}
-        hasAccess={hasRevisionAccess}
-        onRequireAccess={requireAccess}
-      />
-    );
+    page = <WeakTopicsPage uid={uid} route={path} />;
   } else if (path.startsWith("#/revision/progress")) {
     page = <ProgressPage uid={uid} route={path} />;
   } else if (path.startsWith("#/revision/profile")) {
@@ -136,13 +148,13 @@ export default function RevisionApp() {
   } else if (path.startsWith("#/revision/customize")) {
     // Legacy customization deep-links now land on the AI test generator —
     // customization is fully user-driven from the profile page.
-    page = <AiGeneratePage uid={uid} route={path} />;
+    page = <AiGeneratePage uid={uid} route={path} hasAccess={hasRevisionAccess} onRequireAccess={requireAccess} />;
   } else if (path.startsWith("#/revision/ai-settings")) {
     page = <AiSettingsPage uid={uid} route={path} />;
   } else if (path.startsWith("#/revision/ai-generate")) {
-    page = <AiGeneratePage uid={uid} route={path} />;
+    page = <AiGeneratePage uid={uid} route={path} hasAccess={hasRevisionAccess} onRequireAccess={requireAccess} />;
   } else if (path.startsWith("#/revision/bulk-import")) {
-    page = <BulkImportPage uid={uid} route={path} />;
+    page = <BulkImportPage uid={uid} route={path} hasAccess={hasRevisionAccess} onRequireAccess={requireAccess} />;
   } else {
     page = (
       <DashboardPage
@@ -166,11 +178,11 @@ export default function RevisionApp() {
             onNavigateToCart={() => { window.location.hash = "#/cart"; }}
             onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
           />
-          {revisionAccessLoading ? (
+          {revisionAccessLoading || revisionDataLoading ? (
             <div data-revision-access-loading className="grid min-h-0 flex-1 place-items-center bg-white">
               <div className="flex flex-col items-center gap-2 text-slate-400">
                 <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-violet-500" />
-                <p className="text-xs font-semibold">Checking your membership…</p>
+                <p className="text-xs font-semibold">{revisionAccessLoading ? "Checking your membership…" : "Syncing your Test Bank…"}</p>
               </div>
             </div>
           ) : (
@@ -189,7 +201,7 @@ export default function RevisionApp() {
             setPaywallOpen(false);
             window.location.hash = "#/subscription";
           }}
-          subtitle="Daily tests, smart revision sessions aur weak-topic analytics ab Eduvora Plus+ subscription ka hissa hain. Subscribe karke turant shuru karo."
+          subtitle="Naya AI ya imported revision test cloud Test Bank mein save karne ke liye active Revision Studio access chahiye. Aapke existing tests, results aur retakes hamesha available rahenge."
         />
       </div>
     </div>

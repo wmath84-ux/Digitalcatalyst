@@ -2,6 +2,8 @@ import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from 
 import { referralCodeForUid, runReferralRepairOnce } from "./_lib/referrals.js";
 import { handleEmbedProxy } from "./_lib/embedProxy.js";
 import { handleRevisionGenerate } from "./_lib/revisionGenerate.js";
+import { handleRevisionData } from "./_lib/revisionData.js";
+import { handleMyDay } from "./_lib/myDay.js";
 
 type SubscriberRow = {
   uid: string;
@@ -76,9 +78,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "GET" && req.query?.url) {
     return handleEmbedProxy(req, res);
   }
-  // Revision AI generation. `/api/revision/generate` rewrites here for the
-  // same 12-function cap. POST is otherwise unused on this route.
+  // Revision APIs share this deployed function to stay within the 12-function
+  // Hobby cap. The body action safely dispatches cloud Test Bank writes while
+  // the existing generation action keeps its original handler.
   if (req.method === "POST") {
+    const rawBody = typeof req.body === "string" ? (() => { try { return JSON.parse(req.body); } catch { return {}; } })() : (req.body || {});
+    const action = String(rawBody?.action || "");
+    if (action.startsWith("revision.data.")) {
+      return handleRevisionData(req, res);
+    }
+    if (action.startsWith("myday.")) {
+      return handleMyDay(req, res);
+    }
     return handleRevisionGenerate(req, res);
   }
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });

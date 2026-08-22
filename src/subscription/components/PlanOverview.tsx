@@ -158,6 +158,32 @@ export default function PlanOverview({
           })}
         </div>
 
+        {activePlan ? (
+          <div
+            data-revision-bank-benefit
+            className="relative mt-4 flex items-center gap-2 rounded-2xl bg-indigo-400/10 px-3 py-2.5 text-[11px] font-semibold text-indigo-50 ring-1 ring-indigo-300/20"
+          >
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white/10 text-sm">🧠</span>
+            <span>
+              {activePlan.revisionTestBankLimits?.[cycle] === -1
+                ? "With Revision Studio: unlimited cloud-saved tests"
+                : `With Revision Studio: save up to ${activePlan.revisionTestBankLimits?.[cycle] ?? 20} tests in your cloud Test Bank`}
+            </span>
+          </div>
+        ) : null}
+
+        {activePlan ? (
+          <div data-school-ai-benefit className="relative mt-2 flex items-center gap-2 rounded-2xl bg-violet-400/10 px-3 py-2.5 text-[11px] font-semibold text-violet-50 ring-1 ring-violet-300/20">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white/10 text-sm">✨</span>
+            <span>
+              School AI: {activePlan.aiAllowances?.[cycle]?.dailyGenerationLimit === 0 ? "unlimited" : `${activePlan.aiAllowances?.[cycle]?.dailyGenerationLimit ?? 20} successful tests/day`}
+              {(activePlan.aiAllowances?.[cycle]?.costBudgetMicros ?? -1) >= 0
+                ? ` · $${((activePlan.aiAllowances?.[cycle]?.costBudgetMicros ?? 0) / 1_000_000).toFixed(2)} model-cost budget per term when hybrid metering is enabled`
+                : ""}
+            </span>
+          </div>
+        ) : null}
+
         {/* Included / selected features pill row */}
         {(includedFeatureRecords.length > 0 || selectedFeatureRecords.length > 0) ? (
           <div className="relative mt-4 flex flex-wrap gap-1.5">

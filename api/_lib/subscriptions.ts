@@ -21,6 +21,8 @@ import { Timestamp, type Firestore, type QueryDocumentSnapshot, type Transaction
 import { adminDb, parseProductPricePaise } from "./firebaseAdmin.js";
 import { getRenewalBaseTime } from "../../utils/subscriptionRenewal.js";
 import { resolveFeaturePrice } from "../../utils/featurePricing.js";
+import { revisionBankLimitForCycle } from "../../utils/revisionLimits.js";
+import { aiAllowanceForCycle } from "../../utils/aiAllowances.js";
 import {
   ALREADY_ACTIVE_CODE,
   evaluateSubscriptionSelection,
@@ -63,6 +65,14 @@ const USER_SUBS_COLLECTION = "users";
 const USER_SUBS_DOC = "subscription";
 
 /** Merge verified access into a stored same-order subscription without time math. */
+const aiAllowanceSnapshot = (plan: SubscriptionPlanDoc, cycle: BillingCycle) => {
+  const allowance = aiAllowanceForCycle(plan, cycle);
+  return {
+    aiDailyGenerationLimit: allowance.dailyGenerationLimit,
+    aiCostBudgetMicros: allowance.costBudgetMicros,
+  };
+};
+
 const mergeSubscriptionAccess = (
   previousData: Record<string, unknown>,
   plan: SubscriptionPlanDoc,
@@ -94,9 +104,9 @@ const mergeSubscriptionAccess = (
  * always the selected features + bonus products.
  */
 const DEFAULT_SUBSCRIPTION_PLANS: Array<Record<string, unknown>> = [
-  { id: "basic", name: "Basic", description: "Flexible subscription access with optional My Day cloud saving.", monthlyPrice: 199, yearlyPrice: 1990, allowedCycles: ["monthly", "yearly"], active: true, badge: null, sortOrder: 0 },
-  { id: "premium", name: "Premium", description: "Premium subscription access with selectable My Day cloud saving.", monthlyPrice: 499, yearlyPrice: 4990, allowedCycles: ["monthly", "yearly"], active: true, badge: "POPULAR", sortOrder: 1 },
-  { id: "pro", name: "Pro", description: "Pro subscription access with selectable products and My Day cloud saving.", monthlyPrice: 999, yearlyPrice: 9990, allowedCycles: ["monthly", "yearly"], active: true, badge: null, sortOrder: 2 },
+  { id: "basic", name: "Basic", description: "Flexible subscription access with optional My Day cloud saving.", monthlyPrice: 199, yearlyPrice: 1990, allowedCycles: ["monthly", "yearly"], active: true, badge: null, sortOrder: 0, revisionTestBankLimits: { monthly: 20, yearly: 20 }, aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } } },
+  { id: "premium", name: "Premium", description: "Premium subscription access with selectable My Day cloud saving.", monthlyPrice: 499, yearlyPrice: 4990, allowedCycles: ["monthly", "yearly"], active: true, badge: "POPULAR", sortOrder: 1, revisionTestBankLimits: { monthly: 50, yearly: 50 }, aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } } },
+  { id: "pro", name: "Pro", description: "Pro subscription access with selectable products and My Day cloud saving.", monthlyPrice: 999, yearlyPrice: 9990, allowedCycles: ["monthly", "yearly"], active: true, badge: null, sortOrder: 2, revisionTestBankLimits: { monthly: 100, yearly: 100 }, aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } } },
 ];
 
 /**
@@ -109,6 +119,18 @@ const DEFAULT_SUBSCRIPTION_PLANS: Array<Record<string, unknown>> = [
  * doc records what has been seeded, so a deliberate deletion is respected.
  */
 const DEFAULT_SUBSCRIPTION_FEATURES: Array<Record<string, unknown>> = [
+  {
+    id: "my-day",
+    name: "My Day cloud saving",
+    description: "Securely save and sync tasks, schedules, reminders and notes.",
+    icon: "calendar",
+    price: 149,
+    included: false,
+    active: true,
+    badge: "PAID",
+    sortOrder: 0,
+    freeItemsPerDay: 1,
+  },
   {
     id: "revision",
     name: "Revision Studio",
@@ -705,6 +727,9 @@ export const writeSubscriptionAfterPayment = async (
       amountPaise: Math.max(0, Math.round(Number(previousData.amountPaise ?? args.amountPaise ?? 0))),
       source: args.source,
       couponCode: args.couponCode || null,
+      revisionTestBankLimit: Number(previousData.revisionTestBankLimit ?? revisionBankLimitForCycle(args.plan, args.cycle)),
+      aiDailyGenerationLimit: Number(previousData.aiDailyGenerationLimit ?? aiAllowanceSnapshot(args.plan, args.cycle).aiDailyGenerationLimit),
+      aiCostBudgetMicros: Number(previousData.aiCostBudgetMicros ?? aiAllowanceSnapshot(args.plan, args.cycle).aiCostBudgetMicros),
     };
   }
 
@@ -749,6 +774,9 @@ export const writeSubscriptionAfterPayment = async (
       amountPaise: Math.max(0, Math.round(Number(args.amountPaise || 0))),
       source: args.source,
       couponCode: args.couponCode || null,
+      revisionTestBankLimit: Number(previousData.revisionTestBankLimit ?? revisionBankLimitForCycle(args.plan, previousCycle === "yearly" ? "yearly" : "monthly")),
+      aiDailyGenerationLimit: Number(previousData.aiDailyGenerationLimit ?? aiAllowanceSnapshot(args.plan, previousCycle === "yearly" ? "yearly" : "monthly").aiDailyGenerationLimit),
+      aiCostBudgetMicros: Number(previousData.aiCostBudgetMicros ?? aiAllowanceSnapshot(args.plan, previousCycle === "yearly" ? "yearly" : "monthly").aiCostBudgetMicros),
     };
     tx.set(subRef, {
       ...addOnRecord,
@@ -798,6 +826,8 @@ export const writeSubscriptionAfterPayment = async (
     amountPaise: Math.max(0, Math.round(Number(args.amountPaise || 0))),
     source: args.source,
     couponCode: args.couponCode || null,
+    revisionTestBankLimit: revisionBankLimitForCycle(args.plan, args.cycle),
+    ...aiAllowanceSnapshot(args.plan, args.cycle),
   };
   tx.set(subRef, {
     ...record,

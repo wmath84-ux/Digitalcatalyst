@@ -27,6 +27,8 @@
 //     gets handed to the Part 4 engine.
 
 import { normalisePlanPricing, resolveFeaturePrice } from "./featurePricing.js";
+import { normalizeRevisionTestBankLimits } from "./revisionLimits.js";
+import { normalizePlanAiAllowances } from "./aiAllowances.js";
 
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x !== null && x !== undefined) : []);
@@ -82,6 +84,8 @@ export const normalisePlanDoc = (raw, id) => {
     trialDays: Math.max(0, Math.floor(Number(raw.trialDays || 0))),
     autoRenewByDefault: raw.autoRenewByDefault !== false,
     sortOrder: Number.isFinite(Number(raw.sortOrder)) ? Math.floor(Number(raw.sortOrder)) : 0,
+    revisionTestBankLimits: normalizeRevisionTestBankLimits(raw.revisionTestBankLimits, planId),
+    aiAllowances: normalizePlanAiAllowances(raw.aiAllowances),
   };
 };
 
@@ -121,6 +125,7 @@ export const normaliseFeatureDoc = (raw, id) => {
     active: raw.active !== false,
     badge: typeof raw.badge === "string" ? raw.badge : null,
     sortOrder: Number.isFinite(Number(raw.sortOrder)) ? Math.floor(Number(raw.sortOrder)) : 0,
+    freeItemsPerDay: featureId === "my-day" ? Math.max(0, Math.min(100, Math.round(Number(raw.freeItemsPerDay ?? 1) || 0))) : null,
   };
 };
 

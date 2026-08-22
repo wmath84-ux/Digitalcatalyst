@@ -1,4 +1,5 @@
 import path from "path";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -21,11 +22,13 @@ export default defineConfig({
     {
       name: "embed-proxy-dev-stub",
       configureServer(server) {
-        server.middlewares.use("/api/revision/generate", (_req, res) => {
+        const revisionApiUnavailable = (_req: IncomingMessage, res: ServerResponse) => {
           res.statusCode = 501;
           res.setHeader("content-type", "application/json; charset=utf-8");
-          res.end(JSON.stringify({ ok: false, code: "dev_no_api", error: "Local dev has no serverless AI proxy." }));
-        });
+          res.end(JSON.stringify({ ok: false, code: "dev_no_api", error: "Local dev has no serverless Revision API." }));
+        };
+        server.middlewares.use("/api/revision/generate", revisionApiUnavailable);
+        server.middlewares.use("/api/revision/data", revisionApiUnavailable);
         server.middlewares.use("/api/embed-proxy", (req, res) => {
           const safe = (new URL(req.url || "/", "http://localhost").searchParams.get("url") || "").trim();
           const link = safe.startsWith("https://")

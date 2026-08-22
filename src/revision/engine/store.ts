@@ -189,6 +189,11 @@ export type DailyTestRow = {
 export type TestAttemptRow = {
   id: number;
   dailyTestId: number;
+  /** Optional immutable subset used by skipped-only revision attempts. */
+  questionIds?: number[];
+  /** Retake metadata; old attempts default to a full first attempt. */
+  attemptKind?: "full" | "skipped";
+  parentAttemptId?: number | null;
   status: TestStatus;
   currentIndex: number;
   score: number;
@@ -393,14 +398,32 @@ function normalizeDb(db: RevisionDb): RevisionDb {
 export function applyCatalog(uid: string, input: RevisionCatalogInput, catalogVersion: number): RevisionDb {
   const fresh = buildDbFromCatalog(input);
   const current = loadDb(uid);
+
+  // Custom tests own immutable question snapshots. Older code replaced the
+  // entire question/subject/topic catalog here while retaining the tests and
+  // attempts, leaving those retained rows pointing at questions that no
+  // longer existed. Preserve every row referenced by a custom test and merge
+  // it after the newly published school catalog.
+  const customQuestionIds = new Set(
+    current.dailyTests.filter((test) => test.kind === "custom").flatMap((test) => test.questionIds),
+  );
+  const customQuestions = current.questions.filter((question) => customQuestionIds.has(question.id));
+  const customSubjectIds = new Set(customQuestions.map((question) => question.subjectId));
+  const customTopicIds = new Set(customQuestions.map((question) => question.topicId));
+  const mergeById = <T extends { id: number }>(base: T[], extra: T[]) => {
+    const rows = new Map(base.map((row) => [row.id, row]));
+    extra.forEach((row) => rows.set(row.id, row));
+    return Array.from(rows.values());
+  };
+
   const db: RevisionDb = {
     ...current,
     seedVersion: SEED_VERSION,
     catalogVersion,
     settings: fresh.settings,
-    subjects: fresh.subjects,
-    topics: fresh.topics,
-    questions: fresh.questions,
+    subjects: mergeById(fresh.subjects, current.subjects.filter((subject) => customSubjectIds.has(subject.id))),
+    topics: mergeById(fresh.topics, current.topics.filter((topic) => customTopicIds.has(topic.id))),
+    questions: mergeById(fresh.questions, customQuestions),
   };
   saveDb(uid, db);
   return db;
@@ -411,14 +434,31 @@ export function saveDb(uid: string, db: RevisionDb) {
   try {
     localStorage.setItem(storageKey(uid), JSON.stringify(db));
   } catch {
-    // Persistence is best-effort — a full quota must never crash the UI.
+    // The cloud mirror is the durable source; local persistence remains a
+    // best-effort fast cache for offline rendering.
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("revision-db-changed", { detail: { uid } }));
   }
 }
 
+let lastGeneratedId = 0;
+
+/**
+ * Globally collision-resistant numeric ids keep the existing synchronous
+ * engine/routes intact while allowing two devices to create data safely.
+ * A one-million-value random namespace per UTC second makes cross-device
+ * clashes vanishingly unlikely while staying well below MAX_SAFE_INTEGER;
+ * the monotonic fallback handles rapid same-device writes.
+ */
 export function nextId(db: RevisionDb, table: string): number {
+  const randomTail = Math.floor(Math.random() * 1_000_000);
+  const wall = Math.floor(Date.now() / 1000) * 1_000_000 + randomTail;
   const current = db.nextIds[table] ?? 1;
-  db.nextIds[table] = current + 1;
-  return current;
+  const id = Math.max(wall, lastGeneratedId + 1, current);
+  lastGeneratedId = id;
+  db.nextIds[table] = id + 1;
+  return id;
 }
 
 export function nowIso(): string {

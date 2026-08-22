@@ -46,6 +46,13 @@ export interface SubscriptionPlanDoc {
   autoRenewByDefault: boolean;
   /** Sort order for the picker. */
   sortOrder: number;
+  /** Cloud Test Bank capacity per billing duration (-1 = unlimited). */
+  revisionTestBankLimits: { monthly: number; yearly: number };
+  /** School-AI daily successful-test and per-term model-cost allowances. */
+  aiAllowances: {
+    monthly: { dailyGenerationLimit: number; costBudgetMicros: number };
+    yearly: { dailyGenerationLimit: number; costBudgetMicros: number };
+  };
 }
 
 /** Server-normalised subscription feature. */
@@ -75,6 +82,8 @@ export interface SubscriptionFeatureDoc {
   badge?: string | null;
   /** Sort order for the picker. */
   sortOrder: number;
+  /** Non-subscriber daily free creations (My Day only). */
+  freeItemsPerDay?: number | null;
 }
 
 /** Server-normalised plan-to-product unlock (Firestore

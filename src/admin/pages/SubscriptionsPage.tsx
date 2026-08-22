@@ -16,6 +16,11 @@ type Plan = {
   cta: string | null;
   featured: boolean;
   active: boolean;
+  revisionTestBankLimits: { monthly: number; yearly: number };
+  aiAllowances: {
+    monthly: { dailyGenerationLimit: number; costBudgetMicros: number };
+    yearly: { dailyGenerationLimit: number; costBudgetMicros: number };
+  };
 };
 
 /** Per-plan price override stored on a feature doc. */
@@ -37,6 +42,8 @@ type FeatureRow = {
   badge: string | null;
   sortOrder: number;
   active: boolean;
+  /** Non-subscriber item creations allowed each calendar day (My Day only). */
+  freeItemsPerDay?: number;
 };
 
 /** Subscription add-on product (like features but unlocks real products). */
@@ -70,8 +77,8 @@ type SubscriptionProductRow = {
   hasOverride?: boolean;
 };
 
-const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }], accessTier: "basic", cta: "Subscribe", featured: false, active: true };
-const EMPTY_FEATURE: Partial<FeatureRow> = { key: "", name: "", description: "", individualPrice: "0", monthlyPrice: "", yearlyPrice: "", planPricing: {}, icon: "sparkles", included: false, badge: "", sortOrder: 0, active: true };
+const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }, { cycle: "yearly", label: "Yearly", price: 0 }], revisionTestBankLimits: { monthly: 20, yearly: 20 }, aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } }, accessTier: "basic", cta: "Subscribe", featured: false, active: true };
+const EMPTY_FEATURE: Partial<FeatureRow> = { key: "", name: "", description: "", individualPrice: "0", monthlyPrice: "", yearlyPrice: "", planPricing: {}, icon: "sparkles", included: false, badge: "", sortOrder: 0, freeItemsPerDay: 1, active: true };
 const EMPTY_SUB_PRODUCT: Partial<SubscriptionProductRow> = { productId: "", name: "", individualPrice: "0", monthlyPrice: "", yearlyPrice: "", planPricing: {}, included: false, sortOrder: 0, active: true };
 
 export default function SubscriptionsPage() {
@@ -327,6 +334,12 @@ export default function SubscriptionsPage() {
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">{p.description}</p>
                   <p className="mt-1 text-xs text-slate-600">{p.billingCycles?.map((c) => `${c.label}: ${Number(c.price) === 0 ? "FREE" : `₹${c.price}`}`).join(" · ")}</p>
+                  <p className="mt-1 text-[11px] font-semibold text-indigo-600">
+                    Test Bank: {p.revisionTestBankLimits?.monthly === -1 ? "Unlimited" : `${p.revisionTestBankLimits?.monthly ?? 20} monthly`} · {p.revisionTestBankLimits?.yearly === -1 ? "Unlimited yearly" : `${p.revisionTestBankLimits?.yearly ?? 20} yearly`}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-violet-600">
+                    School AI/day: {p.aiAllowances?.monthly?.dailyGenerationLimit === 0 ? "Unlimited" : p.aiAllowances?.monthly?.dailyGenerationLimit ?? 20} monthly · {p.aiAllowances?.yearly?.dailyGenerationLimit === 0 ? "Unlimited" : p.aiAllowances?.yearly?.dailyGenerationLimit ?? 20} yearly
+                  </p>
                   <div className="mt-2 flex gap-2">
                     <SecondaryButton className="h-9 flex-1 text-xs" onClick={() => setEditingPlan(p)}>Edit</SecondaryButton>
                     <DangerButton className="h-9 flex-1 text-xs" onClick={() => removePlan(p)}>Delete</DangerButton>
@@ -461,6 +474,93 @@ export default function SubscriptionsPage() {
                 onChange={(e) => setEditingPlan({ ...editingPlan, billingCycles: [editingPlan.billingCycles?.[0] ?? { cycle: "monthly", label: "Monthly", price: 0 }, { cycle: "yearly", label: "Yearly", price: Number(e.target.value) }] })}
               />
             </Field>
+
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3">
+              <p className="text-sm font-semibold text-slate-900">Revision Test Bank capacity</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                Maximum cloud-saved tests for each duration. Use −1 for unlimited. Retakes do not use another slot.
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <Field label="Monthly saved tests">
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min={-1}
+                    max={1000}
+                    value={editingPlan.revisionTestBankLimits?.monthly ?? 20}
+                    onChange={(e) => setEditingPlan({
+                      ...editingPlan,
+                      revisionTestBankLimits: {
+                        monthly: Math.max(-1, Math.min(1000, Math.round(Number(e.target.value) || 0))),
+                        yearly: editingPlan.revisionTestBankLimits?.yearly ?? 20,
+                      },
+                    })}
+                  />
+                </Field>
+                <Field label="Yearly saved tests">
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min={-1}
+                    max={1000}
+                    value={editingPlan.revisionTestBankLimits?.yearly ?? 20}
+                    onChange={(e) => setEditingPlan({
+                      ...editingPlan,
+                      revisionTestBankLimits: {
+                        monthly: editingPlan.revisionTestBankLimits?.monthly ?? 20,
+                        yearly: Math.max(-1, Math.min(1000, Math.round(Number(e.target.value) || 0))),
+                      },
+                    })}
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+              <p className="text-sm font-semibold text-slate-900">School AI allowances</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                Configure each billing duration independently. Every successfully generated complete test uses one daily generation. Cost budget is the maximum school-model spend for that purchased term; leave it blank for unlimited. A learner&apos;s own API key never uses either allowance.
+              </p>
+              {(["monthly", "yearly"] as const).map((cycle) => {
+                const allowance = editingPlan.aiAllowances?.[cycle] ?? { dailyGenerationLimit: 20, costBudgetMicros: -1 };
+                const setAllowance = (patch: Partial<typeof allowance>) => setEditingPlan({
+                  ...editingPlan,
+                  aiAllowances: {
+                    monthly: editingPlan.aiAllowances?.monthly ?? { dailyGenerationLimit: 20, costBudgetMicros: -1 },
+                    yearly: editingPlan.aiAllowances?.yearly ?? { dailyGenerationLimit: 20, costBudgetMicros: -1 },
+                    [cycle]: { ...allowance, ...patch },
+                  },
+                });
+                return (
+                  <div key={cycle} className="mt-3 rounded-lg border border-violet-100 bg-white p-2.5">
+                    <p className="mb-2 text-xs font-bold capitalize text-violet-800">{cycle} membership</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Successful tests / day" hint="0 = unlimited">
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min={0}
+                          max={10000}
+                          value={allowance.dailyGenerationLimit}
+                          onChange={(e) => setAllowance({ dailyGenerationLimit: Math.max(0, Math.min(10000, Math.round(Number(e.target.value) || 0))) })}
+                        />
+                      </Field>
+                      <Field label="Term cost budget (USD)" hint="Blank = unlimited">
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          placeholder="Unlimited"
+                          value={allowance.costBudgetMicros < 0 ? "" : allowance.costBudgetMicros / 1_000_000}
+                          onChange={(e) => setAllowance({ costBudgetMicros: e.target.value === "" ? -1 : Math.max(0, Math.min(1_000_000_000_000, Math.round(Number(e.target.value) * 1_000_000))) })}
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Access tier">
                 <select className={selectClass} value={editingPlan.accessTier ?? "basic"} onChange={(e) => setEditingPlan({ ...editingPlan, accessTier: e.target.value })}>
@@ -487,6 +587,19 @@ export default function SubscriptionsPage() {
             <Field label="Feature key" required hint="Unique ID used by the subscription catalog"><input className={inputClass} placeholder="for example: ai-mentor" value={editingFeature.key ?? ""} disabled={!!editingFeature.id} onChange={(e) => setEditingFeature({ ...editingFeature, key: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "-") })} /></Field>
             <Field label="Name" required><input className={inputClass} placeholder="Feature name shown to customers" value={editingFeature.name ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, name: e.target.value })} /></Field>
             <Field label="Description"><textarea className={textareaClass} placeholder="Explain what this feature includes" value={editingFeature.description ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, description: e.target.value })} /></Field>
+            {(editingFeature.id === "my-day" || editingFeature.key === "my-day") && (
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3">
+                <p className="text-sm font-semibold text-slate-900">Non-subscriber daily free creations</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                  Learners without an active My Day subscription can browse normally and create this many new tasks, schedule items, notes or reminders per calendar day. After it is used, creation is gated until the next daily reset.
+                </p>
+                <div className="mt-2">
+                  <Field label="Free items per day" hint="Default 1 · use 0 for browse-only">
+                    <input className={inputClass} type="number" min={0} max={100} value={editingFeature.freeItemsPerDay ?? 1} onChange={(e) => setEditingFeature({ ...editingFeature, freeItemsPerDay: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))) })} />
+                  </Field>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Individual price (₹)" hint="Base rate; overridden by the cycle/plan rules below"><input className={inputClass} type="number" min="0" value={editingFeature.individualPrice ?? "0"} onChange={(e) => setEditingFeature({ ...editingFeature, individualPrice: e.target.value })} /></Field>
               <Field label="Icon key" hint="calendar, brain, refresh-cw, rocket, code, users…"><input className={inputClass} value={editingFeature.icon ?? "sparkles"} onChange={(e) => setEditingFeature({ ...editingFeature, icon: e.target.value })} /></Field>

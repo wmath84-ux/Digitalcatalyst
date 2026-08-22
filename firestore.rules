@@ -73,18 +73,16 @@ service cloud.firestore {
       }
 
       match /myDay/{documentId} {
-        allow read: if isOwner(uid) || isAdmin();
-        allow create, update: if isOwner(uid)
-          && documentId == 'current'
-          // A catalog feature controls its own gate. If Admin removes the
-          // feature (or deactivates it), My Day is intentionally free again.
-          && (!exists(/databases/$(database)/documents/subscriptionFeatures/my-day)
-            || get(/databases/$(database)/documents/subscriptionFeatures/my-day).data.active == false
-            || (exists(/databases/$(database)/documents/users/$(uid)/subscription/current)
-              && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.status == 'active'
-              && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.expiresAt > request.time
-              && get(/databases/$(database)/documents/users/$(uid)/subscription/current).data.features.hasAny(['my-day'])));
-        allow delete: if isOwner(uid) || isAdmin();
+        allow read: if documentId == 'current' && (isOwner(uid) || isAdmin());
+        // The shared My Day API compares item IDs, validates the legacy paid
+        // entitlement equivalent of features.hasAny(['my-day']), and consumes
+        // the daily-free counter in one transaction. Direct owner writes would bypass it.
+        allow create, update, delete: if isAdmin();
+      }
+
+      match /myDayUsage/{documentId} {
+        allow read: if documentId == 'current' && (isOwner(uid) || isAdmin());
+        allow create, update, delete: if isAdmin();
       }
 
       match /courseProgress/{productId} {
@@ -144,19 +142,78 @@ service cloud.firestore {
       }
 
 
-      match /aiUsage/{documentId} {
+      // Cloud Revision Test Bank. Test documents and capacity counters are
+      // server-authoritative (Admin SDK only) so a client cannot bypass its
+      // plan limit. Owner-scoped progress documents may be updated directly so
+      // Firestore's offline queue can preserve every answer while taking a test.
+      match /revisionTests/{testId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if isAdmin();
+      }
+
+      match /revisionUsage/{documentId} {
         allow read: if documentId == 'current' && (isOwner(uid) || isAdmin());
-        allow create, update: if documentId == 'current'
-          && isOwner(uid)
+        allow create, update, delete: if isAdmin();
+      }
+
+      // Server-only deletion tombstones prevent another offline device from
+      // re-importing a test that the learner permanently deleted.
+      match /revisionDeletedTests/{testId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if isAdmin();
+      }
+
+      match /revisionAttempts/{attemptId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
           && request.resource.data.uid == uid
-          && request.resource.data.dayCount is number
-          && request.resource.data.dayCount >= 0
-          && request.resource.data.dayCount <= 10000
-          && request.resource.data.dayKey is string
-          && request.resource.data.stamps is list
-          && request.resource.data.stamps.size() <= 200
-          && !request.resource.data.keys().hasAny(['apiKey', 'authorization', 'secret', 'role', 'status']);
-        allow delete: if isAdmin();
+          && request.resource.data.testId is number
+          && request.resource.data.testKey is string
+          && request.resource.data.testKey.size() > 0
+          && request.resource.data.testKey.size() <= 40
+          && !exists(/databases/$(database)/documents/users/$(uid)/revisionDeletedTests/$(request.resource.data.testKey))
+          && request.resource.data.attempt is map
+          && request.resource.data.answers is list
+          && request.resource.data.answers.size() <= 100
+          && !request.resource.data.keys().hasAny(['apiKey', 'authorization', 'secret', 'role']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
+      match /revisionItems/{itemId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.testId is number
+          && request.resource.data.testKey is string
+          && request.resource.data.testKey.size() > 0
+          && request.resource.data.testKey.size() <= 40
+          && !exists(/databases/$(database)/documents/users/$(uid)/revisionDeletedTests/$(request.resource.data.testKey))
+          && request.resource.data.item is map
+          && !request.resource.data.keys().hasAny(['apiKey', 'authorization', 'secret', 'role']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
+      match /revisionSessions/{sessionId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.testKey is string
+          && request.resource.data.testKey.size() > 0
+          && request.resource.data.testKey.size() <= 40
+          && !exists(/databases/$(database)/documents/users/$(uid)/revisionDeletedTests/$(request.resource.data.testKey))
+          && request.resource.data.session is map
+          && request.resource.data.answers is list
+          && request.resource.data.answers.size() <= 100
+          && !request.resource.data.keys().hasAny(['apiKey', 'authorization', 'secret', 'role']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
+      match /aiUsage/{documentId} {
+        // Usage, in-flight reservations, plan snapshots and token-cost totals
+        // are written only by the transactional Admin-SDK generation API.
+        // Learners can watch their own live allowance but cannot mint quota.
+        allow read: if documentId == 'current' && (isOwner(uid) || isAdmin());
+        allow create, update, delete: if isAdmin();
       }
 
       match /aiMentorChats/{chatId} {

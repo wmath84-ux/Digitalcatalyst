@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { saveMyDayData } from "./lib/myDayClient";
 import {
   Bell,
   CalendarClock,
@@ -54,7 +53,17 @@ const CREATE_OPTIONS: { id: DaySection; label: string; hint: string; icon: typeo
 export default function App() {
   const { cartIds } = useCommerce();
   const { user } = useAuth();
-  const { hasAccess: hasMyDayAccess, uid } = useMyDayAccess();
+  const {
+    hasAccess: hasMyDayAccess,
+    canCreate: canCreateMyDay,
+    freeLimit,
+    freeUsed,
+    freeRemaining,
+    resetAt,
+    uid,
+    setAccess: setMyDayAccess,
+    refresh: refreshMyDay,
+  } = useMyDayAccess();
   const [cloudLoaded, setCloudLoaded] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>(() => loadFromStorage("myday_tasks", initialTasks));
@@ -70,7 +79,7 @@ export default function App() {
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
-  const mutatedRef = useRef(false);
+  const [savingMyDay, setSavingMyDay] = useState(false);
 
   const userName = user?.name?.split(" ")[0] || "Learner";
 
@@ -92,62 +101,66 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Same beautiful premium gate for My Day – appears when user tries to create/save
+  // Non-subscribers may create the Admin-configured free number of items.
+  // After today's allowance is consumed, My Day remains browseable and the
+  // same polished subscription gate returns for every create/edit action.
   const requireMyDayAccess = useCallback(() => {
-    if (hasMyDayAccess) return true;
+    if (hasMyDayAccess || canCreateMyDay) return true;
     setPaywallOpen(true);
     return false;
-  }, [hasMyDayAccess]);
+  }, [canCreateMyDay, hasMyDayAccess]);
 
-  // Keep alias for older handlers
   const canSaveMyDay = requireMyDayAccess;
 
-  const persistMyDay = useCallback(
-    (next: Partial<{ tasks: Task[]; schedule: ScheduleEvent[]; notes: QuickNote[]; reminders: Reminder[] }>) => {
-      mutatedRef.current = true;
-      if (!uid || !hasMyDayAccess) return;
-      setDoc(
-        doc(db, "users", uid, "myDay", "current"),
-        {
-          ...(next.tasks ? { tasks: next.tasks } : {}),
-          ...(next.schedule ? { schedule: next.schedule } : {}),
-          ...(next.notes ? { notes: next.notes } : {}),
-          ...(next.reminders ? { reminders: next.reminders } : {}),
-          tzOffsetMinutes: new Date().getTimezoneOffset(),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      ).catch(() => {
-        addToast("My Day cloud save failed", "error");
+  const applyCloudData = useCallback((data: { tasks: Task[]; schedule: ScheduleEvent[]; notes: QuickNote[]; reminders: Reminder[] }) => {
+    setTasks(data.tasks);
+    setSchedule(data.schedule);
+    setNotes(data.notes);
+    setReminders(data.reminders);
+    try {
+      localStorage.setItem("myday_tasks", JSON.stringify(data.tasks));
+      localStorage.setItem("myday_schedule", JSON.stringify(data.schedule));
+      localStorage.setItem("myday_notes", JSON.stringify(data.notes));
+      localStorage.setItem("myday_reminders", JSON.stringify(data.reminders));
+    } catch {
+      // Cloud remains authoritative when local storage is unavailable.
+    }
+  }, []);
+
+  // The API transaction is the only writer to the users/{uid}/myDay collection.
+  const persistMyDay = useCallback(async (
+    next: Partial<{ tasks: Task[]; schedule: ScheduleEvent[]; notes: QuickNote[]; reminders: Reminder[] }>,
+  ): Promise<boolean> => {
+    if (!uid || savingMyDay) return false;
+    setSavingMyDay(true);
+    try {
+      const result = await saveMyDayData(next, {
+        tzOffsetMinutes: new Date().getTimezoneOffset(),
       });
-    },
-    [addToast, hasMyDayAccess, uid],
-  );
-
-  useEffect(() => {
-    if (!uid || !hasMyDayAccess) { setCloudLoaded(false); return undefined; }
-    let cancelled = false;
-    void getDoc(doc(db, "users", uid, "myDay", "current")).then((snapshot) => {
-      if (cancelled) return;
-      const data = snapshot.data() || {};
-      if (!mutatedRef.current) {
-        if (!snapshot.exists()) { setTasks([]); setSchedule([]); setNotes([]); setReminders([]); }
-        if (Array.isArray(data.tasks)) setTasks(data.tasks as Task[]);
-        if (Array.isArray(data.schedule)) setSchedule(data.schedule as ScheduleEvent[]);
-        if (Array.isArray(data.notes)) setNotes(data.notes as QuickNote[]);
-        if (Array.isArray(data.reminders)) setReminders(data.reminders as Reminder[]);
-      }
+      applyCloudData(result.data);
+      setMyDayAccess(result.access);
       setCloudLoaded(true);
-    }).catch(() => setCloudLoaded(false));
-    return () => { cancelled = true; };
-  }, [hasMyDayAccess, uid]);
+      return true;
+    } catch (err) {
+      const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code || "") : "";
+      if (code === "MYDAY_DAILY_FREE_USED") setPaywallOpen(true);
+      addToast(err instanceof Error ? err.message : "My Day cloud save failed", "error");
+      return false;
+    } finally {
+      setSavingMyDay(false);
+    }
+  }, [addToast, applyCloudData, savingMyDay, setMyDayAccess, uid]);
 
   useEffect(() => {
-    if (!uid || !hasMyDayAccess || !cloudLoaded) return;
-    setDoc(doc(db, "users", uid, "myDay", "current"), { tasks, schedule, notes, reminders, tzOffsetMinutes: new Date().getTimezoneOffset(), updatedAt: serverTimestamp() }, { merge: true }).catch(() => {
-      addToast("My Day cloud save failed", "error");
+    if (!uid) { setCloudLoaded(false); return; }
+    let cancelled = false;
+    void refreshMyDay().then((result) => {
+      if (cancelled || !result) return;
+      applyCloudData(result.data);
+      setCloudLoaded(true);
     });
-  }, [addToast, cloudLoaded, hasMyDayAccess, notes, reminders, schedule, tasks, uid]);
+    return () => { cancelled = true; };
+  }, [applyCloudData, refreshMyDay, uid]);
 
   useEffect(() => {
     if (!createMenuOpen) return;
@@ -208,41 +221,48 @@ export default function App() {
   }, []);
 
   const handleToggleTask = useCallback((id: string) => {
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        const newStatus: TaskStatus = t.status === "completed" ? "pending" : "completed";
-        if (newStatus === "completed") { playSfxComplete(); addToast("Task completed"); }
-        else playSfxToggle();
-        return { ...t, status: newStatus };
-      }),
-    );
-  }, [addToast]);
+    if (!canSaveMyDay()) return;
+    const next = tasks.map((task) => task.id !== id ? task : {
+      ...task,
+      status: (task.status === "completed" ? "pending" : "completed") as TaskStatus,
+    });
+    const changed = next.find((task) => task.id === id);
+    void persistMyDay({ tasks: next }).then((saved) => {
+      if (!saved) return;
+      if (changed?.status === "completed") { playSfxComplete(); addToast("Task completed"); }
+      else playSfxToggle();
+    });
+  }, [addToast, canSaveMyDay, persistMyDay, tasks]);
 
   const handleCycleStatus = useCallback((id: string) => {
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        const cycle: TaskStatus[] = ["pending", "in-progress", "completed"];
-        const idx = cycle.indexOf(t.status);
-        const next = cycle[(idx + 1) % cycle.length];
-        if (next === "completed" && t.status !== "completed") { playSfxComplete(); addToast("Task completed"); }
-        else playSfxToggle();
-        return { ...t, status: next };
-      }),
-    );
-  }, [addToast]);
+    if (!canSaveMyDay()) return;
+    const cycle: TaskStatus[] = ["pending", "in-progress", "completed"];
+    let changed: TaskStatus | null = null;
+    const next = tasks.map((task) => {
+      if (task.id !== id) return task;
+      const status = cycle[(cycle.indexOf(task.status) + 1) % cycle.length];
+      changed = status;
+      return { ...task, status };
+    });
+    void persistMyDay({ tasks: next }).then((saved) => {
+      if (!saved) return;
+      if (changed === "completed") { playSfxComplete(); addToast("Task completed"); }
+      else playSfxToggle();
+    });
+  }, [addToast, canSaveMyDay, persistMyDay, tasks]);
 
   const handleDeleteTask = useCallback((id: string) => {
+    if (!canSaveMyDay()) return;
     showConfirm("Delete Task", "Are you sure you want to delete this task? This action cannot be undone.", () => {
-      const next = tasks.filter((t) => t.id !== id);
-      setTasks(next);
-      persistMyDay({ tasks: next });
-      playSfxRemove();
-      addToast("Task deleted", "info");
-      setConfirmOpen(false);
+      const next = tasks.filter((task) => task.id !== id);
+      void persistMyDay({ tasks: next }).then((saved) => {
+        if (!saved) return;
+        playSfxRemove();
+        addToast("Task deleted", "info");
+        setConfirmOpen(false);
+      });
     });
-  }, [addToast, persistMyDay, showConfirm, tasks]);
+  }, [addToast, canSaveMyDay, persistMyDay, showConfirm, tasks]);
 
   const openAddTask = useCallback(() => {
     if (!requireMyDayAccess()) return;
@@ -251,22 +271,22 @@ export default function App() {
   }, [requireMyDayAccess]);
 
   const openEditTask = useCallback((task: Task) => {
-    if (!requireMyDayAccess()) return;
+    if (!canSaveMyDay()) return;
     setEditingTask(task);
     setTaskModalOpen(true);
-  }, [requireMyDayAccess]);
+  }, [canSaveMyDay]);
 
   const handleSaveTask = useCallback((task: Task) => {
     if (!canSaveMyDay()) return;
-    setTasks((prev) => {
-      const exists = prev.some((t) => t.id === task.id);
-      if (exists) return prev.map((t) => (t.id === task.id ? task : t));
-      return [task, ...prev];
+    const exists = tasks.some((current) => current.id === task.id);
+    const next = exists ? tasks.map((current) => current.id === task.id ? task : current) : [task, ...tasks];
+    void persistMyDay({ tasks: next }).then((saved) => {
+      if (!saved) return;
+      setTaskModalOpen(false);
+      playSfxSuccess();
+      addToast(editingTask ? "Task updated successfully" : "New task created");
     });
-    setTaskModalOpen(false);
-    playSfxSuccess();
-    addToast(editingTask ? "Task updated successfully" : "New task created");
-  }, [addToast, canSaveMyDay, editingTask]);
+  }, [addToast, canSaveMyDay, editingTask, persistMyDay, tasks]);
 
   const openAddEvent = useCallback(() => {
     if (!requireMyDayAccess()) return;
@@ -275,90 +295,104 @@ export default function App() {
   }, [requireMyDayAccess]);
 
   const openEditEvent = useCallback((event: ScheduleEvent) => {
-    if (!requireMyDayAccess()) return;
+    if (!canSaveMyDay()) return;
     setEditingEvent(event);
     setScheduleModalOpen(true);
-  }, [requireMyDayAccess]);
+  }, [canSaveMyDay]);
 
   const handleSaveEvent = useCallback((event: ScheduleEvent) => {
     if (!canSaveMyDay()) return;
-    setSchedule((prev) => {
-      const exists = prev.some((e) => e.id === event.id);
-      if (exists) return prev.map((e) => (e.id === event.id ? event : e));
-      return [...prev, event];
+    const exists = schedule.some((current) => current.id === event.id);
+    const next = exists ? schedule.map((current) => current.id === event.id ? event : current) : [...schedule, event];
+    void persistMyDay({ schedule: next }).then((saved) => {
+      if (!saved) return;
+      setScheduleModalOpen(false);
+      playSfxSuccess();
+      addToast(editingEvent ? "Event updated" : "Event added to schedule");
     });
-    setScheduleModalOpen(false);
-    playSfxSuccess();
-    addToast(editingEvent ? "Event updated" : "Event added to schedule");
-  }, [addToast, canSaveMyDay, editingEvent]);
+  }, [addToast, canSaveMyDay, editingEvent, persistMyDay, schedule]);
 
   const handleDeleteEvent = useCallback((id: string) => {
+    if (!canSaveMyDay()) return;
     showConfirm("Delete Event", "Remove this event from your schedule?", () => {
-      const next = schedule.filter((e) => e.id !== id);
-      setSchedule(next);
-      persistMyDay({ schedule: next });
-      playSfxRemove();
-      addToast("Event removed", "info");
-      setConfirmOpen(false);
+      const next = schedule.filter((event) => event.id !== id);
+      void persistMyDay({ schedule: next }).then((saved) => {
+        if (!saved) return;
+        playSfxRemove();
+        addToast("Event removed", "info");
+        setConfirmOpen(false);
+      });
     });
-  }, [addToast, persistMyDay, schedule, showConfirm]);
+  }, [addToast, canSaveMyDay, persistMyDay, schedule, showConfirm]);
 
-  const handleAddNote = useCallback((text: string) => {
+  const handleAddNote = useCallback((noteText: string) => {
     if (!canSaveMyDay()) return;
     const note: QuickNote = {
       id: crypto.randomUUID(),
-      text,
+      text: noteText,
       createdAt: Date.now(),
       color: NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)],
     };
-    setNotes((prev) => [note, ...prev]);
-    playSfxAdd();
-    addToast("Note saved");
-  }, [addToast, canSaveMyDay]);
+    void persistMyDay({ notes: [note, ...notes] }).then((saved) => {
+      if (!saved) return;
+      playSfxAdd();
+      addToast("Note saved");
+    });
+  }, [addToast, canSaveMyDay, notes, persistMyDay]);
 
-  const handleEditNote = useCallback((id: string, text: string) => {
+  const handleEditNote = useCallback((id: string, noteText: string) => {
     if (!canSaveMyDay()) return;
-    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, text } : n)));
-    addToast("Note updated");
-  }, [addToast, canSaveMyDay]);
+    const next = notes.map((note) => note.id === id ? { ...note, text: noteText } : note);
+    void persistMyDay({ notes: next }).then((saved) => saved && addToast("Note updated"));
+  }, [addToast, canSaveMyDay, notes, persistMyDay]);
 
   const handleDeleteNote = useCallback((id: string) => {
-    const next = notes.filter((n) => n.id !== id);
-    setNotes(next);
-    persistMyDay({ notes: next });
-    playSfxRemove();
-    addToast("Note deleted", "info");
-  }, [addToast, notes, persistMyDay]);
+    if (!canSaveMyDay()) return;
+    const next = notes.filter((note) => note.id !== id);
+    void persistMyDay({ notes: next }).then((saved) => {
+      if (!saved) return;
+      playSfxRemove();
+      addToast("Note deleted", "info");
+    });
+  }, [addToast, canSaveMyDay, notes, persistMyDay]);
 
   const handleAddReminder = useCallback((reminder: Reminder) => {
     if (!canSaveMyDay()) return;
-    setReminders((prev) => [...prev, reminder]);
-    playSfxAdd();
-    addToast("Reminder set");
-  }, [addToast, canSaveMyDay]);
+    void persistMyDay({ reminders: [...reminders, reminder] }).then((saved) => {
+      if (!saved) return;
+      playSfxAdd();
+      addToast("Reminder set");
+    });
+  }, [addToast, canSaveMyDay, persistMyDay, reminders]);
 
   const handleEditReminder = useCallback((reminder: Reminder) => {
     if (!canSaveMyDay()) return;
-    setReminders((prev) => prev.map((r) => (r.id === reminder.id ? reminder : r)));
-    playSfxSuccess();
-    addToast("Reminder updated");
-  }, [addToast, canSaveMyDay]);
+    const next = reminders.map((current) => current.id === reminder.id ? reminder : current);
+    void persistMyDay({ reminders: next }).then((saved) => {
+      if (!saved) return;
+      playSfxSuccess();
+      addToast("Reminder updated");
+    });
+  }, [addToast, canSaveMyDay, persistMyDay, reminders]);
 
   const handleToggleReminder = useCallback((id: string) => {
-    setReminders((prev) => prev.map((r) => (r.id !== id ? r : { ...r, done: !r.done })));
-    playSfxToggle();
-  }, []);
+    if (!canSaveMyDay()) return;
+    const next = reminders.map((reminder) => reminder.id !== id ? reminder : { ...reminder, done: !reminder.done });
+    void persistMyDay({ reminders: next }).then((saved) => saved && playSfxToggle());
+  }, [canSaveMyDay, persistMyDay, reminders]);
 
   const handleDeleteReminder = useCallback((id: string) => {
+    if (!canSaveMyDay()) return;
     showConfirm("Delete Reminder", "Remove this reminder?", () => {
-      const next = reminders.filter((r) => r.id !== id);
-      setReminders(next);
-      persistMyDay({ reminders: next });
-      playSfxRemove();
-      addToast("Reminder deleted", "info");
-      setConfirmOpen(false);
+      const next = reminders.filter((reminder) => reminder.id !== id);
+      void persistMyDay({ reminders: next }).then((saved) => {
+        if (!saved) return;
+        playSfxRemove();
+        addToast("Reminder deleted", "info");
+        setConfirmOpen(false);
+      });
     });
-  }, [addToast, persistMyDay, reminders, showConfirm]);
+  }, [addToast, canSaveMyDay, persistMyDay, reminders, showConfirm]);
 
   const completedCount = useMemo(() => tasks.filter((t) => t.status === "completed").length, [tasks]);
 
@@ -467,6 +501,30 @@ export default function App() {
           <SideNav active={activeSection} onNavigate={handleNavigate} />
 
           <main className="min-w-0 flex-1 pb-6">
+            {!hasMyDayAccess && (
+              <div data-myday-free-allowance className={`mb-5 rounded-2xl border px-4 py-3 ${canCreateMyDay ? "border-indigo-200 bg-indigo-50 text-indigo-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-bold">
+                      {canCreateMyDay
+                        ? `${freeRemaining} of ${freeLimit} free creation${freeLimit === 1 ? "" : "s"} available today`
+                        : "Today’s free creation allowance has been used"}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-relaxed opacity-80">
+                      {canCreateMyDay
+                        ? "Create a task, schedule item, note or reminder. After the daily allowance is used, My Day remains browse-only until reset."
+                        : `You can continue browsing your pages. Subscribe for unlimited creation${resetAt > Date.now() ? `, or return after ${new Date(resetAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}.`}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider">
+                    {freeUsed}/{freeLimit} used
+                  </span>
+                </div>
+              </div>
+            )}
+            {(!cloudLoaded || savingMyDay) && (
+              <p className="mb-3 text-center text-[11px] font-semibold text-slate-400">{savingMyDay ? "Saving My Day securely…" : "Syncing My Day…"}</p>
+            )}
             {activeSection === "overview" && (
               <section className="space-y-8">
                 <GreetingHeader
@@ -604,7 +662,7 @@ export default function App() {
           setPaywallOpen(false);
           window.location.hash = "#/subscription";
         }}
-        subtitle="Cloud saving has ongoing server costs. Subscribe to save tasks, schedules and notes."
+        subtitle={`Cloud saving has ongoing server costs. Subscribe to save tasks, schedules and notes. You have used today’s ${freeLimit} free My Day creation${freeLimit === 1 ? "" : "s"}; your pages remain available to browse until the daily reset.`}
       />
 
       <Toast toasts={toasts} onRemove={removeToast} />
