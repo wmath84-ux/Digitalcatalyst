@@ -146,14 +146,27 @@ const currentFirebaseUser = (uid: string) => {
   return user;
 };
 
+// Every serverless call gets the same bounded budget as cloud hydration, so a
+// silent network blackhole can never hold the app on the "Syncing your Test
+// Bank…" screen or block a save indefinitely.
+const REVISION_API_TIMEOUT_MS = 7_000;
+
 async function callRevisionData<T>(uid: string, body: Record<string, unknown>): Promise<T> {
   const user = currentFirebaseUser(uid);
   const token = await user.getIdToken();
-  const response = await fetch("/api/revision/data", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REVISION_API_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch("/api/revision/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   const raw = await response.text();
   let payload: Record<string, any> = {};
   try { payload = JSON.parse(raw) as Record<string, any>; } catch { /* handled below */ }
