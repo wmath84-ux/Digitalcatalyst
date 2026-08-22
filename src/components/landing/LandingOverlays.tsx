@@ -13,6 +13,7 @@ import {
   promptInstall,
   showDesktopMaintenanceNotice,
 } from "@/utils/pwaInstall";
+import BrandMark from "@/components/BrandMark";
 
 export default function LandingOverlays() {
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
@@ -128,7 +129,7 @@ export default function LandingOverlays() {
             <div className="glass-panel overflow-hidden rounded-3xl border border-emerald-300/20 shadow-2xl shadow-black/50">
               <div className="bg-gradient-to-r from-emerald-500/20 via-cyan-500/15 to-violet-500/20 p-5">
                 <div className="flex items-start gap-3">
-                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-400 text-xl font-black text-white">E</span>
+                  <BrandMark className="h-12 w-12 shrink-0 rounded-2xl" fallbackLetter />
                   <div className="min-w-0 flex-1">
                     <h2 className="text-base font-black text-white">Install Eduvora</h2>
                     <p className="mt-1 text-xs leading-relaxed text-slate-300">

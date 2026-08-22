@@ -9,6 +9,7 @@ export const ADMIN_NAV = [
   { href: "/admin/analytics", label: "Analytics & Reports", icon: "📈" },
   { href: "/admin/revision", label: "Revision · AI & Curriculum", icon: "🧠" },
   { href: "/admin/content", label: "Course Player Controls", icon: "🧩" },
+  { href: "/admin/branding", label: "App Branding", icon: "🎨" },
   { href: "/admin/session", label: "Admin Session", icon: "🔐" },
 ] as const;
 

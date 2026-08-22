@@ -24,6 +24,7 @@ import NotificationsPage from "./components/NotificationsPage";
 import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { BrandingProvider, useBranding } from "./context/BrandingContext";
 import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
@@ -205,10 +206,11 @@ const startCheckout = ({
 };
 
 function AppLaunchSplash({ label = "Preparing your learning space…" }: { label?: string }) {
+  const { logoUrl } = useBranding();
   return (
     <main className="app-boot-splash" role="status" aria-live="polite" aria-label="Loading Eduvora">
       <div className="app-boot-content">
-        <img className="app-boot-icon" src="/icons/icon-192x192.svg" alt="Eduvora" />
+        <img className="app-boot-icon" src={logoUrl} alt="Eduvora" />
         <p className="app-boot-title">Eduvora</p>
         <p className="app-boot-label">{label}</p>
         <div className="app-boot-track" aria-hidden="true"><div className="app-boot-bar" /></div>
@@ -872,13 +874,15 @@ function Root() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
-      <CatalogProvider>
-        <CommerceProvider>
-          <Root />
-          <RenewalNotice />
-          <PortraitOnlyGuard />
-        </CommerceProvider>
-      </CatalogProvider>
+      <BrandingProvider>
+        <CatalogProvider>
+          <CommerceProvider>
+            <Root />
+            <RenewalNotice />
+            <PortraitOnlyGuard />
+          </CommerceProvider>
+        </CatalogProvider>
+      </BrandingProvider>
     </AuthProvider>
   </StrictMode>,
 );
