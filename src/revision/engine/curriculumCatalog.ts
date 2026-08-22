@@ -82,10 +82,12 @@ export function defaultCurriculumPrompt(): string {
 }
 
 export function fillCurriculumPrompt(template: string, vars: { board: string; year: string; className: string }): string {
+  // split/join (not String.replaceAll) keeps this ES2020-lib safe and avoids
+  // any regex / replacement-string special-character surprises from admin input.
   return template
-    .replaceAll("{{board}}", vars.board)
-    .replaceAll("{{year}}", vars.year)
-    .replaceAll("{{className}}", vars.className);
+    .split("{{board}}").join(vars.board)
+    .split("{{year}}").join(vars.year)
+    .split("{{className}}").join(vars.className);
 }
 
 const slug = (value: string) =>
