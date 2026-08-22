@@ -45,8 +45,12 @@ export function getRevisionBank(uid: string, filters: BankFilters = {}) {
     .map((item) => {
       const q = db.questions.find((row) => row.id === item.questionId);
       if (!q) return null;
-      const topic = db.topics.find((t) => t.id === item.topicId)!;
-      const subject = db.subjects.find((s) => s.id === item.subjectId)!;
+      const topic = db.topics.find((t) => t.id === item.topicId);
+      const subject = db.subjects.find((s) => s.id === item.subjectId);
+      // A stale/orphan revision row (for example after a catalog update or a
+      // partially completed cloud delete) must not bring down the whole
+      // Revision Bank. Skip it and keep every healthy row visible.
+      if (!topic || !subject) return null;
       return {
         id: item.id,
         questionId: item.questionId,
@@ -224,10 +228,11 @@ export function getRevisionSessionForPlayer(uid: string, sessionId: number) {
   const ordered: PlayerQuestion[] = ids
     .map((id) => db.questions.find((q) => q.id === id))
     .filter((q): q is NonNullable<typeof q> => Boolean(q))
-    .map((q) => {
-      const topic = db.topics.find((t) => t.id === q.topicId)!;
-      const subject = db.subjects.find((s) => s.id === q.subjectId)!;
-      return {
+    .flatMap((q) => {
+      const topic = db.topics.find((t) => t.id === q.topicId);
+      const subject = db.subjects.find((s) => s.id === q.subjectId);
+      if (!topic || !subject) return [];
+      const row: PlayerQuestion = {
         id: q.id,
         prompt: q.prompt,
         options: q.options,
@@ -239,6 +244,7 @@ export function getRevisionSessionForPlayer(uid: string, sessionId: number) {
         topicName: topic.name,
         selectedIndex: answerByQ.get(q.id)?.selectedIndex ?? null,
       };
+      return [row];
     });
 
   return {
@@ -410,13 +416,14 @@ export function getRevisionSessionResult(uid: string, sessionId: number) {
   const wrong = answers.filter((a) => !a.isSkipped && a.isCorrect === false).length;
 
   const items = session.questionIds
-    .map((id) => {
+    .flatMap((id) => {
       const q = db.questions.find((row) => row.id === id);
       const a = answerByQ.get(id);
-      if (!q) return null;
-      const topic = db.topics.find((t) => t.id === q.topicId)!;
-      const subject = db.subjects.find((s) => s.id === q.subjectId)!;
-      return {
+      if (!q) return [];
+      const topic = db.topics.find((t) => t.id === q.topicId);
+      const subject = db.subjects.find((s) => s.id === q.subjectId);
+      if (!topic || !subject) return [];
+      return [{
         id: q.id,
         prompt: q.prompt,
         options: q.options,
@@ -431,9 +438,8 @@ export function getRevisionSessionResult(uid: string, sessionId: number) {
         isSkipped: a?.isSkipped ?? true,
         statusBefore: a?.statusBefore ?? null,
         statusAfter: a?.statusAfter ?? null,
-      };
-    })
-    .filter((r): r is NonNullable<typeof r> => Boolean(r));
+      }];
+    });
 
   return {
     sessionId: session.id,
