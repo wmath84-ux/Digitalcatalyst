@@ -1,5 +1,8 @@
 import { Bell, CalendarClock, ClipboardList, Home, LayoutGrid, NotebookPen } from "lucide-react";
 import { cn } from "../../utils/cn";
+import BrandMark from "../BrandMark";
+import { DEFAULT_LOGO_URL } from "@/utils/branding";
+import { useBranding } from "@/context/BrandingContext";
 
 interface SideNavProps {
   active: string;
@@ -16,11 +19,13 @@ const items = [
 ];
 
 export default function SideNav({ active, onNavigate }: SideNavProps) {
+  const { logoUrl } = useBranding();
+  const custom = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
   return (
     <aside className="sticky top-[65px] hidden h-fit w-60 shrink-0 flex-col gap-1 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm lg:flex xl:w-64">
       <div className="mb-5 flex items-center gap-2.5 px-1">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200">
-          <LayoutGrid className="h-5 w-5" />
+        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200">
+          {custom ? <BrandMark className="h-10 w-10" /> : <LayoutGrid className="h-5 w-5" />}
         </div>
         <div>
           <p className="text-sm font-extrabold tracking-tight text-slate-900">Eduvora Tasker</p>

@@ -1,15 +1,14 @@
 "use client";
 
 import { openApp } from "@/utils/pwaInstall";
+import BrandMark from "@/components/BrandMark";
 
 export default function Footer() {
   return (
     <footer className="border-t border-white/10 bg-[#05060f] px-6 py-10 text-slate-500 sm:px-8">
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
         <div className="flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-400 text-sm font-black text-white">
-            E
-          </span>
+          <BrandMark className="h-8 w-8 rounded-lg" fallbackLetter />
           <span className="text-sm font-semibold text-slate-300">
             Eduvora <span className="text-slate-500">| Digital Catalyst</span>
           </span>

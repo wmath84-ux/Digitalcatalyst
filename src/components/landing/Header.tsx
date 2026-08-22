@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { openApp } from "@/utils/pwaInstall";
+import BrandMark from "@/components/BrandMark";
 
 export default function Header() {
   return (
@@ -13,9 +14,7 @@ export default function Header() {
     >
       <div className="glass-panel flex w-full items-center justify-between gap-3 rounded-b-2xl border-x-0 border-t-0 px-4 py-3 sm:px-6">
         <a href="#/landing" className="flex items-center gap-2 shrink-0">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-400 text-lg font-black text-white shadow-lg shadow-fuchsia-500/30">
-            E
-          </span>
+          <BrandMark className="h-9 w-9 rounded-xl shadow-lg shadow-fuchsia-500/30" fallbackLetter />
           <span className="hidden text-lg font-bold tracking-tight text-white sm:block">
             Eduvora <span className="text-slate-400 font-medium">| Digital Catalyst</span>
           </span>

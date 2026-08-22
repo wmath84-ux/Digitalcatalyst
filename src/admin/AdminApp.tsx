@@ -18,6 +18,7 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import RevisionPage from "./pages/RevisionPage";
 import ContentPage from "./pages/ContentPage";
 import SessionPage from "./pages/SessionPage";
+import BrandingPage from "./pages/BrandingPage";
 
 const adminPath = () => (window.location.hash.slice(1).split("?")[0] || "/admin").replace(/\/$/, "") || "/admin";
 
@@ -37,6 +38,7 @@ function AdminRoutes() {
   if (path === "/admin/analytics") return <AnalyticsPage />;
   if (path === "/admin/revision") return <RevisionPage />;
   if (path === "/admin/content") return <ContentPage />;
+  if (path === "/admin/branding") return <BrandingPage />;
   if (path === "/admin/session") return <SessionPage />;
   return <DashboardPage />;
 }

@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import type { Product } from "../types";
 import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
+import BrandMark from "../../components/BrandMark";
 
 interface HeaderProps {
   userName: string;
@@ -28,11 +29,14 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   return (
     <header className="relative rounded-b-[28px] bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 px-5 pb-8 pt-6 text-white shadow-lg shadow-indigo-900/20">
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-white/70">
-            Good to see you 👋
-          </p>
-          <h1 className="mt-0.5 text-xl font-bold tracking-tight">Hello, {userName}</h1>
+        <div className="flex min-w-0 items-center gap-3">
+          <BrandMark className="h-11 w-11 shrink-0 rounded-2xl bg-white/15 ring-1 ring-white/25" />
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-white/70">
+              Good to see you 👋
+            </p>
+            <h1 className="mt-0.5 text-xl font-bold tracking-tight">Hello, {userName}</h1>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button

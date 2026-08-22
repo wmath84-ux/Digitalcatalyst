@@ -8,6 +8,7 @@ import CourseOverlay, { type DockTab } from "./course/CourseOverlay";
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
+import { useBranding } from "./context/BrandingContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
 import { isEmptyRichText, richTextToPlain, sanitizeRichText } from "./utils/richText";
 import { useRotatedScroll } from "./course/useRotatedScroll";
@@ -176,6 +177,7 @@ const loadDesktopViewPreference = (): boolean => {
 
 export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: CoursePlayerProps) {
   const { user } = useAuth();
+  const { logoUrl } = useBranding();
   const modules = product.courseContent || [];
   const files = useMemo(() => allFiles(modules).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
   const { resolution, hasActiveSubscription } = useCourseAccess({ product });
@@ -682,7 +684,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
       data-course-back
       data-course-logo-back
     >
-      <img src="/icons/icon-192x192.svg" alt="Eduvora" className="h-10 w-10" data-course-logo />
+      <img src={logoUrl} alt="Eduvora" className="h-10 w-10 object-cover" data-course-logo />
     </button>
   );
 

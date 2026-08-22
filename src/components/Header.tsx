@@ -1,6 +1,9 @@
 import type { ComponentType, ReactNode } from "react";
 import { BellIcon, BookIcon, CartIcon, CrownIcon, DownloadIcon, SearchIcon } from "./icons";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
+import BrandMark from "./BrandMark";
+import { DEFAULT_LOGO_URL } from "@/utils/branding";
+import { useBranding } from "@/context/BrandingContext";
 
 type HeaderProps = {
   cartCount: number;
@@ -64,12 +67,14 @@ export default function Header({
   const liveNotificationCount = useUnreadNotificationCount();
   const displayedNotificationCount = liveNotificationCount ?? 0;
   const LogoIcon = icon ?? BookIcon;
+  const { logoUrl } = useBranding();
+  const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
   return (
     <header data-site-header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-200">
-            <LogoIcon className="h-6 w-6" />
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-200">
+            {customLogo ? <BrandMark className="h-11 w-11" /> : <LogoIcon className="h-6 w-6" />}
           </div>
           <div className="min-w-0 leading-tight">
             <h1 className="truncate text-lg font-extrabold tracking-tight text-slate-900">{title}</h1>

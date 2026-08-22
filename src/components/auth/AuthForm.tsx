@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import BrandMark from "@/components/BrandMark";
 
 type Mode = "login" | "signup";
 
@@ -134,9 +135,7 @@ export default function AuthForm() {
       className="glass-panel mx-auto w-full max-w-md rounded-3xl p-6 shadow-2xl shadow-black/40 sm:p-8"
     >
       <div className="mb-6 flex items-center gap-3">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-400 text-lg font-black text-white">
-          E
-        </span>
+        <BrandMark className="h-10 w-10 rounded-xl" fallbackLetter />
         <div>
           <span className="block text-lg font-bold text-white">Eduvora</span>
           <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
