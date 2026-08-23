@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { auth, db } from "../../../firebase";
-import { ChevronLeft, HelpCircle, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import Header from "../../components/Header";
 import BottomNav, { type TabKey } from "../../components/BottomNav";
 import StackedCards from "./StackedCards";
@@ -44,6 +44,7 @@ import ActiveMemberView from "./ActiveMemberView";
 import OwnedPlanCard from "./OwnedPlanCard";
 import {
   buildOwnedPlanSummary,
+  evaluatePlanChange,
   evaluateSubscriptionSelection,
 } from "../../../utils/subscriptionOwnership";
 import { getRenewalReminder } from "../../../utils/subscriptionRenewal";
@@ -325,17 +326,59 @@ export default function SubscriptionPage({
   // when the selection changes. Passed to the pricing block below so an
   // add-on upgrade charges ONLY the new items.
   // ---------------------------------------------------------------------------
-  const ownershipState = useMemo(
+  const ownedPlanId = String(activeSubscription?.planId || "").trim();
+  const ownedCycle: BillingCycle | null =
+    activeSubscription?.cycle === "yearly"
+      ? "yearly"
+      : activeSubscription?.cycle === "monthly"
+        ? "monthly"
+        : null;
+  // Plans rank by their catalog `sortOrder` (Basic 1 < Premium 2 < Pro 3 …).
+  // A null rank means "cannot rank" — the no-downgrade rule then refuses to
+  // guess and never blocks.
+  const planOrderOf = useCallback(
+    (planId: string | null | undefined): number | null => {
+      const found = plans.find((entry) => entry.id === String(planId || ""));
+      const order = Number(found?.sortOrder);
+      return found && Number.isFinite(order) ? order : null;
+    },
+    [plans],
+  );
+  const ownedPlanOrder = planOrderOf(ownedPlanId);
+
+  // NO-DOWNGRADE verdict: while the membership is active a lower plan — or
+  // the monthly cycle of a yearly-held plan — can never be purchased. The
+  // pure helper is shared with the quote endpoint, so the server refuses the
+  // same order even if the page state is tampered with.
+  const planChangeState = useMemo(
     () =>
-      evaluateSubscriptionSelection({
+      evaluatePlanChange({
         record: activeSubscription,
         planId: selectedPlanId,
         cycle,
-        featureIds: selectedFeatureIds,
-        productIds: selectedCourseIds,
+        ownedPlanOrder,
+        selectedPlanOrder: planOrderOf(selectedPlanId),
       }),
-    [activeSubscription, selectedPlanId, cycle, selectedFeatureIds, selectedCourseIds],
+    [activeSubscription, selectedPlanId, cycle, ownedPlanOrder, planOrderOf],
   );
+
+  const ownershipState = useMemo(() => {
+    const base = evaluateSubscriptionSelection({
+      record: activeSubscription,
+      planId: selectedPlanId,
+      cycle,
+      featureIds: selectedFeatureIds,
+      productIds: selectedCourseIds,
+    });
+    if (!planChangeState.blocked) return base;
+    return {
+      ...base,
+      blocked: true,
+      downgrade: true,
+      code: planChangeState.code,
+      reason: planChangeState.reason,
+    };
+  }, [activeSubscription, selectedPlanId, cycle, selectedFeatureIds, selectedCourseIds, planChangeState]);
   const isSelectionOwned = ownershipState.owned;
   // An add-on upgrade: the member keeps their current plan + cycle but adds at
   // least one feature / product they don't have yet. Only the NEW items are
@@ -451,6 +494,53 @@ export default function SubscriptionPage({
     activeSubscription?.status === "active" && subscriptionExpiresAtMs > Date.now();
   const showMemberView = isActiveMember && !manageMode;
 
+  // ---------------------------------------------------------------------------
+  // NO-DOWNGRADE plan ladder. An active member never sees the plans BELOW
+  // their own: the picker shows only their current plan (for renewal +
+  // add-ons) and every HIGHER plan. Guests and expired members see the full
+  // catalog. If the member's plan no longer ranks (deactivated), nothing is
+  // hidden — the server re-checks the same rule at checkout anyway.
+  // ---------------------------------------------------------------------------
+  const pickerPlans = useMemo(() => {
+    if (!isActiveMember || ownedPlanOrder === null) return plans;
+    return plans.filter((candidate) => {
+      const order = Number(candidate.sortOrder);
+      if (!Number.isFinite(order)) return true; // never hide unranked custom plans
+      return order >= ownedPlanOrder;
+    });
+  }, [plans, isActiveMember, ownedPlanOrder]);
+
+  // Higher plans only — the plans a member can actually switch TO.
+  const upgradePlans = useMemo(
+    () => pickerPlans.filter((candidate) => candidate.active && candidate.id !== ownedPlanId),
+    [pickerPlans, ownedPlanId],
+  );
+
+  // If the selection falls outside the ladder (e.g. the catalog loaded after
+  // the default pre-select picked the lowest plan for a Premium member), snap
+  // it back to the member's own plan — or the first plan still purchasable.
+  useEffect(() => {
+    if (pickerPlans.length === 0) return;
+    if (selectedPlanId && pickerPlans.some((candidate) => candidate.id === selectedPlanId)) return;
+    const ownedVisible = ownedPlanId && pickerPlans.some((candidate) => candidate.id === ownedPlanId);
+    setSelectedPlanId(ownedVisible ? ownedPlanId : pickerPlans[0].id);
+  }, [pickerPlans, selectedPlanId, ownedPlanId]);
+
+  // A yearly member can never slip into the monthly cycle of their own plan
+  // while the yearly membership is active. The toggle is also disabled in
+  // PlanOverview; this is the state-level guard so the two never disagree.
+  useEffect(() => {
+    if (
+      isActiveMember &&
+      ownedCycle === "yearly" &&
+      selectedPlanId &&
+      selectedPlanId === ownedPlanId &&
+      cycle === "monthly"
+    ) {
+      setCycle("yearly");
+    }
+  }, [isActiveMember, ownedCycle, selectedPlanId, ownedPlanId, cycle]);
+
   const memberRenewalView = useMemo(() => {
     if (!activeSubscription) return null;
     const memberPlanName =
@@ -496,15 +586,10 @@ export default function SubscriptionPage({
     });
   }, [activeSubscription, isSelectionOwned, addOnIntent, memberFeatures, memberProductTitles, plans]);
 
-  // Plans the buyer could still switch to — used for the "want something
-  // different?" hint on the owned card.
-  const purchasablePlanNames = useMemo(
-    () =>
-      plans
-        .filter((p) => p.active && p.id !== String(activeSubscription?.planId || ""))
-        .map((p) => p.name),
-    [plans, activeSubscription],
-  );
+  // Plans the member could still switch to — used for the "want something
+  // different?" hint on the owned card. Only HIGHER plans are offered: a
+  // downgrade is never purchasable, so it is never advertised either.
+  const purchasablePlanNames = useMemo(() => upgradePlans.map((p) => p.name), [upgradePlans]);
 
   // Never leave a stale coupon / referral attached to a selection the buyer
   // cannot purchase. Add-on upgrades ARE purchasable, so their coupon state
@@ -687,6 +772,7 @@ export default function SubscriptionPage({
           onNavigateToSubscription={onNavigateToSubscription}
           onNavigateToCart={onNavigateToCart}
           onNavigateToNotifications={onNavigateToNotifications}
+          onHelpClick={() => setHelpOpen(true)}
         />
 
         <main className="flex-1 overflow-y-auto">
@@ -710,28 +796,11 @@ export default function SubscriptionPage({
               </div>
             ) : (
               <>
-      {/* Page title bar */}
-      <div className="sticky top-0 z-30 flex items-center justify-between bg-gradient-to-b from-slate-50 to-slate-50/70 px-5 pb-2 pt-5 backdrop-blur-sm">
-        <button
-          onClick={() => {
-            window.location.hash = "#/profile";
-          }}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm shadow-slate-200 active:scale-90 transition-transform"
-          aria-label="Go back"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <h1 className="text-[15px] font-extrabold tracking-tight text-slate-900">
-          {showMemberView ? "My membership" : manageMode && isActiveMember ? "Manage plan" : "Go Premium"}
-        </h1>
-        <button
-          onClick={() => setHelpOpen(true)}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm shadow-slate-200 active:scale-90 transition-transform"
-          aria-label="Help & FAQ"
-        >
-          <HelpCircle className="h-4.5 w-4.5" />
-        </button>
-      </div>
+      {/* The page formerly rendered a second sticky title bar here ("Manage
+          plan" / "My membership" / "Go Premium") with its own back button and
+          the help (?) icon. That extra header is removed; the help icon now
+          lives on the main app Header above (onHelpClick) so it is visible on
+          every subscription page state. */}
 
       {/* An active member gets the membership dashboard, not the buy flow. */}
       {showMemberView ? (
@@ -747,10 +816,10 @@ export default function SubscriptionPage({
             reminderOptOut={Boolean(activeSubscription?.renewalReminderOptOut)}
             onRenew={() => setManageMode(true)}
             onChangePlan={() => {
-              // Open directly on another active plan so an existing subscriber
-              // can immediately upgrade/downgrade to any catalog plan.
-              const currentPlanId = String(activeSubscription?.planId || "");
-              const nextPlan = plans.find((candidate) => candidate.active && candidate.id !== currentPlanId);
+              // Open directly on the next HIGHER plan so an existing
+              // subscriber can immediately upgrade. Lower plans are never
+              // offered — a membership can only move up while it is active.
+              const nextPlan = upgradePlans[0] || null;
               if (nextPlan) setSelectedPlanId(nextPlan.id);
               setManageMode(true);
             }}
@@ -770,13 +839,13 @@ export default function SubscriptionPage({
       ) : (
       <>
       <div className="flex-1 pb-4">
-        {/* Returning member who chose to renew / change plan / add items. */}
+        {/* Returning member who chose to renew / change plan / add items.
+            The old info banner ("You already have an active membership…")
+            was removed on request; only the Cancel control remains so the
+            member can exit the buy flow back to their membership dashboard. */}
         {isActiveMember && manageMode ? (
           <div className="mx-5 mt-4 space-y-2">
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2.5">
-              <p className="text-[11px] font-semibold leading-relaxed text-violet-900">
-                You already have an active membership. Choose any active plan, feature, or product below. Plan changes activate after verified payment.
-              </p>
+            <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => {
@@ -825,9 +894,11 @@ export default function SubscriptionPage({
         )}
         <StackedCards cards={SHOWCASE_CARDS} />
 
-        {/* Plan + cycle card */}
+        {/* Plan + cycle card. Members only see their own plan + HIGHER plans
+            (pickerPlans) — lower plans are hidden, not merely disabled, so a
+            downgrade can never even be selected. */}
         <PlanOverview
-          plans={plans}
+          plans={pickerPlans}
           features={features}
           selectedPlanId={selectedPlanId}
           onChangePlan={setSelectedPlanId}
@@ -838,10 +909,8 @@ export default function SubscriptionPage({
           selectedFeatureRecords={selectedFeatureRecords}
           includedFeatureRecords={includedFeatureRecords}
           totalPaise={totalPaise}
-          ownedPlanId={isActiveMember ? String(activeSubscription?.planId || "") || null : null}
-          ownedCycle={
-            isActiveMember ? (activeSubscription?.cycle === "yearly" ? "yearly" : "monthly") : null
-          }
+          ownedPlanId={isActiveMember ? ownedPlanId || null : null}
+          ownedCycle={isActiveMember ? ownedCycle : null}
         />
 
         {/* Already-owned selection: the entire buy flow below is replaced by
@@ -856,10 +925,9 @@ export default function SubscriptionPage({
             renewalOpensAtLabel={formatExpiryDate(ownedPlanSummary.renewalOpensAt)}
             otherPlanNames={purchasablePlanNames}
             onSeeOtherPlans={() => {
-              const firstOther = plans.find(
-                (p) => p.active && p.id !== String(activeSubscription?.planId || ""),
-              );
-              if (firstOther) setSelectedPlanId(firstOther.id);
+              // Only HIGHER plans are ever offered (no-downgrade rule).
+              const firstUpgrade = upgradePlans[0] || null;
+              if (firstUpgrade) setSelectedPlanId(firstUpgrade.id);
             }}
             onAddMore={() => setAddOnIntent(true)}
           />

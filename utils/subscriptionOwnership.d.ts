@@ -55,15 +55,31 @@ export interface OwnedPlanSummary<F = OwnedPlanSummaryFeature> {
   productTitles: string[];
 }
 
+export interface PlanChangeState {
+  /** The buyer currently holds an active, unexpired membership. */
+  active: boolean;
+  /** The selection is a forbidden downgrade while the membership is active. */
+  downgrade: boolean;
+  /** The selection is a legitimate move to a higher plan / longer cycle. */
+  upgrade: boolean;
+  /** The purchase must be refused (same value as `downgrade`). */
+  blocked: boolean;
+  code: string | null;
+  reason: string | null;
+  ownedPlanId: string | null;
+  ownedCycle: OwnedBillingCycle | null;
+}
+
 export interface SubscribeCta {
   label: string;
-  tone: "default" | "owned" | "upgrade";
+  tone: "default" | "owned" | "upgrade" | "blocked";
   disabled: boolean;
   owned: boolean;
 }
 
 export declare const RENEWAL_WINDOW_DAYS: number;
 export declare const ALREADY_ACTIVE_CODE: string;
+export declare const DOWNGRADE_CODE: string;
 
 export declare const normaliseOwnedSubscription: (record: unknown) => OwnedSubscription | null;
 export declare const isOwnedSubscriptionActive: (record: unknown, now?: number) => boolean;
@@ -85,6 +101,23 @@ export declare const evaluateSubscriptionSelection: (input?: {
   now?: number;
   renewalWindowDays?: number;
 }) => SubscriptionSelectionState;
+
+/**
+ * The no-downgrade rule: while a membership is active the buyer can only move
+ * UP (higher plan, or monthly → yearly on the same plan), never DOWN (lower
+ * plan, or yearly → monthly on the same plan). Plan ranking is supplied by
+ * the caller as plain sort orders; unknown ranks never block.
+ */
+export declare const evaluatePlanChange: (input?: {
+  record?: unknown;
+  planId?: string | null;
+  cycle?: string | null;
+  /** Sort order of the plan the buyer currently owns (higher = bigger plan). */
+  ownedPlanOrder?: number | null;
+  /** Sort order of the plan being considered. */
+  selectedPlanOrder?: number | null;
+  now?: number;
+}) => PlanChangeState;
 
 export declare const buildOwnedPlanSummary: <F extends { id: string }>(input?: {
   record?: unknown;

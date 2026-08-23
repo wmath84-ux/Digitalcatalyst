@@ -25,7 +25,10 @@ import { revisionBankLimitForCycle } from "../../utils/revisionLimits.js";
 import { aiAllowanceForCycle } from "../../utils/aiAllowances.js";
 import {
   ALREADY_ACTIVE_CODE,
+  DOWNGRADE_CODE,
+  evaluatePlanChange,
   evaluateSubscriptionSelection,
+  isOwnedSubscriptionActive,
 } from "../../utils/subscriptionOwnership.js";
 import {
   buildSubscriptionLineItems,
@@ -242,13 +245,61 @@ export const assertSubscriptionPurchasable = async (
 ): Promise<{ ok: true } | { ok: false; status: number; code: string; error: string }> => {
   const record = await loadCurrentSubscription(uid, options);
   if (!record) return { ok: true };
+  const now = options.now ?? Date.now();
+
+  // ---------------------------------------------------------------------------
+  // NO-DOWNGRADE rule (authoritative half — the client page hides the same
+  // choices, but the client is never the authority). While the membership is
+  // active the buyer can only move UP: a lower plan (by `sortOrder`) is
+  // refused in both cycles, and the yearly → monthly hop on the SAME plan is
+  // refused until the yearly membership ends. Higher plans stay purchasable
+  // in either cycle; expired members can buy anything again.
+  // ---------------------------------------------------------------------------
+  if (isOwnedSubscriptionActive(record, now)) {
+    const ownedPlanId = String(record.planId || "").trim();
+    const selectedPlanId = String(selection.subscriptionPlanId || "").trim();
+    if (ownedPlanId && selectedPlanId) {
+      let ownedPlanOrder: number | null = null;
+      let selectedPlanOrder: number | null = null;
+      if (ownedPlanId === selectedPlanId) {
+        // Same plan — only the cycle can be a downgrade (yearly → monthly).
+        ownedPlanOrder = 0;
+        selectedPlanOrder = 0;
+      } else {
+        const activePlans = await loadActivePlans(options);
+        const orderOf = (planId: string): number | null => {
+          const plan = activePlans.find((candidate) => candidate.id === planId);
+          return plan && Number.isFinite(Number(plan.sortOrder)) ? Number(plan.sortOrder) : null;
+        };
+        ownedPlanOrder = orderOf(ownedPlanId);
+        selectedPlanOrder = orderOf(selectedPlanId);
+      }
+      const change = evaluatePlanChange({
+        record,
+        planId: selectedPlanId,
+        cycle: selection.billingCycle === "yearly" ? "yearly" : "monthly",
+        ownedPlanOrder,
+        selectedPlanOrder,
+        now,
+      });
+      if (change.blocked) {
+        return {
+          ok: false,
+          status: 409,
+          code: change.code || DOWNGRADE_CODE,
+          error: change.reason || "Downgrading an active membership is not allowed.",
+        };
+      }
+    }
+  }
+
   const verdict = evaluateSubscriptionSelection({
     record,
     planId: String(selection.subscriptionPlanId || ""),
     cycle: selection.billingCycle === "yearly" ? "yearly" : "monthly",
     featureIds: Array.isArray(selection.featureIds) ? selection.featureIds.map(String) : [],
     productIds: Array.isArray(selection.productIds) ? selection.productIds.map(String) : [],
-    now: options.now ?? Date.now(),
+    now,
   });
   if (!verdict.blocked) return { ok: true };
   return {

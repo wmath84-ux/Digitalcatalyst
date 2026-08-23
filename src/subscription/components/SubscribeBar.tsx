@@ -12,7 +12,7 @@
 // helper `resolveSubscribeCta`, so the bar can never disagree with the server
 // guard that refuses the same order.
 
-import { BadgeCheck, ShieldCheck, Loader2 } from "lucide-react";
+import { BadgeCheck, Lock, ShieldCheck, Loader2 } from "lucide-react";
 import { resolveSubscribeCta, type SubscriptionSelectionState } from "../../../utils/subscriptionOwnership";
 
 interface Props {
@@ -52,6 +52,9 @@ export default function SubscribeBar({
     freeSelection: isFreeSelection,
   });
   const isOwned = cta.owned;
+  // A downgrade-blocked selection is neither owned nor purchasable: the bar
+  // explains the no-downgrade rule and keeps the CTA firmly disabled.
+  const isDowngradeBlocked = cta.tone === "blocked";
   const isDisabled = Boolean(loading || disabled || cta.disabled);
 
   return (
@@ -98,16 +101,27 @@ export default function SubscribeBar({
           )}
         </div>
       </div>
+      {isDowngradeBlocked ? (
+        <p
+          data-subscription-downgrade-note
+          className="mb-2 rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-amber-800 ring-1 ring-amber-200"
+        >
+          {ownershipState?.reason ||
+            "This change isn't available while your current membership is active."}
+        </p>
+      ) : null}
       <button
         type="button"
         onClick={onSubscribe}
         disabled={isDisabled}
         data-subscription-subscribe
         data-subscription-cta-tone={cta.tone}
-        className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-extrabold text-white transition-transform active:scale-[0.98] disabled:cursor-not-allowed ${
+        className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-extrabold transition-transform active:scale-[0.98] disabled:cursor-not-allowed ${
           isOwned
-            ? "bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg shadow-emerald-200 disabled:opacity-100"
-            : "bg-gradient-to-r from-violet-600 to-indigo-600 shadow-lg shadow-violet-300 disabled:opacity-70"
+            ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-200 disabled:opacity-100"
+            : isDowngradeBlocked
+              ? "bg-slate-200 text-slate-500 disabled:opacity-100"
+              : "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-300 disabled:opacity-70"
         }`}
       >
         {loading ? (
@@ -117,6 +131,10 @@ export default function SubscribeBar({
         ) : isOwned ? (
           <>
             <BadgeCheck className="h-4 w-4" /> {cta.label}
+          </>
+        ) : isDowngradeBlocked ? (
+          <>
+            <Lock className="h-4 w-4" /> {cta.label}
           </>
         ) : (
           cta.label
