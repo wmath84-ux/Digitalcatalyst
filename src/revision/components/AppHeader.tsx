@@ -33,8 +33,8 @@ export default function AppHeader({ title, subtitle, backHref, rightSlot }: AppH
           <div className="w-1" />
         )}
         <div className="min-w-0 flex-1 py-2">
-          <h1 className="truncate text-[17px] font-semibold leading-tight text-slate-900">{title}</h1>
-          {subtitle && <p className="truncate text-xs text-slate-500">{subtitle}</p>}
+          <h1 className="truncate text-[17px] font-bold leading-tight text-slate-900">{title}</h1>
+          {subtitle && <p className="truncate text-xs font-medium text-slate-600">{subtitle}</p>}
         </div>
         {rightSlot && <div className="flex shrink-0 items-center gap-1 pr-1">{rightSlot}</div>}
       </div>

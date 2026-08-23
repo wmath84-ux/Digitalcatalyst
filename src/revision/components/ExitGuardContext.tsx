@@ -62,7 +62,7 @@ export function ExitGuardProvider({
               <button
                 type="button"
                 onClick={() => setPendingHref(null)}
-                className="min-h-[48px] flex-1 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 active:bg-slate-50"
+                className="min-h-[48px] flex-1 rounded-2xl border border-slate-300 bg-white text-sm font-bold text-slate-800 shadow-sm active:bg-slate-100"
               >
                 Stay
               </button>
@@ -74,7 +74,7 @@ export function ExitGuardProvider({
                   setPendingHref(null);
                   if (href) onNavigateRef.current(href);
                 }}
-                className="min-h-[48px] flex-1 rounded-2xl bg-rose-600 text-sm font-semibold text-white active:bg-rose-700"
+                className="min-h-[48px] flex-1 rounded-2xl bg-rose-600 text-sm font-bold text-white shadow-md shadow-rose-200 active:bg-rose-700"
               >
                 {guard.confirmLabel}
               </button>

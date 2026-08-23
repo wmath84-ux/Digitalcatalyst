@@ -71,19 +71,27 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
     navigate(`#/revision/test/play/${plan.id}`);
   };
 
+  // Memoized so the header registration in PageShell doesn't re-register on
+  // every render — a fresh JSX node each render would loop against the
+  // context's shallow-compare guard.
+  const streakSlot = useMemo(
+    () =>
+      data.quickStats.streak > 0 ? (
+        <div className="flex items-center gap-1 rounded-full border border-orange-200 bg-orange-100 px-2.5 py-1.5 text-orange-700 shadow-sm">
+          <FlameIcon className="h-4 w-4" />
+          <span className="text-xs font-bold">{data.quickStats.streak}</span>
+        </div>
+      ) : undefined,
+    [data.quickStats.streak],
+  );
+
   return (
     <PageShell
       route={route}
       title="Revision"
       subtitle={`Hi ${userName}, choose what you want to revise`}
-      rightSlot={
-        data.quickStats.streak > 0 ? (
-          <div className="flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1.5 text-orange-600">
-            <FlameIcon className="h-4 w-4" />
-            <span className="text-xs font-bold">{data.quickStats.streak}</span>
-          </div>
-        ) : undefined
-      }
+      rightSlot={streakSlot}
+      mergeIntoMainHeader
     >
       <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
         {revisionPlans.length === 0 ? (
@@ -100,18 +108,18 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
 
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[15px] font-semibold text-slate-900">Weak Topics</h2>
+            <h2 className="text-[15px] font-bold text-slate-900">Weak Topics</h2>
             <button type="button" onClick={() => navigate("#/revision/weak-topics")} className="text-xs font-semibold text-indigo-600">
               View all
             </button>
           </div>
           {data.weakTopicSummary.length === 0 ? (
-            <p className="text-sm text-slate-500">No weak topics yet. Complete a revision plan to build your learning profile.</p>
+            <p className="text-sm text-slate-600">No weak topics yet. Complete a revision plan to build your learning profile.</p>
           ) : (
             <div className="space-y-3">
               {data.weakTopicSummary.map((topic) => (
                 <div key={topic.topicId} className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-lg">{topic.subjectIcon}</div>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg">{topic.subjectIcon}</div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="truncate text-sm font-medium text-slate-800">{topic.topicName}</p>
@@ -129,7 +137,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
 
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[15px] font-semibold text-slate-900">Revision Bank</h2>
+            <h2 className="text-[15px] font-bold text-slate-900">Revision Bank</h2>
             <button type="button" onClick={() => navigate("#/revision/bank")} className="text-xs font-semibold text-indigo-600">
               Open
             </button>
@@ -144,7 +152,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
               <SparklesIcon className="h-4 w-4" /> Revise {data.revisionBankSummary.due} due question{data.revisionBankSummary.due === 1 ? "" : "s"}
             </PrimaryButton>
           ) : (
-            <p className="mt-3 text-center text-xs text-slate-400">
+            <p className="mt-3 text-center text-xs font-medium text-slate-500">
               {data.revisionBankSummary.total === 0 ? "Your revision bank will grow from your completed plans." : "You're all caught up on revisions 🎉"}
             </p>
           )}
@@ -296,13 +304,13 @@ function PlanRow({ label, value }: { label: string; value: string }) {
 
 function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-2xl border border-slate-100 bg-white py-3 shadow-[0_1px_2px_rgba(15,23,42,0.06)]">
+    <div className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-white py-3 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)]">
       {icon}<span className="text-base font-bold text-slate-900">{value}</span><span className="text-[10px] font-medium text-slate-500">{label}</span>
     </div>
   );
 }
 
 function BankCount({ tone, value, label }: { tone: "amber" | "sky" | "emerald"; value: number; label: string }) {
-  const tones = { amber: "bg-amber-50 text-amber-700", sky: "bg-sky-50 text-sky-700", emerald: "bg-emerald-50 text-emerald-700" };
+  const tones = { amber: "bg-amber-100 text-amber-800", sky: "bg-sky-100 text-sky-800", emerald: "bg-emerald-100 text-emerald-800" };
   return <div className={`rounded-2xl py-2.5 ${tones[tone]}`}><p className="text-lg font-bold">{value}</p><p className="text-[11px] font-medium">{label}</p></div>;
 }

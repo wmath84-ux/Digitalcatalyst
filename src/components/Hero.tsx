@@ -15,26 +15,26 @@ export default function Hero({ resourceCount }: HeroProps) {
         <br />
         resource, faster
       </h2>
-      <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500">
+      <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-600">
         Search focused notes, courses, PDFs, and study tools by subject, class, or format.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm">
           <ZapIcon className="h-3.5 w-3.5 text-amber-500" />
           Instant download
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm">
           <ShieldIcon className="h-3.5 w-3.5 text-emerald-500" />
           Secure checkout
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm">
           <ZapIcon className="h-3.5 w-3.5 text-amber-500" />
           Lifetime access
         </span>
       </div>
 
-      <div className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-2.5 text-sm font-bold text-indigo-700">
+      <div className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-indigo-300 bg-indigo-100 px-4 py-2.5 text-sm font-extrabold text-indigo-800 shadow-sm">
         <BookOpenIcon className="h-4 w-4" />
         {resourceCount} resource{resourceCount === 1 ? "" : "s"} available
       </div>

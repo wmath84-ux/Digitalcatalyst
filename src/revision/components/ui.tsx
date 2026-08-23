@@ -14,7 +14,7 @@ export function FullScreenLoader({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
       <Spinner className="h-8 w-8" />
-      <p className="text-sm text-slate-500">{label}</p>
+      <p className="text-sm font-medium text-slate-600">{label}</p>
     </div>
   );
 }
@@ -62,12 +62,12 @@ export function EmptyState({
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
       {icon && (
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50 text-indigo-500">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 shadow-sm shadow-indigo-100">
           {icon}
         </div>
       )}
-      <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-      {description && <p className="max-w-[280px] text-sm leading-relaxed text-slate-500">{description}</p>}
+      <h3 className="text-base font-bold text-slate-900">{title}</h3>
+      {description && <p className="max-w-[280px] text-sm leading-relaxed text-slate-600">{description}</p>}
       {action}
     </div>
   );
@@ -76,11 +76,11 @@ export function EmptyState({
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-50 text-rose-500">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-rose-600 shadow-sm shadow-rose-100">
         <AlertIcon className="h-8 w-8" />
       </div>
-      <h3 className="text-base font-semibold text-slate-900">Something went wrong</h3>
-      <p className="max-w-[280px] text-sm leading-relaxed text-slate-500">{message}</p>
+      <h3 className="text-base font-bold text-slate-900">Something went wrong</h3>
+      <p className="max-w-[280px] text-sm leading-relaxed text-slate-600">{message}</p>
       {onRetry && (
         <button
           type="button"
@@ -97,7 +97,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 export function ProgressBar({ value, className = "" }: { value: number; className?: string }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <div className={`h-2 w-full overflow-hidden rounded-full bg-slate-100 ${className}`}>
+    <div className={`h-2 w-full overflow-hidden rounded-full bg-slate-200/80 ${className}`}>
       <div
         className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-300"
         style={{ width: `${clamped}%` }}
@@ -107,19 +107,19 @@ export function ProgressBar({ value, className = "" }: { value: number; classNam
 }
 
 const statusStyles: Record<string, string> = {
-  learning: "bg-amber-50 text-amber-700 border-amber-200",
-  improving: "bg-sky-50 text-sky-700 border-sky-200",
-  mastered: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  easy: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  medium: "bg-amber-50 text-amber-700 border-amber-200",
-  hard: "bg-rose-50 text-rose-700 border-rose-200",
-  correct: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  wrong: "bg-rose-50 text-rose-700 border-rose-200",
-  skipped: "bg-slate-100 text-slate-600 border-slate-200",
+  learning: "bg-amber-100 text-amber-800 border-amber-300",
+  improving: "bg-sky-100 text-sky-800 border-sky-300",
+  mastered: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  easy: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  medium: "bg-amber-100 text-amber-800 border-amber-300",
+  hard: "bg-rose-100 text-rose-800 border-rose-300",
+  correct: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  wrong: "bg-rose-100 text-rose-800 border-rose-300",
+  skipped: "bg-slate-200 text-slate-700 border-slate-300",
 };
 
 export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: string }) {
-  const cls = statusStyles[tone] ?? "bg-slate-100 text-slate-600 border-slate-200";
+  const cls = statusStyles[tone] ?? "bg-slate-200 text-slate-700 border-slate-300";
   return (
     <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold capitalize ${cls}`}>
       {children}
@@ -129,7 +129,7 @@ export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-3xl border border-slate-100 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.06)] ${className}`}>
+    <div className={`rounded-3xl border border-slate-200/90 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)] ${className}`}>
       {children}
     </div>
   );
@@ -153,7 +153,7 @@ export function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 text-[15px] font-semibold text-white shadow-sm transition active:scale-[0.98] active:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 ${className}`}
+      className={`flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 text-[15px] font-bold text-white shadow-md shadow-indigo-200 transition hover:brightness-105 active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:bg-none disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none ${className}`}
     >
       {children}
     </button>
@@ -176,7 +176,7 @@ export function SecondaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-[15px] font-semibold text-slate-700 transition active:scale-[0.98] active:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 ${className}`}
+      className={`flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 text-[15px] font-bold text-slate-800 shadow-sm transition active:scale-[0.98] active:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:shadow-none ${className}`}
     >
       {children}
     </button>

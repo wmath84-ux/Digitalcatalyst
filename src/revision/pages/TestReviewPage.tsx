@@ -28,16 +28,16 @@ export default function TestReviewPage({ uid, route, attemptId }: { uid: string;
             const status = q.isSkipped ? "skipped" : q.isCorrect ? "correct" : "wrong";
             const statusStyles =
               status === "correct"
-                ? "border-emerald-200 bg-emerald-50/60"
+                ? "border-emerald-300 bg-emerald-50"
                 : status === "wrong"
-                  ? "border-rose-200 bg-rose-50/60"
-                  : "border-slate-200 bg-slate-50";
+                  ? "border-rose-300 bg-rose-50"
+                  : "border-slate-300 bg-slate-50";
             return (
               <Card key={q.id} className={`border-2 ${statusStyles}`}>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-400">Q{idx + 1}</span>
+                  <span className="text-xs font-bold text-slate-500">Q{idx + 1}</span>
                   <Badge tone={q.difficulty}>{q.difficulty}</Badge>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                     {q.subjectIcon} {q.subjectName} · {q.topicName}
                   </span>
                   <StatusPill status={status} />
@@ -48,7 +48,7 @@ export default function TestReviewPage({ uid, route, attemptId }: { uid: string;
                   {q.options.map((opt, optIdx) => {
                     const isCorrectOpt = optIdx === q.correctIndex;
                     const isUserOpt = optIdx === q.selectedIndex;
-                    let cls = "border-slate-200 bg-white text-slate-600";
+                    let cls = "border-slate-300 bg-white text-slate-700";
                     if (isCorrectOpt) cls = "border-emerald-300 bg-emerald-100 text-emerald-800";
                     else if (isUserOpt && !isCorrectOpt) cls = "border-rose-300 bg-rose-100 text-rose-800";
                     return (
@@ -65,7 +65,7 @@ export default function TestReviewPage({ uid, route, attemptId }: { uid: string;
                 </div>
 
                 <div className="mt-3 rounded-xl bg-white/80 p-3">
-                  <p className="text-xs font-semibold text-slate-500">Explanation</p>
+                  <p className="text-xs font-bold text-slate-600">Explanation</p>
                   <p className="mt-1 text-sm leading-relaxed text-slate-700">{q.explanation}</p>
                 </div>
               </Card>
@@ -93,7 +93,7 @@ function StatusPill({ status }: { status: "correct" | "wrong" | "skipped" }) {
     );
   }
   return (
-    <span className="ml-auto flex items-center gap-1 rounded-full bg-slate-400 px-2.5 py-1 text-[11px] font-bold text-white">
+    <span className="ml-auto flex items-center gap-1 rounded-full bg-slate-500 px-2.5 py-1 text-[11px] font-bold text-white">
       <MinusIcon className="h-3 w-3" /> Skipped
     </span>
   );

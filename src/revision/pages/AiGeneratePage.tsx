@@ -136,12 +136,12 @@ function PickerButton({
         open
           ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200"
           : count > 0
-            ? "border-indigo-200 bg-indigo-50/50"
-            : "border-slate-200 bg-white"
+            ? "border-indigo-300 bg-indigo-50"
+            : "border-slate-300 bg-white"
       } ${disabled ? "opacity-40" : "active:scale-[0.97]"}`}
     >
       <span className="text-[11px] font-bold text-slate-700">{label}</span>
-      <span className={`text-[10px] font-semibold ${count > 0 ? "text-indigo-600" : "text-slate-400"}`}>
+      <span className={`text-[10px] font-semibold ${count > 0 ? "text-indigo-700" : "text-slate-500"}`}>
         {count > 0 ? `${count}/${total}` : "Select ▾"}
       </span>
     </button>
@@ -181,22 +181,22 @@ function PickerPanel({
   const allSelected = options.length > 0 && options.every((o) => selected.has(o.key));
   const someSelected = options.some((o) => selected.has(o.key));
   return (
-    <div className="animate-fade-in mt-2 overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-lg shadow-indigo-100/60">
-      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-3 py-2.5">
-        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{title}</span>
+    <div className="animate-fade-in mt-2 overflow-hidden rounded-2xl border border-indigo-200 bg-white shadow-lg shadow-indigo-100/60">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-3 py-2.5">
+        <span className="text-xs font-bold uppercase tracking-wide text-slate-600">{title}</span>
         <button type="button" onClick={onDone} className="rounded-lg bg-indigo-600 px-3 py-1 text-[11px] font-bold text-white active:scale-95">
           Done
         </button>
       </div>
       {options.length === 0 ? (
-        <p className="px-3 py-4 text-center text-xs text-slate-400">{emptyHint}</p>
+        <p className="px-3 py-4 text-center text-xs text-slate-500">{emptyHint}</p>
       ) : (
         <div className="max-h-60 overflow-y-auto">
           {/* Select-all master checkbox */}
           <button
             type="button"
             onClick={onToggleAll}
-            className="flex w-full items-center gap-2.5 border-b border-slate-100 bg-indigo-50/40 px-3 py-2.5 text-left active:bg-indigo-50"
+            className="flex w-full items-center gap-2.5 border-b border-slate-200 bg-indigo-50/40 px-3 py-2.5 text-left active:bg-indigo-50"
           >
             <CheckBox checked={allSelected} partial={!allSelected && someSelected} />
             <span className="text-[13px] font-bold text-indigo-700">
@@ -575,7 +575,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
     <PageShell route={route} title="AI Revision Generator" subtitle="Build a focused revision plan" backHref="#/revision/profile">
       <div className="animate-fade-in space-y-4 px-4 py-4 pb-10">
         {/* Provider strip */}
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.06)]">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)]">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white">
             <SparklesIcon className="h-5 w-5" />
           </span>
@@ -583,7 +583,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
             <p className="text-[13px] font-bold text-slate-900">
               {activeConfig ? `${providerMeta?.name} · ${activeConfig.model}` : "No AI connected"}
             </p>
-            <p className="truncate text-[11px] text-slate-500">
+            <p className="truncate text-[11px] text-slate-600">
               {effective.mode === "own"
                 ? "Your provider account is used · school/plan AI allowance is not deducted"
                 : effective.mode === "default"
@@ -594,7 +594,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
           <button
             type="button"
             onClick={() => navigate("#/revision/ai-settings")}
-            className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-600 active:bg-slate-200"
+            className="shrink-0 rounded-full bg-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-700 active:bg-slate-300"
           >
             Configure
           </button>
@@ -604,8 +604,8 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
           <>
             {/* Step 1 — the 4-dropdown selection row */}
             <Card>
-              <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-400">1 · What to test</h3>
-              <p className="mt-0.5 text-[11px] text-slate-400">
+              <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">1 · What to test</h3>
+              <p className="mt-0.5 text-[11px] text-slate-500">
                 Each list filters the next: Class → Subject → Chapter → Topic
               </p>
               {curriculumMeta && (
@@ -665,8 +665,8 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
 
             {/* Step 2 — difficulty and question type are separate settings */}
             <Card>
-              <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-400">2 · Difficulty</h3>
-              <p className="mt-0.5 text-[11px] text-slate-400">
+              <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">2 · Difficulty</h3>
+              <p className="mt-0.5 text-[11px] text-slate-500">
                 Difficulty controls level only. Question type is selected separately below.
               </p>
               <div className="mt-3 grid grid-cols-4 gap-1.5">
@@ -681,23 +681,23 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                     } ${
                       difficulty === d.value
                         ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200"
-                        : "border-slate-200 bg-white"
+                        : "border-slate-300 bg-white"
                     }`}
                   >
                     <span className="text-sm">{d.emoji}</span>
                     <span className={`text-[11px] font-bold ${difficulty === d.value ? "text-indigo-700" : "text-slate-600"}`}>
                       {d.label}
                     </span>
-                    <span className="line-clamp-1 text-[9px] font-medium text-slate-400">{d.desc}</span>
+                    <span className="line-clamp-1 text-[9px] font-medium text-slate-500">{d.desc}</span>
                   </button>
                 ))}
               </div>
 
-              <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h4 className="text-[12px] font-bold uppercase tracking-wide text-slate-500">Question type</h4>
-                    <p className="mt-0.5 text-[11px] leading-snug text-slate-400">
+                    <h4 className="text-[12px] font-bold uppercase tracking-wide text-slate-600">Question type</h4>
+                    <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
                       Default is Mixed. This strict mode applies to AI-generated tests; offline built-in questions are not dynamically transformed.
                     </p>
                   </div>
@@ -718,12 +718,12 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                       } ${
                         questionMode === m.value
                           ? "border-indigo-500 bg-white text-indigo-700 ring-2 ring-indigo-200"
-                          : "border-slate-200 bg-white/80 text-slate-600"
+                          : "border-slate-300 bg-white text-slate-700"
                       }`}
                     >
                       <span className="text-base">{m.emoji}</span>
                       <span className="text-[11px] font-extrabold leading-tight">{m.label}</span>
-                      <span className="line-clamp-2 text-[9px] font-medium leading-tight text-slate-400">{m.desc}</span>
+                      <span className="line-clamp-2 text-[9px] font-medium leading-tight text-slate-500">{m.desc}</span>
                     </button>
                   ))}
                 </div>
@@ -732,18 +732,18 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
 
             {/* Step 3 — questions & time */}
             <Card>
-              <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-400">3 · Questions & time</h3>
+              <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">3 · Questions & time</h3>
               <div className="mt-3 space-y-3">
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-600">Total questions</span>
+                    <span className="text-xs font-semibold text-slate-700">Total questions</span>
                     <input
                       type="number"
                       min={1}
                       max={20}
                       value={totalQuestions}
                       onChange={(e) => setTotalQuestions(Math.max(1, Math.min(20, Math.round(Number(e.target.value) || 1))))}
-                      className="h-9 w-20 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm font-bold text-slate-900 outline-none focus:border-indigo-400"
+                      className="h-9 w-20 rounded-lg border border-slate-300 bg-white px-2 text-center text-sm font-bold text-slate-900 outline-none focus:border-indigo-500"
                     />
                   </div>
                   <div className="mt-2 flex gap-1.5">
@@ -755,7 +755,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                         className={`flex-1 rounded-lg border py-1.5 text-xs font-bold transition ${
                           totalQuestions === n
                             ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                            : "border-slate-200 bg-white text-slate-500"
+                            : "border-slate-300 bg-white text-slate-600"
                         }`}
                       >
                         {n}
@@ -765,7 +765,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1 text-xs font-semibold text-slate-600">
+                    <span className="flex items-center gap-1 text-xs font-semibold text-slate-700">
                       <ClockIcon className="h-3.5 w-3.5" /> Total time (minutes)
                     </span>
                     <input
@@ -774,7 +774,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                       max={240}
                       value={totalMinutes}
                       onChange={(e) => setTotalMinutes(Math.max(1, Math.min(240, Math.round(Number(e.target.value) || 1))))}
-                      className="h-9 w-20 rounded-lg border border-slate-200 bg-white px-2 text-center text-sm font-bold text-slate-900 outline-none focus:border-indigo-400"
+                      className="h-9 w-20 rounded-lg border border-slate-300 bg-white px-2 text-center text-sm font-bold text-slate-900 outline-none focus:border-indigo-500"
                     />
                   </div>
                   <div className="mt-2 flex gap-1.5">
@@ -786,7 +786,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                         className={`flex-1 rounded-lg border py-1.5 text-xs font-bold transition ${
                           totalMinutes === n
                             ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                            : "border-slate-200 bg-white text-slate-500"
+                            : "border-slate-300 bg-white text-slate-600"
                         }`}
                       >
                         {n}m
@@ -835,7 +835,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   <SparklesIcon className="h-5 w-5" /> Generate revision plan
                 </PrimaryButton>
                 {!canGenerate && (
-                  <p className="text-center text-[11px] text-slate-400">
+                  <p className="text-center text-[11px] text-slate-500">
                     Select at least one class, subject, chapter and topic to generate.
                   </p>
                 )}
@@ -853,7 +853,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
               </span>
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Your revision plan is ready! 🎉</h2>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-600">
                   {readyInfo.count} questions saved to your Test Bank · ~{totalMinutes} min ·{" "}
                   {readyInfo.usedAi ? `generated by ${providerMeta?.name ?? "AI"}` : "built-in engine"}
                 </p>
@@ -884,7 +884,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   setReadyInfo(null);
                   setNotice(null);
                 }}
-                className="text-xs font-semibold text-slate-400 underline-offset-2 hover:underline"
+                className="text-xs font-semibold text-slate-500 underline-offset-2 hover:underline"
               >
                 Create another revision plan
               </button>

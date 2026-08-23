@@ -28,7 +28,7 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
   const dashboard = useMemo(() => getRevisionOverview(uid), [uid]);
 
   return (
-    <PageShell route={route} title="Profile">
+    <PageShell route={route} title="Profile" mergeIntoMainHeader>
       <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
         {/* Identity */}
         <Card className="flex items-center gap-4">
@@ -37,7 +37,7 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-lg font-bold text-slate-900">{userName}</h2>
-            <p className="text-sm text-slate-500">Daily learner</p>
+            <p className="text-sm text-slate-600">Daily learner</p>
             <div className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-orange-600">
               <FlameIcon className="h-3.5 w-3.5" /> {dashboard.quickStats.streak}-day streak
             </div>
@@ -46,7 +46,7 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
 
         {/* The two customization options */}
         <div>
-          <h3 className="mb-2 px-1 text-[13px] font-semibold uppercase tracking-wide text-slate-400">
+          <h3 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-500">
             Customization
           </h3>
           <div className="space-y-3">
@@ -109,28 +109,28 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
 
         {/* Bulk import — moved from the admin panel */}
         <div>
-          <h3 className="mb-2 px-1 text-[13px] font-semibold uppercase tracking-wide text-slate-400">Import</h3>
+          <h3 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-500">Import</h3>
           <button
             type="button"
             onClick={() => navigate("#/revision/bulk-import")}
-            className="flex w-full items-center gap-3 rounded-3xl border border-sky-100 bg-gradient-to-r from-sky-50 to-indigo-50 p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition active:scale-[0.98]"
+            className="flex w-full items-center gap-3 rounded-3xl border border-sky-200 bg-gradient-to-r from-sky-50 to-indigo-50 p-4 text-left shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)] transition active:scale-[0.98]"
           >
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
               <BookOpenIcon className="h-6 w-6" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-bold text-slate-900">Bulk Import Questions</span>
-              <span className="block text-xs text-slate-500">
+              <span className="block text-xs text-slate-600">
                 Paste questions as plain text — a new test is created directly
               </span>
             </span>
-            <ChevronRightIcon className="h-5 w-5 text-slate-300" />
+            <ChevronRightIcon className="h-5 w-5 text-slate-400" />
           </button>
         </div>
 
         {/* Quick snapshot */}
         <div>
-          <h3 className="mb-2 px-1 text-[13px] font-semibold uppercase tracking-wide text-slate-400">Snapshot</h3>
+          <h3 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-500">Snapshot</h3>
           <div className="grid grid-cols-3 gap-3">
             <WidgetCard
               icon={<ChartIcon className="h-5 w-5 text-emerald-600" />}
@@ -158,7 +158,7 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
 
 function WidgetCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-2xl border border-slate-100 bg-white py-3 text-center shadow-[0_1px_2px_rgba(15,23,42,0.06)]">
+    <div className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-white py-3 text-center shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)]">
       {icon}
       <span className="text-base font-bold text-slate-900">{value}</span>
       <span className="text-[10px] font-medium text-slate-500">{label}</span>

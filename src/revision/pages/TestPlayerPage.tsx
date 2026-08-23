@@ -237,7 +237,7 @@ export default function TestPlayerPage({
             <div key={question.id} className="animate-fade-in">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge tone={question.difficulty}>{question.difficulty}</Badge>
-                <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                   {question.subjectIcon} {question.subjectName} · {question.topicName}
                 </span>
               </div>
@@ -254,12 +254,12 @@ export default function TestPlayerPage({
                       className={`flex min-h-[56px] w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-[15px] font-medium transition active:scale-[0.99] ${
                         selected
                           ? "border-indigo-600 bg-indigo-50 text-indigo-900"
-                          : "border-slate-200 bg-white text-slate-700 active:bg-slate-50"
+                          : "border-slate-300 bg-white text-slate-800 active:bg-slate-100"
                       }`}
                     >
                       <span
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          selected ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"
+                          selected ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-600"
                         }`}
                       >
                         {OPTION_LETTERS[idx]}
@@ -273,7 +273,7 @@ export default function TestPlayerPage({
               <button
                 type="button"
                 onClick={goNext}
-                className="mt-4 flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-slate-400 active:text-slate-500"
+                className="mt-4 flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-slate-500 active:text-slate-600"
               >
                 Skip this question
               </button>
@@ -311,7 +311,7 @@ function ReviewBeforeSubmit({
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        <p className="mb-4 text-sm text-slate-500">
+        <p className="mb-4 text-sm text-slate-600">
           Tap any question to jump back and change your answer before you submit.
         </p>
         <div className="grid grid-cols-5 gap-2.5">
@@ -324,8 +324,8 @@ function ReviewBeforeSubmit({
                 onClick={() => onJump(idx)}
                 className={`flex h-12 flex-col items-center justify-center rounded-xl border text-sm font-bold transition active:scale-95 ${
                   answered
-                    ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-                    : "border-amber-200 bg-amber-50 text-amber-700"
+                    ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                    : "border-amber-300 bg-amber-50 text-amber-800"
                 }`}
               >
                 {idx + 1}
@@ -333,7 +333,7 @@ function ReviewBeforeSubmit({
             );
           })}
         </div>
-        <div className="mt-5 flex items-center gap-4 text-xs text-slate-500">
+        <div className="mt-5 flex items-center gap-4 text-xs font-medium text-slate-600">
           <span className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-indigo-400" /> Answered
           </span>

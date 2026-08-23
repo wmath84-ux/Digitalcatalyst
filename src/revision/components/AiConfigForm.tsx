@@ -53,7 +53,7 @@ function ProviderTile({
       className={`group relative flex flex-col items-start gap-2 rounded-2xl border p-3 text-left transition-all active:scale-[0.98] ${
         selected
           ? `border-transparent bg-white shadow-md ring-2 ${meta.ring}`
-          : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
+          : "border-slate-300 bg-white hover:border-slate-400 hover:shadow-sm"
       }`}
     >
       {selected && (
@@ -222,12 +222,12 @@ export default function AiConfigForm({
               {provider.keyHint} ↗
             </a>
           )}
-          {!provider.keyUrl && <span className="text-[11px] text-slate-400">{provider.keyHint}</span>}
+          {!provider.keyUrl && <span className="text-[11px] text-slate-500">{provider.keyHint}</span>}
         </div>
         <div className="relative mt-1.5">
           <input
             type={showKey ? "text" : "password"}
-            className={`w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 pr-11 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 ${provider.accentText.replace("text-", "focus:ring-")}`}
+            className={`w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 pr-11 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:ring-2 ${provider.accentText.replace("text-", "focus:ring-")}`}
             placeholder={provider.keyPlaceholder}
             value={value.apiKey}
             autoComplete="off"
@@ -239,7 +239,7 @@ export default function AiConfigForm({
             tabIndex={-1}
             aria-label={showKey ? "Hide API key" : "Show API key"}
             onClick={() => setShowKey((s) => !s)}
-            className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600"
+            className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 hover:text-slate-700"
           >
             {showKey ? (
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -256,7 +256,7 @@ export default function AiConfigForm({
             )}
           </button>
         </div>
-        <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">
+        <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
           🔒 Stored only in this browser — sent directly to {provider.name}. Never uploaded to the app's servers.
         </p>
       </div>
@@ -277,16 +277,16 @@ export default function AiConfigForm({
         <div>
           <label className="text-xs font-semibold text-slate-700">Base URL</label>
           <input
-            className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono text-xs text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
             placeholder={provider.id === "custom" ? "https://your-endpoint.example.com/v1" : provider.baseUrl || "https://…"}
             value={value.baseUrl}
             spellCheck={false}
             onChange={(e) => onChange({ ...value, baseUrl: e.target.value })}
           />
           {provider.id === "custom" ? (
-            <p className="mt-1 text-[11px] text-slate-400">Required for a custom OpenAI-compatible endpoint. Starts empty.</p>
+            <p className="mt-1 text-[11px] text-slate-500">Required for a custom OpenAI-compatible endpoint. Starts empty.</p>
           ) : (
-            <p className="mt-1 text-[11px] text-slate-400">Leave empty to use {provider.name}&apos;s default endpoint.</p>
+            <p className="mt-1 text-[11px] text-slate-500">Leave empty to use {provider.name}&apos;s default endpoint.</p>
           )}
         </div>
       )}
@@ -300,7 +300,7 @@ export default function AiConfigForm({
           className={`flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border text-[13px] font-bold transition active:scale-[0.98] disabled:opacity-50 ${
             hasKey
               ? `${provider.accentBg} ${provider.accentText} border-transparent`
-              : "border-slate-200 bg-slate-50 text-slate-400"
+              : "border-slate-300 bg-slate-50 text-slate-500"
           }`}
         >
           {loadingModels ? <Spinner className="h-4 w-4" /> : "⟳"}
@@ -310,7 +310,7 @@ export default function AiConfigForm({
           type="button"
           onClick={() => void runTest()}
           disabled={!hasKey || !hasCustomEndpoint || testing}
-          className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-[13px] font-bold text-slate-700 transition active:scale-[0.98] disabled:opacity-50"
+          className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-[13px] font-bold text-slate-800 transition active:scale-[0.98] disabled:opacity-50"
         >
           {testing ? <Spinner className="h-4 w-4" /> : "✓"}
           {testing ? "Testing…" : "Test connection"}
@@ -322,7 +322,7 @@ export default function AiConfigForm({
         <div className="flex items-center justify-between">
           <label className="text-xs font-semibold text-slate-700">Model</label>
           {didAutoFetch && !loadingModels && (
-            <span className={`text-[11px] font-medium ${allModels.length > 0 ? "text-emerald-600" : "text-slate-400"}`}>
+            <span className={`text-[11px] font-medium ${allModels.length > 0 ? "text-emerald-600" : "text-slate-500"}`}>
               {allModels.length} available
             </span>
           )}
@@ -345,7 +345,7 @@ export default function AiConfigForm({
           ))}
           {hasKey && value.model && !modelKnown && <option value={value.model}>{value.model} (custom)</option>}
         </select>
-        <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">
+        <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
           {value.model ? `Using ${value.model} — questions are generated with this model.` : "Pick the model used for question generation."}
         </p>
       </div>
