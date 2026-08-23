@@ -33,11 +33,26 @@ const MAX_COUNT = 20;
 const MAX_STAMPS = 200;
 const REVISION_CATALOG_DOC = "revisionCatalog";
 
+export type RevisionSelectionRow = {
+  className: string;
+  subjectName: string;
+  chapterName: string;
+  topicName: string;
+};
+
 export type RevisionSyllabus = {
   classNames: string[];
   subjectNames: string[];
   chapterNames: string[];
   topicNames: string[];
+  /** Exact selected class → subject → chapter → topic rows, preserving relationships. */
+  selectionRows?: RevisionSelectionRow[];
+  /** Learner-local test date (YYYY-MM-DD) included in the AI prompt. */
+  testDate?: string;
+  /** ISO timestamp when generation was requested. */
+  generatedAt?: string;
+  /** Learner timezone label, when available. */
+  timezone?: string;
   difficulty: "easy" | "medium" | "hard" | "mixed";
   /** AI question type, separate from difficulty (default "mixed" = theory + application). */
   questionMode?: "mixed" | "theory" | "application";
@@ -127,6 +142,41 @@ const cleanList = (value: unknown, maxItems = 40, maxLen = 80): string[] => {
   return out;
 };
 
+const cleanDate = (value: unknown): string => {
+  const text = String(value ?? "").trim().slice(0, 32);
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+};
+
+const cleanIsoDateTime = (value: unknown): string => {
+  const text = String(value ?? "").trim().slice(0, 80);
+  if (!text) return "";
+  const millis = Date.parse(text);
+  return Number.isFinite(millis) ? new Date(millis).toISOString() : "";
+};
+
+const cleanTimezone = (value: unknown): string =>
+  String(value ?? "").trim().replace(/[^A-Za-z0-9_+./:-]/g, "").slice(0, 80);
+
+function cleanSelectionRows(value: unknown): RevisionSelectionRow[] {
+  if (!Array.isArray(value)) return [];
+  const out: RevisionSelectionRow[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    const row = asRecord(item);
+    const className = String(row.className ?? "").trim().slice(0, 80);
+    const subjectName = String(row.subjectName ?? "").trim().slice(0, 80);
+    const chapterName = String(row.chapterName ?? "").trim().slice(0, 120);
+    const topicName = String(row.topicName ?? "").trim().slice(0, 160);
+    if (!className || !subjectName || !chapterName || !topicName) continue;
+    const key = `${className.toLowerCase()}|${subjectName.toLowerCase()}|${chapterName.toLowerCase()}|${topicName.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ className, subjectName, chapterName, topicName });
+    if (out.length >= 120) break;
+  }
+  return out;
+}
+
 const firstHeader = (headers: VercelRequest["headers"] | undefined, name: string): string => {
   const value = headers?.[name] ?? headers?.[name.toLowerCase()];
   return Array.isArray(value) ? String(value[0] || "") : String(value || "");
@@ -204,16 +254,27 @@ function questionStyleLines(mode: RevisionSyllabus["questionMode"]): string[] {
 export function buildSyllabusPrompt(syllabus: RevisionSyllabus): string {
   const difficulty =
     syllabus.difficulty === "mixed" ? "a mix of easy, medium and hard" : syllabus.difficulty;
+  const rows = (syllabus.selectionRows ?? []).filter((row) => row.className && row.subjectName && row.chapterName && row.topicName);
   return [
-    `Generate ${syllabus.count} multiple-choice questions for a revision test.`,
+    `Generate exactly ${syllabus.count} multiple-choice questions for a revision test.`,
+    `Total questions requested: ${syllabus.count}`,
     `Class: ${syllabus.classNames.join(", ") || "General"}`,
     `Subject: ${syllabus.subjectNames.join(", ") || "General"}`,
     `Chapter: ${syllabus.chapterNames.join(", ") || "General"}`,
     `Concepts / topics: ${syllabus.topicNames.join(", ") || "General"}`,
+    ...(rows.length
+      ? [
+          "Exact selected syllabus combinations (preserve these class → subject → chapter → topic links):",
+          ...rows.slice(0, 80).map((row, index) => `${index + 1}. ${row.className} → ${row.subjectName} → ${row.chapterName} → ${row.topicName}`),
+        ]
+      : []),
+    ...(syllabus.testDate ? [`Requested test date: ${syllabus.testDate}`] : []),
+    ...(syllabus.generatedAt ? [`Generation requested at: ${syllabus.generatedAt}${syllabus.timezone ? ` (${syllabus.timezone})` : ""}`] : []),
     `Difficulty: ${difficulty}`,
     ...questionStyleLines(syllabus.questionMode),
     `Exam duration to keep in mind: ${syllabus.minutes} minutes`,
     "Cover the listed concepts at the given class level. Every question must be distinct, unambiguous, and have one correct answer.",
+    `Return a complete set of exactly ${syllabus.count} usable questions; do not return fewer.`,
   ].join("\n");
 }
 
@@ -319,10 +380,27 @@ function parseSyllabus(raw: unknown): RevisionSyllabus {
   const subjectNames = cleanList(r.subjectNames);
   const chapterNames = cleanList(r.chapterNames);
   const topicNames = cleanList(r.topicNames);
+  const selectionRows = cleanSelectionRows(r.selectionRows);
+  const testDate = cleanDate(r.testDate);
+  const generatedAt = cleanIsoDateTime(r.generatedAt);
+  const timezone = cleanTimezone(r.timezone);
   if (!classNames.length || !subjectNames.length || !chapterNames.length || !topicNames.length) {
     throw Object.assign(new Error("Select class, subject, chapter and topic before generating."), { statusCode: 400 });
   }
-  return { classNames, subjectNames, chapterNames, topicNames, difficulty, questionMode, count, minutes };
+  return {
+    classNames,
+    subjectNames,
+    chapterNames,
+    topicNames,
+    selectionRows,
+    testDate,
+    generatedAt,
+    timezone,
+    difficulty,
+    questionMode,
+    count,
+    minutes,
+  };
 }
 
 function parseOwnConfig(raw: unknown): AiConfig | null {

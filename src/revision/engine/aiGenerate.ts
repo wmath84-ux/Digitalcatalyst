@@ -138,6 +138,10 @@ export type GenerateInput = {
   subjectNames?: string[];
   chapterNames?: string[];
   topicNames?: string[];
+  selectionRows?: Array<{ className: string; subjectName: string; chapterName: string; topicName: string }>;
+  testDate?: string;
+  generatedAt?: string;
+  timezone?: string;
   minutes?: number;
   questionMode?: QuestionMode;
 };
@@ -266,12 +270,24 @@ export function buildUserPrompt(input: GenerateInput): string {
   const subjects = (input.subjectNames ?? []).filter(Boolean);
   const chapters = (input.chapterNames ?? []).filter(Boolean);
   const topics = (input.topicNames ?? []).filter(Boolean);
+  const exactRows = (input.selectionRows ?? [])
+    .filter((row) => row.className && row.subjectName && row.chapterName && row.topicName)
+    .slice(0, 80);
   const lines = [
-    `Generate ${input.count} multiple-choice questions for a revision test.`,
+    `Generate exactly ${input.count} multiple-choice questions for a revision test.`,
+    `Total questions requested: ${input.count}`,
     `Class: ${classes.join(", ") || "General"}`,
     `Subject: ${subjects.join(", ") || input.subject || "General"}`,
     `Chapter: ${chapters.join(", ") || "General"}`,
     `Concepts / topics: ${topics.join(", ") || input.topic || "General"}`,
+    ...(exactRows.length
+      ? [
+          "Exact selected syllabus combinations (preserve these class → subject → chapter → topic links):",
+          ...exactRows.map((row, index) => `${index + 1}. ${row.className} → ${row.subjectName} → ${row.chapterName} → ${row.topicName}`),
+        ]
+      : []),
+    ...(input.testDate ? [`Requested test date: ${input.testDate}`] : []),
+    ...(input.generatedAt ? [`Generation requested at: ${input.generatedAt}${input.timezone ? ` (${input.timezone})` : ""}`] : []),
     `Difficulty: ${input.difficulty}`,
     ...questionStyleLines(input.questionMode),
   ];
