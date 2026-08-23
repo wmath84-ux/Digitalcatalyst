@@ -7,6 +7,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/manifest",
+      "destination": "/api/referral-leaderboard"
+    },
+    {
+      "source": "/api/brand-icon",
+      "destination": "/api/referral-leaderboard"
+    },
+    {
       "source": "/api/embed-proxy",
       "destination": "/api/referral-leaderboard"
     },

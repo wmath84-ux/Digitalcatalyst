@@ -1,24 +1,20 @@
-import type { VercelRequest, VercelResponse } from "./_lib/firebaseAdmin.js";
-import { DEFAULT_ICONS, getBranding } from "./_lib/branding.js";
+import type { VercelRequest, VercelResponse } from "./firebaseAdmin.js";
+import { DEFAULT_ICONS, getBranding } from "./branding.js";
 
 /**
- * Dynamic PWA web app manifest.
+ * Dynamic PWA web app manifest handler.
  *
- * The static /manifest.webmanifest ships hardcoded name + icons, so branding
- * changes made in the admin panel never reached the installed PWA /
- * "Add to Home screen". This endpoint reads the live `settings/branding` doc
- * and emits the configured name, description and icons. Icons point at the
- * brand-icon proxy, which serves the uploaded image (or the built-in default)
- * with permissive CORS + long-lived caching.
- *
- * The client cache-busts this URL (see applyDocumentBranding) whenever the
- * branding changes, forcing browsers to re-read it; installed PWAs refresh
- * their name/icon on the next launch / manifest update.
+ * Mounted via /api/manifest (rewritten to the shared referral-leaderboard
+ * function in vercel.json) because the Vercel Hobby plan caps serverless
+ * functions at 12 and the project is already at that limit. It reads the live
+ * settings/branding doc and emits the configured name, description and
+ * icons. The client cache-busts this URL whenever branding changes.
  */
-export default async function handler(_req: VercelRequest, res: VercelResponse) {
+export async function handleManifest(_req: VercelRequest, res: VercelResponse) {
   const { logoUrl, appName, tagline, description, version } = await getBranding();
 
-  const versioned = (path: string) => `${path}${path.includes("?") ? "&" : "?"}v=${version}`;
+  const versioned = (path: string) =>
+    `${path}${path.includes("?") ? "&" : "?"}v=${version}`;
 
   const icons = logoUrl
     ? [
@@ -44,7 +40,12 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
     : [
         { src: DEFAULT_ICONS[192], sizes: "192x192", type: "image/png" },
         { src: DEFAULT_ICONS[512], sizes: "512x512", type: "image/png" },
-        { src: DEFAULT_ICONS.maskable, sizes: "512x512", type: "image/svg+xml", purpose: "maskable" },
+        {
+          src: DEFAULT_ICONS.maskable,
+          sizes: "512x512",
+          type: "image/svg+xml",
+          purpose: "maskable",
+        },
       ];
 
   const manifest = {
@@ -62,6 +63,9 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
   };
 
   res.setHeader("Content-Type", "application/manifest+json; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=0, s-maxage=60, stale-while-revalidate=300");
+  res.setHeader(
+    "Cache-Control",
+    "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
+  );
   res.status(200).end(JSON.stringify(manifest));
 }
