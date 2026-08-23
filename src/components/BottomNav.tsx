@@ -1,4 +1,5 @@
 import { BagIcon, CalendarIcon, HomeIcon, SparkBookIcon, StoreIcon, UserIcon } from "./icons";
+import { useBranding } from "../context/BrandingContext";
 
 export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision";
 
@@ -19,8 +20,14 @@ const TABS: { key: TabKey; label: string; icon: typeof HomeIcon }[] = [
 ];
 
 export default function BottomNav({ active, onChange, storeBadge, purchasesBadge }: BottomNavProps) {
+  const { hideFrameBorders } = useBranding();
   return (
-    <nav data-site-footer className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur">
+    <nav
+      data-site-footer
+      className={`sticky bottom-0 z-30 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur ${
+        hideFrameBorders ? "" : "border-t border-slate-200"
+      }`}
+    >
       <div className="flex items-stretch justify-between">
         {TABS.map(({ key, label, icon: Icon }) => {
           const isActive = active === key;

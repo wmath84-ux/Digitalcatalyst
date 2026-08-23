@@ -1,5 +1,6 @@
 import { useExitGuard } from "./ExitGuardContext";
 import { BankIcon, ChartIcon, DashboardIcon, HomeIcon, TargetIcon, UserIcon } from "./icons";
+import { useBranding } from "../../context/BrandingContext";
 
 // The revision footer now mirrors the website's own footer (src/components/BottomNav.tsx)
 // pixel-for-pixel: same container padding, same icon pill (h-9 w-14), same icon size
@@ -25,11 +26,14 @@ const TABS = [
 
 export default function BottomNav({ route }: { route: string }) {
   const { navigate } = useExitGuard();
+  const { hideFrameBorders } = useBranding();
 
   return (
     <nav
       data-site-footer
-      className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur"
+      className={`sticky bottom-0 z-30 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur ${
+        hideFrameBorders ? "" : "border-t border-slate-200"
+      }`}
       aria-label="Bottom navigation"
     >
       <div className="flex items-stretch justify-between">

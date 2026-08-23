@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Heart, Home, ShoppingBag } from "lucide-react";
 import { TabKey } from "../types";
+import { useBranding } from "../../context/BrandingContext";
 
 interface BottomNavProps {
   active: TabKey;
@@ -31,8 +32,14 @@ export default function BottomNav({
     },
   ];
 
+  const { hideFrameBorders } = useBranding();
+
   return (
-    <nav className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur">
+    <nav
+      className={`sticky bottom-0 z-30 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur ${
+        hideFrameBorders ? "" : "border-t border-slate-200"
+      }`}
+    >
       <div className="flex items-stretch justify-between">
         {items.map(({ key, label, icon, badge }) => {
           const isActive = active === key;

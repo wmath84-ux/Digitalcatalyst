@@ -1,5 +1,6 @@
 import { Bell, CalendarClock, ClipboardList, Home, LayoutGrid, NotebookPen } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { useBranding } from "../../context/BrandingContext";
 
 interface BottomNavProps {
   active: string;
@@ -16,8 +17,14 @@ const items = [
 ];
 
 export default function BottomNav({ active, onNavigate }: BottomNavProps) {
+  const { hideFrameBorders } = useBranding();
   return (
-    <nav className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur">
+    <nav
+      className={cn(
+        "sticky bottom-0 z-30 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur",
+        !hideFrameBorders && "border-t border-slate-200",
+      )}
+    >
       <div className="mx-auto flex max-w-md items-stretch justify-between">
         {items.map((item) => {
           const Icon = item.icon;
