@@ -23,6 +23,7 @@ import { adminFetch } from "@/lib/admin/client";
 import { type RevisionCatalog } from "@/revision/engine/catalogService";
 import AiConfigForm from "@/revision/components/AiConfigForm";
 import RevisionCurriculumSection from "@/admin/pages/RevisionCurriculumSection";
+import ManualCurriculumEditor from "@/admin/pages/ManualCurriculumEditor";
 import {
   defaultCatalogAiSettings,
   getProvider,
@@ -480,6 +481,11 @@ export default function RevisionPage() {
       <RevisionCurriculumSection
         catalog={catalog}
         adminConfig={adminCfg.config}
+        onCatalog={setCatalog}
+      />
+
+      <ManualCurriculumEditor
+        catalog={catalog}
         onCatalog={setCatalog}
       />
     </div>
