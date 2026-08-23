@@ -8,7 +8,7 @@
 
 import { useMemo } from "react";
 import PageShell from "../components/PageShell";
-import { Card, PrimaryButton } from "../components/ui";
+import { PrimaryButton } from "../components/ui";
 import {
   BookOpenIcon,
   ChartIcon,
@@ -17,7 +17,6 @@ import {
   GearIcon,
   SparklesIcon,
   TrophyIcon,
-  UserIcon,
 } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { getRevisionOverview } from "../engine/statsService";
@@ -30,20 +29,6 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
   return (
     <PageShell route={route} title="Profile" mergeIntoMainHeader>
       <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
-        {/* Identity */}
-        <Card className="flex items-center gap-4">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
-            <UserIcon className="h-8 w-8" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-lg font-bold text-slate-900">{userName}</h2>
-            <p className="text-sm text-slate-600">Daily learner</p>
-            <div className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-orange-600">
-              <FlameIcon className="h-3.5 w-3.5" /> {dashboard.quickStats.streak}-day streak
-            </div>
-          </div>
-        </Card>
-
         {/* The two customization options */}
         <div>
           <h3 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-500">
