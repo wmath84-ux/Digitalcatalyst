@@ -15,11 +15,23 @@ test("admin-configured plan price is charged by both client and server", () => {
   assert.match(admin, /Yearly plan price \(₹\)/);
 });
 
-test("active subscribers can enter upgrade flow and switch to another active plan", () => {
+test("active subscribers can enter upgrade flow and switch to a HIGHER plan only", () => {
   const page = read("src/subscription/components/SubscriptionPage.tsx");
   const writer = read("api/_lib/subscriptions.ts");
-  assert.match(page, /candidate\.active && candidate\.id !== currentPlanId/);
-  assert.match(page, /Choose any active plan, feature, or product below/);
+  // The no-downgrade rule: the change-plan entry point opens on the next
+  // HIGHER plan, and the picker itself is filtered to the member's own plan
+  // plus the plans above it. Lower plans are never offered or selectable.
+  assert.match(page, /const upgradePlans = useMemo/);
+  assert.match(page, /candidate\.active && candidate\.id !== ownedPlanId/);
+  assert.match(page, /order >= ownedPlanOrder/);
+  assert.match(page, /const nextPlan = upgradePlans\[0\] \|\| null/);
+  // The old banner inviting the member to "choose any active plan" was
+  // removed together with the ability to move sideways/down.
+  assert.equal(
+    page.includes("Choose any active plan, feature, or product below"),
+    false,
+    "the arbitrary-plan banner must be gone — only upgrades are shown now",
+  );
   assert.match(writer, /const isPlanChange = previous\.exists/);
   assert.match(writer, /const subscriptionBase = isPlanChange \? args\.now/);
   assert.match(writer, /subscriptionUpgradeCount: upgradeCount/);

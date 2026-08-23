@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { HelpCircle } from "lucide-react";
 import { BellIcon, BookIcon, CartIcon, CrownIcon, DownloadIcon, SearchIcon } from "./icons";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
 import BrandMark from "./BrandMark";
@@ -48,6 +49,12 @@ type HeaderProps = {
   onToggleSearch?: () => void;
   /** Highlights the search button while its input is open. */
   searchActive?: boolean;
+  /**
+   * When provided, a circular help (?) button is rendered at the far right
+   * of the header. The subscription page uses this for its Help & FAQ
+   * overlay so the shortcut lives on the main header itself.
+   */
+  onHelpClick?: () => void;
 };
 
 export default function Header({
@@ -63,6 +70,7 @@ export default function Header({
   onDownloadReport,
   onToggleSearch,
   searchActive = false,
+  onHelpClick,
 }: HeaderProps) {
   const liveNotificationCount = useUnreadNotificationCount();
   const displayedNotificationCount = liveNotificationCount ?? 0;
@@ -149,6 +157,16 @@ export default function Header({
           >
             <CrownIcon className="h-5 w-5" />
           </button>
+          {onHelpClick ? (
+            <button
+              type="button"
+              aria-label="Help & FAQ"
+              onClick={onHelpClick}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 active:scale-95"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </button>
+          ) : null}
           {action}
         </div>
       </div>

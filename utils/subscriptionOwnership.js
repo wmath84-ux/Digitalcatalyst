@@ -48,6 +48,9 @@ export const RENEWAL_WINDOW_DAYS = 7;
 /** Error code returned when a duplicate purchase is refused. */
 export const ALREADY_ACTIVE_CODE = "SUBSCRIPTION_ALREADY_ACTIVE";
 
+/** Error code returned when a plan / cycle downgrade is refused. */
+export const DOWNGRADE_CODE = "SUBSCRIPTION_DOWNGRADE_NOT_ALLOWED";
+
 const toStringArray = (value) =>
   Array.isArray(value) ? value.map((entry) => String(entry)).filter(Boolean) : [];
 
@@ -169,6 +172,99 @@ export const evaluateSubscriptionSelection = ({
 };
 
 /**
+ * The NO-DOWNGRADE rule.
+ *
+ * While a membership is active the buyer can only ever move UP the ladder,
+ * never down:
+ *
+ *   * A member on a higher plan (e.g. Premium, sortOrder 1) can never buy a
+ *     lower plan (Basic, sortOrder 0) in either cycle — they may buy a higher
+ *     plan (Pro, sortOrder 2) on EITHER cycle.
+ *   * A member on the YEARLY cycle of a plan cannot switch to the MONTHLY
+ *     cycle of that same plan until the yearly membership ends. The reverse
+ *     (monthly → yearly on the same plan) is an upgrade and stays allowed.
+ *   * Once the membership has expired the rule lifts entirely — any plan and
+ *     any cycle can be bought again.
+ *
+ * Plan ranking is supplied by the caller as plain sort orders
+ * (`ownedPlanOrder` / `selectedPlanOrder`): the client ranks from the loaded
+ * catalog's `sortOrder`, the server from the live `subscriptionPlans` docs.
+ * When either rank is unknown (plan deleted / deactivated) the function
+ * refuses to guess and does NOT block — the duplicate-purchase guard above
+ * still applies.
+ *
+ * Returns:
+ *   active    — the buyer currently holds an active membership
+ *   downgrade — the selection is a forbidden downgrade while active
+ *   upgrade   — the selection is a legitimate move to a higher plan / cycle
+ *   blocked   — the purchase must be refused (same value as `downgrade`)
+ *   code / reason — machine + human explanation when blocked
+ */
+export const evaluatePlanChange = ({
+  record,
+  planId,
+  cycle,
+  ownedPlanOrder = null,
+  selectedPlanOrder = null,
+  now = Date.now(),
+} = {}) => {
+  const owned = normaliseOwnedSubscription(record);
+  const active = isOwnedSubscriptionActive(record, now);
+  const base = {
+    active,
+    downgrade: false,
+    upgrade: false,
+    blocked: false,
+    code: null,
+    reason: null,
+    ownedPlanId: owned ? owned.planId : null,
+    ownedCycle: owned ? owned.cycle : null,
+  };
+  if (!active || !owned) return base;
+  const selectedPlanId = String(planId || "").trim();
+  if (!selectedPlanId) return base;
+  const selectedCycle = normaliseCycle(cycle);
+
+  // Same plan: only the cycle can move. Yearly → monthly while the yearly
+  // membership is active is a downgrade; monthly → yearly is an upgrade;
+  // same cycle is the OWNED selection (handled by the guard above).
+  if (owned.planId === selectedPlanId) {
+    if (owned.cycle === "yearly" && selectedCycle === "monthly") {
+      return {
+        ...base,
+        downgrade: true,
+        blocked: true,
+        code: DOWNGRADE_CODE,
+        reason:
+          "Your yearly membership is still active, so you can't switch to the monthly cycle of the same plan. You can renew yearly, add features, or move up to a higher plan.",
+      };
+    }
+    if (owned.cycle === "monthly" && selectedCycle === "yearly") {
+      return { ...base, upgrade: true };
+    }
+    return base;
+  }
+
+  // Different plans: rank them. A lower rank is a smaller plan.
+  const ownedOrder = Number(ownedPlanOrder);
+  const selectedOrder = Number(selectedPlanOrder);
+  if (!Number.isFinite(ownedOrder) || !Number.isFinite(selectedOrder)) return base;
+  if (selectedOrder < ownedOrder) {
+    return {
+      ...base,
+      downgrade: true,
+      blocked: true,
+      code: DOWNGRADE_CODE,
+      reason:
+        "You already have a higher plan active. Downgrading to a lower plan isn't possible while your membership is active — you can upgrade to an even higher plan anytime.",
+    };
+  }
+  if (selectedOrder > ownedOrder) return { ...base, upgrade: true };
+  // Same rank but a different plan id: treat as a sideways move, allowed.
+  return base;
+};
+
+/**
  * View-model for the "you already own this" card. Keeps the copy and the
  * feature/product lists in one place so the page and any future surface
  * (profile, admin preview) stay in sync.
@@ -235,6 +331,18 @@ export const resolveSubscribeCta = ({ state, loading = false, hasPlan = true, fr
       tone: "owned",
       disabled: !state.renewalEligible,
       owned: true,
+    };
+  }
+  // Downgrade-blocked selection (lower plan, or yearly → monthly on the same
+  // plan while that yearly membership is active): the CTA must be disabled
+  // and say so, instead of advertising a Razorpay payment that the server
+  // would refuse anyway.
+  if (state && state.blocked) {
+    return {
+      label: "Downgrade not allowed",
+      tone: "blocked",
+      disabled: true,
+      owned: false,
     };
   }
   // Zero-price selection (admin set the plan price — and every selected

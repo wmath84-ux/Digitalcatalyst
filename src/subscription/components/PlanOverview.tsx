@@ -6,7 +6,7 @@
 // took hard-coded `basePriceMonthly` / `basePriceYearly` props;
 // those are gone.
 
-import { BadgeCheck, Check, Crown, X as XIcon, ChevronDown, ChevronUp } from "lucide-react";
+import { BadgeCheck, Check, Crown, Lock, X as XIcon, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type {
@@ -126,7 +126,15 @@ export default function PlanOverview({
         {/* Cycle toggle */}
         <div className="relative mt-4 inline-flex rounded-full bg-white/10 p-1 text-[11px] font-bold ring-1 ring-white/15">
           {(["monthly", "yearly"] as BillingCycle[]).map((c) => {
-            const enabled = supportedCycles.includes(c);
+            // NO-DOWNGRADE rule: a yearly member cannot drop to the monthly
+            // cycle of the SAME plan while that yearly membership is active.
+            const isCycleDowngrade = Boolean(
+              ownedPlanId &&
+                ownedCycle === "yearly" &&
+                selectedPlanId === ownedPlanId &&
+                c === "monthly",
+            );
+            const enabled = supportedCycles.includes(c) && !isCycleDowngrade;
             // The owned cycle is only "owned" on the plan that was bought.
             const isOwnedCycle = Boolean(
               ownedPlanId && ownedCycle === c && selectedPlanId === ownedPlanId,
@@ -139,7 +147,9 @@ export default function PlanOverview({
                 onClick={() => enabled && onChangeCycle(c)}
                 data-subscription-cycle={c}
                 data-subscription-cycle-owned={isOwnedCycle ? "true" : undefined}
-                className={`rounded-full px-3 py-1.5 transition ${
+                data-subscription-cycle-downgrade={isCycleDowngrade ? "true" : undefined}
+                title={isCycleDowngrade ? "Available after your yearly membership ends" : undefined}
+                className={`inline-flex items-center rounded-full px-3 py-1.5 transition ${
                   cycle === c
                     ? isOwnedCycle
                       ? "bg-emerald-400 text-emerald-950 shadow"
@@ -150,6 +160,8 @@ export default function PlanOverview({
                 {c === "monthly" ? "Monthly" : "Yearly"}
                 {isOwnedCycle ? (
                   <span className="ml-1 text-[9px] font-black">· ACTIVE</span>
+                ) : isCycleDowngrade ? (
+                  <Lock className="ml-1 h-3 w-3" aria-label="Locked until your yearly membership ends" />
                 ) : c === "yearly" ? (
                   <span className="ml-1 text-[9px] text-emerald-600">Save</span>
                 ) : null}
@@ -157,6 +169,14 @@ export default function PlanOverview({
             );
           })}
         </div>
+        {ownedPlanId && ownedCycle === "yearly" && selectedPlanId === ownedPlanId ? (
+          <p
+            data-subscription-cycle-downgrade-note
+            className="relative mt-2 text-[10px] font-semibold text-violet-200/70"
+          >
+            Monthly unlocks after your yearly membership ends — until then you can renew yearly, add features, or move up a plan.
+          </p>
+        ) : null}
 
         {activePlan ? (
           <div
