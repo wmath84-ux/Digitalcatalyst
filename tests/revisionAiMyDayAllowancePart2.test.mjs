@@ -119,7 +119,7 @@ test("provider metadata supports actual usage with an estimate fallback", () => 
 
 test("My Day free creation is Admin-configurable, daily-reset and server-authoritative", () => {
   const backend = read("api/_lib/myDay.ts");
-  const app = read("src/MyDayApp.tsx");
+  const card = read("src/components/MyDayAllowanceCard.tsx");
   const rules = read("firestore.rules");
   const admin = read("src/admin/pages/SubscriptionsPage.tsx");
   assert.match(backend, /freeItemsPerDay \?\? 1/);
@@ -128,7 +128,32 @@ test("My Day free creation is Admin-configurable, daily-reset and server-authori
   assert.match(backend, /runTransaction/);
   assert.match(backend, /dayKeyInZone/);
   assert.match(admin, /Non-subscriber daily free creations/);
-  assert.match(app, /My Day remains browse-only until reset/);
+  assert.match(card, /My Day remains browse-only until reset/);
   assert.match(rules, /match \/myDayUsage\/\{documentId\}/);
   assert.match(rules, /allow create, update, delete: if isAdmin\(\)/);
+});
+
+test("the My Day free-allowance summary lives on Profile, never on the My Day dashboard", () => {
+  const app = read("src/MyDayApp.tsx");
+  const profile = read("src/profile/App.tsx");
+  const card = read("src/components/MyDayAllowanceCard.tsx");
+
+  // The old banner strip must not come back to the My Day page.
+  assert.doesNotMatch(app, /data-myday-free-allowance/);
+  assert.doesNotMatch(app, /free creation\$\{freeLimit === 1/);
+  assert.doesNotMatch(app, /available today/);
+  assert.doesNotMatch(app, /free creation allowance has been used/);
+
+  // Profile renders the redesigned card and wires both CTAs.
+  assert.match(profile, /import MyDayAllowanceCard from "\.\.\/components\/MyDayAllowanceCard"/);
+  assert.match(profile, /<MyDayAllowanceCard[\s\S]*?onOpenMyDay=\{\(\) => \{ window\.location\.hash = "#\/my-day"; \}\}[\s\S]*?onSubscribe=\{openPlans\}/);
+
+  // The card is server-authoritative: same hook, no local entitlement math.
+  assert.match(card, /useMyDayAccess/);
+  assert.match(card, /data-myday-allowance-card/);
+  assert.match(card, /data-myday-allowance-state/);
+  assert.match(card, /data-myday-allowance-refresh/);
+  assert.match(card, /freeRemaining/);
+  assert.match(card, /freeUsed/);
+  assert.match(card, /resetAt/);
 });

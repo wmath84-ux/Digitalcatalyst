@@ -35,6 +35,7 @@ import { useOwnedProducts } from "../hooks/useCourseAccess";
 import { APPROVED_ADMIN_EMAIL } from "../utils/adminSession";
 import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
 import AiQuotaCard from "../components/AiQuotaCard";
+import MyDayAllowanceCard from "../components/MyDayAllowanceCard";
 
 type Modal = "edit" | "settings" | null;
 type Preferences = {
@@ -485,6 +486,15 @@ export default function ProfileApp() {
                 }}
               />
             ) : null}
+
+            {/* My Day daily free-creation allowance. This used to sit as a
+                banner on top of the My Day dashboard; usage/allowance data
+                belongs with the account cards, so it is presented here in the
+                same premium card language as membership and AI allowance. */}
+            <MyDayAllowanceCard
+              onOpenMyDay={() => { window.location.hash = "#/my-day"; }}
+              onSubscribe={openPlans}
+            />
 
             {/* AI usage limits are a subscription benefit. The card is hidden
                 for users who have not purchased a subscription yet — showing

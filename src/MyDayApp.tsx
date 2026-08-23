@@ -59,9 +59,6 @@ export default function App() {
     hasAccess: hasMyDayAccess,
     canCreate: canCreateMyDay,
     freeLimit,
-    freeUsed,
-    freeRemaining,
-    resetAt,
     uid,
     setAccess: setMyDayAccess,
     refresh: refreshMyDay,
@@ -503,27 +500,11 @@ export default function App() {
           <SideNav active={activeSection} onNavigate={handleNavigate} />
 
           <main className="min-w-0 flex-1 pb-6">
-            {!hasMyDayAccess && (
-              <div data-myday-free-allowance className={`mb-5 rounded-2xl border px-4 py-3 ${canCreateMyDay ? "border-indigo-200 bg-indigo-50 text-indigo-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-bold">
-                      {canCreateMyDay
-                        ? `${freeRemaining} of ${freeLimit} free creation${freeLimit === 1 ? "" : "s"} available today`
-                        : "Today’s free creation allowance has been used"}
-                    </p>
-                    <p className="mt-0.5 text-xs leading-relaxed opacity-80">
-                      {canCreateMyDay
-                        ? "Create a task, schedule item, note or reminder. After the daily allowance is used, My Day remains browse-only until reset."
-                        : `You can continue browsing your pages. Subscribe for unlimited creation${resetAt > Date.now() ? `, or return after ${new Date(resetAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}.`}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider">
-                    {freeUsed}/{freeLimit} used
-                  </span>
-                </div>
-              </div>
-            )}
+            {/* The free-creation allowance summary is deliberately NOT rendered
+                here. It is account/usage information, so it lives on the
+                Profile page inside MyDayAllowanceCard. My Day itself stays a
+                clean planning surface; the PremiumGate below still explains
+                the allowance at the exact moment a creation is blocked. */}
             {(!cloudLoaded || savingMyDay) && (
               <p className="mb-3 text-center text-[11px] font-semibold text-slate-400">{savingMyDay ? "Saving My Day securely…" : "Syncing My Day…"}</p>
             )}
