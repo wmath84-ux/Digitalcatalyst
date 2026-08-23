@@ -34,7 +34,11 @@ self.addEventListener('push', event => {
   const title = data.title || 'Eduvora update';
   const body = data.body || '';
   const tag = data.tag || data.notificationId || 'eduvora-push';
-  const icon = data.icon || '/icons/icon-192x192.png';
+  // Default to the live brand logo (proxied through /api/brand-icon) so push
+  // notifications match the logo chosen in the admin branding page. The badge
+  // stays the shipped monochrome PNG — Android renders it from the alpha
+  // channel only.
+  const icon = data.icon || '/api/brand-icon?size=192';
   const badge = data.badge || '/icons/badge-96x96.png';
   const targetUrl = data.url || (data.notificationId ? `/?siteNotification=${encodeURIComponent(data.notificationId)}` : '/');
   const target = data.target || null;
