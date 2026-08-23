@@ -76,14 +76,14 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
   };
 
   const startEdit = (note: QuickNote) => {
-    if (onRequireAccess && !onRequireAccess()) return;
+    // No access check for editing existing notes - users should always be able to edit their own items
     setEditingId(note.id);
     setEditText(note.text);
     setExpandedIds((prev) => new Set(prev).add(note.id));
   };
 
   const saveEdit = () => {
-    if (onRequireAccess && !onRequireAccess()) return;
+    // No access check for saving edited notes - editing existing items is always allowed
     if (editingId && editText.trim()) {
       onEdit(editingId, editText.trim());
     }

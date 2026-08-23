@@ -47,7 +47,7 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
   };
 
   const openEdit = (rem: Reminder) => {
-    if (onRequireAccess && !onRequireAccess()) return;
+    // No access check for editing existing reminders - users should always be able to edit their own items
     setEditingReminder(rem);
     setForm({ ...rem });
     setModalOpen(true);

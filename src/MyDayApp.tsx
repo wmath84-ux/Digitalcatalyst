@@ -102,14 +102,24 @@ export default function App() {
 
   // Non-subscribers may create the Admin-configured free number of items.
   // After today's allowance is consumed, My Day remains browseable and the
-  // same polished subscription gate returns for every create/edit action.
+  // same polished subscription gate returns for every CREATE action.
+  //
+  // IMPORTANT: Editing and deleting existing items is ALWAYS allowed.
+  // A user who has already created items (within their free limit or paid)
+  // must be able to manage those items without hitting a paywall.
   const requireMyDayAccess = useCallback(() => {
     if (hasMyDayAccess || canCreateMyDay) return true;
     setPaywallOpen(true);
     return false;
   }, [canCreateMyDay, hasMyDayAccess]);
 
-  const canSaveMyDay = requireMyDayAccess;
+  // canSaveMyDay allows editing, deleting, toggling existing items.
+  // Only creation of NEW items requires a check against free limit.
+  const canSaveMyDay = useCallback(() => {
+    // All users (free or paid) can save/edit/delete existing items.
+    // The server will handle any creation limits server-side.
+    return true;
+  }, []);
 
   const applyCloudData = useCallback((data: { tasks: Task[]; schedule: ScheduleEvent[]; notes: QuickNote[]; reminders: Reminder[] }) => {
     setTasks(data.tasks);
@@ -276,8 +286,10 @@ export default function App() {
   }, [canSaveMyDay]);
 
   const handleSaveTask = useCallback((task: Task) => {
-    if (!canSaveMyDay()) return;
+    // Check access for NEW task creation only. Editing existing tasks is always allowed.
     const exists = tasks.some((current) => current.id === task.id);
+    if (!exists && !requireMyDayAccess()) return;
+    if (!canSaveMyDay()) return;
     const next = exists ? tasks.map((current) => current.id === task.id ? task : current) : [task, ...tasks];
     void persistMyDay({ tasks: next }).then((saved) => {
       if (!saved) return;
@@ -285,7 +297,7 @@ export default function App() {
       playSfxSuccess();
       addToast(editingTask ? "Task updated successfully" : "New task created");
     });
-  }, [addToast, canSaveMyDay, editingTask, persistMyDay, tasks]);
+  }, [addToast, canSaveMyDay, editingTask, persistMyDay, requireMyDayAccess, tasks]);
 
   const openAddEvent = useCallback(() => {
     if (!requireMyDayAccess()) return;
@@ -300,8 +312,10 @@ export default function App() {
   }, [canSaveMyDay]);
 
   const handleSaveEvent = useCallback((event: ScheduleEvent) => {
-    if (!canSaveMyDay()) return;
+    // Check access for NEW event creation only. Editing existing events is always allowed.
     const exists = schedule.some((current) => current.id === event.id);
+    if (!exists && !requireMyDayAccess()) return;
+    if (!canSaveMyDay()) return;
     const next = exists ? schedule.map((current) => current.id === event.id ? event : current) : [...schedule, event];
     void persistMyDay({ schedule: next }).then((saved) => {
       if (!saved) return;
@@ -309,7 +323,7 @@ export default function App() {
       playSfxSuccess();
       addToast(editingEvent ? "Event updated" : "Event added to schedule");
     });
-  }, [addToast, canSaveMyDay, editingEvent, persistMyDay, schedule]);
+  }, [addToast, canSaveMyDay, editingEvent, persistMyDay, requireMyDayAccess, schedule]);
 
   const handleDeleteEvent = useCallback((id: string) => {
     if (!canSaveMyDay()) return;
@@ -325,6 +339,8 @@ export default function App() {
   }, [addToast, canSaveMyDay, persistMyDay, schedule, showConfirm]);
 
   const handleAddNote = useCallback((noteText: string) => {
+    // Check access for NEW note creation. Editing/deleting existing notes is always allowed.
+    if (!requireMyDayAccess()) return;
     if (!canSaveMyDay()) return;
     const note: QuickNote = {
       id: crypto.randomUUID(),
@@ -337,7 +353,7 @@ export default function App() {
       playSfxAdd();
       addToast("Note saved");
     });
-  }, [addToast, canSaveMyDay, notes, persistMyDay]);
+  }, [addToast, canSaveMyDay, notes, persistMyDay, requireMyDayAccess]);
 
   const handleEditNote = useCallback((id: string, noteText: string) => {
     if (!canSaveMyDay()) return;
@@ -356,13 +372,15 @@ export default function App() {
   }, [addToast, canSaveMyDay, notes, persistMyDay]);
 
   const handleAddReminder = useCallback((reminder: Reminder) => {
+    // Check access for NEW reminder creation. Editing/deleting existing reminders is always allowed.
+    if (!requireMyDayAccess()) return;
     if (!canSaveMyDay()) return;
     void persistMyDay({ reminders: [...reminders, reminder] }).then((saved) => {
       if (!saved) return;
       playSfxAdd();
       addToast("Reminder set");
     });
-  }, [addToast, canSaveMyDay, persistMyDay, reminders]);
+  }, [addToast, canSaveMyDay, persistMyDay, reminders, requireMyDayAccess]);
 
   const handleEditReminder = useCallback((reminder: Reminder) => {
     if (!canSaveMyDay()) return;
