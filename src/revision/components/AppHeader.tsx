@@ -18,14 +18,14 @@ type AppHeaderProps = {
 export default function AppHeader({ title, subtitle, backHref, rightSlot }: AppHeaderProps) {
   const { navigate } = useExitGuard();
   return (
-    <header className="sticky top-[68px] z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <header className="sticky top-[68px] z-20 border-b border-slate-200/60 bg-white/75 backdrop-blur-xl transition-all shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]">
       <div className="flex min-h-[56px] items-center gap-2 px-3">
         {backHref ? (
           <button
             type="button"
             onClick={() => navigate(backHref)}
             aria-label="Go back"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-600 active:bg-slate-100"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 bg-white/60 shadow-sm border border-slate-200/70 backdrop-blur-sm transition-all hover:bg-slate-50 active:scale-95"
           >
             <ChevronLeftIcon className="h-6 w-6" />
           </button>
@@ -33,8 +33,8 @@ export default function AppHeader({ title, subtitle, backHref, rightSlot }: AppH
           <div className="w-1" />
         )}
         <div className="min-w-0 flex-1 py-2">
-          <h1 className="truncate text-[17px] font-bold leading-tight text-slate-900">{title}</h1>
-          {subtitle && <p className="truncate text-xs font-medium text-slate-600">{subtitle}</p>}
+          <h1 className="truncate text-[17px] font-extrabold tracking-tight leading-tight text-slate-900">{title}</h1>
+          {subtitle && <p className="truncate text-xs font-semibold tracking-wide uppercase text-slate-500">{subtitle}</p>}
         </div>
         {rightSlot && <div className="flex shrink-0 items-center gap-1 pr-1">{rightSlot}</div>}
       </div>
