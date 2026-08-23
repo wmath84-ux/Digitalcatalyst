@@ -641,11 +641,26 @@ export async function generateQuestionsWithAi(config: AiConfig, input: GenerateI
   return generateOpenAiCompatible(config, input);
 }
 
+export type RevisionSelectionRow = {
+  className: string;
+  subjectName: string;
+  chapterName: string;
+  topicName: string;
+};
+
 export type RevisionSyllabus = {
   classNames: string[];
   subjectNames: string[];
   chapterNames: string[];
   topicNames: string[];
+  /** Exact selected class → subject → chapter → topic rows, preserving relationships. */
+  selectionRows?: RevisionSelectionRow[];
+  /** Learner-local test date (YYYY-MM-DD) to include in the AI request. */
+  testDate?: string;
+  /** ISO timestamp when generation was requested. */
+  generatedAt?: string;
+  /** Learner timezone label, when available. */
+  timezone?: string;
   difficulty: "easy" | "medium" | "hard" | "mixed";
   /** AI question type, separate from difficulty (default "mixed" = theory + application). */
   questionMode?: QuestionMode;
@@ -658,22 +673,6 @@ export type RevisionGenerateArgs = {
   config: AiConfig | null;
   syllabus: RevisionSyllabus;
 };
-
-function syllabusToInput(syllabus: RevisionSyllabus): GenerateInput {
-  const difficulty = syllabus.difficulty === "mixed" ? "medium" : syllabus.difficulty;
-  return {
-    subject: syllabus.subjectNames.join(", ") || "General",
-    topic: `${syllabus.chapterNames.join(", ")} — ${syllabus.topicNames.join(", ")}`,
-    difficulty,
-    count: syllabus.count,
-    classNames: syllabus.classNames,
-    subjectNames: syllabus.subjectNames,
-    chapterNames: syllabus.chapterNames,
-    topicNames: syllabus.topicNames,
-    minutes: syllabus.minutes,
-    questionMode: syllabus.questionMode,
-  };
-}
 
 function isSpaFallback(res: Response, text: string): boolean {
   if (res.status === 404 || res.status === 501) return true;
@@ -737,16 +736,11 @@ async function generateViaServer(args: RevisionGenerateArgs): Promise<ParsedQues
 export async function generateRevisionQuestions(args: RevisionGenerateArgs): Promise<ParsedQuestion[]> {
   const count = Math.max(1, Math.min(20, Math.round(args.syllabus.count || 10)));
   const syllabus = { ...args.syllabus, count };
-  try {
-    return await generateViaServer({ ...args, syllabus });
-  } catch (err) {
-    const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code || "") : "";
-    if (code !== "no_proxy") throw err;
-  }
-  if (!args.config?.apiKey.trim()) {
-    throw new Error("No API key configured. Add your own key or wait for school-provided AI.");
-  }
-  return generateQuestionsWithAi(args.config, syllabusToInput(syllabus));
+  // Always send the learner's full generation request through the server API.
+  // This keeps school-provided and user-owned providers on the same path,
+  // avoids CORS/client leakage issues, and lets the server pass the complete
+  // class/subject/chapter/topic/date/count details to the model.
+  return generateViaServer({ ...args, syllabus });
 }
 
 /* ------------------------------------------------------------------ */

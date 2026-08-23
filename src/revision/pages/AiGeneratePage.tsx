@@ -82,6 +82,22 @@ const QUESTION_MODE_OPTIONS: { value: QuestionMode; label: string; emoji: string
 const QUESTION_PRESETS = [5, 10, 15, 20];
 const TIME_PRESETS = [5, 10, 15, 30];
 
+const learnerLocalDate = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const learnerTimezone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {
+    return "";
+  }
+};
+
 const GENERATING_MESSAGES = [
   "Reading your selections…",
   "Asking the AI for fresh questions…",
@@ -407,6 +423,9 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
     const chapterNames = Array.from(new Set(rows.map((row) => row.chapterName)));
     const topicNames = Array.from(new Set(rows.map((row) => row.topicName)));
     const total = Math.max(1, Math.min(20, Math.round(totalQuestions)));
+    const testDate = learnerLocalDate();
+    const generatedAt = new Date().toISOString();
+    const timezone = learnerTimezone();
     const pickDifficulty = (): Difficulty =>
       difficulty === "mixed" ? "medium" : difficulty;
 
@@ -426,6 +445,10 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
             subjectNames,
             chapterNames,
             topicNames,
+            selectionRows: rows,
+            testDate,
+            generatedAt,
+            timezone,
             difficulty,
             questionMode,
             count: total,

@@ -241,6 +241,7 @@ function RenewalNotice() {
 
 function Root() {
   const { user, loading, logout } = useAuth();
+  const { openingAnimationEnabled } = useBranding();
   const { products: catalogProducts, purchasedIds, loading: catalogLoading } = useCatalog();
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
@@ -609,10 +610,11 @@ function Root() {
   // auth and admin login) get the dark bar; every light app screen switches
   // the bar to the page background so it never shows black over light UI.
   useEffect(() => {
-    const splashVisible =
+    const launchPending =
       loading
       || skipLandingForInstalledMobilePwa
       || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
+    const splashVisible = openingAnimationEnabled && launchPending;
     const darkScreen =
       splashVisible
       || protectedRoutePending
@@ -621,14 +623,21 @@ function Root() {
       || hash.startsWith(AUTH_HASH)
       || hash.startsWith(ADMIN_LOGIN_HASH);
     setThemeColor(darkScreen ? THEME_COLOR_DARK : THEME_COLOR_LIGHT);
-  }, [hash, loading, skipLandingForInstalledMobilePwa, protectedRoutePending, user, catalogLoading]);
+  }, [hash, loading, skipLandingForInstalledMobilePwa, protectedRoutePending, user, catalogLoading, openingAnimationEnabled]);
 
   if (desktopLocked && !hash.startsWith(ADMIN_HASH) && !hash.startsWith(ADMIN_LOGIN_HASH)) {
     return <LandingApp />;
   }
 
-  if (loading || skipLandingForInstalledMobilePwa || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH))) {
+  const launchPending =
+    loading
+    || skipLandingForInstalledMobilePwa
+    || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
+  if (launchPending && openingAnimationEnabled) {
     return <AppLaunchSplash label={skipLandingForInstalledMobilePwa ? "Opening your dashboard…" : "Preparing your learning space…"} />;
+  }
+  if (launchPending && skipLandingForInstalledMobilePwa) {
+    return <main className="min-h-[100dvh] bg-white" aria-busy="true" aria-label="Opening app" />;
   }
 
   if (protectedRoutePending) {

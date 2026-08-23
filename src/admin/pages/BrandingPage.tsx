@@ -17,6 +17,7 @@ type BrandDraft = {
   logoUrl: string;
   appName: string;
   tagline: string;
+  openingAnimationEnabled: boolean;
 };
 
 export default function BrandingPage() {
@@ -26,6 +27,7 @@ export default function BrandingPage() {
     logoUrl: branding.logoUrl,
     appName: branding.appName,
     tagline: branding.tagline,
+    openingAnimationEnabled: branding.openingAnimationEnabled,
   });
   const [saving, setSaving] = useState(false);
 
@@ -34,8 +36,9 @@ export default function BrandingPage() {
       logoUrl: branding.logoUrl,
       appName: branding.appName,
       tagline: branding.tagline,
+      openingAnimationEnabled: branding.openingAnimationEnabled,
     });
-  }, [branding.logoUrl, branding.appName, branding.tagline]);
+  }, [branding.logoUrl, branding.appName, branding.tagline, branding.openingAnimationEnabled]);
 
   const update = <K extends keyof BrandDraft>(key: K, value: BrandDraft[K]) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -45,14 +48,15 @@ export default function BrandingPage() {
     const logoUrl = merged.logoUrl.trim() || DEFAULT_BRANDING.logoUrl;
     const appName = merged.appName.trim() || DEFAULT_BRANDING.appName;
     const tagline = merged.tagline.trim();
+    const openingAnimationEnabled = merged.openingAnimationEnabled === true;
     setSaving(true);
     try {
       await setDoc(
         doc(db, BRANDING_DOC_PATH.collection, BRANDING_DOC_PATH.id),
-        { logoUrl, appName, tagline, updatedAt: serverTimestamp() },
+        { logoUrl, appName, tagline, openingAnimationEnabled, updatedAt: serverTimestamp() },
         { merge: true },
       );
-      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline });
+      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline, openingAnimationEnabled });
       notify("success", "Branding updated. It now applies live across the app and PWA.");
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "Could not save branding.");
@@ -127,6 +131,23 @@ export default function BrandingPage() {
             className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800"
           />
         </label>
+
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={draft.openingAnimationEnabled}
+              onChange={(e) => update("openingAnimationEnabled", e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-bold text-slate-700">App opening animation page</span>
+              <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
+                Show the branded animated splash screen while the app opens. This is off by default.
+              </span>
+            </span>
+          </label>
+        </div>
         <div className="mt-3 flex gap-2">
           <PrimaryButton
             className="flex-1"
@@ -143,6 +164,7 @@ export default function BrandingPage() {
                 logoUrl: DEFAULT_BRANDING.logoUrl,
                 appName: DEFAULT_BRANDING.appName,
                 tagline: DEFAULT_BRANDING.tagline,
+                openingAnimationEnabled: DEFAULT_BRANDING.openingAnimationEnabled,
               });
               void persist(DEFAULT_BRANDING);
             }}
