@@ -7,12 +7,15 @@ export type Branding = {
   logoUrl: string;
   appName: string;
   tagline: string;
+  /** Controls the animated app-opening splash screen. Default is off. */
+  openingAnimationEnabled: boolean;
 };
 
 export const DEFAULT_BRANDING: Branding = {
   logoUrl: DEFAULT_LOGO_URL,
   appName: DEFAULT_APP_NAME,
   tagline: DEFAULT_TAGLINE,
+  openingAnimationEnabled: false,
 };
 
 // v2 cache stores the full branding object (v1 only stored the logo URL).
@@ -32,6 +35,7 @@ export function normalizeBranding(data: Partial<Record<keyof Branding, unknown>>
     logoUrl,
     appName: sanitize(data?.appName, DEFAULT_APP_NAME),
     tagline: sanitize(data?.tagline, DEFAULT_TAGLINE, 80),
+    openingAnimationEnabled: data?.openingAnimationEnabled === true,
   };
 }
 

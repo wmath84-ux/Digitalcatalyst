@@ -32,7 +32,7 @@
   </head>
   <body>
     <div id="root">
-      <div class="app-boot-splash" role="status" aria-label="Loading Eduvora">
+      <div class="app-boot-splash" role="status" aria-label="Loading Eduvora" style="display:none">
         <div class="app-boot-content">
           <img class="app-boot-icon" id="boot-brand-icon" src="/icons/icon-192x192.svg" alt="Eduvora" />
           <p class="app-boot-title">Eduvora</p>
@@ -53,6 +53,7 @@
           var name = (data.appName || "Eduvora").toString().trim().slice(0, 40);
           var tagline = (data.tagline || "Digital Catalyst").toString().trim().slice(0, 80);
           var logo = (data.logoUrl || legacy || "/icons/icon-192x192.svg").toString();
+          var openingAnimationEnabled = data.openingAnimationEnabled === true;
           if (!/^https?:\/\//.test(logo) && !logo.startsWith("/")) logo = "/icons/icon-192x192.svg";
           if (name) {
             var t = document.querySelector(".app-boot-title");
@@ -63,6 +64,7 @@
           if (icon) { icon.src = logo; if (name) icon.alt = name; }
           var splash = document.querySelector(".app-boot-splash");
           if (splash && name) splash.setAttribute("aria-label", "Loading " + name);
+          if (splash && openingAnimationEnabled) splash.style.display = "";
         } catch (e) { /* private mode / corrupt cache — keep static defaults */ }
       })();
     </script>
