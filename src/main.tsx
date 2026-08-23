@@ -28,6 +28,7 @@ import { BrandingProvider, useBranding } from "./context/BrandingContext";
 import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
+import { initFooterGlow } from "./utils/footerGlow";
 import { CheckoutProvider } from "./checkout/CheckoutContext";
 import { clearAdminSession, hasAdminSession } from "./utils/adminSession";
 import { useOwnedUpdateIds } from "./hooks/useOwnedUpdates";
@@ -879,6 +880,10 @@ function Root() {
     />
   );
 }
+
+// Drive the footer's outside magic glow with the page's scroll energy
+// (see src/utils/footerGlow.ts). Runs once for the whole app shell.
+initFooterGlow();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

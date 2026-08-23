@@ -1,6 +1,5 @@
 import { Bell, CalendarClock, ClipboardList, Home, LayoutGrid, NotebookPen } from "lucide-react";
 import { cn } from "../../utils/cn";
-import { useBranding } from "../../context/BrandingContext";
 
 interface BottomNavProps {
   active: string;
@@ -16,42 +15,51 @@ const items = [
   { id: "notes", label: "Notes", icon: NotebookPen },
 ];
 
+/**
+ * Same floating magic pill footer as the main app footer
+ * (src/components/BottomNav.tsx): capsule rounding on all four sides,
+ * light-black border, bottom-right shadow, and the outside-only blue
+ * scroll glow. Icons/labels are crisp black; the active tab keeps its
+ * blue accent exactly as it was.
+ */
 export default function BottomNav({ active, onNavigate }: BottomNavProps) {
-  const { hideFrameBorders } = useBranding();
   return (
     <nav
-      data-site-footer
-      className={cn(
-        "sticky bottom-0 z-30 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur",
-        !hideFrameBorders && "border-t border-slate-200",
-      )}
+      className="pointer-events-none sticky bottom-0 z-30 w-full px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-1"
+      aria-label="My day"
     >
-      <div className="mx-auto flex max-w-md items-stretch justify-between">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const isActive = active === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onNavigate(item.id)}
-              className={cn(
-                "relative flex flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-semibold transition",
-                isActive ? "text-indigo-600" : "text-slate-400 hover:text-slate-600",
-              )}
-            >
-              <span
+      <div className="dc-footer-shell pointer-events-auto mx-auto w-full max-w-md">
+        <div className="dc-footer-glow" aria-hidden="true" />
+        <div
+          data-site-footer
+          className="dc-footer-pill flex items-stretch justify-between px-1 py-0.5"
+        >
+          {items.map((item) => {
+            const Icon = item.icon;
+            const isActive = active === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onNavigate(item.id)}
                 className={cn(
-                  "relative flex h-9 w-14 items-center justify-center rounded-full transition",
-                  isActive ? "bg-indigo-100" : "",
+                  "relative flex flex-1 flex-col items-center gap-1 rounded-full px-1 py-1.5 text-[11px] font-semibold transition",
+                  isActive ? "text-indigo-600" : "text-black hover:opacity-70",
                 )}
               >
-                <Icon className="h-5 w-5" />
-              </span>
-              {item.label}
-            </button>
-          );
-        })}
+                <span
+                  className={cn(
+                    "relative flex h-9 w-14 items-center justify-center rounded-full transition",
+                    isActive ? "bg-indigo-100" : "",
+                  )}
+                >
+                  <Icon className="h-5 w-5 text-black" />
+                </span>
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

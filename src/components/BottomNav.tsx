@@ -1,5 +1,4 @@
 import { BagIcon, CalendarIcon, HomeIcon, SparkBookIcon, StoreIcon, UserIcon } from "./icons";
-import { useBranding } from "../context/BrandingContext";
 
 export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision";
 
@@ -19,47 +18,58 @@ const TABS: { key: TabKey; label: string; icon: typeof HomeIcon }[] = [
   { key: "revision", label: "Revision", icon: SparkBookIcon },
 ];
 
+/**
+ * The app footer — the floating magic pill shown on the home page and
+ * everywhere else. Capsule rounded on all four sides, light-black border,
+ * bottom-right shadow, and a blue glow that lives OUTSIDE the pill and
+ * swells with the page's scroll energy (see .dc-footer-pill /
+ * .dc-footer-glow in src/index.css). Icons and labels are crisp black;
+ * the active tab keeps its blue accent exactly as it was.
+ */
 export default function BottomNav({ active, onChange, storeBadge, purchasesBadge }: BottomNavProps) {
-  const { hideFrameBorders } = useBranding();
   return (
     <nav
-      data-site-footer
-      className={`sticky bottom-0 z-30 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur ${
-        hideFrameBorders ? "" : "border-t border-slate-200"
-      }`}
+      className="pointer-events-none sticky bottom-0 z-30 w-full px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-1"
+      aria-label="Primary"
     >
-      <div className="flex items-stretch justify-between">
-        {TABS.map(({ key, label, icon: Icon }) => {
-          const isActive = active === key;
-          const badge = key === "store" ? storeBadge : key === "purchases" ? purchasesBadge : undefined;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => {
-                if (key === "revision") window.location.hash = "#/revision";
-                else onChange(key);
-              }}
-              className={`relative flex flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-semibold transition ${
-                isActive ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              <span
-                className={`relative flex h-9 w-14 items-center justify-center rounded-full transition ${
-                  isActive ? "bg-indigo-100" : ""
+      <div className="dc-footer-shell pointer-events-auto">
+        <div className="dc-footer-glow" aria-hidden="true" />
+        <div
+          data-site-footer
+          className="dc-footer-pill flex items-stretch justify-between px-1 py-0.5"
+        >
+          {TABS.map(({ key, label, icon: Icon }) => {
+            const isActive = active === key;
+            const badge = key === "store" ? storeBadge : key === "purchases" ? purchasesBadge : undefined;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => {
+                  if (key === "revision") window.location.hash = "#/revision";
+                  else onChange(key);
+                }}
+                className={`relative flex flex-1 flex-col items-center gap-1 rounded-full px-1 py-1.5 text-[11px] font-semibold transition ${
+                  isActive ? "text-indigo-600" : "text-black hover:opacity-70"
                 }`}
               >
-                <Icon className="h-5 w-5" />
-                {!!badge && badge > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
-                    {badge}
-                  </span>
-                )}
-              </span>
-              {label}
-            </button>
-          );
-        })}
+                <span
+                  className={`relative flex h-9 w-14 items-center justify-center rounded-full transition ${
+                    isActive ? "bg-indigo-100" : ""
+                  }`}
+                >
+                  <Icon className="h-5 w-5 text-black" />
+                  {!!badge && badge > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
+                      {badge}
+                    </span>
+                  )}
+                </span>
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );
