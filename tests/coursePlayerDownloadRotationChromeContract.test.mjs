@@ -145,7 +145,10 @@ test("Hiding the player chrome removes the course header and the dock", () => {
 });
 
 test("The two hides are independent and always reversible", () => {
-  assert.match(coursePlayer, /const \[fileBarsHidden, setFileBarsHidden\] = useState\(false\)/);
+  // File bars start HIDDEN for mobile users (both portrait and landscape) so
+  // the content keeps the full screen; desktop users still see them. Either
+  // way the same toggle flips the state, so it stays fully reversible.
+  assert.match(coursePlayer, /const \[fileBarsHidden, setFileBarsHidden\] = useState<boolean>\(\(\) => isMobileDevice\(\)\)/);
   assert.match(coursePlayer, /const \[playerChromeHidden, setPlayerChromeHidden\] = useState\(false\)/);
   // A floating pill is the way back once the header itself is gone.
   assert.match(coursePlayer, /data-course-chrome-restore/);

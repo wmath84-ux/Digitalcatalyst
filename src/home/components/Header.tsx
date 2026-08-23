@@ -2,6 +2,8 @@ import { forwardRef } from "react";
 import type { Product } from "../types";
 import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
 import BrandMark from "../../components/BrandMark";
+import { useBranding } from "../../context/BrandingContext";
+import { DEFAULT_HOME_GRADIENT_FROM, DEFAULT_HOME_GRADIENT_TO } from "../../utils/branding";
 
 interface HeaderProps {
   userName: string;
@@ -26,10 +28,20 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   ref,
 ) {
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
+  // The header gradient follows the app brand: by default it is the web app
+  // icon's own indigo → violet blend, and the admin can re-theme both stops
+  // from the branding page. Inline style (not Tailwind classes) so the live
+  // Firestore values always win.
+  const { homeGradientFrom, homeGradientTo } = useBranding();
+  const gradientFrom = homeGradientFrom || DEFAULT_HOME_GRADIENT_FROM;
+  const gradientTo = homeGradientTo || DEFAULT_HOME_GRADIENT_TO;
   return (
     <header
       data-site-header
-      className="relative rounded-b-[28px] bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 px-4 pb-8 pt-[calc(1.5rem+env(safe-area-inset-top))] text-white shadow-lg shadow-indigo-900/20 min-[390px]:px-5"
+      className="relative rounded-b-[28px] px-4 pb-8 pt-[calc(1.5rem+env(safe-area-inset-top))] text-white shadow-lg shadow-indigo-900/20 min-[390px]:px-5"
+      style={{ backgroundImage: `linear-gradient(to bottom right, ${gradientFrom}, ${gradientTo})` }}
+      data-home-gradient-from={gradientFrom}
+      data-home-gradient-to={gradientTo}
     >
       <div className="flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 min-[390px]:gap-3">

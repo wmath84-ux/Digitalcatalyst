@@ -19,6 +19,18 @@ type BrandDraft = {
   tagline: string;
   openingAnimationEnabled: boolean;
   hideFrameBorders: boolean;
+  homeGradientFrom: string;
+  homeGradientTo: string;
+};
+
+const pickHex = (value: unknown, fallback: string) => {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (/^#[0-9a-f]{6}$/i.test(text)) return text;
+  // Expand shorthand #rgb so it also feeds the <input type="color">.
+  if (/^#[0-9a-f]{3}$/i.test(text)) {
+    return `#${text[1]}${text[1]}${text[2]}${text[2]}${text[3]}${text[3]}`;
+  }
+  return fallback;
 };
 
 export default function BrandingPage() {
@@ -30,6 +42,8 @@ export default function BrandingPage() {
     tagline: branding.tagline,
     openingAnimationEnabled: branding.openingAnimationEnabled,
     hideFrameBorders: branding.hideFrameBorders,
+    homeGradientFrom: branding.homeGradientFrom,
+    homeGradientTo: branding.homeGradientTo,
   });
   const [saving, setSaving] = useState(false);
 
@@ -40,11 +54,19 @@ export default function BrandingPage() {
       tagline: branding.tagline,
       openingAnimationEnabled: branding.openingAnimationEnabled,
       hideFrameBorders: branding.hideFrameBorders,
+      homeGradientFrom: branding.homeGradientFrom,
+      homeGradientTo: branding.homeGradientTo,
     });
-  }, [branding.logoUrl, branding.appName, branding.tagline, branding.openingAnimationEnabled, branding.hideFrameBorders]);
+  }, [branding.logoUrl, branding.appName, branding.tagline, branding.openingAnimationEnabled, branding.hideFrameBorders, branding.homeGradientFrom, branding.homeGradientTo]);
 
   const update = <K extends keyof BrandDraft>(key: K, value: BrandDraft[K]) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
+
+  // The colour preview works even while the admin is typing, but a half-typed
+  // hex must never be persisted — `normalizeBranding` on the client falls
+  // back to the icon colours, and here the same guard keeps the doc clean.
+  const previewFrom = pickHex(draft.homeGradientFrom, DEFAULT_BRANDING.homeGradientFrom);
+  const previewTo = pickHex(draft.homeGradientTo, DEFAULT_BRANDING.homeGradientTo);
 
   async function persist(next: Partial<BrandDraft>) {
     const merged: BrandDraft = { ...draft, ...next };
@@ -53,14 +75,16 @@ export default function BrandingPage() {
     const tagline = merged.tagline.trim();
     const openingAnimationEnabled = merged.openingAnimationEnabled === true;
     const hideFrameBorders = merged.hideFrameBorders !== false;
+    const homeGradientFrom = pickHex(merged.homeGradientFrom, DEFAULT_BRANDING.homeGradientFrom);
+    const homeGradientTo = pickHex(merged.homeGradientTo, DEFAULT_BRANDING.homeGradientTo);
     setSaving(true);
     try {
       await setDoc(
         doc(db, BRANDING_DOC_PATH.collection, BRANDING_DOC_PATH.id),
-        { logoUrl, appName, tagline, openingAnimationEnabled, hideFrameBorders, updatedAt: serverTimestamp() },
+        { logoUrl, appName, tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, updatedAt: serverTimestamp() },
         { merge: true },
       );
-      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline, openingAnimationEnabled, hideFrameBorders });
+      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo });
       notify("success", "Branding updated. It now applies live across the app and PWA.");
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "Could not save branding.");
@@ -155,6 +179,64 @@ export default function BrandingPage() {
         </div>
 
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+          <p className="text-xs font-bold text-slate-700">Home page header gradient</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+            The gradient behind the home page greeting &amp; search bar. By default it uses the web
+            app icon's own colours — it changes immediately for every user after you save.
+          </p>
+          <div
+            className="mt-3 overflow-hidden rounded-xl px-4 py-3 text-white shadow-sm"
+            style={{ backgroundImage: `linear-gradient(to bottom right, ${previewFrom}, ${previewTo})` }}
+            data-home-gradient-preview
+          >
+            <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Good to see you 👋</p>
+            <p className="mt-0.5 truncate text-sm font-bold tracking-tight">Hello, Learner</p>
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="text-xs font-semibold text-slate-600">
+              Gradient start colour
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="color"
+                  value={previewFrom}
+                  onChange={(e) => update("homeGradientFrom", e.target.value)}
+                  className="h-9 w-10 shrink-0 cursor-pointer rounded-lg border border-slate-200 bg-white p-0.5"
+                  aria-label="Pick gradient start colour"
+                />
+                <input
+                  value={draft.homeGradientFrom}
+                  maxLength={7}
+                  onChange={(e) => update("homeGradientFrom", e.target.value)}
+                  placeholder={DEFAULT_BRANDING.homeGradientFrom}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs font-normal uppercase text-slate-800"
+                  aria-label="Gradient start colour hex code"
+                />
+              </div>
+            </div>
+            <div className="text-xs font-semibold text-slate-600">
+              Gradient end colour
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="color"
+                  value={previewTo}
+                  onChange={(e) => update("homeGradientTo", e.target.value)}
+                  className="h-9 w-10 shrink-0 cursor-pointer rounded-lg border border-slate-200 bg-white p-0.5"
+                  aria-label="Pick gradient end colour"
+                />
+                <input
+                  value={draft.homeGradientTo}
+                  maxLength={7}
+                  onChange={(e) => update("homeGradientTo", e.target.value)}
+                  placeholder={DEFAULT_BRANDING.homeGradientTo}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs font-normal uppercase text-slate-800"
+                  aria-label="Gradient end colour hex code"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
           <label className="flex items-start gap-3">
             <input
               type="checkbox"
@@ -194,6 +276,8 @@ export default function BrandingPage() {
                 tagline: DEFAULT_BRANDING.tagline,
                 openingAnimationEnabled: DEFAULT_BRANDING.openingAnimationEnabled,
                 hideFrameBorders: DEFAULT_BRANDING.hideFrameBorders,
+                homeGradientFrom: DEFAULT_BRANDING.homeGradientFrom,
+                homeGradientTo: DEFAULT_BRANDING.homeGradientTo,
               });
               void persist(DEFAULT_BRANDING);
             }}

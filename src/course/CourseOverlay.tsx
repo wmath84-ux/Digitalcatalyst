@@ -176,8 +176,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         onClick={props.onClose}
         aria-hidden={!open}
         className={`absolute z-30 bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${
-          landscape ? "bottom-0 left-0 right-16 top-0" : "inset-x-0 bottom-16 top-0"
+          landscape ? "bottom-0 left-0 top-0" : "inset-x-0 bottom-16 top-0"
         } ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
+        style={landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : undefined}
         data-course-overlay-scrim
       />
 
@@ -185,13 +186,18 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       <div
         className={`absolute z-40 flex flex-col overflow-hidden border-[var(--course-border)] bg-[var(--course-panel)] shadow-[0_-18px_50px_rgba(0,0,0,0.55)] transition-[transform,opacity] duration-300 ease-out ${
           landscape
-            ? "bottom-0 right-16 top-0 border-l"
+            ? "bottom-0 top-0 border-l"
             : "inset-x-0 bottom-16 rounded-t-[1.75rem] border-t"
         } ${open
           ? "pointer-events-auto translate-x-0 translate-y-0 opacity-100"
           : `pointer-events-none invisible opacity-0 ${landscape ? "translate-x-full" : "translate-y-full"}`
         }`}
-        style={{ [landscape ? "width" : "height"]: sheetHeight }}
+        style={{
+          // Sits flush against the dock's left edge — the dock grows by the
+          // right safe-area inset in fullscreen, so the sheet must too.
+          ...(landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : null),
+          [landscape ? "width" : "height"]: sheetHeight,
+        }}
         data-course-overlay
         data-open={open ? "true" : "false"}
         data-orientation={orientation}
@@ -249,7 +255,14 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       <div
         className={`relative z-50 shrink-0 border-[var(--course-border)] bg-[var(--course-surface-translucent)] backdrop-blur ${landscape ? "flex w-16 flex-col border-l" : "h-16 border-t"}`}
         style={landscape
-          ? { paddingRight: "env(safe-area-inset-right, 0px)" }
+          ? {
+              // In fullscreen the navigation-bar / cutout inset becomes
+              // non-zero; growing the rail by that inset (instead of letting
+              // padding eat the fixed 4rem box) keeps the four tab buttons
+              // fully visible and tappable.
+              width: "calc(4rem + env(safe-area-inset-right, 0px))",
+              paddingRight: "env(safe-area-inset-right, 0px)",
+            }
           : { paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         data-course-dock
         data-orientation={orientation}

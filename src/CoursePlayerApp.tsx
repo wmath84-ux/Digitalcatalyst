@@ -207,10 +207,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // Two independent direct toggles live in the header, just like the theme
   // button. One hides the resource header/footer; the other hides the Course
   // Player's own header + bottom dock. No dropdown is needed.
-  // The resource header (Download) and footer (Mark complete) start VISIBLE;
-  // one tap on the "file bars" toggle hides them for a full-bleed viewing
-  // surface, and the same toggle (or Escape) brings them back.
-  const [fileBarsHidden, setFileBarsHidden] = useState(false);
+  // The resource header (Download) and footer (Mark complete) start HIDDEN
+  // on mobile devices (both portrait and landscape) so the content gets the
+  // full screen real estate; desktop keeps them visible. One tap on the
+  // "file bars" toggle shows them again, and the same toggle (or Escape)
+  // flips the state back at any time.
+  const [fileBarsHidden, setFileBarsHidden] = useState<boolean>(() => isMobileDevice());
   const [playerChromeHidden, setPlayerChromeHidden] = useState(false);
   // Desktop request mode for embedded documents — a Google Doc / Sheet /
   // Slides deck rendered at desktop width is unreadable on a phone, so the
@@ -809,7 +811,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
       {playerChromeHidden ? null : (
       <header
         className="sticky left-0 top-0 z-50 flex h-full min-h-0 w-14 shrink-0 flex-col items-center gap-2 overflow-y-auto no-scrollbar overscroll-contain border-r border-[var(--course-border)] bg-[var(--course-surface)] py-2"
-        style={{ paddingLeft: mobileRotated ? "0px" : "env(safe-area-inset-left, 0px)" }}
+        style={mobileRotated
+          ? { paddingLeft: "0px" }
+          : {
+              // Fullscreen (status bar / navigation bar hidden) exposes the
+              // display cutout, and Chrome starts reporting a non-zero
+              // env(safe-area-inset-left). If that inset were only padding
+              // inside the fixed w-14 rail, the 40px shrink-0 buttons would
+              // overflow the shrunken content box and get clipped on the
+              // rail's right edge. Growing the rail by the inset keeps the
+              // full 56px content area, so every button stays fully visible.
+              width: "calc(3.5rem + env(safe-area-inset-left, 0px))",
+              paddingLeft: "env(safe-area-inset-left, 0px)",
+              paddingTop: "calc(0.5rem + env(safe-area-inset-top, 0px))",
+              paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))",
+            }}
         data-course-landscape-header
         data-course-mobile-landscape-header={mobileRotated ? "true" : undefined}
       >

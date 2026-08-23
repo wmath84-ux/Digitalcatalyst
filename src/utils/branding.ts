@@ -2,6 +2,11 @@ export const BRANDING_DOC_PATH = { collection: "settings", id: "branding" } as c
 export const DEFAULT_LOGO_URL = "/icons/icon-192x192.svg";
 export const DEFAULT_APP_NAME = "Eduvora";
 export const DEFAULT_TAGLINE = "Digital Catalyst";
+// The web app icon (/icons/icon-*.svg) is a diagonal indigo → violet blend.
+// The home page header gradient defaults to these very colours so the app
+// chrome and the icon always read as one brand.
+export const DEFAULT_HOME_GRADIENT_FROM = "#4f46e5";
+export const DEFAULT_HOME_GRADIENT_TO = "#7c3aed";
 
 export type Branding = {
   logoUrl: string;
@@ -16,6 +21,14 @@ export type Branding = {
    * Hidden by default.
    */
   hideFrameBorders: boolean;
+  /**
+   * Start colour of the home page header gradient. Defaults to the web app
+   * icon's indigo so the header matches the installed PWA icon out of the
+   * box. Customisable from the admin branding page.
+   */
+  homeGradientFrom: string;
+  /** End colour of the home page header gradient (app icon violet). */
+  homeGradientTo: string;
 };
 
 export const DEFAULT_BRANDING: Branding = {
@@ -24,6 +37,8 @@ export const DEFAULT_BRANDING: Branding = {
   tagline: DEFAULT_TAGLINE,
   openingAnimationEnabled: false,
   hideFrameBorders: true,
+  homeGradientFrom: DEFAULT_HOME_GRADIENT_FROM,
+  homeGradientTo: DEFAULT_HOME_GRADIENT_TO,
 };
 
 // v2 cache stores the full branding object (v1 only stored the logo URL).
@@ -37,6 +52,12 @@ function sanitize(value: unknown, fallback: string, max = 60): string {
   return text.slice(0, max);
 }
 
+// Hex colours only — a malformed value can never reach the stylesheet.
+function sanitizeColor(value: unknown, fallback: string): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  return /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(text) ? text : fallback;
+}
+
 export function normalizeBranding(data: Partial<Record<keyof Branding, unknown>> | null | undefined): Branding {
   const logoRaw = typeof data?.logoUrl === "string" ? data.logoUrl.trim() : "";
   const logoUrl = /^https?:\/\//.test(logoRaw) || logoRaw.startsWith("/") ? logoRaw : DEFAULT_LOGO_URL;
@@ -48,6 +69,8 @@ export function normalizeBranding(data: Partial<Record<keyof Branding, unknown>>
     // Hidden by default: only an explicit `false` (toggle turned off in the
     // admin panel) brings the top/bottom separator lines back.
     hideFrameBorders: data?.hideFrameBorders !== false,
+    homeGradientFrom: sanitizeColor(data?.homeGradientFrom, DEFAULT_HOME_GRADIENT_FROM),
+    homeGradientTo: sanitizeColor(data?.homeGradientTo, DEFAULT_HOME_GRADIENT_TO),
   };
 }
 
