@@ -54,6 +54,8 @@
           var tagline = (data.tagline || "Digital Catalyst").toString().trim().slice(0, 80);
           var logo = (data.logoUrl || legacy || "/icons/icon-192x192.svg").toString();
           var openingAnimationEnabled = data.openingAnimationEnabled === true;
+          var hideFrameBorders = data.hideFrameBorders !== false;
+          document.documentElement.dataset.hideFrameBorders = String(hideFrameBorders);
           if (!/^https?:\/\//.test(logo) && !logo.startsWith("/")) logo = "/icons/icon-192x192.svg";
           if (name) {
             var t = document.querySelector(".app-boot-title");

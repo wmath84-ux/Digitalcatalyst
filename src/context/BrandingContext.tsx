@@ -3,6 +3,7 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import {
   applyDocumentBranding,
+  BRANDING_CHANGE_EVENT,
   BRANDING_DOC_PATH,
   DEFAULT_BRANDING,
   normalizeBranding,
@@ -38,6 +39,15 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       },
     );
     return unsub;
+  }, []);
+
+  useEffect(() => {
+    const syncSameTabChange = (event: Event) => {
+      const next = (event as CustomEvent<Branding>).detail;
+      if (next) setBranding(normalizeBranding(next));
+    };
+    window.addEventListener(BRANDING_CHANGE_EVENT, syncSameTabChange);
+    return () => window.removeEventListener(BRANDING_CHANGE_EVENT, syncSameTabChange);
   }, []);
 
   useEffect(() => {

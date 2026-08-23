@@ -30,6 +30,22 @@ body,
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Branding setting: remove only the outer app-chrome separators. Keeping this
+   as a document-level rule makes the setting work on every route, including
+   custom Home/My Day/Revision headers, and wins over route utility classes. */
+html[data-hide-frame-borders="true"] [data-site-header] {
+  border-top-width: 0 !important;
+  border-bottom-width: 0 !important;
+  outline: 0 !important;
+}
+
+html[data-hide-frame-borders="true"] [data-site-footer],
+html[data-hide-frame-borders="true"] [data-app-frame] {
+  border-top-width: 0 !important;
+  border-bottom-width: 0 !important;
+  outline: 0 !important;
+}
+
 
 @keyframes fadeIn {
   from {

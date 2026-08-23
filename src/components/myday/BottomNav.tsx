@@ -20,6 +20,7 @@ export default function BottomNav({ active, onNavigate }: BottomNavProps) {
   const { hideFrameBorders } = useBranding();
   return (
     <nav
+      data-site-footer
       className={cn(
         "sticky bottom-0 z-30 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur",
         !hideFrameBorders && "border-t border-slate-200",

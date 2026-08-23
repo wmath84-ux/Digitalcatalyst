@@ -29,6 +29,7 @@ export const DEFAULT_BRANDING: Branding = {
 // v2 cache stores the full branding object (v1 only stored the logo URL).
 const BRAND_CACHE_KEY = "eduvora.branding.v2";
 const LEGACY_LOGO_CACHE_KEY = "eduvora.brandLogoUrl.v1";
+export const BRANDING_CHANGE_EVENT = "eduvora:branding-change";
 
 function sanitize(value: unknown, fallback: string, max = 60): string {
   const text = typeof value === "string" ? value.trim() : "";
@@ -83,6 +84,11 @@ export function writeCachedBranding(branding: Branding) {
   } catch {
     /* ignore */
   }
+
+  // localStorage's native `storage` event does not fire in the tab that made
+  // the change. Emit a same-tab event so an admin toggle updates every mounted
+  // header/footer immediately instead of waiting for Firestore's snapshot.
+  window.dispatchEvent(new CustomEvent<Branding>(BRANDING_CHANGE_EVENT, { detail: branding }));
 }
 
 // Backwards-compatible helpers (some older call sites still import these).
@@ -148,6 +154,13 @@ function announceBrandingToServiceWorker(branding: Branding) {
  */
 export function applyDocumentBranding(branding: Branding) {
   if (typeof document === "undefined") return;
+
+  // This document-level flag is the reliable source for all app shells,
+  // including route-specific/custom headers. Component-local Tailwind classes
+  // remain useful, while this attribute also removes accidental borders or
+  // inset separator shadows added by a page layout.
+  document.documentElement.dataset.hideFrameBorders = String(branding.hideFrameBorders);
+
   const href = branding.logoUrl || DEFAULT_LOGO_URL;
   const ensure = (rel: string) => {
     let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"][data-brand-icon="true"]`);

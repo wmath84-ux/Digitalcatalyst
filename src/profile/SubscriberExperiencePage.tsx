@@ -24,7 +24,7 @@ export default function SubscriberExperiencePage() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 sm:py-6">
-      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
         <Header
           cartCount={cartIds.size}
           notifCount={0}
