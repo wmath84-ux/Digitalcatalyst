@@ -143,7 +143,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
               </span>
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Test created! 🎉</h2>
-                <p className="mt-1 text-xs text-slate-500">{ready.count} questions imported — saved to your Test Bank and live on your dashboard.</p>
+                <p className="mt-1 text-xs text-slate-600">{ready.count} questions imported — saved to your Test Bank and live on your dashboard.</p>
                 {ready.pendingSync && (
                   <p className="mt-1 text-[11px] font-semibold text-amber-700">
                     Saved on this device. Cloud sync will finish automatically when you are online.
@@ -167,7 +167,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
               <button
                 type="button"
                 onClick={() => setReady(null)}
-                className="text-xs font-semibold text-slate-400 underline-offset-2 hover:underline"
+                className="text-xs font-semibold text-slate-500 underline-offset-2 hover:underline"
               >
                 Import more questions
               </button>
@@ -182,7 +182,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                 </span>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-[15px] font-bold text-slate-900">Paste your revision plan</h2>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-600">
                     Drop in a complete test — questions, options and correct answers. Generate them in ChatGPT,
                     Claude or anywhere else, then paste here to create a revision plan in one go.
                   </p>
@@ -191,19 +191,19 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
 
               <div className="mt-4 space-y-3">
                 <input
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 outline-none focus:border-indigo-400"
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 outline-none focus:border-indigo-500"
                   placeholder="Test name (optional)"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
                 <textarea
                   rows={9}
-                  className="w-full rounded-xl border border-slate-200 bg-white p-3 font-mono text-xs leading-relaxed text-slate-800 outline-none focus:border-indigo-400"
+                  className="w-full rounded-xl border border-slate-300 bg-white p-3 font-mono text-xs leading-relaxed text-slate-800 outline-none focus:border-indigo-500"
                   placeholder={SAMPLE}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                 />
-                <p className="text-[11px] leading-relaxed text-slate-400">
+                <p className="text-[11px] leading-relaxed text-slate-500">
                   Format: “1. Question?” then “A. …”, “B. …”. Mark the right answer with ✓ / * / (correct) or an
                   “Answer: B” line.
                 </p>
@@ -233,11 +233,11 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
               <Card>
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-900">Preview ({preview.length})</h3>
-                  <span className="text-[11px] text-slate-400">Tap the correct answer where needed</span>
+                  <span className="text-[11px] font-medium text-slate-500">Tap the correct answer where needed</span>
                 </div>
                 <div className="space-y-3">
                   {preview.map((q, qi) => (
-                    <div key={q.key} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                    <div key={q.key} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3 shadow-sm">
                       <div className="flex items-start gap-2">
                         <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
                           {qi + 1}
@@ -251,7 +251,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                         <button
                           type="button"
                           onClick={() => removeItem(q.key)}
-                          className="h-7 w-7 shrink-0 rounded-lg text-slate-400 active:bg-slate-100"
+                          className="h-7 w-7 shrink-0 rounded-lg text-slate-500 active:bg-slate-100"
                         >
                           ✕
                         </button>
@@ -266,12 +266,12 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                               onChange={() => patch(q.key, { correctIndex: i, detected: true })}
                               className="h-4 w-4 shrink-0 accent-emerald-600"
                             />
-                            <span className="w-5 shrink-0 text-xs font-bold text-slate-500">{OPTION_LETTERS[i]}</span>
+                            <span className="w-5 shrink-0 text-xs font-bold text-slate-600">{OPTION_LETTERS[i]}</span>
                             <input
                               className={`w-full rounded-lg border px-2 py-1 text-sm outline-none ${
                                 i === q.correctIndex
                                   ? "border-emerald-300 bg-emerald-50 text-emerald-900"
-                                  : "border-slate-200 bg-white text-slate-700 focus:border-slate-400"
+                                  : "border-slate-300 bg-white text-slate-800 focus:border-slate-500"
                               }`}
                               value={opt}
                               onChange={(e) => {

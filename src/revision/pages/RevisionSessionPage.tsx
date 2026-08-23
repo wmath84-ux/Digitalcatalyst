@@ -67,7 +67,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
       <PageShell route={route} title="Revision Session" backHref="#/revision/bank" hideNav>
         {isInvalidState ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-            <p className="text-sm text-slate-500">This session has already finished.</p>
+            <p className="text-sm text-slate-600">This session has already finished.</p>
             <PrimaryButton className="w-auto px-6" onClick={() => navigate(`#/revision/session/${sessionId}/result`)}>
               View Results
             </PrimaryButton>
@@ -150,7 +150,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
             <div key={question.id} className="animate-fade-in">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge tone={question.difficulty}>{question.difficulty}</Badge>
-                <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                   {question.subjectIcon} {question.subjectName} · {question.topicName}
                 </span>
               </div>
@@ -167,12 +167,12 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
                       className={`flex min-h-[56px] w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-[15px] font-medium transition active:scale-[0.99] ${
                         selected
                           ? "border-indigo-600 bg-indigo-50 text-indigo-900"
-                          : "border-slate-200 bg-white text-slate-700 active:bg-slate-50"
+                          : "border-slate-300 bg-white text-slate-800 active:bg-slate-100"
                       }`}
                     >
                       <span
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          selected ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"
+                          selected ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-600"
                         }`}
                       >
                         {OPTION_LETTERS[idx]}
@@ -185,7 +185,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
               <button
                 type="button"
                 onClick={goNext}
-                className="mt-4 flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-slate-400 active:text-slate-500"
+                className="mt-4 flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-slate-500 active:text-slate-600"
               >
                 Skip this question
               </button>
@@ -210,7 +210,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
             )}
           </PrimaryButton>
         </div>
-        <p className="pb-2 text-center text-[11px] text-slate-400">{answeredCount} of {total} answered</p>
+        <p className="pb-2 text-center text-[11px] font-medium text-slate-500">{answeredCount} of {total} answered</p>
       </div>
     </PageShell>
   );

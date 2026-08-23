@@ -37,18 +37,18 @@ export default function RevisionSessionResultPage({ uid, route, sessionId }: { u
           </Card>
 
           <div className="grid grid-cols-3 gap-3">
-            <ResultChip icon={<CheckIcon className="h-5 w-5 text-emerald-600" />} label="Correct" value={data.correctCount} tone="bg-emerald-50" />
-            <ResultChip icon={<XIcon className="h-5 w-5 text-rose-600" />} label="Wrong" value={data.wrongCount} tone="bg-rose-50" />
-            <ResultChip icon={<MinusIcon className="h-5 w-5 text-slate-500" />} label="Skipped" value={data.skippedCount} tone="bg-slate-50" />
+            <ResultChip icon={<CheckIcon className="h-5 w-5 text-emerald-600" />} label="Correct" value={data.correctCount} tone="bg-emerald-100" />
+            <ResultChip icon={<XIcon className="h-5 w-5 text-rose-600" />} label="Wrong" value={data.wrongCount} tone="bg-rose-100" />
+            <ResultChip icon={<MinusIcon className="h-5 w-5 text-slate-500" />} label="Skipped" value={data.skippedCount} tone="bg-slate-100" />
           </div>
 
           <Card>
-            <h2 className="mb-3 text-[15px] font-semibold text-slate-900">Question Progress</h2>
+            <h2 className="mb-3 text-[15px] font-bold text-slate-900">Question Progress</h2>
             <div className="space-y-3">
               {data.items.map((item) => {
                 const status = item.isSkipped ? "skipped" : item.isCorrect ? "correct" : "wrong";
                 return (
-                  <div key={item.id} className="rounded-2xl border border-slate-100 p-3">
+                  <div key={item.id} className="rounded-2xl border border-slate-200 p-3">
                     <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                       <Badge tone={status}>{status}</Badge>
                       {item.statusBefore && item.statusAfter && item.statusBefore !== item.statusAfter && (
@@ -56,13 +56,13 @@ export default function RevisionSessionResultPage({ uid, route, sessionId }: { u
                           <SparklesIcon className="h-3 w-3" /> {item.statusBefore} → {item.statusAfter}
                         </span>
                       )}
-                      <span className="ml-auto text-[11px] font-medium text-slate-400">
+                      <span className="ml-auto text-[11px] font-medium text-slate-500">
                         {item.subjectIcon} {item.topicName}
                       </span>
                     </div>
                     <p className="line-clamp-2 text-sm font-medium text-slate-800">{item.prompt}</p>
                     {item.selectedIndex !== null && item.correctIndex !== item.selectedIndex && (
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-slate-600">
                         Your answer: {OPTION_LETTERS[item.selectedIndex]} · Correct: {OPTION_LETTERS[item.correctIndex]}
                       </p>
                     )}

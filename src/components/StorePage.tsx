@@ -66,24 +66,20 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
 
       <div className="space-y-4">
         <SearchBar value={search} onChange={setSearch} sort={sort} onSortChange={setSort} />
-        <div className="sticky top-0 z-20 border-b border-slate-100 bg-white/95 py-2 backdrop-blur">
+        <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 py-2 backdrop-blur">
           <FilterChips chips={chips} active={activeChip} onSelect={setActiveChip} />
         </div>
       </div>
 
-      <p className="px-4 pt-5 text-center text-[15px] font-semibold text-slate-500">
-        {loading ? "Syncing live catalog…" : `${filtered.length} resource${filtered.length === 1 ? "" : "s"} available`}
-      </p>
-
       {error ? (
         <div className="mx-4 mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-8 text-center text-sm font-semibold text-rose-700">{error}</div>
       ) : loading ? (
-        <div className="mx-4 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">{[0, 1, 2, 3].map((item) => <div key={item} className="h-72 animate-pulse rounded-2xl bg-slate-100" />)}</div>
+        <div className="mx-4 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">{[0, 1, 2, 3].map((item) => <div key={item} className="h-72 animate-pulse rounded-2xl bg-slate-200/80" />)}</div>
       ) : filtered.length === 0 ? (
-        <div className="mx-4 mt-6 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-14 text-center">
-          <BookOpenIcon className="h-8 w-8 text-slate-300" />
-          <p className="text-sm font-semibold text-slate-500">No resources match your search</p>
-          <p className="text-xs text-slate-400">Try a different keyword or clear filters</p>
+        <div className="mx-4 mt-6 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-14 text-center">
+          <BookOpenIcon className="h-8 w-8 text-slate-400" />
+          <p className="text-sm font-bold text-slate-700">No resources match your search</p>
+          <p className="text-xs font-medium text-slate-500">Try a different keyword or clear filters</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 px-4 pt-4 sm:grid-cols-2">

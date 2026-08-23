@@ -16,23 +16,23 @@ import { startRevisionSession, ServiceError } from "../engine/revisionService";
 function TrendBadge({ trend }: { trend: string }) {
   if (trend === "improving")
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
         <TrendUpIcon className="h-3 w-3" /> Improving
       </span>
     );
   if (trend === "declining")
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">
         <TrendDownIcon className="h-3 w-3" /> Declining
       </span>
     );
   if (trend === "stable")
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+      <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700">
         <MinusIcon className="h-3 w-3" /> Stable
       </span>
     );
-  return <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">New</span>;
+  return <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800">New</span>;
 }
 
 type Props = {
@@ -67,7 +67,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
   };
 
   return (
-    <PageShell route={route} title="Weak Topics" subtitle="Where to focus your revision">
+    <PageShell route={route} title="Weak Topics" subtitle="Where to focus your revision" mergeIntoMainHeader>
       {!data.hasData && (
         <EmptyState
           icon={<TargetIcon className="h-8 w-8" />}
@@ -83,23 +83,23 @@ export default function WeakTopicsPage({ uid, route }: Props) {
       {data.hasData && (
         <div className="animate-fade-in space-y-5 px-4 py-4 pb-8">
           {errorMsg && (
-            <div className="flex items-center gap-2 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div className="flex items-center gap-2 rounded-2xl bg-rose-100/70 px-4 py-3 text-sm font-medium text-rose-800">
               <AlertIcon className="h-4 w-4 shrink-0" /> {errorMsg}
             </div>
           )}
 
           {data.recommendedTopics.length > 0 && (
             <section>
-              <h2 className="mb-2 text-[15px] font-semibold text-slate-900">Recommended for you</h2>
+              <h2 className="mb-2 text-[15px] font-bold text-slate-900">Recommended for you</h2>
               <div className="space-y-3">
                 {data.recommendedTopics.map((t) => (
-                  <Card key={t.topicId} className="border-indigo-100 bg-indigo-50/40">
+                  <Card key={t.topicId} className="border-indigo-200 bg-indigo-50/70">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{t.subjectIcon}</span>
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{t.topicName}</p>
-                          <p className="text-xs text-slate-500">{t.subjectName}</p>
+                          <p className="text-xs text-slate-600">{t.subjectName}</p>
                         </div>
                       </div>
                       <span className="text-sm font-bold text-rose-600">{t.accuracy}%</span>
@@ -109,7 +109,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
                       type="button"
                       onClick={() => handleRevise(t.topicId)}
                       disabled={revisingTopicId === t.topicId}
-                      className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 text-sm font-semibold text-white active:scale-[0.98] disabled:opacity-60"
+                      className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-sm font-bold text-white shadow-md shadow-indigo-200 transition active:scale-[0.98] disabled:opacity-60 disabled:shadow-none"
                     >
                       <SparklesIcon className="h-4 w-4" />
                       {revisingTopicId === t.topicId ? "Starting…" : "Revise Now"}
@@ -122,7 +122,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
 
           {data.weakestSubjects.length > 0 && (
             <section>
-              <h2 className="mb-2 text-[15px] font-semibold text-slate-900">Weakest Subjects</h2>
+              <h2 className="mb-2 text-[15px] font-bold text-slate-900">Weakest Subjects</h2>
               <div className="grid grid-cols-2 gap-3">
                 {data.weakestSubjects.map((s) => (
                   <Card key={s.subjectId} className="text-center">
@@ -137,7 +137,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
           )}
 
           <section>
-            <h2 className="mb-2 text-[15px] font-semibold text-slate-900">All Weak Topics</h2>
+            <h2 className="mb-2 text-[15px] font-bold text-slate-900">All Weak Topics</h2>
             <Card>
               <div className="space-y-4">
                 {data.weakestTopics.map((t) => (
@@ -161,9 +161,9 @@ export default function WeakTopicsPage({ uid, route }: Props) {
 
           {data.mostMissedTopics.length > 0 && (
             <section>
-              <h2 className="mb-2 text-[15px] font-semibold text-slate-900">Most Missed Topics</h2>
+              <h2 className="mb-2 text-[15px] font-bold text-slate-900">Most Missed Topics</h2>
               <Card>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-200">
                   {data.mostMissedTopics.map((t) => (
                     <div key={t.topicId} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
                       <span className="flex items-center gap-2 text-sm text-slate-700">
@@ -179,15 +179,15 @@ export default function WeakTopicsPage({ uid, route }: Props) {
 
           {data.frequentlySkippedTopics.length > 0 && (
             <section>
-              <h2 className="mb-2 text-[15px] font-semibold text-slate-900">Frequently Skipped</h2>
+              <h2 className="mb-2 text-[15px] font-bold text-slate-900">Frequently Skipped</h2>
               <Card>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-200">
                   {data.frequentlySkippedTopics.map((t) => (
                     <div key={t.topicId} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
                       <span className="flex items-center gap-2 text-sm text-slate-700">
                         {t.subjectIcon} {t.topicName}
                       </span>
-                      <span className="text-xs font-bold text-slate-500">{t.skipped} skipped</span>
+                      <span className="text-xs font-bold text-slate-600">{t.skipped} skipped</span>
                     </div>
                   ))}
                 </div>

@@ -28,7 +28,7 @@ export default function ProductCard({
   return (
     <div
       onClick={() => onView(product)}
-      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      className="flex flex-col overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
     >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
         <img src={product.image} alt={product.title} className="h-full w-full object-cover" />
@@ -63,11 +63,11 @@ export default function ProductCard({
             event.stopPropagation();
             onToggleWishlist(product.id);
           }}
-          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow transition hover:scale-105 active:scale-95"
+          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-600 shadow transition hover:scale-105 active:scale-95"
         >
           <HeartIcon
             filled={wishlisted}
-            className={`h-4 w-4 ${wishlisted ? "text-rose-500" : "text-slate-500"}`}
+            className={`h-4 w-4 ${wishlisted ? "text-rose-500" : "text-slate-600"}`}
           />
         </button>
       </div>
@@ -75,20 +75,20 @@ export default function ProductCard({
       <div className="flex flex-1 flex-col gap-2 p-4">
         <div className="flex items-center gap-1.5 text-sm">
           <StarIcon className="h-4 w-4 text-amber-400" />
-          <span className="font-bold text-slate-800">{product.rating.toFixed(1)}</span>
-          <span className="text-slate-400">({product.reviews} review{product.reviews === 1 ? "" : "s"})</span>
+          <span className="font-bold text-slate-900">{product.rating.toFixed(1)}</span>
+          <span className="text-slate-500">({product.reviews} review{product.reviews === 1 ? "" : "s"})</span>
         </div>
 
         <h3 className="text-[15px] font-extrabold leading-snug text-slate-900">{product.title}</h3>
-        <p className="text-sm text-slate-500">by {product.instructor}</p>
+        <p className="text-sm font-medium text-slate-600">by {product.instructor}</p>
 
         <div className="mt-auto flex items-center gap-2 pt-1">
           {product.originalPrice > product.price && (
-            <span className="text-sm text-slate-400 line-through">₹{product.originalPrice}</span>
+            <span className="text-sm text-slate-500 line-through">₹{product.originalPrice}</span>
           )}
           <span className="text-lg font-extrabold text-slate-900">₹{product.price}</span>
           {discount > 0 && (
-            <span className="rounded-md bg-rose-50 px-1.5 py-0.5 text-[11px] font-bold text-rose-500">
+            <span className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-bold text-rose-600">
               -{discount}%
             </span>
           )}

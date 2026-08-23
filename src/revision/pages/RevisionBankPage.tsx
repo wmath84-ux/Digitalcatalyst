@@ -201,20 +201,20 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
   const capacityLabel = limit === -1 ? `${used} saved · Unlimited` : limit == null ? `${used} saved` : `${used} of ${limit} saved`;
 
   return (
-    <PageShell route={route} title="Test Bank" subtitle={view === "tests" ? capacityLabel : `${summary.due} questions ready for Smart Revision`}>
-      <div className="border-b border-slate-100 bg-white px-4 pb-3 pt-3">
+    <PageShell route={route} title="Test Bank" subtitle={view === "tests" ? capacityLabel : `${summary.due} questions ready for Smart Revision`} mergeIntoMainHeader>
+      <div className="border-b border-slate-200 bg-white px-4 pb-3 pt-3">
         <div className="grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
           <button
             type="button"
             onClick={() => setView("tests")}
-            className={`flex min-h-[42px] items-center justify-center gap-2 rounded-xl text-xs font-black transition ${view === "tests" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"}`}
+            className={`flex min-h-[42px] items-center justify-center gap-2 rounded-xl text-xs font-black transition ${view === "tests" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600"}`}
           >
             <Archive className="h-4 w-4" /> Saved Tests
           </button>
           <button
             type="button"
             onClick={() => setView("smart")}
-            className={`flex min-h-[42px] items-center justify-center gap-2 rounded-xl text-xs font-black transition ${view === "smart" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"}`}
+            className={`flex min-h-[42px] items-center justify-center gap-2 rounded-xl text-xs font-black transition ${view === "smart" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-600"}`}
           >
             <BrainCircuit className="h-4 w-4" /> Smart Revision
           </button>
@@ -339,14 +339,14 @@ function SavedTestsView({
 
   return (
     <div className="animate-fade-in pb-24">
-      <div className="sticky top-0 z-10 space-y-3 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur">
-        <div className="flex min-h-[44px] items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3">
-          <SearchIcon className="h-4 w-4 text-slate-400" />
-          <input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search saved tests" className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none placeholder:text-slate-400" />
-          {search && <button type="button" onClick={() => onSearch("")} aria-label="Clear search"><XIcon className="h-4 w-4 text-slate-400" /></button>}
+      <div className="sticky top-0 z-10 space-y-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+        <div className="flex min-h-[44px] items-center gap-2 rounded-2xl border border-slate-300 bg-slate-50 px-3">
+          <SearchIcon className="h-4 w-4 text-slate-500" />
+          <input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search saved tests" className="min-w-0 flex-1 bg-transparent py-2 text-sm text-slate-800 outline-none placeholder:text-slate-500" />
+          {search && <button type="button" onClick={() => onSearch("")} aria-label="Clear search"><XIcon className="h-4 w-4 text-slate-500" /></button>}
         </div>
         {bankStatus && limit !== -1 && (
-          <div className="rounded-xl bg-indigo-50 px-3 py-2.5">
+          <div className="rounded-xl bg-indigo-100/70 px-3 py-2.5">
             <div className="flex items-center justify-between text-[11px] font-bold text-indigo-800">
               <span>{bankStatus.planName} Test Bank</span><span>{used}/{limit}</span>
             </div>
@@ -435,25 +435,25 @@ function SavedTestCard({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-2"><h3 className="min-w-0 flex-1 text-[15px] font-black leading-snug text-slate-900">{test.title}</h3><Badge tone={test.status === "completed" ? "mastered" : test.status === "in_progress" ? "learning" : "neutral"}>{test.status === "in_progress" ? "in progress" : test.status}</Badge></div>
-            <p className="mt-1 text-[11px] font-medium text-slate-400">{sourceLabel(test.source)} · {test.totalQuestions} questions · {test.estimatedMinutes} min</p>
+            <p className="mt-1 text-[11px] font-medium text-slate-500">{sourceLabel(test.source)} · {test.totalQuestions} questions · {test.estimatedMinutes} min</p>
           </div>
         </div>
 
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {labels.map((label) => <span key={label} className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">{label}</span>)}
+          {labels.map((label) => <span key={label} className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600">{label}</span>)}
           <span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-600">{questionModeLabel(test.planDetails.questionMode)}</span>
-          <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold capitalize text-slate-500">{test.planDetails.difficulty}</span>
+          <span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold capitalize text-slate-600">{test.planDetails.difficulty}</span>
         </div>
 
         {test.status === "in_progress" && (
-          <div className="mt-3 rounded-xl bg-indigo-50 p-3">
+          <div className="mt-3 rounded-xl bg-indigo-100/70 p-3">
             <div className="flex justify-between text-[11px] font-bold text-indigo-700"><span>Attempt in progress</span><span>{Math.min(test.currentIndex + 1, test.totalQuestions)}/{test.totalQuestions}</span></div>
             <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${progress}%` }} /></div>
           </div>
         )}
 
         {test.status === "completed" && (
-          <div className="mt-3 grid grid-cols-4 gap-1 rounded-xl bg-slate-50 p-2.5 text-center">
+          <div className="mt-3 grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-2.5 text-center">
             <ResultMetric value={`${test.score ?? 0}%`} label="Score" />
             <ResultMetric value={String(test.correctCount)} label="Correct" tone="text-emerald-600" />
             <ResultMetric value={String(test.wrongCount)} label="Wrong" tone="text-rose-600" />
@@ -461,7 +461,7 @@ function SavedTestCard({
           </div>
         )}
 
-        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
+        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
           <span className="flex items-center gap-1"><History className="h-3.5 w-3.5" /> {test.attemptCount} completed attempt{test.attemptCount === 1 ? "" : "s"}</span>
           <span>{relativeDate(test.completedAt)}</span>
         </div>
@@ -482,8 +482,8 @@ function SavedTestCard({
           <button type="button" onClick={() => onOpenResult(test.attemptId!)} className="mt-2 flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-50 text-xs font-black text-emerald-700"><BarChart3 className="h-4 w-4" /> View latest result</button>
         )}
 
-        <div className="mt-2 flex gap-2 border-t border-slate-100 pt-2">
-          <button type="button" onClick={onExpand} className="flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-xl text-xs font-bold text-slate-500 active:bg-slate-50">
+        <div className="mt-2 flex gap-2 border-t border-slate-200 pt-2">
+          <button type="button" onClick={onExpand} className="flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-xl text-xs font-bold text-slate-600 active:bg-slate-100">
             <History className="h-4 w-4" /> Attempt history {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
           <button type="button" onClick={onDelete} className="grid h-[38px] w-10 place-items-center rounded-xl text-rose-500 active:bg-rose-50" aria-label={`Delete ${test.title}`}><Trash2 className="h-4 w-4" /></button>
@@ -491,22 +491,22 @@ function SavedTestCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-slate-100 bg-slate-50/80 px-4 py-3">
-          {attempts.length === 0 ? <p className="py-2 text-center text-xs text-slate-400">No attempts yet.</p> : (
+        <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-3">
+          {attempts.length === 0 ? <p className="py-2 text-center text-xs text-slate-500">No attempts yet.</p> : (
             <div className="space-y-2">
               {attempts.map((attempt, index) => (
                 <button
                   key={attempt.id}
                   type="button"
                   onClick={() => attempt.status === "completed" ? onOpenResult(attempt.id) : onOpenAttempt(attempt.id)}
-                  className="flex min-h-[52px] w-full items-center gap-3 rounded-xl border border-slate-100 bg-white px-3 text-left shadow-sm"
+                  className="flex min-h-[52px] w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-left shadow-sm"
                 >
                   <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-black ${attempt.status === "completed" ? "bg-emerald-50 text-emerald-700" : "bg-indigo-50 text-indigo-700"}`}>{attempts.length - index}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-xs font-black text-slate-700">{attempt.attemptKind === "skipped" ? "Skipped questions" : "Full test"} · {attempt.questionCount} questions</span>
-                    <span className="mt-0.5 block text-[10px] text-slate-400">{relativeDate(attempt.completedAt ?? attempt.startedAt)}</span>
+                    <span className="mt-0.5 block text-[10px] text-slate-500">{relativeDate(attempt.completedAt ?? attempt.startedAt)}</span>
                   </span>
-                  <span className="text-right"><span className="block text-xs font-black text-slate-700">{attempt.status === "completed" ? `${attempt.score}%` : "Continue"}</span><span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{attempt.status}</span></span>
+                  <span className="text-right"><span className="block text-xs font-black text-slate-700">{attempt.status === "completed" ? `${attempt.score}%` : "Continue"}</span><span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">{attempt.status}</span></span>
                 </button>
               ))}
             </div>
@@ -518,7 +518,7 @@ function SavedTestCard({
 }
 
 function ResultMetric({ value, label, tone = "text-slate-800" }: { value: string; label: string; tone?: string }) {
-  return <div><p className={`text-sm font-black ${tone}`}>{value}</p><p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">{label}</p></div>;
+  return <div><p className={`text-sm font-black ${tone}`}>{value}</p><p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-500">{label}</p></div>;
 }
 
 function SmartRevisionView({ bankData, summary, search, statusTab, activeFilterCount, startingSession, onSearch, onStatus, onFilters, onStart, onClear }: {
@@ -536,19 +536,19 @@ function SmartRevisionView({ bankData, summary, search, statusTab, activeFilterC
 }) {
   return (
     <div className="animate-fade-in pb-28">
-      <div className="sticky top-0 z-10 space-y-3 border-b border-slate-100 bg-white px-4 py-3">
+      <div className="sticky top-0 z-10 space-y-3 border-b border-slate-200 bg-white px-4 py-3">
         <div className="flex gap-2">
-          <div className="flex min-h-[44px] flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3"><SearchIcon className="h-4 w-4 text-slate-400" /><input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search weak questions or topics" className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none placeholder:text-slate-400" />{search && <button type="button" onClick={() => onSearch("")}><XIcon className="h-4 w-4 text-slate-400" /></button>}</div>
-          <button type="button" onClick={onFilters} className="relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-600"><FilterIcon className="h-5 w-5" />{activeFilterCount > 0 && <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-indigo-600 text-[9px] font-bold text-white">{activeFilterCount}</span>}</button>
+          <div className="flex min-h-[44px] flex-1 items-center gap-2 rounded-2xl border border-slate-300 bg-slate-50 px-3"><SearchIcon className="h-4 w-4 text-slate-500" /><input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search weak questions or topics" className="min-w-0 flex-1 bg-transparent py-2 text-sm text-slate-800 outline-none placeholder:text-slate-500" />{search && <button type="button" onClick={() => onSearch("")}><XIcon className="h-4 w-4 text-slate-500" /></button>}</div>
+          <button type="button" onClick={onFilters} className="relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-slate-300 bg-slate-50 text-slate-700"><FilterIcon className="h-5 w-5" />{activeFilterCount > 0 && <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-indigo-600 text-[9px] font-bold text-white">{activeFilterCount}</span>}</button>
         </div>
-        <div className="no-scrollbar flex gap-2 overflow-x-auto">{STATUS_TABS.map((tab) => <button key={tab.key} type="button" onClick={() => onStatus(tab.key)} className={`min-h-[36px] shrink-0 rounded-full border px-3.5 text-xs font-semibold ${statusTab === tab.key ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-600"}`}>{tab.label}{tab.key === "active" ? ` (${summary.due})` : ""}</button>)}</div>
+        <div className="no-scrollbar flex gap-2 overflow-x-auto">{STATUS_TABS.map((tab) => <button key={tab.key} type="button" onClick={() => onStatus(tab.key)} className={`min-h-[36px] shrink-0 rounded-full border px-3.5 text-xs font-semibold ${statusTab === tab.key ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 bg-white text-slate-700"}`}>{tab.label}{tab.key === "active" ? ` (${summary.due})` : ""}</button>)}</div>
       </div>
       {bankData.length === 0 ? (
         <EmptyState icon={<BankIcon className="h-8 w-8" />} title={summary.total === 0 ? "No weak questions yet" : "No matching questions"} description={summary.total === 0 ? "Questions you answer incorrectly or skip are automatically organized here for focused revision." : "Adjust the search or filters to see more questions."} action={summary.total > 0 ? <SecondaryButton className="mt-2 w-auto px-6" onClick={onClear}>Clear filters</SecondaryButton> : undefined} />
       ) : (
-        <div className="space-y-3 px-4 py-4">{bankData.map((item) => <Card key={item.id}><div className="mb-2 flex flex-wrap items-center gap-1.5"><Badge tone={item.status}>{item.status}</Badge><Badge tone={item.difficulty}>{item.difficulty}</Badge><span className="ml-auto text-[11px] text-slate-400">{relativeDate(item.lastRevisedAt)}</span></div><p className="line-clamp-2 text-[15px] font-semibold leading-snug text-slate-900">{item.prompt}</p><div className="mt-2 flex justify-between text-xs text-slate-500"><span>{item.subjectIcon} {item.subjectName} · {item.topicName}</span><span>Missed {item.timesWrong}×</span></div></Card>)}</div>
+        <div className="space-y-3 px-4 py-4">{bankData.map((item) => <Card key={item.id}><div className="mb-2 flex flex-wrap items-center gap-1.5"><Badge tone={item.status}>{item.status}</Badge><Badge tone={item.difficulty}>{item.difficulty}</Badge><span className="ml-auto text-[11px] text-slate-500">{relativeDate(item.lastRevisedAt)}</span></div><p className="line-clamp-2 text-[15px] font-semibold leading-snug text-slate-900">{item.prompt}</p><div className="mt-2 flex justify-between text-xs text-slate-600"><span>{item.subjectIcon} {item.subjectName} · {item.topicName}</span><span>Missed {item.timesWrong}×</span></div></Card>)}</div>
       )}
-      {bankData.length > 0 && <div className="fixed inset-x-0 bottom-[56px] z-20 mx-auto w-full max-w-[480px] border-t border-slate-100 bg-white/95 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur"><PrimaryButton onClick={onStart} disabled={startingSession}><SparklesIcon className="h-4 w-4" />{startingSession ? "Starting…" : `Start Smart Revision (${bankData.length})`}</PrimaryButton></div>}
+      {bankData.length > 0 && <div className="fixed inset-x-0 bottom-[56px] z-20 mx-auto w-full max-w-[480px] border-t border-slate-200 bg-white/95 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur"><PrimaryButton onClick={onStart} disabled={startingSession}><SparklesIcon className="h-4 w-4" />{startingSession ? "Starting…" : `Start Smart Revision (${bankData.length})`}</PrimaryButton></div>}
     </div>
   );
 }
@@ -560,7 +560,7 @@ function DeleteConfirmation({ test, busy, onClose, onConfirm }: { test: CustomTe
       <div className="relative w-full max-w-md rounded-t-[2rem] bg-white p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-[2rem]">
         <span className="grid h-14 w-14 place-items-center rounded-2xl bg-rose-50 text-rose-600"><Trash2 className="h-7 w-7" /></span>
         <h3 className="mt-4 text-xl font-black text-slate-900">Permanently delete this test?</h3>
-        <p className="mt-2 text-sm leading-relaxed text-slate-500"><strong className="text-slate-700">{test.title}</strong>, all {test.attemptCount} completed attempt{test.attemptCount === 1 ? "" : "s"}, answers and historical results will be removed from every device. This cannot be undone.</p>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600"><strong className="text-slate-700">{test.title}</strong>, all {test.attemptCount} completed attempt{test.attemptCount === 1 ? "" : "s"}, answers and historical results will be removed from every device. This cannot be undone.</p>
         <div className="mt-5 grid grid-cols-2 gap-2"><SecondaryButton disabled={busy} onClick={onClose}>Keep Test</SecondaryButton><button type="button" disabled={busy} onClick={onConfirm} className="min-h-[48px] rounded-2xl bg-rose-600 px-4 text-sm font-black text-white disabled:opacity-60">{busy ? "Deleting…" : "Delete Permanently"}</button></div>
       </div>
     </div>
@@ -583,9 +583,9 @@ function FilterSheet({ subjects, subjectId, difficulty, sort, onApply, onClose }
     <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/50 backdrop-blur-sm sm:items-center">
       <div className="max-h-[85vh] w-full max-w-[480px] overflow-y-auto rounded-t-3xl bg-white p-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] shadow-2xl sm:rounded-3xl">
         <div className="mb-4 flex items-center justify-between"><h3 className="text-lg font-semibold text-slate-900">Filter & Sort</h3><button type="button" onClick={onClose}><XIcon className="h-5 w-5 text-slate-500" /></button></div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Subject</p><div className="mb-4 flex flex-wrap gap-2"><FilterChoice active={localSubject === undefined} label="All Subjects" onClick={() => setLocalSubject(undefined)} />{subjects.map((subject) => <FilterChoice key={subject.id} active={localSubject === subject.id} label={`${subject.icon} ${subject.name}`} onClick={() => setLocalSubject(subject.id)} />)}</div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Difficulty</p><div className="mb-4 flex flex-wrap gap-2"><FilterChoice active={localDifficulty === undefined} label="Any" onClick={() => setLocalDifficulty(undefined)} />{["easy", "medium", "hard"].map((item) => <FilterChoice key={item} active={localDifficulty === item} label={item} onClick={() => setLocalDifficulty(item)} />)}</div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Sort by</p><div className="mb-6 space-y-2">{sorts.map((item) => <button key={item.key} type="button" onClick={() => setLocalSort(item.key)} className={`flex min-h-[44px] w-full items-center rounded-xl border px-3 text-sm font-medium ${localSort === item.key ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-600"}`}>{item.label}</button>)}</div>
+        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Subject</p><div className="mb-4 flex flex-wrap gap-2"><FilterChoice active={localSubject === undefined} label="All Subjects" onClick={() => setLocalSubject(undefined)} />{subjects.map((subject) => <FilterChoice key={subject.id} active={localSubject === subject.id} label={`${subject.icon} ${subject.name}`} onClick={() => setLocalSubject(subject.id)} />)}</div>
+        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Difficulty</p><div className="mb-4 flex flex-wrap gap-2"><FilterChoice active={localDifficulty === undefined} label="Any" onClick={() => setLocalDifficulty(undefined)} />{["easy", "medium", "hard"].map((item) => <FilterChoice key={item} active={localDifficulty === item} label={item} onClick={() => setLocalDifficulty(item)} />)}</div>
+        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Sort by</p><div className="mb-6 space-y-2">{sorts.map((item) => <button key={item.key} type="button" onClick={() => setLocalSort(item.key)} className={`flex min-h-[44px] w-full items-center rounded-xl border px-3 text-sm font-medium ${localSort === item.key ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-300 text-slate-700"}`}>{item.label}</button>)}</div>
         <PrimaryButton onClick={() => onApply({ subjectId: localSubject, difficulty: localDifficulty, sort: localSort })}>Apply Filters</PrimaryButton>
       </div>
     </div>
@@ -593,5 +593,5 @@ function FilterSheet({ subjects, subjectId, difficulty, sort, onApply, onClose }
 }
 
 function FilterChoice({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`rounded-full border px-3 py-1.5 text-xs font-semibold capitalize ${active ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-200 text-slate-600"}`}>{label}</button>;
+  return <button type="button" onClick={onClick} className={`rounded-full border px-3 py-1.5 text-xs font-semibold capitalize ${active ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 text-slate-700"}`}>{label}</button>;
 }

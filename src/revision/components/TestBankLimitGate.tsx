@@ -34,7 +34,7 @@ export default function TestBankLimitGate({ open, bank, onClose, onManageBank, o
 
           <p className="mt-5 text-[11px] font-black uppercase tracking-[0.16em] text-indigo-600">Cloud storage limit</p>
           <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">Your Test Bank is full</h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500">
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
             Your <strong className="text-slate-700">{planName} ({cycle})</strong> plan can save up to{" "}
             <strong className="text-slate-700">{limit} tests</strong>. You currently have {used} of {limit} tests saved.
           </p>
@@ -58,7 +58,7 @@ export default function TestBankLimitGate({ open, bank, onClose, onManageBank, o
           <button type="button" onClick={onExplorePlans} className="mt-2.5 flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 text-sm font-black text-white shadow-lg shadow-indigo-200 active:scale-[0.99]">
             Explore Plans <ArrowUpRight className="h-4.5 w-4.5" />
           </button>
-          <button type="button" onClick={onClose} className="mt-2 w-full py-2 text-xs font-bold text-slate-400">Not now</button>
+          <button type="button" onClick={onClose} className="mt-2 w-full py-2 text-xs font-bold text-slate-500">Not now</button>
         </div>
       </section>
     </div>

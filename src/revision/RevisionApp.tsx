@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import StoreHeader from "../components/Header";
 import { ExitGuardProvider } from "./components/ExitGuardContext";
+import { RevisionHeaderProvider, useRevisionHeader } from "./components/RevisionHeaderContext";
 import DashboardPage from "./pages/DashboardPage";
 import RevisionBankPage from "./pages/RevisionBankPage";
 import RevisionSessionPage from "./pages/RevisionSessionPage";
@@ -15,6 +16,7 @@ import AiSettingsPage from "./pages/AiSettingsPage";
 import AiGeneratePage from "./pages/AiGeneratePage";
 import BulkImportPage from "./pages/BulkImportPage";
 import { useAuth } from "../context/AuthContext";
+import { useBranding } from "../context/BrandingContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useRevisionAccess } from "../hooks/useRevisionAccess";
 import { syncRevisionCatalog } from "./engine/catalogService";
@@ -30,6 +32,30 @@ import PremiumGate from "../components/subscription/PremiumGate";
  * Revision remain available after expiry/downgrade. The gate applies only
  * while the `revision` feature doc is active in the subscription catalog.
  */
+
+/**
+ * The shared website header. Top-level tab pages merge their section header
+ * into it (e.g. Dashboard shows "<AppName> Revision" with its user-name
+ * greeting; Test Bank shows "<AppName> Test Bank" with its saved-count), so
+ * only one headers renders at a time. Sub-pages with back buttons keep their
+ * own feature header and this header shows the default store branding.
+ */
+function RevisionStoreHeader({ cartCount }: { cartCount: number }) {
+  const { appName } = useBranding();
+  const header = useRevisionHeader();
+  return (
+    <StoreHeader
+      cartCount={cartCount}
+      notifCount={1}
+      onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
+      onNavigateToCart={() => { window.location.hash = "#/cart"; }}
+      onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
+      title={header.title ? `${appName} ${header.title}` : undefined}
+      subtitle={header.subtitle}
+      action={header.rightSlot}
+    />
+  );
+}
 
 export default function RevisionApp() {
   const { user } = useAuth();
@@ -171,38 +197,34 @@ export default function RevisionApp() {
     <div className="min-h-screen bg-slate-100 sm:py-6">
       <div className="relative mx-auto flex h-dvh w-full max-w-md flex-col overflow-hidden bg-white shadow-xl shadow-slate-200 sm:h-[calc(100vh-3rem)] sm:rounded-[2rem] sm:border sm:border-slate-200">
         <ExitGuardProvider onNavigate={(href) => { window.location.hash = href; }}>
-          <StoreHeader
-            cartCount={cartIds.size}
-            notifCount={1}
-            onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
-            onNavigateToCart={() => { window.location.hash = "#/cart"; }}
-            onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
-          />
-          {revisionAccessLoading || revisionDataLoading ? (
-            <div data-revision-access-loading className="grid min-h-0 flex-1 place-items-center bg-white">
-              <div className="flex flex-col items-center gap-2 text-slate-400">
-                <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-violet-500" />
-                <p className="text-xs font-semibold">{revisionAccessLoading ? "Checking your membership…" : "Syncing your Test Bank…"}</p>
+          <RevisionHeaderProvider>
+            <RevisionStoreHeader cartCount={cartIds.size} />
+            {revisionAccessLoading || revisionDataLoading ? (
+              <div data-revision-access-loading className="grid min-h-0 flex-1 place-items-center bg-white">
+                <div className="flex flex-col items-center gap-2 text-slate-400">
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-violet-500" />
+                  <p className="text-xs font-semibold">{revisionAccessLoading ? "Checking your membership…" : "Syncing your Test Bank…"}</p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <Fragment key={syncKey}>{page}</Fragment>
-          )}
-        </ExitGuardProvider>
+            ) : (
+              <Fragment key={syncKey}>{page}</Fragment>
+            )}
 
-        {/* Floating subscription gate — appears when a paywalled action is
-            attempted (same behaviour as My Day). */}
-        <PremiumGate
-          variant="revision"
-          userName={userName}
-          open={paywallOpen}
-          onClose={() => setPaywallOpen(false)}
-          onViewSubscription={() => {
-            setPaywallOpen(false);
-            window.location.hash = "#/subscription";
-          }}
-          subtitle="Naya AI ya imported revision test cloud Test Bank mein save karne ke liye active Revision Studio access chahiye. Aapke existing tests, results aur retakes hamesha available rahenge."
-        />
+            {/* Floating subscription gate — appears when a paywalled action is
+                attempted (same behaviour as My Day). */}
+            <PremiumGate
+              variant="revision"
+              userName={userName}
+              open={paywallOpen}
+              onClose={() => setPaywallOpen(false)}
+              onViewSubscription={() => {
+                setPaywallOpen(false);
+                window.location.hash = "#/subscription";
+              }}
+              subtitle="Naya AI ya imported revision test cloud Test Bank mein save karne ke liye active Revision Studio access chahiye. Aapke existing tests, results aur retakes hamesha available rahenge."
+            />
+          </RevisionHeaderProvider>
+        </ExitGuardProvider>
       </div>
     </div>
   );

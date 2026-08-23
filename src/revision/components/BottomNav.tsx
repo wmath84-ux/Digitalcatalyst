@@ -50,7 +50,7 @@ export default function BottomNav({ route }: { route: string }) {
               onClick={() => navigate(tab.href)}
               aria-current={active ? "page" : undefined}
               className={`relative flex flex-1 flex-col items-center gap-1 rounded-xl px-0.5 py-2 text-[10px] font-semibold transition ${
-                active ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
+                active ? "text-indigo-600" : "text-slate-500 hover:text-slate-700"
               }`}
             >
               <span
