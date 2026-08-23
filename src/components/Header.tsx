@@ -67,11 +67,16 @@ export default function Header({
   const liveNotificationCount = useUnreadNotificationCount();
   const displayedNotificationCount = liveNotificationCount ?? 0;
   const LogoIcon = icon ?? BookIcon;
-  const { logoUrl, appName } = useBranding();
+  const { logoUrl, appName, hideFrameBorders } = useBranding();
   const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
   const headerTitle = title ?? appName;
   return (
-    <header data-site-header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur">
+    <header
+      data-site-header
+      className={`sticky top-0 z-30 bg-white/95 px-4 py-3 backdrop-blur ${
+        hideFrameBorders ? "" : "border-b border-slate-100"
+      }`}
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-200">

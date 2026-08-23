@@ -18,6 +18,7 @@ type BrandDraft = {
   appName: string;
   tagline: string;
   openingAnimationEnabled: boolean;
+  hideFrameBorders: boolean;
 };
 
 export default function BrandingPage() {
@@ -28,6 +29,7 @@ export default function BrandingPage() {
     appName: branding.appName,
     tagline: branding.tagline,
     openingAnimationEnabled: branding.openingAnimationEnabled,
+    hideFrameBorders: branding.hideFrameBorders,
   });
   const [saving, setSaving] = useState(false);
 
@@ -37,8 +39,9 @@ export default function BrandingPage() {
       appName: branding.appName,
       tagline: branding.tagline,
       openingAnimationEnabled: branding.openingAnimationEnabled,
+      hideFrameBorders: branding.hideFrameBorders,
     });
-  }, [branding.logoUrl, branding.appName, branding.tagline, branding.openingAnimationEnabled]);
+  }, [branding.logoUrl, branding.appName, branding.tagline, branding.openingAnimationEnabled, branding.hideFrameBorders]);
 
   const update = <K extends keyof BrandDraft>(key: K, value: BrandDraft[K]) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -49,14 +52,15 @@ export default function BrandingPage() {
     const appName = merged.appName.trim() || DEFAULT_BRANDING.appName;
     const tagline = merged.tagline.trim();
     const openingAnimationEnabled = merged.openingAnimationEnabled === true;
+    const hideFrameBorders = merged.hideFrameBorders !== false;
     setSaving(true);
     try {
       await setDoc(
         doc(db, BRANDING_DOC_PATH.collection, BRANDING_DOC_PATH.id),
-        { logoUrl, appName, tagline, openingAnimationEnabled, updatedAt: serverTimestamp() },
+        { logoUrl, appName, tagline, openingAnimationEnabled, hideFrameBorders, updatedAt: serverTimestamp() },
         { merge: true },
       );
-      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline, openingAnimationEnabled });
+      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline, openingAnimationEnabled, hideFrameBorders });
       notify("success", "Branding updated. It now applies live across the app and PWA.");
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "Could not save branding.");
@@ -148,6 +152,25 @@ export default function BrandingPage() {
             </span>
           </label>
         </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={draft.hideFrameBorders}
+              onChange={(e) => update("hideFrameBorders", e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-bold text-slate-700">Hide top &amp; bottom border lines</span>
+              <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
+                Hides the thin horizontal lines drawn between the status bar and the app at the top,
+                and between the app and the bottom navigation bar. This is hidden by default — turn
+                it off to show the lines again.
+              </span>
+            </span>
+          </label>
+        </div>
         <div className="mt-3 flex gap-2">
           <PrimaryButton
             className="flex-1"
@@ -165,6 +188,7 @@ export default function BrandingPage() {
                 appName: DEFAULT_BRANDING.appName,
                 tagline: DEFAULT_BRANDING.tagline,
                 openingAnimationEnabled: DEFAULT_BRANDING.openingAnimationEnabled,
+                hideFrameBorders: DEFAULT_BRANDING.hideFrameBorders,
               });
               void persist(DEFAULT_BRANDING);
             }}
