@@ -28,7 +28,7 @@ export default function ProductCard({
   return (
     <div
       onClick={() => onView(product)}
-      className="flex flex-col overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md shadow-slate-300/60 transition hover:-translate-y-0.5 hover:shadow-lg"
     >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
         <img src={product.image} alt={product.title} className="h-full w-full object-cover" />

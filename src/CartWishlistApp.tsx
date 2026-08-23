@@ -43,7 +43,7 @@ export default function CartWishlistApp({
   onOpenProduct,
 }: CartWishlistAppProps) {
   return (
-    <div className="min-h-screen bg-slate-100 sm:py-6">
+    <div className="min-h-screen bg-white sm:py-6">
       <div data-app-frame className="relative mx-auto flex h-[100dvh] w-full max-w-md flex-col overflow-hidden bg-white shadow-xl shadow-slate-200 sm:h-[calc(100vh-3rem)] sm:rounded-[2rem] sm:border sm:border-slate-200">
         <Header
           cartCount={cartIds.size}
@@ -53,7 +53,7 @@ export default function CartWishlistApp({
           onNavigateToNotifications={onNavigateToNotifications}
         />
 
-        <div className="relative flex flex-1 flex-col overflow-hidden bg-slate-50">
+        <div className="relative flex flex-1 flex-col overflow-hidden bg-white">
           <Toast message={toast} />
           {activeTab === "favorites" && (
             <FavoritesPage

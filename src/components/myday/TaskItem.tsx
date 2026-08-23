@@ -63,7 +63,7 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
   return (
     <div
       className={cn(
-        "group relative flex items-start gap-3 rounded-2xl border p-3.5 transition-all duration-200 hover:shadow-md sm:items-center sm:px-4",
+        "group relative flex items-start gap-3 rounded-2xl border bg-white p-3.5 shadow-md shadow-slate-200/80 transition-all duration-200 hover:shadow-lg sm:items-center sm:px-4",
         sc.border,
         sc.bg,
         highlightQuery && "ring-2 ring-amber-200/50"
