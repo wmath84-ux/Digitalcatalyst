@@ -690,52 +690,68 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     </button>
   );
 
+  // ── Header actions: rotate + mark complete ──────────────────────────────
+  // Both controls used to live in a footer bar under the resource. They now
+  // sit in the Course Player header itself, so they are reachable without
+  // scrolling and never fight the embedded document for vertical space.
+  const rotateFullscreenButton = !useLandscapeRails ? (
+    <button
+      type="button"
+      onClick={() => {
+        // The tap is a real user gesture — hide the phone status bar
+        // (true fullscreen) before the rotated view renders. Idempotent
+        // if the learner already hid the bar with the rail button.
+        enterCourseLandscapeChrome(courseBackgroundForStatusBar);
+        setImmersive(true);
+      }}
+      className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+      aria-label="Rotate to fullscreen"
+      title="Rotate to fullscreen"
+      data-course-rotate-fullscreen
+    >
+      <RotateCw size={17} />
+    </button>
+  ) : null;
+
+  // Toggle, not a one-way action: an accidental tap is fully reversible so
+  // the tracked progress always matches reality. `compact` renders the
+  // square icon variant used by the 56px landscape rail.
+  const markCompleteButton = (compact: boolean) => (selectedFile ? (
+    <button
+      type="button"
+      onClick={() => void toggleComplete()}
+      aria-pressed={isDone}
+      aria-label={isDone ? "Mark this lesson as not complete" : "Mark this lesson complete"}
+      title={isDone ? "Tap to mark as not complete" : "Mark this lesson complete"}
+      className={`course-icon-button flex shrink-0 items-center justify-center gap-1.5 rounded-xl font-black transition ${
+        compact ? "h-10 w-10 p-0" : "h-10 px-3 text-[11px]"
+      } ${
+        isDone
+          ? "bg-emerald-500/15 text-emerald-400 ring-1 ring-inset ring-emerald-400/40 hover:bg-emerald-500/25"
+          : "bg-gradient-to-br from-emerald-400 to-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 hover:from-emerald-300 hover:to-emerald-400"
+      }`}
+      data-course-mark-complete
+      data-completed={isDone ? "true" : "false"}
+    >
+      {isDone ? <CheckCircle2 size={compact ? 18 : 15} /> : <Circle size={compact ? 18 : 15} />}
+      {compact ? null : <span className="hidden whitespace-nowrap sm:inline">{isDone ? "Completed" : "Mark complete"}</span>}
+    </button>
+  ) : null);
+
+  // The old footer is now a slim lesson strip inside the header: it names the
+  // lesson that is playing and mirrors its completion state. It follows the
+  // same "file bars" toggle the resource header does, so hiding the file
+  // chrome still gives the content every pixel — while the mark-complete and
+  // rotate buttons stay permanently in the header row above it.
   const markCompleteBar = selectedFile && !fileBarsHidden ? (
-    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--course-border)] bg-[var(--course-surface)] px-4 py-2.5" data-course-mark-complete-bar>
-      <div className="min-w-0">
-        <p className="truncate text-xs font-black" data-course-selected-name>{selectedFile.name}</p>
-        <p className="text-[10px] text-[var(--course-muted)]">
-          {isDone ? "Tap again to undo · progress is saved to your account" : "Progress is saved to your account"}
-        </p>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {!useLandscapeRails ? (
-          <button
-            type="button"
-            onClick={() => {
-              // The tap is a real user gesture — hide the phone status bar
-              // (true fullscreen) before the rotated view renders. Idempotent
-              // if the learner already hid the bar with the rail button.
-              enterCourseLandscapeChrome(courseBackgroundForStatusBar);
-              setImmersive(true);
-            }}
-            className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
-            aria-label="Rotate to fullscreen"
-            title="Rotate to fullscreen"
-            data-course-rotate-fullscreen
-          >
-            <RotateCw size={15} />
-          </button>
-        ) : null}
-        {/* Toggle, not a one-way action: an accidental tap is fully reversible
-            so the tracked progress always matches reality. */}
-        <button
-          type="button"
-          onClick={() => void toggleComplete()}
-          aria-pressed={isDone}
-          title={isDone ? "Tap to mark as not complete" : "Mark this lesson complete"}
-          className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-black transition ${
-            isDone
-              ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-inset ring-emerald-400/40 hover:bg-emerald-500/25"
-              : "bg-emerald-500 text-slate-950 hover:bg-emerald-400"
-          }`}
-          data-course-mark-complete
-          data-completed={isDone ? "true" : "false"}
-        >
-          {isDone ? <CheckCircle2 size={14} /> : <Circle size={14} />}
-          {isDone ? "Completed" : "Mark complete"}
-        </button>
-      </div>
+    <div className="flex min-w-0 flex-1 items-center gap-2" data-course-mark-complete-bar>
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isDone ? "bg-emerald-400" : "bg-violet-400"}`} aria-hidden="true" />
+      <p className="min-w-0 flex-1 truncate text-[11px] font-black text-[var(--course-text)]" data-course-selected-name>{selectedFile.name}</p>
+      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+        isDone ? "bg-emerald-500/15 text-emerald-400" : "bg-[var(--course-soft)] text-[var(--course-muted)]"
+      }`}>
+        {isDone ? "Completed" : "In progress"}
+      </span>
     </div>
   ) : null;
 
@@ -830,6 +846,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
         data-course-mobile-landscape-header={mobileRotated ? "true" : undefined}
       >
         {logoBackButton}
+        {/* Mark complete lives in the header rail now (it used to sit in the
+            resource footer) so it is one tap away in every orientation. */}
+        {markCompleteButton(true)}
+        <span className="h-px w-7 shrink-0 rounded-full bg-[var(--course-border)]" aria-hidden="true" />
         {fullscreenToggle}
         {fileBarsToggle}
         {playerChromeToggle}
@@ -870,7 +890,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
       <section id="course-viewer" className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden" data-course-landscape-content>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
-          {markCompleteBar}
         </div>
         {playerChromeHidden ? null : overlay}
         {chromeRestoreButton}
@@ -911,37 +930,63 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     <div className="course-player-shell fixed inset-0 flex h-[100dvh] flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="portrait" style={{ colorScheme: browserColorScheme }}>
       {playerChromeHidden ? null : (
       <header
-        className="sticky top-0 z-50 flex shrink-0 items-center gap-3 border-b border-[var(--course-border)] bg-[var(--course-surface)] px-3 py-2.5 sm:px-5"
-        style={{ paddingTop: "calc(0.625rem + env(safe-area-inset-top, 0px))" }}
+        className="sticky top-0 z-50 flex shrink-0 flex-col overflow-hidden border-b border-[var(--course-border)] bg-[var(--course-surface)] shadow-[0_10px_30px_-24px_rgba(0,0,0,0.9)]"
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
         data-course-header
       >
-        {logoBackButton}
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-sm font-black sm:text-base" data-course-product-title>{product.title}</h1>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1" data-course-progress-summary>
-            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-[var(--course-soft-hover)]" data-course-progress-bar>
-              <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-400 transition-[width] duration-500" style={{ width: `${progress}%` }} data-course-progress-fill data-progress-value={progress} />
+        {/* Brand glow — a soft violet→cyan wash that lifts the bar off the
+            viewer without ever competing with the content itself. */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-violet-500/12 via-transparent to-cyan-400/10" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-400/40 to-transparent" aria-hidden="true" />
+
+        {/* Row 1 — identity, live progress and the primary lesson actions. */}
+        <div className="relative flex items-center gap-2.5 px-3 py-2.5 sm:gap-3 sm:px-5">
+          <div className="relative shrink-0 rounded-xl ring-1 ring-inset ring-[var(--course-border)]">
+            {logoBackButton}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-sm font-black leading-tight tracking-tight sm:text-base" data-course-product-title>{product.title}</h1>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1" data-course-progress-summary>
+              <div className="relative h-1.5 w-20 overflow-hidden rounded-full bg-[var(--course-soft-hover)] sm:w-28" data-course-progress-bar>
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-violet-500 via-fuchsia-400 to-cyan-400 shadow-[0_0_10px_-2px_rgba(139,92,246,0.9)] transition-[width] duration-500"
+                  style={{ width: `${progress}%` }}
+                  data-course-progress-fill
+                  data-progress-value={progress}
+                />
+              </div>
+              <span className="rounded-full bg-[var(--course-soft)] px-1.5 py-0.5 text-[10px] font-black text-[var(--course-muted)]" data-course-progress-label>{progress}% complete</span>
+              {hasActiveSubscription ? (
+                <span data-course-subscription-badge="active" className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-violet-200 ring-1 ring-violet-400/30">Active subscription</span>
+              ) : null}
+              {resolution.previewModuleIds.size > 0 ? (
+                <span data-course-preview-badge className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-sky-200 ring-1 ring-sky-400/20">Preview mode</span>
+              ) : null}
             </div>
-            <span className="text-[10px] font-bold text-[var(--course-muted)]" data-course-progress-label>{progress}% complete</span>
-            {hasActiveSubscription ? (
-              <span data-course-subscription-badge="active" className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-violet-200 ring-1 ring-violet-400/30">Active subscription</span>
-            ) : null}
-            {resolution.previewModuleIds.size > 0 ? (
-              <span data-course-preview-badge className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-sky-200 ring-1 ring-sky-400/20">Preview mode</span>
-            ) : null}
+          </div>
+          {/* Primary actions, promoted out of the old resource footer. */}
+          <div className="flex shrink-0 items-center gap-1.5" data-course-header-actions>
+            {rotateFullscreenButton}
+            {markCompleteButton(false)}
           </div>
         </div>
-        {fileBarsToggle}
-        {playerChromeToggle}
-        {showViewportToggle ? viewportToggle : null}
-        {themeToggle}
+
+        {/* Row 2 — the lesson currently open plus the secondary view toggles. */}
+        <div className="relative flex items-center gap-2 border-t border-[var(--course-border)] bg-[var(--course-soft)]/40 px-3 py-1.5 sm:px-5">
+          {markCompleteBar || <div className="min-w-0 flex-1" />}
+          <div className="flex shrink-0 items-center gap-1">
+            {fileBarsToggle}
+            {playerChromeToggle}
+            {showViewportToggle ? viewportToggle : null}
+            {themeToggle}
+          </div>
+        </div>
       </header>
       )}
 
       {/* Everything between the pinned header and the pinned dock. */}
       <section id="course-viewer" className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
-        {markCompleteBar}
         {playerChromeHidden ? null : overlay}
         {chromeRestoreButton}
       </section>
