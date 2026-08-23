@@ -43,6 +43,27 @@ const normalizePushData = (payload) => {
   }
 };
 
+const SHIPPED_DEFAULT_ICONS = [
+  '/icons/icon-192x192.png',
+  '/icons/icon-192x192.svg',
+  '/icons/icon-512x512.png',
+];
+
+const isShippedDefaultIcon = (url) => {
+  if (!url) return true;
+  return SHIPPED_DEFAULT_ICONS.some((item) => url === item || url.endsWith(item));
+};
+
+const resolveNotificationIcon = (payloadIcon) => {
+  const candidates = [payloadIcon, branding.logoUrl, '/api/brand-icon?size=192'];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim() && !isShippedDefaultIcon(candidate.trim())) {
+      return candidate.trim();
+    }
+  }
+  return branding.logoUrl || '/api/brand-icon?size=192';
+};
+
 self.addEventListener('push', event => {
   let data;
   try {
@@ -54,14 +75,12 @@ self.addEventListener('push', event => {
   const title = data.title || `${branding.appName} update`;
   const body = data.body || '';
   const tag = data.tag || data.notificationId || 'eduvora-push';
-  // Default to the live brand logo (proxied through /api/brand-icon) so push
-  // notifications match the logo chosen in the admin branding page. The badge
-  // stays the shipped monochrome PNG — Android renders it from the alpha
-  // channel only. For uploaded logos, /api/brand-icon serves the real image;
-  // for the default it 308-redirects to the shipped PNG.
-  const icon = data.icon || (branding.logoUrl.startsWith('/api/brand-icon')
-    ? branding.logoUrl
-    : '/api/brand-icon?size=192');
+  // Every notification kind (renewal, My Day, product, unlock, test) uses the
+  // logo from the admin Branding page. Prefer an explicit payload icon, then
+  // the last branding-update from the app, then the live /api/brand-icon
+  // proxy. Shipped default PNGs are treated as "no logo yet" so a stale
+  // hardcoded icon cannot override a newly uploaded brand mark.
+  const icon = resolveNotificationIcon(data.icon);
   const badge = data.badge || '/icons/badge-96x96.png';
   const targetUrl = data.url || (data.notificationId ? `/?siteNotification=${encodeURIComponent(data.notificationId)}` : '/');
   const target = data.target || null;

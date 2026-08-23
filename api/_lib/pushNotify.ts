@@ -8,8 +8,22 @@
 
 import { setVapidDetails, sendNotification } from "./webpush.js";
 import type { Firestore } from "firebase-admin/firestore";
+import { getNotificationBrandChrome } from "./branding.js";
 
-export type PushPayload = { title: string; body: string; tag?: string; url?: string };
+export type PushPayload = { title: string; body: string; tag?: string; url?: string; icon?: string; badge?: string };
+
+/** Every push payload carries the live admin branding logo as `icon`. */
+export async function serializePushPayload(payload: PushPayload, defaultTag = "eduvora"): Promise<string> {
+  const brand = await getNotificationBrandChrome();
+  return JSON.stringify({
+    title: payload.title,
+    body: payload.body,
+    tag: payload.tag || defaultTag,
+    url: payload.url || "/",
+    icon: payload.icon || brand.icon,
+    badge: payload.badge || brand.badge,
+  });
+}
 
 export const pushConfigured = (): boolean => {
   const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY;
@@ -43,7 +57,7 @@ const sendToSubscriptionDoc = async (item: SubscriptionDoc, payloadString: strin
 export async function pushToUser(db: Firestore, uid: string, payload: PushPayload): Promise<number> {
   if (!pushConfigured()) return 0;
   const subscriptions = await db.collection("users").doc(uid).collection("webPushSubscriptions").get();
-  const payloadString = JSON.stringify({ title: payload.title, body: payload.body, tag: payload.tag || "eduvora", url: payload.url || "/" });
+  const payloadString = await serializePushPayload(payload, "eduvora");
   let sent = 0;
   for (const item of subscriptions.docs) sent += await sendToSubscriptionDoc(item, payloadString);
   return sent;
@@ -53,7 +67,7 @@ export async function pushToUser(db: Firestore, uid: string, payload: PushPayloa
 export async function pushToAllDevices(db: Firestore, payload: PushPayload): Promise<{ sent: number; devices: number }> {
   if (!pushConfigured()) return { sent: 0, devices: 0 };
   const snapshot = await db.collectionGroup("webPushSubscriptions").get();
-  const payloadString = JSON.stringify({ title: payload.title, body: payload.body, tag: payload.tag || "eduvora-content", url: payload.url || "/" });
+  const payloadString = await serializePushPayload(payload, "eduvora-content");
   let sent = 0;
   for (const item of snapshot.docs) sent += await sendToSubscriptionDoc(item, payloadString);
   return { sent, devices: snapshot.size };

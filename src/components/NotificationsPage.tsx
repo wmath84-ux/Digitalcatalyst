@@ -17,7 +17,8 @@ import {
   type SiteNotificationCategory,
 } from "../../utils/siteNotifications";
 import { useAuth } from "../context/AuthContext";
-import { BellIcon, BookOpenIcon, CheckIcon, StoreIcon } from "./icons";
+import { BellIcon, CheckIcon } from "./icons";
+import BrandMark from "./BrandMark";
 import { ensureSavedWebPushSubscription, isWebPushSupported } from "../../utils/webPush";
 
 type NotificationsPageProps = {
@@ -26,15 +27,6 @@ type NotificationsPageProps = {
   onNavigateToCart: () => void;
   onNavigateToSubscription: () => void;
   onNavigateFooter: (tab: TabKey) => void;
-};
-
-const CATEGORY_ICON: Record<string, typeof BellIcon> = {
-  store: StoreIcon,
-  course: BookOpenIcon,
-  unlock: BookOpenIcon,
-  announcement: BellIcon,
-  mayday: BellIcon,
-  subscription: BellIcon,
 };
 
 function timeAgo(ts: number): string {
@@ -265,7 +257,6 @@ export default function NotificationsPage({
           ) : (
             <div className="divide-y divide-slate-100 px-2 pb-6">
               {visibleItems.map((notification) => {
-                const Icon = CATEGORY_ICON[notification.category] || BellIcon;
                 return (
                   <button
                     key={notification.id}
@@ -275,8 +266,11 @@ export default function NotificationsPage({
                       notification.read ? "bg-white" : "bg-indigo-50/70"
                     }`}
                   >
-                    <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
-                      <Icon className="h-5 w-5" />
+                    <span
+                      data-notification-brand-logo
+                      className="mt-0.5 flex h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200"
+                    >
+                      <BrandMark className="h-10 w-10" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-bold text-slate-900">{notification.title}</span>
