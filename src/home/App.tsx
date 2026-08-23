@@ -67,7 +67,10 @@ export default function App({
     trending: product.tags.includes("TRENDING") || product.rating >= 4.5,
   })), [catalogProducts]);
   const { reviews: homepageReviews } = useHomepageProductReviews(catalogProducts, fallbackReviews, 6);
-  const userName = user?.name?.split(" ")[0] || "Learner";
+  // A profile can contain repeated spaces or a very long full name. The home
+  // greeting intentionally shows only its first non-empty word so the compact
+  // mobile header never turns the name into a second line.
+  const userName = user?.name?.trim().split(/\s+/)[0] || "Learner";
   const [progressRecords, setProgressRecords] = useState<Array<{ productId: string; completedFileIds: string[]; updatedAt: number }>>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -185,7 +188,7 @@ export default function App({
 
   return (
     <div className="min-h-screen bg-slate-100 sm:py-6">
-      <div className="relative mx-auto flex min-h-screen max-w-md flex-col bg-[#f4f4f8] shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
+      <div data-app-frame className="relative mx-auto flex min-h-screen max-w-md flex-col bg-[#f4f4f8] shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
         <div ref={contentTopRef} />
         <Header
           ref={searchInputRef}

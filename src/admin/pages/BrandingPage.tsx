@@ -158,7 +158,11 @@ export default function BrandingPage() {
             <input
               type="checkbox"
               checked={draft.hideFrameBorders}
-              onChange={(e) => update("hideFrameBorders", e.target.checked)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                update("hideFrameBorders", checked);
+                void persist({ hideFrameBorders: checked });
+              }}
               className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
             />
             <span className="min-w-0 flex-1">
@@ -166,7 +170,7 @@ export default function BrandingPage() {
               <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
                 Hides the thin horizontal lines drawn between the status bar and the app at the top,
                 and between the app and the bottom navigation bar. This is hidden by default — turn
-                it off to show the lines again.
+                it off to show the lines again. This switch is applied and saved immediately.
               </span>
             </span>
           </label>

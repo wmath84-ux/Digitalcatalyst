@@ -36,6 +36,7 @@ export default function BottomNav({
 
   return (
     <nav
+      data-site-footer
       className={`sticky bottom-0 z-30 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur ${
         hideFrameBorders ? "" : "border-t border-slate-200"
       }`}

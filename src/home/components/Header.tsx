@@ -27,32 +27,37 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
 ) {
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
   return (
-    <header className="relative rounded-b-[28px] bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 px-5 pb-8 pt-6 text-white shadow-lg shadow-indigo-900/20">
-      <div className="flex items-center justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <BrandMark className="h-11 w-11 shrink-0 rounded-2xl bg-white/15 ring-1 ring-white/25" />
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-white/70">
+    <header
+      data-site-header
+      className="relative rounded-b-[28px] bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 px-4 pb-8 pt-[calc(1.5rem+env(safe-area-inset-top))] text-white shadow-lg shadow-indigo-900/20 min-[390px]:px-5"
+    >
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 min-[390px]:gap-3">
+          <BrandMark className="h-10 w-10 shrink-0 rounded-2xl bg-white/15 ring-1 ring-white/25 min-[390px]:h-11 min-[390px]:w-11" />
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <p data-home-welcome className="truncate whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-white/70 min-[390px]:text-xs">
               Good to see you 👋
             </p>
-            <h1 className="mt-0.5 text-xl font-bold tracking-tight">Hello, {userName}</h1>
+            <h1 data-home-greeting className="mt-0.5 truncate whitespace-nowrap text-[clamp(0.875rem,4.8vw,1.25rem)] font-bold tracking-tight">
+              Hello, {userName}
+            </h1>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
           <button
             type="button"
             aria-label="Leaderboard"
             onClick={() => { window.location.hash = "#/leaderboard"; }}
-            className="flex h-10 items-center gap-1.5 rounded-xl border border-white/25 bg-white/15 px-3 backdrop-blur-sm transition hover:bg-white/25 active:scale-95"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/25 bg-white/15 backdrop-blur-sm transition hover:bg-white/25 active:scale-95 min-[390px]:h-10 min-[390px]:w-10 min-[430px]:w-auto min-[430px]:gap-1.5 min-[430px]:px-3"
           >
             <span className="text-base leading-none">🏆</span>
-            <span className="text-xs font-bold tracking-tight">Leaderboard</span>
+            <span className="hidden text-xs font-bold tracking-tight min-[430px]:inline">Leaderboard</span>
           </button>
           <button
             type="button"
             aria-label="Notifications"
             onClick={onOpenNotifications}
-            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm transition active:scale-90"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
           >
             <span className="text-lg">🔔</span>
             {unreadNotificationCount > 0 && <span aria-label={`${unreadNotificationCount} unread notifications`} className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold ring-2 ring-indigo-600">{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}</span>}
@@ -61,7 +66,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             type="button"
             aria-label="Favorites"
             onClick={onOpenFavorites}
-            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm transition active:scale-90"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
           >
             <span className="text-lg">❤️</span>
             {favoritesCount > 0 && (
