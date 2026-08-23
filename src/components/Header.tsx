@@ -81,31 +81,31 @@ export default function Header({
   return (
     <header
       data-site-header
-      className={`sticky top-0 z-30 bg-white/95 px-4 py-3 backdrop-blur ${
-        hideFrameBorders ? "" : "border-b border-slate-100"
+      className={`sticky top-0 z-30 bg-white/75 px-4 py-3 sm:px-5 backdrop-blur-xl transition-all duration-300 ${
+        hideFrameBorders ? "" : "border-b border-slate-200/50 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.08)]"
       }`}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-200">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
             {customLogo ? <BrandMark className="h-11 w-11" /> : <LogoIcon className="h-6 w-6" />}
           </div>
-          <div className="min-w-0 leading-tight">
-            <h1 className="truncate text-lg font-extrabold tracking-tight text-slate-900">{headerTitle}</h1>
-            <p className="truncate text-xs font-medium text-slate-400">{subtitle}</p>
+          <div className="min-w-0 leading-tight pt-0.5">
+            <h1 className="truncate text-[1.125rem] font-black tracking-tight text-slate-900 drop-shadow-sm">{headerTitle}</h1>
+            <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-widest text-slate-400">{subtitle}</p>
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-2">
           {onToggleSearch ? (
             <button
               type="button"
               aria-label="Search"
               onClick={onToggleSearch}
-              className={`flex h-10 w-10 items-center justify-center rounded-full transition active:scale-95 ${
+              className={`flex h-10 w-10 items-center justify-center rounded-full border transition-all active:scale-95 ${
                 searchActive
-                  ? "bg-indigo-100 text-indigo-600"
-                  : "text-slate-700 hover:bg-slate-100"
+                  ? "border-indigo-200 bg-indigo-50 text-indigo-600"
+                  : "border-slate-200/70 bg-white/60 text-slate-600 shadow-sm backdrop-blur-sm hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
               <SearchIcon className="h-5 w-5" />
@@ -117,7 +117,7 @@ export default function Header({
               aria-label="Download report"
               title="Download My Day report"
               onClick={onDownloadReport}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 active:scale-95"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/70 bg-white/60 text-slate-600 shadow-sm backdrop-blur-sm transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95"
             >
               <DownloadIcon className="h-5 w-5" />
             </button>
@@ -126,11 +126,11 @@ export default function Header({
               type="button"
               aria-label="Cart"
               onClick={onNavigateToCart}
-              className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 active:scale-95"
+              className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/70 bg-white/60 text-slate-600 shadow-sm backdrop-blur-sm transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95"
             >
               <CartIcon className="h-5 w-5" />
               {cartCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
                   {cartCount}
                 </span>
               )}
@@ -140,11 +140,11 @@ export default function Header({
             type="button"
             aria-label="Notifications"
             onClick={onNavigateToNotifications}
-            className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 active:scale-95"
+            className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/70 bg-white/60 text-slate-600 shadow-sm backdrop-blur-sm transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95"
           >
             <BellIcon className="h-5 w-5" />
             {displayedNotificationCount > 0 && (
-              <span aria-label={`${displayedNotificationCount} unread notifications`} className="absolute -top-0.5 -right-0.5 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-indigo-600 px-1 text-[9px] font-bold text-white">
+              <span aria-label={`${displayedNotificationCount} unread notifications`} className="absolute -right-0.5 -top-0.5 flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-indigo-600 px-1 text-[9px] font-bold text-white ring-2 ring-white">
                 {displayedNotificationCount > 99 ? "99+" : displayedNotificationCount}
               </span>
             )}
@@ -153,7 +153,7 @@ export default function Header({
             type="button"
             aria-label="Subscription"
             onClick={onNavigateToSubscription}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-50 text-violet-600 transition hover:bg-violet-100 active:scale-95"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-violet-200/70 bg-violet-50/80 text-violet-600 shadow-sm backdrop-blur-sm transition-all hover:bg-violet-100 hover:text-violet-700 active:scale-95"
           >
             <CrownIcon className="h-5 w-5" />
           </button>
@@ -162,7 +162,7 @@ export default function Header({
               type="button"
               aria-label="Help & FAQ"
               onClick={onHelpClick}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 active:scale-95"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/70 bg-white/60 text-slate-600 shadow-sm backdrop-blur-sm transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95"
             >
               <HelpCircle className="h-5 w-5" />
             </button>
