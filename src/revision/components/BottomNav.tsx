@@ -1,15 +1,18 @@
 import { useExitGuard } from "./ExitGuardContext";
 import { BankIcon, ChartIcon, DashboardIcon, HomeIcon, TargetIcon, UserIcon } from "./icons";
-import { useBranding } from "../../context/BrandingContext";
 
-// The revision footer now mirrors the website's own footer (src/components/BottomNav.tsx)
-// pixel-for-pixel: same container padding, same icon pill (h-9 w-14), same icon size
-// (h-5 w-5), same icon stroke width (2px), same label size/weight, same active state.
-// Only the tab set differs — Home stays, and Dashboard / Bank / Weak Spots / Progress /
-// Profile fill the other slots. Dashboard sits right next to Home and points at the
-// revision dashboard (#/revision), which is the feature's own landing screen.
-// Note: these local icons are drawn at strokeWidth 1.8 by default, so the footer
-// explicitly overrides the stroke to 2px to match the store/home footer's contrast.
+// The revision footer mirrors the main app footer
+// (src/components/BottomNav.tsx) exactly: same floating magic pill
+// (capsule rounding on all four sides, light-black border, bottom-right
+// shadow, outside-only blue scroll glow), same icon pill (h-9 w-14),
+// same icon size (h-5 w-5), same icon stroke width (2px), same label
+// size/weight. Only the tab set differs — Home stays, and Dashboard /
+// Bank / Weak Spots / Progress / Profile fill the other slots.
+// Dashboard sits right next to Home and points at the revision
+// dashboard (#/revision), which is the feature's own landing screen.
+// Note: these local icons are drawn at strokeWidth 1.8 by default, so
+// the footer explicitly overrides the stroke to 2px to match the
+// store/home footer's contrast.
 const TABS = [
   { href: "#/home", label: "Home", icon: HomeIcon, match: (p: string) => p === "#/home" },
   {
@@ -26,44 +29,46 @@ const TABS = [
 
 export default function BottomNav({ route }: { route: string }) {
   const { navigate } = useExitGuard();
-  const { hideFrameBorders } = useBranding();
 
   return (
     <nav
-      data-site-footer
-      className={`sticky bottom-0 z-30 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur ${
-        hideFrameBorders ? "" : "border-t border-slate-200"
-      }`}
+      className="pointer-events-none sticky bottom-0 z-30 w-full px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-1"
       aria-label="Bottom navigation"
     >
-      <div className="flex items-stretch justify-between">
-        {TABS.map((tab) => {
-          const active =
-            tab.href === "#/revision/bank"
-              ? route.startsWith("#/revision/bank") || route.startsWith("#/revision/session")
-              : tab.match(route);
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.href}
-              type="button"
-              onClick={() => navigate(tab.href)}
-              aria-current={active ? "page" : undefined}
-              className={`relative flex flex-1 flex-col items-center gap-1 rounded-xl px-0.5 py-2 text-[10px] font-semibold transition ${
-                active ? "text-indigo-600" : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <span
-                className={`relative flex h-9 w-14 items-center justify-center rounded-full transition ${
-                  active ? "bg-indigo-100" : ""
+      <div className="dc-footer-shell pointer-events-auto">
+        <div className="dc-footer-glow" aria-hidden="true" />
+        <div
+          data-site-footer
+          className="dc-footer-pill flex items-stretch justify-between px-1 py-0.5"
+        >
+          {TABS.map((tab) => {
+            const active =
+              tab.href === "#/revision/bank"
+                ? route.startsWith("#/revision/bank") || route.startsWith("#/revision/session")
+                : tab.match(route);
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.href}
+                type="button"
+                onClick={() => navigate(tab.href)}
+                aria-current={active ? "page" : undefined}
+                className={`relative flex flex-1 flex-col items-center gap-1 rounded-full px-0.5 py-1.5 text-[10px] font-semibold transition ${
+                  active ? "text-indigo-600" : "text-black hover:opacity-70"
                 }`}
               >
-                <Icon className="h-5 w-5 [stroke-width:2px]" />
-              </span>
-              <span className="w-full truncate leading-tight">{tab.label}</span>
-            </button>
-          );
-        })}
+                <span
+                  className={`relative flex h-9 w-14 items-center justify-center rounded-full transition ${
+                    active ? "bg-indigo-100" : ""
+                  }`}
+                >
+                  <Icon className="h-5 w-5 [stroke-width:2px] text-black" />
+                </span>
+                <span className="w-full truncate leading-tight">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

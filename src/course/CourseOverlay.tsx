@@ -251,51 +251,60 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         </div>
       </div>
 
-      {/* ── Dock: always the top-most interactive layer ───────────────── */}
+      {/* ── Dock: always the top-most interactive layer ─────────────────
+          Same floating magic pill as the app footer (src/components/
+          BottomNav.tsx): capsule rounding on all four sides, light-black
+          border, bottom-right shadow, and the outside-only blue glow
+          that swells with scroll energy. Icons/labels are crisp black
+          (white while sitting on the accent pill); the sliding accent
+          indicator keeps its original color exactly. */}
       <div
-        className={`relative z-50 shrink-0 border-[var(--course-border)] bg-[var(--course-surface-translucent)] backdrop-blur ${landscape ? "flex w-16 flex-col border-l" : "h-16 border-t"}`}
-        style={landscape
-          ? {
-              // In fullscreen the navigation-bar / cutout inset becomes
-              // non-zero; growing the rail by that inset (instead of letting
-              // padding eat the fixed 4rem box) keeps the four tab buttons
-              // fully visible and tappable.
-              width: "calc(4rem + env(safe-area-inset-right, 0px))",
-              paddingRight: "env(safe-area-inset-right, 0px)",
-            }
-          : { paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        className="relative z-50 shrink-0"
         data-course-dock
         data-orientation={orientation}
       >
-        <div className={`relative ${landscape ? "flex flex-1 flex-col" : "flex h-full"}`}>
-          <span
-            className={`pointer-events-none absolute transition-transform duration-300 ease-out ${landscape ? "left-1.5 right-1.5 top-0 h-1/4" : "bottom-1.5 left-0 top-1.5 w-1/4"}`}
-            style={{ transform: landscape ? `translateY(${activeIndex * 100}%)` : `translateX(${activeIndex * 100}%)` }}
-            data-course-dock-indicator
-            data-index={activeIndex}
-          >
-            <span className={`block h-full rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-600/30 ${landscape ? "my-1.5" : "mx-1.5"}`} />
-          </span>
-          {TABS.map(({ key, label, icon }) => {
-            const active = key === tab;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => props.onTabChange(key)}
-                aria-pressed={active}
-                className={`relative z-10 flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-black transition-colors ${
-                  active ? "text-white" : "text-[var(--course-muted)] hover:text-[var(--course-text)]"
-                }`}
-                data-course-dock-tab
-                data-tab={key}
-                data-active={active ? "true" : "false"}
-              >
-                {icon(active)}
-                <span className="truncate px-1">{label}</span>
-              </button>
-            );
-          })}
+        <div
+          className={
+            landscape
+              // In fullscreen the navigation-bar / cutout inset becomes
+              // non-zero; growing the rail's right margin by that inset
+              // (instead of padding the fixed 4rem pill) keeps the four
+              // tab buttons fully visible and tappable.
+              ? "dc-footer-shell my-3 ml-2 mr-[max(env(safe-area-inset-right),8px)] h-full w-16"
+              : "dc-footer-shell mx-3 mb-[max(env(safe-area-inset-bottom),10px)] mt-2"
+          }
+        >
+          <div className="dc-footer-glow" aria-hidden="true" />
+          <div className={`dc-footer-pill flex ${landscape ? "h-full w-full flex-col" : "h-16 w-full"}`}>
+            <span
+              className={`pointer-events-none absolute transition-transform duration-300 ease-out ${landscape ? "left-1.5 right-1.5 top-0 h-1/4" : "bottom-1.5 left-0 top-1.5 w-1/4"}`}
+              style={{ transform: landscape ? `translateY(${activeIndex * 100}%)` : `translateX(${activeIndex * 100}%)` }}
+              data-course-dock-indicator
+              data-index={activeIndex}
+            >
+              <span className={`block h-full rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-600/30 ${landscape ? "my-1.5" : "mx-1.5"}`} />
+            </span>
+            {TABS.map(({ key, label, icon }) => {
+              const active = key === tab;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => props.onTabChange(key)}
+                  aria-pressed={active}
+                  className={`relative z-10 flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-black transition-colors ${
+                    active ? "text-white" : "text-black hover:opacity-70"
+                  }`}
+                  data-course-dock-tab
+                  data-tab={key}
+                  data-active={active ? "true" : "false"}
+                >
+                  {icon(active)}
+                  <span className="truncate px-1">{label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </>

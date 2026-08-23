@@ -39,11 +39,90 @@ html[data-hide-frame-borders="true"] [data-site-header] {
   outline: 0 !important;
 }
 
-html[data-hide-frame-borders="true"] [data-site-footer],
+/* The footer is now a floating capsule with a border on ALL four sides,
+   so the "hide frame borders" branding switch must clear the whole
+   border (not just the old top hairline). */
+html[data-hide-frame-borders="true"] [data-site-footer] {
+  border-width: 0 !important;
+  outline: 0 !important;
+}
+
 html[data-hide-frame-borders="true"] [data-app-frame] {
   border-top-width: 0 !important;
   border-bottom-width: 0 !important;
   outline: 0 !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   Floating footer pill — the app's bottom footer (home, profile, store,
+   checkout, …) and the Course Player dock share this treatment:
+
+   • rounded on all four sides — so much so that the left and right ends
+     of the bar read as fully circular (a true capsule)
+   • light-black border on every side
+   • a soft shadow facing the BOTTOM-RIGHT
+   • a blue "magic" glow that lives OUTSIDE the pill only. It breathes
+     slowly on its own and, while the page is being scrolled, it swells
+     OUT of the footer and is pulled back IN as the scroll settles
+     (driven by the --dc-footer-glow custom property, written by
+     src/utils/footerGlow.ts). The pill itself stays solid white and
+     crisp — no blur, no tint, no effect inside: icons and labels are
+     clean, clear and black.
+   ───────────────────────────────────────────────────────────────────── */
+.dc-footer-shell {
+  position: relative;
+}
+
+.dc-footer-glow {
+  position: absolute;
+  inset: -14px;
+  z-index: 0;
+  pointer-events: none;
+  opacity: calc(0.35 + var(--dc-footer-glow, 0) * 0.65);
+  transform: scale(calc(1 + var(--dc-footer-glow, 0) * 0.1));
+  transition: opacity 0.35s ease-out, transform 0.35s ease-out;
+}
+
+.dc-footer-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background:
+    radial-gradient(70% 130% at 50% 100%, rgba(37, 99, 235, 0.6) 0%, rgba(59, 130, 246, 0.34) 45%, rgba(96, 165, 250, 0.12) 70%, transparent 100%),
+    radial-gradient(45% 90% at 50% 0%, rgba(99, 102, 241, 0.38) 0%, transparent 70%);
+  filter: blur(18px);
+  animation: dc-footer-breathe 3.2s ease-in-out infinite;
+}
+
+@keyframes dc-footer-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+.dc-footer-pill {
+  position: relative;
+  z-index: 1;
+  border-radius: 9999px;
+  border: 1.5px solid #34343a; /* light black — all four sides */
+  background: #ffffff;
+  box-shadow:
+    9px 11px 26px rgba(15, 23, 42, 0.2), /* facing bottom-right */
+    4px 5px 12px rgba(15, 23, 42, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-footer-glow::before {
+    animation: none;
+    opacity: 0.7;
+  }
 }
 
 
