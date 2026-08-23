@@ -18,8 +18,10 @@ import {
 } from "../utils/appOrientation";
 import { isMobileDevice } from "../utils/courseStatusBar";
 import { isPwaInstalled } from "../utils/pwaInstall";
+import { useBranding } from "../context/BrandingContext";
 
 export default function PortraitOnlyGuard() {
+  const { appName } = useBranding();
   const [playerOpen, setPlayerOpen] = useState<boolean>(isCoursePlayerRotationActive);
   const [landscape, setLandscape] = useState(false);
   const [mobile, setMobile] = useState(false);
@@ -76,7 +78,7 @@ export default function PortraitOnlyGuard() {
         </div>
         <h2 className="mt-6 text-xl font-black tracking-tight">Rotate your phone</h2>
         <p className="mx-auto mt-2 max-w-[260px] text-sm leading-relaxed text-slate-300">
-          Eduvora runs in portrait mode. The screen can only rotate while a course lesson is open.
+          {appName} runs in portrait mode. The screen can only rotate while a course lesson is open.
         </p>
       </div>
     </div>

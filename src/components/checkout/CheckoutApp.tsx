@@ -26,6 +26,7 @@ import BottomNav, { type TabKey } from "../BottomNav";
 import { useCheckout } from "../../checkout/CheckoutContext";
 import { useCatalog } from "../../context/CatalogContext";
 import { useCommerce } from "../../context/CommerceContext";
+import { useBranding } from "../../context/BrandingContext";
 import CheckoutReviewStep from "./CheckoutReviewStep";
 import CheckoutSuccessStep from "./CheckoutSuccessStep";
 
@@ -49,6 +50,7 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
   const checkout = useCheckout();
   const { cartIds } = useCommerce();
   const { purchasedIds } = useCatalog();
+  const { appName } = useBranding();
   const [step, setStep] = useState<StepId>(1);
   const [transaction, setTransaction] = useState<VerifiedPayment | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -113,8 +115,8 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
   const quote = checkout.quote;
   const selection = checkout.selection;
   const productName = selection && quote
-    ? quote.verifiedLineItems[0]?.title || selection.productIds[0] || "Digital Catalyst"
-    : "Digital Catalyst";
+    ? quote.verifiedLineItems[0]?.title || selection.productIds[0] || appName
+    : appName;
   const finalPrice = quote?.cashPayable || 0;
   const quoteId = quote?.quoteId || "";
 

@@ -18,6 +18,7 @@ import { auth } from "../../firebase";
 import { prepareCheckoutChrome, revealCheckoutChromeOverRazorpay, type CheckoutChromeController } from "../utils/razorpayCheckoutChrome";
 import { playPaymentSuccessChime, preparePaymentSound } from "../utils/paymentSounds";
 import { formatPaise } from "../utils/money";
+import { useBranding } from "../context/BrandingContext";
 
 export type VerifiedPayment = {
   orderId: string;
@@ -151,6 +152,7 @@ interface VerifyPaymentResponse {
 }
 
 export default function PaymentGateway({ quoteId, finalPrice, currency, productName, onPaymentSuccess, onGoBack }: PaymentGatewayProps) {
+  const { appName } = useBranding();
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
   const [error, setError] = useState("");
   const razorpayRef = useRef<RazorpayInstance | null>(null);
@@ -307,7 +309,7 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
         key: order.keyId,
         amount: order.amount,
         currency: order.currency || "INR",
-        name: "Digital Catalyst",
+        name: appName,
         description: order.productName || productName,
         order_id: order.orderId,
         prefill: order.customer,

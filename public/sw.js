@@ -1,5 +1,25 @@
 const CACHE_NAME = 'digital-catalyst-app-shell-v2';
 const APP_SHELL = ['/','/index.html'];
+
+// Live branding pushed from the page (BrandingContext). Falls back to the
+// built-in defaults until the first message arrives. Lets notification titles
+// and icons follow whatever name/logo the admin configured.
+const branding = {
+  appName: 'Eduvora',
+  logoUrl: '/api/brand-icon?size=192',
+};
+
+self.addEventListener('message', event => {
+  const data = event.data || {};
+  if (data.type !== 'branding-update') return;
+  if (typeof data.appName === 'string' && data.appName.trim()) {
+    branding.appName = data.appName.trim().slice(0, 40);
+  }
+  if (typeof data.logoUrl === 'string' && data.logoUrl.trim()) {
+    branding.logoUrl = data.logoUrl.trim();
+  }
+});
+
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
 });
@@ -31,10 +51,17 @@ self.addEventListener('push', event => {
     data = event.data ? normalizePushData(event.data.text()) : {};
   }
 
-  const title = data.title || 'Eduvora update';
+  const title = data.title || `${branding.appName} update`;
   const body = data.body || '';
   const tag = data.tag || data.notificationId || 'eduvora-push';
-  const icon = data.icon || '/icons/icon-192x192.png';
+  // Default to the live brand logo (proxied through /api/brand-icon) so push
+  // notifications match the logo chosen in the admin branding page. The badge
+  // stays the shipped monochrome PNG — Android renders it from the alpha
+  // channel only. For uploaded logos, /api/brand-icon serves the real image;
+  // for the default it 308-redirects to the shipped PNG.
+  const icon = data.icon || (branding.logoUrl.startsWith('/api/brand-icon')
+    ? branding.logoUrl
+    : '/api/brand-icon?size=192');
   const badge = data.badge || '/icons/badge-96x96.png';
   const targetUrl = data.url || (data.notificationId ? `/?siteNotification=${encodeURIComponent(data.notificationId)}` : '/');
   const target = data.target || null;

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "./utils/cn";
 import StoreHeader from "./components/Header";
+import { useBranding } from "./context/BrandingContext";
 import GreetingHeader from "./components/myday/GreetingHeader";
 import TaskList from "./components/myday/TaskList";
 import TaskModal from "./components/myday/TaskModal";
@@ -53,6 +54,7 @@ const CREATE_OPTIONS: { id: DaySection; label: string; hint: string; icon: typeo
 export default function App() {
   const { cartIds } = useCommerce();
   const { user } = useAuth();
+  const { appName } = useBranding();
   const {
     hasAccess: hasMyDayAccess,
     canCreate: canCreateMyDay,
@@ -464,7 +466,7 @@ export default function App() {
         <StoreHeader
           cartCount={cartIds.size}
           notifCount={1}
-          title="Eduvora Taskar"
+          title={`${appName} Tasker`}
           subtitle="My Day Activities"
           onDownloadReport={handleDownloadReport}
           onToggleSearch={() => setShowMobileSearch((s) => !s)}

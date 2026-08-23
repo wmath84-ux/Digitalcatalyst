@@ -5,6 +5,7 @@ import Header from "./components/Header";
 import BottomNav from "./components/BottomNav";
 import { useCatalog } from "./context/CatalogContext";
 import { useCommerce } from "./context/CommerceContext";
+import { useBranding } from "./context/BrandingContext";
 import { db } from "../firebase";
 
 type SubscriberRow = {
@@ -48,6 +49,7 @@ function Avatar({ name, photoURL }: { name: string; photoURL: string | null }) {
 export default function LeaderboardApp() {
   const { cartIds } = useCommerce();
   const { purchasedIds } = useCatalog();
+  const { appName } = useBranding();
   const [view, setView] = useState<View>("all");
   const [subscribers, setSubscribers] = useState<SubscriberRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -140,7 +142,7 @@ export default function LeaderboardApp() {
             </div>
             <p className="mt-3 text-xs leading-relaxed text-white/75">
               {view === "all"
-                ? "Every learner on Eduvora. Switch to subscribers to see unique referral IDs."
+                ? `Every learner on ${appName}. Switch to subscribers to see unique referral IDs.`
                 : view === "unused"
                   ? "Only subscribers whose referral ID has not been used yet. Each ID works once."
                   : "Every verified subscriber receives a unique referral ID. Each ID can be used only once for ₹250 off."}

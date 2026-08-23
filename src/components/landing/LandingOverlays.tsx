@@ -14,8 +14,10 @@ import {
   showDesktopMaintenanceNotice,
 } from "@/utils/pwaInstall";
 import BrandMark from "@/components/BrandMark";
+import { useBranding } from "@/context/BrandingContext";
 
 export default function LandingOverlays() {
+  const { appName } = useBranding();
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [installOpen, setInstallOpen] = useState(false);
   const [installing, setInstalling] = useState(false);
@@ -97,7 +99,7 @@ export default function LandingOverlays() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-white">Under Preparation</p>
                   <p className="mt-0.5 text-xs leading-relaxed text-slate-300">
-                    The desktop website is under preparation. Instead of using the website, install the PWA app and use it for the complete Eduvora experience.
+                    The desktop website is under preparation. Instead of using the website, install the PWA app and use it for the complete {appName} experience.
                   </p>
                   <button
                     type="button"
@@ -131,7 +133,7 @@ export default function LandingOverlays() {
                 <div className="flex items-start gap-3">
                   <BrandMark className="h-12 w-12 shrink-0 rounded-2xl" fallbackLetter />
                   <div className="min-w-0 flex-1">
-                    <h2 className="text-base font-black text-white">Install Eduvora</h2>
+                    <h2 className="text-base font-black text-white">{`Install ${appName}`}</h2>
                     <p className="mt-1 text-xs leading-relaxed text-slate-300">
                       Add the secure PWA to your home screen for fullscreen access, faster loading, and offline support.
                     </p>

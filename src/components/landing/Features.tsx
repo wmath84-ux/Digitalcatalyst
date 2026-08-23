@@ -1,8 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useBranding } from "@/context/BrandingContext";
 
-const features = [
+const buildFeatures = (appName: string) => [
   {
     icon: "📚",
     title: "Premium Digital Library",
@@ -30,12 +31,14 @@ const features = [
   {
     icon: "📱",
     title: "Cross-Platform Experience",
-    desc: "Learn on the web or install the Eduvora PWA for a blazing-fast, native, offline-friendly experience on the go.",
+    desc: `Learn on the web or install the ${appName} PWA for a blazing-fast, native, offline-friendly experience on the go.`,
     gradient: "from-sky-400 to-cyan-400",
   },
 ];
 
 export default function Features() {
+  const { appName } = useBranding();
+  const features = buildFeatures(appName);
   return (
     <section id="features" className="relative bg-[#05060f] px-6 py-28 sm:px-8">
       <div className="pointer-events-none absolute inset-0 bg-grid opacity-20" />
@@ -54,7 +57,7 @@ export default function Features() {
             Everything you need to <span className="gradient-text">learn faster</span>
           </h2>
           <p className="mt-4 text-slate-400">
-            Eduvora blends immersive design with real utility — built to keep
+            {appName} blends immersive design with real utility — built to keep
             you engaged and always progressing.
           </p>
         </motion.div>

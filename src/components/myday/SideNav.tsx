@@ -19,7 +19,7 @@ const items = [
 ];
 
 export default function SideNav({ active, onNavigate }: SideNavProps) {
-  const { logoUrl } = useBranding();
+  const { logoUrl, appName } = useBranding();
   const custom = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
   return (
     <aside className="sticky top-[65px] hidden h-fit w-60 shrink-0 flex-col gap-1 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm lg:flex xl:w-64">
@@ -28,7 +28,7 @@ export default function SideNav({ active, onNavigate }: SideNavProps) {
           {custom ? <BrandMark className="h-10 w-10" /> : <LayoutGrid className="h-5 w-5" />}
         </div>
         <div>
-          <p className="text-sm font-extrabold tracking-tight text-slate-900">Eduvora Tasker</p>
+          <p className="text-sm font-extrabold tracking-tight text-slate-900">{`${appName} Tasker`}</p>
           <p className="text-[11px] font-medium text-slate-400">My Day Dashboard</p>
         </div>
       </div>

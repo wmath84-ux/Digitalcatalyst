@@ -30,6 +30,7 @@ import BottomNav, { type TabKey } from "../components/BottomNav";
 import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
+import { useBranding } from "../context/BrandingContext";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
 import { APPROVED_ADMIN_EMAIL } from "../utils/adminSession";
 import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
@@ -196,6 +197,7 @@ const MEMBERSHIP_THEMES: Record<MembershipTier, {
 
 export default function ProfileApp() {
   const { user, logout, updateAccount } = useAuth();
+  const { appName } = useBranding();
   const { products, purchasedIds } = useCatalog();
   const { favoriteIds, cartIds } = useCommerce();
   // Part 10 — full product ownership from the canonical entitlements
@@ -496,7 +498,7 @@ export default function ProfileApp() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Your referral code</p>
-                    <p className="mt-1 text-xs text-slate-500">Share it with a learner joining Eduvora.</p>
+                    <p className="mt-1 text-xs text-slate-500">{`Share it with a learner joining ${appName}.`}</p>
                   </div>
                   <div className="grid h-10 w-10 place-items-center rounded-2xl bg-amber-50 text-amber-600"><Sparkles className="h-5 w-5" /></div>
                 </div>

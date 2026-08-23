@@ -4,6 +4,8 @@ import { handleEmbedProxy } from "./_lib/embedProxy.js";
 import { handleRevisionGenerate } from "./_lib/revisionGenerate.js";
 import { handleRevisionData } from "./_lib/revisionData.js";
 import { handleMyDay } from "./_lib/myDay.js";
+import { handleManifest } from "./_lib/manifest.js";
+import { handleBrandIcon } from "./_lib/brandIcon.js";
 
 type SubscriberRow = {
   uid: string;
@@ -71,6 +73,17 @@ const isSubscriber = (data: Record<string, unknown>) =>
   Boolean(data.subscriptionPlanId || (data.subscriptionTier && data.subscriptionTier !== "basic"));
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // PWA manifest + brand icon share this deployed function to stay within the
+  // 12-function Hobby cap (see vercel.json rewrites). Dispatch on path first
+  // so these never fall through to the leaderboard/embed logic below.
+  const reqWithUrl = req as VercelRequest & { url?: string };
+  const path = String(reqWithUrl.url || "").split("?")[0].replace(/\/+$/, "");
+  if (path === "/api/manifest") {
+    return handleManifest(req, res);
+  }
+  if (path === "/api/brand-icon") {
+    return handleBrandIcon(req, res);
+  }
   // Course-player GitHub embed proxy. `/api/embed-proxy` rewrites here
   // (see vercel.json) because the Hobby plan caps serverless functions at
   // 12 and the project is already at the limit — the proxy logic lives in

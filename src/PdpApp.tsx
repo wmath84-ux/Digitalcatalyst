@@ -37,6 +37,7 @@ import { useCourseAccess } from "./hooks/useCourseAccess";
 import { useHomepageProductReviews, usePublishedProductReviews, type PublishedProductReview } from "./hooks/useProductReviews";
 import { reviews as fallbackReviews } from "./home/data/mockData";
 import { useAuth } from "./context/AuthContext";
+import { useBranding } from "./context/BrandingContext";
 import { auth, db } from "../firebase";
 import PromoCodeInput, { type PromoResult } from "./subscription/components/PromoCodeInput";
 import { isFreeProduct, shouldShowCouponInput } from "../utils/couponVisibility";
@@ -152,6 +153,7 @@ function PremiumProductContent({
 }: ProductDetailProps & { product: Product }) {
   const { resolution } = useCourseAccess({ product });
   const { user } = useAuth();
+  const { appName } = useBranding();
   const reviewCatalog = useMemo(() => products.length > 0 ? products : [product], [product, products]);
   const { reviews: homepageReviews } = useHomepageProductReviews(reviewCatalog, fallbackReviews, 6);
   const { reviews: liveProductReviews } = usePublishedProductReviews(reviewCatalog);
@@ -321,7 +323,7 @@ function PremiumProductContent({
 
   const shareTo = (target: "whatsapp" | "telegram") => {
     const url = encodeURIComponent(productShareUrl || window.location.href);
-    const text = encodeURIComponent(`${product.title} — ${product.description || "Learn on Eduvora"}`);
+    const text = encodeURIComponent(`${product.title} — ${product.description || `Learn on ${appName}`}`);
     const href = target === "whatsapp"
       ? `https://wa.me/?text=${text}%20${url}`
       : `https://t.me/share/url?url=${url}&text=${text}`;

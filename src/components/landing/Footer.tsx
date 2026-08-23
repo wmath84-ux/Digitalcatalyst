@@ -2,18 +2,21 @@
 
 import { openApp } from "@/utils/pwaInstall";
 import BrandMark from "@/components/BrandMark";
+import { useBranding } from "@/context/BrandingContext";
 
 export default function Footer() {
+  const { appName, tagline } = useBranding();
   return (
     <footer className="border-t border-white/10 bg-[#05060f] px-6 py-10 text-slate-500 sm:px-8">
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
         <div className="flex items-center gap-2">
           <BrandMark className="h-8 w-8 rounded-lg" fallbackLetter />
           <span className="text-sm font-semibold text-slate-300">
-            Eduvora <span className="text-slate-500">| Digital Catalyst</span>
+            {appName}
+            {tagline ? <span className="text-slate-500"> | {tagline}</span> : null}
           </span>
         </div>
-        <p className="text-xs">© {new Date().getFullYear()} Eduvora. All rights reserved.</p>
+        <p className="text-xs">© {new Date().getFullYear()} {appName}. All rights reserved.</p>
         <div className="flex flex-wrap items-center gap-4 text-xs">
           <button
             type="button"
