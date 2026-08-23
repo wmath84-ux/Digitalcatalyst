@@ -29,6 +29,7 @@ import {
   type VercelResponse,
 } from "../_lib/firebaseAdmin.js";
 import { pushToAllDevices, pushToUser, pushConfigured, type PushPayload } from "../_lib/pushNotify.js";
+import { getNotificationBrandChrome } from "../_lib/branding.js";
 import { buildProductInventoryEntry, diffProductInventory } from "../../utils/pushScheduler.js";
 
 type PushSub = { endpoint: string; keys: { p256dh: string; auth: string } };
@@ -200,12 +201,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = safeText(req.body?.body, 240);
     if (!title) return res.status(400).json({ ok: false, error: 'Missing notification title.' });
 
+    const brand = await getNotificationBrandChrome();
     const payload = {
       title,
       body,
       tag: safeText(req.body?.tag, 60) || undefined,
-      icon: safeText(req.body?.icon, 300) || undefined,
-      badge: safeText(req.body?.badge, 300) || undefined,
+      icon: safeText(req.body?.icon, 300) || brand.icon,
+      badge: safeText(req.body?.badge, 300) || brand.badge,
       url: safeText(req.body?.url, 500) || undefined,
     };
     const payloadString = JSON.stringify(payload);

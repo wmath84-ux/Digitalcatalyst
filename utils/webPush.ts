@@ -1,5 +1,19 @@
 import { collection, deleteDoc, doc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { db, auth } from '../firebase';
+import { DEFAULT_LOGO_URL, readCachedBranding } from '../src/utils/branding';
+
+const BRAND_NOTIFICATION_ICON = '/api/brand-icon?size=192';
+
+/** Logo from the admin Branding page, used on every local/system notification. */
+export const getBrandNotificationIcon = () => {
+  try {
+    const logoUrl = readCachedBranding().logoUrl;
+    if (logoUrl && logoUrl !== DEFAULT_LOGO_URL) return logoUrl;
+  } catch {
+    /* private mode / SSR */
+  }
+  return BRAND_NOTIFICATION_ICON;
+};
 
 export const WEB_PUSH_VAPID_PUBLIC_KEY =
   (typeof import.meta !== 'undefined' && String(import.meta.env?.VITE_WEB_PUSH_VAPID_PUBLIC_KEY || '').trim())
@@ -186,7 +200,7 @@ export const showLocalSystemNotification = async (
   if (!isWebPushSupported() || window.Notification.permission !== 'granted') return false;
   const options: NotificationOptions & { renotify?: boolean } = {
     body,
-    icon: '/icons/icon-192x192.png',
+    icon: getBrandNotificationIcon(),
     badge: '/icons/badge-96x96.png',
     tag,
     renotify: true,

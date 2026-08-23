@@ -1,5 +1,6 @@
 import { setVapidDetails, sendNotification } from "../_lib/webpush.js";
 import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "../_lib/firebaseAdmin.js";
+import { getNotificationBrandChrome } from "../_lib/branding.js";
 
 const clean = (value: unknown, max: number) => String(value || "").trim().slice(0, max);
 
@@ -44,12 +45,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const snapshot = await adminDb().collection("users").doc(user.uid).collection("webPushSubscriptions").get();
     if (snapshot.empty) return res.status(404).json({ ok: false, code: "subscription_not_saved", error: "No browser push subscription is saved for this account. Allow notifications and try again." });
 
+    const brand = await getNotificationBrandChrome();
     const payload = JSON.stringify({
-      title: "Eduvora test notification",
+      title: `${brand.appName} test notification`,
       body: "Web notifications are working correctly on this device.",
       tag: `push-test-${Date.now()}`,
-      icon: "/icons/icon-192x192.png",
-      badge: "/icons/badge-96x96.png",
+      icon: brand.icon,
+      badge: brand.badge,
       url: "/#/notifications",
     });
     const results: Array<{ id: string; sent: boolean; statusCode?: number; error?: string }> = [];

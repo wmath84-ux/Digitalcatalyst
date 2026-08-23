@@ -33,6 +33,7 @@ import {
   resolveLookbackMs,
 } from "../../utils/pushScheduler.js";
 import { runReferralRepairOnce } from "../_lib/referrals.js";
+import { getNotificationBrandChrome } from "../_lib/branding.js";
 
 const bearer = (req: VercelRequest) => {
   const raw = req.headers?.authorization;
@@ -68,8 +69,16 @@ async function sendToSubscriptionDoc(item: { ref: { delete: () => Promise<unknow
 
 async function sendPush(db: Firestore, uid: string, title: string, body: string, target?: { tag?: string; url?: string }) {
   if (!vapidConfigured()) return 0;
+  const brand = await getNotificationBrandChrome();
   const subscriptions = await db.collection("users").doc(uid).collection("webPushSubscriptions").get();
-  const payloadString = JSON.stringify({ title, body, tag: target?.tag || "eduvora", url: target?.url || "/" });
+  const payloadString = JSON.stringify({
+    title,
+    body,
+    tag: target?.tag || "eduvora",
+    url: target?.url || "/",
+    icon: brand.icon,
+    badge: brand.badge,
+  });
   let sent = 0;
   for (const item of subscriptions.docs) sent += await sendToSubscriptionDoc(item, payloadString);
   return sent;
@@ -77,8 +86,16 @@ async function sendPush(db: Firestore, uid: string, title: string, body: string,
 
 async function sendPushToAll(db: Firestore, payload: PushPayload) {
   if (!vapidConfigured()) return { sent: 0, devices: 0 };
+  const brand = await getNotificationBrandChrome();
   const snapshot = await db.collectionGroup("webPushSubscriptions").get();
-  const payloadString = JSON.stringify({ title: payload.title, body: payload.body, tag: payload.tag || "eduvora-content", url: payload.url || "/" });
+  const payloadString = JSON.stringify({
+    title: payload.title,
+    body: payload.body,
+    tag: payload.tag || "eduvora-content",
+    url: payload.url || "/",
+    icon: brand.icon,
+    badge: brand.badge,
+  });
   let sent = 0;
   for (const item of snapshot.docs) sent += await sendToSubscriptionDoc(item, payloadString);
   return { sent, devices: snapshot.size };

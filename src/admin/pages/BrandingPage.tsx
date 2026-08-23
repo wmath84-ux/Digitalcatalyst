@@ -74,8 +74,9 @@ export default function BrandingPage() {
       <SectionCard title="App branding">
         <p className="text-xs leading-relaxed text-slate-500">
           Set your app name, tagline and logo. They replace the Eduvora/Digital Catalyst defaults
-          everywhere — landing header, home, loading splash, course player, auth, browser tab, push
-          notifications, and the installed PWA name &amp; icon — as soon as you save.
+          everywhere — landing header, home, loading splash, course player, auth, browser tab, the
+          in-app notification list, every system/push notification (products, My Day, subscription,
+          unlocks and updates), and the installed PWA name &amp; icon — as soon as you save.
         </p>
 
         <div className="mt-4 flex items-center gap-4">

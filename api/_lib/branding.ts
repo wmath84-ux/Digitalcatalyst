@@ -99,3 +99,43 @@ export function normalizeImageUrl(url: string): string | null {
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   return null;
 }
+
+/**
+ * Live logo used on every system / Web Push notification. Absolute https
+ * logos (Cloudinary uploads from the admin Branding page) are sent as-is so
+ * Android/Chrome can fetch them even when the app is closed. Relative or
+ * missing logos go through /api/brand-icon, which always proxies the current
+ * branding image (or 308s to the shipped PNG).
+ */
+export const NOTIFICATION_ICON_PATH = "/api/brand-icon?size=192";
+export const NOTIFICATION_BADGE_PATH = "/icons/badge-96x96.png";
+
+export type NotificationBrandChrome = {
+  icon: string;
+  badge: string;
+  appName: string;
+};
+
+export function notificationIconFromBranding(logoUrl: string | null | undefined): string {
+  const raw = typeof logoUrl === "string" ? logoUrl.trim() : "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return NOTIFICATION_ICON_PATH;
+}
+
+let brandChromeCache: { value: NotificationBrandChrome; at: number } | null = null;
+const BRAND_CHROME_TTL_MS = 60_000;
+
+/** Cached read so a cron/push fan-out does not hit Firestore once per device. */
+export async function getNotificationBrandChrome(): Promise<NotificationBrandChrome> {
+  if (brandChromeCache && Date.now() - brandChromeCache.at < BRAND_CHROME_TTL_MS) {
+    return brandChromeCache.value;
+  }
+  const branding = await getBranding();
+  const value: NotificationBrandChrome = {
+    icon: notificationIconFromBranding(branding.logoUrl),
+    badge: NOTIFICATION_BADGE_PATH,
+    appName: branding.appName,
+  };
+  brandChromeCache = { value, at: Date.now() };
+  return value;
+}
