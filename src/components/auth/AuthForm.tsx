@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useBranding } from "@/context/BrandingContext";
 import BrandMark from "@/components/BrandMark";
 
 type Mode = "login" | "signup";
@@ -17,6 +18,7 @@ const destinationAfterAuth = (fallback = "#/store") => {
 };
 
 export default function AuthForm() {
+  const { appName } = useBranding();
   const [mode, setMode] = useState<Mode>(() =>
     readAuthParams().get("mode") === "signup" ? "signup" : "login",
   );
@@ -137,7 +139,7 @@ export default function AuthForm() {
       <div className="mb-6 flex items-center gap-3">
         <BrandMark className="h-10 w-10 rounded-xl" fallbackLetter />
         <div>
-          <span className="block text-lg font-bold text-white">Eduvora</span>
+          <span className="block text-lg font-bold text-white">{appName}</span>
           <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
             <ShieldCheck size={12} /> Secured by Firebase
           </span>
@@ -167,7 +169,7 @@ export default function AuthForm() {
       </h1>
       <p className="mt-1 text-sm text-slate-400">
         {mode === "login"
-          ? "Log in securely and continue your Eduvora journey."
+          ? `Log in securely and continue your ${appName} journey.`
           : "Create your Firebase-secured learner account."}
       </p>
 

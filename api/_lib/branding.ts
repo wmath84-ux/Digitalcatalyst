@@ -3,10 +3,15 @@ import { adminDb } from "./firebaseAdmin.js";
 export const BRANDING_COLLECTION = "settings";
 export const BRANDING_DOC_ID = "branding";
 
+export const DEFAULT_APP_NAME = "Eduvora";
+export const DEFAULT_TAGLINE = "Digital Catalyst";
+export const DEFAULT_DESCRIPTION =
+  "Student learning app for notes, courses, and digital study resources.";
+
 /**
- * Static fallback icons shipped in /public. These are used both when no custom
- * logo has been uploaded and as the offline/error fallback for the dynamic
- * brand-icon endpoint.
+ * Static fallback icons shipped in /public. Used both when no custom logo has
+ * been uploaded and as the offline/error fallback for the dynamic brand-icon
+ * endpoint.
  */
 export const DEFAULT_ICONS = {
   192: "/icons/icon-192x192.png",
@@ -16,12 +21,21 @@ export const DEFAULT_ICONS = {
 
 export type ResolvedBranding = {
   logoUrl: string | null;
+  appName: string;
+  tagline: string;
+  description: string;
   /**
-   * Opaque version string for the current logo. Bumped whenever the logo
+   * Opaque version string for the current branding. Bumped whenever branding
    * changes so CDNs and browsers refetch the manifest/icon instead of serving
    * a stale cached copy.
    */
   version: string;
+};
+
+const sanitize = (value: unknown, fallback: string, max = 60): string => {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return fallback;
+  return text.slice(0, max);
 };
 
 function hashString(value: string): string {
@@ -30,35 +44,47 @@ function hashString(value: string): string {
     hash = (hash << 5) - hash + value.charCodeAt(i);
     hash |= 0;
   }
-  // Convert to an unsigned, base36 string.
   return (hash >>> 0).toString(36);
 }
 
 /**
- * Reads the live brand settings from Firestore. Returns `logoUrl: null` when
- * the admin has not uploaded a custom logo (or reset to the default). Never
- * throws — a Firestore outage should not take down the PWA manifest.
+ * Reads the live brand settings from Firestore. Never throws — a Firestore
+ * outage should not take down the PWA manifest.
  */
 export async function getBranding(): Promise<ResolvedBranding> {
+  const defaults: ResolvedBranding = {
+    logoUrl: null,
+    appName: DEFAULT_APP_NAME,
+    tagline: DEFAULT_TAGLINE,
+    description: `${DEFAULT_APP_NAME} ${DEFAULT_DESCRIPTION}`,
+    version: "default",
+  };
   try {
     const snap = await adminDb()
       .collection(BRANDING_COLLECTION)
       .doc(BRANDING_DOC_ID)
       .get();
     const data = snap.data() || {};
-    const raw = typeof data.logoUrl === "string" ? data.logoUrl.trim() : "";
-    const logoUrl = /^https?:\/\//i.test(raw) || raw.startsWith("/") ? raw : null;
+    const rawLogo = typeof data.logoUrl === "string" ? data.logoUrl.trim() : "";
+    const logoUrl = /^https?:\/\//i.test(rawLogo) || rawLogo.startsWith("/") ? rawLogo : null;
+    const appName = sanitize(data.appName, DEFAULT_APP_NAME, 40);
+    const tagline = sanitize(data.tagline, DEFAULT_TAGLINE, 80);
+    const description = sanitize(
+      data.description,
+      `${appName} ${DEFAULT_DESCRIPTION}`,
+      200,
+    );
 
-    // Prefer the Firestore update timestamp (changes on every save), fall
-    // back to a hash of the URL itself.
     const updatedAt = data.updatedAt as { toMillis?: () => number } | undefined;
     const millis = typeof updatedAt?.toMillis === "function" ? updatedAt.toMillis() : 0;
-    const version = millis ? String(millis) : logoUrl ? hashString(logoUrl) : "default";
+    const version = millis
+      ? String(millis)
+      : hashString(`${appName}|${tagline}|${logoUrl || ""}`);
 
-    return { logoUrl, version };
+    return { logoUrl, appName, tagline, description, version };
   } catch (error) {
     console.error("[branding] could not read branding settings", error);
-    return { logoUrl: null, version: "default" };
+    return defaults;
   }
 }
 

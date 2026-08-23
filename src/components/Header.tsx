@@ -12,8 +12,8 @@ type HeaderProps = {
   onNavigateToCart: () => void;
   onNavigateToNotifications: () => void;
   /**
-   * Branding override. The store shows "Eduvora"; My Day shows
-   * "Eduvora Taskar".
+   * Branding override. The store shows the configured app name; My Day shows
+   * "<AppName> Tasker".
    */
   title?: string;
   /**
@@ -55,7 +55,7 @@ export default function Header({
   onNavigateToSubscription,
   onNavigateToCart,
   onNavigateToNotifications,
-  title = "Eduvora",
+  title,
   subtitle = "Premium learning store",
   icon,
   action,
@@ -67,8 +67,9 @@ export default function Header({
   const liveNotificationCount = useUnreadNotificationCount();
   const displayedNotificationCount = liveNotificationCount ?? 0;
   const LogoIcon = icon ?? BookIcon;
-  const { logoUrl } = useBranding();
+  const { logoUrl, appName } = useBranding();
   const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
+  const headerTitle = title ?? appName;
   return (
     <header data-site-header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur">
       <div className="flex items-center justify-between gap-3">
@@ -77,7 +78,7 @@ export default function Header({
             {customLogo ? <BrandMark className="h-11 w-11" /> : <LogoIcon className="h-6 w-6" />}
           </div>
           <div className="min-w-0 leading-tight">
-            <h1 className="truncate text-lg font-extrabold tracking-tight text-slate-900">{title}</h1>
+            <h1 className="truncate text-lg font-extrabold tracking-tight text-slate-900">{headerTitle}</h1>
             <p className="truncate text-xs font-medium text-slate-400">{subtitle}</p>
           </div>
         </div>

@@ -45,9 +45,9 @@ export default defineConfig({
         // manifest + icons here — enough to test installability and routing.
         server.middlewares.use("/api/manifest", (_req: IncomingMessage, res: ServerResponse) => {
           const manifest = {
-            name: "Eduvora",
+            name: "Eduvora | Digital Catalyst",
             short_name: "Eduvora",
-            description: "Eduvora student learning app for notes, courses, and digital study resources.",
+            description: "Student learning app for notes, courses, and digital study resources.",
             start_url: "/#/home",
             scope: "/",
             display: "standalone",

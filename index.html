@@ -41,6 +41,31 @@
         </div>
       </div>
     </div>
+    <!-- Apply cached branding to the boot splash + document title BEFORE the
+         React bundle loads, so a renamed app never flashes "Eduvora" on reload.
+         The live Firestore values overwrite this once BrandingProvider mounts. -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("eduvora.branding.v2");
+          var legacy = localStorage.getItem("eduvora.brandLogoUrl.v1");
+          var data = raw ? JSON.parse(raw) : {};
+          var name = (data.appName || "Eduvora").toString().trim().slice(0, 40);
+          var tagline = (data.tagline || "Digital Catalyst").toString().trim().slice(0, 80);
+          var logo = (data.logoUrl || legacy || "/icons/icon-192x192.svg").toString();
+          if (!/^https?:\/\//.test(logo) && !logo.startsWith("/")) logo = "/icons/icon-192x192.svg";
+          if (name) {
+            var t = document.querySelector(".app-boot-title");
+            if (t) t.textContent = name;
+            document.title = tagline ? name + " | " + tagline : name;
+          }
+          var icon = document.getElementById("boot-brand-icon");
+          if (icon) { icon.src = logo; if (name) icon.alt = name; }
+          var splash = document.querySelector(".app-boot-splash");
+          if (splash && name) splash.setAttribute("aria-label", "Loading " + name);
+        } catch (e) { /* private mode / corrupt cache — keep static defaults */ }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

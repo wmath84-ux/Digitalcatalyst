@@ -206,12 +206,12 @@ const startCheckout = ({
 };
 
 function AppLaunchSplash({ label = "Preparing your learning space…" }: { label?: string }) {
-  const { logoUrl } = useBranding();
+  const { logoUrl, appName } = useBranding();
   return (
-    <main className="app-boot-splash" role="status" aria-live="polite" aria-label="Loading Eduvora">
+    <main className="app-boot-splash" role="status" aria-live="polite" aria-label={`Loading ${appName}`}>
       <div className="app-boot-content">
-        <img className="app-boot-icon" src={logoUrl} alt="Eduvora" />
-        <p className="app-boot-title">Eduvora</p>
+        <img className="app-boot-icon" src={logoUrl} alt={appName} />
+        <p className="app-boot-title">{appName}</p>
         <p className="app-boot-label">{label}</p>
         <div className="app-boot-track" aria-hidden="true"><div className="app-boot-bar" /></div>
       </div>

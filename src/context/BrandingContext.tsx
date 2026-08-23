@@ -2,25 +2,24 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import {
-  applyDocumentBrandIcons,
+  applyDocumentBranding,
   BRANDING_DOC_PATH,
-  DEFAULT_LOGO_URL,
-  readCachedLogoUrl,
-  writeCachedLogoUrl,
+  DEFAULT_BRANDING,
+  normalizeBranding,
+  readCachedBranding,
+  writeCachedBranding,
+  type Branding,
 } from "../utils/branding";
 
-type BrandingValue = {
-  logoUrl: string;
-  loading: boolean;
-};
+type BrandingValue = Branding & { loading: boolean };
 
 const BrandingContext = createContext<BrandingValue>({
-  logoUrl: DEFAULT_LOGO_URL,
+  ...DEFAULT_BRANDING,
   loading: true,
 });
 
 export function BrandingProvider({ children }: { children: ReactNode }) {
-  const [logoUrl, setLogoUrl] = useState(readCachedLogoUrl);
+  const [branding, setBranding] = useState<Branding>(readCachedBranding);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,11 +27,10 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     const unsub = onSnapshot(
       ref,
       (snap) => {
-        const data = snap.data() || {};
-        const next = typeof data.logoUrl === "string" && data.logoUrl.trim() ? data.logoUrl.trim() : DEFAULT_LOGO_URL;
-        setLogoUrl(next);
-        writeCachedLogoUrl(next === DEFAULT_LOGO_URL ? null : next);
-        applyDocumentBrandIcons(next);
+        const next = normalizeBranding((snap.data() || {}) as Partial<Branding>);
+        setBranding(next);
+        writeCachedBranding(next);
+        applyDocumentBranding(next);
         setLoading(false);
       },
       () => {
@@ -43,10 +41,10 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    applyDocumentBrandIcons(logoUrl);
-  }, [logoUrl]);
+    applyDocumentBranding(branding);
+  }, [branding]);
 
-  const value = useMemo(() => ({ logoUrl, loading }), [logoUrl, loading]);
+  const value = useMemo<BrandingValue>(() => ({ ...branding, loading }), [branding, loading]);
   return <BrandingContext.Provider value={value}>{children}</BrandingContext.Provider>;
 }
 

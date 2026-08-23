@@ -3,8 +3,10 @@
 import { motion } from "framer-motion";
 import HeroScene from "./HeroScene";
 import { openApp, openInstallPanel } from "@/utils/pwaInstall";
+import { useBranding } from "@/context/BrandingContext";
 
 export default function Hero() {
+  const { appName, tagline } = useBranding();
   return (
     <section className="relative flex min-h-screen items-center overflow-hidden bg-[#05060f] pt-24">
       <HeroScene />
@@ -23,9 +25,13 @@ export default function Hero() {
           </span>
 
           <h1 className="mt-6 text-[clamp(2.4rem,6vw,4.5rem)] font-black leading-[1.03] tracking-tight text-white">
-            Welcome to <span className="gradient-text">Eduvora</span>
-            <br />
-            Your Digital Catalyst.
+            Welcome to <span className="gradient-text">{appName}</span>
+            {tagline ? (
+              <>
+                <br />
+                Your {tagline}.
+              </>
+            ) : null}
           </h1>
 
           <p className="mt-6 max-w-xl text-base leading-relaxed text-slate-300 sm:text-lg">

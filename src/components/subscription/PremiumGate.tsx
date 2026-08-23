@@ -64,6 +64,7 @@ import {
   Bell as BellIcon,
   NotebookPen as NotebookPenIcon,
 } from "lucide-react";
+import { useBranding } from "@/context/BrandingContext";
 
 function wrapLucide(Lucide: React.ComponentType<{ className?: string }>) {
   return (props: { className?: string }) => <Lucide {...props} />;
@@ -152,7 +153,7 @@ function GateContent({
               </>
             ) : (
               <>
-                Daily tests, smart revision sessions aur weak-topic analytics ab Eduvora Plus+ subscription ka hissa hain. Subscribe karke turant shuru karo.
+                Daily tests, smart revision sessions aur weak-topic analytics ab {appName} Plus+ subscription ka hissa hain. Subscribe karke turant shuru karo.
               </>
             )}
           </p>
@@ -176,7 +177,7 @@ function GateContent({
         </div>
 
         <div className="relative mt-7 rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-violet-700 p-5 text-white shadow-xl shadow-indigo-200">
-          <p className="text-[11px] font-black uppercase tracking-wider text-indigo-200">Eduvora Plus+</p>
+          <p className="text-[11px] font-black uppercase tracking-wider text-indigo-200">{`${appName} Plus+`}</p>
           <h2 className="mt-1 text-lg font-black">
             {isMyDay ? "My Day + Revision + premium content, ek hi plan me" : "Revision + My Day + premium content, ek hi plan mein"}
           </h2>
@@ -226,6 +227,7 @@ export default function PremiumGate({
   asPage = false,
   subtitle,
 }: Props) {
+  const { appName } = useBranding();
   if (!open) return null;
 
   if (asPage) {

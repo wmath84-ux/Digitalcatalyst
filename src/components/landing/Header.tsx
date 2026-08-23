@@ -3,8 +3,10 @@
 import { motion } from "framer-motion";
 import { openApp } from "@/utils/pwaInstall";
 import BrandMark from "@/components/BrandMark";
+import { useBranding } from "@/context/BrandingContext";
 
 export default function Header() {
+  const { appName, tagline } = useBranding();
   return (
     <motion.header
       initial={{ y: -40, opacity: 0 }}
@@ -16,7 +18,8 @@ export default function Header() {
         <a href="#/landing" className="flex items-center gap-2 shrink-0">
           <BrandMark className="h-9 w-9 rounded-xl shadow-lg shadow-fuchsia-500/30" fallbackLetter />
           <span className="hidden text-lg font-bold tracking-tight text-white sm:block">
-            Eduvora <span className="text-slate-400 font-medium">| Digital Catalyst</span>
+            {appName}
+            {tagline ? <span className="text-slate-400 font-medium"> | {tagline}</span> : null}
           </span>
         </a>
 
