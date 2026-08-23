@@ -476,8 +476,8 @@ export default function App() {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50/80">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col bg-slate-50/80 lg:max-w-7xl">
+    <div className="min-h-screen bg-white">
+      <div className="mx-auto flex min-h-screen max-w-md flex-col bg-white lg:max-w-7xl">
         <StoreHeader
           cartCount={cartIds.size}
           notifCount={1}

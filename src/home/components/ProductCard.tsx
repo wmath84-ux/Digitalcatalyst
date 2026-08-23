@@ -28,7 +28,7 @@ export default function ProductCard({
   return (
     <div
       onClick={() => onOpen?.(product)}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200 ring-1 ring-slate-100 transition-transform duration-200 active:scale-[0.98] ${className}`}
+      className={`group relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-md shadow-slate-300/70 ring-1 ring-slate-200/80 transition-transform duration-200 active:scale-[0.98] ${className}`}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
         <img

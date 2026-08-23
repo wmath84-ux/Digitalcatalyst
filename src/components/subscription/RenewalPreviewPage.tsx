@@ -86,7 +86,7 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
   const NotifIcon = view ? ICONS[view.icon as keyof typeof ICONS] || Bell : Bell;
 
   return (
-    <div className="min-h-screen bg-slate-100 sm:py-6">
+    <div className="min-h-screen bg-white sm:py-6">
       <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:rounded-[2rem] sm:border sm:border-slate-200">
         {/* Header */}
         <header className="flex items-center gap-3 border-b border-slate-100 px-4 py-4">

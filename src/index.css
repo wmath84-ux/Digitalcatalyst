@@ -20,7 +20,7 @@ html,
 body,
 #root {
   height: 100%;
-  background-color: #f4f4f8;
+  background-color: #ffffff;
   touch-action: pan-x pan-y;
   overscroll-behavior: none;
   -ms-touch-action: pan-x pan-y;

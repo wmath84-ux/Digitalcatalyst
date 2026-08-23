@@ -77,7 +77,7 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
 
   return (
     <>
-      <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
+      <div className="rounded-3xl border border-slate-200 bg-white shadow-md shadow-slate-200/80">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-4 pt-5 pb-4 sm:px-6">
           <div className="flex items-center gap-3">

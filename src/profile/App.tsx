@@ -136,8 +136,8 @@ const MEMBERSHIP_THEMES: Record<MembershipTier, {
   stat: string;
 }> = {
   normal: {
-    hero: "bg-gradient-to-br from-slate-700 via-indigo-700 to-violet-700",
-    heroGlow: "bg-white/10",
+    hero: "bg-[#05060f]",
+    heroGlow: "bg-violet-600/35",
     heroBadge: "bg-white/15 text-white",
     membership: "border-indigo-100 bg-gradient-to-br from-white via-indigo-50/60 to-violet-50",
     membershipIcon: "bg-indigo-100 text-indigo-600",
@@ -151,8 +151,8 @@ const MEMBERSHIP_THEMES: Record<MembershipTier, {
   },
   basic: {
     // Basic is calm and fresh, so paid status is visible without looking loud.
-    hero: "bg-gradient-to-br from-cyan-600 via-sky-600 to-blue-700",
-    heroGlow: "bg-cyan-200/20",
+    hero: "bg-[#05060f]",
+    heroGlow: "bg-cyan-500/25",
     heroBadge: "bg-white/15 text-white",
     membership: "border-sky-200 bg-gradient-to-br from-white via-sky-50 to-cyan-50",
     membershipIcon: "bg-sky-100 text-sky-700",
@@ -166,8 +166,8 @@ const MEMBERSHIP_THEMES: Record<MembershipTier, {
   },
   premium: {
     // Premium moves into the violet/fuchsia family.
-    hero: "bg-gradient-to-br from-violet-700 via-fuchsia-600 to-rose-500",
-    heroGlow: "bg-fuchsia-200/20",
+    hero: "bg-[#05060f]",
+    heroGlow: "bg-fuchsia-500/30",
     heroBadge: "bg-white/15 text-white",
     membership: "border-fuchsia-200 bg-gradient-to-br from-white via-violet-50 to-fuchsia-50",
     membershipIcon: "bg-fuchsia-100 text-fuchsia-700",
@@ -181,8 +181,8 @@ const MEMBERSHIP_THEMES: Record<MembershipTier, {
   },
   pro: {
     // Pro is intentionally the strongest, most premium gradient.
-    hero: "bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-700",
-    heroGlow: "bg-violet-300/20",
+    hero: "bg-[#05060f]",
+    heroGlow: "bg-violet-600/35",
     heroBadge: "bg-white/15 text-white",
     membership: "border-violet-200 bg-gradient-to-br from-white via-indigo-50 to-violet-100",
     membershipIcon: "bg-violet-100 text-violet-700",
@@ -356,7 +356,7 @@ export default function ProfileApp() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 sm:py-6">
+    <div className="min-h-screen bg-white text-slate-900 sm:py-6">
       <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
         <Header
           cartCount={cartIds.size}
@@ -382,9 +382,10 @@ export default function ProfileApp() {
 
             {/* This is the one profile hero. Paid plans keep the same layout,
                 while the gradient changes by tier as requested. */}
-            <section data-profile-membership-tier={membership.tier} className={`relative overflow-hidden rounded-[2rem] p-6 text-white shadow-xl ${theme.hero}`}>
-              <div className={`absolute -right-12 -top-12 h-44 w-44 rounded-full blur-[1px] ${theme.heroGlow}`} />
-              <div className={`absolute -bottom-16 -left-8 h-36 w-36 rounded-full ${theme.heroGlow}`} />
+            <section data-profile-membership-tier={membership.tier} className={`relative overflow-hidden rounded-[2rem] p-6 text-white shadow-xl shadow-violet-500/20 ${theme.hero}`}>
+              <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-violet-600/40 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-16 -left-8 h-36 w-36 rounded-full bg-cyan-500/25 blur-3xl" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400" />
               <div className="relative">
                 <div className="flex items-start justify-between gap-3">
                   <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] backdrop-blur ${theme.heroBadge}`}>
@@ -504,7 +505,7 @@ export default function ProfileApp() {
             {membership.subscriber ? <AiQuotaCard uid={user.id} /> : null}
 
             {referralCode && (
-              <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-md shadow-slate-200/80">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Your referral code</p>
@@ -539,7 +540,7 @@ export default function ProfileApp() {
               {purchasedProducts.length > 0 && <div className="mt-5 space-y-2">{purchasedProducts.slice(0, 3).map((product) => <button type="button" key={product.id} onClick={() => { window.location.hash = `#/course/${encodeURIComponent(product.id)}`; }} className="flex w-full items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left transition hover:bg-slate-100"><img src={product.image} alt="" className="h-12 w-16 rounded-lg object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-black">{product.title}</span><span className="text-xs text-slate-400">Owned · Open course</span></span><ChevronRight size={16} className="text-slate-300" /></button>)}</div>}
             </section>
 
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><h3 className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Preferences</h3><p className="mt-1 text-xs text-slate-400">Saved securely to your account</p></div><button type="button" onClick={() => setModal("settings")} className="grid h-10 w-10 place-items-center rounded-xl bg-violet-50 text-violet-600"><Bell size={18} /></button></div></section>
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-md shadow-slate-200/80"><div className="flex items-center justify-between"><div><h3 className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Preferences</h3><p className="mt-1 text-xs text-slate-400">Saved securely to your account</p></div><button type="button" onClick={() => setModal("settings")} className="grid h-10 w-10 place-items-center rounded-xl bg-violet-50 text-violet-600"><Bell size={18} /></button></div></section>
 
             <button type="button" onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-50 py-4 text-sm font-black text-rose-600 ring-1 ring-rose-100"><LogOut size={17} /> Log out</button>
 

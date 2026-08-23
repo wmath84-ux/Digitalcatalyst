@@ -121,7 +121,7 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
   const quoteId = quote?.quoteId || "";
 
   return (
-    <div className="min-h-screen bg-slate-100 sm:py-6" data-checkout-app>
+    <div className="min-h-screen bg-white sm:py-6" data-checkout-app>
       <div
         data-checkout-shell
         data-app-frame
@@ -159,7 +159,7 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
           </div>
         </div>
 
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-4 pt-4 pb-8">
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto bg-white px-4 pt-4 pb-8">
           {step === 1 ? (
             <CheckoutReviewStep onProceed={handleProceedToPayment} onEdit={handleEditSelection} />
           ) : null}

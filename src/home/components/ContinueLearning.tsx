@@ -58,7 +58,7 @@ function ContinueLearningCard({ item, showProgressLabel }: { item: ContinueLearn
       tabIndex={0}
       onClick={open}
       onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") open(); }}
-      className="flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-white p-3 text-left shadow-sm shadow-slate-200 ring-1 ring-slate-100 transition active:scale-[0.98]"
+      className="flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-white p-3 text-left shadow-md shadow-slate-300/70 ring-1 ring-slate-200/80 transition active:scale-[0.98]"
     >
       <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-slate-100">
         <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
