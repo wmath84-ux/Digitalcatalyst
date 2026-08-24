@@ -35,11 +35,13 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
             Customization
           </h3>
           <div className="space-y-3">
-            {/* Option 1 — AI Configuration (only AI config, nothing else) */}
+            {/* Option 1 — AI Configuration (only AI config, nothing else).
+                Uses the website brand gradient (indigo → violet) with a soft
+                glassmorphism wash and a deep branded shadow. */}
             <button
               type="button"
               onClick={() => navigate("#/revision/ai-settings")}
-              className="group relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-5 text-left shadow-lg shadow-purple-200 transition-all active:scale-[0.98]"
+              className="group relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-5 text-left shadow-[0_24px_50px_-20px_rgba(79,70,229,0.65)] ring-1 ring-white/30 backdrop-blur transition-all active:scale-[0.98]"
             >
               <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10" />
               <div className="absolute -bottom-6 -left-6 h-20 w-20 rounded-full bg-white/5" />
@@ -57,11 +59,12 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
               </div>
             </button>
 
-            {/* Option 2 — AI Test Generator */}
+            {/* Option 2 — AI Test Generator. Matches the website brand
+                (indigo → violet) with glassmorphism + a deep branded shadow. */}
             <button
               type="button"
               onClick={() => navigate("#/revision/ai-generate")}
-              className="group relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-indigo-600 to-blue-600 p-5 text-left shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]"
+              className="group relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-500 via-violet-500 to-purple-600 p-5 text-left shadow-[0_24px_50px_-20px_rgba(124,58,237,0.6)] ring-1 ring-white/30 backdrop-blur transition-all active:scale-[0.98]"
             >
               <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10" />
               <div className="absolute -bottom-6 -left-6 h-20 w-20 rounded-full bg-white/5" />
@@ -143,7 +146,9 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
 
 function WidgetCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
   return (
-    <div className="dc-glass flex flex-col items-center gap-1 rounded-2xl py-3 text-center shadow-[0_16px_36px_-24px_rgba(79,70,229,0.35)]">
+    // Stable opaque surface (no backdrop-filter) so the snapshot cards below
+    // the Import section never show a white-flash glitch while scrolling.
+    <div className="rev-card flex flex-col items-center gap-1 rounded-2xl py-3 text-center">
       {icon}
       <span className="text-base font-bold text-slate-900">{value}</span>
       <span className="text-[10px] font-medium text-slate-500">{label}</span>
