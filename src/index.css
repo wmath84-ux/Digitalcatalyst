@@ -425,28 +425,32 @@ html, body {
   overscroll-behavior: none;
 }
 
-/* Keep the Eduvora website header visible while Razorpay Checkout is open.
-   The Razorpay frame is inset below the header, anchored to the bottom of
-   the viewport (top + bottom, not a fixed height), so it behaves like an
-   in-app iframe: its own page scrolls internally and every field and button
-   stays reachable. The JS chrome utility sets --eduvora-header-h and the
-   exact left/width; these rules are the static fallback + layering. */
-body.eduvora-razorpay-open [data-site-header] {
-  z-index: 2147483000 !important;
-  background-color: rgba(255, 255, 255, 0.98);
+/* Razorpay Standard Checkout — full-screen overlay.
+   The payment iframe covers the entire visual viewport so every field
+   and Razorpay's own × stay tappable on mobile. Site header / footer
+   stay underneath; we do not render any extra close buttons. */
+body.eduvora-razorpay-open {
+  overflow: hidden !important;
+}
+
+body.eduvora-razorpay-open [data-site-header],
+body.eduvora-razorpay-open [data-site-footer],
+body.eduvora-razorpay-open [data-checkout-toolbar] {
+  z-index: 1 !important;
+  pointer-events: none;
 }
 
 body.eduvora-razorpay-open .razorpay-container,
 body.eduvora-razorpay-open .razorpay-checkout-frame {
   position: fixed !important;
-  /* The frame is anchored below the header (top + bottom, never a
-     pre-computed height) so the payment page always gets the full remaining
-     viewport and scrolls internally. The JS chrome utility overrides `top`
-     inline with the live measured offset (header + Cancel-payment bar); this
-     is the static fallback before the first measurement. */
-  top: var(--eduvora-header-h, 64px) !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
   bottom: 0 !important;
-  height: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
   max-height: none !important;
   transform: none !important;
   border-radius: 0 !important;
@@ -455,11 +459,11 @@ body.eduvora-razorpay-open .razorpay-checkout-frame {
 }
 
 body.eduvora-razorpay-open .razorpay-backdrop {
-  z-index: 2147482000 !important;
+  z-index: 2147483645 !important;
 }
 
 body.eduvora-razorpay-open .razorpay-container {
-  z-index: 2147482001 !important;
+  z-index: 2147483646 !important;
 }
 
 body.eduvora-razorpay-open iframe.razorpay-checkout-frame,
@@ -467,6 +471,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   width: 100% !important;
   height: 100% !important;
   max-height: 100% !important;
+  min-height: 100% !important;
   color-scheme: light;
 }
 

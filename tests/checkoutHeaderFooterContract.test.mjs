@@ -36,28 +36,32 @@ test("checkout footer routes to the same store destinations as other pages", () 
   assert.match(checkoutApp, /#\/notifications/);
 });
 
-test("Razorpay checkout keeps the site header visible and insets the payment frame below it", () => {
+test("Razorpay checkout opens full screen with no extra close buttons", () => {
   assert.match(paymentGateway, /revealCheckoutChromeOverRazorpay/);
   assert.match(paymentGateway, /checkout\.open\(\)/);
   assert.match(paymentGateway, /unpinChromeRef\.current = revealCheckoutChromeOverRazorpay\(\)/);
   assert.match(chrome, /eduvora-razorpay-open/);
-  assert.match(chrome, /data-site-header/);
-  assert.match(chrome, /data-checkout-shell/);
   assert.match(chrome, /razorpay-container/);
   assert.match(chrome, /razorpay-backdrop/);
-  // The frame is anchored below the header, down to the bottom of the
-  // viewport (top + bottom, never a pre-computed height) so the payment
-  // page always gets the full remaining screen and scrolls internally.
-  assert.match(chrome, /"top", `\$\{frameTop\}px`/);
-  assert.match(chrome, /"bottom", "0"/);
-  assert.match(chrome, /"height", "auto"/);
-  // Layering: backdrop < payment frame < site header.
-  assert.match(chrome, /HEADER_Z = "2147483000"/);
-  assert.match(chrome, /CONTAINER_Z = "2147482001"/);
-  assert.match(chrome, /BACKDROP_Z = "2147482000"/);
-  assert.match(css, /body\.eduvora-razorpay-open \[data-site-header\]/);
+  // Full-screen frame: live visual viewport, not inset under the site header.
+  assert.match(chrome, /visualViewport/);
+  assert.match(chrome, /inset: "0"/);
+  assert.match(chrome, /top: `\$\{top\}px`/);
+  assert.match(chrome, /height: `\$\{height\}px`/);
+  // No custom Cancel-payment bar / confirm sheet — Razorpay's native × is enough.
+  assert.doesNotMatch(chrome, /Cancel payment/);
+  assert.doesNotMatch(chrome, /eduvora-razorpay-exit-bar/);
+  assert.doesNotMatch(chrome, /eduvora-razorpay-exit-confirm/);
+  assert.doesNotMatch(chrome, /prepareCheckoutChrome/);
+  assert.doesNotMatch(paymentGateway, /prepareCheckoutChrome/);
+  // Closing without paying is a single gesture (×, backdrop, Esc, system Back).
+  assert.match(paymentGateway, /confirm_close: false/);
+  assert.match(paymentGateway, /backdropclose: true/);
+  assert.match(paymentGateway, /escape: true/);
+  assert.match(paymentGateway, /dismissWithoutPaying/);
   assert.match(css, /body\.eduvora-razorpay-open \.razorpay-container/);
-  assert.match(css, /top: var\(--eduvora-header-h, 64px\) !important/);
+  assert.match(css, /inset: 0 !important/);
+  assert.match(css, /top: 0 !important/);
   assert.match(css, /bottom: 0 !important/);
 });
 
@@ -65,5 +69,11 @@ test("Razorpay chrome is released when checkout closes or the payment step unmou
   assert.match(paymentGateway, /releaseCheckoutChrome/);
   assert.match(paymentGateway, /closeRazorpayCheckout/);
   assert.match(paymentGateway, /ondismiss/);
-  assert.match(chrome, /restoreStyle/);
+  assert.match(chrome, /document\.body\.classList\.remove\(OPEN_CLASS\)/);
+});
+
+test("system Back while Razorpay is open only closes the checkout", () => {
+  assert.match(checkoutApp, /eduvora-razorpay-open/);
+  assert.match(checkoutApp, /document\.body\.classList\.contains\("eduvora-razorpay-open"\)/);
+  assert.match(paymentGateway, /handleback: false/);
 });
