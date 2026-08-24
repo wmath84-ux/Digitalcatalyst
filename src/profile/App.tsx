@@ -78,6 +78,15 @@ const TIER_LABELS: Record<MembershipTier, string> = {
   pro: "Pro",
 };
 
+// Keep the plan name in the profile hero tied to the resolved subscription
+// tier. This avoids a stale "Basic member" badge after a Premium/Pro upgrade.
+const PLAN_LABELS: Record<MembershipTier, string> = {
+  normal: "Free plan",
+  basic: "Basic Plan",
+  premium: "Premium Plan",
+  pro: "Pro Plan",
+};
+
 /**
  * The profile can be opened before the subscription listener has finished.
  * Keep the fallback conservative: the `basic` value on the user document is
@@ -296,6 +305,7 @@ export default function ProfileApp() {
   const ownedCount = signedIn ? Math.max(purchasedIds.size, canonicalOwnedIds.length) : purchasedIds.size;
   const theme = MEMBERSHIP_THEMES[membership.tier];
   const tierLabel = TIER_LABELS[membership.tier];
+  const planLabel = PLAN_LABELS[membership.tier];
 
   const handleFooterChange = (tab: TabKey) => {
     if (tab === "home") window.location.hash = "#/home";
@@ -387,39 +397,45 @@ export default function ProfileApp() {
             {message && <div className="rounded-2xl border border-rose-200/70 bg-rose-50/80 p-3 text-sm font-semibold text-rose-700 shadow-[0_10px_24px_-16px_rgba(225,29,72,0.55)] backdrop-blur-md">{message}</div>}
 
             {/* This is the one profile hero. Paid plans keep the same layout,
-                while the gradient changes by tier as requested. */}
-            <section data-profile-membership-tier={membership.tier} className={`relative overflow-hidden rounded-[2rem] p-6 text-white ${theme.hero}`}>
-              <div className={`pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full blur-3xl ${theme.heroGlow}`} />
-              <div className="pointer-events-none absolute -bottom-16 -left-8 h-40 w-40 rounded-full bg-cyan-400/30 blur-3xl" />
-              <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400" />
-              <div className="relative">
-                <div className="flex items-start justify-between gap-3">
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] backdrop-blur-md ${theme.heroBadge}`}>
-                    {membership.subscriber ? <BadgeCheck className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
-                    {membership.subscriber ? `${tierLabel} member` : "Free learner"}
-                  </span>
-                  {membership.subscriber ? (
-                    <span className="rounded-full bg-emerald-300/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-50 ring-1 ring-emerald-100/25 shadow-[0_0_18px_rgba(52,211,153,0.28)]">
-                      {membership.active ? "Active" : "Renew access"}
+                while the gradient changes by tier. The outer shell provides a
+                continuous blue/cyan orbit without covering the card content. */}
+            <div className="dc-profile-plan-orbit">
+              <section data-profile-membership-tier={membership.tier} className={`dc-profile-plan-card relative overflow-hidden rounded-[2rem] p-6 text-white ${theme.hero}`}>
+                <div className={`pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full blur-3xl ${theme.heroGlow}`} />
+                <div className="pointer-events-none absolute -bottom-16 -left-8 h-40 w-40 rounded-full bg-cyan-400/30 blur-3xl" />
+                <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400" />
+                <div className="relative">
+                  <div className="flex items-start justify-between gap-3">
+                    <span data-profile-plan-label className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] backdrop-blur-md ${theme.heroBadge}`}>
+                      {membership.subscriber ? <BadgeCheck className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
+                      {membership.subscriber ? planLabel : PLAN_LABELS.normal}
                     </span>
-                  ) : (
-                    <span className="rounded-full bg-white/8 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white/75 ring-1 ring-white/15">No plan yet</span>
-                  )}
-                </div>
-
-                <div className="mt-5 flex items-center gap-4">
-                  {user.photoURL ? <img src={user.photoURL} alt="" className="h-16 w-16 rounded-full object-cover dc-glow-ring" /> : <div className="grid h-16 w-16 place-items-center rounded-full bg-white/18 text-xl font-black dc-glow-ring">{initials}</div>}
-                  <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-2xl font-black tracking-tight">{user.name}</h2>
-                    <p className="truncate text-xs text-white/80">{user.email}</p>
-                    <p className="mt-1 text-[11px] text-white/60">Member since {memberSince}</p>
+                    {membership.subscriber ? (
+                      <span
+                        data-profile-plan-status={membership.active ? "active" : "expired"}
+                        className={`rounded-full bg-emerald-300/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-50 ring-1 ring-emerald-100/25 shadow-[0_0_18px_rgba(52,211,153,0.28)] ${membership.active ? "dc-profile-status-orbit" : ""}`}
+                      >
+                        {membership.active ? "Active" : "Renew access"}
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-white/8 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white/75 ring-1 ring-white/15">No plan yet</span>
+                    )}
                   </div>
+
+                  <div className="mt-5 flex items-center gap-4">
+                    {user.photoURL ? <img src={user.photoURL} alt="" className="h-16 w-16 rounded-full object-cover dc-glow-ring" /> : <div className="grid h-16 w-16 place-items-center rounded-full bg-white/18 text-xl font-black dc-glow-ring">{initials}</div>}
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate text-2xl font-black tracking-tight">{user.name}</h2>
+                      <p className="truncate text-xs text-white/80">{user.email}</p>
+                      <p className="mt-1 text-[11px] text-white/60">Member since {memberSince}</p>
+                    </div>
+                  </div>
+                  <p className="relative mt-5 text-sm leading-6 text-white/85">{user.bio || (membership.subscriber ? `Your ${tierLabel} learning space is ready. Keep building momentum.` : "Add a short bio to personalize your learner profile.")}</p>
+                  <button type="button" onClick={() => setModal("edit")} className="relative mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/14 py-3 text-sm font-black ring-1 ring-white/30 shadow-[0_10px_24px_-12px_rgba(255,255,255,0.35)] backdrop-blur-md transition hover:bg-white/24 active:scale-[0.99]"><Pencil size={15} /> Edit profile</button>
                 </div>
-                <p className="relative mt-5 text-sm leading-6 text-white/85">{user.bio || (membership.subscriber ? `Your ${tierLabel} learning space is ready. Keep building momentum.` : "Add a short bio to personalize your learner profile.")}</p>
-                <button type="button" onClick={() => setModal("edit")} className="relative mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/14 py-3 text-sm font-black ring-1 ring-white/30 shadow-[0_10px_24px_-12px_rgba(255,255,255,0.35)] backdrop-blur-md transition hover:bg-white/24 active:scale-[0.99]"><Pencil size={15} /> Edit profile</button>
-              </div>
-            </section>
+              </section>
+            </div>
 
             {membership.subscriber ? (
               <section data-profile-membership-card className={`rounded-[2rem] p-5 ${theme.membership}`}>
