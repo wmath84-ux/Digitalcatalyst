@@ -567,7 +567,7 @@ async function generateOpenAiCompatible(config: AiConfig, input: GenerateInput):
         body: JSON.stringify({
           model: config.model,
           messages,
-          temperature: 0.7,
+          temperature: 0.4,
           ...(withJsonMode ? { response_format: { type: "json_object" } } : {}),
         }),
       },
@@ -610,6 +610,9 @@ async function generateAnthropic(config: AiConfig, input: GenerateInput): Promis
       body: JSON.stringify({
         model: config.model,
         max_tokens: 4096,
+        // Anthropic defaults to temperature 1.0, which drifts from the strict
+        // question-type rules — pin it low for reliable rule-following.
+        temperature: 0.4,
         system: systemPrompt(),
         messages: [{ role: "user", content: buildUserPrompt(input) }],
       }),
@@ -673,6 +676,32 @@ export type RevisionGenerateArgs = {
   config: AiConfig | null;
   syllabus: RevisionSyllabus;
 };
+
+/**
+ * Map a full revision syllabus (the profile-page form) onto the direct
+ * generation input shape. Every selected field — class, subject, chapter,
+ * topic, exact selection rows, difficulty, question type, count and time —
+ * is preserved so the prompt the AI receives is identical to the
+ * server-proxied path.
+ */
+export function syllabusToInput(syllabus: RevisionSyllabus): GenerateInput {
+  return {
+    subject: syllabus.subjectNames[0] ?? "General",
+    topic: syllabus.topicNames.join(", ") || syllabus.chapterNames[0] || "General",
+    difficulty: syllabus.difficulty === "mixed" ? "medium" : syllabus.difficulty,
+    count: syllabus.count,
+    classNames: syllabus.classNames,
+    subjectNames: syllabus.subjectNames,
+    chapterNames: syllabus.chapterNames,
+    topicNames: syllabus.topicNames,
+    selectionRows: syllabus.selectionRows,
+    testDate: syllabus.testDate,
+    generatedAt: syllabus.generatedAt,
+    timezone: syllabus.timezone,
+    minutes: syllabus.minutes,
+    questionMode: syllabus.questionMode,
+  };
+}
 
 function isSpaFallback(res: Response, text: string): boolean {
   if (res.status === 404 || res.status === 501) return true;

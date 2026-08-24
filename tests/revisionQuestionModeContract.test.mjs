@@ -44,6 +44,33 @@ test("AI prompts enforce theory, application, and mixed modes", () => {
   }
 });
 
+test("question type is a strict, self-checked rule with explicit forbidden kinds", () => {
+  for (const source of [aiGenerate, generateApi]) {
+    // A labelled hard constraint, per-mode forbidden lists, a same-style
+    // example, and a self-check the model runs before answering.
+    assert.match(source, /STRICT QUESTION TYPE RULE — the learner selected: THEORY ONLY/);
+    assert.match(source, /STRICT QUESTION TYPE RULE — the learner selected: APPLICATION ONLY/);
+    assert.match(source, /STRICT QUESTION TYPE RULE — the learner selected: MIXED/);
+    assert.match(source, /Forbidden in theory mode/);
+    assert.match(source, /Forbidden in application mode/);
+    assert.match(source, /Self-check before answering/);
+    assert.match(source, /What is the SI unit of force\?/);
+    // The system prompt also defends the rule so weak system-attention models comply.
+    assert.match(source, /question-style rule in the user request is a hard constraint/);
+    // The final line of the user prompt repeats the selected type as a hard check.
+    assert.match(source, /CRITICAL FINAL CHECK/);
+    assert.match(source, /follows that rule exactly/);
+  }
+});
+
+test("generation temperature is pinned low so strict rules are followed", () => {
+  assert.match(generateApi, /temperature: 0\.4/);
+  assert.match(aiGenerate, /temperature: 0\.4/);
+  assert.match(aiConfig, /temperature: 0\.4/);
+  assert.doesNotMatch(generateApi, /temperature: 0\.7/);
+  assert.doesNotMatch(aiGenerate, /temperature: 0\.7/);
+});
+
 test("questionMode survives local save, cloud sanitize, migration, and result/history display", () => {
   assert.match(customTests, /questionMode: normalizeQuestionMode\(input\.planDetails\.questionMode\)/);
   assert.match(customTests, /Existing plans that pre-date questionMode get an explicit Mixed/);
