@@ -77,3 +77,18 @@ test("system Back while Razorpay is open only closes the checkout", () => {
   assert.match(checkoutApp, /document\.body\.classList\.contains\("eduvora-razorpay-open"\)/);
   assert.match(paymentGateway, /handleback: false/);
 });
+
+test("system Back from the payment step returns to the recent page, not the app exit", () => {
+  // When Razorpay is closed, a Back press on the checkout must navigate to the
+  // recent page (the source the user came from) via checkout.goBack. Previously
+  // the extra synthetic history.pushState entries left the user stuck on the
+  // payment step and let the browser walk off the end of its history, closing
+  // the installed PWA.
+  assert.match(checkoutApp, /goBackRef\.current\(\)/);
+  assert.match(checkoutApp, /window\.addEventListener\("popstate", onPopState\)/);
+  // The old per-step synthetic history entry is gone — only PaymentGateway
+  // pushes one entry (for closing the full-screen checkout), so Back cannot
+  // accumulate dead entries that end in closing the app.
+  assert.doesNotMatch(checkoutApp, /eduvoraCheckoutPayment/);
+  assert.doesNotMatch(checkoutApp, /history\.pushState\(\{ \[\s\S]*eduvoraCheckoutPayment/);
+});

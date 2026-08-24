@@ -59,25 +59,32 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, [step]);
 
+  // Keep a fresh reference to the most recent `goBack` so the popstate handler
+  // below (registered once) always returns to the latest return route.
+  const goBackRef = useRef(checkout.goBack);
+  goBackRef.current = checkout.goBack;
+
+  // System-Back handling for the whole checkout, registered once at mount —
+  // BEFORE PaymentGateway mounts and registers its own popstate handler at
+  // step 2. That ordering matters: on a Back press this handler runs FIRST,
+  // so it can still see Razorpay open (the `eduvora-razorpay-open` body class)
+  // and leave the close to PaymentGateway — the first Back while paying only
+  // dismisses the full-screen checkout and stays on the payment step. When
+  // Razorpay is closed, Back returns to the recent page (the source the user
+  // came from) instead of leaving them stuck on the payment step, which
+  // previously let the browser walk off the end of its history and close the
+  // installed PWA.
   useEffect(() => {
-    if (step !== 2 || typeof window === "undefined") return;
-    if (!window.history.state?.eduvoraCheckoutPayment) {
-      window.history.pushState({ ...(window.history.state || {}), eduvoraCheckoutPayment: true }, "");
-    }
+    if (typeof window === "undefined") return undefined;
     const onPopState = () => {
-      // PaymentGateway owns the first Back press while Razorpay is open
-      // (it just closes the full-screen checkout). Leave the payment step
-      // alone so the user can reopen it or tap "Back to order summary".
       if (typeof document !== "undefined" && document.body.classList.contains("eduvora-razorpay-open")) {
         return;
       }
-      setStep(1);
+      goBackRef.current();
     };
     window.addEventListener("popstate", onPopState);
-    return () => {
-      window.removeEventListener("popstate", onPopState);
-    };
-  }, [step]);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const handleProceedToPayment = useCallback(() => {
     if (!checkout.quote) return;

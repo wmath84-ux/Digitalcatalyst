@@ -1059,17 +1059,20 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 .dc-glass-hero {
   position: relative;
   isolation: isolate;
+  /* Match the app brand: the home header / icon blend is indigo → violet
+     (#4f46e5 → #7c3aed). The profile hero now uses the same gradient so the
+     card reads as the website's own colour instead of the old dark navy. */
   background:
-    radial-gradient(120% 90% at 100% 0%, rgba(167, 139, 250, 0.42), transparent 46%),
-    radial-gradient(90% 80% at 0% 110%, rgba(34, 211, 238, 0.26), transparent 48%),
-    linear-gradient(165deg, rgba(18, 16, 42, 0.9), rgba(7, 8, 22, 0.88));
+    radial-gradient(120% 90% at 100% 0%, rgba(255, 255, 255, 0.16), transparent 46%),
+    radial-gradient(90% 80% at 0% 110%, rgba(34, 211, 238, 0.2), transparent 48%),
+    linear-gradient(160deg, #4f46e5 0%, #7c3aed 55%, #a21caf 100%);
   backdrop-filter: blur(26px) saturate(150%);
   -webkit-backdrop-filter: blur(26px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow:
-    0 28px 56px -20px rgba(109, 40, 217, 0.58),
-    0 0 0 1px rgba(167, 139, 250, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    0 28px 56px -20px rgba(109, 40, 217, 0.6),
+    0 0 0 1px rgba(167, 139, 250, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .dc-glass-hero--basic {
