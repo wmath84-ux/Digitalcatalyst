@@ -954,6 +954,10 @@ export const firestoreToEditorForm = (raw, documentId) => {
     subject: str(editor.subject ?? raw.subject),
     sku: str(editor.sku ?? raw.sku),
     tags: arr(editor.tags?.length ? editor.tags : raw.tags).map(String),
+    // Store filter chips the product is attached to. Read back from the
+    // editor blob first, then from the top-level field written for the
+    // Store page, so the admin always reloads exactly what it saved.
+    filterIds: arr(editor.filterIds?.length ? editor.filterIds : raw.filterIds).map(String),
     searchKeywords: arr(editor.searchKeywords?.length ? editor.searchKeywords : raw.keywords).map(String),
     features: arr(editor.features?.length ? editor.features : raw.features).map(String),
     estimatedDuration: str(editor.estimatedDuration ?? raw.dimensions),

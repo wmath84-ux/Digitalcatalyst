@@ -14,6 +14,12 @@ export type Product = {
   classLevel: string;
   subject: string;
   tags: string[];
+  /**
+   * Ids of the admin-managed store filter chips this product is attached to
+   * (see `src/data/storeFilters.ts`). Empty means the product only matches
+   * chips through the legacy category/class/subject/tag fallback.
+   */
+  filterIds?: string[];
   searchKeywords?: string[];
   rating: number;
   reviews: number;

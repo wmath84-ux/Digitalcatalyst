@@ -9,6 +9,7 @@ import {
   stripUndefinedDeep,
 } from "../../../utils/productMapping";
 import { fullDemoCourseContent } from "../../data/demoCourseContent";
+import { normalizeStoreFilters, STORE_FILTERS_DOC_ID } from "../../data/storeFilters";
 import { defaultCatalog, normalizeCatalog, REVISION_CATALOG_DOC_ID } from "../../revision/engine/catalogService";
 import type { PaidUpdate, ProductModule } from "./types";
 import { normalizeRevisionTestBankLimits } from "../../../utils/revisionLimits.js";
@@ -175,6 +176,10 @@ async function saveProduct(ref: ReturnType<typeof doc>, body: any) {
     language: str(normalizedBody.language, "English"),
     dimensions: str(normalizedBody.classLevel || normalizedBody.estimatedDuration),
     tags: strList(normalizedBody.tags),
+    // Store filter chips (settings/storeFilters) this product is attached to.
+    // Written top-level so CatalogContext can read it without unpacking the
+    // admin blob, and so Firestore queries stay possible later.
+    filterIds: strList(normalizedBody.filterIds),
     keywords: strList(normalizedBody.searchKeywords),
     features: strList(normalizedBody.features),
     images: urls,
@@ -372,6 +377,27 @@ async function homeBannersRequest(init?:RequestInit){
   return{banners:list,isDefault:false};
 }
 
+/**
+ * Store filter chips (the row of filters above the Store page grid). Stored
+ * as a single `settings/storeFilters` document — public read, admin write.
+ * An absent (or empty) list means "derive the chips from the products",
+ * which the Store page falls back to, so the filter row is never empty.
+ */
+async function storeFiltersRequest(init?: RequestInit) {
+  const ref = doc(db, "settings", STORE_FILTERS_DOC_ID);
+  if ((init?.method || "GET") === "GET") {
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return { filters: [], isDefault: true };
+    const data = (snap.data() || {}) as any;
+    return { filters: normalizeStoreFilters(data.filters), isDefault: false };
+  }
+  const body = bodyOf(init);
+  if (!Array.isArray(body.filters)) throw new ApiError("Store filter list is invalid.", 400);
+  const filters = normalizeStoreFilters(body.filters);
+  await setDoc(ref, stripUndefinedDeep({ filters, updatedAt: serverTimestamp() }), { merge: true });
+  return { filters, isDefault: false };
+}
+
 async function revisionRequest(init?: RequestInit) {
   const ref = doc(db, "settings", REVISION_CATALOG_DOC_ID);
   if ((init?.method || "GET") === "GET") {
@@ -417,6 +443,7 @@ export async function adminFetch<T=unknown>(input:string,init?:RequestInit):Prom
   else if(p==="/api/admin/reviews")result=await genericCollection("siteReviews","reviews",init);
   else if(p==="/api/admin/content")result=await settingsRequest("adminContent","settings",init);
   else if(p==="/api/admin/home/banners")result=await homeBannersRequest(init);
+  else if(p==="/api/admin/store/filters")result=await storeFiltersRequest(init);
   else if(p==="/api/admin/revision")result=await revisionRequest(init);
   else if(p.startsWith("/api/admin/analytics")){const [ordersRes,productsRes,customersRes,reviewsRes]=await Promise.all([ordersRequest(new URL("/api/admin/orders",url)),productsRequest(new URL("/api/admin/products",url)),customersRequest(new URL("/api/admin/customers",url)),genericCollection("siteReviews","reviews")]);const orders=(ordersRes as any).orders||[],products=(productsRes as any).products||[],customers=(customersRes as any).customers||[],reviews=(reviewsRes as any).reviews||[];const successful=orders.filter((o:any)=>!["failed","cancelled"].includes(o.paymentStatus)),revenue=successful.reduce((n:number,o:any)=>n+Number(o.finalAmount||0),0);result={range:{start:new Date(0).toISOString(),end:new Date().toISOString()},revenue,orders:orders.length,averageOrderValue:successful.length?revenue/successful.length:0,uniqueBuyers:new Set(successful.map((o:any)=>o.customerId)).size,newUsers:customers.length,paymentSuccessRate:orders.length?successful.length/orders.length*100:0,failedPayments:orders.filter((o:any)=>o.paymentStatus==="failed").length,topProducts:products.slice(0,5),activeSubscriptionPlans:0,averageReviewRating:reviews.length?reviews.reduce((n:number,r:any)=>n+Number(r.rating||0),0)/reviews.length:0,reviewsInRange:reviews.length};}
   else throw new ApiError(`Unsupported admin operation: ${p}`,404);

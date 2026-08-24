@@ -97,6 +97,8 @@ export interface EditorForm {
   subject?: string;
   sku?: string;
   tags?: string[];
+  /** Ids of the admin-managed store filter chips this product belongs to. */
+  filterIds?: string[];
   searchKeywords?: string[];
   features?: string[];
   estimatedDuration?: string;

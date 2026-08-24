@@ -73,6 +73,13 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     classLevel: String(data.dimensions || data.level || "Lifetime access"),
     subject: String(data.subject || data.category || "Digital learning"),
     tags: tags.map((tag) => tag.toUpperCase()),
+    // Admin-configured store filter chips this product is attached to.
+    filterIds: [
+      ...(Array.isArray(data.filterIds) ? data.filterIds : []),
+      ...(Array.isArray(data.adminProduct?.filterIds) ? data.adminProduct.filterIds : []),
+    ]
+      .map((value) => String(value || "").trim())
+      .filter((value, index, list) => Boolean(value) && list.indexOf(value) === index),
     searchKeywords,
     rating: Number.isFinite(rating) ? rating : 0,
     reviews: Number(data.reviewCount ?? data.ratingCount ?? 0) || 0,

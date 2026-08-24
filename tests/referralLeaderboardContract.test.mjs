@@ -22,8 +22,10 @@ test("home and store no longer switch filters on left/right swipe", () => {
   // The tap-driven category nav itself remains intact on Home.
   assert.match(home, /<CategoryNav/);
   assert.match(home, /onSelect=\{setActiveCategory\}/);
-  // The store's tap-driven FilterChips remain intact.
-  assert.match(store, /<FilterChips chips=\{chips\} active=\{activeChip\} onSelect=\{setActiveChip\} \/>/);
+  // The store's tap-driven FilterChips remain intact. The chip list is now
+  // admin-managed (settings/storeFilters), so the props carry filter objects
+  // and the selected filter id instead of plain label strings.
+  assert.match(store, /<FilterChips filters=\{chips\} activeId=\{activeFilter\.id\} onSelect=\{setActiveFilterId\} \/>/);
 });
 
 test("leaderboard is reached from the home header while the footer hosts Revision", () => {

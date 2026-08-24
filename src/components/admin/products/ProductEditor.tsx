@@ -20,6 +20,12 @@ import { adminFetch } from "@/lib/admin/client";
 import type { PaidUpdate, ProductImage, ProductModule, ProductResource } from "@/lib/admin/types";
 import { CloudinaryImageUploadField, imageProviderFromUrl } from "@/components/admin/products/CloudinaryImageUploadField";
 import { normalizeResourceUrl } from "../../../../utils/productMapping";
+import {
+  DEFAULT_STORE_FILTER_GROUP,
+  STORE_FILTER_GROUPS,
+  uniqueStoreFilterId,
+  type StoreFilter,
+} from "@/data/storeFilters";
 
 type ProductForm = {
   id: string;
@@ -33,6 +39,8 @@ type ProductForm = {
   subject: string;
   sku: string;
   tags: string[];
+  /** Store page filter chips this product should appear under. */
+  filterIds: string[];
   searchKeywords: string[];
   features: string[];
   estimatedDuration: string;
@@ -70,6 +78,7 @@ const EMPTY_PRODUCT: ProductForm = {
   subject: "",
   sku: "",
   tags: [],
+  filterIds: [],
   searchKeywords: [],
   features: [],
   estimatedDuration: "",
@@ -95,6 +104,7 @@ const EMPTY_PRODUCT: ProductForm = {
 
 const TABS = [
   { key: "basic", label: "Basic" },
+  { key: "filters", label: "Store filters" },
   { key: "images", label: "Images" },
   { key: "pricing", label: "Pricing" },
   { key: "modules", label: "Modules & Resources" },
@@ -151,6 +161,7 @@ export function ProductEditor({ productId }: { productId?: string }) {
         const res = await adminFetch<{ product: ProductForm }>(`/api/admin/products/${productId}`);
         setForm({
           ...res.product,
+          filterIds: Array.isArray(res.product.filterIds) ? res.product.filterIds : [],
           salePrice: res.product.salePrice ?? null,
           manualRating: res.product.manualRating ?? null,
         });
@@ -431,6 +442,13 @@ export function ProductEditor({ productId }: { productId?: string }) {
           </div>
         )}
 
+        {tab === "filters" && (
+          <StoreFiltersEditor
+            selectedIds={form.filterIds}
+            onChange={(filterIds) => update("filterIds", filterIds)}
+          />
+        )}
+
         {tab === "images" && (
           <div className="space-y-3">
             <Field label="Add image URL" hint="Public HTTPS or Cloudinary URL">
@@ -693,6 +711,237 @@ function FeaturesEditor({ features, onChange }: { features: string[]; onChange: 
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Store filters                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Connect this product to the filter chips shown on the Store page — and
+ * create brand-new chips right here.
+ *
+ * The chip list itself is global (`settings/storeFilters`), so adding,
+ * renaming, hiding or deleting a chip is saved immediately and takes effect
+ * on every device. Which chips this particular product belongs to is part of
+ * the product form and is written when the product is saved.
+ */
+function StoreFiltersEditor({ selectedIds, onChange }: { selectedIds: string[]; onChange: (ids: string[]) => void }) {
+  const { notify } = useToast();
+  const [filters, setFilters] = useState<StoreFilter[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [savingList, setSavingList] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newGroup, setNewGroup] = useState<string>(DEFAULT_STORE_FILTER_GROUP);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await adminFetch<{ filters: StoreFilter[] }>("/api/admin/store/filters");
+        setFilters(res.filters || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load store filters.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  /** Persist the global chip list. Local state updates optimistically. */
+  async function persistList(next: StoreFilter[], message: string) {
+    const previous = filters;
+    const ordered = next.map((filter, index) => ({ ...filter, sortOrder: index }));
+    setFilters(ordered);
+    setSavingList(true);
+    try {
+      await adminFetch("/api/admin/store/filters", { method: "PATCH", body: JSON.stringify({ filters: ordered }) });
+      notify("success", message);
+    } catch (err) {
+      setFilters(previous);
+      notify("error", err instanceof Error ? err.message : "Failed to save store filters.");
+    } finally {
+      setSavingList(false);
+    }
+  }
+
+  function toggleSelected(id: string) {
+    onChange(selectedIds.includes(id) ? selectedIds.filter((value) => value !== id) : [...selectedIds, id]);
+  }
+
+  function addFilter() {
+    const label = newLabel.trim();
+    if (!label) {
+      notify("error", "Type a filter name first.");
+      return;
+    }
+    if (filters.some((filter) => filter.label.toLowerCase() === label.toLowerCase())) {
+      notify("error", `“${label}” already exists.`);
+      return;
+    }
+    const filter: StoreFilter = {
+      id: uniqueStoreFilterId(label, filters.map((item) => item.id)),
+      label,
+      group: newGroup || DEFAULT_STORE_FILTER_GROUP,
+      description: "",
+      sortOrder: filters.length,
+      active: true,
+    };
+    setNewLabel("");
+    // A newly created filter is attached to the open product straight away —
+    // that is almost always why the admin created it.
+    onChange([...selectedIds, filter.id]);
+    void persistList([...filters, filter], `“${label}” added to the Store filters.`);
+  }
+
+  function renameFilter(id: string, label: string) {
+    setFilters((current) => current.map((filter) => (filter.id === id ? { ...filter, label } : filter)));
+  }
+
+  function commitRename() {
+    void persistList(filters.filter((filter) => filter.label.trim()), "Store filters updated.");
+  }
+
+  function moveFilter(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= filters.length) return;
+    const next = [...filters];
+    [next[index], next[target]] = [next[target], next[index]];
+    void persistList(next, "Filter order updated.");
+  }
+
+  function removeFilter(filter: StoreFilter) {
+    onChange(selectedIds.filter((value) => value !== filter.id));
+    void persistList(filters.filter((item) => item.id !== filter.id), `“${filter.label}” removed from the Store filters.`);
+  }
+
+  const selectedLabels = selectedIds
+    .map((id) => filters.find((filter) => filter.id === id)?.label || id)
+    .filter(Boolean);
+
+  if (loading) return <LoadingState label="Loading store filters…" />;
+  if (error) return <ErrorState message={error} />;
+
+  return (
+    <div className="space-y-3" data-admin-store-filters>
+      <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+        <p className="text-sm font-semibold text-slate-900">Show this product under these filters</p>
+        <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+          These are the exact chips learners tap above the Store grid. Tick every filter this product should appear
+          under — a product can belong to many. Create a new chip below and it shows up on the Store page instantly.
+        </p>
+        {filters.length === 0 ? (
+          <p className="mt-3 text-xs text-slate-400">
+            No filters created yet. Add the first one below — until then the Store page derives chips from each
+            product’s category, class and subject.
+          </p>
+        ) : (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {filters.map((filter) => {
+              const active = selectedIds.includes(filter.id);
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  onClick={() => toggleSelected(filter.id)}
+                  aria-pressed={active}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                    active
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+                  } ${filter.active ? "" : "opacity-50"}`}
+                >
+                  {active ? "✓" : "+"} {filter.label}
+                  {!filter.active && <span className="text-[9px] uppercase">hidden</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <p className="mt-3 text-[11px] text-slate-500">
+          {selectedLabels.length === 0
+            ? "Not attached to any filter — the product still appears under “All”."
+            : `Attached to: ${selectedLabels.join(", ")}`}
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 p-3">
+        <p className="text-sm font-semibold text-slate-900">Add a new filter</p>
+        <p className="mt-0.5 text-[11px] text-slate-500">Appears as a chip on the Store page for every learner.</p>
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+          <input
+            className={inputClass + " flex-1"}
+            placeholder="e.g. Class 12 Boards"
+            value={newLabel}
+            maxLength={40}
+            onChange={(e) => setNewLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addFilter();
+              }
+            }}
+          />
+          <select className={selectClass + " sm:w-40"} value={newGroup} onChange={(e) => setNewGroup(e.target.value)}>
+            {STORE_FILTER_GROUPS.map((group) => (
+              <option key={group} value={group}>{group}</option>
+            ))}
+          </select>
+          <SecondaryButton onClick={addFilter} disabled={savingList}>Add filter</SecondaryButton>
+        </div>
+      </div>
+
+      {filters.length > 0 && (
+        <div className="rounded-lg border border-slate-200 p-3">
+          <p className="text-sm font-semibold text-slate-900">Manage the Store filter row</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            Rename, reorder, hide or delete chips. Saved instantly for the whole store.
+          </p>
+          <div className="mt-2 space-y-2">
+            {filters.map((filter, index) => (
+              <div key={filter.id} className="flex items-center gap-2 rounded-lg border border-slate-200 p-2">
+                <div className="min-w-0 flex-1">
+                  <input
+                    className={inputClass + " h-9"}
+                    value={filter.label}
+                    maxLength={40}
+                    onChange={(e) => renameFilter(filter.id, e.target.value)}
+                    onBlur={commitRename}
+                  />
+                  <p className="mt-1 truncate text-[10px] text-slate-400">{filter.group} · id: {filter.id}</p>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button type="button" aria-label="Move filter up" disabled={index === 0} onClick={() => moveFilter(index, -1)}
+                    className="h-7 w-7 rounded-md border border-slate-200 text-xs disabled:opacity-30 active:bg-slate-100">↑</button>
+                  <button type="button" aria-label="Move filter down" disabled={index === filters.length - 1} onClick={() => moveFilter(index, 1)}
+                    className="h-7 w-7 rounded-md border border-slate-200 text-xs disabled:opacity-30 active:bg-slate-100">↓</button>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    className="h-7 rounded-md border border-slate-200 px-2 text-[10px] active:bg-slate-100"
+                    onClick={() => void persistList(
+                      filters.map((item) => (item.id === filter.id ? { ...item, active: !item.active } : item)),
+                      filter.active ? `“${filter.label}” hidden from the Store.` : `“${filter.label}” shown on the Store.`,
+                    )}
+                  >
+                    {filter.active ? "Hide" : "Show"}
+                  </button>
+                  <button
+                    type="button"
+                    className="h-7 rounded-md border border-red-200 px-2 text-[10px] text-red-600 active:bg-red-50"
+                    onClick={() => removeFilter(filter)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
