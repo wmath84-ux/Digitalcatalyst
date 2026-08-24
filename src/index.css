@@ -1156,41 +1156,43 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   --fp-violet-text: #6d28d9;
 }
 
-/* ---------- FlowPath utility classes ---------- */
-.text-fp-text { color: var(--fp-text); }
-.text-fp-muted { color: var(--fp-muted); }
-.text-fp-text-85 { color: var(--fp-text-85); }
-.text-fp-text-70 { color: var(--fp-text-70); }
-.text-fp-text-55 { color: var(--fp-text-55); }
-.text-fp-text-50 { color: var(--fp-text-50); }
-.text-fp-text-45 { color: var(--fp-text-45); }
-.text-fp-text-40 { color: var(--fp-text-40); }
-.text-fp-text-30 { color: var(--fp-text-30); }
-.text-fp-text-15 { color: var(--fp-text-15); }
-.text-fp-text-10 { color: var(--fp-text-10); }
+@layer utilities {
+  /* ---------- FlowPath utility classes ---------- */
+  .text-fp-text { color: var(--fp-text); }
+  .text-fp-muted { color: var(--fp-muted); }
+  .text-fp-text-85 { color: var(--fp-text-85); }
+  .text-fp-text-70 { color: var(--fp-text-70); }
+  .text-fp-text-55 { color: var(--fp-text-55); }
+  .text-fp-text-50 { color: var(--fp-text-50); }
+  .text-fp-text-45 { color: var(--fp-text-45); }
+  .text-fp-text-40 { color: var(--fp-text-40); }
+  .text-fp-text-30 { color: var(--fp-text-30); }
+  .text-fp-text-15 { color: var(--fp-text-15); }
+  .text-fp-text-10 { color: var(--fp-text-10); }
 
-.fp-text-rose { color: var(--fp-rose-text); }
-.fp-text-amber { color: var(--fp-amber-text); }
-.fp-text-emerald { color: var(--fp-emerald-text); }
-.fp-text-violet { color: var(--fp-violet-text); }
+  .fp-text-rose { color: var(--fp-rose-text); }
+  .fp-text-amber { color: var(--fp-amber-text); }
+  .fp-text-emerald { color: var(--fp-emerald-text); }
+  .fp-text-violet { color: var(--fp-violet-text); }
 
-.bg-fp-surface { background: var(--fp-surface); }
-.bg-fp-surface-hover { background: var(--fp-surface-hover); }
-.bg-fp-text-15 { background: var(--fp-text-15); }
-.bg-fp-text-10 { background: var(--fp-text-10); }
-.bg-fp-text-6 { background: var(--fp-text-6); }
-.bg-fp-text-5 { background: var(--fp-text-5); }
-.bg-fp-text-3 { background: var(--fp-text-3); }
+  .bg-fp-surface { background: var(--fp-surface); }
+  .bg-fp-surface-hover { background: var(--fp-surface-hover); }
+  .bg-fp-text-15 { background: var(--fp-text-15); }
+  .bg-fp-text-10 { background: var(--fp-text-10); }
+  .bg-fp-text-6 { background: var(--fp-text-6); }
+  .bg-fp-text-5 { background: var(--fp-text-5); }
+  .bg-fp-text-3 { background: var(--fp-text-3); }
 
-.border-fp-border { border-color: var(--fp-border); }
-.border-fp-border-hover:hover { border-color: var(--fp-border-hover); }
-.border-fp-text-30 { border-color: var(--fp-text-30); }
-.border-fp-text-20 { border-color: var(--fp-text-20); }
-.border-fp-text-15 { border-color: var(--fp-text-15); }
+  .border-fp-border { border-color: var(--fp-border); }
+  .border-fp-border-hover:hover { border-color: var(--fp-border-hover); }
+  .border-fp-text-30 { border-color: var(--fp-text-30); }
+  .border-fp-text-20 { border-color: var(--fp-text-20); }
+  .border-fp-text-15 { border-color: var(--fp-text-15); }
 
-.decoration-fp-text-30 { text-decoration-color: var(--fp-text-30); }
+  .decoration-fp-text-30 { text-decoration-color: var(--fp-text-30); }
 
-.placeholder-fp-text-30::placeholder { color: var(--fp-text-30); }
+  .placeholder-fp-text-30::placeholder { color: var(--fp-text-30); }
+}
 
 /* ---------- FlowPath glass surfaces ---------- */
 .glass-panel {

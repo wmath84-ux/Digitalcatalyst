@@ -44,7 +44,7 @@ export function ActivityNode({ type, status, onClick }: ActivityNodeProps) {
           : isCompleted
             ? "0 6px 20px -8px rgba(0,0,0,0.6)"
             : `0 0 16px 1px ${meta.glow}, 0 10px 24px -10px rgba(0,0,0,0.7)`,
-        opacity: isCompleted ? 0.62 : 1,
+        opacity: isCompleted ? 0.78 : 1,
       }}
       aria-label={`${meta.label} — ${status}`}
     >
