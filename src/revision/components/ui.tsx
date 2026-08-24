@@ -129,7 +129,7 @@ export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`dc-glass rounded-3xl p-4 shadow-[0_20px_46px_-28px_rgba(79,70,229,0.42)] ${className}`}>
+    <div className={`rev-card rounded-3xl p-4 ${className}`}>
       {children}
     </div>
   );
