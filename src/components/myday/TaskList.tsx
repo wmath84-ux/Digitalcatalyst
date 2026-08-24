@@ -75,16 +75,16 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
   }, [filtered, highlightId]);
 
   return (
-    <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
+    <div className="rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-300/50">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-5 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-200">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-300/50">
             <ClipboardList className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-900 sm:text-lg">Today's Tasks</h2>
-            <p className="text-xs text-slate-400">
+            <h2 className="text-base font-extrabold text-slate-900 sm:text-lg">Today's Tasks</h2>
+            <p className="text-xs font-medium text-slate-500">
               {counts.completed} of {counts.all} completed
             </p>
           </div>
@@ -176,16 +176,16 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
       {/* Task list */}
       <div ref={listRef} className="space-y-2 p-4 sm:p-6 sm:pt-4">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/80 py-12 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 shadow-inner">
               {isSearchActive ? (
-                <Search className="h-6 w-6 text-slate-300" />
+                <Search className="h-6 w-6 text-slate-400" />
               ) : (
-                <ClipboardList className="h-6 w-6 text-slate-300" />
+                <ClipboardList className="h-6 w-6 text-slate-400" />
               )}
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-400">
+              <p className="text-sm font-bold text-slate-500">
                 {isSearchActive
                   ? `No tasks match "${searchQuery}"`
                   : "No tasks in this category"}

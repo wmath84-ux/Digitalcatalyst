@@ -65,7 +65,7 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
 
   return (
     <PageShell route={route} title="Progress" subtitle="Your learning journey" mergeIntoMainHeader>
-      <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
+      <div className="space-y-4 px-4 py-4 pb-8" style={{ animation: "fade-in 0.25s ease-out both" }}>
         <div className="grid grid-cols-2 gap-3">
           <TotalCard icon={<CheckIcon className="h-5 w-5 text-indigo-600" />} label="Tests Completed" value={data.totals.testsCompleted} />
           <TotalCard icon={<ChartIcon className="h-5 w-5 text-emerald-600" />} label="Overall Accuracy" value={`${data.totals.overallAccuracy}%`} />
@@ -110,18 +110,18 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
               {data.activityHistory.map((a, idx) => (
                 <div key={`${a.type}-${a.refId}-${idx}`} className="flex items-start gap-3">
                   <div
-                    className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                    className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-sm ${
                       a.type === "test" ? "bg-indigo-100 text-indigo-700" : "bg-emerald-100 text-emerald-700"
                     }`}
                   >
                     {a.type === "test" ? <ChartIcon className="h-4.5 w-4.5" /> : <SparklesIcon className="h-4.5 w-4.5" />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-slate-800">{a.title}</p>
-                    <p className="text-xs text-slate-600">{a.detail}</p>
+                    <p className="text-sm font-semibold text-slate-800">{a.title}</p>
+                    <p className="text-xs text-slate-500">{a.detail}</p>
                   </div>
-                  <span className="shrink-0 text-[11px] font-medium text-slate-500">
-                    {new Date(a.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  <span className="shrink-0 text-[11px] font-semibold text-slate-500">
+                    {a.date ? new Date(a.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
                   </span>
                 </div>
               ))}

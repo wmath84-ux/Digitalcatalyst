@@ -129,7 +129,7 @@ export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-3xl border border-slate-200/90 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)] ${className}`}>
+    <div className={`rounded-3xl border border-slate-200 bg-white p-4 shadow-md shadow-slate-200/60 ${className}`}>
       {children}
     </div>
   );
