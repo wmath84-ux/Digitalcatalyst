@@ -1074,6 +1074,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         >
           <div className="min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
         </div>
+        {/* Split-mode spacer. The dock (rendered by the overlay as this
+            section's last in-flow child) sits in normal flex flow, so when
+            the lesson shrinks to 60% for the notes editor the rail used to
+            slide with it toward the middle of the screen. The spacer eats
+            the gap under the 40% notes sheet and pins the dock back to the
+            far-right edge — exactly where it sits when the sheet is closed.
+            The sheet (absolute, z-40) covers the spacer completely. */}
+        {notesSplitMode ? <div className="min-h-0 flex-1" aria-hidden="true" data-course-dock-spacer /> : null}
         {playerChromeHidden ? null : overlay}
         {chromeRestoreButton}
       </section>

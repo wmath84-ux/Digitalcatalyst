@@ -161,7 +161,10 @@ test("ImageViewer shows a friendly error when the image fails to load", () => {
 // ---------------------------------------------------------------------------
 
 test("NotesPanel supports add, edit, and delete via a single + button", () => {
-  assert.match(notesPanel, /data-course-notes-add/);
+  // The "+" moved from the panel's secondary header up to the overlay's
+  // MAIN header — the panel itself renders no header row anymore.
+  assert.match(overlay, /data-course-notes-add/);
+  assert.doesNotMatch(notesPanel, /data-course-notes-add/);
   assert.match(notesPanel, /data-course-notes-save/);
   assert.match(notesPanel, /data-course-note-edit/);
   assert.match(notesPanel, /data-course-note-edit-input/);
@@ -183,10 +186,24 @@ test("NotesPanel renders the empty state and a square-grid notes list", () => {
   assert.doesNotMatch(notesPanel, /<Trash2 /);
 });
 
-test("NotesPanel drops the context box and keeps only the + composer", () => {
-  assert.match(notesPanel, /<Plus size=\{16\} \/>/);
+test("The single + button lives in the overlay's main header, not the panel", () => {
+  // The "+" moved up into the overlay's main header; the panel no longer
+  // renders its own header row at all.
+  assert.match(overlay, /<Plus size=\{16\} \/>/);
+  assert.match(overlay, /aria-label="Add note"/);
+  assert.doesNotMatch(notesPanel, /<Plus \/>/);
+  assert.doesNotMatch(notesPanel, /data-course-notes-title/);
   assert.doesNotMatch(notesPanel, /Context: \{productTitle\}/);
   assert.doesNotMatch(notesPanel, /sync across devices/);
+});
+
+test("The overlay hides its main header + grab handle while the writing box is open", () => {
+  // Writing mode = notes tab + editor open. In that mode the sheet keeps no
+  // chrome at all: toolbar / writing surface / Save + Cancel only, so the
+  // box gets maximum space in both portrait and landscape.
+  assert.match(overlay, /const notesWriting = tab === "notes" && notesEditorOpen;/);
+  assert.match(overlay, /\{!landscape && !notesWriting \? \(/);
+  assert.match(overlay, /\{notesWriting \? null : \(/);
 });
 
 test("CourseOverlay wires NotesPanel into the notes tab", () => {
