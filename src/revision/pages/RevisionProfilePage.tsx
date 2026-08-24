@@ -1,18 +1,20 @@
-// Revision profile — redesigned.
+// Revision profile — redesigned to match the app's glass / aurora language.
 //
-// Exactly two customization options, both user-facing:
-//   1. AI Configuration    — only AI provider/model/key settings, nothing else.
-//   2. AI Test Generator   — class/subject/chapter/topic → generate an exam.
-// Plus the bulk importer (moved here from the admin panel) so users can turn
-// pasted questions into a new test directly.
+// The page is a launchpad, not a settings dump:
+//   1. A branded hero greeting + quick snapshot of the learner's progress.
+//   2. "Create" — Generate Questions with AI (the primary action) + Bulk Import.
+//   3. "Configure" — AI configuration (provider / model / key).
+//   4. The live school-AI allowance card.
+// Everything keeps the opaque/stable card surface so nothing flashes while
+// the allowance or snapshot data refreshes in place.
 
 import { useMemo } from "react";
 import PageShell from "../components/PageShell";
 import { PrimaryButton } from "../components/ui";
 import {
   BookOpenIcon,
-  ChartIcon,
   ChevronRightIcon,
+  ChartIcon,
   FlameIcon,
   GearIcon,
   SparklesIcon,
@@ -29,74 +31,77 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
   return (
     <PageShell route={route} title="Profile" mergeIntoMainHeader>
       <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
-        {/* The two customization options */}
-        <div>
-          <h3 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-500">
-            Customization
-          </h3>
-          <div className="space-y-3">
-            {/* Option 1 — AI Configuration (only AI config, nothing else).
-                Uses the website brand gradient (indigo → violet) with a soft
-                glassmorphism wash and a deep branded shadow. */}
-            <button
-              type="button"
-              onClick={() => navigate("#/revision/ai-settings")}
-              className="group relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-5 text-left shadow-[0_24px_50px_-20px_rgba(79,70,229,0.65)] ring-1 ring-white/30 backdrop-blur transition-all active:scale-[0.98]"
-            >
-              <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10" />
-              <div className="absolute -bottom-6 -left-6 h-20 w-20 rounded-full bg-white/5" />
-              <div className="relative flex items-center gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur">
-                  <GearIcon className="h-7 w-7 text-white" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-base font-bold text-white">AI Configuration</h3>
-                  <p className="mt-0.5 text-xs text-purple-100">
-                    Connect your own AI — Gemini, ChatGPT, Claude, Groq & more
-                  </p>
-                </div>
-                <ChevronRightIcon className="h-6 w-6 text-white/70" />
-              </div>
-            </button>
-
-            {/* Option 2 — AI Test Generator. Matches the website brand
-                (indigo → violet) with glassmorphism + a deep branded shadow. */}
+        {/* Branded hero */}
+        <section className="dc-glass-hero relative overflow-hidden rounded-[2rem] p-5 text-white">
+          <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-16 -left-10 h-36 w-36 rounded-full bg-cyan-300/20 blur-2xl" />
+          <div className="relative">
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-violet-100/80">Revision Studio</p>
+            <h2 className="mt-1.5 text-2xl font-extrabold leading-tight">Hi {userName}</h2>
+            <p className="mt-1 text-xs leading-relaxed text-violet-50/90">
+              Build focused revision plans, connect AI and track how you are improving.
+            </p>
             <button
               type="button"
               onClick={() => navigate("#/revision/ai-generate")}
-              className="group relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-500 via-violet-500 to-purple-600 p-5 text-left shadow-[0_24px_50px_-20px_rgba(124,58,237,0.6)] ring-1 ring-white/30 backdrop-blur transition-all active:scale-[0.98]"
+              className="mt-4 flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-white text-sm font-extrabold text-violet-700 shadow-lg shadow-violet-950/20 transition active:scale-[0.98]"
             >
-              <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10" />
-              <div className="absolute -bottom-6 -left-6 h-20 w-20 rounded-full bg-white/5" />
-              <div className="relative flex items-center gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur">
-                  <SparklesIcon className="h-7 w-7 text-white" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-base font-bold text-white">Generate Questions with AI</h3>
-                  <p className="mt-0.5 text-xs text-indigo-100">
-                    Pick class, subject, chapter & topic — get a ready exam
-                  </p>
-                </div>
-                <ChevronRightIcon className="h-6 w-6 text-white/70" />
-              </div>
-              <div className="relative mt-3 flex flex-wrap gap-1.5">
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">Class</span>
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">Subject</span>
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">Chapter</span>
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">Topic</span>
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">Difficulty</span>
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">Question type</span>
-                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">Questions & time</span>
-              </div>
+              <SparklesIcon className="h-5 w-5" /> Generate Questions with AI
             </button>
           </div>
-        </div>
+        </section>
 
+        {/* Quick snapshot */}
+        <section>
+          <h3 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-500">Snapshot</h3>
+          <div className="grid grid-cols-3 gap-2.5">
+            <WidgetCard
+              icon={<ChartIcon className="h-5 w-5 text-emerald-600" />}
+              label="Accuracy"
+              value={`${dashboard.quickStats.overallAccuracy}%`}
+            />
+            <WidgetCard
+              icon={<TrophyIcon className="h-5 w-5 text-amber-600" />}
+              label="Tests done"
+              value={dashboard.quickStats.testsCompleted}
+            />
+            <WidgetCard
+              icon={<FlameIcon className="h-5 w-5 text-orange-600" />}
+              label="Streak"
+              value={`${dashboard.quickStats.streak}d`}
+            />
+          </div>
+        </section>
+
+        {/* Configure AI */}
+        <section>
+          <h3 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-500">Configure AI</h3>
+          <button
+            type="button"
+            onClick={() => navigate("#/revision/ai-settings")}
+            className="group relative w-full overflow-hidden rounded-3xl border border-white/70 bg-white/75 p-4 text-left shadow-[0_20px_40px_-26px_rgba(79,70,229,0.55)] backdrop-blur-xl transition active:scale-[0.98]"
+          >
+            <div className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-violet-300/30 blur-xl" />
+            <div className="relative flex items-center gap-4">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm">
+                <GearIcon className="h-6 w-6" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-slate-900">AI Configuration</h3>
+                <p className="mt-0.5 text-[11px] text-slate-600">
+                  Connect Gemini, ChatGPT, Claude, Groq & more
+                </p>
+              </div>
+              <ChevronRightIcon className="h-5 w-5 text-slate-400 transition group-active:translate-x-0.5" />
+            </div>
+          </button>
+        </section>
+
+        {/* AI allowance */}
         <AiQuotaCard uid={uid} />
 
-        {/* Bulk import — moved from the admin panel */}
-        <div>
+        {/* Bulk import */}
+        <section>
           <h3 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-500">Import</h3>
           <button
             type="button"
@@ -114,31 +119,9 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
             </span>
             <ChevronRightIcon className="h-5 w-5 text-slate-400" />
           </button>
-        </div>
+        </section>
 
-        {/* Quick snapshot */}
-        <div>
-          <h3 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-500">Snapshot</h3>
-          <div className="grid grid-cols-3 gap-3">
-            <WidgetCard
-              icon={<ChartIcon className="h-5 w-5 text-emerald-600" />}
-              label="Accuracy"
-              value={`${dashboard.quickStats.overallAccuracy}%`}
-            />
-            <WidgetCard
-              icon={<TrophyIcon className="h-5 w-5 text-amber-600" />}
-              label="Tests done"
-              value={dashboard.quickStats.testsCompleted}
-            />
-            <WidgetCard
-              icon={<FlameIcon className="h-5 w-5 text-orange-600" />}
-              label="Streak"
-              value={`${dashboard.quickStats.streak}d`}
-            />
-          </div>
-        </div>
-
-        <PrimaryButton onClick={() => navigate("#/revision")}>Go to Dashboard</PrimaryButton>
+        <PrimaryButton onClick={() => navigate("#/revision")}>Go to Revision Dashboard</PrimaryButton>
       </div>
     </PageShell>
   );
@@ -146,8 +129,9 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
 
 function WidgetCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
   return (
-    // Stable opaque surface (no backdrop-filter) so the snapshot cards below
-    // the Import section never show a white-flash glitch while scrolling.
+    // Stable opaque surface (no backdrop-filter) so the snapshot cards never
+    // show a white-flash glitch while scrolling or when the allowance card
+    // refreshes alongside them.
     <div className="rev-card flex flex-col items-center gap-1 rounded-2xl py-3 text-center">
       {icon}
       <span className="text-base font-bold text-slate-900">{value}</span>

@@ -70,12 +70,42 @@ const RECALL_OPENER =
 const WHICH_FOLLOWING = /\bwhich of the following\b/i;
 const HOW_MANY_FACT = /\bhow many\b/i;
 
+// Clues that a value has to be worked out for an unknown/variable — stronger
+// than a bare recall "value of a constant" (which stays theory).
+const EQUATION_HINT =
+  /\b(?:solve(?:ing)? for|find x|find (?:the )?value of x|what is (?:the )?value of x|find (?:the )?(?:sum|product|difference|result|total|value) of|x\s*=)\b/i;
+
 // Option that starts with a bare/computed number ("5", "5 N", "12.5%", "2/3"…).
 const NUMERIC_OPTION =
   /^\s*[([]?\s*[-+±]?\s*(?:\d[\d,]*(?:\.\d+)?|\.\d+)(?:\s*[/:]\s*\d|\s|[a-zA-Zµ°Ω%/^²³·×-]|$)/;
 
 const countNumericOptions = (options) =>
   options.reduce((total, option) => total + (NUMERIC_OPTION.test(String(option ?? "").trim()) ? 1 : 0), 0);
+
+/**
+ * True when a question carries evidence that it must be SOLVED, not merely
+ * recalled. Excludes recall-of-a-constant ("value of g") and fact counting
+ * ("how many bones"), which stay theory even though their options may be
+ * numeric — those triggers require a digit in the prompt itself.
+ */
+const hasSolveSignal = (question) => {
+  const row = question && typeof question === "object" ? question : {};
+  const prompt = String(row.prompt ?? "");
+  const options = Array.isArray(row.options) ? row.options : [];
+  const hasDigit = /\d/.test(prompt);
+  const numericOptions = options.length >= 2 ? countNumericOptions(options) : 0;
+  const unitAnchor = UNIT_ANCHOR.test(prompt);
+  const scenario = hasDigit && SCENARIO_VERB.test(prompt);
+  const howMuch = HOW_MUCH_COMPUTE.test(prompt) && (hasDigit || unitAnchor || numericOptions >= 2);
+  return (
+    COMPUTE_VERB.test(prompt) ||
+    EQUATION_HINT.test(prompt) ||
+    unitAnchor ||
+    scenario ||
+    (hasDigit && numericOptions >= 2) ||
+    howMuch
+  );
+};
 
 /**
  * Heuristic read of a question's true style.
@@ -92,10 +122,12 @@ export const classifyQuestionKind = (question) => {
   const compute = COMPUTE_VERB.test(prompt);
   const unitAnchor = UNIT_ANCHOR.test(prompt);
   const scenario = hasDigit && SCENARIO_VERB.test(prompt);
+  const equation = EQUATION_HINT.test(prompt);
   const numericOptions = options.length >= 2 ? countNumericOptions(options) : 0;
 
   let application = 0;
   if (compute) application += 4;
+  if (equation) application += 3;
   if (hasDigit) application += 2;
   if (unitAnchor) application += 2;
   if (scenario) application += 2;
@@ -109,10 +141,16 @@ export const classifyQuestionKind = (question) => {
   if (HOW_MANY_FACT.test(prompt) && !hasDigit) theory += 2; // fact counting ("How many bones…")
   if (!hasDigit && numericOptions === 0) theory += 1; // purely verbal question & answers
 
-  if (application >= 4 && application - theory >= 2) return "application";
+  // Strong solve evidence wins even when a recall opener is also present —
+  // that overlap is the signature of a word problem hiding behind a "state
+  // the …" frame (e.g. "State Newton's law. A 2 kg body accelerates at 3 m/s².").
+  if (application >= 4 && (application - theory >= 1 || numericOptions >= 2)) return "application";
   if (theory >= 3 && application <= 2) return "theory";
   if (application === 0) return "theory"; // no solve-signal at all ⇒ plain conceptual MCQ
   if (application <= 1 && theory >= 2) return "theory";
+  // Any remaining ambiguity that still carries solve evidence is application;
+  // this is what stops solve-type questions leaking into "Theory only".
+  if (hasSolveSignal(question)) return "application";
   return "unknown";
 };
 
@@ -170,7 +208,15 @@ export const planModeEnforcement = (questions, mode, requestedCount) => {
     const keep = [];
     const allRejects = [];
     for (const entry of entries) {
-      if (entry.kind !== rejectedKind) {
+      // In a strict mode an "unknown" question is not automatically trusted:
+      // it is only accepted when it has no solve signal in theory mode (a
+      // plain recall/definition item) or carries one in application mode.
+      // Otherwise the model's self-declared tag is what leaks solve-type
+      // questions into "Theory only", which is exactly the reported bug.
+      const ambiguousWrongType =
+        entry.kind === "unknown" &&
+        (wanted === "theory" ? hasSolveSignal(entry.question) : !hasSolveSignal(entry.question));
+      if (entry.kind !== rejectedKind && !ambiguousWrongType) {
         if (keep.length < count) keep.push(entry.question);
       } else {
         allRejects.push(entry.question);
