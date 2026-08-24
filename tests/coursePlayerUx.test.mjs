@@ -223,7 +223,10 @@ test("CoursePlayer persists last opened file id", () => {
 
 test("CoursePlayer resumes the last opened file when the snapshot delivers it", () => {
   assert.match(coursePlayer, /Resume the last opened file when the Firestore listener/);
-  assert.match(coursePlayer, /if \(!lastOpenedFileId \|\| selectedFile\) return;/);
+  // A deep-link open (`?module=` — admin hero slide → specific module) is
+  // an explicit "take me to THIS module" intent, so the saved resume
+  // position must never clobber it.
+  assert.match(coursePlayer, /if \(!lastOpenedFileId \|\| selectedFile \|\| deepLinkFileId\) return;/);
   assert.match(coursePlayer, /const match = files\.find\(\(file\) => file\.id === lastOpenedFileId\)/);
 });
 

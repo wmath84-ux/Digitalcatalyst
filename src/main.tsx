@@ -280,6 +280,16 @@ function Root() {
     return catalogProducts.find((product) => product.id === routeId) || null;
   }, [catalogProducts, hash]);
 
+  // Course deep-link module (`#/course/<id>?module=<moduleId>`). Set by
+  // admin-linked home hero slides so the player opens straight at that
+  // product's specific module.
+  const selectedCourseModuleId = useMemo(() => {
+    if (!hash.startsWith(COURSE_HASH)) return null;
+    const query = hash.split("?")[1] || "";
+    const moduleParam = new URLSearchParams(query).get("module");
+    return moduleParam ? moduleParam : null;
+  }, [hash]);
+
   const showShoppingToast = (message: string) => {
     setShoppingToast(message);
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -787,6 +797,7 @@ function Root() {
         onCheckout={(price) => navigateToCheckout(price)}
         onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }}
         onPurchaseUpdate={handlePurchaseUpdate}
+        initialModuleId={selectedCourseModuleId || undefined}
       />
     );
   }
