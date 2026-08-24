@@ -30,6 +30,33 @@ const HOLD_MS = 550;
 const RING_R = 15;
 const RING_C = 2 * Math.PI * RING_R;
 
+/**
+ * Map a dock radial item to the real app route it should open. "Create" is
+ * handled separately (it creates an activity inside FlowPath); the Home /
+ * MyDay / Revision items jump straight to their pages.
+ */
+const ROUTE_FOR_ITEM: Record<string, string> = {
+  // Home long-press quick links
+  "home-purchase": "#/store/purchases",
+  "home-store": "#/store",
+  "home-subscription": "#/subscription",
+  "home-profile": "#/profile",
+  "home-wishlist": "#/favorites",
+  "home-cart": "#/cart",
+  // MyDay quick sections (MyDay reads ?section= to open that tab)
+  day: "#/my-day",
+  "day-task": "#/my-day?section=tasks",
+  "day-schedule": "#/my-day?section=schedule",
+  "day-reminder": "#/my-day?section=reminders",
+  "day-note": "#/my-day?section=notes",
+  // Revision quick pages
+  "rev-dashboard": "#/revision",
+  "rev-bank": "#/revision/bank",
+  "rev-week": "#/revision/weak-topics",
+  "rev-progress": "#/revision/progress",
+  "rev-profile": "#/revision/profile",
+};
+
 const MYDAY_ITEMS: RadialItem[] = [
   { id: "day", label: "Day", icon: Sunrise, color: "#5eead4" },
   { id: "day-task", label: "Task", icon: CheckSquare, color: "#8b7bff" },
@@ -223,13 +250,20 @@ export function BottomDock({ onCreateType, onStub, onNavigateToHome }: BottomDoc
         onClose={() => setMenu(null)}
         onSelect={(id) => {
           const group = menu?.group ?? "";
-          const item = menu?.items.find((i) => i.id === id);
           setMenu(null);
           if (group === "Create") {
             onCreateType(id as ActivityType);
-          } else {
-            onStub(group, item?.label ?? id);
+            return;
           }
+          const route = ROUTE_FOR_ITEM[id];
+          if (route) {
+            // Jump straight to the real page for Home / MyDay / Revision items.
+            window.location.hash = route;
+            return;
+          }
+          // Unknown item — fall back to the stub so nothing silently disappears.
+          const item = menu?.items.find((i) => i.id === id);
+          onStub(group, item?.label ?? id);
         }}
       />
     </>

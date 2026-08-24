@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { Bell, Heart, Search, Trophy, X } from "lucide-react";
+import { Bell, Heart, Plus, Search, Trophy, X } from "lucide-react";
 import type { Product } from "../types";
 import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
 import BrandMark from "../../components/BrandMark";
@@ -68,6 +68,17 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           >
             <Trophy size={17} strokeWidth={2.4} className="shrink-0" />
             <span className="hidden text-xs font-bold tracking-tight min-[430px]:inline">Leaderboard</span>
+          </button>
+          {/* Quick shortcut to the FlowPath / task-planning dashboard (the same
+              page that opens on a long-press of the Home button). */}
+          <button
+            type="button"
+            aria-label="Open FlowPath planning"
+            title="FlowPath planning"
+            onClick={() => { window.location.hash = "#/flowpath"; }}
+            className="grid h-9 w-9 place-items-center rounded-xl border border-white/35 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition hover:bg-white/24 active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
+          >
+            <Plus size={18} strokeWidth={2.6} />
           </button>
           <button
             type="button"

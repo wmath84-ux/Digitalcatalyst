@@ -1227,6 +1227,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   --fp-amber-text: #fcd34d;
   --fp-emerald-text: #6ee7b7;
   --fp-violet-text: #ddd6fe;
+
+  color-scheme: dark;
 }
 
 /* FlowPath light theme overrides */
@@ -1264,6 +1266,13 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   --fp-amber-text: #b45309;
   --fp-emerald-text: #047857;
   --fp-violet-text: #6d28d9;
+
+  color-scheme: light;
+}
+
+/* FlowPath display font (matches the provided design zip) */
+.font-display {
+  font-family: "Sora", "Manrope", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer utilities {
@@ -1304,8 +1313,13 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   .placeholder-fp-text-30::placeholder { color: var(--fp-text-30); }
 }
 
-/* ---------- FlowPath glass surfaces ---------- */
-.glass-panel {
+/* ---------- FlowPath glass surfaces ----------
+   Scoped under `.flowpath-app` so the theme-aware surface always wins over the
+   dark `.glass-panel` defined in landing.css (which loads after index.css and
+   would otherwise pin the FlowPath header to a black background even in light
+   mode). The provided design zip ships a single index.css, so this conflict
+   did not exist there; scoping reproduces the same result in this app. */
+.flowpath-app .glass-panel {
   background: var(--fp-panel);
   backdrop-filter: blur(22px) saturate(140%);
   -webkit-backdrop-filter: blur(22px) saturate(140%);
@@ -1316,7 +1330,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
-.glass-panel-strong {
+.flowpath-app .glass-panel-strong {
   background: var(--fp-surface-strong);
   backdrop-filter: blur(28px) saturate(150%);
   -webkit-backdrop-filter: blur(28px) saturate(150%);
