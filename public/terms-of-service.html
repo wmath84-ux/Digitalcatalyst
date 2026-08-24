@@ -50,18 +50,21 @@
     a:hover { text-decoration: underline; }
 
     .brand-badge {
-      width: 38px;
-      height: 38px;
+      width: 44px;
+      height: 44px;
       flex: none;
-      display: grid;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       place-items: center;
-      border-radius: 11px;
-      background: var(--accent);
+      border-radius: 16px;
+      background: linear-gradient(to bottom right, #6366f1, #a855f7, #7c3aed);
       color: #fff;
       font-weight: 900;
       font-size: 17px;
       letter-spacing: -0.02em;
-      box-shadow: 0 8px 18px -8px rgba(124, 58, 237, 0.6);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3), 0 10px 15px -3px rgba(99, 102, 241, 0.25), 0 4px 6px -4px rgba(99, 102, 241, 0.25);
+      overflow: hidden;
     }
 
     /* ── Sticky header ─────────────────────────────────────────────── */
@@ -204,7 +207,9 @@
       max-width: 880px;
       margin: 0 auto;
       padding: 28px 18px 60px;
-      display: grid;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       gap: 22px;
     }
 
@@ -253,9 +258,11 @@
       width: 40px;
       height: 40px;
       border-radius: 12px;
-      background: var(--accent);
+      background: linear-gradient(to bottom right, #6366f1, #a855f7, #7c3aed);
       color: #fff;
-      display: grid;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       place-items: center;
       font-size: 15px;
       font-weight: 800;
@@ -302,14 +309,16 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: #fff;
-      background: var(--accent);
+      background: linear-gradient(to bottom right, #6366f1, #a855f7, #7c3aed);
       padding: 3px 9px;
       border-radius: 999px;
       margin-top: 1px;
     }
 
     .contact-block {
-      display: grid;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       gap: 10px;
       margin-top: 6px;
     }
@@ -406,7 +415,7 @@
   <header class="site-header">
     <div class="site-header-inner">
       <a class="brand" href="/#/home" aria-label="Eduvora home">
-        <span class="brand-badge">E</span>
+        <span class="brand-badge"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></span>
         <span>
           <span class="brand-name">Eduvora</span>
           <span class="brand-sub">Digital Catalyst</span>
@@ -600,7 +609,7 @@
   <footer class="site-footer">
     <div class="site-footer-inner">
       <a class="brand" href="/#/home">
-        <span class="brand-badge">E</span>
+        <span class="brand-badge"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg></span>
         <span>
           <span class="brand-name">Eduvora</span>
           <span class="brand-sub">Digital Catalyst</span>
