@@ -1005,6 +1005,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           status={mindMap.status}
           errorMessage={mindMap.errorMessage}
           onFlush={mindMap.flush}
+          landscape={useLandscapeRails}
         />
       )}
       onMindMapSplitChange={handleMindMapSplitChange}
