@@ -137,6 +137,51 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
     4px 5px 12px rgba(15, 23, 42, 0.12);
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   Course Player dock — fluid sheen + breathing glow.
+   The dock reuses the floating footer pill (.dc-footer-pill) but sits on the
+   player's stage, whose overflow-hidden clipping can hide the outward halo.
+   Two additions make the dock read like the home-page footer:
+     1. a brighter resting halo (.dc-footer-glow tuned for the dock) so the
+        slow breathe is clearly visible against the dark surface, and
+     2. a slow liquid highlight (.dc-dock-fluid) that drifts INSIDE the
+        capsule — it is never clipped, so it gives the pill a "magic" shimmer
+        (indigo → cyan) without washing out the crisp black icons.
+   ───────────────────────────────────────────────────────────────────── */
+[data-course-dock] .dc-footer-glow {
+  /* A touch brighter at rest than the site footer so the breathe reads on the
+     player's dark stage; still swells with scroll energy. */
+  opacity: calc(0.55 + var(--dc-footer-glow, 0) * 0.45);
+}
+
+.dc-dock-fluid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 28%,
+    rgba(129, 140, 248, 0.34) 46%,
+    rgba(34, 211, 238, 0.28) 55%,
+    transparent 74%
+  );
+  background-size: 240% 100%;
+  animation: dc-dock-fluid 5.5s linear infinite;
+}
+
+@keyframes dc-dock-fluid {
+  0% { background-position: 130% 0; }
+  100% { background-position: -130% 0; }
+}
+
+/* While the indicator is being dragged, the active pill glows a little harder
+   so it feels "alive" as it travels between tabs. */
+[data-course-dock-indicator][data-dragging="true"] > span {
+  filter: brightness(1.1) drop-shadow(0 0 6px rgba(167, 139, 250, 0.6));
+}
+
 @media (max-width: 639px) {
   [data-app-frame] {
     width: 100%;
@@ -167,6 +212,10 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   .dc-footer-glow::before {
     animation: none;
     opacity: 0.7;
+  }
+  .dc-dock-fluid {
+    animation: none;
+    opacity: 0.4;
   }
 }
 

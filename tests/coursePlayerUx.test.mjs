@@ -223,11 +223,18 @@ test("CoursePlayer persists last opened file id", () => {
 
 test("CoursePlayer resumes the last opened file when the snapshot delivers it", () => {
   assert.match(coursePlayer, /Resume the last opened file when the Firestore listener/);
-  // A deep-link open (`?module=` — admin hero slide → specific module) is
-  // an explicit "take me to THIS module" intent, so the saved resume
-  // position must never clobber it.
-  assert.match(coursePlayer, /if \(!lastOpenedFileId \|\| selectedFile \|\| deepLinkFileId\) return;/);
+  // A deep-link open (`?module=` — admin hero slide → specific module) is an
+  // explicit "take me to THIS module" intent, so the saved resume position
+  // must never clobber it. A deliberate manual navigation wins too — but the
+  // default first-lesson auto-selection does NOT count as one, which is what
+  // finally lets the saved position take over once it arrives (the old
+  // `selectedFile` guard made resume silently never fire).
+  assert.match(coursePlayer, /if \(!lastOpenedFileId \|\| deepLinkFileId \|\| userSelectedRef\.current\) return;/);
   assert.match(coursePlayer, /const match = files\.find\(\(file\) => file\.id === lastOpenedFileId\)/);
+  // The owning module + paid-update ownership are re-checked, so a position
+  // saved before a refund / lock change never reopens unreachable content.
+  assert.match(coursePlayer, /owningModuleForFile\(modules, match\.id\)/);
+  assert.match(coursePlayer, /moduleAccessible && !filePaidLocked/);
 });
 
 test("CoursePlayer persists completed file ids + access source + preview state", () => {
