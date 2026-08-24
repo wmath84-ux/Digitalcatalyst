@@ -137,6 +137,23 @@ const firstAccessibleFileInModule = (
   return null;
 };
 
+/**
+ * Find the module that DIRECTLY owns a file (by file id), recursing through
+ * the nested tree. Hidden modules are skipped so a file that lives under a
+ * now-hidden branch never reports a stale owner. Returns null when the file
+ * is not present in any visible module — used by the resume path to decide
+ * whether reopening it is still legitimate for this learner.
+ */
+const owningModuleForFile = (modules: CourseModule[], fileId: string): CourseModule | null => {
+  for (const module of modules) {
+    if (module.accessLevel === "hidden") continue;
+    if (filesInModule(module).some((file) => file.id === fileId)) return module;
+    const nested = owningModuleForFile(module.modules || [], fileId);
+    if (nested) return nested;
+  }
+  return null;
+};
+
 const collectUpdates = (modules: CourseModule[]) => {
   const map = new Map<string, PaidCourseUpdate>();
   const add = (item: CourseModule | CourseFile, contentName: string) => {
@@ -230,6 +247,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const files = useMemo(() => allFiles(modules).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
   const { resolution, hasActiveSubscription } = useCourseAccess({ product });
   const [selectedFile, setSelectedFile] = useState<CourseFile | null>(null);
+  // Tracks whether the LEARNER has manually picked a file this session. The
+  // first-lesson auto-selection and the saved-position resume both set
+  // `selectedFile` directly (not through `selectFile`), so this flag is the
+  // only way to tell "the app chose this for me" from "I chose this myself".
+  // The resume path uses it so a saved position can still take over from the
+  // default first lesson, but never clobbers a deliberate navigation.
+  const userSelectedRef = useRef(false);
 
   // ── Deep-link module (admin hero slide → specific product module) ──
   // Resolved once per module/access change. A missing, hidden or
@@ -467,17 +491,28 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     if (first) setSelectedFile(first);
   }, [files, deepLinkFileId, resolution.accessibleModuleIds, selectedFile, modules]);
 
-  // Resume the last opened file when the Firestore listener
-  // delivers the id. A deep-link open is the learner's explicit
-  // "take me to THIS module" intent, so it is never clobbered by the
-  // saved resume position.
+  // Resume the last opened file when the Firestore listener delivers the id.
+  // A deep-link open is the learner's explicit "take me to THIS module" intent,
+  // so it is never clobbered by the saved resume position, and a deliberate
+  // navigation (userSelectedRef) always wins too. The default first-lesson
+  // auto-selection does NOT set that flag, so the saved position is still
+  // allowed to take over from it the moment it arrives — that is what makes
+  // "reopen the course and land on the module I left off in" actually work.
+  //
+  // The owning module + paid-update ownership are re-checked so a position
+  // saved before a refund / lock change never reopens content the learner can
+  // no longer reach.
   useEffect(() => {
-    if (!lastOpenedFileId || selectedFile || deepLinkFileId) return;
+    if (!lastOpenedFileId || deepLinkFileId || userSelectedRef.current) return;
     const match = files.find((file) => file.id === lastOpenedFileId);
-    if (match && resolution.accessibleModuleIds.has(String((match as CourseFile & { parentModuleId?: string }).parentModuleId || ""))) {
-      setSelectedFile(match);
-    }
-  }, [files, lastOpenedFileId, deepLinkFileId, resolution.accessibleModuleIds, selectedFile]);
+    if (!match) return;
+    const owner = owningModuleForFile(modules, match.id);
+    const moduleAccessible = owner ? resolution.accessibleModuleIds.has(String(owner.id)) : true;
+    const filePaidLocked = match.accessLevel === "paidUpdate"
+      && Boolean(match.paidUpdateId)
+      && !resolution.ownedUpdateIds.has(String(accessId(match)));
+    if (moduleAccessible && !filePaidLocked) setSelectedFile(match);
+  }, [files, lastOpenedFileId, deepLinkFileId, resolution.accessibleModuleIds, resolution.ownedUpdateIds, modules]);
 
   /**
    * "Mark complete" is a TOGGLE, never a one-way door. Tapping it by mistake
@@ -551,6 +586,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // Switching modules must PAUSE the outgoing lesson rather than let it keep
     // playing in the background. `ResourceViewer` does that itself the moment
     // it stops being the active file (see its `active` prop).
+    userSelectedRef.current = true;
     setSelectedFile(file);
     // Close the overlay so the user sees the freshly opened content.
     setDockOpen(false);
@@ -571,7 +607,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   }, [selectedFile]);
 
   // A different course resets the stack.
-  useEffect(() => { setVisitedFiles([]); }, [product.id]);
+  useEffect(() => { setVisitedFiles([]); userSelectedRef.current = false; }, [product.id]);
 
   const handleBuyModule = (module: { id: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string }) => {
     if (!module.paidUpdateId) return;

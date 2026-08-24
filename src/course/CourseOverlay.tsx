@@ -28,7 +28,7 @@
 //   - Landscape → dock pinned to the right edge as a vertical rail,
 //     sheet slides in from the right.
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, NotebookPen, PlayCircle, ShoppingBag, Sparkles, X } from "lucide-react";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
@@ -77,6 +77,25 @@ const fileIcon = (file: CourseFile) => {
 
 const isPaidLocked = (module: CourseModule, ownedUpdateIds: Set<string>) =>
   module.accessLevel === "paidUpdate" && Boolean(module.paidUpdateId) && !ownedUpdateIds.has(String(module.paidUpdateId));
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+/**
+ * Magnetic easing for the dock indicator while it is being dragged. Within
+ * `BAND` of any tab's centre the displayed position locks to that centre, so
+ * the pill visibly "clicks" toward a tab a hair before it is fully selected.
+ * Outside the band it follows the finger almost 1:1 (lightly damped) so the
+ * drag still feels direct. The snap-to-nearest itself happens on release.
+ */
+const DOCK_MAGNETIC_BAND = 0.18;
+const magneticIndex = (raw: number): number => {
+  const nearest = Math.round(raw);
+  const dist = raw - nearest;
+  const adist = Math.abs(dist);
+  if (adist <= DOCK_MAGNETIC_BAND) return nearest;
+  const sign = dist < 0 ? -1 : 1;
+  return nearest + sign * (DOCK_MAGNETIC_BAND + (adist - DOCK_MAGNETIC_BAND) * 0.9);
+};
 
 /**
  * The "Module" tab only lists unlocked modules. Locked / paid modules are
@@ -145,6 +164,89 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // NotesPanel reports when its big editor is open so the sheet can grow.
   const [notesEditorOpen, setNotesEditorOpen] = useState(false);
 
+  // ── Draggable, magnetic dock indicator ──────────────────────────────────
+  // The sliding accent pill can be GRABBED and dragged between the four tabs.
+  // While dragging it follows the finger (with a magnetic lock near each tab
+  // centre), the overlay content swaps LIVE as the pill crosses each tab, and
+  // on release it snaps to the nearest tab. A pure tap on the indicator still
+  // behaves exactly like tapping the active tab button (toggle open/close), so
+  // the drag handle never steals the original button behaviour. The handle
+  // only ever covers the ACTIVE slot, so the other three tab buttons stay
+  // fully clickable.
+  const pillRef = useRef<HTMLDivElement>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const dragRef = useRef<{ id: number; start: number; index: number; slot: number; moved: boolean } | null>(null);
+  const dragging = dragIndex != null;
+  const displayedIndex = dragging ? magneticIndex(dragIndex as number) : activeIndex;
+
+  const onHandlePointerDown = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const pill = pillRef.current;
+    if (!pill) return;
+    const rect = pill.getBoundingClientRect();
+    const slot = (landscape ? rect.height : rect.width) / TABS.length;
+    dragRef.current = { id: event.pointerId, start: landscape ? event.clientY : event.clientX, index: activeIndex, slot, moved: false };
+    setDragIndex(activeIndex);
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* capture unsupported — drag still works without it */ }
+  };
+
+  const onHandlePointerMove = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    const st = dragRef.current;
+    if (!st || st.id !== event.pointerId) return;
+    const coord = landscape ? event.clientY : event.clientX;
+    const delta = coord - st.start;
+    // A small dead-zone keeps a pure tap (or a tiny jiggle) from moving the
+    // indicator at all, so a tap still behaves exactly like the button tap.
+    if (!st.moved) {
+      if (Math.abs(delta) > 5) st.moved = true;
+      else return;
+    }
+    const raw = clamp(st.index + delta / st.slot, 0, TABS.length - 1);
+    setDragIndex(raw);
+    // Live overlay swap: the moment the pill's centre crosses into a tab, that
+    // tab becomes active so the sheet content updates in real time.
+    const nearest = Math.round(raw);
+    const key = TABS[nearest]?.key;
+    if (key && nearest !== activeIndex) props.onTabChange(key);
+  };
+
+  const onHandlePointerUp = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    const st = dragRef.current;
+    if (!st || st.id !== event.pointerId) return;
+    dragRef.current = null;
+    try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
+    setDragIndex((current) => {
+      if (!st.moved) {
+        // Pure tap → preserve the original "tap active tab" behaviour (toggle).
+        const key = TABS[activeIndex]?.key;
+        if (key) props.onTabChange(key);
+        return null;
+      }
+      const snapped = current == null ? activeIndex : Math.round(current);
+      const key = TABS[snapped]?.key;
+      if (key && snapped !== activeIndex) props.onTabChange(key);
+      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
+      return null;
+    });
+  };
+
+  // ── Soft-keyboard awareness (landscape notes split) ─────────────────────
+  // When the rich-text editor is focused the OS keyboard rises and covers the
+  // bottom of the sheet. We measure the covered height from the visual
+  // viewport and reserve that much space at the sheet's bottom edge, so the
+  // editor (and its Save buttons) shrink to sit ABOVE the keyboard instead of
+  // being hidden behind it. The lesson on the left keeps its full 60%.
+  const [keyboardInset, setKeyboardInset] = useState(0);
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vv) return undefined;
+    const update = () => setKeyboardInset(Math.max(0, Math.round((window.innerHeight ?? 0) - vv.height - vv.offsetTop)));
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => { vv.removeEventListener("resize", update); vv.removeEventListener("scroll", update); };
+  }, []);
+
   // Notes: the saved list only needs half the screen, but the moment the
   // editor is open it takes the full sheet so the writing surface is as
   // large as the notes area allows and long text is easy to read.
@@ -165,6 +267,10 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   const sheetHeight = tab === "notes"
     ? (notesEditorOpen ? notesEditorHeight : notesHeight)
     : defaultHeight;
+  // True only while the notes editor is open AND a soft keyboard is covering
+  // part of the viewport. Drives the sheet's bottom inset so the editor lifts
+  // above the keyboard instead of being half-hidden behind it.
+  const keyboardActive = tab === "notes" && notesEditorOpen && keyboardInset > 0;
 
   // Bubble the split state up to the parent so the surrounding shell can
   // shrink the content area to the matching 60vw. A missing callback (older
@@ -222,6 +328,12 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           // (minus the 4rem dock) so the lesson keeps the left 60%.
           ...(landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : null),
           [landscape ? "width" : "height"]: splitMode ? splitEditorWidth : sheetHeight,
+          // When the soft keyboard is up over the notes editor, lift the sheet
+          // above it so the editor + Save buttons stay visible. The lesson on
+          // the left is untouched. Portrait keeps its 4rem dock clearance too.
+          ...(keyboardActive
+            ? { bottom: landscape ? `${keyboardInset}px` : `${Math.max(64, keyboardInset)}px` }
+            : null),
         }}
         data-course-overlay
         data-open={open ? "true" : "false"}
@@ -301,12 +413,21 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           }
         >
           <div className="dc-footer-glow" aria-hidden="true" />
-          <div className={`dc-footer-pill flex ${landscape ? "h-full w-full flex-col" : "h-16 w-full"}`}>
+          <div
+            ref={pillRef}
+            className={`dc-footer-pill flex ${landscape ? "h-full w-full flex-col" : "h-16 w-full"}`}
+          >
+            {/* Fluid sheen — a slow liquid highlight that drifts across the
+                capsule, echoing the home footer's "magic" feel. Painted
+                behind the indicator + buttons so it never washes out an icon. */}
+            <span className="dc-dock-fluid" aria-hidden="true" />
             <span
-              className={`pointer-events-none absolute transition-transform duration-300 ease-out ${landscape ? "left-1.5 right-1.5 top-0 h-1/4" : "bottom-1.5 left-0 top-1.5 w-1/4"}`}
-              style={{ transform: landscape ? `translateY(${activeIndex * 100}%)` : `translateX(${activeIndex * 100}%)` }}
+              className={`pointer-events-none absolute ${dragging ? "" : "transition-transform duration-300 ease-out"} ${landscape ? "left-1.5 right-1.5 top-0 h-1/4" : "bottom-1.5 left-0 top-1.5 w-1/4"}`}
+              style={{ transform: landscape ? `translateY(${displayedIndex * 100}%)` : `translateX(${displayedIndex * 100}%)` }}
               data-course-dock-indicator
               data-index={activeIndex}
+              data-display-index={displayedIndex.toFixed(3)}
+              data-dragging={dragging ? "true" : "false"}
             >
               <span className={`block h-full rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-600/30 ${landscape ? "my-1.5" : "mx-1.5"}`} />
             </span>
@@ -330,6 +451,22 @@ export default function CourseOverlay(props: CourseOverlayProps) {
                 </button>
               );
             })}
+            {/* Draggable grab handle that overlays ONLY the active slot, so the
+                other three tab buttons stay fully clickable. A tap (no move)
+                forwards to the active-tab toggle; a drag slides the indicator
+                between tabs with a magnetic snap on release. */}
+            <span
+              aria-hidden="true"
+              tabIndex={-1}
+              className={`absolute z-20 touch-none cursor-grab active:cursor-grabbing ${landscape ? "left-1.5 right-1.5 top-0 h-1/4" : "bottom-1.5 left-0 top-1.5 w-1/4"}`}
+              style={{ transform: landscape ? `translateY(${displayedIndex * 100}%)` : `translateX(${displayedIndex * 100}%)`, transition: dragging ? "none" : "transform 0.3s ease-out" }}
+              onPointerDown={onHandlePointerDown}
+              onPointerMove={onHandlePointerMove}
+              onPointerUp={onHandlePointerUp}
+              onPointerCancel={onHandlePointerUp}
+              data-course-dock-handle
+              data-dragging={dragging ? "true" : "false"}
+            />
           </div>
         </div>
       </div>

@@ -75,8 +75,9 @@ test("Every opened file stays mounted so switching modules never reloads it", ()
   assert.match(coursePlayer, /pointer-events-none invisible opacity-0/);
   assert.match(coursePlayer, /active=\{active\}/);
   assert.match(coursePlayer, /onPlaybackChange=\{reportPlayback\}/);
-  // A different course starts a fresh stack.
-  assert.match(coursePlayer, /setVisitedFiles\(\[\]\); \}, \[product\.id\]\)/);
+  // A different course starts a fresh stack AND clears the "user navigated"
+  // flag so a saved resume position can take over again on the next open.
+  assert.match(coursePlayer, /setVisitedFiles\(\[\]\); userSelectedRef\.current = false; \}, \[product\.id\]\)/);
 });
 
 test("ResourceViewer accepts the active flag and the playback wiring", () => {

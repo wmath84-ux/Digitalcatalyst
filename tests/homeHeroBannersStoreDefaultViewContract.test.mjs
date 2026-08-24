@@ -121,9 +121,11 @@ test("course player starts at the linked module when accessible", () => {
   assert.match(coursePlayer, /const findModuleById = /);
   assert.match(coursePlayer, /const firstAccessibleFileInModule = /);
   assert.match(coursePlayer, /const deepLinkFileId = useMemo\(/);
-  // The deep link wins over "first lesson" and over the saved resume position.
+  // The deep link wins over "first lesson" and over the saved resume position
+  // (the resume effect bails whenever a deep-link target is present, and the
+  // first-lesson effect prefers the deep-linked file).
   assert.match(coursePlayer, /const deep = deepLinkFileId \? files\.find/);
-  assert.match(coursePlayer, /if \(!lastOpenedFileId \|\| selectedFile \|\| deepLinkFileId\) return/);
+  assert.match(coursePlayer, /if \(!lastOpenedFileId \|\| deepLinkFileId \|\| userSelectedRef\.current\) return/);
 });
 
 /* ------------------------------------------------------------------ */
