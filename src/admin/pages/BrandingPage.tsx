@@ -21,6 +21,8 @@ type BrandDraft = {
   hideFrameBorders: boolean;
   homeGradientFrom: string;
   homeGradientTo: string;
+  supportEmail: string;
+  supportPhone: string;
 };
 
 const pickHex = (value: unknown, fallback: string) => {
@@ -44,6 +46,8 @@ export default function BrandingPage() {
     hideFrameBorders: branding.hideFrameBorders,
     homeGradientFrom: branding.homeGradientFrom,
     homeGradientTo: branding.homeGradientTo,
+    supportEmail: branding.supportEmail,
+    supportPhone: branding.supportPhone,
   });
   const [saving, setSaving] = useState(false);
 
@@ -56,8 +60,10 @@ export default function BrandingPage() {
       hideFrameBorders: branding.hideFrameBorders,
       homeGradientFrom: branding.homeGradientFrom,
       homeGradientTo: branding.homeGradientTo,
+      supportEmail: branding.supportEmail,
+      supportPhone: branding.supportPhone,
     });
-  }, [branding.logoUrl, branding.appName, branding.tagline, branding.openingAnimationEnabled, branding.hideFrameBorders, branding.homeGradientFrom, branding.homeGradientTo]);
+  }, [branding.logoUrl, branding.appName, branding.tagline, branding.openingAnimationEnabled, branding.hideFrameBorders, branding.homeGradientFrom, branding.homeGradientTo, branding.supportEmail, branding.supportPhone]);
 
   const update = <K extends keyof BrandDraft>(key: K, value: BrandDraft[K]) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -77,14 +83,16 @@ export default function BrandingPage() {
     const hideFrameBorders = merged.hideFrameBorders !== false;
     const homeGradientFrom = pickHex(merged.homeGradientFrom, DEFAULT_BRANDING.homeGradientFrom);
     const homeGradientTo = pickHex(merged.homeGradientTo, DEFAULT_BRANDING.homeGradientTo);
+    const supportEmail = merged.supportEmail.trim() || DEFAULT_BRANDING.supportEmail;
+    const supportPhone = merged.supportPhone.trim() || DEFAULT_BRANDING.supportPhone;
     setSaving(true);
     try {
       await setDoc(
         doc(db, BRANDING_DOC_PATH.collection, BRANDING_DOC_PATH.id),
-        { logoUrl, appName, tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, updatedAt: serverTimestamp() },
+        { logoUrl, appName, tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, supportEmail, supportPhone, updatedAt: serverTimestamp() },
         { merge: true },
       );
-      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo });
+      writeCachedBranding({ logoUrl, appName, tagline: tagline || DEFAULT_BRANDING.tagline, openingAnimationEnabled, hideFrameBorders, homeGradientFrom, homeGradientTo, supportEmail, supportPhone });
       notify("success", "Branding updated. It now applies live across the app and PWA.");
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "Could not save branding.");
@@ -258,6 +266,38 @@ export default function BrandingPage() {
             </span>
           </label>
         </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+          <p className="text-xs font-bold text-slate-700">Support contact</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+            Shown in the subscription page's Help &amp; FAQ overlay ("Still need help?" section) so
+            learners reach the right email and phone instead of placeholder defaults.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs font-semibold text-slate-600">
+              Support email
+              <input
+                value={draft.supportEmail}
+                maxLength={120}
+                onChange={(e) => update("supportEmail", e.target.value)}
+                placeholder={DEFAULT_BRANDING.supportEmail}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800"
+                data-branding-support-email
+              />
+            </label>
+            <label className="block text-xs font-semibold text-slate-600">
+              Support phone / hours
+              <input
+                value={draft.supportPhone}
+                maxLength={160}
+                onChange={(e) => update("supportPhone", e.target.value)}
+                placeholder={DEFAULT_BRANDING.supportPhone}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal text-slate-800"
+                data-branding-support-phone
+              />
+            </label>
+          </div>
+        </div>
         <div className="mt-3 flex gap-2">
           <PrimaryButton
             className="flex-1"
@@ -278,6 +318,8 @@ export default function BrandingPage() {
                 hideFrameBorders: DEFAULT_BRANDING.hideFrameBorders,
                 homeGradientFrom: DEFAULT_BRANDING.homeGradientFrom,
                 homeGradientTo: DEFAULT_BRANDING.homeGradientTo,
+                supportEmail: DEFAULT_BRANDING.supportEmail,
+                supportPhone: DEFAULT_BRANDING.supportPhone,
               });
               void persist(DEFAULT_BRANDING);
             }}

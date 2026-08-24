@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Maximize2, Minimize, Minimize2, Monitor, Moon, PanelBottomClose, PanelBottomOpen, RotateCw, Smartphone, Sun } from "lucide-react";
+import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Maximize2, Minimize, Minimize2, Monitor, Moon, PanelBottomClose, PanelBottomOpen, Smartphone, Sun } from "lucide-react";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer from "./course/ResourceViewer";
@@ -14,9 +14,7 @@ import { useBranding } from "./context/BrandingContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
 import { useHomeHold } from "./hooks/useHomeHold";
 import { isEmptyRichText, richTextToPlain, sanitizeRichText } from "./utils/richText";
-import { useRotatedScroll } from "./course/useRotatedScroll";
 import {
-  enterCourseLandscapeChrome,
   enterCoursePlayerFullscreen,
   exitCoursePlayerFullscreen,
   isCoursePlayerFullscreen,
@@ -306,9 +304,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const [dockTab, setDockTab] = useState<DockTab>("modules");
   const [dockOpen, setDockOpen] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
-  // Immersive mode: rotates the viewer a quarter-turn so a portrait-locked
-  // phone can still watch a video / read a wide sheet edge-to-edge.
-  const [immersive, setImmersive] = useState(false);
   // True while the document is actually in fullscreen — i.e. the Android
   // status bar is really hidden. Mirrors the live document state so the rail
   // button stays correct even when the learner swipes out of fullscreen.
@@ -339,7 +334,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Android-only capability: iOS can never hide its status bar and desktop
   // browsers don't need to. Gates the "Hide status bar" rail button.
   const canFullscreen = useMemo(() => isMobileDevice() && !isIOSDevice(), []);
-  const immersiveRootRef = useRef<HTMLDivElement>(null);
   const ownedUpdateIds = resolution.ownedUpdateIds;
   const updates = useMemo(() => collectUpdates(modules).filter((update) => !ownedUpdateIds.has(update.id)), [modules, ownedUpdateIds]);
   const moduleTitleById = useMemo(() => collectModuleTitleById(modules), [modules]);
@@ -382,10 +376,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     };
   }, []);
 
-  // The rotated immersive view only makes sense on a portrait viewport —
-  // once the device is physically turned, drop back to the rail layout.
-  useEffect(() => { if (isLandscape) setImmersive(false); }, [isLandscape]);
-
   // ── App-wide orientation lock ───────────────────────────────────────────
   // The Course Player is the ONLY screen where rotating the phone is
   // allowed. Mounting the player unlocks the screen orientation; unmounting
@@ -402,24 +392,23 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // REAL user gesture — a gesture-less request right after rotation is
   // rejected by the browser and the bar stays. Hiding therefore can never
   // be automatic: the learner hides/restores the bar explicitly with the
-  // "Hide status bar" rail button (Android only), and the rotate-to-
-  // fullscreen tap is the other gesture path. Whatever the learner did,
-  // the chrome is restored the moment the player leaves landscape /
-  // immersive or unmounts.
+  // "Hide status bar" rail button (Android only). Whatever the learner did,
+  // the chrome is restored the moment the player leaves landscape or
+  // unmounts.
   const courseBackgroundForStatusBar = theme === "dark" ? "#090912" : "#f1f5f9";
   useEffect(() => {
-    if (isLandscape || immersive) {
+    if (isLandscape) {
       return () => restoreStatusBarFromCoursePlayer();
     }
     restoreStatusBarFromCoursePlayer();
     return undefined;
-  }, [isLandscape, immersive]);
+  }, [isLandscape]);
 
   // Theme flips while already in landscape only re-blend the bar colour —
   // a fresh fullscreen request here would be gesture-less and get blocked.
   useEffect(() => {
-    if (isLandscape || immersive) syncCourseLandscapeChromeColor(courseBackgroundForStatusBar);
-  }, [courseBackgroundForStatusBar, isLandscape, immersive]);
+    if (isLandscape) syncCourseLandscapeChromeColor(courseBackgroundForStatusBar);
+  }, [courseBackgroundForStatusBar, isLandscape]);
 
   // Whatever happens, unmounting the player puts the phone chrome back.
   useEffect(() => () => restoreStatusBarFromCoursePlayer(), []);
@@ -459,22 +448,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   useEffect(() => () => resetDocumentViewportMode(), []);
 
-  // Escape leaves immersive mode and restores any hidden chrome so the learner
-  // can never get stuck in a bare screen.
+  // Escape restores any hidden chrome so the learner can never get stuck in a
+  // bare screen.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (immersive) { setImmersive(false); return; }
       if (playerChromeHidden || fileBarsHidden) { setPlayerChromeHidden(false); setFileBarsHidden(false); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [immersive, playerChromeHidden, fileBarsHidden]);
-
-  // Scrolling inside the quarter-turned immersive view has to be driven
-  // manually. Without this, browsers bind scrollTop to a left/right gesture
-  // after the CSS transform; learners must always be able to swipe up/down.
-  useRotatedScroll(immersiveRootRef, immersive && !isLandscape);
+  }, [playerChromeHidden, fileBarsHidden]);
 
   const progressRef = useMemo(() => (user ? doc(db, "users", user.id, "courseProgress", product.id) : null), [product.id, user]);
 
@@ -690,9 +673,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   const progress = totalEligibleFiles.length ? Math.round((completedIds.size / totalEligibleFiles.length) * 100) : 0;
   const isDone = Boolean(selectedFile && completedIds.has(selectedFile.id));
-  // A portrait-locked phone can enter the rotated landscape interface. It
-  // must use the same left header + right dock as a physically rotated phone.
-  const useLandscapeRails = isLandscape || immersive;
+  // A physically rotated phone uses the same left header + right dock rail
+  // layout in landscape. Portrait keeps the sticky header / dock layout.
+  const useLandscapeRails = isLandscape;
   // Two deliberate states: dark ⇄ light. Every tap simply flips between the
   // two, so a third tap cycles straight back to the first state.
   const nextTheme: CoursePlayerTheme = theme === "dark" ? "light" : "dark";
@@ -907,31 +890,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     </button>
   );
 
-  // ── Header actions: rotate + mark complete ──────────────────────────────
-  // Both controls used to live in a footer bar under the resource. They now
-  // sit in the Course Player header itself, so they are reachable without
-  // scrolling and never fight the embedded document for vertical space.
-  const rotateFullscreenButton = !useLandscapeRails ? (
-    <button
-      type="button"
-      onClick={() => {
-        // The tap is a real user gesture — hide the phone status bar
-        // (true fullscreen) before the rotated view renders. Idempotent
-        // if the learner already hid the bar with the rail button.
-        enterCourseLandscapeChrome(courseBackgroundForStatusBar);
-        setImmersive(true);
-      }}
-      className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
-      aria-label="Rotate to fullscreen"
-      title="Rotate to fullscreen"
-      data-course-rotate-fullscreen
-    >
-      <RotateCw size={17} />
-    </button>
-  ) : null;
-
-  // Toggle, not a one-way action: an accidental tap is fully reversible so
-  // the tracked progress always matches reality. `compact` renders the
+  // ── Header action: mark complete ────────────────────────────────────────
+  // The toggle, not a one-way action: an accidental tap is fully reversible
+  // so the tracked progress always matches reality. `compact` renders the
   // square icon variant used by the 56px landscape rail.
   const markCompleteButton = (compact: boolean) => (selectedFile ? (
     <button
@@ -958,8 +919,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // The old footer is now a slim lesson strip inside the header: it names the
   // lesson that is playing and mirrors its completion state. It follows the
   // same "file bars" toggle the resource header does, so hiding the file
-  // chrome still gives the content every pixel — while the mark-complete and
-  // rotate buttons stay permanently in the header row above it.
+  // chrome still gives the content every pixel — while the mark-complete
+  // button stays permanently in the header row above it.
   const markCompleteBar = selectedFile && !fileBarsHidden ? (
     <div className="flex min-w-0 flex-1 items-center gap-2" data-course-mark-complete-bar>
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isDone ? "bg-emerald-400" : "bg-violet-400"}`} aria-hidden="true" />
@@ -1044,37 +1005,34 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           status={mindMap.status}
           errorMessage={mindMap.errorMessage}
           onFlush={mindMap.flush}
+          landscape={useLandscapeRails}
         />
       )}
       onMindMapSplitChange={handleMindMapSplitChange}
     />
   );
 
-  // Both physical landscape and the quarter-turned mobile view share this
-  // layout. This keeps the header rail on the left and the four-tab footer
+  // The landscape layout keeps the header rail on the left and the dock
   // navigation on the right instead of dropping all navigation in fullscreen.
-  const landscapeLayout = (mobileRotated: boolean) => (
+  const landscapeLayout = () => (
     <>
       {playerChromeHidden ? null : (
       <header
         className="sticky left-0 top-0 z-50 flex h-full min-h-0 w-14 shrink-0 flex-col items-center gap-2 overflow-y-auto no-scrollbar overscroll-contain border-r border-[var(--course-border)] bg-[var(--course-surface)] py-2"
-        style={mobileRotated
-          ? { paddingLeft: "0px" }
-          : {
-              // Fullscreen (status bar / navigation bar hidden) exposes the
-              // display cutout, and Chrome starts reporting a non-zero
-              // env(safe-area-inset-left). If that inset were only padding
-              // inside the fixed w-14 rail, the 40px shrink-0 buttons would
-              // overflow the shrunken content box and get clipped on the
-              // rail's right edge. Growing the rail by the inset keeps the
-              // full 56px content area, so every button stays fully visible.
-              width: "calc(3.5rem + env(safe-area-inset-left, 0px))",
-              paddingLeft: "env(safe-area-inset-left, 0px)",
-              paddingTop: "calc(0.5rem + env(safe-area-inset-top, 0px))",
-              paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))",
-            }}
+        style={{
+          // Fullscreen (status bar / navigation bar hidden) exposes the
+          // display cutout, and Chrome starts reporting a non-zero
+          // env(safe-area-inset-left). If that inset were only padding
+          // inside the fixed w-14 rail, the 40px shrink-0 buttons would
+          // overflow the shrunken content box and get clipped on the
+          // rail's right edge. Growing the rail by the inset keeps the
+          // full 56px content area, so every button stays fully visible.
+          width: "calc(3.5rem + env(safe-area-inset-left, 0px))",
+          paddingLeft: "env(safe-area-inset-left, 0px)",
+          paddingTop: "calc(0.5rem + env(safe-area-inset-top, 0px))",
+          paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))",
+        }}
         data-course-landscape-header
-        data-course-mobile-landscape-header={mobileRotated ? "true" : undefined}
       >
         {logoBackButton}
         {/* Mark complete lives in the header rail now (it used to sit in the
@@ -1085,7 +1043,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         {fileBarsToggle}
         {playerChromeToggle}
         {showViewportToggle ? viewportToggle : null}
-        {!mobileRotated ? themeToggle : null}
+        {themeToggle}
         {/* Secondary strip toggle is always reachable in the rail — landscape
             does not have a separate "Row 2" so the rail itself is the only
             home this control can live in. */}
@@ -1093,30 +1051,18 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
           <span className="line-clamp-1 max-h-full text-xs font-black [writing-mode:vertical-rl] rotate-180" data-course-product-title>{product.title}</span>
         </div>
-        {!mobileRotated && hasActiveSubscription ? (
+        {hasActiveSubscription ? (
           <span data-course-subscription-badge="active" className="shrink-0 rounded-full bg-violet-500/20 px-1.5 py-2 text-[8px] font-black uppercase tracking-wider text-violet-200 ring-1 ring-violet-400/30 [writing-mode:vertical-rl] rotate-180">Active subscription</span>
         ) : null}
-        {!mobileRotated && resolution.previewModuleIds.size > 0 ? (
+        {resolution.previewModuleIds.size > 0 ? (
           <span data-course-preview-badge className="shrink-0 rounded-full bg-sky-500/15 px-1.5 py-2 text-[8px] font-black uppercase tracking-wider text-sky-200 ring-1 ring-sky-400/20 [writing-mode:vertical-rl] rotate-180">Preview mode</span>
         ) : null}
         <div className="flex shrink-0 flex-col items-center gap-1.5" data-course-progress-summary>
-          <div className={`relative w-1.5 overflow-hidden rounded-full bg-[var(--course-soft-hover)] ${mobileRotated ? "h-14" : "h-24"}`} data-course-progress-bar>
+          <div className="relative w-1.5 h-24 overflow-hidden rounded-full bg-[var(--course-soft-hover)]" data-course-progress-bar>
             <div className="absolute bottom-0 w-full bg-gradient-to-t from-violet-500 to-cyan-400" style={{ height: `${progress}%` }} data-course-progress-fill data-progress-value={progress} />
           </div>
           <span className="text-[9px] font-bold text-[var(--course-muted)]" data-course-progress-label>{progress}%</span>
         </div>
-        {mobileRotated ? (
-          <button
-            type="button"
-            onClick={() => setImmersive(false)}
-            className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
-            aria-label="Exit landscape view"
-            title="Exit landscape view"
-            data-course-exit-immersive
-          >
-            <Minimize2 size={16} />
-          </button>
-        ) : null}
       </header>
       )}
 
@@ -1172,30 +1118,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     </>
   );
 
-  // ── Immersive: quarter-turn the complete landscape UI on a portrait-locked
-  // phone. Both side rails rotate with the viewer and remain interactive.
-  if (immersive && !isLandscape) {
-    return (
-      <div className="fixed inset-0 z-[100] overflow-hidden bg-black" data-course-mobile-landscape-viewport data-course-statusbar-hidden={courseFullscreen ? "true" : "false"}>
-        <div
-          ref={immersiveRootRef}
-          className="course-rotated-surface absolute left-1/2 top-1/2 origin-center overflow-hidden"
-          style={{ width: "100dvh", height: "100dvw", transform: "translate(-50%, -50%) rotate(90deg)" }}
-          data-course-rotated-scroll="active"
-        >
-          <div className="course-player-shell flex h-full w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-course-mobile-landscape="rails" data-orientation="immersive" style={{ colorScheme: browserColorScheme }}>
-            {landscapeLayout(true)}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // ── Landscape: header rail left, content centre, toggle rail right ──
   if (isLandscape) {
     return (
       <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" data-course-statusbar-hidden={courseFullscreen ? "true" : "false"} style={{ colorScheme: browserColorScheme }}>
-        {landscapeLayout(false)}
+        {landscapeLayout()}
       </div>
     );
   }
@@ -1241,7 +1168,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           </div>
           {/* Primary actions, promoted out of the old resource footer. */}
           <div className="flex shrink-0 items-center gap-1.5" data-course-header-actions>
-            {rotateFullscreenButton}
             {markCompleteButton(false)}
             {/* When the secondary strip is hidden the toggle migrates up here,
                 so the learner can always bring the toolbar back without

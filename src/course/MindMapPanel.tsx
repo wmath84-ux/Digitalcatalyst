@@ -38,7 +38,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { CornerDownLeft, Maximize, Minus, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { CornerDownLeft, Maximize, Minus, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import {
   addChildNode,
   countNodes,
@@ -184,12 +184,28 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
         <Plus size={14} strokeWidth={3} />
       </button>
 
-      {/* ── Collapse + delete ride the inward edge, away from the `+` ──── */}
+      {/* ── Collapse + delete + edit ride the inward edge, away from the `+` ── */}
       <div
         className={`absolute top-1/2 flex -translate-y-1/2 items-center gap-1 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100 ${
           facesLeft ? "-right-8" : "-left-8"
         } max-md:opacity-100`}
       >
+        {/* Explicit pencil so a node's text can always be edited — a phone
+            double-tap is unreliable and there was no other affordance, which
+            made existing boxes effectively uneditable. */}
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenEditor(id);
+          }}
+          className="grid h-5 w-5 place-items-center rounded-full border border-sky-300/30 bg-black/60 text-sky-300 transition hover:bg-sky-500/30"
+          aria-label="Text badlein"
+          title="Edit text"
+          data-mind-node-edit={id}
+        >
+          <Pencil size={10} />
+        </button>
         {childCount > 0 ? (
           <button
             type="button"
@@ -249,10 +265,17 @@ export interface MindMapPanelProps {
   errorMessage?: string | null;
   /** Flush the debounced write now — called when the sheet closes. */
   onFlush?: () => void;
+  /**
+   * True when the panel is opened in landscape. The toolbar (Branch / stats /
+   * zoom) is hidden so the diagram gets the whole landscape sheet — the `+`
+   * buttons and pinch-zoom still do everything the toolbar did, just with more
+   * room to organise and create.
+   */
+  landscape?: boolean;
 }
 
 function MindMapCanvas(props: MindMapPanelProps) {
-  const { mind, onMindChange, status, errorMessage, onFlush } = props;
+  const { mind, onMindChange, status, errorMessage, onFlush, landscape } = props;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { zoomIn, zoomOut, fitView, setCenter } = useReactFlow();
@@ -385,7 +408,11 @@ function MindMapCanvas(props: MindMapPanelProps) {
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-[#0b0b16]" data-course-mindmap>
-      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+      {/* ── Toolbar ───────────────────────────────────────────────────────
+          Hidden in landscape so the diagram fills the whole sheet. The `+`
+          buttons on every node and pinch-zoom keep adding + zooming possible,
+          so nothing the toolbar offered is lost. */}
+      {landscape ? null : (
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2" data-course-mindmap-toolbar>
         <div className="flex min-w-0 items-center gap-2">
           <button
@@ -432,6 +459,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           </button>
         </div>
       </div>
+      )}
 
       {/* ── Canvas ────────────────────────────────────────────────────────
           `touch-action: none` is required, not cosmetic: without it the

@@ -55,14 +55,20 @@ test("service worker prefers the admin branding logo over shipped default icons"
   assert.match(sw, /const icon = resolveNotificationIcon\(data\.icon\)/);
 });
 
-test("local system notifications and the in-app bell use the branding logo", () => {
+test("local system notifications use the branding logo; in-app rows use per-notification icons", () => {
+  // Local system alerts keep the admin branding logo as their icon.
   assert.match(webPush, /getBrandNotificationIcon/);
   assert.match(webPush, /readCachedBranding/);
   assert.match(webPush, /icon: getBrandNotificationIcon\(\)/);
   assert.doesNotMatch(webPush, /icon: '\/icons\/icon-192x192\.png'/);
-  assert.match(page, /BrandMark/);
-  assert.match(page, /data-notification-brand-logo/);
-  assert.doesNotMatch(page, /CATEGORY_ICON/);
+  // The in-app notification list shows an icon that matches each notification's
+  // category (product unlock, My Day, renewal, etc.) instead of the PWA logo.
+  assert.match(page, /data-notification-icon/);
+  assert.match(page, /function notificationIcon\(notification: SiteNotification\)/);
+  assert.match(page, /case "store":/);
+  assert.match(page, /target === "mayday" \|\| category === "mayday"/);
+  assert.match(page, /case "subscription":/);
+  assert.doesNotMatch(page, /data-notification-brand-logo/);
   assert.match(adminBranding, /in-app notification list/);
   assert.match(adminBranding, /every system\/push notification/);
 });

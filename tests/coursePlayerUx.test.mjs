@@ -409,12 +409,15 @@ test("CoursePlayer header uses the website logo in the back slot and keeps onBac
   assert.doesNotMatch(coursePlayer, /<ArrowLeft/);
 });
 
-test("CoursePlayer rotates content into a landscape layout with vertical header + toggles", () => {
+test("CoursePlayer uses a landscape layout with vertical header + toggles", () => {
   assert.match(coursePlayer, /matchMedia\("\(orientation: landscape\)"\)/);
-  assert.match(coursePlayer, /rotate\(90deg\)/);
   assert.match(coursePlayer, /data-orientation="landscape"/);
   assert.match(coursePlayer, /data-course-landscape-header/);
   assert.match(overlay, /orientation === "landscape"/);
+  // The old quarter-turned immersive view (rotate(90deg)) was removed along
+  // with the header's rotate-to-fullscreen button, so no rotation transform
+  // should remain.
+  assert.doesNotMatch(coursePlayer, /rotate\(90deg\)/);
 });
 
 test("ResourceViewer offers a fullscreen toggle for media", () => {

@@ -212,3 +212,23 @@ test("the newly created node is scrolled into view", () => {
 test("the panel flushes its pending write when it unmounts", () => {
   assert.match(panel, /useEffect\(\(\) => \(\) => \{ onFlush\?\.\(\); \}, \[onFlush\]\)/);
 });
+
+test("every node exposes an explicit pencil edit button", () => {
+  // A phone double-tap is unreliable, so each node carries a pencil that opens
+  // the same inline editor — existing boxes' text stays editable.
+  assert.match(panel, /data-mind-node-edit=\{id\}/);
+  assert.match(panel, /onOpenEditor\(id\)/);
+  assert.match(panel, /Pencil size=\{10\}/);
+  // The edit button is always reachable on touch, not hidden until hover.
+  assert.match(panel, /max-md:opacity-100/);
+});
+
+test("the toolbar is hidden in landscape so the diagram fills the sheet", () => {
+  // The Branch / stats / zoom toolbar disappears in landscape, giving the map
+  // the whole sheet; the + buttons and pinch-zoom keep editing possible.
+  assert.match(panel, /landscape \? null : \(/);
+  assert.match(panel, /data-course-mindmap-toolbar/);
+  // The parent passes the same landscape flag it uses for the overlay rails.
+  assert.match(coursePlayer, /landscape=\{useLandscapeRails\}/);
+});
+

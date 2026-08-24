@@ -1014,6 +1014,30 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
+/*
+ * Stable card surface for the Revision feature.
+ *
+ * The revision pages render lists of `Card`s inside a scroll container and
+ * switch tabs / re-render their content in place (e.g. the Progress page's
+ * daily / weekly / monthly chart). `dc-glass` uses a heavy
+ * `backdrop-filter: blur(...) saturate(...)`, and re-compositing that over
+ * rapidly changing content causes two mobile-browser artifacts: a white flash
+ * / glitch on a card and a flicker when the chart swaps. A plain opaque card
+ * has no backdrop to sample, so it renders pixel-stable.
+ */
+.rev-card {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 20px 40px -26px rgba(79, 70, 229, 0.45),
+    0 10px 22px -18px rgba(15, 23, 42, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+
 .dc-glass-toolbar {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.64));
@@ -1059,17 +1083,20 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 .dc-glass-hero {
   position: relative;
   isolation: isolate;
+  /* Match the app brand: the home header / icon blend is indigo → violet
+     (#4f46e5 → #7c3aed). The profile hero now uses the same gradient so the
+     card reads as the website's own colour instead of the old dark navy. */
   background:
-    radial-gradient(120% 90% at 100% 0%, rgba(167, 139, 250, 0.42), transparent 46%),
-    radial-gradient(90% 80% at 0% 110%, rgba(34, 211, 238, 0.26), transparent 48%),
-    linear-gradient(165deg, rgba(18, 16, 42, 0.9), rgba(7, 8, 22, 0.88));
+    radial-gradient(120% 90% at 100% 0%, rgba(255, 255, 255, 0.16), transparent 46%),
+    radial-gradient(90% 80% at 0% 110%, rgba(34, 211, 238, 0.2), transparent 48%),
+    linear-gradient(160deg, #4f46e5 0%, #7c3aed 55%, #a21caf 100%);
   backdrop-filter: blur(26px) saturate(150%);
   -webkit-backdrop-filter: blur(26px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow:
-    0 28px 56px -20px rgba(109, 40, 217, 0.58),
-    0 0 0 1px rgba(167, 139, 250, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    0 28px 56px -20px rgba(109, 40, 217, 0.6),
+    0 0 0 1px rgba(167, 139, 250, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .dc-glass-hero--basic {
@@ -1224,6 +1251,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   --fp-amber-text: #fcd34d;
   --fp-emerald-text: #6ee7b7;
   --fp-violet-text: #ddd6fe;
+
+  color-scheme: dark;
 }
 
 /* FlowPath light theme overrides */
@@ -1261,6 +1290,13 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   --fp-amber-text: #b45309;
   --fp-emerald-text: #047857;
   --fp-violet-text: #6d28d9;
+
+  color-scheme: light;
+}
+
+/* FlowPath display font (matches the provided design zip) */
+.font-display {
+  font-family: "Sora", "Manrope", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer utilities {
@@ -1301,8 +1337,13 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   .placeholder-fp-text-30::placeholder { color: var(--fp-text-30); }
 }
 
-/* ---------- FlowPath glass surfaces ---------- */
-.glass-panel {
+/* ---------- FlowPath glass surfaces ----------
+   Scoped under `.flowpath-app` so the theme-aware surface always wins over the
+   dark `.glass-panel` defined in landing.css (which loads after index.css and
+   would otherwise pin the FlowPath header to a black background even in light
+   mode). The provided design zip ships a single index.css, so this conflict
+   did not exist there; scoping reproduces the same result in this app. */
+.flowpath-app .glass-panel {
   background: var(--fp-panel);
   backdrop-filter: blur(22px) saturate(140%);
   -webkit-backdrop-filter: blur(22px) saturate(140%);
@@ -1313,7 +1354,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
-.glass-panel-strong {
+.flowpath-app .glass-panel-strong {
   background: var(--fp-surface-strong);
   backdrop-filter: blur(28px) saturate(150%);
   -webkit-backdrop-filter: blur(28px) saturate(150%);

@@ -12,7 +12,7 @@ interface FlowPathAppProps {
  */
 export default function FlowPathApp({ onNavigateToHome }: FlowPathAppProps) {
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[var(--fp-bg-0)] text-fp-text">
+    <div className="flowpath-app relative min-h-screen overflow-x-hidden bg-[var(--fp-bg-0)] text-fp-text">
       {/* ambient dimensional background */}
       <div className="pointer-events-none fixed inset-0 z-0">
         <div

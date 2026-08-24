@@ -16,7 +16,7 @@ function BarChart({ data }: { data: { label: string; accuracy: number; attempted
           <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
             <div className="flex h-32 w-full items-end">
               <div
-                className={`w-full rounded-t-md ${d.attempted === 0 ? "bg-slate-200" : "bg-gradient-to-t from-indigo-500 to-violet-400"}`}
+                className={`w-full rounded-t-md transition-[height] duration-300 ease-out ${d.attempted === 0 ? "bg-slate-200" : "bg-gradient-to-t from-indigo-500 to-violet-400"}`}
                 style={{ height: `${heightPct}%` }}
                 title={`${d.attempted} attempted · ${d.accuracy}% accuracy`}
               />
@@ -65,7 +65,7 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
 
   return (
     <PageShell route={route} title="Progress" subtitle="Your learning journey" mergeIntoMainHeader>
-      <div className="space-y-4 px-4 py-4 pb-8" style={{ animation: "fade-in 0.25s ease-out both" }}>
+      <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
         <div className="grid grid-cols-2 gap-3">
           <TotalCard icon={<CheckIcon className="h-5 w-5 text-indigo-600" />} label="Tests Completed" value={data.totals.testsCompleted} />
           <TotalCard icon={<ChartIcon className="h-5 w-5 text-emerald-600" />} label="Overall Accuracy" value={`${data.totals.overallAccuracy}%`} />

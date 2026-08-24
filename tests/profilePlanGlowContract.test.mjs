@@ -32,3 +32,10 @@ test("only the active plan status receives the matching animated glow", () => {
   assert.match(styles, /\.dc-profile-status-orbit::before/);
   assert.match(styles, /\.dc-profile-status-orbit::after/);
 });
+
+test("profile hero card uses the website brand gradient", () => {
+  // The profile card matches the app brand (indigo → violet, #4f46e5 →
+  // #7c3aed) instead of the old dark navy so it reads as the website's colour.
+  assert.match(styles, /\.dc-glass-hero\s*\{/);
+  assert.match(styles, /#4f46e5 0%, #7c3aed 55%/);
+});

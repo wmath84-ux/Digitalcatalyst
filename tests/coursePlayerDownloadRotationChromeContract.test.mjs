@@ -77,13 +77,16 @@ test("The rotated view drives scrolling itself instead of letting the browser gu
   assert.match(rotatedScroll, /"pointermove", onPointerMove, \{ passive: false \}/);
 });
 
-test("The player enables rotated scrolling only in the immersive view", () => {
-  assert.match(coursePlayer, /useRotatedScroll\(immersiveRootRef, immersive && !isLandscape\)/);
-  assert.match(coursePlayer, /ref=\{immersiveRootRef\}/);
-  assert.match(coursePlayer, /data-course-rotated-scroll="active"/);
-  assert.match(coursePlayer, /course-rotated-surface/);
-  // The browser must stop claiming the gesture first.
-  assert.match(styles, /\.course-rotated-surface[\s\S]{0,80}touch-action: none/);
+test("the rotate-to-fullscreen button and immersive view are removed", () => {
+  // The rotation button was removed from the header and its quarter-turned
+  // immersive view (plus the enter/exit logic) is gone entirely.
+  assert.doesNotMatch(coursePlayer, /data-course-rotate-fullscreen/);
+  assert.doesNotMatch(coursePlayer, /setImmersive\(/);
+  assert.doesNotMatch(coursePlayer, /enterCourseLandscapeChrome/);
+  assert.doesNotMatch(coursePlayer, /RotateCw/);
+  assert.doesNotMatch(coursePlayer, /useRotatedScroll\(immersiveRootRef/);
+  assert.doesNotMatch(coursePlayer, /data-course-rotated-scroll="active"/);
+  assert.doesNotMatch(coursePlayer, /course-rotated-surface/);
 });
 
 // ---------------------------------------------------------------------------

@@ -169,7 +169,11 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
         <SubscriptionUnlocksCard quote={quote} products={catalogProducts} />
       ) : null}
 
-      {/* Itemised line items */}
+      {/* Itemised line items — hidden for subscription purchases because the
+          "What you'll get" card above already lists every feature + product the
+          buyer unlocks, and the price section below shows the money. Rendering
+          both repeated the same names on the review page. */}
+      {isSubscriptionPurchase ? null : (
       <section data-checkout-line-items className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
         <header className="mb-2 flex items-center justify-between">
           <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">
@@ -195,6 +199,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           ))}
         </div>
       </section>
+      )}
 
       {/* Part 7 — Coupon input card (server-validated, with verified savings).
           Hidden entirely for free / ₹0-payable orders. */}

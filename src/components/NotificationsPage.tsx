@@ -1,4 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  Bell,
+  BellRing,
+  BookOpen,
+  CalendarClock,
+  CheckSquare,
+  CreditCard,
+  Megaphone,
+  Newspaper,
+  ShoppingBag,
+  Sparkles,
+  Unlock,
+  Users,
+} from "lucide-react";
 import { collection, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import Header from "./Header";
@@ -18,7 +32,6 @@ import {
 } from "../../utils/siteNotifications";
 import { useAuth } from "../context/AuthContext";
 import { BellIcon, CheckIcon } from "./icons";
-import BrandMark from "./BrandMark";
 import { ensureSavedWebPushSubscription, isWebPushSupported } from "../../utils/webPush";
 
 type NotificationsPageProps = {
@@ -37,6 +50,46 @@ function timeAgo(ts: number): string {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
+}
+
+// ---------------------------------------------------------------------------
+// Per-notification icon. Each notification carries a `category` and a `target`
+// (see utils/siteNotifications), so the list shows an icon that matches what
+// the alert is about — a product unlock, a My Day task/reminder, a renewal,
+// etc. — instead of reusing the app/PWA logo on every row.
+// ---------------------------------------------------------------------------
+type IconStyle = { Icon: typeof Bell; bg: string; color: string };
+
+function notificationIcon(notification: SiteNotification): IconStyle {
+  const target = notification.target?.type;
+  const category = notification.category;
+
+  // My Day reminders carry the section on the target — show the matching icon.
+  if (target === "mayday" || category === "mayday") {
+    const section = notification.target && notification.target.type === "mayday" ? notification.target.section : undefined;
+    if (section === "schedule") return { Icon: CalendarClock, bg: "bg-cyan-50", color: "text-cyan-600" };
+    if (section === "reminders") return { Icon: BellRing, bg: "bg-amber-50", color: "text-amber-600" };
+    return { Icon: CheckSquare, bg: "bg-teal-50", color: "text-teal-600" };
+  }
+
+  switch (category) {
+    case "store":
+      return { Icon: ShoppingBag, bg: "bg-indigo-50", color: "text-indigo-600" };
+    case "unlock":
+      return { Icon: Unlock, bg: "bg-emerald-50", color: "text-emerald-600" };
+    case "course":
+      return { Icon: BookOpen, bg: "bg-sky-50", color: "text-sky-600" };
+    case "reading":
+      return { Icon: Newspaper, bg: "bg-blue-50", color: "text-blue-600" };
+    case "community":
+      return { Icon: Users, bg: "bg-fuchsia-50", color: "text-fuchsia-600" };
+    case "announcement":
+      return { Icon: Megaphone, bg: "bg-violet-50", color: "text-violet-600" };
+    case "subscription":
+      return { Icon: CreditCard, bg: "bg-purple-50", color: "text-purple-600" };
+    default:
+      return { Icon: Sparkles, bg: "bg-slate-50", color: "text-slate-600" };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -266,12 +319,17 @@ export default function NotificationsPage({
                       notification.read ? "bg-white" : "bg-indigo-50/70"
                     }`}
                   >
-                    <span
-                      data-notification-brand-logo
-                      className="mt-0.5 flex h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200"
-                    >
-                      <BrandMark className="h-10 w-10" />
-                    </span>
+                    {(() => {
+                      const { Icon, bg, color } = notificationIcon(notification);
+                      return (
+                        <span
+                          data-notification-icon
+                          className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-slate-200 ${bg} ${color}`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </span>
+                      );
+                    })()}
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-bold text-slate-900">{notification.title}</span>
                       <span className="mt-0.5 block text-xs leading-5 text-slate-500">{notification.body}</span>
