@@ -8,7 +8,11 @@ type BottomNavProps = {
   onChange: (tab: TabKey) => void;
   storeBadge?: number;
   purchasesBadge?: number;
-  /** When provided, holding the Home button for 3 seconds opens FlowPath */
+  /**
+   * Action fired after a 3-second hold on the Home button. Enabled on every
+   * screen that renders this footer — defaults to opening the FlowPath
+   * (task-planning) dashboard, but a caller may override it.
+   */
   onLongPressHome?: () => void;
 };
 
@@ -25,6 +29,13 @@ const HOLD_DURATION = 3000; // 3 seconds
 const RING_R = 18;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_R;
 
+// "Task planning" = the FlowPath dashboard. The Home button's long-press is
+// enabled on every screen that renders this footer, so a 3-second hold is
+// always a shortcut to FlowPath — not just on the home page.
+const DEFAULT_LONG_PRESS_HOME = () => {
+  window.location.hash = "#/flowpath";
+};
+
 /**
  * The app footer — the floating magic pill shown on the home page and
  * everywhere else. Capsule rounded on all four sides, light-black border,
@@ -38,7 +49,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_R;
  *  - On completing the hold, a liquid expand effect fills the screen
  *  - Then navigates to the FlowPath dashboard
  */
-export default function BottomNav({ active, onChange, storeBadge, purchasesBadge, onLongPressHome }: BottomNavProps) {
+export default function BottomNav({ active, onChange, storeBadge, purchasesBadge, onLongPressHome = DEFAULT_LONG_PRESS_HOME }: BottomNavProps) {
   const [holding, setHolding] = useState(false);
   const [liquidExpand, setLiquidExpand] = useState(false);
   const holdTimerRef = useRef<number | null>(null);
@@ -46,7 +57,6 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
   const homeBtnRef = useRef<HTMLButtonElement>(null);
 
   const startHold = useCallback(() => {
-    if (!onLongPressHome) return;
     setHolding(true);
     holdTimerRef.current = window.setTimeout(() => {
       suppressClickRef.current = true;
@@ -117,14 +127,11 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
                   ref={isHome ? homeBtnRef : undefined}
                   key={key}
                   type="button"
-                  onPointerDown={isHome && onLongPressHome ? (e) => {
-                    e.preventDefault();
-                    startHold();
-                  } : undefined}
-                  onPointerUp={isHome && onLongPressHome ? endHold : undefined}
-                  onPointerLeave={isHome && onLongPressHome ? endHold : undefined}
-                  onPointerCancel={isHome && onLongPressHome ? endHold : undefined}
-                  onContextMenu={isHome && onLongPressHome ? (e) => e.preventDefault() : undefined}
+                  onPointerDown={isHome ? () => startHold() : undefined}
+                  onPointerUp={isHome ? endHold : undefined}
+                  onPointerLeave={isHome ? endHold : undefined}
+                  onPointerCancel={isHome ? endHold : undefined}
+                  onContextMenu={isHome ? (e) => e.preventDefault() : undefined}
                   onClick={() => {
                     if (isHome && suppressClickRef.current) {
                       suppressClickRef.current = false;
@@ -145,12 +152,22 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
                       transition: "transform 0.2s ease",
                     }}
                   >
-                    {/* Circular hold progress ring - only for Home button */}
-                    {isHome && onLongPressHome && (
+                    {/* Circular hold progress ring - only for Home button.
+                        Centered on the icon pill: absolutely positioned at
+                        (50%, 50%) of the pill and shifted back by half its own
+                        size, so the ring hugs the button instead of dropping
+                        below it. */}
+                    {isHome && (
                       <svg
-                        className="pointer-events-none absolute inset-0 h-full w-full -rotate-90"
+                        className="pointer-events-none absolute"
                         viewBox="0 0 40 40"
-                        style={{ left: "50%", top: "50%", transform: "translate(-50%, -50%) rotate(-90deg)", width: 44, height: 44 }}
+                        style={{
+                          left: "50%",
+                          top: "50%",
+                          width: 46,
+                          height: 46,
+                          transform: "translate(-50%, -50%) rotate(-90deg)",
+                        }}
                       >
                         {/* Background ring track */}
                         <circle
@@ -199,7 +216,7 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
                   {label}
 
                   {/* Pulsing glow dot indicator that Home button has hold feature */}
-                  {isHome && onLongPressHome && !holding && (
+                  {isHome && !holding && (
                     <span
                       className="absolute -top-0.5 left-1/2 -translate-x-1/2 h-1.5 w-1.5 rounded-full bg-indigo-500"
                       style={{
