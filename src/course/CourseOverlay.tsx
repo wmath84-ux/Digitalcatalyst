@@ -125,6 +125,10 @@ interface CourseOverlayProps {
   onAddNote: (text: string) => void;
   onEditNote: (id: string, text: string) => void;
   onDeleteNote: (id: string) => void;
+  // Reports upward when the landscape notes editor is open so the parent can
+  // re-flow the content area into a 60/40 split (lesson on the left, notes
+  // + keyboard on the right) without obscuring the lesson.
+  onSplitModeChange?: (active: boolean) => void;
 }
 
 const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; icon: (active: boolean) => ReactNode }> = [
@@ -135,7 +139,7 @@ const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; 
 ];
 
 export default function CourseOverlay(props: CourseOverlayProps) {
-  const { orientation, tab, open } = props;
+  const { orientation, tab, open, onSplitModeChange } = props;
   const activeIndex = Math.max(0, TABS.findIndex((item) => item.key === tab));
   const landscape = orientation === "landscape";
   // NotesPanel reports when its big editor is open so the sheet can grow.
@@ -144,12 +148,31 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // Notes: the saved list only needs half the screen, but the moment the
   // editor is open it takes the full sheet so the writing surface is as
   // large as the notes area allows and long text is easy to read.
+  // In LANDSCAPE the editor triggers a SPLIT mode: the content keeps the
+  // left 60% of the screen while the notes (with the soft keyboard that
+  // pops up on the right side) takes the right 40%. Both halves stay
+  // tappable, so a learner can keep watching the lesson while taking
+  // notes instead of losing the video behind a half-screen sheet.
   const notesHeight = landscape ? "52vw" : "50dvh";
   const notesEditorHeight = landscape ? "min(92vw, 620px)" : "88dvh";
   const defaultHeight = landscape ? "min(78vw, 460px)" : "72dvh";
+  const splitMode = landscape && tab === "notes" && notesEditorOpen;
+  // The split-pane width is expressed as a percentage of the parent so it
+  // always matches the content area's 60% (parent_width − 40% − dock 4rem
+  // already handled by `right` above). The cap keeps very wide screens
+  // from giving the editor an absurdly wide column.
+  const splitEditorWidth = "min(40%, 520px)";
   const sheetHeight = tab === "notes"
     ? (notesEditorOpen ? notesEditorHeight : notesHeight)
     : defaultHeight;
+
+  // Bubble the split state up to the parent so the surrounding shell can
+  // shrink the content area to the matching 60vw. A missing callback (older
+  // call sites, e.g. tests) just means the parent keeps its default layout.
+  useEffect(() => {
+    onSplitModeChange?.(splitMode);
+    return () => onSplitModeChange?.(false);
+  }, [splitMode, onSplitModeChange]);
 
   const flatModules = useMemo(() => flattenModules(props.modules), [props.modules]);
   // Only unlocked modules are listed in the "Module" tab, so the header
@@ -195,12 +218,15 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         style={{
           // Sits flush against the dock's left edge — the dock grows by the
           // right safe-area inset in fullscreen, so the sheet must too.
+          // In split mode the editor takes the right 40% of the section
+          // (minus the 4rem dock) so the lesson keeps the left 60%.
           ...(landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : null),
-          [landscape ? "width" : "height"]: sheetHeight,
+          [landscape ? "width" : "height"]: splitMode ? splitEditorWidth : sheetHeight,
         }}
         data-course-overlay
         data-open={open ? "true" : "false"}
         data-orientation={orientation}
+        data-split-mode={splitMode ? "true" : "false"}
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-violet-500/10 to-transparent" />
 

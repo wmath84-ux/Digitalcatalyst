@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Maximize2, Minimize, Minimize2, Monitor, Moon, RotateCw, Smartphone, Sun } from "lucide-react";
+import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Maximize2, Minimize, Minimize2, Monitor, Moon, PanelBottomClose, PanelBottomOpen, RotateCw, Smartphone, Sun } from "lucide-react";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer from "./course/ResourceViewer";
@@ -214,6 +214,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   // flips the state back at any time.
   const [fileBarsHidden, setFileBarsHidden] = useState<boolean>(() => isMobileDevice());
   const [playerChromeHidden, setPlayerChromeHidden] = useState(false);
+  // The secondary header strip (the slim row that holds the file-bars, player-
+  // chrome, viewport and theme toggles) can be hidden to give the lesson a few
+  // extra pixels. The toggle button itself follows the visibility state — it
+  // lives on the strip when the strip is visible, and migrates to the main
+  // header row when the strip is hidden — so the learner is never stuck
+  // without a way to bring the controls back.
+  const [secondaryStripHidden, setSecondaryStripHidden] = useState(false);
   // Desktop request mode for embedded documents — a Google Doc / Sheet /
   // Slides deck rendered at desktop width is unreadable on a phone, so the
   // learner can flip the same embed to its mobile rendering.
@@ -553,6 +560,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   const selectedEmbedKind = selectedFile ? getCourseEmbed(selectedFile).kind : "none";
   const showViewportToggle = VIEWPORT_AWARE_KINDS.includes(selectedEmbedKind);
 
+  // ── Notes split mode (landscape) ────────────────────────────────────────
+  // CourseOverlay reports when the notes editor is open in landscape — that
+  // is the moment the lesson can be split into a 60/40 layout: course on
+  // the left, the editor + soft keyboard on the right. Tracking it here
+  // lets the content area shrink to 60vw instead of staying hidden behind
+  // the editor sheet.
+  const [notesSplitMode, setNotesSplitMode] = useState(false);
+  const handleSplitModeChange = useCallback((active: boolean) => setNotesSplitMode(active), []);
+  // Reset split state when the notes tab closes, so the lesson smoothly
+  // expands back to full width without an awkward half-rendered state.
+  useEffect(() => {
+    if (dockTab !== "notes" && notesSplitMode) setNotesSplitMode(false);
+  }, [dockTab, notesSplitMode]);
+
   // While the player's own header + dock are hidden there has to be a way
   // back, so a small floating pill sits over the content.
   const chromeRestoreButton = playerChromeHidden ? (
@@ -671,6 +692,29 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
       data-next-theme={nextTheme}
     >
       {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  );
+
+  // The toggle that hides / shows the secondary header strip. The icon always
+  // previews the action the next tap will take, the label matches, and a soft
+  // ring lights up in its active state so the learner can find it again from
+  // a busy header.
+  const secondaryStripToggle = (
+    <button
+      type="button"
+      onClick={() => setSecondaryStripHidden((hidden) => !hidden)}
+      className={`course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl transition ${
+        secondaryStripHidden
+          ? "bg-violet-500 text-white shadow-lg shadow-violet-500/30"
+          : "bg-[var(--course-soft)] text-[var(--course-muted)] ring-1 ring-inset ring-violet-400/40 hover:bg-violet-500/20 hover:text-violet-200"
+      }`}
+      aria-label={secondaryStripHidden ? "Show toolbar strip" : "Hide toolbar strip"}
+      title={secondaryStripHidden ? "Show toolbar strip" : "Hide toolbar strip"}
+      aria-pressed={secondaryStripHidden}
+      data-course-toggle-secondary-strip
+      data-hidden={secondaryStripHidden ? "true" : "false"}
+    >
+      {secondaryStripHidden ? <PanelBottomOpen size={17} /> : <PanelBottomClose size={17} />}
     </button>
   );
 
@@ -816,6 +860,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
       onAddNote={(text) => saveNote(text)}
       onEditNote={(id, text) => editNote(id, text)}
       onDeleteNote={(id) => deleteNote(id)}
+      onSplitModeChange={handleSplitModeChange}
     />
   );
 
@@ -855,6 +900,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
         {playerChromeToggle}
         {showViewportToggle ? viewportToggle : null}
         {!mobileRotated ? themeToggle : null}
+        {/* Secondary strip toggle is always reachable in the rail — landscape
+            does not have a separate "Row 2" so the rail itself is the only
+            home this control can live in. */}
+        {secondaryStripToggle}
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
           <span className="line-clamp-1 max-h-full text-xs font-black [writing-mode:vertical-rl] rotate-180" data-course-product-title>{product.title}</span>
         </div>
@@ -886,9 +935,31 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
       )}
 
       {/* Content is strictly bounded between both rails, preventing embedded
-          players from extending underneath the right-side navigation. */}
-      <section id="course-viewer" className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden" data-course-landscape-content>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          players from extending underneath the right-side navigation.
+          When notes-split mode is on, the content area shrinks to the
+          left 60% of the available landscape section so the editor (40%)
+          and the lesson (60%) sit side-by-side — exactly like a notepad
+          next to a video. The dock still rides along the far right at
+          its own 4rem slot, and the editor overlays the right portion
+          absolutely so the dock stays where the user expects it.
+
+          Implementation note: the overlay is `position: absolute`, so it
+          does not consume flex space. The content's `basis` is set to
+          `calc(60% - 4rem)` so it stops exactly where the overlay's
+          left edge begins; otherwise the overlay would overlap the
+          content by 4rem (the dock's width). */}
+      <section
+        id="course-viewer"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden"
+        data-course-landscape-content
+        data-split-mode={notesSplitMode ? "true" : "false"}
+      >
+        <div
+          className={`flex min-h-0 flex-col overflow-hidden transition-[flex-basis,max-width] duration-300 ${
+            notesSplitMode ? "basis-[calc(60%-4rem)] max-w-[calc(60%-4rem)] shrink-0 grow-0" : "basis-full max-w-full flex-1"
+          }`}
+          data-course-landscape-content-inner
+        >
           <div className="min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
         </div>
         {playerChromeHidden ? null : overlay}
@@ -968,19 +1039,28 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
           <div className="flex shrink-0 items-center gap-1.5" data-course-header-actions>
             {rotateFullscreenButton}
             {markCompleteButton(false)}
+            {/* When the secondary strip is hidden the toggle migrates up here,
+                so the learner can always bring the toolbar back without
+                hunting for it. */}
+            {secondaryStripHidden ? secondaryStripToggle : null}
           </div>
         </div>
 
-        {/* Row 2 — the lesson currently open plus the secondary view toggles. */}
-        <div className="relative flex items-center gap-2 border-t border-[var(--course-border)] bg-[var(--course-soft)]/40 px-3 py-1.5 sm:px-5">
+        {/* Row 2 — the lesson currently open plus the secondary view toggles.
+            When this row is hidden the toggle above keeps the controls one tap
+            away, so a learner never has to remember a long-press gesture. */}
+        {secondaryStripHidden ? null : (
+        <div className="relative flex items-center gap-2 border-t border-[var(--course-border)] bg-[var(--course-soft)]/40 px-3 py-1.5 sm:px-5" data-course-secondary-strip>
           {markCompleteBar || <div className="min-w-0 flex-1" />}
           <div className="flex shrink-0 items-center gap-1">
             {fileBarsToggle}
             {playerChromeToggle}
             {showViewportToggle ? viewportToggle : null}
             {themeToggle}
+            {secondaryStripToggle}
           </div>
         </div>
+        )}
       </header>
       )}
 
