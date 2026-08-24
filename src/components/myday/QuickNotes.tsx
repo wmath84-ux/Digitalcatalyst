@@ -13,11 +13,11 @@ interface QuickNotesProps {
 }
 
 const colorStyles: Record<NoteColor, { card: string; editBg: string; highlight: string }> = {
-  amber: { card: "bg-amber-50 border-amber-200/60 text-amber-900", editBg: "bg-amber-100/50", highlight: "bg-amber-300" },
-  sky: { card: "bg-sky-50 border-sky-200/60 text-sky-900", editBg: "bg-sky-100/50", highlight: "bg-sky-300" },
-  rose: { card: "bg-rose-50 border-rose-200/60 text-rose-900", editBg: "bg-rose-100/50", highlight: "bg-rose-300" },
-  emerald: { card: "bg-emerald-50 border-emerald-200/60 text-emerald-900", editBg: "bg-emerald-100/50", highlight: "bg-emerald-300" },
-  violet: { card: "bg-violet-50 border-violet-200/60 text-violet-900", editBg: "bg-violet-100/50", highlight: "bg-violet-300" },
+  amber: { card: "bg-white border-amber-300/70 text-amber-900 shadow-sm shadow-amber-100/60", editBg: "bg-amber-50", highlight: "bg-amber-300" },
+  sky: { card: "bg-white border-sky-300/70 text-sky-900 shadow-sm shadow-sky-100/60", editBg: "bg-sky-50", highlight: "bg-sky-300" },
+  rose: { card: "bg-white border-rose-300/70 text-rose-900 shadow-sm shadow-rose-100/60", editBg: "bg-rose-50", highlight: "bg-rose-300" },
+  emerald: { card: "bg-white border-emerald-300/70 text-emerald-900 shadow-sm shadow-emerald-100/60", editBg: "bg-emerald-50", highlight: "bg-emerald-300" },
+  violet: { card: "bg-white border-violet-300/70 text-violet-900 shadow-sm shadow-violet-100/60", editBg: "bg-violet-50", highlight: "bg-violet-300" },
 };
 
 const MAX_COLLAPSED_LENGTH = 80; // Characters before truncating
@@ -121,15 +121,15 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
   const isSearchActive = searchQuery.length > 0;
 
   return (
-    <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
+    <div className="rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-300/50">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-5 pb-4 sm:px-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-400 to-pink-500 text-white shadow-md shadow-rose-200">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-400 to-pink-500 text-white shadow-lg shadow-rose-300/50">
           <NotebookPen className="h-5 w-5" />
         </div>
         <div className="flex-1">
-          <h2 className="text-base font-bold text-slate-900 sm:text-lg">Quick Notes</h2>
-          <p className="text-xs text-slate-400">
+          <h2 className="text-base font-extrabold text-slate-900 sm:text-lg">Quick Notes</h2>
+          <p className="text-xs font-medium text-slate-500">
             {notes.length} note{notes.length !== 1 ? "s" : ""} • Click to expand
           </p>
         </div>
@@ -199,18 +199,18 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
         {/* Notes list */}
         <div className="max-h-80 space-y-2.5 overflow-y-auto pr-0.5 custom-scrollbar">
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 py-10 text-center">
+            <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/80 py-10 text-center">
               {isSearchActive ? (
                 <>
-                  <Search className="h-8 w-8 text-slate-200" />
-                  <p className="text-sm font-medium text-slate-400">
+                  <Search className="h-8 w-8 text-slate-300" />
+                  <p className="text-sm font-bold text-slate-500">
                     No notes match "{searchQuery}"
                   </p>
                 </>
               ) : (
                 <>
-                  <NotebookPen className="h-8 w-8 text-slate-200" />
-                  <p className="text-sm font-medium text-slate-400">No notes yet. Start jotting!</p>
+                  <NotebookPen className="h-8 w-8 text-slate-300" />
+                  <p className="text-sm font-bold text-slate-500">No notes yet. Start jotting!</p>
                 </>
               )}
             </div>

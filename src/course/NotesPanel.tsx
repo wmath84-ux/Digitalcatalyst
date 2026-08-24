@@ -179,7 +179,7 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
           underneath and shown again the moment the note is reopened. */}
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {notes.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-[var(--course-border)] p-4 text-center text-xs font-semibold text-[var(--course-muted)]">
+          <p className="rounded-lg border border-dashed border-slate-300 bg-white/80 p-4 text-center text-xs font-semibold text-slate-500">
             No notes yet — tap + to add one.
           </p>
         ) : (
@@ -192,16 +192,17 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
                   className="relative aspect-square overflow-visible rounded-2xl p-2.5"
                   data-course-note
                   data-note-id={note.id}
+                  style={{ background: "#ffffff", border: "1px solid rgba(148,163,184,0.35)", boxShadow: "0 4px 14px -4px rgba(15,23,42,0.18), 0 2px 6px -2px rgba(15,23,42,0.1)" }}
                 >
                   <div className="flex h-full flex-col overflow-hidden">
-                    <p className="min-h-0 flex-1 overflow-hidden text-xs leading-snug text-[var(--course-muted)] line-clamp-5" title={preview}>
+                    <p className="min-h-0 flex-1 overflow-hidden text-xs leading-snug text-slate-600 line-clamp-5" title={preview}>
                       {preview}
                     </p>
                     <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1.5">
                       <button
                         type="button"
                         onClick={() => startEdit(note)}
-                        className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-[0_4px_10px_rgba(37,99,235,0.45)] transition hover:brightness-110"
+                        className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-md shadow-blue-200/50 transition hover:brightness-110"
                         aria-label="Edit note"
                         data-course-note-edit
                       >
@@ -210,7 +211,7 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
                       <button
                         type="button"
                         onClick={() => onDelete(note.id)}
-                        className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-800 text-white shadow-[0_4px_10px_rgba(37,99,235,0.4)] transition hover:brightness-110"
+                        className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-rose-400 to-rose-600 text-white shadow-md shadow-rose-200/50 transition hover:brightness-110"
                         aria-label="Delete note"
                         data-course-note-delete
                       >
