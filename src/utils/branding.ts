@@ -2,6 +2,8 @@ export const BRANDING_DOC_PATH = { collection: "settings", id: "branding" } as c
 export const DEFAULT_LOGO_URL = "/icons/icon-192x192.svg";
 export const DEFAULT_APP_NAME = "Eduvora";
 export const DEFAULT_TAGLINE = "Digital Catalyst";
+export const DEFAULT_SUPPORT_EMAIL = "support@learnpro.app";
+export const DEFAULT_SUPPORT_PHONE = "+1 (800) 123-4567 · Mon–Fri 9–6 EST";
 // The web app icon (/icons/icon-*.svg) is a diagonal indigo → violet blend.
 // The home page header gradient defaults to these very colours so the app
 // chrome and the icon always read as one brand.
@@ -29,6 +31,12 @@ export type Branding = {
   homeGradientFrom: string;
   /** End colour of the home page header gradient (app icon violet). */
   homeGradientTo: string;
+  /**
+   * Support contact shown in the subscription Help & FAQ overlay's "Still
+   * need help?" section. Customisable from the admin branding page.
+   */
+  supportEmail: string;
+  supportPhone: string;
 };
 
 export const DEFAULT_BRANDING: Branding = {
@@ -39,6 +47,8 @@ export const DEFAULT_BRANDING: Branding = {
   hideFrameBorders: true,
   homeGradientFrom: DEFAULT_HOME_GRADIENT_FROM,
   homeGradientTo: DEFAULT_HOME_GRADIENT_TO,
+  supportEmail: DEFAULT_SUPPORT_EMAIL,
+  supportPhone: DEFAULT_SUPPORT_PHONE,
 };
 
 // v2 cache stores the full branding object (v1 only stored the logo URL).
@@ -71,6 +81,8 @@ export function normalizeBranding(data: Partial<Record<keyof Branding, unknown>>
     hideFrameBorders: data?.hideFrameBorders !== false,
     homeGradientFrom: sanitizeColor(data?.homeGradientFrom, DEFAULT_HOME_GRADIENT_FROM),
     homeGradientTo: sanitizeColor(data?.homeGradientTo, DEFAULT_HOME_GRADIENT_TO),
+    supportEmail: sanitize(data?.supportEmail, DEFAULT_SUPPORT_EMAIL, 120),
+    supportPhone: sanitize(data?.supportPhone, DEFAULT_SUPPORT_PHONE, 160),
   };
 }
 

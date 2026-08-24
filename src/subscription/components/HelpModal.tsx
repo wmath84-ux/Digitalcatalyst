@@ -12,6 +12,7 @@ import {
   BookOpen,
   Zap,
 } from "lucide-react";
+import { useBranding } from "../../context/BrandingContext";
 
 interface FaqItem {
   q: string;
@@ -53,6 +54,9 @@ interface Props {
 }
 
 export default function HelpModal({ open, onClose }: Props) {
+  // Support contact comes from the admin-branded settings (settings/branding)
+  // so the email + phone shown here are the real ones, not placeholders.
+  const { supportEmail, supportPhone } = useBranding();
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   const toggle = (i: number) =>
@@ -187,7 +191,7 @@ export default function HelpModal({ open, onClose }: Props) {
                         Email Support
                       </p>
                       <p className="text-[11px] text-slate-400">
-                        support@learnpro.app
+                        {supportEmail}
                       </p>
                     </div>
                   </div>
@@ -201,7 +205,7 @@ export default function HelpModal({ open, onClose }: Props) {
                         Call Us
                       </p>
                       <p className="text-[11px] text-slate-400">
-                        +1 (800) 123-4567 · Mon–Fri 9–6 EST
+                        {supportPhone}
                       </p>
                     </div>
                   </div>
