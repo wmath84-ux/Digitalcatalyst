@@ -342,6 +342,9 @@ export default function App({
           active="home"
           onChange={handleFooterChange}
           purchasesBadge={purchasedIds.size}
+          onLongPressHome={() => {
+            window.location.hash = "#/flowpath";
+          }}
         />
       </div>
     </div>
