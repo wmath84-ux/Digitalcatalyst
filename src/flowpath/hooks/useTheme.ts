@@ -8,11 +8,12 @@ function resolve(mode: ThemeMode): "dark" | "light" {
 }
 
 export function useTheme() {
+  // FlowPath is a dark-first 3D dashboard — default to dark, not system
   const [mode, setMode] = useState<ThemeMode>(() => {
     try {
-      return (localStorage.getItem("flowpath.theme") as ThemeMode) || "system";
+      return (localStorage.getItem("flowpath.theme") as ThemeMode) || "dark";
     } catch {
-      return "system";
+      return "dark";
     }
   });
 
@@ -21,6 +22,7 @@ export function useTheme() {
     return resolve(mode);
   });
 
+  // Set data-theme on mount, REMOVE it on unmount so the rest of the app is unaffected
   useEffect(() => {
     const resolvedNow = resolve(mode);
     setResolved(resolvedNow);
@@ -30,6 +32,10 @@ export function useTheme() {
     } catch {
       // ignore
     }
+    // CLEANUP: remove data-theme when FlowPath unmounts
+    return () => {
+      document.documentElement.removeAttribute("data-theme");
+    };
   }, [mode]);
 
   useEffect(() => {

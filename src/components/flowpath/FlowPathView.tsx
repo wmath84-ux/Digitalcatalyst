@@ -28,7 +28,7 @@ import { BottomDock } from "./BottomDock";
 import { FlowPathHeader } from "./Header";
 import { ACTIVITY_ICONS } from "./icons";
 
-const SCROLL_BUFFER = 900;
+const SCROLL_BUFFER = 2000;
 const CHUNK_SIZE = 8;
 
 const ACTIVITY_RADIAL_ITEMS: RadialItem[] = (
@@ -350,31 +350,29 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
           )}
         </AnimatePresence>
 
-        <AnimatePresence initial={false}>
-          {visibleRows.map((row) =>
-            row.kind === "plus" ? (
-              <PlusRowItem
-                key={row.id}
-                row={row}
-                active={menu?.afterId === row.afterId}
-                onOpen={(rect) => handleOpenMenu(row.afterId, rect)}
-              />
-            ) : (
-              <ActivityRowItem
-                key={row.id}
-                row={row}
-                config={config}
-                width={width}
-                onComplete={() => handleComplete(row.activity!.activity.id)}
-                completing={completingIds.has(row.activity!.activity.id)}
-                highlighted={highlightId === row.id}
-                armed={armedDeleteId === row.id}
-                onNodeClick={() => handleNodeClick(row.activity!.activity.id)}
-                onDelete={() => handleDelete(row.activity!.activity.id)}
-              />
-            )
-          )}
-        </AnimatePresence>
+        {visibleRows.map((row) =>
+          row.kind === "plus" ? (
+            <PlusRowItem
+              key={row.id}
+              row={row}
+              active={menu?.afterId === row.afterId}
+              onOpen={(rect) => handleOpenMenu(row.afterId, rect)}
+            />
+          ) : (
+            <ActivityRowItem
+              key={row.id}
+              row={row}
+              config={config}
+              width={width}
+              onComplete={() => handleComplete(row.activity!.activity.id)}
+              completing={completingIds.has(row.activity!.activity.id)}
+              highlighted={highlightId === row.id}
+              armed={armedDeleteId === row.id}
+              onNodeClick={() => handleNodeClick(row.activity!.activity.id)}
+              onDelete={() => handleDelete(row.activity!.activity.id)}
+            />
+          )
+        )}
       </main>
 
       {/* backdrop to disarm delete when tapping elsewhere */}
@@ -448,7 +446,6 @@ function PlusRowItem({
       className="absolute left-0 w-full"
       initial={false}
       animate={{ top: row.y, height: row.height }}
-      exit={{ opacity: 0 }}
       transition={{ type: "spring", stiffness: 240, damping: 30 }}
     >
       <div style={{ position: "absolute", left: row.x, top: "50%", transform: "translate(-50%, -50%)" }}>
@@ -497,7 +494,6 @@ function ActivityRowItem({
       className="absolute left-0 w-full"
       initial={false}
       animate={{ top: row.y, height: row.height }}
-      exit={{ opacity: 0, scale: 0.88, transition: { duration: 0.28, ease: "easeIn" } }}
       transition={{ type: "spring", stiffness: 240, damping: 30 }}
       style={{ zIndex: armed ? 70 : undefined }}
     >

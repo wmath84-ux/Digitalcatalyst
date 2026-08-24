@@ -80,10 +80,10 @@ export function ActivityCard({ activity, status, side, onComplete, completing }:
     <motion.div
       initial={{ opacity: 0, x: side === "right" ? 28 : -28, scale: 0.92 }}
       animate={{
-        opacity: isCompleted ? 0.55 : 1,
+        opacity: isCompleted ? 0.78 : 1,
         x: 0,
         scale: 1,
-        filter: isCompleted ? "saturate(0.55) brightness(0.92)" : "saturate(1) brightness(1)",
+        filter: isCompleted ? "saturate(0.7) brightness(0.95)" : "saturate(1) brightness(1)",
       }}
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
       className={`pointer-events-auto relative w-full rounded-2xl p-3.5 sm:p-4 ${
