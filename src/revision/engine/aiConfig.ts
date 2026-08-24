@@ -20,6 +20,7 @@ import {
   extractJson,
   geminiGenerateUrl,
   generateWithGemini,
+  isRetiredModel,
   normalizeQuestions,
   systemPrompt,
   type GenerateInput,
@@ -28,6 +29,7 @@ import {
 import { CURRICULUM_SYSTEM_PROMPT, normalizeCurriculumClass } from "./curriculumCatalog";
 import type { CurriculumClass } from "../data/curriculum";
 import { normalizeAiModelPricing, type AiModelPrice } from "../../../utils/aiPolicy.js";
+import { planModeEnforcement } from "../../../utils/questionTypeGuard.js";
 
 export type { AiModelPrice } from "../../../utils/aiPolicy.js";
 
@@ -298,8 +300,11 @@ function sanitizeConfig(raw: unknown): AiConfig {
   const apiKey = String(r.apiKey ?? "").trim();
   // Own-key with no secret stays model-empty so the student form does not
   // inherit the school's published model. A key without a model still gets a
-  // sensible fallback so generation can run.
-  const model = String(r.model ?? "").trim() || (apiKey ? known[0]?.id || DEFAULT_MODEL : "");
+  // sensible fallback so generation can run. A stale model id that Google has
+  // retired (e.g. an old build persisting gemini-2.0-flash) is silently
+  // upgraded to a live one — otherwise every generation 404s and looks broken.
+  const modelRaw = String(r.model ?? "").trim() || (apiKey ? known[0]?.id || DEFAULT_MODEL : "");
+  const model = modelRaw && isRetiredModel(modelRaw) ? known[0]?.id || DEFAULT_MODEL : modelRaw;
   return {
     provider,
     apiKey,
@@ -319,7 +324,8 @@ function legacyGeminiConfig(): AiConfig | null {
   try {
     const key = localStorage.getItem(LEGACY_KEY_STORAGE)?.trim();
     if (!key) return null;
-    const model = localStorage.getItem(LEGACY_MODEL_STORAGE)?.trim() || DEFAULT_MODEL;
+    const stored = localStorage.getItem(LEGACY_MODEL_STORAGE)?.trim() || DEFAULT_MODEL;
+    const model = isRetiredModel(stored) ? KNOWN_MODELS.gemini[0]?.id || DEFAULT_MODEL : stored;
     return { provider: "gemini", apiKey: key, baseUrl: "", model };
   } catch {
     return null;
@@ -526,7 +532,13 @@ export async function testAiConfig(config: AiConfig): Promise<TestResult> {
 /* ------------------------------------------------------------------ */
 
 function parseModelOutput(text: string, input: GenerateInput): ParsedQuestion[] {
-  return normalizeQuestions(extractJson(text), input.difficulty).map((q) => ({
+  const raw = normalizeQuestions(extractJson(text), input.difficulty);
+  type RawQuestion = ReturnType<typeof normalizeQuestions>[number];
+  // Enforce the learner's selected question type deterministically on the
+  // direct browser path too (mirrors the server proxy), so a "Theory only"
+  // request can never deliver a numerical/application question.
+  const plan = planModeEnforcement<RawQuestion>(raw, input.questionMode ?? "mixed", input.count);
+  return plan.keep.slice(0, input.count).map((q) => ({
     prompt: q.prompt,
     options: q.options,
     correctIndex: q.correctIndex,

@@ -9,7 +9,7 @@
 // call fails), the admin panel falls back to the built-in offline generator.
 
 import type { ParsedQuestion } from "./bulkParser";
-import { mixedModeSplit } from "../../../utils/questionTypeGuard.js";
+import { mixedModeSplit, planModeEnforcement } from "../../../utils/questionTypeGuard.js";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -161,6 +161,8 @@ type RawGenerated = {
   correctIndex: number;
   explanation: string;
   difficulty: string;
+  /** Model-declared style, preserved for the deterministic type guard. */
+  type?: "theory" | "application";
 };
 
 export function systemPrompt(): string {
@@ -224,12 +226,20 @@ export function normalizeQuestions(raw: unknown, requestedDifficulty: string): R
     const difficulty = ["easy", "medium", "hard"].includes(String(item.difficulty))
       ? String(item.difficulty)
       : (["easy", "medium", "hard"].includes(requestedDifficulty) ? requestedDifficulty : "medium");
+    const typeRaw = String(item.type ?? item.kind ?? "").trim().toLowerCase();
+    const type =
+      typeRaw.startsWith("theor") || typeRaw.startsWith("concept") || typeRaw === "recall"
+        ? "theory"
+        : typeRaw.startsWith("applic") || typeRaw.startsWith("numer") || typeRaw.startsWith("problem") || typeRaw === "practical"
+          ? "application"
+          : undefined;
     out.push({
       prompt,
       options: options.slice(0, 6),
       correctIndex,
       explanation: String(item.explanation ?? "").trim().slice(0, 600),
       difficulty,
+      ...(type ? { type } : {}),
     });
   }
   return out;
@@ -407,7 +417,16 @@ export async function generateWithGemini(config: GeminiRuntimeConfig, input: Gen
   const text = extractGeminiText(payload);
   if (!text) throw new Error("Gemini returned an empty response.");
 
-  return normalizeQuestions(extractJson(text), input.difficulty).map((q) => ({
+  const raw = normalizeQuestions(extractJson(text), input.difficulty);
+  // Deterministically enforce the learner's selected question type here too,
+  // so the direct (serverless-less) path behaves like the server proxy and
+  // never ships a solve-type question into a "Theory only" test.
+  const plan = planModeEnforcement<RawGenerated>(raw, input.questionMode ?? "mixed", input.count);
+  const final = plan.keep.slice(0, input.count);
+  if (final.length === 0) {
+    throw new Error("The AI returned no questions matching the selected question type.");
+  }
+  return final.map((q) => ({
     prompt: q.prompt,
     options: q.options,
     correctIndex: q.correctIndex,

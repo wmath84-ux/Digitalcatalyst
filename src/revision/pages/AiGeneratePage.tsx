@@ -494,6 +494,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
           topicName: topicNames.join(", ") || chapterNames[0] || "General",
           count: total,
           difficulty: pickDifficulty() as "easy" | "medium" | "hard",
+          questionMode,
         });
         collected.push(
           ...qs.map<CustomTestQuestion>((q) => ({

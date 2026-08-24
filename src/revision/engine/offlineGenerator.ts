@@ -14,6 +14,9 @@ type GenerateInput = {
   topicName: string;
   count: number;
   difficulty: "easy" | "medium" | "hard";
+  /** Selected AI question type — the offline engine honours it so a
+   *  "Theory only" selection never silently falls back to arithmetic. */
+  questionMode?: "mixed" | "theory" | "application";
 };
 
 const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -153,6 +156,16 @@ function genericQuestions(subjectName: string, topicName: string, count: number)
 
 export function generateOfflineQuestions(input: GenerateInput): ParsedQuestion[] {
   const count = Math.max(1, Math.min(20, Math.round(input.count || 5)));
+  const mode = input.questionMode ?? "mixed";
+
+  // Theory only: the offline engine never fabricates correct arithmetic, so
+  // even for a maths subject it must fall back to conceptual/study questions
+  // instead of solve-type arithmetic — otherwise a "Theory only" test would
+  // still show computation questions.
+  if (mode === "theory") {
+    return genericQuestions(input.subjectName, input.topicName, count);
+  }
+
   if (isMathSubject(input.subjectName, input.topicName)) {
     return mathQuestions(count, input.difficulty);
   }

@@ -34,6 +34,23 @@ const MAX_COUNT = 20;
 const MAX_STAMPS = 200;
 const REVISION_CATALOG_DOC = "revisionCatalog";
 
+/** Live fallback when a stored/published Gemini model has been retired. */
+const GEMINI_FALLBACK_MODEL = "gemini-3.7-flash";
+
+/** True when the model id is one Google has retired and would 404 today. */
+const isRetiredGeminiModel = (model: unknown): boolean => {
+  const name = String(model || "").trim().replace(/^models\//i, "");
+  if (!name) return true;
+  return /^gemini-1\./i.test(name) || /^gemini-2\./i.test(name) || /^gemini-pro$/i.test(name) || /^gemini-pro-vision$/i.test(name);
+};
+
+/** Pull the replacement model Google names in its 404 body. */
+const extractSuggestedGeminiModel = (detail: string): string | null => {
+  const match = detail.match(/use\s+models\/([a-z0-9._-]+)/i);
+  if (match?.[1]) return String(match[1]).replace(/^models\//i, "");
+  return null;
+};
+
 export type RevisionSelectionRow = {
   className: string;
   subjectName: string;
@@ -464,7 +481,12 @@ function parseOwnConfig(raw: unknown): AiConfig | null {
   const r = asRecord(raw);
   const provider = PROVIDERS.includes(r.provider as ProviderId) ? (r.provider as ProviderId) : null;
   const apiKey = String(r.apiKey ?? "").trim();
-  const model = String(r.model ?? "").trim().replace(/^models\//i, "");
+  // Upgrade a stale/retired Gemini id so an old saved config never 404s.
+  const modelRaw = String(r.model ?? "").trim().replace(/^models\//i, "");
+  const model =
+    provider === "gemini" && isRetiredGeminiModel(modelRaw)
+      ? GEMINI_FALLBACK_MODEL
+      : modelRaw;
   if (!provider || !apiKey || !model) return null;
   const baseUrl = assertSafeBaseUrl(String(r.baseUrl ?? ""), provider);
   return { provider, apiKey, baseUrl, model };
@@ -475,7 +497,11 @@ async function loadSchoolConfig(): Promise<AiConfig> {
   const settings = asRecord(asRecord(snap.data()).aiSettings);
   const provider = PROVIDERS.includes(settings.provider as ProviderId) ? (settings.provider as ProviderId) : "gemini";
   const apiKey = String(settings.sharedApiKey ?? "").trim();
-  const model = String(settings.model ?? "").trim().replace(/^models\//i, "");
+  const modelRaw = String(settings.model ?? "").trim().replace(/^models\//i, "");
+  const model =
+    provider === "gemini" && isRetiredGeminiModel(modelRaw)
+      ? GEMINI_FALLBACK_MODEL
+      : modelRaw;
   if (!apiKey || !model) {
     throw Object.assign(new Error("School-provided AI is not published yet. Ask your school to share a key, or use your own API key."), { statusCode: 409 });
   }
@@ -809,24 +835,44 @@ function providerUsage(raw: unknown, fallbackInputText: string, fallbackOutputTe
 }
 
 async function callGemini(config: AiConfig, userPrompt: string, difficulty: RevisionSyllabus["difficulty"]): Promise<ProviderGeneration> {
-  const url = geminiGenerateUrl(config.baseUrl || DEFAULT_BASE.gemini, config.model);
-  const res = await fetchWithTimeout(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": config.apiKey,
-    },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemPrompt() }] },
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      // Lower temperature keeps the model closer to the strict question-type
-      // rules (theory vs application) instead of drifting to generic exam items.
-      generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
-    }),
-  });
+  const base = config.baseUrl || DEFAULT_BASE.gemini;
+  const call = (model: string) =>
+    fetchWithTimeout(geminiGenerateUrl(base, model), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": config.apiKey,
+      },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt() }] },
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        // Lower temperature keeps the model closer to the strict question-type
+        // rules (theory vs application) instead of drifting to generic exam items.
+        generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
+      }),
+    });
+
+  let model = config.model;
+  let res = await call(model);
+  if (!res.ok && (res.status === 404 || res.status === 400)) {
+    const detail = await res.text().catch(() => "");
+    // A retired model answers 404 and names its replacement; otherwise fall
+    // back to the live default so a stale stored model never blocks a test.
+    const suggested = extractSuggestedGeminiModel(detail);
+    const fallback =
+      suggested && suggested !== model
+        ? suggested
+        : model !== GEMINI_FALLBACK_MODEL
+          ? GEMINI_FALLBACK_MODEL
+          : null;
+    if (fallback) {
+      model = fallback;
+      res = await call(fallback);
+    }
+  }
   if (!res.ok) {
     const detail = (await res.text().catch(() => "")).slice(0, 240);
-    throw Object.assign(new Error(`Gemini returned ${res.status}. Check the API key and model (${config.model}). ${detail}`), { statusCode: 502 });
+    throw Object.assign(new Error(`Gemini returned ${res.status}. Check the API key and model (${model}). ${detail}`), { statusCode: 502 });
   }
   const payload = await res.json();
   const text = extractGeminiText(payload);
