@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
-import { BadgeCheck, Crown, LoaderCircle, Trophy, Users } from "lucide-react";
+import { BadgeCheck, Check, Copy, Crown, LoaderCircle, Trophy, Users } from "lucide-react";
 import Header from "./components/Header";
 import BottomNav from "./components/BottomNav";
 import { useCatalog } from "./context/CatalogContext";
@@ -55,6 +55,18 @@ export default function LeaderboardApp() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [copiedReferralCode, setCopiedReferralCode] = useState("");
+
+  const copyReferralCode = async (code: string) => {
+    if (!code) return;
+    try {
+      await navigator.clipboard?.writeText(code);
+      setCopiedReferralCode(code);
+      window.setTimeout(() => setCopiedReferralCode((current) => (current === code ? "" : current)), 1400);
+    } catch {
+      setCopiedReferralCode("");
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -223,9 +235,20 @@ export default function LeaderboardApp() {
                       {used ? "Used" : "Use now"}
                     </span>
                   </div>
-                  <div className="mt-3 flex items-center justify-between rounded-xl bg-white/70 px-3 py-2">
-                    <span className="text-[10px] font-bold uppercase text-slate-400">Referral ID</span>
-                    <code className={`max-w-[230px] truncate text-xs font-black ${used ? "text-slate-400 line-through decoration-2 decoration-rose-400" : "text-slate-800"}`}>{row.referralCode}</code>
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2">
+                    <span className="shrink-0 text-[10px] font-bold uppercase text-slate-400">Referral ID</span>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <code className={`min-w-0 max-w-[190px] truncate text-xs font-black ${used ? "text-slate-400 line-through decoration-2 decoration-rose-400" : "text-slate-800"}`}>{row.referralCode}</code>
+                      <button
+                        type="button"
+                        onClick={() => void copyReferralCode(row.referralCode)}
+                        className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:text-violet-700 active:scale-95"
+                        aria-label={`Copy referral ID ${row.referralCode}`}
+                        title="Copy referral ID"
+                      >
+                        {copiedReferralCode === row.referralCode ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                      </button>
+                    </div>
                   </div>
                   {used ? (
                     <p className="mt-2 text-[10px] font-semibold text-amber-700">This referral ID has been used and is discontinued.</p>

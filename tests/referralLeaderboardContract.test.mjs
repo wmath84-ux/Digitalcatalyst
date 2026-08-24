@@ -53,6 +53,14 @@ test("leaderboard toggles all users versus subscribers with referral IDs", () =>
   assert.match(leaderboard, /photoURL/);
 });
 
+test("leaderboard referral IDs have a small copy icon button", () => {
+  assert.match(leaderboard, /Copy/);
+  assert.match(leaderboard, /copyReferralCode/);
+  assert.match(leaderboard, /navigator\.clipboard/);
+  assert.match(leaderboard, /aria-label=\{`Copy referral ID/);
+  assert.match(leaderboard, /<Copy size=\{13\}/);
+});
+
 test("a referral ID can be redeemed only once", () => {
   assert.match(referrals, /globalLimit: 1/);
   assert.match(referrals, /maxUsesPerReferrer: 1/);
