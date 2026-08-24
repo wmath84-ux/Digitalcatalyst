@@ -20,10 +20,27 @@ html,
 body,
 #root {
   height: 100%;
+  width: 100%;
+  margin: 0;
   background-color: #ffffff;
   touch-action: pan-x pan-y;
   overscroll-behavior: none;
   -ms-touch-action: pan-x pan-y;
+}
+
+html,
+body {
+  /* Mobile webviews can otherwise pan into tiny off-canvas areas created by
+     glows/shadows (notably the floating footer), making the app look like a
+     white page floating inside the screen. */
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 * {
@@ -71,6 +88,8 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
    ───────────────────────────────────────────────────────────────────── */
 .dc-footer-shell {
   position: relative;
+  max-width: 100%;
+  isolation: isolate;
 }
 
 .dc-footer-glow {
@@ -116,6 +135,32 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   box-shadow:
     9px 11px 26px rgba(15, 23, 42, 0.2), /* facing bottom-right */
     4px 5px 12px rgba(15, 23, 42, 0.12);
+}
+
+@media (max-width: 639px) {
+  [data-app-frame] {
+    width: 100%;
+    max-width: 100vw;
+    height: 100dvh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  [data-app-frame] > main {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 374px) {
+  .dc-footer-pill button {
+    font-size: 10px;
+    letter-spacing: -0.01em;
+  }
+
+  .dc-footer-pill button > span:first-child {
+    width: 2.75rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
