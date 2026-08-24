@@ -20,6 +20,7 @@ import LandingApp from "./LandingApp";
 import AuthApp from "./AuthApp";
 import AdminLoginApp from "./AdminLoginApp";
 import AdminApp from "./admin/AdminApp";
+import FlowPathApp from "./FlowPathApp";
 import NotificationsPage from "./components/NotificationsPage";
 import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
@@ -96,6 +97,7 @@ const NOTIFICATIONS_HASH = "#/notifications";
 // Developer sandbox for the expiry / renewal messaging. Pure preview:
 // it synthesises a subscription document and never touches Firestore.
 const RENEWAL_PREVIEW_HASH = "#/dev/subscription-preview";
+const FLOWPATH_HASH = "#/flowpath";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
 
@@ -804,6 +806,7 @@ function Root() {
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
   if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
   if (hash.startsWith(LEADERBOARD_HASH)) return <LeaderboardApp />;
+  if (hash.startsWith(FLOWPATH_HASH)) return <FlowPathApp onNavigateToHome={() => { window.location.hash = HOME_HASH; }} />;
   if (hash.startsWith(REVISION_HASH)) return <RevisionApp />;
   if (hash.startsWith(PRODUCT_HASH)) {
     return (

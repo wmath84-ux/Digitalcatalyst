@@ -1077,3 +1077,294 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     animation: none;
   }
 }
+
+/* ==================== FlowPath 3D Dashboard Styles ==================== */
+/* These styles are scoped to FlowPath components via CSS variable naming
+   and class prefixes (fp-*). They do NOT affect any existing app styles. */
+
+/* FlowPath CSS variables — dark theme defaults */
+:root {
+  --fp-bg-0: #05060a;
+  --fp-bg-1: #0a0d16;
+  --fp-surface: rgba(255, 255, 255, 0.05);
+  --fp-surface-hover: rgba(255, 255, 255, 0.10);
+  --fp-surface-strong: linear-gradient(160deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03));
+  --fp-panel: linear-gradient(155deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02));
+  --fp-text: #ffffff;
+  --fp-muted: rgba(255, 255, 255, 0.55);
+  --fp-border: rgba(255, 255, 255, 0.12);
+  --fp-border-hover: rgba(255, 255, 255, 0.22);
+  --fp-grid-line: rgba(255, 255, 255, 0.035);
+  --fp-card-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.75);
+  --fp-strong-shadow: 0 30px 80px -24px rgba(0, 0, 0, 0.85);
+  --fp-overlay: rgba(2, 6, 23, 0.70);
+
+  --fp-text-85: color-mix(in srgb, #ffffff 85%, transparent);
+  --fp-text-70: color-mix(in srgb, #ffffff 70%, transparent);
+  --fp-text-55: color-mix(in srgb, #ffffff 55%, transparent);
+  --fp-text-50: color-mix(in srgb, #ffffff 50%, transparent);
+  --fp-text-45: color-mix(in srgb, #ffffff 45%, transparent);
+  --fp-text-40: color-mix(in srgb, #ffffff 40%, transparent);
+  --fp-text-30: color-mix(in srgb, #ffffff 30%, transparent);
+  --fp-text-20: color-mix(in srgb, #ffffff 20%, transparent);
+  --fp-text-15: color-mix(in srgb, #ffffff 15%, transparent);
+  --fp-text-10: color-mix(in srgb, #ffffff 10%, transparent);
+  --fp-text-6: color-mix(in srgb, #ffffff 6%, transparent);
+  --fp-text-5: color-mix(in srgb, #ffffff 5%, transparent);
+  --fp-text-3: color-mix(in srgb, #ffffff 3%, transparent);
+
+  --fp-rose-text: #fda4af;
+  --fp-amber-text: #fcd34d;
+  --fp-emerald-text: #6ee7b7;
+  --fp-violet-text: #ddd6fe;
+}
+
+/* FlowPath light theme overrides */
+[data-theme="light"] {
+  --fp-bg-0: #f6f7fa;
+  --fp-bg-1: #ffffff;
+  --fp-surface: rgba(255, 255, 255, 0.72);
+  --fp-surface-hover: rgba(255, 255, 255, 0.95);
+  --fp-surface-strong: linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(241, 243, 250, 0.80));
+  --fp-panel: linear-gradient(155deg, rgba(255, 255, 255, 0.82), rgba(235, 238, 248, 0.62));
+  --fp-text: #0f1222;
+  --fp-muted: rgba(15, 18, 34, 0.52);
+  --fp-border: rgba(15, 18, 34, 0.10);
+  --fp-border-hover: rgba(15, 18, 34, 0.22);
+  --fp-grid-line: rgba(15, 18, 34, 0.055);
+  --fp-card-shadow: 0 20px 60px -20px rgba(15, 18, 34, 0.18);
+  --fp-strong-shadow: 0 30px 80px -24px rgba(15, 18, 34, 0.22);
+  --fp-overlay: rgba(246, 247, 250, 0.82);
+
+  --fp-text-85: color-mix(in srgb, #0f1222 85%, transparent);
+  --fp-text-70: color-mix(in srgb, #0f1222 70%, transparent);
+  --fp-text-55: color-mix(in srgb, #0f1222 55%, transparent);
+  --fp-text-50: color-mix(in srgb, #0f1222 50%, transparent);
+  --fp-text-45: color-mix(in srgb, #0f1222 45%, transparent);
+  --fp-text-40: color-mix(in srgb, #0f1222 40%, transparent);
+  --fp-text-30: color-mix(in srgb, #0f1222 30%, transparent);
+  --fp-text-20: color-mix(in srgb, #0f1222 20%, transparent);
+  --fp-text-15: color-mix(in srgb, #0f1222 15%, transparent);
+  --fp-text-10: color-mix(in srgb, #0f1222 10%, transparent);
+  --fp-text-6: color-mix(in srgb, #0f1222 6%, transparent);
+  --fp-text-5: color-mix(in srgb, #0f1222 5%, transparent);
+  --fp-text-3: color-mix(in srgb, #0f1222 3%, transparent);
+
+  --fp-rose-text: #e11d48;
+  --fp-amber-text: #b45309;
+  --fp-emerald-text: #047857;
+  --fp-violet-text: #6d28d9;
+}
+
+/* ---------- FlowPath utility classes ---------- */
+.text-fp-text { color: var(--fp-text); }
+.text-fp-muted { color: var(--fp-muted); }
+.text-fp-text-85 { color: var(--fp-text-85); }
+.text-fp-text-70 { color: var(--fp-text-70); }
+.text-fp-text-55 { color: var(--fp-text-55); }
+.text-fp-text-50 { color: var(--fp-text-50); }
+.text-fp-text-45 { color: var(--fp-text-45); }
+.text-fp-text-40 { color: var(--fp-text-40); }
+.text-fp-text-30 { color: var(--fp-text-30); }
+.text-fp-text-15 { color: var(--fp-text-15); }
+.text-fp-text-10 { color: var(--fp-text-10); }
+
+.fp-text-rose { color: var(--fp-rose-text); }
+.fp-text-amber { color: var(--fp-amber-text); }
+.fp-text-emerald { color: var(--fp-emerald-text); }
+.fp-text-violet { color: var(--fp-violet-text); }
+
+.bg-fp-surface { background: var(--fp-surface); }
+.bg-fp-surface-hover { background: var(--fp-surface-hover); }
+.bg-fp-text-15 { background: var(--fp-text-15); }
+.bg-fp-text-10 { background: var(--fp-text-10); }
+.bg-fp-text-6 { background: var(--fp-text-6); }
+.bg-fp-text-5 { background: var(--fp-text-5); }
+.bg-fp-text-3 { background: var(--fp-text-3); }
+
+.border-fp-border { border-color: var(--fp-border); }
+.border-fp-border-hover:hover { border-color: var(--fp-border-hover); }
+.border-fp-text-30 { border-color: var(--fp-text-30); }
+.border-fp-text-20 { border-color: var(--fp-text-20); }
+.border-fp-text-15 { border-color: var(--fp-text-15); }
+
+.decoration-fp-text-30 { text-decoration-color: var(--fp-text-30); }
+
+.placeholder-fp-text-30::placeholder { color: var(--fp-text-30); }
+
+/* ---------- FlowPath glass surfaces ---------- */
+.glass-panel {
+  background: var(--fp-panel);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid var(--fp-border);
+  box-shadow:
+    0 1px 0 var(--fp-border) inset,
+    var(--fp-card-shadow);
+  transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+.glass-panel-strong {
+  background: var(--fp-surface-strong);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  border: 1px solid var(--fp-border);
+  box-shadow:
+    0 1px 0 var(--fp-border) inset,
+    var(--fp-strong-shadow);
+  transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+.fp-overlay {
+  background: var(--fp-overlay);
+  backdrop-filter: blur(2px);
+}
+
+/* ---------- FlowPath background ambience ---------- */
+.fp-bg-grid {
+  background-image:
+    linear-gradient(to right, var(--fp-grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--fp-grid-line) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 40%, transparent 100%);
+}
+
+@keyframes fp-drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(2%, -3%, 0) scale(1.05); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+
+.fp-orb {
+  animation: fp-drift 22s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes fp-particle-float {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: var(--op, 0.5); }
+  50% { transform: translateY(-18px) translateX(6px); opacity: calc(var(--op, 0.5) * 1.4); }
+}
+
+.fp-particle {
+  animation: fp-particle-float linear infinite;
+}
+
+/* ---------- FlowPath node pulse ---------- */
+@keyframes fp-pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.55; }
+  70% { transform: scale(1.9); opacity: 0; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+.fp-pulse::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(139, 123, 255, 0.55), transparent 70%);
+  animation: fp-pulse-ring 2.6s ease-out infinite;
+}
+
+@keyframes fp-float-node {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+.fp-floaty {
+  animation: fp-float-node 5.5s ease-in-out infinite;
+}
+
+@keyframes fp-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.fp-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: fp-shimmer 6s ease-in-out infinite;
+}
+
+[data-theme="light"] .fp-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.85) 50%,
+    transparent 70%
+  );
+}
+
+/* ---------- FlowPath custom slider ---------- */
+.fp-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fp-border);
+  outline: none;
+}
+.fp-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8b7bff, #5eead4);
+  border: 2px solid var(--fp-bg-0);
+  box-shadow: 0 4px 10px -4px rgba(139, 123, 255, 0.55);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.fp-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+.fp-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8b7bff, #5eead4);
+  border: 2px solid var(--fp-bg-0);
+  box-shadow: 0 4px 10px -4px rgba(139, 123, 255, 0.55);
+  cursor: pointer;
+}
+
+/* ---------- FlowPath: Home button 3-second hold + liquid expand transition ---------- */
+@keyframes fp-home-hold-ring {
+  from { stroke-dashoffset: 94.25; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes fp-liquid-expand {
+  0% {
+    transform: scale(0);
+    border-radius: 50%;
+    opacity: 1;
+  }
+  40% {
+    border-radius: 50%;
+    opacity: 1;
+  }
+  70% {
+    border-radius: 28%;
+    opacity: 1;
+  }
+  100% {
+    transform: scale(60);
+    border-radius: 0%;
+    opacity: 1;
+  }
+}
+
+.fp-liquid-expand {
+  animation: fp-liquid-expand 0.85s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fp-orb, .fp-particle, .fp-pulse::before, .fp-floaty, .fp-shimmer {
+    animation: none !important;
+  }
+}
+/* ==================== End FlowPath Styles ==================== */
