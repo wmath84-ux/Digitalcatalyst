@@ -136,63 +136,63 @@ const MEMBERSHIP_THEMES: Record<MembershipTier, {
   stat: string;
 }> = {
   normal: {
-    hero: "bg-[#05060f]",
-    heroGlow: "bg-violet-600/35",
-    heroBadge: "bg-white/15 text-white",
-    membership: "border-indigo-100 bg-gradient-to-br from-white via-indigo-50/60 to-violet-50",
-    membershipIcon: "bg-indigo-100 text-indigo-600",
-    membershipPill: "bg-slate-100 text-slate-600",
-    primaryButton: "bg-indigo-600 shadow-indigo-200 hover:bg-indigo-700",
-    secondaryButton: "border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50",
-    renewal: "border-slate-200 bg-white",
-    renewalIcon: "bg-slate-100 text-slate-600",
-    progress: "bg-slate-400",
-    stat: "bg-white/75 ring-slate-200/80",
+    hero: "dc-glass-hero",
+    heroGlow: "bg-violet-500/50",
+    heroBadge: "bg-white/12 text-white ring-1 ring-white/20",
+    membership: "dc-glass border-indigo-200/40",
+    membershipIcon: "bg-indigo-500/15 text-indigo-600 ring-1 ring-indigo-300/40",
+    membershipPill: "bg-slate-900/5 text-slate-600 ring-1 ring-white/60",
+    primaryButton: "bg-gradient-to-r from-indigo-600 to-violet-600 dc-glow-btn hover:from-indigo-500 hover:to-violet-500",
+    secondaryButton: "border-white/70 bg-white/45 text-indigo-700 backdrop-blur-md hover:bg-white/75",
+    renewal: "dc-glass",
+    renewalIcon: "bg-slate-900/5 text-slate-600 ring-1 ring-white/60",
+    progress: "bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-400",
+    stat: "bg-white/45 ring-white/70 backdrop-blur-md",
   },
   basic: {
     // Basic is calm and fresh, so paid status is visible without looking loud.
-    hero: "bg-[#05060f]",
-    heroGlow: "bg-cyan-500/25",
-    heroBadge: "bg-white/15 text-white",
-    membership: "border-sky-200 bg-gradient-to-br from-white via-sky-50 to-cyan-50",
-    membershipIcon: "bg-sky-100 text-sky-700",
-    membershipPill: "bg-sky-100 text-sky-700",
-    primaryButton: "bg-sky-600 shadow-sky-200 hover:bg-sky-700",
-    secondaryButton: "border-sky-200 bg-white text-sky-700 hover:bg-sky-50",
-    renewal: "border-sky-200 bg-gradient-to-br from-white to-sky-50",
-    renewalIcon: "bg-sky-100 text-sky-700",
-    progress: "bg-sky-500",
-    stat: "bg-white/75 ring-sky-200/80",
+    hero: "dc-glass-hero dc-glass-hero--basic",
+    heroGlow: "bg-cyan-400/45",
+    heroBadge: "bg-white/12 text-white ring-1 ring-white/20",
+    membership: "dc-glass border-cyan-200/50",
+    membershipIcon: "bg-cyan-500/15 text-cyan-700 ring-1 ring-cyan-300/40",
+    membershipPill: "bg-cyan-500/12 text-cyan-800 ring-1 ring-cyan-200/50",
+    primaryButton: "bg-gradient-to-r from-sky-500 to-cyan-500 shadow-[0_12px_28px_-10px_rgba(14,165,233,0.65)] hover:from-sky-400 hover:to-cyan-400",
+    secondaryButton: "border-white/70 bg-white/45 text-sky-700 backdrop-blur-md hover:bg-white/75",
+    renewal: "dc-glass border-cyan-200/40",
+    renewalIcon: "bg-cyan-500/15 text-cyan-700 ring-1 ring-cyan-300/40",
+    progress: "bg-gradient-to-r from-sky-400 to-cyan-500",
+    stat: "bg-white/45 ring-cyan-100/80 backdrop-blur-md",
   },
   premium: {
     // Premium moves into the violet/fuchsia family.
-    hero: "bg-[#05060f]",
-    heroGlow: "bg-fuchsia-500/30",
-    heroBadge: "bg-white/15 text-white",
-    membership: "border-fuchsia-200 bg-gradient-to-br from-white via-violet-50 to-fuchsia-50",
-    membershipIcon: "bg-fuchsia-100 text-fuchsia-700",
-    membershipPill: "bg-fuchsia-100 text-fuchsia-700",
-    primaryButton: "bg-fuchsia-600 shadow-fuchsia-200 hover:bg-fuchsia-700",
-    secondaryButton: "border-fuchsia-200 bg-white text-fuchsia-700 hover:bg-fuchsia-50",
-    renewal: "border-fuchsia-200 bg-gradient-to-br from-white to-fuchsia-50",
-    renewalIcon: "bg-fuchsia-100 text-fuchsia-700",
-    progress: "bg-fuchsia-500",
-    stat: "bg-white/75 ring-fuchsia-200/80",
+    hero: "dc-glass-hero dc-glass-hero--premium",
+    heroGlow: "bg-fuchsia-400/45",
+    heroBadge: "bg-white/12 text-white ring-1 ring-white/20",
+    membership: "dc-glass border-fuchsia-200/50",
+    membershipIcon: "bg-fuchsia-500/15 text-fuchsia-700 ring-1 ring-fuchsia-300/40",
+    membershipPill: "bg-fuchsia-500/12 text-fuchsia-800 ring-1 ring-fuchsia-200/50",
+    primaryButton: "bg-gradient-to-r from-fuchsia-600 to-violet-600 shadow-[0_12px_28px_-10px_rgba(192,38,211,0.65)] hover:from-fuchsia-500 hover:to-violet-500",
+    secondaryButton: "border-white/70 bg-white/45 text-fuchsia-700 backdrop-blur-md hover:bg-white/75",
+    renewal: "dc-glass border-fuchsia-200/40",
+    renewalIcon: "bg-fuchsia-500/15 text-fuchsia-700 ring-1 ring-fuchsia-300/40",
+    progress: "bg-gradient-to-r from-fuchsia-500 to-violet-500",
+    stat: "bg-white/45 ring-fuchsia-100/80 backdrop-blur-md",
   },
   pro: {
     // Pro is intentionally the strongest, most premium gradient.
-    hero: "bg-[#05060f]",
-    heroGlow: "bg-violet-600/35",
-    heroBadge: "bg-white/15 text-white",
-    membership: "border-violet-200 bg-gradient-to-br from-white via-indigo-50 to-violet-100",
-    membershipIcon: "bg-violet-100 text-violet-700",
-    membershipPill: "bg-violet-100 text-violet-800",
-    primaryButton: "bg-violet-700 shadow-violet-300 hover:bg-violet-800",
-    secondaryButton: "border-violet-200 bg-white text-violet-800 hover:bg-violet-50",
-    renewal: "border-violet-200 bg-gradient-to-br from-white via-indigo-50 to-violet-100",
-    renewalIcon: "bg-violet-100 text-violet-700",
-    progress: "bg-violet-600",
-    stat: "bg-white/75 ring-violet-200/80",
+    hero: "dc-glass-hero dc-glass-hero--pro",
+    heroGlow: "bg-violet-400/55",
+    heroBadge: "bg-white/12 text-white ring-1 ring-white/20",
+    membership: "dc-glass border-violet-200/50",
+    membershipIcon: "bg-violet-500/18 text-violet-700 ring-1 ring-violet-300/40",
+    membershipPill: "bg-violet-500/12 text-violet-800 ring-1 ring-violet-200/50",
+    primaryButton: "bg-gradient-to-r from-violet-700 via-indigo-600 to-fuchsia-600 dc-glow-btn hover:from-violet-600 hover:via-indigo-500 hover:to-fuchsia-500",
+    secondaryButton: "border-white/70 bg-white/45 text-violet-800 backdrop-blur-md hover:bg-white/75",
+    renewal: "dc-glass border-violet-200/40",
+    renewalIcon: "bg-violet-500/15 text-violet-700 ring-1 ring-violet-300/40",
+    progress: "bg-gradient-to-r from-violet-500 via-indigo-500 to-fuchsia-500",
+    stat: "bg-white/45 ring-violet-100/80 backdrop-blur-md",
   },
 };
 
@@ -356,8 +356,13 @@ export default function ProfileApp() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 sm:py-6">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
+    <div className="min-h-screen bg-[#eef1ff] text-slate-900 sm:py-6">
+      <div data-app-frame data-profile-page className="relative mx-auto flex min-h-screen w-full max-w-md flex-col overflow-hidden shadow-xl shadow-indigo-200/50 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-white/70">
+        <div className="dc-profile-aurora" aria-hidden="true">
+          <div className="dc-profile-orb dc-profile-orb-a" />
+          <div className="dc-profile-orb dc-profile-orb-b" />
+          <div className="dc-profile-orb dc-profile-orb-c" />
+        </div>
         <Header
           cartCount={cartIds.size}
           notifCount={0}
@@ -366,43 +371,45 @@ export default function ProfileApp() {
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
         />
 
-        <main ref={mainRef} className="flex-1 overflow-y-auto px-4 pt-2 pb-5">
+        <main ref={mainRef} className="relative z-[1] flex-1 overflow-y-auto px-4 pt-2 pb-5">
           <div className="space-y-5">
             <div className="flex items-center justify-between px-1">
               <div>
-                <h1 className="text-xl font-black tracking-tight text-slate-950">Profile & library</h1>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500">Your space</p>
+                <h1 className="mt-0.5 text-xl font-black tracking-tight text-slate-950">Profile & library</h1>
               </div>
               <div className="flex items-center gap-2">
-                {membershipLoaded && membership.subscriber ? <span className="hidden rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 sm:inline-flex">{membership.active ? "Active" : "Expired"}</span> : null}
+                {membershipLoaded && membership.subscriber ? <span className="hidden rounded-full bg-emerald-400/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-300/40 sm:inline-flex">{membership.active ? "Active" : "Expired"}</span> : null}
                 {preferencesSaving && <LoaderCircle className="h-4 w-4 animate-spin text-violet-600" />}
               </div>
             </div>
 
-            {message && <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{message}</div>}
+            {message && <div className="rounded-2xl border border-rose-200/70 bg-rose-50/80 p-3 text-sm font-semibold text-rose-700 shadow-[0_10px_24px_-16px_rgba(225,29,72,0.55)] backdrop-blur-md">{message}</div>}
 
             {/* This is the one profile hero. Paid plans keep the same layout,
                 while the gradient changes by tier as requested. */}
-            <section data-profile-membership-tier={membership.tier} className={`relative overflow-hidden rounded-[2rem] p-6 text-white shadow-xl shadow-violet-500/20 ${theme.hero}`}>
-              <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-violet-600/40 blur-3xl" />
-              <div className="pointer-events-none absolute -bottom-16 -left-8 h-36 w-36 rounded-full bg-cyan-500/25 blur-3xl" />
+            <section data-profile-membership-tier={membership.tier} className={`relative overflow-hidden rounded-[2rem] p-6 text-white ${theme.hero}`}>
+              <div className={`pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full blur-3xl ${theme.heroGlow}`} />
+              <div className="pointer-events-none absolute -bottom-16 -left-8 h-40 w-40 rounded-full bg-cyan-400/30 blur-3xl" />
+              <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400" />
               <div className="relative">
                 <div className="flex items-start justify-between gap-3">
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] backdrop-blur ${theme.heroBadge}`}>
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] backdrop-blur-md ${theme.heroBadge}`}>
                     {membership.subscriber ? <BadgeCheck className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
                     {membership.subscriber ? `${tierLabel} member` : "Free learner"}
                   </span>
                   {membership.subscriber ? (
-                    <span className="rounded-full bg-emerald-300/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-50 ring-1 ring-emerald-100/25">
+                    <span className="rounded-full bg-emerald-300/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-50 ring-1 ring-emerald-100/25 shadow-[0_0_18px_rgba(52,211,153,0.28)]">
                       {membership.active ? "Active" : "Renew access"}
                     </span>
                   ) : (
-                    <span className="rounded-full bg-black/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white/75">No plan yet</span>
+                    <span className="rounded-full bg-white/8 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white/75 ring-1 ring-white/15">No plan yet</span>
                   )}
                 </div>
 
                 <div className="mt-5 flex items-center gap-4">
-                  {user.photoURL ? <img src={user.photoURL} alt="" className="h-16 w-16 rounded-full object-cover ring-2 ring-white/40" /> : <div className="grid h-16 w-16 place-items-center rounded-full bg-white/20 text-xl font-black ring-2 ring-white/40">{initials}</div>}
+                  {user.photoURL ? <img src={user.photoURL} alt="" className="h-16 w-16 rounded-full object-cover dc-glow-ring" /> : <div className="grid h-16 w-16 place-items-center rounded-full bg-white/18 text-xl font-black dc-glow-ring">{initials}</div>}
                   <div className="min-w-0 flex-1">
                     <h2 className="truncate text-2xl font-black tracking-tight">{user.name}</h2>
                     <p className="truncate text-xs text-white/80">{user.email}</p>
@@ -410,19 +417,19 @@ export default function ProfileApp() {
                   </div>
                 </div>
                 <p className="relative mt-5 text-sm leading-6 text-white/85">{user.bio || (membership.subscriber ? `Your ${tierLabel} learning space is ready. Keep building momentum.` : "Add a short bio to personalize your learner profile.")}</p>
-                <button type="button" onClick={() => setModal("edit")} className="relative mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/15 py-3 text-sm font-black ring-1 ring-white/30 transition hover:bg-white/25 active:scale-[0.99]"><Pencil size={15} /> Edit profile</button>
+                <button type="button" onClick={() => setModal("edit")} className="relative mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/14 py-3 text-sm font-black ring-1 ring-white/30 shadow-[0_10px_24px_-12px_rgba(255,255,255,0.35)] backdrop-blur-md transition hover:bg-white/24 active:scale-[0.99]"><Pencil size={15} /> Edit profile</button>
               </div>
             </section>
 
             {membership.subscriber ? (
-              <section data-profile-membership-card className={`rounded-[2rem] border p-5 shadow-sm ${theme.membership}`}>
-                <div className="flex items-start justify-between gap-3">
+              <section data-profile-membership-card className={`rounded-[2rem] p-5 ${theme.membership}`}>
+                <div className="relative flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className={`grid h-12 w-12 place-items-center rounded-2xl ${theme.membershipIcon}`}>
+                    <div className={`grid h-12 w-12 place-items-center rounded-2xl shadow-[0_10px_22px_-12px_rgba(79,70,229,0.7)] ${theme.membershipIcon}`}>
                       {membership.tier === "pro" ? <Zap className="h-6 w-6" /> : membership.tier === "premium" ? <Sparkles className="h-6 w-6" /> : <Crown className="h-6 w-6" />}
                     </div>
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Membership</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-400">Membership</p>
                       <h3 className="mt-1 text-xl font-black text-slate-950">{tierLabel} membership</h3>
                     </div>
                   </div>
@@ -445,11 +452,12 @@ export default function ProfileApp() {
                 </button>
               </section>
             ) : (
-              <section data-profile-upgrade-card className="relative overflow-hidden rounded-[2rem] border border-indigo-100 bg-gradient-to-br from-white via-indigo-50 to-violet-100 p-5 shadow-sm">
-                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-violet-200/50" />
+              <section data-profile-upgrade-card className="dc-glass relative overflow-hidden rounded-[2rem] p-5">
+                <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-violet-400/30 blur-2xl" />
+                <div className="pointer-events-none absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-cyan-300/25 blur-2xl" />
                 <div className="relative">
                   <div className="flex items-start gap-3">
-                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200"><Rocket className="h-6 w-6" /></div>
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_12px_24px_-10px_rgba(79,70,229,0.8)]"><Rocket className="h-6 w-6" /></div>
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600">Basic learner access</p>
                       <h3 className="mt-1 text-xl font-black leading-tight text-slate-950">Upgrade your learning space</h3>
@@ -505,44 +513,44 @@ export default function ProfileApp() {
             {membership.subscriber ? <AiQuotaCard uid={user.id} /> : null}
 
             {referralCode && (
-              <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-md shadow-slate-200/80">
-                <div className="flex items-center justify-between gap-3">
+              <section className="dc-glass rounded-[2rem] p-5">
+                <div className="relative flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Your referral code</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-500">Your referral code</p>
                     <p className="mt-1 text-xs text-slate-500">{`Share it with a learner joining ${appName}.`}</p>
                   </div>
-                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-amber-50 text-amber-600"><Sparkles className="h-5 w-5" /></div>
+                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-amber-400/15 text-amber-600 ring-1 ring-amber-200/60 shadow-[0_8px_18px_-10px_rgba(245,158,11,0.7)]"><Sparkles className="h-5 w-5" /></div>
                 </div>
                 {referralUsed ? (
-                  <div data-profile-referral-used className="mt-4 rounded-2xl bg-slate-100 p-3">
+                  <div data-profile-referral-used className="relative mt-4 rounded-2xl bg-white/45 p-3 ring-1 ring-white/70 backdrop-blur-md">
                     <div className="flex items-center justify-between"><code className="min-w-0 truncate text-sm font-black text-slate-400 line-through decoration-2 decoration-rose-400">{referralCode}</code><span className="rounded-full bg-amber-200 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-800">Used</span></div>
                     <p className="mt-1 text-[10px] font-semibold text-slate-400">This referral ID has been used and is no longer active.</p>
                   </div>
                 ) : (
-                  <div className="mt-4 flex items-center justify-between gap-2 rounded-2xl bg-violet-50 p-3">
+                  <div className="relative mt-4 flex items-center justify-between gap-2 rounded-2xl bg-violet-500/10 p-3 ring-1 ring-violet-200/50 backdrop-blur-md">
                     <code className="min-w-0 truncate text-sm font-black text-violet-900">{referralCode}</code>
-                    <button type="button" onClick={() => void navigator.clipboard?.writeText(referralCode)} className="shrink-0 rounded-xl bg-white px-3 py-1.5 text-[10px] font-black text-violet-700 shadow-sm">Copy</button>
+                    <button type="button" onClick={() => void navigator.clipboard?.writeText(referralCode)} className="shrink-0 rounded-xl bg-white/80 px-3 py-1.5 text-[10px] font-black text-violet-700 shadow-sm ring-1 ring-white/80">Copy</button>
                   </div>
                 )}
               </section>
             )}
 
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div><h3 className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">My library</h3><p className="mt-1 text-xs text-slate-400">Your saved learning activity at a glance</p></div>
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-violet-50 text-violet-600"><ShoppingBag className="h-5 w-5" /></div>
+            <section className="dc-glass rounded-[2rem] p-5">
+              <div className="relative flex items-center justify-between">
+                <div><h3 className="text-xs font-black uppercase tracking-[0.16em] text-indigo-400">My library</h3><p className="mt-1 text-xs text-slate-500">Your saved learning activity at a glance</p></div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-violet-500/12 text-violet-600 ring-1 ring-violet-200/50"><ShoppingBag className="h-5 w-5" /></div>
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                <LibraryStat icon={<ShoppingBag />} value={ownedCount} label="Purchased" onClick={() => { window.location.hash = "#/store/purchases"; }} />
-                <LibraryStat icon={<Heart />} value={favoriteIds.size} label="Favorites" onClick={() => { window.location.hash = "#/favorites"; }} />
-                <LibraryStat icon={<Boxes />} value={cartIds.size} label="In cart" onClick={() => { window.location.hash = "#/cart"; }} />
+              <div className="relative mt-4 grid grid-cols-3 gap-3">
+                <LibraryStat icon={<ShoppingBag />} value={ownedCount} label="Purchased" tone="text-indigo-600 bg-indigo-500/10" onClick={() => { window.location.hash = "#/store/purchases"; }} />
+                <LibraryStat icon={<Heart />} value={favoriteIds.size} label="Favorites" tone="text-rose-500 bg-rose-500/10" onClick={() => { window.location.hash = "#/favorites"; }} />
+                <LibraryStat icon={<Boxes />} value={cartIds.size} label="In cart" tone="text-amber-600 bg-amber-400/12" onClick={() => { window.location.hash = "#/cart"; }} />
               </div>
-              {purchasedProducts.length > 0 && <div className="mt-5 space-y-2">{purchasedProducts.slice(0, 3).map((product) => <button type="button" key={product.id} onClick={() => { window.location.hash = `#/course/${encodeURIComponent(product.id)}`; }} className="flex w-full items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left transition hover:bg-slate-100"><img src={product.image} alt="" className="h-12 w-16 rounded-lg object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-black">{product.title}</span><span className="text-xs text-slate-400">Owned · Open course</span></span><ChevronRight size={16} className="text-slate-300" /></button>)}</div>}
+              {purchasedProducts.length > 0 && <div className="relative mt-5 space-y-2">{purchasedProducts.slice(0, 3).map((product) => <button type="button" key={product.id} onClick={() => { window.location.hash = `#/course/${encodeURIComponent(product.id)}`; }} className="flex w-full items-center gap-3 rounded-2xl bg-white/45 p-3 text-left ring-1 ring-white/70 backdrop-blur-md transition hover:bg-white/70"><img src={product.image} alt="" className="h-12 w-16 rounded-lg object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-black">{product.title}</span><span className="text-xs text-slate-400">Owned · Open course</span></span><ChevronRight size={16} className="text-slate-300" /></button>)}</div>}
             </section>
 
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-md shadow-slate-200/80"><div className="flex items-center justify-between"><div><h3 className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Preferences</h3><p className="mt-1 text-xs text-slate-400">Saved securely to your account</p></div><button type="button" onClick={() => setModal("settings")} className="grid h-10 w-10 place-items-center rounded-xl bg-violet-50 text-violet-600"><Bell size={18} /></button></div></section>
+            <section className="dc-glass rounded-[2rem] p-5"><div className="relative flex items-center justify-between"><div><h3 className="text-xs font-black uppercase tracking-[0.16em] text-indigo-400">Preferences</h3><p className="mt-1 text-xs text-slate-500">Saved securely to your account</p></div><button type="button" onClick={() => setModal("settings")} className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500/12 text-violet-600 ring-1 ring-violet-200/50 shadow-[0_8px_18px_-10px_rgba(109,40,217,0.7)]"><Bell size={18} /></button></div></section>
 
-            <button type="button" onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-50 py-4 text-sm font-black text-rose-600 ring-1 ring-rose-100"><LogOut size={17} /> Log out</button>
+            <button type="button" onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-500/10 py-4 text-sm font-black text-rose-600 ring-1 ring-rose-200/70 shadow-[0_12px_24px_-16px_rgba(225,29,72,0.55)] backdrop-blur-md"><LogOut size={17} /> Log out</button>
 
             <nav aria-label="Legal" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-1 text-[11px] font-semibold text-slate-400">
               <a href="/privacy-policy.html" className="transition hover:text-violet-600 hover:underline">Privacy Policy</a>
@@ -576,20 +584,20 @@ function ProfileRenewalCard({ tier, subscription, now, onRenew, onToggleReminder
   const daysRemaining = subscription.expiresAt > now ? Math.max(1, Math.ceil((subscription.expiresAt - now) / 86400000)) : 0;
   const totalDays = subscription.cycle === "yearly" ? 365 : 30;
   const progress = subscription.expiresAt > 0 ? Math.max(0, Math.min(100, Math.round((daysRemaining / totalDays) * 100))) : 100;
-  const renewalShell = expired ? "border-rose-200 bg-gradient-to-br from-white to-rose-50" : theme.renewal;
-  const renewalIcon = expired ? "bg-rose-100 text-rose-700" : theme.renewalIcon;
-  const renewalButton = expired ? "bg-rose-600 hover:bg-rose-700 shadow-rose-200" : theme.primaryButton;
+  const renewalShell = expired ? "dc-glass border-rose-200/70" : theme.renewal;
+  const renewalIcon = expired ? "bg-rose-500/12 text-rose-700 ring-1 ring-rose-200/60" : theme.renewalIcon;
+  const renewalButton = expired ? "bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 shadow-[0_12px_28px_-10px_rgba(225,29,72,0.6)]" : theme.primaryButton;
   const accessLabel = subscription.expiresAt ? formatDate(subscription.expiresAt) : "Active access";
 
   return (
-    <section data-renewal-card data-stage={expired ? "expired" : "active"} className={`relative overflow-hidden rounded-[2rem] border p-5 shadow-sm ${renewalShell}`}>
-      <div className={`absolute -right-12 -top-12 h-36 w-36 rounded-full opacity-60 ${expired ? "bg-rose-100" : "bg-white/70"}`} />
+    <section data-renewal-card data-stage={expired ? "expired" : "active"} className={`relative overflow-hidden rounded-[2rem] p-5 ${renewalShell}`}>
+      <div className={`pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full blur-2xl ${expired ? "bg-rose-400/30" : "bg-violet-400/25"}`} />
       <div className="relative">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${renewalIcon}`}><CalendarDays className="h-6 w-6" /></span>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Membership renewal</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-400">Membership renewal</p>
               <h3 data-renewal-card-headline className="mt-1 text-lg font-black leading-tight text-slate-950">{expired ? "Your access needs a refresh" : "Your access is active"}</h3>
               <p className="mt-1 text-xs font-semibold text-slate-500">{TIER_LABELS[tier]} · {cycleLabel(subscription.cycle)}</p>
             </div>
@@ -602,12 +610,12 @@ function ProfileRenewalCard({ tier, subscription, now, onRenew, onToggleReminder
           <div className={`rounded-2xl p-3 ring-1 ${theme.stat}`}><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Renewal mode</p><p className="mt-1 text-sm font-black text-slate-950">Manual & secure</p></div>
         </div>
 
-        {!expired ? <div className="mt-4"><div className="flex items-center justify-between text-[10px] font-bold text-slate-400"><span>Current access window</span><span>{progress}% remaining</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div data-renewal-progress className={`h-full rounded-full transition-all ${theme.progress}`} style={{ width: `${progress}%` }} /></div></div> : <p className="mt-4 rounded-2xl bg-white/80 px-3 py-2.5 text-xs font-semibold leading-5 text-rose-800 ring-1 ring-rose-100">Your saved learning data is safe. Renew to restore your plan access.</p>}
+        {!expired ? <div className="mt-4"><div className="flex items-center justify-between text-[10px] font-bold text-slate-400"><span>Current access window</span><span>{progress}% remaining</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/50 ring-1 ring-white/70"><div data-renewal-progress className={`h-full rounded-full transition-all ${theme.progress}`} style={{ width: `${progress}%` }} /></div></div> : <p className="mt-4 rounded-2xl bg-rose-50/80 px-3 py-2.5 text-xs font-semibold leading-5 text-rose-800 ring-1 ring-rose-100/80 backdrop-blur-md">Your saved learning data is safe. Renew to restore your plan access.</p>}
 
         <p className="mt-4 text-xs leading-5 text-slate-600">{expired ? "Choose Renew access to return to your plan. Renewal is manual and secure." : "Renewal is manual and secure. We will never charge you automatically; every renewal needs your confirmation."}</p>
         <div className="mt-4 flex items-center gap-2">
           <button type="button" onClick={onRenew} data-renewal-card-cta className={`flex-1 rounded-2xl py-3 text-sm font-black text-white shadow-lg transition active:scale-[0.98] ${renewalButton}`}>{expired ? "Renew access" : "Renew / extend access"}</button>
-          <button type="button" onClick={() => onToggleReminders(!subscription.reminderOptOut)} data-renewal-reminder-toggle className="flex shrink-0 items-center gap-1.5 rounded-2xl bg-white px-3 py-3 text-[11px] font-black text-slate-600 ring-1 ring-slate-200 transition active:scale-[0.98]">{subscription.reminderOptOut ? "Reminders off" : "Reminders on"}</button>
+          <button type="button" onClick={() => onToggleReminders(!subscription.reminderOptOut)} data-renewal-reminder-toggle className="flex shrink-0 items-center gap-1.5 rounded-2xl bg-white/55 px-3 py-3 text-[11px] font-black text-slate-600 ring-1 ring-white/70 backdrop-blur-md transition hover:bg-white/80 active:scale-[0.98]">{subscription.reminderOptOut ? "Reminders off" : "Reminders on"}</button>
         </div>
         <p className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-slate-400"><ShieldCheck className="h-3.5 w-3.5 shrink-0" /> No automatic charge without your confirmation.</p>
       </div>
@@ -623,16 +631,16 @@ function UpgradePoint({ children }: { children: ReactNode }) {
   return <div className="flex items-center gap-2 text-xs font-bold text-slate-700"><CircleCheck className="h-4 w-4 shrink-0 text-indigo-600" />{children}</div>;
 }
 
-function LibraryStat({ icon, value, label, onClick }: { icon: ReactNode; value: number; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className="rounded-2xl bg-slate-50 p-3 text-center transition hover:bg-slate-100 active:scale-[0.98]"><span className="mx-auto flex justify-center text-violet-600">{icon}</span><span className="mt-2 block text-xl font-black">{value}</span><span className="block text-[10px] font-bold text-slate-400">{label}</span></button>;
+function LibraryStat({ icon, value, label, onClick, tone = "text-violet-600 bg-violet-500/10" }: { icon: ReactNode; value: number; label: string; onClick: () => void; tone?: string }) {
+  return <button type="button" onClick={onClick} className="rounded-2xl bg-white/45 p-3 text-center ring-1 ring-white/70 backdrop-blur-md transition hover:bg-white/75 active:scale-[0.98]"><span className={`mx-auto grid h-9 w-9 place-items-center rounded-xl ${tone}`}>{icon}</span><span className="mt-2 block text-xl font-black text-slate-950">{value}</span><span className="block text-[10px] font-bold text-slate-400">{label}</span></button>;
 }
 
 function BaseModal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 sm:items-center sm:p-6"><div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"><div className="mb-5 flex items-center justify-between"><h2 className="text-xl font-black">{title}</h2><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100"><X size={17} /></button></div>{children}</div></div>;
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 backdrop-blur-md sm:items-center sm:p-6"><div className="dc-modal-glass max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl p-6 sm:rounded-3xl"><div className="mb-5 flex items-center justify-between"><h2 className="text-xl font-black text-slate-950">{title}</h2><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl bg-white/60 ring-1 ring-white/80"><X size={17} /></button></div>{children}</div></div>;
 }
 
 function PreferenceRow({ icon, label, checked, onChange }: { icon: ReactNode; label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4"><span className="text-violet-600">{icon}</span><span className="flex-1 text-sm font-bold">{label}</span><button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`relative h-7 w-12 rounded-full ${checked ? "bg-violet-600" : "bg-slate-300"}`}><span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} /></button></div>;
+  return <div className="flex items-center gap-3 rounded-2xl bg-white/50 p-4 ring-1 ring-white/70 backdrop-blur-md"><span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-500/12 text-violet-600">{icon}</span><span className="flex-1 text-sm font-bold text-slate-900">{label}</span><button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`relative h-7 w-12 rounded-full ${checked ? "bg-violet-600 shadow-[0_0_16px_rgba(124,58,237,0.45)]" : "bg-slate-300"}`}><span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} /></button></div>;
 }
 
 function EditModal({ user, onClose, onSave }: { user: NonNullable<ReturnType<typeof useAuth>["user"]>; onClose: () => void; onSave: (details: { name: string; mobile: string; bio: string }) => Promise<boolean> }) {
