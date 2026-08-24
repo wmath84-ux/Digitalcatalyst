@@ -163,7 +163,8 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
   const [search, setSearch] = useState("");
   const [activeChip, setActiveChip] = useState("All");
   const [sort, setSort] = useState("Recommended");
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  // Default to the second layout option ("Cards" / rectangular list view).
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 

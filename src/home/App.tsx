@@ -8,11 +8,12 @@ import ProductCard from "./components/ProductCard";
 import ContinueLearning from "./components/ContinueLearning";
 import Reviews from "./components/Reviews";
 import BottomNav, { type TabKey } from "../components/BottomNav";
-import { banners, categories, reviews as fallbackReviews } from "./data/mockData";
-import type { Product } from "./types";
+import { categories, reviews as fallbackReviews } from "./data/mockData";
+import type { Banner, Product } from "./types";
 import { useCatalog } from "../context/CatalogContext";
 import { useHomepageProductReviews } from "../hooks/useProductReviews";
 import { useAuth } from "../context/AuthContext";
+import { useHomeBanners } from "./hooks/useHomeBanners";
 import { ensureSavedWebPushSubscription, subscribeToWebPush } from "../../utils/webPush";
 
 /**
@@ -52,6 +53,10 @@ export default function App({
 }: AppProps) {
   const { user } = useAuth();
   const { products: catalogProducts, purchasedIds } = useCatalog();
+  // Hero slides are admin-editable (Admin → Home · Hero Slides). Live
+  // Firestore list; falls back to the built-in slides until the admin
+  // saves their own.
+  const { banners } = useHomeBanners();
   const products = useMemo<Product[]>(() => catalogProducts.map((product) => ({
     id: product.id,
     title: product.title,
@@ -161,6 +166,30 @@ export default function App({
     if (product) onNavigateToProductReview(product);
   };
 
+  /**
+   * Hero slide tap target, configured per banner in the admin panel:
+   *   product → open the product page (PDP) from the products module.
+   *   module  → open the Course Player straight at that product's
+   *             specific module (?module= deep link). Learners without
+   *             access are still handled — the course route falls
+   *             through to the PDP where they can buy.
+   * Unlinked or stale banners (product removed from the catalog) are
+   * simply inert.
+   */
+  const handleBannerOpen = (banner: Banner) => {
+    if ((banner.linkType !== "product" && banner.linkType !== "module") || !banner.productId) return;
+    const catalogProduct = catalogProducts.find((item) => item.id === banner.productId);
+    if (!catalogProduct) return;
+    if (banner.linkType === "product") {
+      const mapped = products.find((item) => item.id === catalogProduct.id);
+      if (mapped) onNavigateToProduct(mapped);
+      return;
+    }
+    // linkType === "module"
+    const moduleId = banner.moduleId || "";
+    window.location.hash = `#/course/${encodeURIComponent(catalogProduct.id)}${moduleId ? `?module=${encodeURIComponent(moduleId)}` : ""}`;
+  };
+
   const handleFooterChange = (tab: TabKey) => {
     if (tab === "home") {
       setSearchQuery("");
@@ -245,7 +274,7 @@ export default function App({
             </section>
           ) : (
             <>
-              <HeroCarousel banners={banners} />
+              <HeroCarousel banners={banners} onOpen={handleBannerOpen} />
 
               <div>
                 <CategoryNav

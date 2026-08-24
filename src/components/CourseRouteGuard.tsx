@@ -24,13 +24,21 @@ interface Props {
   onCheckout: (price: number) => void;
   onBack: () => void;
   onPurchaseUpdate: (update: PaidCourseUpdate) => void;
+  /**
+   * Optional course deep-link module id (from the `?module=` query on
+   * `#/course/<productId>`). When the player opens, it starts at the
+   * first accessible file of that module instead of the resume/first
+   * lesson. Admin-linked home hero slides use this to send learners
+   * straight to a specific product module.
+   */
+  initialModuleId?: string;
 }
 
 const PDP_WITH_OWNERSHIP = ({ product, onCheckout, onBack }: Pick<Props, "product" | "onCheckout" | "onBack">) => (
   <PdpApp product={product} onCheckout={onCheckout} onBack={onBack} />
 );
 
-export default function CourseRouteGuard({ product, onCheckout, onBack, onPurchaseUpdate }: Props) {
+export default function CourseRouteGuard({ product, onCheckout, onBack, onPurchaseUpdate, initialModuleId }: Props) {
   const { resolution, loading, signedIn } = useCourseAccess({ product });
 
   if (loading) {
@@ -67,6 +75,7 @@ export default function CourseRouteGuard({ product, onCheckout, onBack, onPurcha
         product={product}
         onBack={onBack}
         onPurchaseUpdate={onPurchaseUpdate}
+        initialModuleId={initialModuleId}
       />
     );
   }

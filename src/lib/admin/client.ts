@@ -350,6 +350,28 @@ async function ordersRequest(url:URL){const match=url.pathname.match(/\/orders\/
 const SETTINGS_DEFAULTS:Record<string,any>={adminContent:{docsEditorAccess:"full",docsEditorAccessByType:{},drivePersonalCopy:{clientId:"",byType:{}}},referralProgram:{enabled:true,discountPaise:25000,maxUsesPerReferrer:null}};
 async function settingsRequest(documentId:string,key:string,init?:RequestInit){const ref=doc(db,"settings",documentId),defaults=SETTINGS_DEFAULTS[documentId]||{};if((init?.method||"GET")==="GET"){const snap=await getDoc(ref);return {[key]:{...defaults,...(snap.exists()?snap.data():{})}};}const b=bodyOf(init);await setDoc(ref,stripUndefinedDeep({...b,updatedAt:serverTimestamp()}),{merge:true});return {[key]:{...defaults,...b}};}
 
+/**
+ * Home hero slides (the sliding cards on the app home page). Stored as a
+ * single `settings/homeBanners` document — public read, admin write. An
+ * absent (or empty) document means "use the built-in slides", which the
+ * app side falls back to, so deleting the list never leaves a blank hero.
+ */
+async function homeBannersRequest(init?:RequestInit){
+  const ref=doc(db,"settings","homeBanners");
+  if((init?.method||"GET")==="GET"){
+    const snap=await getDoc(ref);
+    if(!snap.exists())return{banners:[],isDefault:true};
+    const data=(snap.data()||{}) as any;
+    const list=Array.isArray(data.banners)?data.banners:[];
+    return{banners:list,isDefault:false};
+  }
+  const b=bodyOf(init);
+  const list=Array.isArray(b.banners)?b.banners:null;
+  if(!list)throw new ApiError("Banner list is invalid.",400);
+  await setDoc(ref,stripUndefinedDeep({banners:list,updatedAt:serverTimestamp()}),{merge:true});
+  return{banners:list,isDefault:false};
+}
+
 async function revisionRequest(init?: RequestInit) {
   const ref = doc(db, "settings", REVISION_CATALOG_DOC_ID);
   if ((init?.method || "GET") === "GET") {
@@ -394,6 +416,7 @@ export async function adminFetch<T=unknown>(input:string,init?:RequestInit):Prom
   else if(p==="/api/admin/coupons")result=await genericCollection("siteCoupons","coupons",init);
   else if(p==="/api/admin/reviews")result=await genericCollection("siteReviews","reviews",init);
   else if(p==="/api/admin/content")result=await settingsRequest("adminContent","settings",init);
+  else if(p==="/api/admin/home/banners")result=await homeBannersRequest(init);
   else if(p==="/api/admin/revision")result=await revisionRequest(init);
   else if(p.startsWith("/api/admin/analytics")){const [ordersRes,productsRes,customersRes,reviewsRes]=await Promise.all([ordersRequest(new URL("/api/admin/orders",url)),productsRequest(new URL("/api/admin/products",url)),customersRequest(new URL("/api/admin/customers",url)),genericCollection("siteReviews","reviews")]);const orders=(ordersRes as any).orders||[],products=(productsRes as any).products||[],customers=(customersRes as any).customers||[],reviews=(reviewsRes as any).reviews||[];const successful=orders.filter((o:any)=>!["failed","cancelled"].includes(o.paymentStatus)),revenue=successful.reduce((n:number,o:any)=>n+Number(o.finalAmount||0),0);result={range:{start:new Date(0).toISOString(),end:new Date().toISOString()},revenue,orders:orders.length,averageOrderValue:successful.length?revenue/successful.length:0,uniqueBuyers:new Set(successful.map((o:any)=>o.customerId)).size,newUsers:customers.length,paymentSuccessRate:orders.length?successful.length/orders.length*100:0,failedPayments:orders.filter((o:any)=>o.paymentStatus==="failed").length,topProducts:products.slice(0,5),activeSubscriptionPlans:0,averageReviewRating:reviews.length?reviews.reduce((n:number,r:any)=>n+Number(r.rating||0),0)/reviews.length:0,reviewsInRange:reviews.length};}
   else throw new ApiError(`Unsupported admin operation: ${p}`,404);

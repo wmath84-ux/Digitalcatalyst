@@ -38,6 +38,14 @@ interface CoursePlayerProps {
   product: Product;
   onBack: () => void;
   onPurchaseUpdate: (update: PaidCourseUpdate) => void;
+  /**
+   * Deep-link target module (e.g. `#/course/<id>?module=<moduleId>` —
+   * used by admin-linked home hero slides). When the player opens, it
+   * starts at the first file of THAT module the learner can actually
+   * access. If the module is unknown, hidden or locked for this
+   * learner, the normal first-lesson / resume behaviour applies.
+   */
+  initialModuleId?: string;
 }
 
 const numericPrice = (value?: string) => { const number = Number(String(value || "0").replace(/[^0-9.-]/g, "")); return Number.isFinite(number) ? Math.max(0, number) : 0; };
@@ -84,6 +92,46 @@ const firstAccessibleFile = (
     );
     if (file) return file;
     const nested = firstAccessibleFile(module.modules || [], accessible, moduleLocked);
+    if (nested) return nested;
+  }
+  return null;
+};
+
+/**
+ * Locate a module (by id) anywhere inside the nested course tree.
+ * Returns the node itself or null.
+ */
+const findModuleById = (modules: CourseModule[], id: string): CourseModule | null => {
+  if (!id) return null;
+  for (const module of modules) {
+    if (String(module.id) === id) return module;
+    const nested = findModuleById(module.modules || [], id);
+    if (nested) return nested;
+  }
+  return null;
+};
+
+/**
+ * First openable file inside ONE module subtree (recursing into child
+ * modules), honouring the same access rules as `firstAccessibleFile`.
+ * A locked/hidden module contributes nothing.
+ */
+const firstAccessibleFileInModule = (
+  module: CourseModule,
+  accessible: Set<string>,
+  inheritedLocked = false,
+): CourseFile | null => {
+  if (module.accessLevel === "hidden") return null;
+  const moduleLocked = inheritedLocked || !accessible.has(String(module.id));
+  const file = filesInModule(module).find((item) =>
+    item.accessLevel !== "hidden" &&
+    Boolean(item.url || item.embedUrl || item.youtubeUrl || item.youtubeVideoId) &&
+    !moduleLocked &&
+    (item.accessLevel !== "paidUpdate" || accessible.has(String(accessId(item)))),
+  );
+  if (file) return file;
+  for (const child of module.modules || []) {
+    const nested = firstAccessibleFileInModule(child, accessible, moduleLocked);
     if (nested) return nested;
   }
   return null;
@@ -175,13 +223,24 @@ const loadDesktopViewPreference = (): boolean => {
   return !isBrowserDesktopSiteMode();
 };
 
-export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: CoursePlayerProps) {
+export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initialModuleId }: CoursePlayerProps) {
   const { user } = useAuth();
   const { logoUrl, appName } = useBranding();
   const modules = product.courseContent || [];
   const files = useMemo(() => allFiles(modules).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
   const { resolution, hasActiveSubscription } = useCourseAccess({ product });
   const [selectedFile, setSelectedFile] = useState<CourseFile | null>(null);
+
+  // ── Deep-link module (admin hero slide → specific product module) ──
+  // Resolved once per module/access change. A missing, hidden or
+  // locked target yields null, so the normal first-lesson / resume
+  // behaviour below simply takes over.
+  const deepLinkFileId = useMemo(() => {
+    if (!initialModuleId) return null;
+    const target = findModuleById(modules, initialModuleId);
+    if (!target) return null;
+    return firstAccessibleFileInModule(target, resolution.accessibleModuleIds)?.id ?? null;
+  }, [initialModuleId, modules, resolution.accessibleModuleIds]);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState<CoursePlayerNote[]>([]);
   const [lastOpenedFileId, setLastOpenedFileId] = useState<string | null>(null);
@@ -402,19 +461,23 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
   useEffect(() => {
     if (selectedFile || files.length === 0) return;
-    const first = firstAccessibleFile(modules, resolution.accessibleModuleIds);
+    // A deep-linked module (hero slide tap) wins over "first lesson".
+    const deep = deepLinkFileId ? files.find((file) => file.id === deepLinkFileId) : null;
+    const first = deep || firstAccessibleFile(modules, resolution.accessibleModuleIds);
     if (first) setSelectedFile(first);
-  }, [files, resolution.accessibleModuleIds, selectedFile, modules]);
+  }, [files, deepLinkFileId, resolution.accessibleModuleIds, selectedFile, modules]);
 
   // Resume the last opened file when the Firestore listener
-  // delivers the id.
+  // delivers the id. A deep-link open is the learner's explicit
+  // "take me to THIS module" intent, so it is never clobbered by the
+  // saved resume position.
   useEffect(() => {
-    if (!lastOpenedFileId || selectedFile) return;
+    if (!lastOpenedFileId || selectedFile || deepLinkFileId) return;
     const match = files.find((file) => file.id === lastOpenedFileId);
     if (match && resolution.accessibleModuleIds.has(String((match as CourseFile & { parentModuleId?: string }).parentModuleId || ""))) {
       setSelectedFile(match);
     }
-  }, [files, lastOpenedFileId, resolution.accessibleModuleIds, selectedFile]);
+  }, [files, lastOpenedFileId, deepLinkFileId, resolution.accessibleModuleIds, selectedFile]);
 
   /**
    * "Mark complete" is a TOGGLE, never a one-way door. Tapping it by mistake
