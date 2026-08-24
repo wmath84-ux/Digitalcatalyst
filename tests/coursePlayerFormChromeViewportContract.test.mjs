@@ -100,7 +100,7 @@ test("the form renders in the normal viewer stack, so the chrome stays mounted",
 test("the two chrome toggle buttons are present in the landscape rail", () => {
   // In landscape the header becomes a 56px rail pinned to the left edge; it
   // must still expose both independent chrome toggles.
-  assert.match(coursePlayer, /data-course-mobile-landscape-header=\{mobileRotated \? "true" : undefined\}/);
+  assert.match(coursePlayer, /data-course-landscape-header/);
   assert.ok((coursePlayer.match(/\{fileBarsToggle\}\s*\{playerChromeToggle\}/g) || []).length >= 2, "both toggles not present in the portrait header and the landscape rail");
 });
 

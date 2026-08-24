@@ -11,9 +11,8 @@
 // never worked on real devices.
 //
 // So hiding is never automatic: the learner hides/restores the bar with the
-// explicit "Hide status bar" rail button (Android only), and the rotate-to-
-// fullscreen tap is the second gesture path. Whatever the learner did, the
-// chrome is restored the moment the player leaves landscape/immersive or
+// explicit "Hide status bar" rail button (Android only). Whatever the learner
+// did, the chrome is restored the moment the player leaves landscape or
 // unmounts.
 
 import test from "node:test";
@@ -56,22 +55,18 @@ test("no gesture-less automatic hide is left (Android rejects it anyway)", () =>
   assert.doesNotMatch(player, /addEventListener\("touchstart"/);
 });
 
-test("the rotate tap stays the second gesture path into fullscreen", () => {
-  // "Rotate to fullscreen" hides the bar synchronously inside the click
-  // handler, then flips immersive state.
-  assert.match(
-    player,
-    /onClick=\{\(\) => \{[\s\S]*?enterCourseLandscapeChrome\(courseBackgroundForStatusBar\);[\s\S]*?setImmersive\(true\);[\s\S]*?\}\}/,
-  );
+test("the rotate-to-fullscreen tap was removed; the rail button is the only fullscreen path", () => {
+  // The header rotate button and its quarter-turned immersive entry were
+  // removed entirely. The Android "Hide status bar" rail button is now the
+  // sole fullscreen gesture path.
+  assert.doesNotMatch(player, /data-course-rotate-fullscreen/);
+  assert.doesNotMatch(player, /setImmersive\(/);
+  assert.doesNotMatch(player, /enterCourseLandscapeChrome/);
 });
 
-test("both landscape shells report the live bar state for QA/integration", () => {
+test("the landscape shell reports the live bar state for QA/integration", () => {
   // The attribute mirrors the real fullscreen state instead of claiming a
   // static hide.
-  assert.match(
-    player,
-    /data-course-mobile-landscape-viewport data-course-statusbar-hidden=\{courseFullscreen \? "true" : "false"\}/,
-  );
   assert.match(player, /data-course-statusbar-hidden=\{courseFullscreen \? "true" : "false"\}/);
 });
 

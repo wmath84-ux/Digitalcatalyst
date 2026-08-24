@@ -25,13 +25,16 @@ test("Course Player theme is scoped and supplies both palette variants", () => {
   }
 });
 
-test("mobile landscape keeps the left header and right navigation rails", () => {
-  assert.match(coursePlayer, /const useLandscapeRails = isLandscape \|\| immersive/);
+test("landscape keeps the left header and right navigation rails", () => {
+  assert.match(coursePlayer, /const useLandscapeRails = isLandscape;/);
   assert.match(coursePlayer, /orientation=\{useLandscapeRails \? "landscape" : "portrait"\}/);
-  assert.match(coursePlayer, /data-course-mobile-landscape="rails"/);
-  assert.match(coursePlayer, /\{landscapeLayout\(true\)\}/);
-  assert.match(coursePlayer, /data-course-mobile-landscape-header/);
-  assert.match(coursePlayer, /data-course-exit-immersive/);
+  assert.match(coursePlayer, /data-course-landscape-header/);
+  assert.match(coursePlayer, /\{landscapeLayout\(\)\}/);
+  // The quarter-turned immersive ("rotated") view and its exit button were
+  // removed along with the header's rotate-to-fullscreen button.
+  assert.doesNotMatch(coursePlayer, /data-course-mobile-landscape-header/);
+  assert.doesNotMatch(coursePlayer, /data-course-exit-immersive/);
+  assert.doesNotMatch(coursePlayer, /setImmersive\(/);
 });
 
 test("YouTube stays strictly contained in the mobile landscape viewport", () => {

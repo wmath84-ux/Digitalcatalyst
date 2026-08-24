@@ -164,7 +164,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
 
 function FirstRevisionCard({ onGenerate }: { onGenerate: () => void }) {
   return (
-    <Card className="relative min-h-[270px] overflow-hidden bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-0 text-white">
+    <div className="relative min-h-[270px] overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-0 text-white shadow-[0_20px_46px_-28px_rgba(79,70,229,0.42)]">
       <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/10" />
       <div className="absolute -bottom-16 -left-12 h-44 w-44 rounded-full bg-indigo-300/10" />
       <div className="relative flex min-h-[270px] flex-col p-5">
@@ -184,7 +184,7 @@ function FirstRevisionCard({ onGenerate }: { onGenerate: () => void }) {
           <SparklesIcon className="h-5 w-5" /> Create my revision plan
         </button>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -258,7 +258,7 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
   const action = plan.status === "completed" ? "View Revision Results" : plan.status === "in_progress" ? "Continue Revision" : "Start Revision";
 
   return (
-    <Card className="relative min-h-[270px] overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-900 p-0 text-white shadow-lg shadow-indigo-200">
+    <div className="relative min-h-[270px] overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-900 p-0 text-white shadow-lg shadow-indigo-200">
       <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-violet-400/15" />
       <div className="relative flex min-h-[270px] flex-col p-5">
         <div className="flex items-start justify-between gap-3">
@@ -288,7 +288,7 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
           {plan.status !== "completed" && <ChevronRightIcon className="h-4 w-4" />}
         </button>
       </div>
-    </Card>
+    </div>
   );
 }
 

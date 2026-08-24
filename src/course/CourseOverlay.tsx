@@ -303,6 +303,12 @@ export default function CourseOverlay(props: CourseOverlayProps) {
     : tab === "notes"
       ? (notesEditorOpen ? notesEditorHeight : notesHeight)
       : defaultHeight;
+  // In portrait the notes writing box and the mind map fill the whole area
+  // between the pinned header and the dock. Anchoring them to the top of the
+  // section (which already starts BELOW the header) instead of using a viewport
+  // percentage keeps their top edge exactly at the header's bottom — they grow
+  // downward and never slide under (or get clipped by) the sticky header.
+  const portraitFullHeight = !landscape && (mindMapActive || notesEditorOpen);
   // True only while the notes editor is open AND a soft keyboard is covering
   // part of the viewport. Drives the sheet's bottom inset so the editor lifts
   // above the keyboard instead of being half-hidden behind it.
@@ -372,7 +378,16 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           // In split mode the editor takes the right 40% of the section
           // (minus the 4rem dock) so the lesson keeps the left 60%.
           ...(landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : null),
-          [landscape ? "width" : "height"]: mindMapSplit ? mindMapSplitWidth : splitMode ? splitEditorWidth : sheetHeight,
+          // Landscape → width (split editor / mind map / default). Portrait →
+          // normally a height, but the notes writing box and the mind map
+          // instead stretch from the section's top (just below the header) to
+          // the dock, so they use the real available space and never slide
+          // underneath the sticky header.
+          ...(landscape
+            ? { width: mindMapSplit ? mindMapSplitWidth : splitMode ? splitEditorWidth : sheetHeight }
+            : portraitFullHeight
+              ? { top: 0, height: "auto" }
+              : { height: sheetHeight }),
           // When the soft keyboard is up over the notes editor, lift the sheet
           // above it so the editor + Save buttons stay visible. The lesson on
           // the left is untouched. Portrait keeps its 4rem dock clearance too.
