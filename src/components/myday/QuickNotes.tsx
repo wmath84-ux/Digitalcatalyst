@@ -13,11 +13,11 @@ interface QuickNotesProps {
 }
 
 const colorStyles: Record<NoteColor, { card: string; editBg: string; highlight: string }> = {
-  amber: { card: "bg-white border-amber-300/70 text-amber-900 shadow-sm shadow-amber-100/60", editBg: "bg-amber-50", highlight: "bg-amber-300" },
-  sky: { card: "bg-white border-sky-300/70 text-sky-900 shadow-sm shadow-sky-100/60", editBg: "bg-sky-50", highlight: "bg-sky-300" },
-  rose: { card: "bg-white border-rose-300/70 text-rose-900 shadow-sm shadow-rose-100/60", editBg: "bg-rose-50", highlight: "bg-rose-300" },
-  emerald: { card: "bg-white border-emerald-300/70 text-emerald-900 shadow-sm shadow-emerald-100/60", editBg: "bg-emerald-50", highlight: "bg-emerald-300" },
-  violet: { card: "bg-white border-violet-300/70 text-violet-900 shadow-sm shadow-violet-100/60", editBg: "bg-violet-50", highlight: "bg-violet-300" },
+  amber: { card: "bg-white/76 border-amber-300/70 text-amber-900 shadow-sm shadow-amber-100/60 backdrop-blur-xl", editBg: "bg-amber-50/90", highlight: "bg-amber-300" },
+  sky: { card: "bg-white/76 border-sky-300/70 text-sky-900 shadow-sm shadow-sky-100/60 backdrop-blur-xl", editBg: "bg-sky-50/90", highlight: "bg-sky-300" },
+  rose: { card: "bg-white/76 border-rose-300/70 text-rose-900 shadow-sm shadow-rose-100/60 backdrop-blur-xl", editBg: "bg-rose-50/90", highlight: "bg-rose-300" },
+  emerald: { card: "bg-white/76 border-emerald-300/70 text-emerald-900 shadow-sm shadow-emerald-100/60 backdrop-blur-xl", editBg: "bg-emerald-50/90", highlight: "bg-emerald-300" },
+  violet: { card: "bg-white/76 border-violet-300/70 text-violet-900 shadow-sm shadow-violet-100/60 backdrop-blur-xl", editBg: "bg-violet-50/90", highlight: "bg-violet-300" },
 };
 
 const MAX_COLLAPSED_LENGTH = 80; // Characters before truncating
@@ -121,7 +121,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
   const isSearchActive = searchQuery.length > 0;
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-300/50">
+    <div className="dc-glass rounded-3xl shadow-[0_22px_48px_-28px_rgba(79,70,229,0.46)]">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-5 pb-4 sm:px-6">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-400 to-pink-500 text-white shadow-lg shadow-rose-300/50">
@@ -138,10 +138,10 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
       <div className="px-4 pb-5 sm:px-6">
         {/* Search bar */}
         <div className={cn(
-          "mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 transition-all",
+          "dc-glass-input mb-3 flex items-center gap-2 rounded-xl px-3 py-2 transition-all",
           isSearchActive
-            ? "border-rose-300 bg-rose-50/50 ring-2 ring-rose-100"
-            : "border-slate-200 bg-slate-50 focus-within:border-rose-300 focus-within:ring-2 focus-within:ring-rose-100"
+            ? "ring-2 ring-rose-100/80"
+            : "focus-within:ring-2 focus-within:ring-rose-100/80"
         )}>
           <Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-rose-500" : "text-slate-400")} />
           <input
@@ -172,7 +172,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
         </div>
 
         {/* Input */}
-        <div className="mb-4 flex items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 transition-all focus-within:border-rose-300 focus-within:ring-2 focus-within:ring-rose-100 focus-within:bg-white">
+        <div className="dc-glass-input mb-4 flex items-start gap-2 rounded-2xl p-2 transition-all focus-within:ring-2 focus-within:ring-rose-100/80">
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -199,7 +199,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
         {/* Notes list */}
         <div className="max-h-80 space-y-2.5 overflow-y-auto pr-0.5 custom-scrollbar">
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/80 py-10 text-center">
+            <div className="dc-glass flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-rose-200/70 bg-white/45 py-10 text-center">
               {isSearchActive ? (
                 <>
                   <Search className="h-8 w-8 text-slate-300" />

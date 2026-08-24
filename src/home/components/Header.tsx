@@ -38,12 +38,15 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   return (
     <header
       data-site-header
-      className="relative rounded-b-[28px] px-4 pb-8 pt-[calc(1.5rem+env(safe-area-inset-top))] text-white shadow-lg shadow-indigo-900/20 min-[390px]:px-5"
+      className="relative overflow-hidden rounded-b-[32px] border-b border-white/20 px-4 pb-8 pt-[calc(1.5rem+env(safe-area-inset-top))] text-white shadow-[0_24px_50px_-26px_rgba(49,46,129,0.7)] min-[390px]:px-5"
       style={{ backgroundImage: `linear-gradient(to bottom right, ${gradientFrom}, ${gradientTo})` }}
       data-home-gradient-from={gradientFrom}
       data-home-gradient-to={gradientTo}
     >
-      <div className="flex min-w-0 items-center justify-between gap-2">
+      <div aria-hidden className="pointer-events-none absolute -left-10 top-10 h-32 w-32 rounded-full bg-white/12 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-cyan-300/20 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/10 to-transparent" />
+      <div className="relative flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 min-[390px]:gap-3">
           <BrandMark className="h-10 w-10 shrink-0 rounded-2xl bg-white/15 ring-1 ring-white/25 min-[390px]:h-11 min-[390px]:w-11" />
           <div className="min-w-0 flex-1 overflow-hidden">
@@ -60,7 +63,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             type="button"
             aria-label="Leaderboard"
             onClick={() => { window.location.hash = "#/leaderboard"; }}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/25 bg-white/15 backdrop-blur-sm transition hover:bg-white/25 active:scale-95 min-[390px]:h-10 min-[390px]:w-10 min-[430px]:w-auto min-[430px]:gap-1.5 min-[430px]:px-3"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/35 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition hover:bg-white/24 active:scale-95 min-[390px]:h-10 min-[390px]:w-10 min-[430px]:w-auto min-[430px]:gap-1.5 min-[430px]:px-3"
           >
             <span className="text-base leading-none">🏆</span>
             <span className="hidden text-xs font-bold tracking-tight min-[430px]:inline">Leaderboard</span>
@@ -69,7 +72,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             type="button"
             aria-label="Notifications"
             onClick={onOpenNotifications}
-            className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
           >
             <span className="text-lg">🔔</span>
             {unreadNotificationCount > 0 && <span aria-label={`${unreadNotificationCount} unread notifications`} className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold ring-2 ring-indigo-600">{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}</span>}
@@ -78,7 +81,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             type="button"
             aria-label="Favorites"
             onClick={onOpenFavorites}
-            className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
           >
             <span className="text-lg">❤️</span>
             {favoritesCount > 0 && (
@@ -91,7 +94,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       </div>
 
       <div className="relative mt-5">
-        <div className="flex items-center gap-2 rounded-2xl bg-white/95 px-4 py-3 shadow-sm">
+        <div className="dc-glass-toolbar flex items-center gap-2 rounded-2xl px-4 py-3">
           <span className="text-slate-400">🔍</span>
           <input
             ref={ref}
@@ -115,7 +118,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         </div>
 
         {query.trim().length > 0 && (
-          <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-80 overflow-y-auto rounded-2xl bg-white p-2 text-slate-800 shadow-2xl shadow-indigo-950/30">
+          <div className="dc-glass-toolbar absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-80 overflow-y-auto rounded-2xl p-2 text-slate-800 shadow-2xl shadow-indigo-950/20">
             {suggestions.length === 0 ? (
               <p className="px-3 py-4 text-center text-sm text-slate-400">
                 No matches for “{query}”. Try a different keyword.

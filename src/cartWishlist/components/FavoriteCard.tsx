@@ -22,7 +22,8 @@ export default function FavoriteCard({
   );
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-200/70 ring-1 ring-slate-100">
+    <div className="group relative flex flex-col overflow-hidden rounded-[1.7rem] border border-white/70 bg-white/62 shadow-[0_18px_42px_-24px_rgba(79,70,229,0.42)] backdrop-blur-xl">
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/35 via-transparent to-transparent" />
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
         <button
           type="button"
@@ -38,7 +39,7 @@ export default function FavoriteCard({
         </button>
         <button
           onClick={() => onRemove(product.id)}
-          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/95 shadow-md backdrop-blur transition active:scale-90"
+          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-white/78 shadow-lg shadow-slate-900/10 backdrop-blur-md transition active:scale-90"
           aria-label="Remove from favorites"
         >
           <Heart size={16} className="fill-rose-500 text-rose-500" />
@@ -47,7 +48,7 @@ export default function FavoriteCard({
           {product.hours} • {product.lessons} lessons
         </span>
       </div>
-      <div className="flex flex-1 flex-col gap-1.5 p-3">
+      <div className="relative flex flex-1 flex-col gap-1.5 p-3">
         <button type="button" onClick={() => onOpen?.(product.id)} className="text-left">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500">
             {product.category}

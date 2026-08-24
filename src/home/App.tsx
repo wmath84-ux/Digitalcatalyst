@@ -216,8 +216,8 @@ export default function App({
   const isSearching = normalizedQuery.length > 0;
 
   return (
-    <div className="min-h-screen bg-white sm:py-6">
-      <div data-app-frame className="relative mx-auto flex min-h-screen max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
+    <div className="dc-app-shell min-h-screen sm:py-6">
+      <div data-app-frame className="dc-app-frame relative mx-auto flex min-h-screen max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem]">
         <div ref={contentTopRef} />
         <Header
           ref={searchInputRef}
@@ -232,6 +232,8 @@ export default function App({
         />
 
         <main className="flex-1 overflow-y-auto pb-2">
+          <div aria-hidden className="pointer-events-none absolute left-4 top-44 h-32 w-32 rounded-full bg-violet-200/20 blur-3xl" />
+          <div aria-hidden className="pointer-events-none absolute right-0 top-72 h-40 w-40 rounded-full bg-sky-200/20 blur-3xl" />
           {isSearching ? (
             <section className="px-5 pt-6">
               <div className="flex items-center justify-between">

@@ -30,21 +30,21 @@ export default function CartPage({ cartProducts, onRemove, onClearAll, onCheckou
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="My Cart" subtitle={`${cartProducts.length} item${cartProducts.length > 1 ? "s" : ""}`} right={<button onClick={onClearAll} className="flex items-center gap-1 rounded-full bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-500"><Trash2 size={12} /> Clear</button>} />
+      <PageHeader title="My Cart" subtitle={`${cartProducts.length} item${cartProducts.length > 1 ? "s" : ""}`} right={<button onClick={onClearAll} className="flex items-center gap-1 rounded-full border border-white/70 bg-rose-50/80 px-3 py-1.5 text-[11px] font-bold text-rose-500 shadow-sm backdrop-blur"><Trash2 size={12} /> Clear</button>} />
       <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
         <div className="flex flex-col gap-2.5">{cartProducts.map((product) => <CartItemCard key={product.id} product={product} onRemove={onRemove} onOpen={onOpenProduct} />)}</div>
-        <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+        <div className="dc-glass mt-4 rounded-[1.6rem] p-4 shadow-[0_18px_42px_-24px_rgba(79,70,229,0.42)]">
           <div className="flex items-center gap-2 pb-3"><ShieldCheck size={16} className="text-indigo-500" /><h3 className="text-sm font-bold text-slate-900">Server-verified price</h3></div>
           <div className="space-y-2 text-[13px]">
             <div className="flex justify-between text-slate-500"><span>Catalog total</span><span>{formatINR(originalTotal)}</span></div>
             {savings > 0 && <div className="flex justify-between text-emerald-600"><span>Product discounts</span><span>− {formatINR(savings)}</span></div>}
             <div className="border-t border-dashed border-slate-200 pt-3 flex justify-between"><span className="font-extrabold">Total payable</span><span className="text-lg font-extrabold text-indigo-600">{formatINR(finalTotal)}</span></div>
           </div>
-          {savings > 0 && <div className="mt-3 flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700"><Sparkles size={13} />You save {formatINR(savings)} on this order.</div>}
+          {savings > 0 && <div className="mt-3 flex items-center gap-1.5 rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-[11px] font-semibold text-emerald-700 backdrop-blur"><Sparkles size={13} />You save {formatINR(savings)} on this order.</div>}
           <p className="mt-3 text-[11px] leading-5 text-slate-400">Final amount is recalculated from Firestore by the payment server.</p>
         </div>
       </div>
-      <div className="border-t border-slate-100 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+12px)] shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.15)]">
+      <div className="dc-glass-toolbar border-t border-white/60 p-4 pb-[calc(env(safe-area-inset-bottom)+12px)] shadow-[0_-10px_30px_-16px_rgba(79,70,229,0.35)]">
         <button onClick={handleCheckout} className="flex w-full items-center justify-between rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-4 text-white shadow-lg shadow-indigo-300/60 active:scale-[0.98]"><span className="text-left"><span className="block text-[11px] text-indigo-100">Total payable</span><span className="text-base font-extrabold">{formatINR(finalTotal)}</span></span><span className="rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold">Secure checkout</span></button>
       </div>
     </div>
@@ -52,5 +52,5 @@ export default function CartPage({ cartProducts, onRemove, onClearAll, onCheckou
 }
 
 function PageHeader({ title, subtitle, right }: { title: string; subtitle: string; right?: React.ReactNode }) {
-  return <div className="flex items-center justify-between border-b border-slate-100 bg-white/95 px-4 py-4 backdrop-blur-xl"><div><h1 className="text-lg font-extrabold text-slate-900">{title}</h1><p className="text-[11px] font-medium text-slate-400">{subtitle}</p></div>{right}</div>;
+  return <div className="dc-glass-toolbar flex items-center justify-between border-b border-white/60 px-4 py-4"><div><h1 className="text-lg font-extrabold text-slate-900">{title}</h1><p className="text-[11px] font-medium text-slate-500">{subtitle}</p></div>{right}</div>;
 }

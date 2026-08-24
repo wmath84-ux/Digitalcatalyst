@@ -476,8 +476,8 @@ export default function App() {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col bg-white lg:max-w-7xl">
+    <div className="dc-app-shell min-h-screen">
+      <div data-app-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden lg:max-w-7xl lg:rounded-[2rem]">
         <StoreHeader
           cartCount={cartIds.size}
           notifCount={1}
@@ -492,8 +492,8 @@ export default function App() {
         />
 
         {showMobileSearch && (
-          <div className="animate-slideUp border-b border-indigo-100 bg-white px-4 pb-3 pt-2">
-            <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/50 px-3.5 py-2.5 ring-2 ring-indigo-100">
+          <div className="animate-slideUp dc-glass-toolbar border-b border-white/60 px-4 pb-3 pt-2">
+            <div className="dc-glass-input flex items-center gap-2 rounded-xl px-3.5 py-2.5 ring-2 ring-indigo-100/60">
               <Search className="h-4 w-4 shrink-0 text-indigo-500" />
               <input
                 autoFocus
@@ -505,7 +505,7 @@ export default function App() {
               {globalSearch && (
                 <button
                   onClick={() => { setGlobalSearch(""); setShowMobileSearch(false); }}
-                  className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-white hover:text-slate-600"
+                  className="shrink-0 rounded-full p-1 text-slate-400 transition hover:bg-white/80 hover:text-slate-600"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -550,7 +550,7 @@ export default function App() {
                   <p className="mt-3 text-sm font-semibold text-slate-500">Add to your day</p>
 
                   {createMenuOpen && (
-                    <div className="absolute bottom-[7.5rem] z-20 w-full max-w-sm rounded-3xl border border-slate-100 bg-white p-2 shadow-2xl shadow-slate-300/70">
+                    <div className="dc-glass absolute bottom-[7.5rem] z-20 w-full max-w-sm rounded-3xl p-2 shadow-[0_24px_60px_-26px_rgba(79,70,229,0.48)]">
                       {CREATE_OPTIONS.map((option) => {
                         const Icon = option.icon;
                         return (
@@ -562,7 +562,7 @@ export default function App() {
                               if (!requireMyDayAccess()) { setCreateMenuOpen(false); return; }
                               handleNavigate(option.id);
                             }}
-                            className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                            className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-white/55"
                           >
                             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
                               <Icon className="h-5 w-5" />

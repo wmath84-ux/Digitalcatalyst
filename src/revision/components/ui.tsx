@@ -129,7 +129,7 @@ export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-3xl border border-slate-200 bg-white p-4 shadow-md shadow-slate-200/60 ${className}`}>
+    <div className={`dc-glass rounded-3xl p-4 shadow-[0_20px_46px_-28px_rgba(79,70,229,0.42)] ${className}`}>
       {children}
     </div>
   );
@@ -176,7 +176,7 @@ export function SecondaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 text-[15px] font-bold text-slate-800 shadow-sm transition active:scale-[0.98] active:bg-slate-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:shadow-none ${className}`}
+      className={`dc-glass-soft flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl px-5 text-[15px] font-bold text-slate-800 transition active:scale-[0.98] active:bg-white/80 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100/70 disabled:text-slate-400 disabled:shadow-none ${className}`}
     >
       {children}
     </button>

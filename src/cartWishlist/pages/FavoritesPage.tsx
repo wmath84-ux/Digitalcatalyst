@@ -64,7 +64,7 @@ export default function FavoritesPage({
 
 function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-100 bg-white/95 px-4 py-4 backdrop-blur-xl">
+    <div className="dc-glass-toolbar flex items-center justify-between border-b border-white/60 px-4 py-4">
       <div>
         <h1 className="text-lg font-extrabold text-slate-900">{title}</h1>
         <p className="text-[11px] font-medium text-slate-400">{subtitle}</p>

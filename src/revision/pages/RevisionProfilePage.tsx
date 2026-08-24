@@ -143,7 +143,7 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
 
 function WidgetCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-white py-3 text-center shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)]">
+    <div className="dc-glass flex flex-col items-center gap-1 rounded-2xl py-3 text-center shadow-[0_16px_36px_-24px_rgba(79,70,229,0.35)]">
       {icon}
       <span className="text-base font-bold text-slate-900">{value}</span>
       <span className="text-[10px] font-medium text-slate-500">{label}</span>

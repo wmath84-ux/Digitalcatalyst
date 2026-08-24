@@ -43,8 +43,8 @@ export default function CartWishlistApp({
   onOpenProduct,
 }: CartWishlistAppProps) {
   return (
-    <div className="min-h-screen bg-white sm:py-6">
-      <div data-app-frame className="relative mx-auto flex h-[100dvh] w-full max-w-md flex-col overflow-hidden bg-white shadow-xl shadow-slate-200 sm:h-[calc(100vh-3rem)] sm:rounded-[2rem] sm:border sm:border-slate-200">
+    <div className="dc-app-shell min-h-screen sm:py-6">
+      <div data-app-frame className="dc-app-frame relative mx-auto flex h-[100dvh] w-full max-w-md flex-col overflow-hidden sm:h-[calc(100vh-3rem)] sm:rounded-[2rem]">
         <Header
           cartCount={cartIds.size}
           notifCount={1}
@@ -53,7 +53,7 @@ export default function CartWishlistApp({
           onNavigateToNotifications={onNavigateToNotifications}
         />
 
-        <div className="relative flex flex-1 flex-col overflow-hidden bg-white">
+        <div className="relative flex flex-1 flex-col overflow-hidden bg-transparent">
           <Toast message={toast} />
           {activeTab === "favorites" && (
             <FavoritesPage
