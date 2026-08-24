@@ -29,11 +29,11 @@
 //     sheet slides in from the right.
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, NotebookPen, PlayCircle, Plus, ShoppingBag, Sparkles, X } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Plus, ShoppingBag, Sparkles, X } from "lucide-react";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 
-export type DockTab = "modules" | "resources" | "notes" | "paid";
+export type DockTab = "modules" | "resources" | "notes" | "mindmap" | "paid";
 export type DockOrientation = "portrait" | "landscape";
 
 const updateKey = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
@@ -148,12 +148,23 @@ interface CourseOverlayProps {
   // re-flow the content area into a 60/40 split (lesson on the left, notes
   // + keyboard on the right) without obscuring the lesson.
   onSplitModeChange?: (active: boolean) => void;
+  // Mind map wiring. The panel itself is owned by the parent (it holds the
+  // Firestore hook), so the overlay only reserves space for it — this keeps
+  // the sheet presentational and lets the map survive tab switches.
+  mindMapPanel?: ReactNode;
+  /** Reports when the mind map sheet is claiming the landscape half-screen. */
+  onMindMapSplitChange?: (active: boolean) => void;
 }
 
 const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; icon: (active: boolean) => ReactNode }> = [
   { key: "modules", label: "Module", heading: "Modules", hint: "Lessons on a connected path", icon: () => <BookOpen size={18} /> },
   { key: "resources", label: "Resource", heading: "Resources", hint: "Course files (paid modules live in Paid)", icon: () => <FileText size={18} /> },
   { key: "notes", label: "Note", heading: "Notes", hint: "Your private writing pad", icon: () => <NotebookPen size={18} /> },
+  // Mind Map sits immediately after Note, so the two private-study tools are
+  // neighbours in the dock. It opens the same way — a sheet over the lesson —
+  // but claims HALF the screen instead of the notes' 40%, because a diagram
+  // needs both width and height to stay readable.
+  { key: "mindmap", label: "Mind map", heading: "Mind map", hint: "Is module ka apna diagram banayein", icon: () => <Network size={18} /> },
   { key: "paid", label: "Paid", heading: "Paid content", hint: "Upgrades still locked", icon: () => <ShoppingBag size={18} /> },
 ];
 
@@ -274,9 +285,24 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // already handled by `right` above). The cap keeps very wide screens
   // from giving the editor an absurdly wide column.
   const splitEditorWidth = "min(40%, 520px)";
-  const sheetHeight = tab === "notes"
-    ? (notesEditorOpen ? notesEditorHeight : notesHeight)
-    : defaultHeight;
+
+  // ── Mind map sheet sizing ───────────────────────────────────────────────
+  // The mind map claims HALF the screen — more than the notes' 40% — because
+  // a diagram needs width AND height to stay legible, and the learner is
+  // reading branches outward from a centre in both directions. In landscape
+  // it is always split (never a full overlay), so the lesson stays visible
+  // beside the diagram. Portrait has no room for a side-by-side split, so the
+  // sheet simply takes the bottom half.
+  const mindMapActive = tab === "mindmap";
+  const mindMapSplit = landscape && mindMapActive;
+  const mindMapSplitWidth = "min(50%, 760px)";
+  const mindMapHeight = "50dvh";
+
+  const sheetHeight = mindMapActive
+    ? mindMapHeight
+    : tab === "notes"
+      ? (notesEditorOpen ? notesEditorHeight : notesHeight)
+      : defaultHeight;
   // True only while the notes editor is open AND a soft keyboard is covering
   // part of the viewport. Drives the sheet's bottom inset so the editor lifts
   // above the keyboard instead of being half-hidden behind it.
@@ -289,6 +315,15 @@ export default function CourseOverlay(props: CourseOverlayProps) {
     onSplitModeChange?.(splitMode);
     return () => onSplitModeChange?.(false);
   }, [splitMode, onSplitModeChange]);
+
+  // Same bubble-up for the mind map, on its own callback: the two sheets take
+  // DIFFERENT widths (notes 40%, mind map 50%), so the parent has to know
+  // which one is open to shrink the lesson to the matching complement.
+  const { onMindMapSplitChange } = props;
+  useEffect(() => {
+    onMindMapSplitChange?.(mindMapSplit);
+    return () => onMindMapSplitChange?.(false);
+  }, [mindMapSplit, onMindMapSplitChange]);
 
   const flatModules = useMemo(() => flattenModules(props.modules), [props.modules]);
   // Only unlocked modules are listed in the "Module" tab, so the header
@@ -337,7 +372,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           // In split mode the editor takes the right 40% of the section
           // (minus the 4rem dock) so the lesson keeps the left 60%.
           ...(landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : null),
-          [landscape ? "width" : "height"]: splitMode ? splitEditorWidth : sheetHeight,
+          [landscape ? "width" : "height"]: mindMapSplit ? mindMapSplitWidth : splitMode ? splitEditorWidth : sheetHeight,
           // When the soft keyboard is up over the notes editor, lift the sheet
           // above it so the editor + Save buttons stay visible. The lesson on
           // the left is untouched. Portrait keeps its 4rem dock clearance too.
@@ -348,7 +383,8 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         data-course-overlay
         data-open={open ? "true" : "false"}
         data-orientation={orientation}
-        data-split-mode={splitMode ? "true" : "false"}
+        data-split-mode={splitMode || mindMapSplit ? "true" : "false"}
+        data-split-kind={mindMapSplit ? "mindmap" : splitMode ? "notes" : "none"}
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-violet-500/10 to-transparent" />
 
@@ -414,10 +450,19 @@ export default function CourseOverlay(props: CourseOverlayProps) {
               onEditorOpenChange={setNotesEditorOpen}
               composerOpenSignal={composerSignal}
             />
+          ) : tab === "mindmap" ? (
+            // The parent owns the map state + Firestore hook, so the panel is
+            // handed down ready-rendered. An empty slot (older call sites)
+            // degrades to a hint instead of a blank sheet.
+            props.mindMapPanel ?? (
+              <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
+                Mind map is course me abhi available nahi hai.
+              </p>
+            )
           ) : tab === "paid" ? (
             <PaidList {...props} />
           ) : (
-            <ContentList {...props} flatModules={flatModules} mode={tab} />
+            <ContentList {...props} flatModules={flatModules} mode={tab as "modules" | "resources"} />
           )}
         </div>
       </div>
@@ -454,8 +499,15 @@ export default function CourseOverlay(props: CourseOverlayProps) {
                 capsule, echoing the home footer's "magic" feel. Painted
                 behind the indicator + buttons so it never washes out an icon. */}
             <span className="dc-dock-fluid" aria-hidden="true" />
+            {/* The accent pill and the grab handle both occupy exactly one
+                dock slot. `20%` is `1 / TABS.length` for the current five
+                tabs (Module · Resource · Note · Mind map · Paid) — it is
+                written as a literal so Tailwind's scanner can see it; a
+                template literal would silently generate no class. The drag
+                maths below derives its slot size from `TABS.length` at
+                runtime, so the two stay in step. */}
             <span
-              className={`pointer-events-none absolute ${dragging ? "" : "transition-transform duration-300 ease-out"} ${landscape ? "left-1.5 right-1.5 top-0 h-1/4" : "bottom-1.5 left-0 top-1.5 w-1/4"}`}
+              className={`pointer-events-none absolute ${dragging ? "" : "transition-transform duration-300 ease-out"} ${landscape ? "left-1.5 right-1.5 top-0 h-[20%]" : "bottom-1.5 left-0 top-1.5 w-[20%]"}`}
               style={{ transform: landscape ? `translateY(${displayedIndex * 100}%)` : `translateX(${displayedIndex * 100}%)` }}
               data-course-dock-indicator
               data-index={activeIndex}
@@ -491,7 +543,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
             <span
               aria-hidden="true"
               tabIndex={-1}
-              className={`absolute z-20 touch-none cursor-grab active:cursor-grabbing ${landscape ? "left-1.5 right-1.5 top-0 h-1/4" : "bottom-1.5 left-0 top-1.5 w-1/4"}`}
+              className={`absolute z-20 touch-none cursor-grab active:cursor-grabbing ${landscape ? "left-1.5 right-1.5 top-0 h-[20%]" : "bottom-1.5 left-0 top-1.5 w-[20%]"}`}
               style={{ transform: landscape ? `translateY(${displayedIndex * 100}%)` : `translateX(${displayedIndex * 100}%)`, transition: dragging ? "none" : "transform 0.3s ease-out" }}
               onPointerDown={onHandlePointerDown}
               onPointerMove={onHandlePointerMove}
