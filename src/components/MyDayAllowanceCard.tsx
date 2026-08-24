@@ -37,7 +37,7 @@ function formatResetClock(resetAt: number): string {
 
 function Stat({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
-    <div className={`rounded-2xl p-3 text-center ring-1 ${tone}`}>
+    <div className={`rounded-2xl p-3 text-center ring-1 backdrop-blur-md ${tone}`}>
       <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{label}</p>
       <p className="mt-1 truncate text-xs font-black text-slate-900">{value}</p>
     </div>
@@ -118,19 +118,19 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
       data-myday-allowance-card
       data-myday-allowance-state={!resolved ? "loading" : unlimited ? "unlimited" : browseOnlyPlan ? "browse-only" : exhausted ? "exhausted" : "available"}
       aria-live="polite"
-      className="relative overflow-hidden rounded-[2rem] border border-indigo-100 bg-gradient-to-br from-white via-indigo-50 to-violet-50 p-5 shadow-sm"
+      className="dc-glass relative overflow-hidden rounded-[2rem] p-5"
     >
-      <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-indigo-200/40" />
-      <div className="absolute -bottom-14 -left-10 h-28 w-28 rounded-full bg-violet-200/30" />
+      <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-indigo-400/30 blur-2xl" />
+      <div className="pointer-events-none absolute -bottom-14 -left-10 h-28 w-28 rounded-full bg-violet-400/25 blur-2xl" />
 
       <div className="relative">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_12px_24px_-10px_rgba(79,70,229,0.8)]">
               {unlimited ? <Zap className="h-6 w-6" /> : <CalendarClock className="h-6 w-6" />}
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">My Day allowance</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-400">My Day allowance</p>
               <h3 data-myday-allowance-headline className="mt-1 text-lg font-black leading-tight text-slate-950">
                 {resolved ? headline : "Checking today’s allowance…"}
               </h3>
@@ -143,7 +143,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
               aria-label="Refresh My Day allowance"
               disabled={loading || !uid}
               onClick={() => void refresh()}
-              className="grid h-8 w-8 place-items-center rounded-full bg-white/80 text-indigo-600 shadow-sm transition disabled:opacity-50"
+              className="grid h-8 w-8 place-items-center rounded-full bg-white/60 text-indigo-600 shadow-sm ring-1 ring-white/70 backdrop-blur-md transition disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
@@ -152,7 +152,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
         </div>
 
         {!resolved ? (
-          <div className="mt-5 rounded-2xl bg-white/70 p-4 ring-1 ring-indigo-100" role="status">
+          <div className="mt-5 rounded-2xl bg-white/45 p-4 ring-1 ring-white/70 backdrop-blur-md" role="status">
             {loading ? (
               <div className="space-y-3">
                 <div className="h-3 w-3/4 animate-pulse rounded-full bg-indigo-100" />
@@ -170,7 +170,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
             )}
           </div>
         ) : unlimited ? (
-          <div className="mt-5 flex items-start gap-2.5 rounded-2xl bg-white/75 p-4 ring-1 ring-violet-200/70">
+          <div className="mt-5 flex items-start gap-2.5 rounded-2xl bg-white/45 p-4 ring-1 ring-violet-200/60 backdrop-blur-md">
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" />
             <p className="text-xs font-bold leading-5 text-slate-700">
               Tasks, schedule, reminders and notes all save to your account without a daily cap.
@@ -185,7 +185,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
                   {browseOnlyPlan ? "Subscribers only" : `${freeRemaining} left`}
                 </span>
               </div>
-              <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-200">
+              <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/50 ring-1 ring-white/70">
                 <div
                   data-myday-allowance-bar
                   className={`h-full rounded-full transition-all duration-500 ${browseOnlyPlan ? "bg-slate-300" : exhausted ? "bg-amber-500" : "bg-gradient-to-r from-indigo-500 to-violet-500"}`}
@@ -199,9 +199,9 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
             {browseOnlyPlan ? null : (
               <>
                 <div className="mt-4 grid grid-cols-3 gap-2">
-                  <Stat label="Used" value={`${freeUsed}`} tone="bg-white/75 ring-indigo-200/70" />
-                  <Stat label="Left" value={`${freeRemaining}`} tone="bg-white/75 ring-indigo-200/70" />
-                  <Stat label="Resets" value={resetAt ? formatResetClock(resetAt) : "Daily"} tone="bg-white/75 ring-indigo-200/70" />
+                  <Stat label="Used" value={`${freeUsed}`} tone="bg-white/45 ring-white/70" />
+                  <Stat label="Left" value={`${freeRemaining}`} tone="bg-white/45 ring-white/70" />
+                  <Stat label="Resets" value={resetAt ? formatResetClock(resetAt) : "Daily"} tone="bg-white/45 ring-white/70" />
                 </div>
 
                 <p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
