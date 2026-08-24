@@ -75,7 +75,7 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
   }, [filtered, highlightId]);
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-300/50">
+    <div className="dc-glass rounded-3xl shadow-[0_22px_48px_-28px_rgba(79,70,229,0.46)]">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-5 sm:px-6">
         <div className="flex items-center gap-3">
@@ -112,10 +112,10 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
       {/* Search bar - show when global search active or local search toggled */}
       <div className={cn("px-4 pt-3 sm:px-6", (showSearch || isSearchActive) ? "block" : "hidden sm:block")}>
         <div className={cn(
-          "flex items-center gap-2 rounded-xl border px-3 py-2.5 transition-all",
+          "dc-glass-input flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all",
           isSearchActive
-            ? "border-indigo-300 bg-indigo-50/50 ring-2 ring-indigo-100"
-            : "border-slate-200 bg-slate-50 focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100"
+            ? "ring-2 ring-indigo-100/70"
+            : "focus-within:ring-2 focus-within:ring-indigo-100/70"
         )}>
           <Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-indigo-500" : "text-slate-400")} />
           <input
@@ -157,8 +157,8 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
             className={cn(
               "relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all",
               filter === f.key
-                ? "bg-slate-900 text-white shadow-sm"
-                : "bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700",
+                ? "border border-indigo-300/70 bg-indigo-500/15 text-indigo-700 shadow-[0_14px_30px_-18px_rgba(79,70,229,0.65)] backdrop-blur-xl"
+                : "dc-glass-chip text-slate-500 hover:bg-white/80 hover:text-slate-700",
               globalSearch && "opacity-50 cursor-not-allowed"
             )}
           >
@@ -176,7 +176,7 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
       {/* Task list */}
       <div ref={listRef} className="space-y-2 p-4 sm:p-6 sm:pt-4">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/80 py-12 text-center">
+          <div className="dc-glass flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-indigo-200/70 bg-white/45 py-12 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 shadow-inner">
               {isSearchActive ? (
                 <Search className="h-6 w-6 text-slate-400" />

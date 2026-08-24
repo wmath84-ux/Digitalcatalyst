@@ -66,7 +66,7 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
   }, [sorted, nowMinutes, activeId]);
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-300/50">
+    <div className="dc-glass rounded-3xl shadow-[0_22px_48px_-28px_rgba(79,70,229,0.46)]">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-5 pb-4 sm:px-6">
         <div className="flex items-center gap-3">

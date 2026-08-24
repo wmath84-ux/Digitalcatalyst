@@ -27,7 +27,7 @@ export default function Reviews({ reviews, onOpenReview }: ReviewsProps) {
             key={review.id}
             onClick={() => onOpenReview(review.productId)}
             aria-label={`Open reviews for ${review.productTitle}`}
-            className="w-64 flex-shrink-0 snap-center-item rounded-2xl bg-white p-4 text-left shadow-md shadow-slate-300/70 ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]"
+            className="dc-glass w-64 flex-shrink-0 snap-center-item rounded-[1.6rem] p-4 text-left shadow-[0_18px_42px_-24px_rgba(79,70,229,0.42)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_50px_-22px_rgba(79,70,229,0.5)] active:scale-[0.99]"
           >
             <div className="flex items-center gap-2.5">
               <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>

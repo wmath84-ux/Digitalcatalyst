@@ -20,21 +20,21 @@ const priorityConfig: Record<Task["priority"], { label: string; cls: string }> =
 
 const statusConfig: Record<Task["status"], { border: string; bg: string; badge: string; badgeText: string }> = {
   completed: {
-    border: "border-emerald-200",
-    bg: "bg-white",
-    badge: "bg-emerald-100 text-emerald-700",
+    border: "border-emerald-200/80",
+    bg: "bg-white/72 backdrop-blur-xl",
+    badge: "border border-emerald-200/80 bg-emerald-100/80 text-emerald-700",
     badgeText: "Done",
   },
   "in-progress": {
-    border: "border-sky-200",
-    bg: "bg-white",
-    badge: "bg-sky-100 text-sky-700",
+    border: "border-sky-200/80",
+    bg: "bg-white/72 backdrop-blur-xl",
+    badge: "border border-sky-200/80 bg-sky-100/80 text-sky-700",
     badgeText: "In Progress",
   },
   pending: {
-    border: "border-slate-200",
-    bg: "bg-white",
-    badge: "bg-slate-100 text-slate-600",
+    border: "border-slate-200/80",
+    bg: "bg-white/72 backdrop-blur-xl",
+    badge: "border border-slate-200/80 bg-white/70 text-slate-600",
     badgeText: "Pending",
   },
 };
@@ -63,7 +63,7 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
   return (
     <div
       className={cn(
-        "group relative flex items-start gap-3 rounded-2xl border bg-white p-3.5 shadow-md shadow-slate-200/70 transition-all duration-200 hover:shadow-lg sm:items-center sm:px-4",
+        "group relative flex items-start gap-3 rounded-2xl border p-3.5 shadow-[0_18px_36px_-24px_rgba(79,70,229,0.4)] transition-all duration-200 hover:shadow-[0_24px_46px_-24px_rgba(79,70,229,0.46)] sm:items-center sm:px-4",
         sc.border,
         sc.bg,
         highlightQuery && "ring-2 ring-amber-200/50"
@@ -102,7 +102,7 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
         </p>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {task.subject && (
-            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+            <span className="rounded-md border border-white/70 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium text-slate-500 backdrop-blur">
               {highlightQuery ? highlightText(task.subject, highlightQuery) : task.subject}
             </span>
           )}

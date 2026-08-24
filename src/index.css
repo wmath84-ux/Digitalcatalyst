@@ -926,6 +926,54 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     linear-gradient(180deg, #f4f6ff 0%, #eef1ff 48%, #f7f4ff 100%);
 }
 
+.dc-app-shell {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.22), transparent 48%),
+    radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.18), transparent 42%),
+    radial-gradient(88% 62% at 50% 100%, rgba(244, 114, 182, 0.12), transparent 48%),
+    linear-gradient(180deg, #f6f8ff 0%, #eef3ff 46%, #f8fafc 100%);
+}
+
+.dc-app-shell::before,
+.dc-app-shell::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 9999px;
+  filter: blur(56px);
+}
+
+.dc-app-shell::before {
+  top: 4rem;
+  left: -5rem;
+  width: 15rem;
+  height: 15rem;
+  background: rgba(167, 139, 250, 0.32);
+}
+
+.dc-app-shell::after {
+  right: -4rem;
+  top: 12rem;
+  width: 16rem;
+  height: 16rem;
+  background: rgba(125, 211, 252, 0.26);
+}
+
+.dc-app-frame {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(248, 250, 252, 0.58));
+  backdrop-filter: blur(30px) saturate(165%);
+  -webkit-backdrop-filter: blur(30px) saturate(165%);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 24px 60px -26px rgba(79, 70, 229, 0.42),
+    0 14px 30px -20px rgba(15, 23, 42, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
 .dc-glass {
   position: relative;
   isolation: isolate;
@@ -947,6 +995,60 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   border-radius: inherit;
   pointer-events: none;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.38), transparent 36%);
+}
+
+.dc-glass-soft {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.5));
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 16px 34px -24px rgba(79, 70, 229, 0.45),
+    0 8px 18px -16px rgba(15, 23, 42, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.dc-glass-toolbar {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.64));
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  box-shadow:
+    0 12px 30px -22px rgba(79, 70, 229, 0.46),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.dc-glass-dark {
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(167, 139, 250, 0.24), transparent 46%),
+    radial-gradient(90% 80% at 0% 100%, rgba(34, 211, 238, 0.16), transparent 48%),
+    linear-gradient(165deg, rgba(17, 24, 39, 0.88), rgba(30, 41, 59, 0.82));
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 22px 44px -24px rgba(15, 23, 42, 0.62),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.dc-glass-chip {
+  background: rgba(255, 255, 255, 0.64);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  box-shadow: 0 10px 22px -20px rgba(79, 70, 229, 0.44);
+}
+
+.dc-glass-input {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  box-shadow:
+    0 10px 22px -18px rgba(79, 70, 229, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .dc-glass-hero {

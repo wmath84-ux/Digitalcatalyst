@@ -103,7 +103,7 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
         {/* List */}
         <div className="px-4 pb-5 sm:px-6">
           {sorted.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/80 py-10 text-center">
+            <div className="dc-glass flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-amber-200/70 bg-white/45 py-10 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 shadow-inner">
                 <AlarmClock className="h-6 w-6 text-slate-400" />
               </div>

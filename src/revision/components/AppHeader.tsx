@@ -18,14 +18,14 @@ type AppHeaderProps = {
 export default function AppHeader({ title, subtitle, backHref, rightSlot }: AppHeaderProps) {
   const { navigate } = useExitGuard();
   return (
-    <header className="sticky top-[68px] z-20 border-b border-slate-200/60 bg-white/75 backdrop-blur-xl transition-all shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]">
+    <header className="dc-glass-toolbar sticky top-[68px] z-20 border-b border-white/60 transition-all shadow-[0_10px_30px_-18px_rgba(79,70,229,0.32)]">
       <div className="flex min-h-[56px] items-center gap-2 px-3">
         {backHref ? (
           <button
             type="button"
             onClick={() => navigate(backHref)}
             aria-label="Go back"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 bg-white/60 shadow-sm border border-slate-200/70 backdrop-blur-sm transition-all hover:bg-slate-50 active:scale-95"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/70 text-slate-600 shadow-sm backdrop-blur-sm transition-all hover:bg-white/90 active:scale-95"
           >
             <ChevronLeftIcon className="h-6 w-6" />
           </button>

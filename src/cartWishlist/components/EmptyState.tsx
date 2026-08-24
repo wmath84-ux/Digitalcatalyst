@@ -18,7 +18,8 @@ export default function EmptyState({
   accent = "from-violet-500 to-indigo-600",
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-8 py-16 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center px-5 py-10 text-center">
+      <div className="dc-glass flex w-full max-w-[280px] flex-col items-center rounded-[2rem] px-6 py-10 shadow-[0_20px_48px_-28px_rgba(79,70,229,0.45)]">
       <div className="relative mb-6">
         <div
           className={`absolute inset-0 -z-10 scale-150 rounded-full bg-gradient-to-br ${accent} opacity-10 blur-2xl`}
@@ -39,6 +40,7 @@ export default function EmptyState({
       >
         {actionLabel}
       </button>
+      </div>
     </div>
   );
 }
