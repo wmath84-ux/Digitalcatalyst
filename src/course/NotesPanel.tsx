@@ -2,8 +2,13 @@
 //
 // Course Player notes panel.
 //
-//   - A single "+" button opens a LARGE rich-text editor that fills the
-//     notes sheet, so long notes are comfortable to read while writing.
+//   - The single "+" button (in the overlay's MAIN header) opens a LARGE
+//     rich-text editor that fills the notes sheet, so long notes are
+//     comfortable to read while writing. The panel itself renders no
+//     header rows: the overlay's main header is the only header, and
+//     while the writing box is open even that one is hidden — leaving
+//     toolbar on top, the writing surface in the middle and Save /
+//     Cancel on the bottom for maximum writing space.
 //   - "Save" collapses the note back into a square card in a grid — the
 //     big surface is an editing affordance only, it never changes how a
 //     saved note looks in the list.
@@ -17,7 +22,7 @@
 // stay on the device and don't collide with Firestore course progress.
 
 import { useEffect, useState } from "react";
-import { Check, Plus, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import type { CoursePlayerNote } from "../types/course";
 import RichTextEditor from "./RichTextEditor";
 import { isEmptyRichText, plainToRichText, richTextToPlain } from "../utils/richText";
@@ -29,6 +34,13 @@ interface NotesPanelProps {
   onDelete: (id: string) => void;
   /** Lets the overlay grow the sheet while the big editor is open. */
   onEditorOpenChange?: (open: boolean) => void;
+  /**
+   * Monotonic counter from the overlay's main header "+" button. Each
+   * increment asks this panel to open its composer — the button moved to
+   * the overlay's main header, so the panel listens for the signal instead
+   * of owning its own header row.
+   */
+  composerOpenSignal?: number;
 }
 
 // Older notes were stored as plain text. Render them through the same
@@ -54,7 +66,7 @@ function PremiumDeleteIcon({ size = 13 }: { size?: number }) {
   );
 }
 
-export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpenChange }: NotesPanelProps) {
+export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpenChange, composerOpenSignal }: NotesPanelProps) {
   const [composing, setComposing] = useState(false);
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -75,6 +87,13 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
     setComposing(true);
     setDraft("");
   };
+
+  // The main header's "+" (in the overlay) asks for a fresh composer.
+  // `> 0` keeps the first mount (signal 0) from auto-opening the editor.
+  useEffect(() => {
+    if (composerOpenSignal && composerOpenSignal > 0) openComposer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composerOpenSignal]);
 
   const submitAdd = () => {
     if (isEmptyRichText(draft)) return;
@@ -107,22 +126,9 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
     };
     return (
       <div className="flex h-full flex-col overflow-hidden" data-course-notes-panel data-course-notes-mode={editing ? "edit" : "compose"}>
-        <div className="flex shrink-0 items-center justify-between border-b border-[var(--course-border)] px-4 py-2">
-          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[var(--course-muted)]" data-course-notes-title>
-            {editing ? "Edit note" : "New note"}
-          </p>
-          <button
-            type="button"
-            onClick={editing ? submitEdit : submitAdd}
-            className="grid h-8 w-8 place-items-center rounded-lg bg-violet-500 text-white transition hover:bg-violet-400 disabled:opacity-40"
-            aria-label="Save note"
-            disabled={empty}
-            data-course-notes-add
-          >
-            <Check size={15} />
-          </button>
-        </div>
-
+        {/* No header here: with the overlay's main header hidden in writing
+            mode, the sheet is exactly toolbar (top) / writing surface
+            (middle) / Save + Cancel (bottom) — maximum writing space. */}
         <div className="flex min-h-0 flex-1 flex-col p-3" data-course-notes-composer>
           <RichTextEditor
             value={value}
@@ -158,22 +164,9 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
 
   return (
     <div className="flex h-full flex-col overflow-hidden" data-course-notes-panel data-course-notes-mode="list">
-      {/* Header: title + the single "+" button */}
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--course-border)] px-4 py-2">
-        <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[var(--course-muted)]" data-course-notes-title>
-          Notes
-        </p>
-        <button
-          type="button"
-          onClick={openComposer}
-          className="grid h-8 w-8 place-items-center rounded-lg bg-violet-500 text-white transition hover:bg-violet-400 disabled:opacity-40"
-          aria-label="Add note"
-          data-course-notes-add
-        >
-          <Plus size={16} />
-        </button>
-      </div>
-
+      {/* No secondary header — the overlay's main header carries the
+          title, the "+" (new note) button and the close button, so the
+          note grid starts at the very top of the sheet. */}
       {/* Note list — square cards in a grid. A saved note always collapses
           back to a compact square; the rich formatting is preserved
           underneath and shown again the moment the note is reopened. */}

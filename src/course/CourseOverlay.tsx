@@ -29,7 +29,7 @@
 //     sheet slides in from the right.
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, NotebookPen, PlayCircle, ShoppingBag, Sparkles, X } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, NotebookPen, PlayCircle, Plus, ShoppingBag, Sparkles, X } from "lucide-react";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 
@@ -163,6 +163,16 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   const landscape = orientation === "landscape";
   // NotesPanel reports when its big editor is open so the sheet can grow.
   const [notesEditorOpen, setNotesEditorOpen] = useState(false);
+  // Writing mode = the rich-text writing box is open (compose or edit). In
+  // this mode the sheet keeps NO headers at all — nothing but the
+  // formatting toolbar on top, the writing surface in the middle and the
+  // Save / Cancel row on the bottom — so the box gets maximum room to write
+  // and organise in both portrait and landscape.
+  const notesWriting = tab === "notes" && notesEditorOpen;
+  // The main header's "+" button lives here (the overlay), but the composer
+  // state lives in NotesPanel. A monotonically increasing signal asks the
+  // panel to open its composer without lifting the draft state up.
+  const [composerSignal, setComposerSignal] = useState(0);
 
   // ── Draggable, magnetic dock indicator ──────────────────────────────────
   // The sliding accent pill can be GRABBED and dragged between the four tabs.
@@ -342,8 +352,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-violet-500/10 to-transparent" />
 
-        {/* Grab handle (portrait only) */}
-        {!landscape ? (
+        {/* Grab handle (portrait only, hidden while the writing box is open
+            so the editor gets every pixel). */}
+        {!landscape && !notesWriting ? (
           <button
             type="button"
             onClick={props.onClose}
@@ -352,6 +363,13 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           />
         ) : null}
 
+        {/* Main header — shown only while the note LIST (or any other tab)
+            is open. While the writing box is open the header disappears
+            entirely: the sheet is nothing but toolbar / writing surface /
+            Save + Cancel, maximum space for writing in both orientations.
+            The "+" (new note) moved up here from the panel's old secondary
+            header. */}
+        {notesWriting ? null : (
         <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--course-border)] px-4 py-3">
           <div className="min-w-0">
             <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-[var(--course-muted)]" data-course-overlay-title>
@@ -361,15 +379,29 @@ export default function CourseOverlay(props: CourseOverlayProps) {
               {tab === "modules" ? `${visibleModuleCount} connected ${visibleModuleCount === 1 ? "module" : "modules"}` : activeTab.hint}
             </p>
           </div>
-          <button
-            onClick={props.onClose}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
-            aria-label="Close overlay"
-            data-course-overlay-close
-          >
-            <X size={15} />
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {tab === "notes" ? (
+              <button
+                type="button"
+                onClick={() => setComposerSignal((signal) => signal + 1)}
+                className="grid h-8 w-8 place-items-center rounded-lg bg-violet-500 text-white transition hover:bg-violet-400"
+                aria-label="Add note"
+                data-course-notes-add
+              >
+                <Plus size={16} />
+              </button>
+            ) : null}
+            <button
+              onClick={props.onClose}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+              aria-label="Close overlay"
+              data-course-overlay-close
+            >
+              <X size={15} />
+            </button>
+          </div>
         </div>
+        )}
 
         {/* Content swaps in place — the sheet itself never closes. */}
         <div key={tab} className="min-h-0 flex-1 overflow-hidden animate-course-overlay-in" data-course-overlay-tab={tab}>
@@ -380,6 +412,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
               onEdit={props.onEditNote}
               onDelete={props.onDeleteNote}
               onEditorOpenChange={setNotesEditorOpen}
+              composerOpenSignal={composerSignal}
             />
           ) : tab === "paid" ? (
             <PaidList {...props} />

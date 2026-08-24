@@ -17,6 +17,9 @@
 //   4. LANDSCAPE NOTES SPLIT IS KEYBOARD-AWARE — in landscape the lesson and
 //      the notes editor stay side by side (60/40); when the soft keyboard
 //      rises the editor shrinks to sit above it instead of being hidden.
+//      The four-tab dock rail STAYS pinned to the far-right edge while the
+//      split is on (a flex spacer under the 40% sheet keeps the in-flow
+//      dock from sliding toward the middle of the screen).
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -157,4 +160,15 @@ test("The landscape split keeps lesson + notes side by side (60/40)", () => {
   assert.match(coursePlayer, /basis-\[calc\(60%-4rem\)\]/);
   assert.match(overlay, /const splitEditorWidth = "min\(40%, 520px\)"/);
   assert.match(overlay, /onSplitModeChange/);
+});
+
+test("The landscape dock rail stays pinned to the far-right edge in split mode", () => {
+  // The dock renders as the section's last IN-FLOW child, so the moment the
+  // lesson shrinks to 60% for the notes editor the rail would slide toward
+  // the middle of the screen with it. A flex spacer eats the gap under the
+  // 40% notes sheet, pinning the dock back to the far-right edge — exactly
+  // where it sits when the sheet is closed. The absolute sheet (z-40)
+  // covers the spacer completely.
+  assert.match(coursePlayer, /data-course-dock-spacer/);
+  assert.match(coursePlayer, /\{notesSplitMode \? <div className="min-h-0 flex-1" aria-hidden="true" data-course-dock-spacer \/> : null\}/);
 });
