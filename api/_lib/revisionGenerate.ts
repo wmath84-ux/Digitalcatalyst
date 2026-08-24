@@ -225,30 +225,61 @@ export function systemPrompt(): string {
     "- explanation must teach the concept in 1-2 sentences.",
     "- difficulty must be one of: easy, medium, hard.",
     "- Stay strictly inside the given class / subject / chapter / concepts.",
+    "- The question-style rule in the user request is a hard constraint: never emit a question kind it forbids, even if a topic suggests it.",
     "- No markdown, no code fences, no extra text outside the JSON.",
   ].join("\n");
 }
 
-/** Question-style instructions appended to the prompt. */
+/**
+ * Question-style instructions appended to the prompt.
+ *
+ * Question type (theory / application / mixed) is a SEPARATE setting from
+ * difficulty and it is a hard rule, not a hint. Each mode lists exactly what
+ * is allowed, what is forbidden and a same-style example, and ends with a
+ * self-check the model must run before answering — learners were seeing
+ * application/numerical questions even after selecting Theory only.
+ */
 function questionStyleLines(mode: RevisionSyllabus["questionMode"]): string[] {
   if (mode === "theory") {
     return [
+      "STRICT QUESTION TYPE RULE — the learner selected: THEORY ONLY.",
       "Question style: THEORETICAL / CONCEPT-BASED ONLY.",
       "- Every question must test theory: definitions, concepts, laws, formulas, units, naming, symbols and conceptual comparisons.",
+      "- Allowed forms: \"What is the definition of…\", \"State the law / principle of…\", \"Which formula correctly represents…\", \"The SI unit of … is\", \"Which of the following statements about … is correct\", term/symbol recall, classification, matching and conceptual comparison questions.",
       "- Do NOT include numerical problems or long application-based word problems.",
+      "- Forbidden in theory mode: any question that gives values to plug in, asks to \"calculate / find / determine / how much\", or describes a real-life scenario that must be solved by applying a formula. Any MCQ whose options are computed answers is forbidden.",
+      "- A formula may be the correct answer (e.g. \"Which of the following is the correct formula for stress?\"), but the question must never require computing with it.",
+      "- Example to follow: \"What is the SI unit of force?\" — never \"Calculate the force on a 2 kg mass moving at 3 m/s².\"",
+      "- Self-check before answering: re-read every question; silently rewrite any that breaks this theory-only rule.",
     ];
   }
   if (mode === "application") {
     return [
+      "STRICT QUESTION TYPE RULE — the learner selected: APPLICATION ONLY.",
       "Question style: APPLICATION-BASED ONLY.",
       "- Every question must be an application problem: numerical calculations, real-world scenarios and situational questions that require using the listed concepts.",
+      "- Allowed forms: \"Calculate…\", \"Find the value of…\", \"A 2 kg object … what is the…\", case- or scenario-based questions where a concept or formula must be applied to reach the answer, and MCQs whose options are computed values or applied conclusions.",
       "- Do NOT include pure definition, naming or formula-recall questions.",
+      "- Forbidden in application mode: direct-recall questions such as \"Define…\", \"State the law of…\", \"What is the SI unit of…\", \"Which formula represents…\" — anything a student could answer from memory without solving. Every question must require working out a solution.",
+      "- Example to follow: \"A 2 kg object accelerates at 3 m/s². The force acting on it is?\" — never \"State Newton's second law of motion.\"",
+      "- Self-check before answering: re-read every question; silently rewrite any that can be answered without solving a problem.",
     ];
   }
   return [
+    "STRICT QUESTION TYPE RULE — the learner selected: MIXED (theory + application).",
     "Question style: MIXED THEORY + APPLICATION.",
     "- Include a balanced blend of theory/concept questions and application/problem-based questions.",
+    "- Roughly half of the questions must be theory (definitions, formulas, units, laws, concepts) and roughly half must be application (numerical or real-world problems to solve).",
+    "- Every question must clearly belong to one of these two styles.",
+    "- Self-check before answering: count theory vs application questions and rebalance if one style dominates.",
   ];
+}
+
+/** Short label of the selected question type, used in the final hard-check line. */
+function questionModeLabelFor(mode: RevisionSyllabus["questionMode"]): string {
+  if (mode === "theory") return "THEORY ONLY (definitions/concepts/formulas/units — zero numerical or application questions)";
+  if (mode === "application") return "APPLICATION ONLY (numerical/problem-solving questions — zero pure definition or recall questions)";
+  return "MIXED (about half theory, about half application)";
 }
 
 export function buildSyllabusPrompt(syllabus: RevisionSyllabus): string {
@@ -271,10 +302,15 @@ export function buildSyllabusPrompt(syllabus: RevisionSyllabus): string {
     ...(syllabus.testDate ? [`Requested test date: ${syllabus.testDate}`] : []),
     ...(syllabus.generatedAt ? [`Generation requested at: ${syllabus.generatedAt}${syllabus.timezone ? ` (${syllabus.timezone})` : ""}`] : []),
     `Difficulty: ${difficulty}`,
+    ...(syllabus.difficulty === "mixed"
+      ? ["- Balance the paper across difficulty: roughly one-third easy, one-third medium and one-third hard, and set each question's \"difficulty\" field correctly."]
+      : [`- Every question must be at ${syllabus.difficulty} difficulty.`]),
+    `Selected question type (hard rule): ${questionModeLabelFor(syllabus.questionMode)}`,
     ...questionStyleLines(syllabus.questionMode),
-    `Exam duration to keep in mind: ${syllabus.minutes} minutes`,
+    `Exam duration to keep in mind: ${syllabus.minutes} minutes for ${syllabus.count} questions — every question must be short enough to be answered well within this time.`,
     "Cover the listed concepts at the given class level. Every question must be distinct, unambiguous, and have one correct answer.",
     `Return a complete set of exactly ${syllabus.count} usable questions; do not return fewer.`,
+    `CRITICAL FINAL CHECK: The learner's selected question type is "${questionModeLabelFor(syllabus.questionMode)}". Verify each of the ${syllabus.count} questions follows that rule exactly before answering — if any question is of the wrong type, replace it with a compliant one.`,
   ].join("\n");
 }
 
@@ -762,7 +798,9 @@ async function callGemini(config: AiConfig, syllabus: RevisionSyllabus): Promise
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt() }] },
       contents: [{ role: "user", parts: [{ text: buildSyllabusPrompt(syllabus) }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.7 },
+      // Lower temperature keeps the model closer to the strict question-type
+      // rules (theory vs application) instead of drifting to generic exam items.
+      generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
     }),
   });
   if (!res.ok) {
@@ -790,6 +828,9 @@ async function callAnthropic(config: AiConfig, syllabus: RevisionSyllabus): Prom
     body: JSON.stringify({
       model: config.model,
       max_tokens: 4096,
+      // Anthropic defaults to temperature 1.0, which drifts from the strict
+      // question-type rules — pin it low for reliable rule-following.
+      temperature: 0.4,
       system: systemPrompt(),
       messages: [{ role: "user", content: buildSyllabusPrompt(syllabus) }],
     }),
@@ -828,7 +869,7 @@ async function callOpenAiCompatible(config: AiConfig, syllabus: RevisionSyllabus
       body: JSON.stringify({
         model: config.model,
         messages,
-        temperature: 0.7,
+        temperature: 0.4,
         ...(withJson ? { response_format: { type: "json_object" } } : {}),
       }),
     });
