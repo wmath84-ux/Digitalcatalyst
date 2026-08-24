@@ -10,8 +10,11 @@
 // Difficulty and question type are separate planning settings. Question type
 // defaults to Mixed and switches the AI's style — Mixed (theory + application),
 // Theory only (definitions/concepts/formulas/units), or Application only
-// (numerical/problem-based/situational questions). The choice is appended to
-// the AI prompt, so the model itself follows it.
+// (numerical/problem-based/situational questions). The choice is sent to the
+// server, which instructs the model with an exact per-type quota and a
+// mandatory per-question type tag, then deterministically verifies every
+// returned question and regenerates any wrong-type ones before the test is
+// delivered (see utils/questionTypeGuard.js).
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import PageShell from "../components/PageShell";
@@ -698,7 +701,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   <div>
                     <h4 className="text-[12px] font-bold uppercase tracking-wide text-slate-600">Question type</h4>
                     <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
-                      Default is Mixed. This strict mode applies to AI-generated tests; offline built-in questions are not dynamically transformed.
+                      Default is Mixed. The AI tags every question by type and the server re-checks each one — wrong-type questions are regenerated automatically. (Offline built-in questions are not dynamically transformed.)
                     </p>
                   </div>
                   <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-indigo-600 shadow-sm">

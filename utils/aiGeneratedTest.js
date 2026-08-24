@@ -6,6 +6,8 @@
 // requested count before finalising a generation reservation, so malformed,
 // duplicate or partial provider output never consumes an allowance.
 
+import { normalizeModelTypeTag } from "./questionTypeGuard.js";
+
 const asRecord = (value) =>
   value && typeof value === "object" && !Array.isArray(value) ? value : {};
 
@@ -47,6 +49,12 @@ export const normalizeCompleteAiQuestions = (raw, requestedDifficulty = "medium"
     if (new Set(optionKeys).size !== options.length) continue;
     if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= options.length) continue;
 
+    // The model's self-declared question style ("theory"/"application") is
+    // carried through so the deterministic question-type guard can verify the
+    // batch against the learner's selected question type. Absent tags stay
+    // absent — the guard falls back to its own heuristic for those.
+    const typeTag = normalizeModelTypeTag(row.type ?? row.kind);
+
     prompts.add(promptKey);
     questions.push({
       prompt,
@@ -54,6 +62,7 @@ export const normalizeCompleteAiQuestions = (raw, requestedDifficulty = "medium"
       correctIndex,
       explanation,
       difficulty: cleanDifficulty(row.difficulty, requestedDifficulty),
+      ...(typeTag ? { type: typeTag } : {}),
     });
   }
 

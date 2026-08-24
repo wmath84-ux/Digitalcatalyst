@@ -9,6 +9,7 @@
 // call fails), the admin panel falls back to the built-in offline generator.
 
 import type { ParsedQuestion } from "./bulkParser";
+import { mixedModeSplit } from "../../../utils/questionTypeGuard.js";
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -167,12 +168,13 @@ export function systemPrompt(): string {
     "You are an expert exam question writer for a student revision app.",
     "You generate multiple-choice questions (MCQs) with exactly 4 options.",
     "Return ONLY valid JSON in this exact shape:",
-    '{"questions":[{"prompt":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"...","difficulty":"easy"}]}',
+    '{"questions":[{"prompt":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"...","difficulty":"easy","type":"theory"}]}',
     "Rules:",
     "- correctIndex is the 0-based index of the single correct option.",
     "- options must be exactly 4 distinct, non-empty strings.",
     "- explanation must teach the concept in 1-2 sentences.",
     "- difficulty must be one of: easy, medium, hard.",
+    "- Every question object must include a \"type\" field: \"theory\" when it tests pure memory/understanding (nothing to solve or calculate), or \"application\" when it must be solved/computed. Tag every question truthfully.",
     "- The question-style rule in the user request is a hard constraint: never emit a question kind it forbids, even if a topic suggests it.",
     "- No markdown, no code fences, no extra text outside the JSON.",
   ].join("\n");
@@ -248,14 +250,19 @@ export type GeminiRuntimeConfig = {
  *
  * Question type (theory / application / mixed) is a SEPARATE setting from
  * difficulty and it is a hard rule, not a hint. Each mode lists exactly what
- * is allowed, what is forbidden and a same-style example, and ends with a
- * self-check the model must run before answering — learners were seeing
- * application/numerical questions even after selecting Theory only.
+ * is allowed, what is forbidden, a same-style example and a mandatory
+ * per-question "type" tag, and ends with a self-check the model must run
+ * before answering — learners were seeing application/numerical questions
+ * even after selecting Theory only. Mixed mode demands an exact quota
+ * (computed by mixedModeSplit), never a vague "roughly half".
  *
  * Keep this wording in sync with api/_lib/revisionGenerate.ts so the direct
- * and server-proxied paths follow identical rules.
+ * and server-proxied paths follow identical rules. The server additionally
+ * verifies every returned question deterministically and repairs wrong-type
+ * output — see utils/questionTypeGuard.js.
  */
-export function questionStyleLines(mode: QuestionMode | undefined): string[] {
+export function questionStyleLines(mode: QuestionMode | undefined, count = 10): string[] {
+  const safeCount = Math.max(1, Math.round(Number(count) || 1));
   if (mode === "theory") {
     return [
       "STRICT QUESTION TYPE RULE — the learner selected: THEORY ONLY.",
@@ -266,6 +273,7 @@ export function questionStyleLines(mode: QuestionMode | undefined): string[] {
       "- Forbidden in theory mode: any question that gives values to plug in, asks to \"calculate / find / determine / how much\", or describes a real-life scenario that must be solved by applying a formula. Any MCQ whose options are computed answers is forbidden.",
       "- A formula may be the correct answer (e.g. \"Which of the following is the correct formula for stress?\"), but the question must never require computing with it.",
       "- Example to follow: \"What is the SI unit of force?\" — never \"Calculate the force on a 2 kg mass moving at 3 m/s².\"",
+      `- Mark each question object with "type":"theory" — the server verifies the tag and rejects any question that actually requires solving.`,
       "- Self-check before answering: re-read every question; silently rewrite any that breaks this theory-only rule.",
     ];
   }
@@ -278,14 +286,17 @@ export function questionStyleLines(mode: QuestionMode | undefined): string[] {
       "- Do NOT include pure definition, naming or formula-recall questions.",
       "- Forbidden in application mode: direct-recall questions such as \"Define…\", \"State the law of…\", \"What is the SI unit of…\", \"Which formula represents…\" — anything a student could answer from memory without solving. Every question must require working out a solution.",
       "- Example to follow: \"A 2 kg object accelerates at 3 m/s². The force acting on it is?\" — never \"State Newton's second law of motion.\"",
+      `- Mark each question object with "type":"application" — the server verifies the tag and rejects any question that can be answered from memory alone.`,
       "- Self-check before answering: re-read every question; silently rewrite any that can be answered without solving a problem.",
     ];
   }
+  const quota = mixedModeSplit(safeCount);
   return [
     "STRICT QUESTION TYPE RULE — the learner selected: MIXED (theory + application).",
     "Question style: MIXED THEORY + APPLICATION.",
     "- Include a balanced blend of theory/concept questions and application/problem-based questions.",
-    "- Roughly half of the questions must be theory (definitions, formulas, units, laws, concepts) and roughly half must be application (numerical or real-world problems to solve).",
+    `- EXACT SPLIT REQUIRED: exactly ${quota.theory} of the ${safeCount} questions must be theory (definitions, formulas, units, laws, concepts — remembered facts, nothing to solve) and exactly ${quota.application} must be application (numerical or real-world problems to solve). "Roughly half" is not acceptable — the split is exact.`,
+    "- Mark each question object truthfully with \"type\":\"theory\" or \"type\":\"application\", and interleave the two styles in the returned array.",
     "- Every question must clearly belong to one of these two styles.",
     "- Self-check before answering: count theory vs application questions and rebalance if one style dominates.",
   ];
@@ -324,7 +335,7 @@ export function buildUserPrompt(input: GenerateInput): string {
     ...(input.generatedAt ? [`Generation requested at: ${input.generatedAt}${input.timezone ? ` (${input.timezone})` : ""}`] : []),
     `Difficulty: ${input.difficulty}`,
     `Selected question type (hard rule): ${questionModeLabelFor(input.questionMode)}`,
-    ...questionStyleLines(input.questionMode),
+    ...questionStyleLines(input.questionMode, input.count),
   ];
   if (input.minutes && input.minutes > 0) {
     lines.push(`Exam duration to keep in mind: ${input.minutes} minutes for ${input.count} questions — every question must be short enough to be answered well within this time.`);

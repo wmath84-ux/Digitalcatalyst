@@ -15,6 +15,7 @@ import { normalisePlanDoc } from "../../utils/subscriptions.js";
 import { aiAllowanceForCycle } from "../../utils/aiAllowances.js";
 import { calculateAiCostMicros, estimateTokensFromText, findAiModelPrice, normalizeAiModelPricing, type AiModelPrice } from "../../utils/aiPolicy.js";
 import { normalizeCompleteAiQuestions } from "../../utils/aiGeneratedTest.js";
+import { mixedModeSplit, planModeEnforcement, type ModeNeed } from "../../utils/questionTypeGuard.js";
 
 const PROVIDERS = ["gemini", "openai", "openrouter", "anthropic", "groq", "custom"] as const;
 type ProviderId = (typeof PROVIDERS)[number];
@@ -73,6 +74,8 @@ type GeneratedQuestion = {
   correctIndex: number;
   explanation: string;
   difficulty: string;
+  /** Model-declared question style, verified by the deterministic question-type guard. */
+  type?: "theory" | "application";
 };
 
 type ProviderUsage = {
@@ -218,12 +221,13 @@ export function systemPrompt(): string {
     "You are an expert exam question writer for Indian school students.",
     "You generate multiple-choice questions (MCQs) with exactly 4 options.",
     "Return ONLY valid JSON in this exact shape:",
-    '{"questions":[{"prompt":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"...","difficulty":"easy"}]}',
+    '{"questions":[{"prompt":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"...","difficulty":"easy","type":"theory"}]}',
     "Rules:",
     "- correctIndex is the 0-based index of the single correct option.",
     "- options must be exactly 4 distinct, non-empty strings.",
     "- explanation must teach the concept in 1-2 sentences.",
     "- difficulty must be one of: easy, medium, hard.",
+    "- Every question object must include a \"type\" field: \"theory\" when it tests pure memory/understanding (nothing to solve or calculate), or \"application\" when it must be solved/computed. Tag every question truthfully — the server verifies each type and rejects mistyped questions.",
     "- Stay strictly inside the given class / subject / chapter / concepts.",
     "- The question-style rule in the user request is a hard constraint: never emit a question kind it forbids, even if a topic suggests it.",
     "- No markdown, no code fences, no extra text outside the JSON.",
@@ -235,11 +239,24 @@ export function systemPrompt(): string {
  *
  * Question type (theory / application / mixed) is a SEPARATE setting from
  * difficulty and it is a hard rule, not a hint. Each mode lists exactly what
- * is allowed, what is forbidden and a same-style example, and ends with a
- * self-check the model must run before answering — learners were seeing
+ * is allowed, what is forbidden and a same-style example, demands a truthful
+ * per-question "type" tag in the output JSON, and ends with a self-check the
+ * model must run before answering — learners were seeing
  * application/numerical questions even after selecting Theory only.
+ *
+ * Mixed mode demands an exact quota (computed by mixedModeSplit), never a
+ * vague "roughly half". A repair prompt can pass an explicit `split` when the
+ * replacement batch has a different composition than the default half/half.
+ *
+ * Keep this wording in sync with src/revision/engine/aiGenerate.ts so the
+ * direct and server-proxied paths follow identical rules.
  */
-function questionStyleLines(mode: RevisionSyllabus["questionMode"]): string[] {
+function questionStyleLines(
+  mode: RevisionSyllabus["questionMode"],
+  count: number,
+  split?: { theory: number; application: number },
+): string[] {
+  const safeCount = Math.max(1, Math.round(Number(count) || 1));
   if (mode === "theory") {
     return [
       "STRICT QUESTION TYPE RULE — the learner selected: THEORY ONLY.",
@@ -250,6 +267,7 @@ function questionStyleLines(mode: RevisionSyllabus["questionMode"]): string[] {
       "- Forbidden in theory mode: any question that gives values to plug in, asks to \"calculate / find / determine / how much\", or describes a real-life scenario that must be solved by applying a formula. Any MCQ whose options are computed answers is forbidden.",
       "- A formula may be the correct answer (e.g. \"Which of the following is the correct formula for stress?\"), but the question must never require computing with it.",
       "- Example to follow: \"What is the SI unit of force?\" — never \"Calculate the force on a 2 kg mass moving at 3 m/s².\"",
+      `- Mark each question object with "type":"theory" — the server verifies the tag and rejects any question that actually requires solving.`,
       "- Self-check before answering: re-read every question; silently rewrite any that breaks this theory-only rule.",
     ];
   }
@@ -262,14 +280,17 @@ function questionStyleLines(mode: RevisionSyllabus["questionMode"]): string[] {
       "- Do NOT include pure definition, naming or formula-recall questions.",
       "- Forbidden in application mode: direct-recall questions such as \"Define…\", \"State the law of…\", \"What is the SI unit of…\", \"Which formula represents…\" — anything a student could answer from memory without solving. Every question must require working out a solution.",
       "- Example to follow: \"A 2 kg object accelerates at 3 m/s². The force acting on it is?\" — never \"State Newton's second law of motion.\"",
+      `- Mark each question object with "type":"application" — the server verifies the tag and rejects any question that can be answered from memory alone.`,
       "- Self-check before answering: re-read every question; silently rewrite any that can be answered without solving a problem.",
     ];
   }
+  const quota = split ?? mixedModeSplit(safeCount);
   return [
     "STRICT QUESTION TYPE RULE — the learner selected: MIXED (theory + application).",
     "Question style: MIXED THEORY + APPLICATION.",
     "- Include a balanced blend of theory/concept questions and application/problem-based questions.",
-    "- Roughly half of the questions must be theory (definitions, formulas, units, laws, concepts) and roughly half must be application (numerical or real-world problems to solve).",
+    `- EXACT SPLIT REQUIRED: exactly ${quota.theory} of the ${safeCount} questions must be theory (definitions, formulas, units, laws, concepts — remembered facts, nothing to solve) and exactly ${quota.application} must be application (numerical or real-world problems to solve). "Roughly half" is not acceptable — the split is exact.`,
+    "- Mark each question object truthfully with \"type\":\"theory\" or \"type\":\"application\", and interleave the two styles in the returned array.",
     "- Every question must clearly belong to one of these two styles.",
     "- Self-check before answering: count theory vs application questions and rebalance if one style dominates.",
   ];
@@ -306,7 +327,7 @@ export function buildSyllabusPrompt(syllabus: RevisionSyllabus): string {
       ? ["- Balance the paper across difficulty: roughly one-third easy, one-third medium and one-third hard, and set each question's \"difficulty\" field correctly."]
       : [`- Every question must be at ${syllabus.difficulty} difficulty.`]),
     `Selected question type (hard rule): ${questionModeLabelFor(syllabus.questionMode)}`,
-    ...questionStyleLines(syllabus.questionMode),
+    ...questionStyleLines(syllabus.questionMode, syllabus.count),
     `Exam duration to keep in mind: ${syllabus.minutes} minutes for ${syllabus.count} questions — every question must be short enough to be answered well within this time.`,
     "Cover the listed concepts at the given class level. Every question must be distinct, unambiguous, and have one correct answer.",
     `Return a complete set of exactly ${syllabus.count} usable questions; do not return fewer.`,
@@ -787,7 +808,7 @@ function providerUsage(raw: unknown, fallbackInputText: string, fallbackOutputTe
   };
 }
 
-async function callGemini(config: AiConfig, syllabus: RevisionSyllabus): Promise<ProviderGeneration> {
+async function callGemini(config: AiConfig, userPrompt: string, difficulty: RevisionSyllabus["difficulty"]): Promise<ProviderGeneration> {
   const url = geminiGenerateUrl(config.baseUrl || DEFAULT_BASE.gemini, config.model);
   const res = await fetchWithTimeout(url, {
     method: "POST",
@@ -797,7 +818,7 @@ async function callGemini(config: AiConfig, syllabus: RevisionSyllabus): Promise
     },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt() }] },
-      contents: [{ role: "user", parts: [{ text: buildSyllabusPrompt(syllabus) }] }],
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       // Lower temperature keeps the model closer to the strict question-type
       // rules (theory vs application) instead of drifting to generic exam items.
       generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
@@ -811,12 +832,12 @@ async function callGemini(config: AiConfig, syllabus: RevisionSyllabus): Promise
   const text = extractGeminiText(payload);
   if (!text) throw Object.assign(new Error("Gemini returned an empty response."), { statusCode: 502 });
   return {
-    questions: normalizeQuestions(extractJson(text), syllabus.difficulty === "mixed" ? "medium" : syllabus.difficulty),
-    usage: providerUsage(payload, `${systemPrompt()}\n${buildSyllabusPrompt(syllabus)}`, text, "gemini"),
+    questions: normalizeQuestions(extractJson(text), difficulty === "mixed" ? "medium" : difficulty),
+    usage: providerUsage(payload, `${systemPrompt()}\n${userPrompt}`, text, "gemini"),
   };
 }
 
-async function callAnthropic(config: AiConfig, syllabus: RevisionSyllabus): Promise<ProviderGeneration> {
+async function callAnthropic(config: AiConfig, userPrompt: string, difficulty: RevisionSyllabus["difficulty"]): Promise<ProviderGeneration> {
   const base = (config.baseUrl || DEFAULT_BASE.anthropic).replace(/\/+$/, "");
   const res = await fetchWithTimeout(`${base}/messages`, {
     method: "POST",
@@ -832,7 +853,7 @@ async function callAnthropic(config: AiConfig, syllabus: RevisionSyllabus): Prom
       // question-type rules — pin it low for reliable rule-following.
       temperature: 0.4,
       system: systemPrompt(),
-      messages: [{ role: "user", content: buildSyllabusPrompt(syllabus) }],
+      messages: [{ role: "user", content: userPrompt }],
     }),
   });
   if (!res.ok) {
@@ -843,12 +864,12 @@ async function callAnthropic(config: AiConfig, syllabus: RevisionSyllabus): Prom
   const text = extractAnthropicText(payload);
   if (!text) throw Object.assign(new Error("Anthropic returned an empty response."), { statusCode: 502 });
   return {
-    questions: normalizeQuestions(extractJson(text), syllabus.difficulty === "mixed" ? "medium" : syllabus.difficulty),
-    usage: providerUsage(payload, `${systemPrompt()}\n${buildSyllabusPrompt(syllabus)}`, text, "anthropic"),
+    questions: normalizeQuestions(extractJson(text), difficulty === "mixed" ? "medium" : difficulty),
+    usage: providerUsage(payload, `${systemPrompt()}\n${userPrompt}`, text, "anthropic"),
   };
 }
 
-async function callOpenAiCompatible(config: AiConfig, syllabus: RevisionSyllabus, origin: string): Promise<ProviderGeneration> {
+async function callOpenAiCompatible(config: AiConfig, userPrompt: string, origin: string, difficulty: RevisionSyllabus["difficulty"]): Promise<ProviderGeneration> {
   const base = assertSafeBaseUrl(config.baseUrl || DEFAULT_BASE[config.provider], config.provider);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -860,7 +881,7 @@ async function callOpenAiCompatible(config: AiConfig, syllabus: RevisionSyllabus
   }
   const messages = [
     { role: "system", content: systemPrompt() },
-    { role: "user", content: buildSyllabusPrompt(syllabus) },
+    { role: "user", content: userPrompt },
   ];
   const call = (withJson: boolean) =>
     fetchWithTimeout(`${base}/chat/completions`, {
@@ -887,15 +908,105 @@ async function callOpenAiCompatible(config: AiConfig, syllabus: RevisionSyllabus
   const text = extractOpenAiText(payload);
   if (!text) throw Object.assign(new Error("The model returned an empty response."), { statusCode: 502 });
   return {
-    questions: normalizeQuestions(extractJson(text), syllabus.difficulty === "mixed" ? "medium" : syllabus.difficulty),
-    usage: providerUsage(payload, `${systemPrompt()}\n${buildSyllabusPrompt(syllabus)}`, text, config.provider),
+    questions: normalizeQuestions(extractJson(text), difficulty === "mixed" ? "medium" : difficulty),
+    usage: providerUsage(payload, `${systemPrompt()}\n${userPrompt}`, text, config.provider),
   };
 }
 
+/** One raw question-generation round trip against the configured provider. */
+async function requestProviderQuestions(
+  config: AiConfig,
+  userPrompt: string,
+  origin: string,
+  difficulty: RevisionSyllabus["difficulty"],
+): Promise<ProviderGeneration> {
+  if (config.provider === "gemini") return callGemini(config, userPrompt, difficulty);
+  if (config.provider === "anthropic") return callAnthropic(config, userPrompt, difficulty);
+  return callOpenAiCompatible(config, userPrompt, origin, difficulty);
+}
+
+function mergeProviderUsage(parts: ProviderUsage[]): ProviderUsage {
+  const inputTokens = parts.reduce((sum, part) => sum + part.inputTokens, 0);
+  const outputTokens = parts.reduce((sum, part) => sum + part.outputTokens, 0);
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    source: parts.every((part) => part.source === "actual") ? "actual" : "estimated",
+  };
+}
+
+/**
+ * Correction prompt used when the deterministic question-type guard catches
+ * wrong-type questions. It restates the strict rule, states the exact number
+ * of each type the replacement batch must contain, and names the specific
+ * offending questions so the model rewrites them on the same concept.
+ */
+function buildTypeRepairPrompt(
+  syllabus: RevisionSyllabus,
+  needs: ModeNeed[],
+  rejects: GeneratedQuestion[],
+  round: number,
+): string {
+  const total = needs.reduce((sum, need) => sum + need.count, 0);
+  const wantedText = needs.map((need) => `${need.count} must be ${need.kind.toUpperCase()} type`).join(" and ");
+  const split = {
+    theory: needs.find((need) => need.kind === "theory")?.count ?? 0,
+    application: needs.find((need) => need.kind === "application")?.count ?? 0,
+  };
+  const difficulty = syllabus.difficulty === "mixed" ? "a mix of easy, medium and hard" : syllabus.difficulty;
+  const shownRejects = rejects.slice(0, 8);
+  return [
+    `CORRECTION REQUIRED (round ${round}): your previous answer violated the learner's selected question type — ${questionModeLabelFor(syllabus.questionMode)}.`,
+    `Generate exactly ${total} replacement multiple-choice question(s): ${wantedText}. Nothing else.`,
+    `Class: ${syllabus.classNames.join(", ") || "General"}`,
+    `Subject: ${syllabus.subjectNames.join(", ") || "General"}`,
+    `Chapter: ${syllabus.chapterNames.join(", ") || "General"}`,
+    `Concepts / topics: ${syllabus.topicNames.join(", ") || "General"}`,
+    `Difficulty: ${difficulty}`,
+    ...questionStyleLines(syllabus.questionMode, total, split),
+    ...(shownRejects.length
+      ? [
+          "The following previous questions were the WRONG TYPE. Rewrite each one as a correct-type question on the same concept and at the same difficulty:",
+          ...shownRejects.map((question, index) => `${index + 1}. WRONG-TYPE QUESTION: "${question.prompt.slice(0, 220)}"`),
+        ]
+      : []),
+    `Return exactly ${total} questions in the same JSON shape as before, each tagged with its truthful "type" field.`,
+    `CRITICAL FINAL CHECK: The learner's selected question type is "${questionModeLabelFor(syllabus.questionMode)}". Verify each of the ${total} questions follows that rule exactly before answering — if any question is of the wrong type, replace it with a compliant one.`,
+  ].join("\n");
+}
+
+/** Max correction round trips after the first generation (first + 2 repairs). */
+const MAX_TYPE_REPAIR_ROUNDS = 2;
+
+/**
+ * Generate questions AND enforce the learner's selected question type
+ * deterministically. Prompt wording alone kept leaking solve-type questions
+ * into "Theory only" tests, so every batch is now verified by the shared
+ * question-type guard: wrong-type questions are dropped and regenerated with
+ * a correction prompt that names them (up to two rounds), with token usage
+ * aggregated across all calls for accurate cost accounting. A batch that
+ * still cannot satisfy the type rule shrinks below the requested count, so
+ * the caller's INCOMPLETE_AI_TEST guard fails the generation honestly — the
+ * learner's allowance is released and a wrong-type test is never delivered.
+ */
 async function generateWithProvider(config: AiConfig, syllabus: RevisionSyllabus, origin: string): Promise<ProviderGeneration> {
-  if (config.provider === "gemini") return callGemini(config, syllabus);
-  if (config.provider === "anthropic") return callAnthropic(config, syllabus);
-  return callOpenAiCompatible(config, syllabus, origin);
+  const mode = syllabus.questionMode === "theory" || syllabus.questionMode === "application" ? syllabus.questionMode : "mixed";
+  const usageParts: ProviderUsage[] = [];
+  const first = await requestProviderQuestions(config, buildSyllabusPrompt(syllabus), origin, syllabus.difficulty);
+  usageParts.push(first.usage);
+  let plan = planModeEnforcement<GeneratedQuestion>(first.questions, mode, syllabus.count);
+  for (let round = 1; !plan.ok && round <= MAX_TYPE_REPAIR_ROUNDS; round += 1) {
+    const repaired = await requestProviderQuestions(
+      config,
+      buildTypeRepairPrompt(syllabus, plan.needs, plan.rejects, round),
+      origin,
+      syllabus.difficulty,
+    );
+    usageParts.push(repaired.usage);
+    plan = planModeEnforcement<GeneratedQuestion>([...plan.keep, ...repaired.questions], mode, syllabus.count);
+  }
+  return { questions: plan.keep.slice(0, syllabus.count), usage: mergeProviderUsage(usageParts) };
 }
 
 const FALLBACK_CURRICULUM_SYSTEM = "You output only JSON for a school exam syllabus. No markdown, no commentary.";
