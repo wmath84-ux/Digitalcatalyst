@@ -1,0 +1,158 @@
+// Type declarations for `utils/mindMapTree.js`. The runtime lives in the
+// sibling `.js` file so the Node test runner can import it without a TS
+// toolchain. The React editor (`src/course/MindMapPanel.tsx`) and the
+// persistence hook (`src/course/useCourseMindMap.ts`) import the runtime
+// from this file.
+
+export const MIND_MAP_VERSION: 1;
+export const MAX_MIND_MAP_NODES: number;
+export const MAX_TOPIC_LENGTH: number;
+
+/** Which side of the centre a root-level branch hangs off. */
+export type MindMapSide = "left" | "right" | null;
+
+/** One node record. The root is implicit (`parentId: null`, id `"root"`). */
+export interface MindMapNode {
+  id: string;
+  topic: string;
+  parentId: string | null;
+  side: MindMapSide;
+  collapsed: boolean;
+}
+
+/** A whole mind map, as stored in Firestore and as held in editor state. */
+export interface MindMap {
+  version: number;
+  title: string;
+  rootTopic: string;
+  nodes: MindMapNode[];
+}
+
+export interface MeasureOptions {
+  fontSize?: number;
+  charWidthRatio?: number;
+  paddingX?: number;
+  paddingY?: number;
+  lineHeight?: number;
+  minWidth?: number;
+  maxWidth?: number;
+}
+
+export interface TopicBox {
+  width: number;
+  height: number;
+  lines: number;
+}
+
+export interface LayoutOptions extends MeasureOptions {
+  hGap?: number;
+  vGap?: number;
+  minNodeHeight?: number;
+  measure?: MeasureOptions;
+}
+
+/** One positioned box from `layoutMindMap`, in React Flow's top-left space. */
+export interface LaidOutNode {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  depth: number;
+  side: MindMapSide;
+  collapsed: boolean;
+  childCount: number;
+  isRoot: boolean;
+}
+
+export interface LaidOutEdge {
+  id: string;
+  source: string;
+  target: string;
+  side: MindMapSide;
+}
+
+export interface MindMapBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  width: number;
+  height: number;
+}
+
+export interface MindMapLayout {
+  nodes: LaidOutNode[];
+  edges: LaidOutEdge[];
+  bounds: MindMapBounds;
+}
+
+/** Metadata written alongside the map so a doc is self-describing. */
+export interface MindMapMeta {
+  uid?: string | number | null;
+  productId?: string | number | null;
+  moduleId?: string | number | null;
+  updatedAt?: number;
+}
+
+/** The exact Firestore-safe object handed to `setDoc`. */
+export interface StoredMindMap {
+  version: number;
+  title: string;
+  rootTopic: string;
+  nodes: MindMapNode[];
+  nodeCount: number;
+  updatedAt: number;
+  uid: string | null;
+  productId: string | null;
+  moduleId: string | null;
+}
+
+// ── Construction ──────────────────────────────────────────────────────────
+export function createMindMap(rootTopic?: string, title?: string): MindMap;
+export function isMindMap(value: unknown): value is MindMap;
+export function nextNodeId(mind: MindMap): string;
+
+// ── Text ──────────────────────────────────────────────────────────────────
+export function sanitizeTopic(value: unknown): string;
+export function sanitizeTitle(value: unknown): string;
+
+// ── Queries ───────────────────────────────────────────────────────────────
+export function allNodes(mind: MindMap): MindMapNode[];
+export function findNode(mind: MindMap, id: string | number): MindMapNode | null;
+export function rootId(): string;
+export function childrenOf(mind: MindMap, id: string | number): MindMapNode[];
+export function countNodes(mind: MindMap): number;
+export function hasChildren(mind: MindMap, id: string | number): boolean;
+export function maxDepth(mind: MindMap): number;
+export function collectSubtreeIds(mind: MindMap, id: string | number): string[];
+
+// ── Mutations ─────────────────────────────────────────────────────────────
+export function addChildNode(
+  mind: MindMap,
+  parentId: string | number,
+  topic?: string,
+  options?: { id?: string; side?: "left" | "right" },
+): { mind: MindMap; nodeId: string | null };
+export function addChildNodes(
+  mind: MindMap,
+  parentId: string | number,
+  topics?: string[],
+): { mind: MindMap; nodeIds: string[] };
+export function setNodeTopic(mind: MindMap, id: string | number, topic: string): MindMap;
+export function removeNode(mind: MindMap, id: string | number): MindMap;
+export function toggleCollapsed(mind: MindMap, id: string | number): MindMap;
+export function setCollapsed(mind: MindMap, id: string | number, collapsed: boolean): MindMap;
+export function setBranchSide(mind: MindMap, id: string | number, side: "left" | "right"): MindMap;
+export function moveNode(mind: MindMap, id: string | number, newParentId: string | number): MindMap;
+
+// ── Measurement + layout ──────────────────────────────────────────────────
+export const DEFAULT_MEASURE: Readonly<Required<MeasureOptions>>;
+export const DEFAULT_LAYOUT: Readonly<{ hGap: number; vGap: number; minNodeHeight: number }>;
+export function measureTopic(topic: string, measure?: MeasureOptions): TopicBox;
+export function layoutMindMap(mind: MindMap, options?: LayoutOptions): MindMapLayout;
+
+// ── Persistence ───────────────────────────────────────────────────────────
+export function mindMapDocId(uid: string | number, productId: string | number, moduleId: string | number): string;
+export function parseMindMap(raw: unknown): MindMap;
+export function toFirestoreMindMap(mind: MindMap, meta?: MindMapMeta): StoredMindMap;

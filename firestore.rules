@@ -129,6 +129,35 @@ service cloud.firestore {
         allow delete: if isOwner(uid) || isAdmin();
       }
 
+      // Per-student Course Player mind maps. One doc per learner + course +
+      // module, so every student's diagram is private and each module keeps
+      // its own map. The doc id is the composite `{uid}__{productId}__
+      // {moduleId}` built by `mindMapDocId()` in utils/mindMapTree.js, and the
+      // rules re-derive it here so one student cannot write into another's
+      // namespace by choosing an id. Writes go straight from the client (the
+      // map is the learner's own data and needs Firestore's offline queue to
+      // survive a dropped connection mid-session).
+      match /mindMaps/{mapId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.productId is string
+          && request.resource.data.moduleId is string
+          && mapId == uid + '__' + request.resource.data.productId + '__' + request.resource.data.moduleId
+          && request.resource.data.version is int
+          && request.resource.data.rootTopic is string
+          && request.resource.data.rootTopic.size() <= 400
+          && request.resource.data.nodes is list
+          // Mirrors MAX_MIND_MAP_NODES in utils/mindMapTree.js. A learner's
+          // own map is capped so one runaway doc cannot approach the 1 MB
+          // document limit and start failing every write.
+          && request.resource.data.nodes.size() <= 600
+          && request.resource.data.nodeCount is int
+          && request.resource.data.nodeCount <= 601
+          && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds', 'purchasedProductUpdateIds', 'coinBalance', 'eduCoins', 'subscriptionPlanId', 'subscriptionTier']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
       match /webPushSubscriptions/{subscriptionId} {
         allow read: if isOwner(uid) || isAdmin();
         allow create, update: if isOwner(uid)

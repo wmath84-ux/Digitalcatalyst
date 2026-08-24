@@ -5,6 +5,8 @@ import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer from "./course/ResourceViewer";
 import CourseOverlay, { type DockTab } from "./course/CourseOverlay";
+import MindMapPanel from "./course/MindMapPanel";
+import useCourseMindMap from "./course/useCourseMindMap";
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
@@ -184,6 +186,26 @@ const collectModuleTitleById = (modules: CourseModule[]): Record<string, string>
   return map;
 };
 
+/**
+ * File id → the id of the module that owns it, at any nesting depth.
+ *
+ * The mind map is scoped per module ("kisi bhi active module ke saath"), but
+ * the player only ever tracks the selected FILE. This map bridges the two so
+ * the learner's diagram follows them from lesson to lesson within a module
+ * and switches to a different diagram when they change modules.
+ */
+const collectModuleIdByFileId = (modules: CourseModule[]): Record<string, string> => {
+  const map: Record<string, string> = {};
+  const visit = (node: CourseModule) => {
+    (node.files || []).forEach((file) => {
+      if (file?.id != null && node.id != null) map[String(file.id)] = String(node.id);
+    });
+    (node.modules || []).forEach(visit);
+  };
+  modules.forEach(visit);
+  return map;
+};
+
 // Notes are kept in the user's localStorage (per user + product) so they stay
 // on the device and never collide with Firestore course progress.
 const notesStorageKey = (uid: string, productId: string) => `dc.courseNotes.${uid}.${productId}`;
@@ -321,6 +343,22 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const ownedUpdateIds = resolution.ownedUpdateIds;
   const updates = useMemo(() => collectUpdates(modules).filter((update) => !ownedUpdateIds.has(update.id)), [modules, ownedUpdateIds]);
   const moduleTitleById = useMemo(() => collectModuleTitleById(modules), [modules]);
+
+  // ── Per-module mind map ─────────────────────────────────────────────────
+  // The player tracks the selected FILE, but the mind map is scoped per
+  // MODULE, so switching lessons inside one module keeps the same diagram
+  // while switching modules swaps to that module's own map. The hook is
+  // called unconditionally (React's rules of hooks) and treats a missing
+  // module id as "nothing to load yet".
+  const moduleIdByFileId = useMemo(() => collectModuleIdByFileId(modules), [modules]);
+  const activeMindMapModuleId = selectedFile ? moduleIdByFileId[String(selectedFile.id)] : undefined;
+  const activeMindMapModuleTitle = activeMindMapModuleId ? moduleTitleById[activeMindMapModuleId] || "" : "";
+  const mindMap = useCourseMindMap({
+    uid: user?.id,
+    productId: product.id,
+    moduleId: activeMindMapModuleId,
+    rootTopic: activeMindMapModuleTitle || product.title,
+  });
 
   // Detect orientation for the landscape layout (header left, toggles right,
   // content filling the space between the two rails). Comparing the live
@@ -679,6 +717,29 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     if (dockTab !== "notes" && notesSplitMode) setNotesSplitMode(false);
   }, [dockTab, notesSplitMode]);
 
+  // ── Mind map split mode (landscape) ─────────────────────────────────────
+  // Tracked separately from `notesSplitMode` because the two sheets claim
+  // DIFFERENT widths: the notes editor takes 40% of the landscape screen and
+  // the mind map takes 50%. The lesson has to shrink to the matching
+  // complement, so the parent needs to know which sheet is the open one.
+  const [mindMapSplitMode, setMindMapSplitMode] = useState(false);
+  const handleMindMapSplitChange = useCallback((active: boolean) => setMindMapSplitMode(active), []);
+  useEffect(() => {
+    if (dockTab !== "mindmap" && mindMapSplitMode) setMindMapSplitMode(false);
+  }, [dockTab, mindMapSplitMode]);
+  // Leaving the Mind map tab flushes any pending debounced write immediately,
+  // so a branch added a moment before switching away is never left unsaved.
+  // Guarded by the previous tab: flushing on mount (the player opens on
+  // "modules") would write an empty map doc for every course ever opened.
+  const previousDockTab = useRef<DockTab>(dockTab);
+  useEffect(() => {
+    const previous = previousDockTab.current;
+    previousDockTab.current = dockTab;
+    if (previous === "mindmap" && dockTab !== "mindmap") mindMap.flush();
+    // `mindMap.flush` is a stable callback, so only the tab is watched.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dockTab]);
+
   // While the player's own header + dock are hidden there has to be a way
   // back, so a small floating pill sits over the content.
   const chromeRestoreButton = playerChromeHidden ? (
@@ -973,6 +1034,19 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onEditNote={(id, text) => editNote(id, text)}
       onDeleteNote={(id) => deleteNote(id)}
       onSplitModeChange={handleSplitModeChange}
+      // The mind map editor is owned here (not inside the overlay) so its
+      // Firestore hook and canvas state survive the sheet being closed and
+      // reopened — the learner never loses an unsaved branch to a tab switch.
+      mindMapPanel={(
+        <MindMapPanel
+          mind={mindMap.mind}
+          onMindChange={mindMap.setMind}
+          status={mindMap.status}
+          errorMessage={mindMap.errorMessage}
+          onFlush={mindMap.flush}
+        />
+      )}
+      onMindMapSplitChange={handleMindMapSplitChange}
     />
   );
 
@@ -1064,11 +1138,18 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         id="course-viewer"
         className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden"
         data-course-landscape-content
-        data-split-mode={notesSplitMode ? "true" : "false"}
+        data-split-mode={notesSplitMode || mindMapSplitMode ? "true" : "false"}
+        data-split-kind={mindMapSplitMode ? "mindmap" : notesSplitMode ? "notes" : "none"}
       >
         <div
           className={`flex min-h-0 flex-col overflow-hidden transition-[flex-basis,max-width] duration-300 ${
-            notesSplitMode ? "basis-[calc(60%-4rem)] max-w-[calc(60%-4rem)] shrink-0 grow-0" : "basis-full max-w-full flex-1"
+            notesSplitMode
+              ? "basis-[calc(60%-4rem)] max-w-[calc(60%-4rem)] shrink-0 grow-0"
+              // The mind map claims a wider half of the screen than the notes
+              // editor, so the lesson shrinks to 50% instead of 60%.
+              : mindMapSplitMode
+                ? "basis-[calc(50%-4rem)] max-w-[calc(50%-4rem)] shrink-0 grow-0"
+                : "basis-full max-w-full flex-1"
           }`}
           data-course-landscape-content-inner
         >
@@ -1082,6 +1163,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             far-right edge — exactly where it sits when the sheet is closed.
             The sheet (absolute, z-40) covers the spacer completely. */}
         {notesSplitMode ? <div className="min-h-0 flex-1" aria-hidden="true" data-course-dock-spacer /> : null}
+        {/* Same dock-pinning spacer for the mind map's own 50% sheet. Only
+            ever one of the two is mounted, since only one tab is open. */}
+        {mindMapSplitMode ? <div className="min-h-0 flex-1" aria-hidden="true" data-course-mindmap-dock-spacer /> : null}
         {playerChromeHidden ? null : overlay}
         {chromeRestoreButton}
       </section>
