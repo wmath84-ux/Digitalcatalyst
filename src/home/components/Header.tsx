@@ -1,4 +1,5 @@
 import { forwardRef } from "react";
+import { Bell, Heart, Search, Trophy, X } from "lucide-react";
 import type { Product } from "../types";
 import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
 import BrandMark from "../../components/BrandMark";
@@ -65,7 +66,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             onClick={() => { window.location.hash = "#/leaderboard"; }}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/35 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition hover:bg-white/24 active:scale-95 min-[390px]:h-10 min-[390px]:w-10 min-[430px]:w-auto min-[430px]:gap-1.5 min-[430px]:px-3"
           >
-            <span className="text-base leading-none">🏆</span>
+            <Trophy size={17} strokeWidth={2.4} className="shrink-0" />
             <span className="hidden text-xs font-bold tracking-tight min-[430px]:inline">Leaderboard</span>
           </button>
           <button
@@ -74,7 +75,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             onClick={onOpenNotifications}
             className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
           >
-            <span className="text-lg">🔔</span>
+            <Bell size={18} strokeWidth={2.4} />
             {unreadNotificationCount > 0 && <span aria-label={`${unreadNotificationCount} unread notifications`} className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold ring-2 ring-indigo-600">{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}</span>}
           </button>
           <button
@@ -83,7 +84,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             onClick={onOpenFavorites}
             className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
           >
-            <span className="text-lg">❤️</span>
+            <Heart size={18} strokeWidth={2.4} fill="currentColor" />
             {favoritesCount > 0 && (
               <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold ring-2 ring-indigo-600">
                 {favoritesCount}
@@ -95,7 +96,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
 
       <div className="relative mt-5">
         <div className="dc-glass-toolbar flex items-center gap-2 rounded-2xl px-4 py-3">
-          <span className="text-slate-400">🔍</span>
+          <Search size={18} className="shrink-0 text-slate-400" strokeWidth={2.4} />
           <input
             ref={ref}
             value={query}
@@ -110,9 +111,9 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
               type="button"
               onClick={() => onQueryChange("")}
               aria-label="Clear search"
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-xs text-slate-500 transition active:scale-90"
+              className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-slate-500 transition active:scale-90"
             >
-              ✕
+              <X size={13} strokeWidth={2.6} />
             </button>
           )}
         </div>
