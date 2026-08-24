@@ -13,9 +13,9 @@
 // the buttons navigate to library / source instead).
 //
 // The page uses the same Eduvora header + BottomNav footer as the store,
-// PDP, notifications and leaderboard. Razorpay Standard Checkout is
-// inset between that chrome so header and footer stay visible while
-// the payment iframe is open.
+// PDP, notifications and leaderboard. Razorpay Standard Checkout opens
+// full-screen over this chrome so mobile users can pay (or close the
+// sheet without paying) without clipped controls.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -65,6 +65,12 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
       window.history.pushState({ ...(window.history.state || {}), eduvoraCheckoutPayment: true }, "");
     }
     const onPopState = () => {
+      // PaymentGateway owns the first Back press while Razorpay is open
+      // (it just closes the full-screen checkout). Leave the payment step
+      // alone so the user can reopen it or tap "Back to order summary".
+      if (typeof document !== "undefined" && document.body.classList.contains("eduvora-razorpay-open")) {
+        return;
+      }
       setStep(1);
     };
     window.addEventListener("popstate", onPopState);
