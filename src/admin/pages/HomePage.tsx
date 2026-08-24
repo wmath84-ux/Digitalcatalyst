@@ -12,6 +12,7 @@ import {
   selectClass,
 } from "@/components/admin/ui";
 import { useConfirm, useToast, useUnsavedGuard } from "@/components/admin/AdminProviders";
+import { CloudinaryImageUploadField } from "@/components/admin/products/CloudinaryImageUploadField";
 import { adminFetch } from "@/lib/admin/client";
 import type { Banner, BannerLinkType } from "@/home/types";
 import { BANNER_GRADIENTS, normalizeBanner } from "@/home/data/bannerGradients";
@@ -311,10 +312,19 @@ export default function AdminHomePage() {
                       <input className={inputClass} value={banner.cta} maxLength={24}
                         onChange={(e) => patchBanner(index, { cta: e.target.value })} />
                     </Field>
-                    <Field label="Image URL" hint="Right side of the card — /images/… or a full https URL">
+                    <Field label="Image URL" hint="Right side of the card — /images/… or a full https URL, or upload your own below">
                       <input className={inputClass} value={banner.image} placeholder="/images/hero-1.jpg"
                         onChange={(e) => patchBanner(index, { image: e.target.value })} />
                     </Field>
+                    <div className="sm:col-span-2" data-admin-banner-image-upload>
+                      <CloudinaryImageUploadField
+                        folder="home-hero-slides"
+                        tags={["home-banner"]}
+                        label="Upload a new image for this slide"
+                        hint="Pick from your gallery / camera — the hosted URL is filled into the Image URL field above automatically."
+                        onUploaded={(hostedUrl) => patchBanner(index, { image: hostedUrl })}
+                      />
+                    </div>
                     <div className="sm:col-span-2">
                       <Field label="Colour" hint="Card background gradient">
                         <div className="flex flex-wrap gap-2">

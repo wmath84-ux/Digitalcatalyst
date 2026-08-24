@@ -151,6 +151,11 @@ test("admin page edits every field and both link kinds", () => {
   assert.match(adminHomePage, /label="Subtitle"/);
   assert.match(adminHomePage, /Button text \(CTA\)/);
   assert.match(adminHomePage, /label="Image URL"/);
+  // The admin can upload their OWN image for a slide (same Cloudinary flow
+  // as product images) — the hosted URL lands in the Image URL field.
+  assert.match(adminHomePage, /CloudinaryImageUploadField/);
+  assert.match(adminHomePage, /folder="home-hero-slides"/);
+  assert.match(adminHomePage, /onUploaded=\{\(hostedUrl\) => patchBanner\(index, \{ image: hostedUrl \}\)\}/);
   assert.match(adminHomePage, /label="Colour"/);
   // Product + specific module pickers sourced from the Products module.
   assert.match(adminHomePage, /"\/api\/admin\/products"/);
