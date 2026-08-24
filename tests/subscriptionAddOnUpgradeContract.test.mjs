@@ -248,6 +248,15 @@ test("the app shell records visited routes and the auth screen uses the resolver
   assert.match(auth, /sessionStorage\.removeItem\("authReturnHash"\)/);
 });
 
+test("the auth screen converts Android system Back into safe in-app navigation", () => {
+  const auth = read("src/AuthApp.tsx");
+  assert.match(auth, /eduvoraAuthBackGuard/);
+  assert.match(auth, /window\.history\.pushState\(\{[\s\S]*eduvoraAuthBackGuard: true/);
+  assert.match(auth, /window\.addEventListener\("popstate", handleSystemBack\)/);
+  assert.match(auth, /window\.location\.hash\.startsWith\("#\/auth"\)/);
+  assert.match(auth, /leaveAuthSafely\(\)/);
+});
+
 // ---------------------------------------------------------------------------
 // Legal pages + Razorpay back navigation
 // ---------------------------------------------------------------------------

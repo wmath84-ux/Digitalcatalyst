@@ -1,3 +1,4 @@
+import { useCallback, useEffect } from "react";
 import AuthForm from "./components/auth/AuthForm";
 import { resolveBackDestination } from "./utils/routeHistory";
 
@@ -14,13 +15,29 @@ import { resolveBackDestination } from "./utils/routeHistory";
  * usable — and the final fallback is the public home page.
  */
 export default function AuthApp() {
-  const handleBack = () => {
+  const leaveAuthSafely = useCallback(() => {
     // The user abandoned the pending auth flow — drop the remembered
     // return route so a later login doesn't resurrect it.
     sessionStorage.removeItem("authReturnHash");
     const destination = resolveBackDestination(window.sessionStorage);
     window.location.hash = destination;
-  };
+  }, []);
+
+  useEffect(() => {
+    // Android's system Back button closes a standalone PWA when the auth page
+    // is the first/only browser-history entry. Add a same-URL guard entry so
+    // that hardware/system Back produces a popstate we can convert into the
+    // same safe in-app navigation as the visible Back button.
+    window.history.pushState({ ...(window.history.state || {}), eduvoraAuthBackGuard: true }, "", window.location.href);
+
+    const handleSystemBack = () => {
+      if (!window.location.hash.startsWith("#/auth")) return;
+      leaveAuthSafely();
+    };
+
+    window.addEventListener("popstate", handleSystemBack);
+    return () => window.removeEventListener("popstate", handleSystemBack);
+  }, [leaveAuthSafely]);
 
   return (
     <main className="relative flex min-h-[100dvh] w-full flex-col overflow-hidden bg-[#05060f] text-white">
@@ -32,7 +49,7 @@ export default function AuthApp() {
         <div className="mx-auto flex w-full max-w-md items-center">
           <button
             type="button"
-            onClick={handleBack}
+            onClick={leaveAuthSafely}
             data-auth-back
             className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-bold text-slate-200 transition hover:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
             aria-label="Go back to the previous page"
