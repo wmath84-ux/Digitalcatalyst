@@ -1,6 +1,8 @@
 import { ReactNode } from "react";
 import { Heart, Home, ShoppingBag } from "lucide-react";
 import { TabKey } from "../types";
+import { useHomeHold } from "../../hooks/useHomeHold";
+import { HoldRing } from "../../components/ui/HoldRing";
 
 interface BottomNavProps {
   active: TabKey;
@@ -15,6 +17,9 @@ interface BottomNavProps {
  * light-black border, bottom-right shadow, and the outside-only blue
  * scroll glow. Icons/labels are crisp black; the active tab keeps its
  * blue accent exactly as it was.
+ *
+ * The Home / Discover button shares the main footer's 3-second long-press
+ * shortcut: holding it opens the FlowPath / task-planning dashboard.
  */
 export default function BottomNav({
   active,
@@ -22,6 +27,10 @@ export default function BottomNav({
   favoritesCount,
   cartCount,
 }: BottomNavProps) {
+  const homeHold = useHomeHold(() => {
+    window.location.hash = "#/flowpath";
+  });
+
   const items: { key: TabKey; label: string; icon: ReactNode; badge?: number }[] = [
     { key: "home", label: "Discover", icon: <Home className="h-5 w-5 strokeWidth={2.2} text-black" /> },
     {
@@ -51,20 +60,26 @@ export default function BottomNav({
         >
           {items.map(({ key, label, icon, badge }) => {
             const isActive = active === key;
+            const isHome = key === "home";
             return (
               <button
                 key={key}
                 type="button"
-                onClick={() => onChange(key)}
-                className={`relative flex flex-1 flex-col items-center gap-1 rounded-full px-1 py-1.5 text-[11px] font-semibold transition ${
+                {...(isHome ? homeHold.handlers : undefined)}
+                onClick={() => {
+                  if (isHome && homeHold.consumeSuppressedClick()) return;
+                  onChange(key);
+                }}
+                className={`relative flex flex-1 flex-col items-center gap-1 rounded-full px-1 py-1.5 text-[11px] font-semibold transition select-none ${
                   isActive ? "text-indigo-600" : "text-black hover:opacity-70"
-                }`}
+                } ${isHome && homeHold.holding ? "[touch-action:none]" : ""}`}
               >
                 <span
                   className={`relative flex h-9 w-14 items-center justify-center rounded-full transition ${
                     isActive ? "bg-indigo-100" : ""
-                  }`}
+                  } ${isHome && homeHold.holding ? "scale-110" : ""}`}
                 >
+                  {isHome && homeHold.holding && <HoldRing holding={homeHold.holding} />}
                   {icon}
                   {!!badge && badge > 0 && (
                     <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">

@@ -1,5 +1,7 @@
 import { useExitGuard } from "./ExitGuardContext";
 import { BankIcon, ChartIcon, DashboardIcon, HomeIcon, TargetIcon, UserIcon } from "./icons";
+import { useHomeHold } from "../../hooks/useHomeHold";
+import { HoldRing } from "../../components/ui/HoldRing";
 
 // The revision footer mirrors the main app footer
 // (src/components/BottomNav.tsx) exactly: same floating magic pill
@@ -29,6 +31,9 @@ const TABS = [
 
 export default function BottomNav({ route }: { route: string }) {
   const { navigate } = useExitGuard();
+  const homeHold = useHomeHold(() => {
+    window.location.hash = "#/flowpath";
+  });
 
   return (
     <nav
@@ -47,21 +52,27 @@ export default function BottomNav({ route }: { route: string }) {
                 ? route.startsWith("#/revision/bank") || route.startsWith("#/revision/session")
                 : tab.match(route);
             const Icon = tab.icon;
+            const isHome = tab.href === "#/home";
             return (
               <button
                 key={tab.href}
                 type="button"
-                onClick={() => navigate(tab.href)}
+                {...(isHome ? homeHold.handlers : undefined)}
+                onClick={() => {
+                  if (isHome && homeHold.consumeSuppressedClick()) return;
+                  navigate(tab.href);
+                }}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex flex-1 flex-col items-center gap-1 rounded-full px-0.5 py-1.5 text-[10px] font-semibold transition ${
+                className={`relative flex flex-1 flex-col items-center gap-1 rounded-full px-0.5 py-1.5 text-[10px] font-semibold transition select-none ${
                   active ? "text-indigo-600" : "text-black hover:opacity-70"
-                }`}
+                } ${isHome && homeHold.holding ? "[touch-action:none]" : ""}`}
               >
                 <span
                   className={`relative flex h-9 w-14 items-center justify-center rounded-full transition ${
                     active ? "bg-indigo-100" : ""
-                  }`}
+                  } ${isHome && homeHold.holding ? "scale-110" : ""}`}
                 >
+                  {isHome && homeHold.holding && <HoldRing holding={homeHold.holding} />}
                   <Icon className="h-5 w-5 [stroke-width:2px] text-black" />
                 </span>
                 <span className="w-full truncate leading-tight">{tab.label}</span>

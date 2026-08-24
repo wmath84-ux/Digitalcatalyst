@@ -10,6 +10,7 @@ import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } fro
 import { useAuth } from "./context/AuthContext";
 import { useBranding } from "./context/BrandingContext";
 import { useCourseAccess } from "./hooks/useCourseAccess";
+import { useHomeHold } from "./hooks/useHomeHold";
 import { isEmptyRichText, richTextToPlain, sanitizeRichText } from "./utils/richText";
 import { useRotatedScroll } from "./course/useRotatedScroll";
 import {
@@ -243,6 +244,11 @@ const loadDesktopViewPreference = (): boolean => {
 export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initialModuleId }: CoursePlayerProps) {
   const { user } = useAuth();
   const { logoUrl, appName } = useBranding();
+  // Holding the header logo opens the main app (Home). A normal tap still
+  // returns the learner to Purchases via `onBack`.
+  const logoHold = useHomeHold(() => {
+    window.location.hash = "#/home";
+  });
   const modules = product.courseContent || [];
   const files = useMemo(() => allFiles(modules).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
   const { resolution, hasActiveSubscription } = useCourseAccess({ product });
@@ -822,14 +828,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const logoBackButton = (
     <button
       type="button"
-      onClick={onBack}
-      className="course-icon-button grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-transparent transition hover:opacity-90"
+      {...logoHold.handlers}
+      onClick={() => {
+        // A completed long-press already opened Home; don't also go to Purchases.
+        if (logoHold.consumeSuppressedClick()) return;
+        onBack();
+      }}
+      className={`course-icon-button grid h-10 w-10 shrink-0 select-none place-items-center overflow-hidden rounded-xl bg-transparent transition hover:opacity-90 ${
+        logoHold.holding ? "[touch-action:none]" : ""
+      }`}
       aria-label="Back to purchases"
       title="Back to purchases"
       data-course-back
       data-course-logo-back
     >
-      <img src={logoUrl} alt={appName} className="h-10 w-10 object-cover" data-course-logo />
+      <img src={logoUrl} alt={appName} className="h-10 w-10 object-cover select-none" draggable={false} data-course-logo />
     </button>
   );
 
