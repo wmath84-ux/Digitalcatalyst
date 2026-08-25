@@ -11,6 +11,7 @@ export const ADMIN_NAV = [
   { href: "/admin/home", label: "Home · Hero Slides", icon: "🖼️" },
   { href: "/admin/content", label: "Course Player Controls", icon: "🧩" },
   { href: "/admin/branding", label: "App Branding", icon: "🎨" },
+  { href: "/admin/zoom", label: "Default Zoom", icon: "🔍" },
   { href: "/admin/session", label: "Admin Session", icon: "🔐" },
 ] as const;
 

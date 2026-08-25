@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.1, maximum-scale=1.1, minimum-scale=1.1, user-scalable=no, viewport-fit=cover" />
     <!-- Dark by default so it matches the boot splash; the app switches it to
          light as soon as a light screen renders (see src/utils/themeColor.ts). -->
     <meta name="theme-color" content="#05060f" />
@@ -43,10 +43,28 @@
     </div>
     <!-- Apply cached branding to the boot splash + document title BEFORE the
          React bundle loads, so a renamed app never flashes "Eduvora" on reload.
-         The live Firestore values overwrite this once BrandingProvider mounts. -->
+         The live Firestore values overwrite this once BrandingProvider mounts.
+         The cached default zoom (110%) is applied at the same time so there is
+         no flash between the default and the admin-configured value. -->
     <script>
       (function () {
         try {
+          var zoom = 110;
+          try {
+            var zoomRaw = localStorage.getItem("eduvora.appZoom.v1");
+            if (zoomRaw) {
+              var parsedZoom = Number(JSON.parse(zoomRaw).zoom);
+              if (Number.isFinite(parsedZoom)) zoom = Math.min(200, Math.max(50, Math.round(parsedZoom)));
+            }
+          } catch (zoomErr) { /* private mode / corrupt cache — keep 110 */ }
+          document.documentElement.dataset.appZoom = String(zoom);
+          var scale = String(zoom / 100);
+          var viewportMeta = document.querySelector('meta[name="viewport"]');
+          if (viewportMeta) {
+            viewportMeta.content = "width=device-width, initial-scale=" + scale +
+              ", maximum-scale=" + scale + ", minimum-scale=" + scale +
+              ", user-scalable=no, viewport-fit=cover";
+          }
           var raw = localStorage.getItem("eduvora.branding.v2");
           var legacy = localStorage.getItem("eduvora.brandLogoUrl.v1");
           var data = raw ? JSON.parse(raw) : {};
