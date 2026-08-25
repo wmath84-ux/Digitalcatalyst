@@ -20,10 +20,7 @@
 //      (see `getCourseEmbed`), which is what actually reflows the text.
 //
 // Flipping it back to "desktop" restores the exact meta the page shipped
-// with (with the app's zoom-lock tokens re-applied), so nothing about the
-// app's normal layout is permanently altered.
-
-import { viewportContentLockedToZoom } from "./appZoom";
+// with, so nothing about the app's normal layout is permanently altered.
 
 export type DocumentViewportMode = "desktop" | "mobile";
 
@@ -52,19 +49,19 @@ export const applyDocumentViewportMode = (mode: DocumentViewportMode): void => {
   if (originalViewportContent === null) originalViewportContent = meta.content;
 
   if (mode === "mobile") {
-    // This switch is about WIDTH, not zoom. The app's zoom policy is applied
-    // on top: user scaling stays locked at the admin-configured default.
-    meta.content = viewportContentLockedToZoom("width=device-width, initial-scale=1.0, viewport-fit=cover");
+    // This switch is about WIDTH: force real device-width layout even when
+    // the browser is in desktop-site mode.
+    meta.content = "width=device-width, initial-scale=1.0, viewport-fit=cover";
     return;
   }
-  meta.content = viewportContentLockedToZoom(originalViewportContent);
+  meta.content = originalViewportContent;
 };
 
 /** Drop the override entirely — used when the Course Player unmounts. */
 export const resetDocumentViewportMode = (): void => {
   const meta = getViewportMeta();
   if (!meta || originalViewportContent === null) return;
-  meta.content = viewportContentLockedToZoom(originalViewportContent);
+  meta.content = originalViewportContent;
 };
 
 /**

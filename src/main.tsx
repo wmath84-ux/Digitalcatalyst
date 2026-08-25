@@ -26,7 +26,6 @@ import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BrandingProvider, useBranding } from "./context/BrandingContext";
-import { AppZoomProvider } from "./context/AppZoomContext";
 import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
@@ -904,15 +903,13 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
       <BrandingProvider>
-        <AppZoomProvider>
-          <CatalogProvider>
-            <CommerceProvider>
-              <Root />
-              <RenewalNotice />
-              <PortraitOnlyGuard />
-            </CommerceProvider>
-          </CatalogProvider>
-        </AppZoomProvider>
+        <CatalogProvider>
+          <CommerceProvider>
+            <Root />
+            <RenewalNotice />
+            <PortraitOnlyGuard />
+          </CommerceProvider>
+        </CatalogProvider>
       </BrandingProvider>
     </AuthProvider>
   </StrictMode>,
