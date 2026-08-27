@@ -91,7 +91,7 @@ export default function ReviewsPage() {
       </select>
 
       {reviews.length === 0 ? <EmptyState title="No reviews found" /> : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
           {reviews.map((r) => (
             <RecordCard key={r.id}>
               <div className="flex items-center justify-between">

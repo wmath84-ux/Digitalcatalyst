@@ -4,10 +4,10 @@ import { type ReactNode, useEffect } from "react";
 
 export function StatCard({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: string; tone?: "warn" | "danger" | "ok" }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
+    <div className="rounded-xl border border-slate-200 bg-white p-3 md:p-4">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 md:text-xs">{label}</p>
       <p
-        className={`mt-1 text-xl font-semibold ${
+        className={`mt-1 text-xl font-semibold md:text-2xl ${
           tone === "danger" ? "text-red-600" : tone === "warn" ? "text-amber-600" : tone === "ok" ? "text-emerald-600" : "text-slate-900"
         }`}
       >
@@ -20,12 +20,12 @@ export function StatCard({ label, value, sub, tone }: { label: string; value: Re
 
 export function SectionCard({ title, action, children, description }: { title?: string; action?: ReactNode; children: ReactNode; description?: string }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4">
+    <section className="rounded-xl border border-slate-200 bg-white p-4 md:p-5">
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between gap-2">
           <div>
-            {title && <h2 className="text-sm font-semibold text-slate-900">{title}</h2>}
-            {description && <p className="mt-0.5 text-xs text-slate-500">{description}</p>}
+            {title && <h2 className="text-sm font-semibold text-slate-900 md:text-base">{title}</h2>}
+            {description && <p className="mt-0.5 text-xs text-slate-500 md:text-sm">{description}</p>}
           </div>
           {action}
         </div>

@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { ADMIN_NAV, titleForPath } from "@/components/admin/nav";
 import { useConfirm, useConnectionStatus, useToast, useUnsavedGuard } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
+import { useResponsiveCategory } from "@/utils/responsive";
 
 export function AdminShell({
   children,
@@ -26,6 +27,13 @@ export function AdminShell({
   const { notify } = useToast();
   const { online } = useConnectionStatus();
   const { isDirty, setDirty } = useUnsavedGuard();
+
+  // Tablet + desktop both get a persistent left rail (replaces the
+  // mobile-only hamburger drawer). Desktop also gets a wider
+  // content column. The user explicitly asked for a proper tablet
+  // layout, not a stretched phone — every screen below 768 px keeps
+  // the mobile drawer, every screen >= 768 px gets the rail.
+  const isWide = useResponsiveCategory();
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -81,20 +89,31 @@ export function AdminShell({
   const title = titleForPath(pathname);
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-[calc(env(safe-area-inset-bottom)+8px)]">
+    <div
+      className="min-h-screen bg-slate-50 pb-[calc(env(safe-area-inset-bottom)+8px)] md:pb-0"
+      data-admin-shell
+    >
+      {/* Top bar — always rendered. On tablet / desktop it becomes a
+          companion to the rail (the rail does the navigation, the
+          top bar carries the page title + connection indicator +
+          tablet hamburger when no rail). On mobile the top bar
+          carries the hamburger. */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex h-14 max-w-[480px] items-center gap-2 px-3">
+        <div
+          className="mx-auto flex h-14 items-center gap-2 px-3 max-w-[480px] md:max-w-[calc(720px+240px)] md:pl-6 md:pr-8"
+          data-admin-topbar
+        >
           <button
             type="button"
             aria-label="Open navigation"
             onClick={() => setNavOpen(true)}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 active:bg-slate-100"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 active:bg-slate-100 md:hidden"
             data-admin-nav-toggle
           >
             <Menu className="h-5 w-5" strokeWidth={2.4} />
           </button>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[15px] font-semibold text-slate-900">{title}</p>
+            <p className="truncate text-[15px] font-semibold text-slate-900 md:text-base">{title}</p>
           </div>
           <span
             title={online ? "Realtime sync connected" : "Connection lost"}
@@ -103,9 +122,71 @@ export function AdminShell({
         </div>
       </header>
 
-      <main className="mx-auto max-w-[480px] px-3 py-3">{children}</main>
+      <div className="md:flex md:items-start">
+        {/* Persistent left rail on tablet / desktop. Mobile gets the
+            drawer below instead. The rail is the primary navigation
+            surface; it shows every section at once so the admin never
+            has to open a menu to switch tabs. */}
+        {isWide ? (
+          <aside
+            data-admin-rail
+            className="sticky top-14 z-30 hidden h-[calc(100dvh-3.5rem)] w-[240px] shrink-0 overflow-y-auto border-r border-slate-200 bg-white md:block"
+            aria-label="Admin navigation"
+          >
+            <div className="border-b border-slate-100 px-4 py-3">
+              <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                Admin
+              </p>
+              <p className="mt-0.5 truncate text-sm font-semibold text-slate-900">{email}</p>
+              <p className="text-[11px] text-slate-500">Role: {role}</p>
+            </div>
+            <nav className="flex-1 px-2 py-2">
+              {ADMIN_NAV.map((item) => {
+                const active = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
+                return (
+                  <button
+                    key={item.href}
+                    type="button"
+                    onClick={() => handleNavigate(item.href)}
+                    className={`mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm ${
+                      active ? "bg-slate-900 text-white shadow-sm" : "text-slate-700 active:bg-slate-100"
+                    }`}
+                  >
+                    <span aria-hidden>{item.icon}</span>
+                    <span className="flex-1 truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="border-t border-slate-100 p-3">
+              <Link
+                href="/"
+                className="mb-2 flex h-11 w-full items-center justify-center rounded-lg border border-slate-300 text-sm font-medium text-slate-700 active:bg-slate-100"
+              >
+                ← Back to main app
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex h-11 w-full items-center justify-center rounded-lg border border-red-300 bg-red-50 text-sm font-semibold text-red-700 active:bg-red-100"
+              >
+                Log out
+              </button>
+            </div>
+          </aside>
+        ) : null}
 
-      {navOpen && (
+        <main
+          className="mx-auto max-w-[480px] px-3 py-3 md:max-w-[720px] md:px-6 md:py-5"
+          data-admin-main
+        >
+          {children}
+        </main>
+      </div>
+
+      {/* Mobile-only drawer (kept for < 768 px viewports; tablet +
+          desktop render the persistent rail above). */}
+      {navOpen && !isWide ? (
         <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/40" onClick={() => setNavOpen(false)} />
           <div className="relative flex h-full w-[86%] max-w-[340px] flex-col bg-white pt-[env(safe-area-inset-top)] shadow-xl">
@@ -154,7 +235,7 @@ export function AdminShell({
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -68,7 +68,7 @@ export default function DashboardPage() {
       </SectionCard>
 
       <SectionCard title="Users">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 md:gap-3">
           <StatCard label="Total" value={data.users.total} />
           <StatCard label="Active" value={data.users.active} tone="ok" />
           <StatCard label="Blocked" value={data.users.blocked} tone={data.users.blocked > 0 ? "danger" : undefined} />
@@ -76,7 +76,7 @@ export default function DashboardPage() {
       </SectionCard>
 
       <SectionCard title="Orders & revenue">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 md:gap-3">
           <StatCard label="Verified" value={data.orders.verified} tone="ok" />
           <StatCard label="Pending" value={data.orders.pending} tone="warn" />
           <StatCard label="Failed" value={data.orders.failed} tone={data.orders.failed > 0 ? "danger" : undefined} />
@@ -87,14 +87,14 @@ export default function DashboardPage() {
       </SectionCard>
 
       <SectionCard title="Subscriptions">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
           <StatCard label="Active" value={data.subscriptions.active} />
           <StatCard label="Expiring soon" value={data.subscriptions.expiring} />
         </div>
       </SectionCard>
 
       <SectionCard title="Reviews">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
           <StatCard label="Pending reviews" value={data.reviews.pending} tone={data.reviews.pending > 0 ? "warn" : undefined} />
         </div>
       </SectionCard>
@@ -141,7 +141,7 @@ export default function DashboardPage() {
       </SectionCard>
 
       <SectionCard title="Quick actions">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
           {QUICK_ACTIONS.map((action) => (
             <Link
               key={action.label}

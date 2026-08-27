@@ -140,7 +140,7 @@ function OverviewTab({ notify: _notify }: { notify: ReturnType<typeof useToast>[
       <DateRangeSelector range={range} onRange={setRange} />
 
       <SectionCard title="Revenue & orders">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
           <StatCard label="Revenue" value={`₹${data.revenue.toLocaleString("en-IN")}`} />
           <StatCard label="Verified orders" value={data.orders} />
           <StatCard label="Avg order value" value={`₹${data.averageOrderValue.toLocaleString("en-IN")}`} />
@@ -149,7 +149,7 @@ function OverviewTab({ notify: _notify }: { notify: ReturnType<typeof useToast>[
       </SectionCard>
 
       <SectionCard title="Users">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
           <StatCard label="New users" value={data.newUsers} />
           <StatCard
             label="Payment success"
@@ -161,7 +161,7 @@ function OverviewTab({ notify: _notify }: { notify: ReturnType<typeof useToast>[
       </SectionCard>
 
       <SectionCard title="Subscriptions & reviews">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
           <StatCard label="Active subs" value={data.activeSubscriptionPlans} />
           <StatCard label="Avg rating" value={`${data.averageReviewRating.toFixed(1)} ⭐`} />
         </div>
@@ -258,7 +258,7 @@ function CustomersTab({ notify: _notify }: { notify: ReturnType<typeof useToast>
       <DateRangeSelector range={range} onRange={setRange} />
 
       <SectionCard title="Customer metrics">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
           <StatCard label="New users" value={data.newUsers} />
           <StatCard label="Unique buyers" value={data.uniqueBuyers} />
         </div>
@@ -283,7 +283,7 @@ function SubscriptionsTab({ notify: _notify }: { notify: ReturnType<typeof useTo
       <DateRangeSelector range={range} onRange={setRange} />
 
       <SectionCard title="Subscription overview">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
           <StatCard label="Active plans" value={data.activeSubscriptionPlans} tone="ok" />
         </div>
       </SectionCard>

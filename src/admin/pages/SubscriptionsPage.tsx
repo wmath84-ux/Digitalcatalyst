@@ -325,7 +325,7 @@ export default function SubscriptionsPage() {
             </p>
           </div>
           {plans.length === 0 ? <EmptyState title="No plans yet" /> : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
               {plans.map((p) => (
                 <RecordCard key={p.id}>
                   <div className="flex items-center justify-between">
@@ -358,7 +358,7 @@ export default function SubscriptionsPage() {
             <PrimaryButton onClick={() => setEditingFeature({ ...EMPTY_FEATURE })}>+ Add feature</PrimaryButton>
           </div>
           {features.length === 0 ? <EmptyState title="No features yet" /> : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
               {features.map((f) => (
                 <RecordCard key={f.id}>
                   <div className="flex items-center justify-between">
@@ -403,7 +403,7 @@ export default function SubscriptionsPage() {
             </div>
           </div>
           {(subscriptionProducts || []).length === 0 ? <EmptyState title="No subscription products yet" description="Click + Add product to choose from your available products." /> : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
               {(subscriptionProducts || []).map((sp) => (
                 <RecordCard key={sp.id}>
                   <div className="flex items-center justify-between">

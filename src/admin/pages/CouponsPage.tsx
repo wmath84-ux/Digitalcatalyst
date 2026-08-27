@@ -90,7 +90,7 @@ export default function CouponsPage() {
       </div>
 
       {coupons.length === 0 ? <EmptyState title="No coupons yet" /> : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
           {coupons.map((c) => (
             <RecordCard key={c.id}>
               <div className="flex items-center justify-between">

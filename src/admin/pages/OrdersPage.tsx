@@ -80,7 +80,7 @@ export default function OrdersPage() {
       {orders.length === 0 ? (
         <EmptyState title="No orders found" />
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
           {orders.map((o) => (
             <Link key={o.id} href={`/admin/orders/${o.id}`}>
               <RecordCard>

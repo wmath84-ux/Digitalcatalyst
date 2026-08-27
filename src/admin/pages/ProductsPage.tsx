@@ -92,7 +92,7 @@ export default function ProductsPage() {
       {products.length === 0 ? (
         <EmptyState title="No products found" description="Try adjusting filters or add your first product." />
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
           {products.map((p) => (
             <Link key={p.id} href={`/admin/products/${p.id}`}>
               <RecordCard>
