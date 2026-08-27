@@ -10,6 +10,17 @@ interface ActivityCardProps {
   side: "left" | "right";
   onComplete: () => void;
   completing: boolean;
+  /**
+   * Opens the edit modal pre-populated with this activity. The card body is
+   * clickable for this; the small status pill / completion circle has its own
+   * handler so it doesn't double-fire.
+   */
+  onEdit?: () => void;
+  /**
+   * Restore a completed item back to active (reverse of onComplete).
+   * Wired to the green tick on a completed card so a single tap re-opens it.
+   */
+  onUncomplete?: () => void;
 }
 
 function CardBody({ activity }: { activity: Activity }) {
@@ -69,7 +80,7 @@ function CardBody({ activity }: { activity: Activity }) {
   }
 }
 
-export function ActivityCard({ activity, status, side, onComplete, completing }: ActivityCardProps) {
+export function ActivityCard({ activity, status, side, onComplete, completing, onEdit, onUncomplete }: ActivityCardProps) {
   const meta = ACTIVITY_TYPE_META[activity.type];
   const Icon = ACTIVITY_ICONS[activity.type];
   const isCurrent = status === "current";
@@ -88,11 +99,28 @@ export function ActivityCard({ activity, status, side, onComplete, completing }:
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
       className={`pointer-events-auto relative w-full rounded-2xl p-3.5 sm:p-4 ${
         isCurrent ? "glass-panel-strong" : "glass-panel"
-      }`}
+      } ${onEdit ? "cursor-pointer transition hover:border-fp-text-30" : ""}`}
       style={{
         boxShadow: isCurrent ? `0 0 40px -8px ${meta.glow}` : undefined,
         borderColor: isOverdue ? "rgba(251,113,133,0.35)" : undefined,
       }}
+      onClick={() => {
+        // Don't open the edit modal when the user clicked the inner
+        // status / completion controls — those have their own click
+        // handlers and call e.stopPropagation() to keep this gate clean.
+        if (!onEdit) return;
+        onEdit();
+      }}
+      role={onEdit ? "button" : undefined}
+      tabIndex={onEdit ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (!onEdit) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onEdit();
+        }
+      }}
+      aria-label={onEdit ? `Edit ${activity.title}` : undefined}
     >
       {isCurrent && (
         <span className="fp-shimmer pointer-events-none absolute inset-0 rounded-2xl" />
@@ -139,7 +167,10 @@ export function ActivityCard({ activity, status, side, onComplete, completing }:
         {!isCompleted && (
           <button
             type="button"
-            onClick={onComplete}
+            onClick={(e) => {
+              e.stopPropagation();
+              onComplete();
+            }}
             aria-label="Mark complete"
             className="group relative mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-fp-text-20 bg-fp-text-5 transition hover:border-emerald-400/70 hover:bg-emerald-400/10"
           >
@@ -166,9 +197,19 @@ export function ActivityCard({ activity, status, side, onComplete, completing }:
           </button>
         )}
         {isCompleted && (
-          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-400/15 fp-text-emerald">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onUncomplete) onUncomplete();
+              else onComplete();
+            }}
+            aria-label="Restore activity (undo complete)"
+            title="Tap to restore"
+            className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-400/15 fp-text-emerald transition hover:bg-emerald-400/30"
+          >
             <Check className="h-3.5 w-3.5" />
-          </span>
+          </button>
         )}
       </div>
     </motion.div>

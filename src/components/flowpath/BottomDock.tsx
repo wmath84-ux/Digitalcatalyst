@@ -6,16 +6,11 @@ import {
   CalendarClock,
   CalendarRange,
   CheckSquare,
-  CreditCard,
-  Heart,
   House,
   Landmark,
   LayoutDashboard,
   Plus,
-  ShoppingBag,
-  ShoppingCart,
   StickyNote,
-  Store,
   Sunrise,
   TrendingUp,
   UserRound,
@@ -25,10 +20,6 @@ import type { ActivityType } from "../../flowpath/types/flowpath";
 import { ACTIVITY_TYPE_META } from "../../flowpath/types/flowpath";
 import { ACTIVITY_ICONS } from "./icons";
 import { RadialMenu, type RadialItem } from "./RadialMenu";
-
-const HOLD_MS = 550;
-const RING_R = 15;
-const RING_C = 2 * Math.PI * RING_R;
 
 /**
  * Map a dock radial item to the real app route it should open. "Create" is
@@ -73,14 +64,20 @@ const REVISION_ITEMS: RadialItem[] = [
   { id: "rev-profile", label: "Profile", icon: UserRound, color: "#fb7185" },
 ];
 
-const HOME_ITEMS: RadialItem[] = [
-  { id: "home-purchase", label: "My Purchase", icon: ShoppingBag, color: "#8b7bff" },
-  { id: "home-store", label: "Store", icon: Store, color: "#5eead4" },
-  { id: "home-subscription", label: "Subscription", icon: CreditCard, color: "#f5b969" },
-  { id: "home-profile", label: "Profile", icon: UserRound, color: "#fb7185" },
-  { id: "home-wishlist", label: "Wishlist", icon: Heart, color: "#f472b6" },
-  { id: "home-cart", label: "Cart", icon: ShoppingCart, color: "#34d399" },
-];
+// The home radial menu (HOME_ITEMS) used to be triggered by a long-press on
+// the FlowPath dock's Home button. The dock now does a plain single-tap
+// navigate, so this list is kept here for documentation only — it is no
+// longer wired to any UI. If/when we want a Home radial menu again, a
+// separate affordance (e.g. the header's Plus shortcut or the home page
+// footer) should host it instead of the FlowPath dock.
+// const HOME_ITEMS: RadialItem[] = [
+//   { id: "home-purchase", label: "My Purchase", icon: ShoppingBag, color: "#8b7bff" },
+//   { id: "home-store", label: "Store", icon: Store, color: "#5eead4" },
+//   { id: "home-subscription", label: "Subscription", icon: CreditCard, color: "#f5b969" },
+//   { id: "home-profile", label: "Profile", icon: UserRound, color: "#fb7185" },
+//   { id: "home-wishlist", label: "Wishlist", icon: Heart, color: "#f472b6" },
+//   { id: "home-cart", label: "Cart", icon: ShoppingCart, color: "#34d399" },
+// ];
 
 interface MenuState {
   items: RadialItem[];
@@ -96,9 +93,6 @@ interface BottomDockProps {
 
 export function BottomDock({ onCreateType, onStub, onNavigateToHome }: BottomDockProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
-  const [holding, setHolding] = useState(false);
-  const holdTimer = useRef<number | null>(null);
-  const suppressClick = useRef(false);
 
   const homeRef = useRef<HTMLButtonElement>(null);
   const mydayRef = useRef<HTMLButtonElement>(null);
@@ -124,23 +118,6 @@ export function BottomDock({ onCreateType, onStub, onNavigateToHome }: BottomDoc
     }
   }
 
-  function startHold() {
-    setHolding(true);
-    holdTimer.current = window.setTimeout(() => {
-      suppressClick.current = true;
-      setHolding(false);
-      openMenu(homeRef, HOME_ITEMS, "Home");
-    }, HOLD_MS);
-  }
-
-  function endHold() {
-    if (holdTimer.current !== null) {
-      clearTimeout(holdTimer.current);
-      holdTimer.current = null;
-    }
-    setHolding(false);
-  }
-
   return (
     <>
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-6">
@@ -154,62 +131,19 @@ export function BottomDock({ onCreateType, onStub, onNavigateToHome }: BottomDoc
               "0 0 0 1px var(--fp-border) inset, 0 0 40px -6px rgba(139,123,255,0.45), 0 25px 60px -20px rgba(0,0,0,0.9)",
           }}
         >
-          {/* Home — single click reserved for future logic; long-press opens pages */}
+          {/* Home — single tap navigates straight to the home page. The
+              long-press radial menu was removed in favour of a simpler
+              one-tap interaction (the home radial now lives in the
+              user-triggered FlowPath "open" affordance, not the dock). */}
           <button
             ref={homeRef}
             type="button"
             aria-label="Go to Home Page"
-            onPointerDown={startHold}
-            onPointerUp={endHold}
-            onPointerLeave={endHold}
-            onPointerCancel={endHold}
-            onContextMenu={(e) => e.preventDefault()}
             onClick={() => {
-              if (suppressClick.current) {
-                suppressClick.current = false;
-                return;
-              }
-              // Single click → navigate to home page
               if (onNavigateToHome) onNavigateToHome();
             }}
-            className={`relative grid h-10 w-10 shrink-0 select-none place-items-center rounded-full border border-fp-border bg-fp-surface text-fp-muted [touch-action:none] sm:h-11 sm:w-11 ${
-              holding ? "text-fp-text" : "hover:bg-fp-surface-hover hover:text-fp-text"
-            }`}
-            style={{
-              transform: holding ? "scale(1.12)" : "scale(1)",
-              transition: "transform 0.2s ease, background 0.2s ease, color 0.2s ease",
-            }}
+            className="grid h-10 w-10 shrink-0 select-none place-items-center rounded-full border border-fp-border bg-fp-surface text-fp-muted transition hover:bg-fp-surface-hover hover:text-fp-text sm:h-11 sm:w-11"
           >
-            <svg
-              className="pointer-events-none absolute inset-0 h-full w-full -rotate-90"
-              viewBox="0 0 36 36"
-            >
-              <circle
-                cx="18"
-                cy="18"
-                r={RING_R}
-                fill="none"
-                stroke="rgba(139,123,255,0.22)"
-                strokeWidth="2"
-              />
-              <circle
-                cx="18"
-                cy="18"
-                r={RING_R}
-                fill="none"
-                stroke="#8b7bff"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeDasharray={RING_C}
-                strokeDashoffset={holding ? 0 : RING_C}
-                style={{
-                  transition: holding
-                    ? `stroke-dashoffset ${HOLD_MS}ms linear`
-                    : "stroke-dashoffset 0.18s ease",
-                  filter: holding ? "drop-shadow(0 0 4px rgba(139,123,255,0.9))" : "none",
-                }}
-              />
-            </svg>
             <House className="h-[18px] w-[18px]" />
           </button>
 

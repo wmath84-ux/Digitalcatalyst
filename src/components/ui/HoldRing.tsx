@@ -1,4 +1,4 @@
-import { HOME_HOLD_DURATION } from "../../hooks/useHomeHold";
+import { DEFAULT_HOME_HOLD_DURATION } from "../../hooks/useHomeHold";
 
 const RING_R = 18;
 const RING_C = 2 * Math.PI * RING_R;
@@ -8,7 +8,12 @@ const RING_C = 2 * Math.PI * RING_R;
  * It is absolutely positioned at (50%, 50%) of the button's icon pill and
  * pulled back by half its own size, so the ring hugs the button instead of
  * dropping below it. The fill grows over the hold duration to show how much
- * of the 3-second long-press remains.
+ * of the long-press remains.
+ *
+ * The animation length is taken from DEFAULT_HOME_HOLD_DURATION so the
+ * ring's stroke-dashoffset transition always matches whatever the active
+ * caller's duration is (e.g. 1s for the main app footer, 3s for the MyDay
+ * footer that still uses the default).
  */
 export function HoldRing({ holding }: { holding: boolean }) {
   return (
@@ -46,7 +51,7 @@ export function HoldRing({ holding }: { holding: boolean }) {
         strokeDashoffset={holding ? 0 : RING_C}
         style={{
           transition: holding
-            ? `stroke-dashoffset ${HOME_HOLD_DURATION}ms linear`
+            ? `stroke-dashoffset ${DEFAULT_HOME_HOLD_DURATION}ms linear`
             : "stroke-dashoffset 0.18s ease",
           filter: holding ? "drop-shadow(0 0 5px rgba(99, 102, 241, 0.9))" : "none",
         }}

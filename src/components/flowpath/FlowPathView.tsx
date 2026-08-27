@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Trash2 } from "lucide-react";
-import type { ActivityType } from "../../flowpath/types/flowpath";
+import type { Activity, ActivityType } from "../../flowpath/types/flowpath";
 import { ACTIVITY_TYPE_META } from "../../flowpath/types/flowpath";
 import { useFlowPath } from "../../flowpath/hooks/useFlowPath";
 import { useTheme } from "../../flowpath/hooks/useTheme";
@@ -30,6 +30,38 @@ import { ACTIVITY_ICONS } from "./icons";
 
 const SCROLL_BUFFER = 2000;
 const CHUNK_SIZE = 8;
+
+/** localStorage key for the persisted flow curve customisation. */
+const CURVE_OVERRIDE_STORAGE_KEY = "flowpath:curve-override";
+
+function loadCurveOverride(): CurveOverride {
+  if (typeof window === "undefined") return DEFAULT_CURVE_OVERRIDE;
+  try {
+    const raw = window.localStorage.getItem(CURVE_OVERRIDE_STORAGE_KEY);
+    if (!raw) return DEFAULT_CURVE_OVERRIDE;
+    const parsed = JSON.parse(raw) as Partial<CurveOverride> | null;
+    if (!parsed || typeof parsed !== "object") return DEFAULT_CURVE_OVERRIDE;
+    return {
+      amplitude:
+        typeof parsed.amplitude === "number" ? parsed.amplitude : DEFAULT_CURVE_OVERRIDE.amplitude,
+      frequency:
+        typeof parsed.frequency === "number" ? parsed.frequency : DEFAULT_CURVE_OVERRIDE.frequency,
+      spacing: typeof parsed.spacing === "number" ? parsed.spacing : DEFAULT_CURVE_OVERRIDE.spacing,
+    };
+  } catch {
+    return DEFAULT_CURVE_OVERRIDE;
+  }
+}
+
+function saveCurveOverride(value: CurveOverride) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(CURVE_OVERRIDE_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // localStorage may be unavailable (private mode, quota) — silently ignore,
+    // the in-memory state still reflects the user's last tweak for the session.
+  }
+}
 
 const ACTIVITY_RADIAL_ITEMS: RadialItem[] = (
   Object.keys(ACTIVITY_TYPE_META) as ActivityType[]
@@ -91,6 +123,8 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
     currentId,
     createActivity,
     completeActivity,
+    uncompleteActivity,
+    updateActivity,
     deleteActivity,
     pulseToken,
     justCreatedId,
@@ -109,9 +143,18 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
   const [pulseSegment, setPulseSegment] = useState<{ key: number; d: string } | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [curveOpen, setCurveOpen] = useState(false);
-  const [curve, setCurve] = useState<CurveOverride>(DEFAULT_CURVE_OVERRIDE);
+  const [curve, setCurve] = useState<CurveOverride>(loadCurveOverride);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
+
+  // Mirror every curve change to localStorage so the user's customisation
+  // survives reloads and revisits. We persist on every change rather than
+  // only on modal close so background saves (rare browser crashes, etc.)
+  // don't drop the user's tweaks.
+  useEffect(() => {
+    saveCurveOverride(curve);
+  }, [curve]);
 
   const hasAutoScrolled = useRef(false);
   const isEmpty = items.length === 0;
@@ -280,6 +323,19 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
 
   const handleCreate = useCallback(
     (data: { title: string; description?: string; datetime: string; extra?: Record<string, unknown> }) => {
+      // If we are editing an existing activity, route the modal submit through
+      // the update path so the same form can both create and edit.
+      if (editingActivity) {
+        updateActivity(editingActivity.id, {
+          title: data.title,
+          description: data.description,
+          datetime: data.datetime,
+          extra: data.extra,
+        });
+        setEditingActivity(null);
+        setCreateType(null);
+        return;
+      }
       if (!createType) return;
       createActivity({
         type: createType.type,
@@ -291,8 +347,25 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
       });
       setCreateType(null);
     },
-    [createType, createActivity]
+    [createType, createActivity, editingActivity, updateActivity]
   );
+
+  const handleEditActivity = useCallback((activity: Activity) => {
+    setEditingActivity(activity);
+    setCreateType({ type: activity.type, afterId: null });
+  }, []);
+
+  const handleUncompleteActivity = useCallback(
+    (id: string) => {
+      uncompleteActivity(id);
+    },
+    [uncompleteActivity]
+  );
+
+  const closeCreateModal = useCallback(() => {
+    setCreateType(null);
+    setEditingActivity(null);
+  }, []);
 
   const handleComplete = useCallback(
     (id: string) => {
@@ -365,6 +438,8 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
               config={config}
               width={width}
               onComplete={() => handleComplete(row.activity!.activity.id)}
+              onEdit={() => handleEditActivity(row.activity!.activity)}
+              onUncomplete={() => handleUncompleteActivity(row.activity!.activity.id)}
               completing={completingIds.has(row.activity!.activity.id)}
               highlighted={highlightId === row.id}
               armed={armedDeleteId === row.id}
@@ -393,8 +468,9 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
 
       <CreateModal
         type={createType?.type ?? null}
-        onClose={() => setCreateType(null)}
+        onClose={closeCreateModal}
         onCreate={handleCreate}
+        editing={editingActivity}
       />
 
       <CurveSettingsModal
@@ -460,6 +536,8 @@ function ActivityRowItem({
   config,
   width,
   onComplete,
+  onEdit,
+  onUncomplete,
   completing,
   highlighted,
   armed,
@@ -470,6 +548,8 @@ function ActivityRowItem({
   config: LayoutConfig;
   width: number;
   onComplete: () => void;
+  onEdit: () => void;
+  onUncomplete: () => void;
   completing: boolean;
   highlighted: boolean;
   armed: boolean;
@@ -549,6 +629,8 @@ function ActivityRowItem({
           status={status}
           side={row.side}
           onComplete={onComplete}
+          onEdit={onEdit}
+          onUncomplete={onUncomplete}
           completing={completing}
         />
       </div>

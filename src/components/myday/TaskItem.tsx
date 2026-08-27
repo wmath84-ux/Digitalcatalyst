@@ -62,8 +62,18 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
 
   return (
     <div
+      onClick={() => onEdit(task)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onEdit(task);
+        }
+      }}
+      aria-label={`Edit task: ${task.title}`}
       className={cn(
-        "group relative flex items-start gap-3 rounded-2xl border p-3.5 shadow-[0_18px_36px_-24px_rgba(79,70,229,0.4)] transition-all duration-200 hover:shadow-[0_24px_46px_-24px_rgba(79,70,229,0.46)] sm:items-center sm:px-4",
+        "group relative flex items-start gap-3 rounded-2xl border p-3.5 shadow-[0_18px_36px_-24px_rgba(79,70,229,0.4)] transition-all duration-200 hover:shadow-[0_24px_46px_-24px_rgba(79,70,229,0.46)] sm:items-center sm:px-4 cursor-pointer",
         sc.border,
         sc.bg,
         highlightQuery && "ring-2 ring-amber-200/50"
@@ -76,7 +86,7 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
 
       {/* Checkbox */}
       <button
-        onClick={() => onToggle(task.id)}
+        onClick={(e) => { e.stopPropagation(); onToggle(task.id); }}
         aria-label={done ? "Mark as pending" : "Mark as completed"}
         className={cn(
           "mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200 sm:mt-0",
@@ -118,7 +128,7 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
             {pc.label}
           </span>
           <button
-            onClick={() => onCycleStatus(task.id)}
+            onClick={(e) => { e.stopPropagation(); onCycleStatus(task.id); }}
             className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide cursor-pointer transition-colors hover:opacity-80", sc.badge)}
           >
             {sc.badgeText}
@@ -127,16 +137,19 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
       </div>
 
       {/* Actions */}
-      <div className="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+      >
         <button
-          onClick={() => onEdit(task)}
+          onClick={(e) => { e.stopPropagation(); onEdit(task); }}
           aria-label="Edit task"
           className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
         <button
-          onClick={() => onDelete(task.id)}
+          onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
           aria-label="Delete task"
           className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
         >

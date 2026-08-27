@@ -536,46 +536,59 @@ export default function App() {
                 />
 
                 <div ref={createMenuRef} className="relative flex flex-col items-center pb-8">
-                  <button
-                    type="button"
-                    aria-label="Create item"
-                    onClick={() => setCreateMenuOpen((open) => !open)}
-                    className={cn(
-                      "flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-300/60 transition active:scale-95",
-                      createMenuOpen && "rotate-45",
-                    )}
-                  >
-                    <Plus className="h-10 w-10" strokeWidth={2.5} />
-                  </button>
-                  <p className="mt-3 text-sm font-semibold text-slate-500">Add to your day</p>
+                  {/* Wrap the cross button in its own relative container so the
+                      create-dropdown can anchor against the BUTTON (not the
+                      whole flex column). The dropdown is now always placed
+                      above the button with explicit spacing, which keeps the
+                      button itself clickable and prevents the dropdown from
+                      falling through to the section below on short screens. */}
+                  <div className="relative flex flex-col items-center">
+                    <button
+                      type="button"
+                      aria-label="Create item"
+                      aria-expanded={createMenuOpen}
+                      onClick={() => setCreateMenuOpen((open) => !open)}
+                      className={cn(
+                        "relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-300/60 transition active:scale-95",
+                        createMenuOpen && "rotate-45",
+                      )}
+                    >
+                      <Plus className="h-10 w-10" strokeWidth={2.5} />
+                    </button>
+                    <p className="mt-3 text-sm font-semibold text-slate-500">Add to your day</p>
 
-                  {createMenuOpen && (
-                    <div className="dc-glass absolute bottom-[7.5rem] z-20 w-full max-w-sm rounded-3xl p-2 shadow-[0_24px_60px_-26px_rgba(79,70,229,0.48)]">
-                      {CREATE_OPTIONS.map((option) => {
-                        const Icon = option.icon;
-                        return (
-                          <button
-                            key={option.id}
-                            type="button"
-                            onClick={() => {
-                              // When user selects what to create, check access immediately
-                              if (!requireMyDayAccess()) { setCreateMenuOpen(false); return; }
-                              handleNavigate(option.id);
-                            }}
-                            className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-white/55"
-                          >
-                            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
-                              <Icon className="h-5 w-5" />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-sm font-bold text-slate-900">{option.label}</span>
-                              <span className="block text-xs text-slate-400">{option.hint}</span>
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                    {createMenuOpen && (
+                      <div
+                        className="dc-glass absolute left-1/2 z-20 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-3xl p-2 shadow-[0_24px_60px_-26px_rgba(79,70,229,0.48)]"
+                        style={{ bottom: "calc(100% + 0.75rem)" }}
+                        role="menu"
+                      >
+                        {CREATE_OPTIONS.map((option) => {
+                          const Icon = option.icon;
+                          return (
+                            <button
+                              key={option.id}
+                              type="button"
+                              onClick={() => {
+                                // When user selects what to create, check access immediately
+                                if (!requireMyDayAccess()) { setCreateMenuOpen(false); return; }
+                                handleNavigate(option.id);
+                              }}
+                              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-white/55"
+                            >
+                              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                                <Icon className="h-5 w-5" />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-sm font-bold text-slate-900">{option.label}</span>
+                                <span className="block text-xs text-slate-400">{option.hint}</span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </section>
             )}

@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
-import type { ActivityType, Priority } from "../../flowpath/types/flowpath";
+import type { Activity, ActivityType, Priority } from "../../flowpath/types/flowpath";
 import { ACTIVITY_TYPE_META } from "../../flowpath/types/flowpath";
 import { ACTIVITY_ICONS } from "./icons";
 
@@ -15,6 +15,12 @@ interface CreateModalProps {
     datetime: string;
     extra?: Record<string, unknown>;
   }) => void;
+  /**
+   * When provided, the modal opens pre-populated with the activity's fields
+   * and the "Create" button becomes "Save changes". The same onCreate callback
+   * is used, so callers pass through the updated payload.
+   */
+  editing?: Activity | null;
 }
 
 function defaultDatetimeLocal() {
@@ -24,7 +30,32 @@ function defaultDatetimeLocal() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function CreateModal({ type, onClose, onCreate }: CreateModalProps) {
+function isoToDatetimeLocal(iso: string | undefined): string {
+  if (!iso) return defaultDatetimeLocal();
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return defaultDatetimeLocal();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** "4:30 PM" -> "16:30" for an <input type="time"> value. */
+function labelToTimeInput(label: string | undefined): string {
+  if (!label) return "16:00";
+  const m = label.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (!m) return "16:00";
+  let h = Number(m[1]);
+  const min = m[2];
+  const ap = m[3]?.toUpperCase();
+  if (ap === "PM" && h < 12) h += 12;
+  if (ap === "AM" && h === 12) h = 0;
+  return `${String(h).padStart(2, "0")}:${min}`;
+}
+
+function safePriority(value: unknown): Priority {
+  return value === "low" || value === "high" ? value : "medium";
+}
+
+export function CreateModal({ type, onClose, onCreate, editing = null }: CreateModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [datetimeLocal, setDatetimeLocal] = useState(defaultDatetimeLocal());
@@ -35,10 +66,47 @@ export function CreateModal({ type, onClose, onCreate }: CreateModalProps) {
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [completedQuestions, setCompletedQuestions] = useState(0);
 
+  // Pre-populate the form whenever the modal is opened in edit mode (or the
+  // editing activity changes). When not editing, fall back to empty defaults.
+  useEffect(() => {
+    if (!editing) {
+      setTitle("");
+      setDescription("");
+      setDatetimeLocal(defaultDatetimeLocal());
+      setPriority("medium");
+      setStartTime("16:00");
+      setEndTime("17:00");
+      setProgress(0);
+      setTotalQuestions(10);
+      setCompletedQuestions(0);
+      return;
+    }
+    setTitle(editing.title);
+    setDescription(editing.description ?? "");
+    setDatetimeLocal(isoToDatetimeLocal(editing.datetime));
+    if (editing.type === "task") {
+      setPriority(safePriority((editing as { priority?: unknown }).priority));
+    }
+    if (editing.type === "schedule") {
+      const a = editing as { startLabel?: string; endLabel?: string };
+      setStartTime(labelToTimeInput(a.startLabel));
+      setEndTime(labelToTimeInput(a.endLabel));
+    }
+    if (editing.type === "revision") {
+      setProgress(Number((editing as { progress?: number }).progress ?? 0));
+    }
+    if (editing.type === "mcq") {
+      const m = editing as { totalQuestions?: number; completedQuestions?: number };
+      setTotalQuestions(Number(m.totalQuestions ?? 10));
+      setCompletedQuestions(Number(m.completedQuestions ?? 0));
+    }
+  }, [editing]);
+
   if (typeof document === "undefined" || !type) return null;
 
   const meta = ACTIVITY_TYPE_META[type];
   const Icon = ACTIVITY_ICONS[type];
+  const isEditing = !!editing;
 
   function reset() {
     setTitle("");
@@ -104,8 +172,12 @@ export function CreateModal({ type, onClose, onCreate }: CreateModalProps) {
               <Icon className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-fp-muted">New</p>
-              <h2 className="font-display text-lg font-semibold text-fp-text">{meta.label}</h2>
+              <p className="text-[11px] uppercase tracking-wider text-fp-muted">
+                {isEditing ? "Edit" : "New"}
+              </p>
+              <h2 className="font-display text-lg font-semibold text-fp-text">
+                {isEditing ? `Edit ${meta.label}` : meta.label}
+              </h2>
             </div>
             <button
               type="button"
@@ -272,7 +344,7 @@ export function CreateModal({ type, onClose, onCreate }: CreateModalProps) {
                 boxShadow: `0 10px 30px -10px ${meta.glow}`,
               }}
             >
-              Create
+              {isEditing ? "Save changes" : "Create"}
             </button>
           </div>
         </motion.form>

@@ -131,16 +131,26 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
 
                     {/* Card */}
                     <div
+                      onClick={() => onEdit(event)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onEdit(event);
+                        }
+                      }}
+                      aria-label={`Edit event: ${event.title}`}
                       className={cn(
-                        "rounded-2xl border p-3.5 transition-all duration-200",
+                        "rounded-2xl border p-3.5 transition-all duration-200 cursor-pointer",
                         isHighlighted && "ring-2 ring-sky-400 ring-offset-2 ring-offset-white",
                         isActive
                           ? "border-indigo-300 bg-white shadow-lg shadow-indigo-200/50"
                           : isNext
-                            ? "border-slate-200 bg-white shadow-md shadow-slate-200/60"
+                            ? "border-slate-200 bg-white shadow-md shadow-slate-200/60 hover:border-sky-200"
                             : isPast
                               ? "border-slate-200/60 bg-white/80 opacity-60 shadow-sm"
-                              : "border-slate-200 bg-white shadow-sm shadow-slate-100/60",
+                              : "border-slate-200 bg-white shadow-sm shadow-slate-100/60 hover:border-sky-200",
                         isHighlighted && isPast && "opacity-100",
                       )}
                     >
@@ -183,16 +193,19 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
                         </div>
 
                         {/* Edit / Delete */}
-                        <div className="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        >
                           <button
-                            onClick={() => onEdit(event)}
+                            onClick={(e) => { e.stopPropagation(); onEdit(event); }}
                             aria-label="Edit event"
                             className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-sky-50 hover:text-sky-600"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() => onDelete(event.id)}
+                            onClick={(e) => { e.stopPropagation(); onDelete(event.id); }}
                             aria-label="Delete event"
                             className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
                           >

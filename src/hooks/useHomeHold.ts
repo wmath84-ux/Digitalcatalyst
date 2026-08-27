@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 
-export const HOME_HOLD_DURATION = 3000; // 3 seconds
+/** Default long-press duration for the Home button (ms). */
+export const DEFAULT_HOME_HOLD_DURATION = 3000;
 
 /**
- * Manages a 3-second long-press on a footer Home button.
+ * Manages a long-press on a footer Home button.
  *
  * On completion it fires `onHold` (used to open the FlowPath / task-planning
  * dashboard) and marks the press as consumed, so the click the browser would
@@ -13,8 +14,12 @@ export const HOME_HOLD_DURATION = 3000; // 3 seconds
  * The returned `handlers` are meant to be spread onto the Home <button>.
  * `consumeSuppressedClick()` should be called at the top of the button's
  * `onClick`; return early when it returns true.
+ *
+ * The `durationMs` parameter lets callers shorten the gesture (e.g. the main
+ * app footer is 1 second per the latest product spec) without duplicating
+ * the entire hold state machine.
  */
-export function useHomeHold(onHold: () => void) {
+export function useHomeHold(onHold: () => void, durationMs: number = DEFAULT_HOME_HOLD_DURATION) {
   const [holding, setHolding] = useState(false);
   const timerRef = useRef<number | null>(null);
   const suppressRef = useRef(false);
@@ -25,8 +30,8 @@ export function useHomeHold(onHold: () => void) {
       suppressRef.current = true;
       setHolding(false);
       onHold();
-    }, HOME_HOLD_DURATION);
-  }, [onHold]);
+    }, durationMs);
+  }, [durationMs, onHold]);
 
   const cancel = useCallback(() => {
     if (timerRef.current !== null) {
@@ -60,5 +65,5 @@ export function useHomeHold(onHold: () => void) {
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   };
 
-  return { holding, handlers, consumeSuppressedClick };
+  return { holding, handlers, consumeSuppressedClick, durationMs };
 }
