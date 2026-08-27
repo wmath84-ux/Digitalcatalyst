@@ -16,6 +16,7 @@ import CouponsPage from "./pages/CouponsPage";
 import ReviewsPage from "./pages/ReviewsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import RevisionPage from "./pages/RevisionPage";
+import CurriculumBuilderPage from "./pages/CurriculumBuilderPage";
 import HomePage from "./pages/HomePage";
 import ContentPage from "./pages/ContentPage";
 import SessionPage from "./pages/SessionPage";
@@ -38,6 +39,7 @@ function AdminRoutes() {
   if (path === "/admin/reviews") return <ReviewsPage />;
   if (path === "/admin/analytics") return <AnalyticsPage />;
   if (path === "/admin/revision") return <RevisionPage />;
+  if (path === "/admin/curriculum") return <CurriculumBuilderPage />;
   if (path === "/admin/home") return <HomePage />;
   if (path === "/admin/content") return <ContentPage />;
   if (path === "/admin/branding") return <BrandingPage />;
