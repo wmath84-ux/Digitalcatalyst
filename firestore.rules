@@ -26,6 +26,31 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();
+
+      // Admin audit log — every FlowPath / admin action appends an
+      // entry here. Read-only for admins; never writeable from the
+      // client (the server uses the Admin SDK which bypasses rules).
+      match /adminAuditLog/{entryId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+      match /adminAuditLog/entries/{entryId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+
+      // Scheduled jobs queue — FlowPath writes here for any item
+      // with scheduledFor in the future; the existing cron pinger
+      // picks the doc up at the right time and fires the FCM /
+      // Web Push / in-app bell. Admin-only read + write.
+      match /adminScheduledJobs/{jobId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+      match /adminScheduledJobs/jobs/{jobId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
     }
 
     match /publicLeaderboard/{docId} {
@@ -192,6 +217,20 @@ service cloud.firestore {
           && request.resource.data.platform in ['android', 'ios', 'web']
           && !request.resource.data.keys().hasAny(['email', 'phone', 'apiKey', 'authorization', 'secret', 'rawHtml']);
         allow delete: if isOwner(uid) || isAdmin();
+      }
+
+      // FlowPath activities — the master copy the FlowPath dashboard
+      // reads. Created by the server-side FlowPath control multiplexer
+      // (api/_lib/flowpathControl.ts), which the user can also drive
+      // from the My Day / Revision pages (those writes are mirrored
+      // here so the dashboard always shows the full picture).
+      // Reads: owner + admin. Writes: admin only (the server is the
+      // single point of truth for what ends up in here; the user's
+      // own My Day / Revision actions go through the original
+      // handlers and the server mirrors them to this collection).
+      match /flowpathActivities/{activityId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if isAdmin();
       }
 
 
