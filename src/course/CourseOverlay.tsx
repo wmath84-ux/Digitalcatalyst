@@ -355,16 +355,26 @@ export default function CourseOverlay(props: CourseOverlayProps) {
 
   return (
     <>
-      {/* ── Scrim: closes the sheet when the content behind it is tapped ── */}
-      <div
-        onClick={props.onClose}
-        aria-hidden={!open}
-        className={`absolute z-30 bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${
-          landscape ? "bottom-0 left-0 top-0" : "inset-x-0 bottom-16 top-0"
-        } ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
-        style={landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : undefined}
-        data-course-overlay-scrim
-      />
+      {/* ── Scrim: closes the sheet when the content behind it is tapped ──
+          In landscape SPLIT mode (notes editor open or mind map active) the
+          left half of the screen must stay fully visible and interactive —
+          the whole point of split mode is that the learner can watch the
+          lesson AND take notes/draw a diagram side-by-side. Showing a dark
+          blurred scrim over the left half defeats that purpose. We therefore
+          suppress the scrim entirely in landscape split mode. In portrait and
+          in non-split landscape (modules / resources / paid tabs) the scrim
+          keeps its usual "tap outside to close" role. */}
+      {!(landscape && (splitMode || mindMapSplit)) ? (
+        <div
+          onClick={props.onClose}
+          aria-hidden={!open}
+          className={`absolute z-30 bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${
+            landscape ? "bottom-0 left-0 top-0" : "inset-x-0 bottom-16 top-0"
+          } ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
+          style={landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : undefined}
+          data-course-overlay-scrim
+        />
+      ) : null}
 
       {/* ── Overlay sheet ─────────────────────────────────────────────── */}
       <div
