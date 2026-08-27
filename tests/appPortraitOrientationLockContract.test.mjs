@@ -1,10 +1,15 @@
 // tests/appPortraitOrientationLockContract.test.mjs
 //
-// Contract for the installed-PWA portrait lock: every PWA screen is locked
-// to portrait, and the ONLY place rotation unlocks is the Course Player.
-// Regular browser tabs are never locked so visitors can install the app.
-// Inside the PWA, a full-screen rotate-back overlay covers landscape when
-// the native lock is refused (iOS).
+// Contract for the installed-PWA portrait lock: every PWA screen is
+// locked to portrait on PHONE-sized viewports, and the ONLY place
+// rotation unlocks is the Course Player. Regular browser tabs are never
+// locked so visitors can install the app. Tablets and desktop viewports
+// (≥ 768 px) are NEVER locked — the tablet/desktop layouts are designed
+// to work in any orientation, and locking them to portrait would push
+// the user to the rotation guard's black screen.
+//
+// Inside the PWA on a phone, a full-screen rotate-back overlay covers
+// landscape when the native lock is refused (iOS).
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -32,7 +37,13 @@ test("portrait lock and rotate overlay apply only after the PWA is installed", (
   // Browser tabs must stay free so landing / Install PWA stay reachable.
   assert.match(orientation, /isPwaInstalled\(\)/);
   assert.match(guard, /isPwaInstalled/);
-  assert.match(guard, /if \(isPwaInstalled\(\) && !isCoursePlayerRotationActive\(\)\) lockAppToPortrait\(\)/);
+  // The lock / overlay is additionally gated on a phone-sized viewport
+  // (`isMobileScreenSize()` returns true below 768 px). Tablets and
+  // desktop sizes are NEVER locked, so a wide device never sees the
+  // rotation guard's black screen.
+  assert.match(orientation, /window\.innerWidth >= 768/);
+  assert.match(guard, /isMobileScreenSize/);
+  assert.match(guard, /isPwaInstalled\(\) && isMobileScreenSize\(\) && !isCoursePlayerRotationActive\(\)/);
 });
 
 test("only mounting the Course Player unlocks rotation", () => {
@@ -47,12 +58,15 @@ test("leaving the player locks straight back to portrait", () => {
   assert.match(orientation, /notifyRotationChange\(\)/);
 });
 
-test("a rotate-back overlay covers landscape while the player is closed", () => {
+test("a rotate-back overlay covers landscape while the player is closed (phones only)", () => {
   assert.match(guard, /data-app-portrait-overlay/);
   assert.match(guard, /window\.innerWidth > window\.innerHeight/);
   assert.match(guard, /Rotate your phone/);
-  // Installed PWA only. Never on a browser tab, desktop, or the open player.
-  assert.match(guard, /!installed \|\| !mobile \|\| playerOpen \|\| !landscape/);
+  // Installed PWA + phone-sized viewport only. Never on a browser tab,
+  // desktop, tablet, or the open player. The new `!phoneViewport` check
+  // is the tablet exemption that removes the rotation guard for
+  // non-phone screens.
+  assert.match(guard, /!installed \|\| !mobile \|\| !phoneViewport \|\| playerOpen \|\| !landscape/);
 });
 
 test("installed PWA manifest keeps dynamic rotation enabled for the player", () => {

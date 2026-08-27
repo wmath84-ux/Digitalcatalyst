@@ -1,22 +1,31 @@
 // src/utils/appOrientation.ts
 //
-// The installed PWA is locked to portrait EXCEPT while the Course Player is
-// open. The player is the only screen where rotating the phone makes sense
-// (landscape lessons), so it is the only screen that unlocks rotation —
-// and it re-locks the moment it unmounts.
+// The installed PWA is locked to portrait on phone-sized viewports ONLY,
+// and only while the Course Player is closed. The player is the one
+// screen where rotating the phone makes sense (landscape lessons), so
+// it is the one screen that unlocks rotation — and it re-locks the
+// moment it unmounts.
 //
 // A regular browser tab is never locked. Visitors must be able to browse
 // the site and tap Install PWA from any orientation; the Screen Orientation
 // API also rejects lock() outside standalone / fullscreen anyway.
 //
+// Tablet and desktop viewports (>= 768 px) are NEVER locked. The tablet
+// layout is designed to work in landscape, and locking it to portrait
+// would push the user to the black "rotate your phone" overlay — which
+// is exactly the bug the latest UX feedback asked us to remove.
+//
 // Two layers, because no single browser API is universal:
 //
 //   1. Screen Orientation API — `lock("portrait")` genuinely prevents
 //      rotation. It is honoured in installed PWAs (display: standalone)
-//      and inside fullscreen. A plain mobile browser tab is skipped.
+//      and inside fullscreen. Plain mobile browser tabs and any
+//      wide-screen viewport (tablet/desktop) are skipped.
 //   2. PortraitOnlyGuard overlay — a full-screen "rotate your phone" panel
-//      shown only in the installed PWA whenever the viewport is landscape
-//      and the Course Player is closed.
+//      shown only in the installed PWA on a phone-sized viewport, when
+//      the screen is landscape and the Course Player is closed. The
+//      guard is the visual fallback for #1; together they cover every
+//      browser the PWA can be installed on.
 
 import { isPwaInstalled } from "./pwaInstall";
 
@@ -48,14 +57,22 @@ const notifyRotationChange = (): void => {
 };
 
 /**
- * Lock the screen to portrait. Installed PWA only — a regular browser
- * tab must stay free so the landing / install flow remains usable.
- * Best-effort: browsers that refuse (no fullscreen, desktop, iOS) reject
- * or throw, and the portrait overlay covers those cases in the PWA.
+ * Lock the screen to portrait. Installed PWA on a phone-sized viewport
+ * only — a regular browser tab must stay free so the landing / install
+ * flow remains usable, and tablet / desktop users must NEVER be locked
+ * to portrait (their layouts are designed to work in any orientation
+ * and locking would push them to the rotation guard's black screen).
+ * Best-effort: browsers that refuse (no fullscreen, iOS) reject or
+ * throw, and the portrait overlay covers those cases in the PWA.
  */
 export const lockAppToPortrait = (): void => {
   if (typeof screen === "undefined") return;
   if (!isPwaInstalled()) return;
+  // Skip the lock on tablet and desktop viewports. The phone-only
+  // overlay is the only fallback, and it is also gated on
+  // `isMobileScreenSize()`, so locking anything wider would just
+  // throw an error inside the Screen Orientation API.
+  if (typeof window !== "undefined" && window.innerWidth >= 768) return;
   const orientation = screen.orientation as OrientationLockable | undefined;
   if (!orientation || typeof orientation.lock !== "function") return;
   try {

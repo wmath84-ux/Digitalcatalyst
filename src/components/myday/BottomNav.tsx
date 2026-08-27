@@ -34,7 +34,7 @@ export default function BottomNav({ active, onNavigate }: BottomNavProps) {
 
   return (
     <nav
-      className="pointer-events-none sticky bottom-0 z-30 w-full px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-1"
+      className="pointer-events-none sticky bottom-0 z-30 w-full px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-1 md:hidden"
       aria-label="My day"
     >
       <div className="dc-footer-shell pointer-events-auto mx-auto w-full max-w-md">

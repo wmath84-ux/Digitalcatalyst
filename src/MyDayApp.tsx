@@ -477,7 +477,7 @@ export default function App() {
 
   return (
     <div className="dc-app-shell min-h-screen">
-      <div data-app-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden lg:max-w-7xl lg:rounded-[2rem]">
+      <div data-app-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0 lg:max-w-7xl lg:rounded-[2rem] lg:bg-white lg:shadow-xl lg:border lg:border-slate-200">
         <StoreHeader
           cartCount={cartIds.size}
           notifCount={1}
@@ -514,7 +514,7 @@ export default function App() {
           </div>
         )}
 
-        <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 pt-6 sm:px-6 lg:px-8">
+        <div data-myday-content className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 pt-6 sm:px-6 md:gap-8 md:px-8 lg:px-10">
           <SideNav active={activeSection} onNavigate={handleNavigate} />
 
           <main className="min-w-0 flex-1 pb-6">
@@ -535,7 +535,7 @@ export default function App() {
                   streak={12}
                 />
 
-                <div ref={createMenuRef} className="relative flex flex-col items-center pb-8">
+                <div ref={createMenuRef} data-myday-create-row className="relative flex flex-col items-center pb-8">
                   {/* Wrap the cross button in its own relative container so the
                       create-dropdown can anchor against the BUTTON (not the
                       whole flex column). The dropdown is now always placed
@@ -549,13 +549,13 @@ export default function App() {
                       aria-expanded={createMenuOpen}
                       onClick={() => setCreateMenuOpen((open) => !open)}
                       className={cn(
-                        "relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-300/60 transition active:scale-95",
+                        "relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-300/60 transition active:scale-95 md:h-24 md:w-24",
                         createMenuOpen && "rotate-45",
                       )}
                     >
-                      <Plus className="h-10 w-10" strokeWidth={2.5} />
+                      <Plus className="h-10 w-10 md:h-12 md:w-12" strokeWidth={2.5} />
                     </button>
-                    <p className="mt-3 text-sm font-semibold text-slate-500">Add to your day</p>
+                    <p className="mt-3 text-sm font-semibold text-slate-500 md:text-base">Add to your day</p>
 
                     {createMenuOpen && (
                       <div

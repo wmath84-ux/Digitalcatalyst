@@ -2,9 +2,13 @@
 //
 // Global sibling mounted next to <Root /> (same pattern as RenewalNotice).
 // Portrait lock + the "rotate your phone" overlay apply ONLY inside the
-// installed PWA (display-mode: standalone / iOS home-screen). A regular
-// browser tab is left free so visitors can use the site and install the
-// app from any orientation.
+// installed PWA (display-mode: standalone / iOS home-screen) AND only on
+// phone-sized viewports. A regular browser tab is left free so visitors
+// can use the site and install the app from any orientation, and tablet
+// / desktop users never see the overlay (their layouts are designed to
+// look correct in any orientation — locking them to portrait was the
+// "black screen with rotation guide" the latest UX feedback asked us
+// to remove).
 //
 // Rotation is unlocked in exactly one place: the Course Player itself, via
 // enterCoursePlayerRotation / exitCoursePlayerRotation.
@@ -19,25 +23,40 @@ import {
 import { isMobileDevice } from "../utils/courseStatusBar";
 import { isPwaInstalled } from "../utils/pwaInstall";
 import { useBranding } from "../context/BrandingContext";
+import { isMobileScreenSize } from "../utils/responsive";
 
 export default function PortraitOnlyGuard() {
   const { appName } = useBranding();
   const [playerOpen, setPlayerOpen] = useState<boolean>(isCoursePlayerRotationActive);
   const [landscape, setLandscape] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const [phoneViewport, setPhoneViewport] = useState(true);
   const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
     const syncInstallState = () => setInstalled(isPwaInstalled());
     setMobile(isMobileDevice());
-    const updateViewport = () => setLandscape(window.innerWidth > window.innerHeight);
+    // The "phone viewport" check is what actually gates the overlay. A
+    // tablet that reports a coarse pointer (so `isMobileDevice` is true)
+    // still has plenty of room to render the whole app in landscape, so
+    // locking IT to portrait would just push the user to a black screen
+    // with a rotation guide — which is exactly the bug the latest UX
+    // feedback asked us to remove. Phone-sized viewports are the only
+    // place where the "rotate your phone" prompt adds value.
+    setPhoneViewport(isMobileScreenSize());
+    const updateViewport = () => {
+      setLandscape(window.innerWidth > window.innerHeight);
+      setPhoneViewport(isMobileScreenSize());
+    };
     updateViewport();
     syncInstallState();
 
-    // Portrait lock is an installed-PWA concern only. Browser tabs reject
-    // Screen Orientation lock anyway, and must stay usable so the landing
-    // page / Install PWA buttons remain reachable in landscape.
-    if (isPwaInstalled() && !isCoursePlayerRotationActive()) lockAppToPortrait();
+    // Portrait lock is an installed-PWA + phone-viewport concern only.
+    // Browser tabs reject Screen Orientation lock anyway, and must stay
+    // usable so the landing page / Install PWA buttons remain reachable
+    // in landscape. Tablet + desktop are never locked — the layouts
+    // are designed to work in any orientation.
+    if (isPwaInstalled() && isMobileScreenSize() && !isCoursePlayerRotationActive()) lockAppToPortrait();
     const unsubscribe = onCoursePlayerRotationChange(() => {
       setPlayerOpen(isCoursePlayerRotationActive());
     });
@@ -61,9 +80,12 @@ export default function PortraitOnlyGuard() {
   }, []);
 
   // Regular browser tabs never show the overlay (so Install PWA stays
-  // reachable). Desktop never shows it. The open Course Player is the
-  // single installed-PWA screen that is allowed to be landscape.
-  if (!installed || !mobile || playerOpen || !landscape) return null;
+  // reachable). Desktop never shows it. Tablets never show it either —
+  // the tablet layouts are designed to work in any orientation. The
+  // overlay is reserved for the phone-only installed-PWA case, and
+  // the open Course Player is the one screen that is allowed to be
+  // landscape even on a phone.
+  if (!installed || !mobile || !phoneViewport || playerOpen || !landscape) return null;
 
   return (
     <div
@@ -78,7 +100,7 @@ export default function PortraitOnlyGuard() {
         </div>
         <h2 className="mt-6 text-xl font-black tracking-tight">Rotate your phone</h2>
         <p className="mx-auto mt-2 max-w-[260px] text-sm leading-relaxed text-slate-300">
-          {appName} runs in portrait mode. The screen can only rotate while a course lesson is open.
+          {appName} runs in portrait mode on phones. The screen can only rotate while a course lesson is open.
         </p>
       </div>
     </div>

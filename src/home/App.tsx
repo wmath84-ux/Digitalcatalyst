@@ -217,7 +217,7 @@ export default function App({
 
   return (
     <div className="dc-app-shell min-h-screen sm:py-6">
-      <div data-app-frame className="dc-app-frame relative mx-auto flex min-h-screen max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem]">
+      <div data-app-frame className="dc-app-frame relative mx-auto flex min-h-screen max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0">
         <div ref={contentTopRef} />
         <Header
           ref={searchInputRef}
@@ -235,9 +235,9 @@ export default function App({
           <div aria-hidden className="pointer-events-none absolute left-4 top-44 h-32 w-32 rounded-full bg-violet-200/20 blur-3xl" />
           <div aria-hidden className="pointer-events-none absolute right-0 top-72 h-40 w-40 rounded-full bg-sky-200/20 blur-3xl" />
           {isSearching ? (
-            <section className="px-5 pt-6">
+            <section data-home-grid className="px-5 pt-6 md:px-8">
               <div className="flex items-center justify-between">
-                <h2 className="text-base font-bold text-slate-900">
+                <h2 className="text-base font-bold text-slate-900 md:text-lg">
                   Results for “{searchQuery}”
                 </h2>
                 <button
@@ -261,7 +261,7 @@ export default function App({
                   </p>
                 </div>
               ) : (
-                <div className="mt-4 grid grid-cols-2 gap-3">
+                <div data-home-grid className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
                   {searchResults.map((product) => (
                     <ProductCard
                       key={product.id}
@@ -276,9 +276,11 @@ export default function App({
             </section>
           ) : (
             <>
-              <HeroCarousel banners={banners} onOpen={handleBannerOpen} />
+              <div data-home-hero>
+                <HeroCarousel banners={banners} onOpen={handleBannerOpen} />
+              </div>
 
-              <div>
+              <div data-home-category-nav>
                 <CategoryNav
                   categories={categories}
                   activeCategory={activeCategory}
@@ -287,22 +289,24 @@ export default function App({
               </div>
 
               {continueLearningEntries.length > 0 && (
-                <ContinueLearning
-                  items={continueLearningEntries.map(({ item, progress }) => ({
-                    id: item.id,
-                    title: item.title,
-                    author: item.author,
-                    image: item.image,
-                    progress,
-                    onResume: () => onNavigateToCourse(item),
-                    onOpen: () => onNavigateToCourse(item),
-                  }))}
-                />
+                <div data-home-continue>
+                  <ContinueLearning
+                    items={continueLearningEntries.map(({ item, progress }) => ({
+                      id: item.id,
+                      title: item.title,
+                      author: item.author,
+                      image: item.image,
+                      progress,
+                      onResume: () => onNavigateToCourse(item),
+                      onOpen: () => onNavigateToCourse(item),
+                    }))}
+                  />
+                </div>
               )}
 
-              <section className="px-5 pt-6">
+              <section data-home-trending className="px-5 pt-6 md:px-8">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold text-slate-900">
+                  <h2 className="text-base font-bold text-slate-900 md:text-lg">
                     {activeCategory === "all"
                       ? "Trending Now"
                       : categories.find((c) => c.id === activeCategory)?.label}
@@ -321,7 +325,7 @@ export default function App({
                     No products in this category yet.
                   </p>
                 ) : (
-                  <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div data-home-grid className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
                     {categoryFiltered.map((product) => (
                       <ProductCard
                         key={product.id}
@@ -335,7 +339,9 @@ export default function App({
                 )}
               </section>
 
-              <Reviews reviews={homepageReviews} onOpenReview={handleOpenReview} />
+              <div data-home-reviews>
+                <Reviews reviews={homepageReviews} onOpenReview={handleOpenReview} />
+              </div>
             </>
           )}
         </main>

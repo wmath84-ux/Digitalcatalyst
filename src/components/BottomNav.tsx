@@ -109,10 +109,10 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
       )}
 
       <nav
-        className="pointer-events-none sticky bottom-0 z-30 w-full px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-1"
+        className="pointer-events-none sticky bottom-0 z-30 w-full px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-1 md:px-6"
         aria-label="Primary"
       >
-        <div className="dc-footer-shell pointer-events-auto">
+        <div className="dc-footer-shell pointer-events-auto md:mx-auto md:max-w-[720px]">
           <div className="dc-footer-glow" aria-hidden="true" />
           <div
             data-site-footer

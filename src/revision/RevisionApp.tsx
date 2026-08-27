@@ -195,19 +195,21 @@ export default function RevisionApp() {
 
   return (
     <div className="dc-app-shell min-h-screen sm:py-6">
-      <div data-app-frame className="dc-app-frame relative mx-auto flex h-dvh w-full max-w-md flex-col overflow-hidden sm:h-[calc(100vh-3rem)] sm:rounded-[2rem]">
+      <div data-app-frame className="dc-app-frame relative mx-auto flex h-dvh w-full max-w-md flex-col overflow-hidden sm:h-[calc(100vh-3rem)] sm:rounded-[2rem] md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0">
         <ExitGuardProvider onNavigate={(href) => { window.location.hash = href; }}>
           <RevisionHeaderProvider>
             <RevisionStoreHeader cartCount={cartIds.size} />
             {revisionAccessLoading || revisionDataLoading ? (
-              <div data-revision-access-loading className="grid min-h-0 flex-1 place-items-center bg-transparent px-4">
+              <div data-revision-access-loading data-revision-content className="grid min-h-0 flex-1 place-items-center bg-transparent px-4">
                 <div className="dc-glass flex flex-col items-center gap-2 rounded-3xl px-8 py-7 text-slate-400">
                   <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-violet-500" />
                   <p className="text-xs font-semibold">{revisionAccessLoading ? "Checking your membership…" : "Syncing your Test Bank…"}</p>
                 </div>
               </div>
             ) : (
-              <Fragment key={syncKey}>{page}</Fragment>
+              <div data-revision-content className="min-h-0 flex-1">
+                <Fragment key={syncKey}>{page}</Fragment>
+              </div>
             )}
 
             {/* Floating subscription gate — appears when a paywalled action is

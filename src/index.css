@@ -197,6 +197,161 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   Tablet layout (768 – 1023 px)
+   ─────────────────────────────────────────────────────────────────────
+   The phone-shaped frame (max-w-md, rounded-[2rem], big drop shadow) was
+   never meant to live on a tablet — on a 768 px wide iPad it would
+   just sit in the middle of the screen with a 160 px gutter on either
+   side, which is the "stretched and failed" feeling the latest UX
+   feedback called out.
+
+   This block reshapes the app shell for tablet:
+
+   • Drop the phone frame's max-width + rounded corners + heavy shadow
+     so the content takes the device's real width with a comfortable
+     24 px gutter.
+   • Switch single-column content to 2- or 3-column grids (the same
+     components that were already on the page, just used at their
+     natural tablet density).
+   • Keep the bottom nav (a tablet held in two hands is closer to a
+     phone in ergonomics than a desktop with a mouse) but reduce the
+     shell padding so cards reach the gutter cleanly.
+   • Hide the rotation black-screen overlay (handled in
+     PortraitOnlyGuard.tsx) so the app is fully usable in landscape.
+
+   The desktop polish (1024 px +) lands in a follow-up.
+   ───────────────────────────────────────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Drop the phone-shaped frame: the app is a real tablet app, not a
+     scaled-up phone. No rounded corners, no phone shadow, no fake
+     "device bezel" — the content sits in a real window. */
+  [data-app-frame] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 100dvh;
+    height: auto;
+    border-radius: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* The surrounding shell: a real tablet container with a soft
+     page background, comfortable horizontal padding, and a wider
+     max-width so the content reads at tablet scale. */
+  .dc-app-shell {
+    background:
+      radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.18), transparent 48%),
+      radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.16), transparent 42%),
+      radial-gradient(88% 62% at 50% 100%, rgba(244, 114, 182, 0.10), transparent 48%),
+      linear-gradient(180deg, #f6f8ff 0%, #eef3ff 46%, #f8fafc 100%);
+  }
+
+  /* Standard inner content max-width: gives the page a comfortable
+     reading column on a tablet without leaving the gutters empty. The
+     720 px figure was chosen so a 768 px iPad portrait gets a 24 px
+     gutter on either side. Landscape iPad (1024 px) is at the
+     tablet/desktop boundary; the next block opens it up further. */
+  .dc-app-shell > main,
+  .dc-app-shell > [data-app-frame] > main {
+    max-width: 720px;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  /* Header row inside the tablet frame: keep the brand block on the
+     left and the action cluster on the right, but cap the row width
+     so the page is centred with the same 24 px gutter. */
+  [data-site-header] {
+    max-width: 720px;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  /* The hero carousel, the product grids, the category nav, the
+     "Continue learning" row and the reviews section all get the same
+     centered 720 px treatment so the visual rhythm matches. */
+  [data-home-hero],
+  [data-home-category-nav],
+  [data-home-continue],
+  [data-home-trending],
+  [data-home-reviews] {
+    max-width: 720px;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  /* Grids: the home / store / PDP cards live in a 2-col grid on
+     phones. On a tablet they become 3 columns (the same cards at a
+     smaller scale feel much more like a real product list than a
+     stretched 2-col layout). */
+  [data-home-grid],
+  [data-store-grid],
+  [data-pdp-grid] {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  /* The My Day / Revision / Profile / Notification content
+     containers get the same 720 px ceiling and auto gutters. */
+  [data-myday-content],
+  [data-revision-content],
+  [data-profile-content],
+  [data-notifications-content] {
+    max-width: 720px;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  /* The bottom nav (floating magic pill) sits at 720 px wide on a
+     tablet — the same look as the phone, just wider, with a 24 px
+     gutter to the device edge. */
+  [data-site-footer].dc-footer-shell {
+    max-width: 720px;
+    margin-inline: auto;
+    width: calc(100% - 48px);
+  }
+
+  /* The My Day overview's big create button sits centred in its
+     720 px column instead of stretching edge-to-edge. */
+  [data-myday-create-row] {
+    max-width: 720px;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  /* PDP carousel + body content: cap the row so the layout looks
+     like a real tablet product page (no stretched phone mock). */
+  [data-pdp-scroll] {
+    max-width: 720px;
+    margin-inline: auto;
+  }
+
+  /* Cart / favorites rows: same ceiling. */
+  [data-cart-row],
+  [data-favorites-row] {
+    max-width: 720px;
+    margin-inline: auto;
+  }
+
+  /* Header brand block gets a bit more breathing room on a tablet. */
+  [data-site-header] .h-11.w-11 {
+    height: 3rem;
+    width: 3rem;
+  }
+  [data-site-header] h1 {
+    font-size: 1.25rem;
+  }
+
+  /* Hero carousel: bigger height + bigger typography on a tablet so
+     the slide actually fills the wider frame. */
+  [data-home-hero] .h-44 {
+    height: 14rem;
+  }
+}
+
 @media (max-width: 374px) {
   .dc-footer-pill button {
     font-size: 10px;
@@ -1209,6 +1364,495 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   .dc-profile-status-orbit::before,
   .dc-profile-status-orbit::after {
     animation: none;
+  }
+}
+
+/* ── Profile — Glass System v2 ─────────────────────────────────────────
+   Rules followed (from the transparency guidelines):
+   1. Transparency is a *variable behavior*, not a fixed identity. The
+      page exposes three opt-in modes (Clear / Tinted / Solid) that
+      change the opacity family of every glass surface, plus automatic
+      retreat for high-contrast and reduced-transparency preferences.
+   2. Material hierarchy by surface role:
+        • Hero (identity surface, persistent)        → LENS, with an
+          internal scrim behind the text so legibility never depends on
+          the moving background.
+        • Persistent content cards (membership, renewal, library, …)   →
+          CONTAINERS — frosted, slightly more opaque, stable, with clear
+          edges. They suppress background noise.
+        • Inline stats (Plan / Billing / Access / Purchased / …)        →
+          SOLID surfaces (chips), so a small label never competes with
+          a shifting orb.
+        • Ephemeral surfaces (modals, hover/focus rings, toggle thumbs) →
+          full lens treatment — more transparency, more refraction.
+        • Floating action buttons (Edit profile, Copy, Save)            →
+          lenses with refractive edge highlights and responsive halo.
+   3. Legibility scrim: behind every important text block inside the
+      hero we render a soft scrim so the moving orbs do not dictate
+      contrast.
+   4. Physical properties are preserved (orbit, edge highlights,
+      light-bending highlight at the top edge) but the volume of
+      background information is strictly controlled.
+   ──────────────────────────────────────────────────────────────────── */
+
+/* The page root opts in to a mode. The default is "clear"; users pick
+   "tinted" or "solid" via the new glass-mode toggle in the profile
+   header. High-contrast and reduced-transparency preferences force
+   "solid" automatically. */
+[data-profile-page][data-glass-mode="clear"] {
+  --glass-card-bg:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.42));
+  --glass-card-border: rgba(255, 255, 255, 0.72);
+  --glass-card-shadow:
+    0 20px 40px -24px rgba(79, 70, 229, 0.45),
+    0 10px 22px -16px rgba(15, 23, 42, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  --glass-card-blur: blur(22px) saturate(170%);
+  --glass-chip-bg: rgba(255, 255, 255, 0.62);
+  --glass-chip-border: rgba(255, 255, 255, 0.7);
+  --glass-scrim: rgba(255, 255, 255, 0.18);
+  --glass-divider: rgba(15, 23, 42, 0.08);
+  --glass-edge: rgba(255, 255, 255, 0.85);
+}
+
+[data-profile-page][data-glass-mode="tinted"] {
+  --glass-card-bg:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.94), rgba(244, 246, 255, 0.86));
+  --glass-card-border: rgba(255, 255, 255, 0.92);
+  --glass-card-shadow:
+    0 18px 34px -22px rgba(79, 70, 229, 0.36),
+    0 8px 18px -14px rgba(15, 23, 42, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  --glass-card-blur: blur(14px) saturate(140%);
+  --glass-chip-bg: rgba(255, 255, 255, 0.86);
+  --glass-chip-border: rgba(15, 23, 42, 0.08);
+  --glass-scrim: rgba(255, 255, 255, 0.42);
+  --glass-divider: rgba(15, 23, 42, 0.1);
+  --glass-edge: rgba(255, 255, 255, 0.98);
+}
+
+[data-profile-page][data-glass-mode="solid"] {
+  --glass-card-bg:
+    linear-gradient(180deg, #ffffff, #f8fafc);
+  --glass-card-border: rgba(15, 23, 42, 0.08);
+  --glass-card-shadow:
+    0 14px 28px -20px rgba(15, 23, 42, 0.16),
+    0 6px 12px -8px rgba(15, 23, 42, 0.08);
+  --glass-card-blur: blur(0);
+  --glass-chip-bg: #f1f5f9;
+  --glass-chip-border: rgba(15, 23, 42, 0.1);
+  --glass-scrim: #ffffff;
+  --glass-divider: rgba(15, 23, 42, 0.1);
+  --glass-edge: rgba(255, 255, 255, 0);
+}
+
+/* Container — persistent content surface (cards, sections). */
+.dc-glass-container {
+  position: relative;
+  isolation: isolate;
+  background: var(--glass-card-bg);
+  backdrop-filter: var(--glass-card-blur);
+  -webkit-backdrop-filter: var(--glass-card-blur);
+  border: 1px solid var(--glass-card-border);
+  box-shadow: var(--glass-card-shadow);
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    backdrop-filter 0.25s ease;
+}
+
+/* Edge highlight — a soft top "light bending" line drawn on top of the
+   card content. It is the iOS-27/Acrylic signature: the rim catches a
+   brighter highlight at the top. */
+.dc-glass-container::after,
+.dc-glass-lens::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    var(--glass-edge) 0%,
+    rgba(255, 255, 255, 0) 18%,
+    rgba(255, 255, 255, 0) 82%,
+    rgba(255, 255, 255, 0.18) 100%
+  );
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  z-index: 0;
+}
+
+.dc-glass-container > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Lens — the hero identity card. Higher transparency, dramatic edge,
+   refracted top highlight. */
+.dc-glass-lens {
+  position: relative;
+  isolation: isolate;
+  background: var(--glass-card-bg);
+  backdrop-filter: var(--glass-card-blur);
+  -webkit-backdrop-filter: var(--glass-card-blur);
+  border: 1px solid var(--glass-card-border);
+  box-shadow: var(--glass-card-shadow);
+  overflow: hidden;
+}
+
+.dc-glass-lens > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Chip — small inline element that must always be readable. Solid. */
+.dc-glass-chip-surface {
+  background: var(--glass-chip-bg);
+  border: 1px solid var(--glass-chip-border);
+}
+
+/* Scrim — a panel that lives BEHIND a chunk of text inside a card so
+   the moving background cannot dictate legibility. */
+.dc-glass-scrim {
+  background: var(--glass-scrim);
+  backdrop-filter: blur(6px) saturate(120%);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Section header (eyebrow + title). No transparency — the title is
+   the page's primary structural anchor. */
+.dc-profile-section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.25rem;
+}
+
+/* Glass mode toggle. The toggle lives in the page header so the user
+   always knows the page has a "retreat" available. */
+.dc-glass-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.2rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 4px 12px -6px rgba(79, 70, 229, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+}
+
+.dc-glass-mode button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(71, 85, 105, 0.85);
+  transition: color 0.2s ease;
+}
+
+.dc-glass-mode button[aria-pressed="true"] {
+  color: #ffffff;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow:
+    0 6px 14px -6px rgba(79, 70, 229, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.dc-glass-mode button:not([aria-pressed="true"]):hover {
+  color: #4338ca;
+}
+
+/* Tonal pill that lives inside cards. The pill is a permanent surface
+   and so is solid / high-opacity. It never competes with the glass. */
+.dc-tonal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--glass-chip-bg);
+  border: 1px solid var(--glass-chip-border);
+}
+
+/* Refractive edge — a 1px bright sliver on the top-left of cards. */
+.dc-glass-edge-highlight {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.7) 0%,
+    rgba(255, 255, 255, 0) 28%
+  );
+  mix-blend-mode: overlay;
+  opacity: 0.7;
+  z-index: 0;
+}
+
+/* Section eyebrow + heading pair, used everywhere a card section
+   starts. The eyebrow is the structural marker. */
+.dc-eyebrow {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #6366f1;
+}
+
+.dc-eyebrow--cyan { color: #0e7490; }
+.dc-eyebrow--amber { color: #b45309; }
+.dc-eyebrow--rose { color: #be123c; }
+.dc-eyebrow--emerald { color: #047857; }
+.dc-eyebrow--violet { color: #6d28d9; }
+.dc-eyebrow--slate { color: #475569; }
+
+/* The library stat tile — small, dense, always readable. Solid surface
+   inside a glass container. The icon stays tinted to mark the
+   category. */
+.dc-stat-tile {
+  position: relative;
+  isolation: isolate;
+  border-radius: 1rem;
+  padding: 0.85rem 0.6rem 0.7rem;
+  text-align: center;
+  background: var(--glass-chip-bg);
+  border: 1px solid var(--glass-chip-border);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.dc-stat-tile:hover { background: rgba(255, 255, 255, 0.92); }
+.dc-stat-tile:active { transform: scale(0.98); }
+
+/* Toggle switch — an ephemeral control, but it must still be clearly
+   visible. A "lens" treatment: more saturated, with a refractive
+   inner highlight and edge halo on the active thumb. */
+.dc-toggle {
+  position: relative;
+  height: 1.65rem;
+  width: 2.6rem;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+.dc-toggle[data-on="true"] {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 246, 0.25),
+    0 6px 14px -6px rgba(124, 58, 237, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.dc-toggle > span {
+  position: absolute;
+  top: 1px;
+  height: 1.4rem;
+  width: 1.4rem;
+  border-radius: 9999px;
+  background:
+    radial-gradient(120% 120% at 30% 25%, #ffffff 0%, #eef2ff 60%, #c7d2fe 100%);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.04),
+    0 4px 10px -4px rgba(15, 23, 42, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.dc-toggle[data-on="true"] > span { transform: translateX(0.95rem); }
+.dc-toggle[data-on="false"] > span { transform: translateX(2px); }
+
+/* Floating action lens — a button that lives over the hero and is
+   expected to refract. Higher transparency, brighter edge. */
+.dc-action-lens {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow:
+    0 12px 24px -10px rgba(15, 23, 42, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  color: #ffffff;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.dc-action-lens::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0) 38%
+  );
+  mix-blend-mode: overlay;
+  opacity: 0.85;
+}
+.dc-action-lens:hover { background: rgba(255, 255, 255, 0.28); }
+.dc-action-lens:active { transform: scale(0.99); }
+
+/* Floating chip inside the hero (Edit profile shortcut etc.). It is a
+   small lens — refractive top edge, otherwise transparent. */
+.dc-hero-lens-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  color: #ffffff;
+  box-shadow:
+    0 6px 14px -6px rgba(15, 23, 42, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+.dc-hero-lens-chip::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 50%);
+  mix-blend-mode: overlay;
+  opacity: 0.7;
+}
+
+/* Modal (Edit profile / Preferences). Higher transparency, dramatic
+   blur, because modals are temporary surfaces. */
+.dc-modal-sheet {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 255, 0.88));
+  backdrop-filter: blur(34px) saturate(180%);
+  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 36px 80px -22px rgba(79, 70, 229, 0.5),
+    0 12px 26px -12px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+}
+.dc-modal-sheet::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 22%);
+  mix-blend-mode: screen;
+  opacity: 0.5;
+}
+
+.dc-modal-backdrop {
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(79, 70, 229, 0.22), transparent 50%),
+    rgba(8, 11, 26, 0.5);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
+/* Form field inside modals — a glass input. */
+.dc-glass-input {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 4px 10px -6px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(6px) saturate(140%);
+  -webkit-backdrop-filter: blur(6px) saturate(140%);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.dc-glass-input:focus {
+  background: #ffffff;
+  border-color: rgba(99, 102, 241, 0.55);
+  box-shadow:
+    0 0 0 3px rgba(99, 102, 241, 0.18),
+    0 1px 0 rgba(255, 255, 255, 1) inset;
+  outline: none;
+}
+
+/* Library section divider — strong, opaque, inside the glass card. The
+   divider is a structural marker, not a decorative gradient. */
+.dc-glass-divider {
+  height: 1px;
+  background: var(--glass-divider);
+}
+
+/* Hero text scrim — sits behind the identity block (name + email +
+   member-since + bio + button) so legibility never depends on the
+   moving orbs. The scrim is a soft panel with its own blur so the
+   glass identity of the hero is preserved. */
+.dc-hero-text-scrim {
+  position: relative;
+  border-radius: 1.25rem;
+  padding: 0.85rem 0.95rem 0.95rem;
+  background: linear-gradient(180deg, rgba(8, 11, 26, 0.34), rgba(8, 11, 26, 0.22));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+}
+
+/* When the page is in "tinted" or "solid" mode, suppress the
+   refracted light line on the hero so the page no longer looks like a
+   dynamic window into a noisy background. The rule preserves the
+   structural shadows but removes the lens signature. */
+[data-profile-page][data-glass-mode="tinted"] .dc-glass-lens::after,
+[data-profile-page][data-glass-mode="solid"] .dc-glass-lens::after,
+[data-profile-page][data-glass-mode="tinted"] .dc-glass-container::after,
+[data-profile-page][data-glass-mode="solid"] .dc-glass-container::after {
+  display: none;
+}
+[data-profile-page][data-glass-mode="solid"] .dc-profile-aurora,
+[data-profile-page][data-glass-mode="solid"] .dc-profile-plan-orbit {
+  display: none;
+}
+
+/* System-level retreat: when the user wants more contrast or no
+   transparency at all, fall back to the "solid" surface treatment. We
+   do this with a `data-glass-mode` override so users can still pick
+   the clear/tinted look afterwards. */
+@media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+  [data-profile-page] {
+    --glass-card-bg: linear-gradient(180deg, #ffffff, #f8fafc);
+    --glass-card-border: rgba(15, 23, 42, 0.1);
+    --glass-card-blur: blur(0);
+    --glass-chip-bg: #f1f5f9;
+    --glass-chip-border: rgba(15, 23, 42, 0.1);
+    --glass-scrim: #ffffff;
+    --glass-divider: rgba(15, 23, 42, 0.12);
+    --glass-edge: rgba(255, 255, 255, 0);
+  }
+  [data-profile-page] .dc-profile-aurora,
+  [data-profile-page] .dc-profile-plan-orbit,
+  [data-profile-page] .dc-glass-lens::after,
+  [data-profile-page] .dc-glass-container::after {
+    display: none;
   }
 }
 

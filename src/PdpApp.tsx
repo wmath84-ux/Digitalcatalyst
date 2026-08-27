@@ -112,7 +112,7 @@ export const getRelatedProducts = (product: Product, catalog: Product[], limit =
 export default function ProductDetail(props: ProductDetailProps) {
   return (
     <div className="min-h-screen bg-white sm:py-6">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200 md:max-w-none md:rounded-none md:border-0 md:shadow-none md:bg-transparent">
         <Header
           cartCount={props.cartIds?.size || 0}
           notifCount={1}
@@ -120,7 +120,7 @@ export default function ProductDetail(props: ProductDetailProps) {
           onNavigateToCart={props.onNavigateToCart || (() => undefined)}
           onNavigateToNotifications={props.onNavigateToNotifications || (() => undefined)}
         />
-        <main data-pdp-scroll className="min-h-0 flex-1 overflow-y-auto">
+        <main data-pdp-scroll data-pdp-grid className="min-h-0 flex-1 overflow-y-auto md:px-8">
           {props.product ? <PremiumProductContent {...props} product={props.product} /> : <MissingProduct onBack={props.onBack} />}
         </main>
         <BottomNav
