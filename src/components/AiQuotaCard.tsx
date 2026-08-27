@@ -27,7 +27,7 @@ function Bar({ used, limit, unlimited, tone }: { used: number; limit: number; un
   const pct = unlimited || limit <= 0 ? 8 : Math.max(4, Math.min(100, Math.round(((limit - used) / limit) * 100)));
   const usedPct = unlimited ? 8 : Math.max(0, Math.min(100, Math.round((used / Math.max(1, limit)) * 100)));
   return (
-    <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/50 ring-1 ring-white/70">
+    <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/70">
       <div
         data-ai-quota-bar
         className={`h-full rounded-full transition-all duration-500 ${tone}`}
@@ -126,16 +126,15 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
     : snap.allowed ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700";
 
   return (
-    <section data-ai-quota-card aria-live="polite" className="dc-glass relative overflow-hidden rounded-[2rem] p-5">
-      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-violet-400/30 blur-2xl" />
+    <section data-ai-quota-card aria-live="polite" className="relative rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_14px_40px_-24px_rgba(49,46,129,0.35)]">
       <div className="relative">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-violet-500/15 text-violet-700 ring-1 ring-violet-300/40 shadow-[0_10px_22px_-12px_rgba(109,40,217,0.7)]">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-700 ring-1 ring-violet-100">
               <Sparkles className="h-6 w-6" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-400">School AI allowance</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600">School AI allowance</p>
               <h3 className="mt-1 truncate text-lg font-black text-slate-950">
                 {hasAuthoritativeSnapshot
                   ? `${snap.planName} · ${snap.planId === "free" ? "No billing cycle" : `${formatCycle(snap.cycle)} billing`}`
@@ -150,7 +149,7 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
               aria-label="Refresh AI allowance"
               disabled={syncing}
               onClick={() => void refresh()}
-              className="grid h-8 w-8 place-items-center rounded-full bg-white/60 text-violet-600 shadow-sm ring-1 ring-white/70 backdrop-blur-md disabled:opacity-50"
+              className="grid h-8 w-8 place-items-center rounded-full border border-slate-200 bg-white text-violet-600 shadow-sm transition hover:bg-violet-50 disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
             </button>
@@ -161,7 +160,7 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
         </div>
 
         {!hasAuthoritativeSnapshot ? (
-          <div className="mt-5 rounded-2xl border border-white/70 bg-white/45 p-4 backdrop-blur-md" role="status">
+          <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-4" role="status">
             {syncing ? (
               <div className="space-y-3">
                 <div className="h-3 w-3/4 animate-pulse rounded-full bg-violet-100" />
@@ -208,7 +207,7 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
             </div>
 
             {snap.costEnabled && (
-              <div className="mt-4 rounded-2xl border border-amber-100/80 bg-white/45 p-3 backdrop-blur-md">
+              <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50/60 p-3">
                 <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
                   <span className="inline-flex items-center gap-1">
                     <Coins className="h-3.5 w-3.5 text-amber-600" />
