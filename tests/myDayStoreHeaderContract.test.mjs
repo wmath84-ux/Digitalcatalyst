@@ -16,8 +16,12 @@ test("My Day renders ONE header — the shared store header, rebranded", () => {
   assert.doesNotMatch(myDay, /<h1 className="hidden text-lg font-bold text-slate-900 lg:block">My Day<\/h1>/);
 });
 
-test("My Day rebrands the shared header: Eduvora Taskar + My Day Activities", () => {
-  assert.match(myDay, /title="Eduvora Taskar"/);
+test("My Day rebrands the shared header: app-name Tasker + My Day Activities", () => {
+  // The title is now driven by the branding context (so the merchant's
+  // chosen app name shows up here) and the literal "Eduvora Taskar"
+  // string is no longer hardcoded. The brand evolved from "Taskar" to
+  // "Tasker" — the test follows the latest source.
+  assert.match(myDay, /title=\{`\$\{appName\} Tasker`\}/);
   assert.match(myDay, /subtitle="My Day Activities"/);
 });
 

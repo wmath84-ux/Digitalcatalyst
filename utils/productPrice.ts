@@ -43,7 +43,7 @@ const formatPriceHistoryLabel = (value: unknown, fallback: string): string => {
 
 export const getProductPriceDetails = (product: { price?: string; salePrice?: string | null | undefined }): ProductPriceDetails => {
   const rawOriginalPrice = parseProductPriceValue(product?.price);
-  const originalPrice = Number.isFinite(rawOriginalPrice) ? rawOriginalPrice : 0;
+  const originalPrice = rawOriginalPrice !== null ? rawOriginalPrice : 0;
   const normalizedSalePrice = normalizePriceString(product?.salePrice);
   const rawSalePrice = normalizedSalePrice ? parseProductPriceValue(normalizedSalePrice) : null;
   const currentPrice = rawSalePrice !== null ? rawSalePrice : originalPrice;

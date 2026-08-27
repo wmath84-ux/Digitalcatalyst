@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { collection, deleteDoc, doc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { DEFAULT_LOGO_URL, readCachedBranding } from '../src/utils/branding';
@@ -297,7 +298,10 @@ export const sendWebPushSelfTest = async (uid: string): Promise<WebPushTestResul
   }
   const subscription = await subscribeToWebPush();
   if (!subscription) {
-    const denied = window.Notification.permission === 'denied';
+    const permission: NotificationPermission = typeof window !== 'undefined' && 'Notification' in window
+      ? (window.Notification.permission as NotificationPermission)
+      : 'default';
+    const denied = permission === 'denied';
     return { ok: false, code: denied ? 'permission_denied' : 'subscribe_failed', message: denied ? 'Notification permission was denied. Enable it in browser Site settings.' : 'The browser could not create a push subscription. Check notification permission and the public VAPID key.' };
   }
 

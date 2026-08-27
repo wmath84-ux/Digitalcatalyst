@@ -238,8 +238,8 @@ function PremiumProductContent({
     () => filterCurriculumForPdp(collectedModules, { isProductOwned: false, ownedUpdateIds: new Set() }).modules,
     [collectedModules],
   );
-  const { modules, curriculumMode } = useMemo(
-    () => filterCurriculumForPdp(collectedModules, { isProductOwned, ownedUpdateIds: updates }),
+  const { modules, mode: curriculumMode } = useMemo(
+    () => filterCurriculumForPdp(collectedModules as unknown as CurriculumModule[], { isProductOwned, ownedUpdateIds: updates }) as { modules: CurriculumModule[]; mode: CurriculumViewMode },
     [collectedModules, isProductOwned, updates],
   );
   const { modulesCount, resourcesCount: resourceCount } = useMemo(() => countCurriculumTree(includedCurriculum), [includedCurriculum]);

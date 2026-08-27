@@ -101,6 +101,7 @@ function GateContent({
   asPage,
   subtitle,
 }: Omit<Props, "open">) {
+  const { appName } = useBranding();
   const isMyDay = variant === "myday";
   const perks = isMyDay ? MYDAY_PERKS : REVISION_PERKS;
 
@@ -227,7 +228,6 @@ export default function PremiumGate({
   asPage = false,
   subtitle,
 }: Props) {
-  const { appName } = useBranding();
   if (!open) return null;
 
   if (asPage) {

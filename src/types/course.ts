@@ -23,6 +23,13 @@ export interface CoursePlayerNote {
   moduleId?: string;
   /** Resource the note was captured from (optional). */
   resourceId?: string;
+  /**
+   * Ids of other notes this note is "linked" to (drawn as wires between
+   * note cards). Persisted alongside the note text so a re-open restores
+   * the user's link graph. Older notes never had this field — readers
+   * treat a missing value as an empty array.
+   */
+  links?: string[];
 }
 
 export interface CourseAccessMeta {

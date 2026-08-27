@@ -15,14 +15,20 @@ import fs from "node:fs";
 
 const page = fs.readFileSync("src/revision/pages/RevisionProfilePage.tsx", "utf8");
 
-test("AI cards match the website brand gradient with glassmorphism + shadow", () => {
-  // AI Configuration
-  assert.match(page, /from-indigo-600 via-violet-600 to-fuchsia-600/);
-  // Generate Questions
-  assert.match(page, /from-indigo-500 via-violet-500 to-purple-600/);
-  // Glassmorphism + deep branded shadow + glass ring on both cards.
-  assert.match(page, /shadow-\[0_24px_50px_-20px_rgba\(79,70,229,0\.65\)\] ring-1 ring-white\/30 backdrop-blur/);
-  assert.match(page, /shadow-\[0_24px_50px_-20px_rgba\(124,58,237,0\.6\)\] ring-1 ring-white\/30 backdrop-blur/);
+test("AI cards use the website brand gradient with glassmorphism + shadow", () => {
+  // The redesign consolidated the two AI cards into a single launchpad
+  // hero on the profile page, with a glass surface + branded shadow
+  // stack. Assert that the brand gradient + glassmorphism are still
+  // present in some form on the AI / Configure sections.
+  assert.match(page, /dc-glass-hero/);
+  assert.match(page, /Generate Questions with AI/);
+  // The Configure AI card uses the indigo→violet brand icon tile.
+  assert.match(page, /from-indigo-500 to-violet-600/);
+  // The Bulk Import card keeps a branded surface with shadow.
+  assert.match(page, /from-sky-50 to-indigo-50/);
+  // Glassmorphism / branded shadow are still used on the hero.
+  assert.match(page, /backdrop-blur-xl/);
+  assert.match(page, /shadow-\[0_20px_40px_-26px_rgba\(79,70,229,0\.55\)\]/);
 });
 
 test("snapshot cards below Import use the stable rev-card surface (no glitch)", () => {

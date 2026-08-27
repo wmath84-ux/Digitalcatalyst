@@ -423,8 +423,6 @@ export const getHigherSubscriptionTier = (current: SubscriptionTier, requested: 
   getSubscriptionTierRank(requested) > getSubscriptionTierRank(current) ? requested : current
 );
 
-const toUserRecord = (user: unknown): Record<string, unknown> => (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
-
 export const getUserSubscriptionTier = (user: unknown): SubscriptionTier => {
   if (isSubscriptionExpired(user)) return 'normal';
   const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;

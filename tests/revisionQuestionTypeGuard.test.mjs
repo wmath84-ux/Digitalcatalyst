@@ -252,7 +252,7 @@ test("both prompt builders require the truthful per-question type tag and exact 
     assert.match(source, /Mark each question object with "type":"theory"/);
     assert.match(source, /Mark each question object with "type":"application"/);
   }
-  assert.match(client, /import \{ mixedModeSplit \} from "\.\.\/\.\.\/\.\.\/utils\/questionTypeGuard\.js"/);
+  assert.match(client, /import \{ mixedModeSplit.*\} from "\.\.\/\.\.\/\.\.\/utils\/questionTypeGuard\.js"/);
   assert.match(client, /questionStyleLines\(input\.questionMode, input\.count\)/);
   assert.match(server, /questionStyleLines\(syllabus\.questionMode, syllabus\.count\)/);
 });

@@ -212,11 +212,11 @@ export default function SubscriptionPage({
     const firebaseUser = auth.currentUser;
     if (!firebaseUser || firebaseUser.uid !== user.id) return;
     repairedOrderIdsRef.current.add(orderId);
-    void firebaseUser.getIdToken().then((token) => fetch("/api/razorpay/verify-payment", {
+    void firebaseUser.getIdToken().then((token: string) => fetch("/api/razorpay/verify-payment", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ orderId }),
-    })).then((response) => {
+    })).then((response: Response) => {
       if (!response.ok) repairedOrderIdsRef.current.delete(orderId);
     }).catch(() => repairedOrderIdsRef.current.delete(orderId));
   }, [activeSubscription, user]);

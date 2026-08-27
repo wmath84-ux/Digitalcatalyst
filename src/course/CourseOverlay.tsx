@@ -144,6 +144,7 @@ interface CourseOverlayProps {
   onAddNote: (text: string) => void;
   onEditNote: (id: string, text: string) => void;
   onDeleteNote: (id: string) => void;
+  onLinkNote: (id: string, links: string[]) => void;
   // Reports upward when the landscape notes editor is open so the parent can
   // re-flow the content area into a 60/40 split (lesson on the left, notes
   // + keyboard on the right) without obscuring the lesson.
