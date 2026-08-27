@@ -164,8 +164,10 @@ const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; 
   // Mind Map sits immediately after Note, so the two private-study tools are
   // neighbours in the dock. It opens the same way — a sheet over the lesson —
   // but claims HALF the screen instead of the notes' 40%, because a diagram
-  // needs both width and height to stay readable.
-  { key: "mindmap", label: "Mind map", heading: "Mind map", hint: "Is module ka apna diagram banayein", icon: () => <Network size={18} /> },
+  // needs both width and height to stay readable. The hint used to live here
+  // ("Is module ka apna diagram banayein") but the user asked for the
+  // header to be clean — only the heading now shows under the mind map tab.
+  { key: "mindmap", label: "Mind map", heading: "Mind map", hint: "", icon: () => <Network size={18} /> },
   { key: "paid", label: "Paid", heading: "Paid content", hint: "Upgrades still locked", icon: () => <ShoppingBag size={18} /> },
 ];
 
@@ -427,9 +429,22 @@ export default function CourseOverlay(props: CourseOverlayProps) {
             <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-[var(--course-muted)]" data-course-overlay-title>
               {activeTab.heading}
             </p>
-            <p className="mt-0.5 truncate text-[10px] font-semibold text-[var(--course-muted)]">
-              {tab === "modules" ? `${visibleModuleCount} connected ${visibleModuleCount === 1 ? "module" : "modules"}` : activeTab.hint}
-            </p>
+            {(() => {
+              // The hint below the heading is contextual: it shows the visible
+              // module count for "Module" and a one-liner for every other
+              // tab. When a tab intentionally has no hint (e.g. the mind map
+              // header should be clean), the paragraph is omitted entirely
+              // instead of leaving an empty line under the heading.
+              const subtitle = tab === "modules"
+                ? `${visibleModuleCount} connected ${visibleModuleCount === 1 ? "module" : "modules"}`
+                : activeTab.hint;
+              if (!subtitle) return null;
+              return (
+                <p className="mt-0.5 truncate text-[10px] font-semibold text-[var(--course-muted)]">
+                  {subtitle}
+                </p>
+              );
+            })()}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {tab === "notes" ? (
