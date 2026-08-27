@@ -1,5 +1,6 @@
 "use client";
 
+import { Menu } from "lucide-react";
 import { AdminLink as Link, useAdminPathname as usePathname, useAdminRouter as useRouter } from "@/lib/admin/router";
 import { useAuth } from "@/context/AuthContext";
 import { clearAdminSession } from "@/utils/adminSession";
@@ -87,9 +88,10 @@ export function AdminShell({
             type="button"
             aria-label="Open navigation"
             onClick={() => setNavOpen(true)}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-lg active:bg-slate-100"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 active:bg-slate-100"
+            data-admin-nav-toggle
           >
-            ☰
+            <Menu className="h-5 w-5" strokeWidth={2.4} />
           </button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[15px] font-semibold text-slate-900">{title}</p>
