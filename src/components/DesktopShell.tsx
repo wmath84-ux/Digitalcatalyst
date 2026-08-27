@@ -138,7 +138,7 @@ const ALL_RAIL: RailEntry[] = [...PRIMARY_RAIL, ...WORKSPACE_RAIL];
 function resolveActiveFromHash(hash: string): DesktopRailKey {
   if (!hash || hash.startsWith("#/home") || hash.startsWith("#/leaderboard")) return "home";
   if (hash.startsWith("#/store/purchases") || hash.startsWith("#/course/")) return "purchases";
-  if (hash.startsWith("#/store") || hash.startsWith("#/product/")) return "store";
+  if (hash.startsWith("#/search") || hash.startsWith("#/store") || hash.startsWith("#/product/")) return "store";
   if (hash.startsWith("#/favorites")) return "favorites";
   if (hash.startsWith("#/cart")) return "purchases";
   if (hash.startsWith("#/my-day")) return "myday";
@@ -179,6 +179,22 @@ export default function DesktopShell({
     const timer = window.setTimeout(() => onSearch(query), 180);
     return () => window.clearTimeout(timer);
   }, [query, onSearch]);
+
+  // The top-bar search is a global launcher: every page benefits from
+  // a single, predictable search affordance, so a query typed here
+  // jumps to the dedicated `#/search` page with the current value
+  // carried over as a `?q=` deep link. The shell's `onSearch` is
+  // still wired for any page that wants the inline (non-page-jump)
+  // behaviour (kept for future per-page filters).
+  const handleSearchSubmit = useCallback(() => {
+    const trimmed = query.trim();
+    if (trimmed) {
+      window.location.hash = `#/search?q=${encodeURIComponent(trimmed)}`;
+      setQuery("");
+    } else {
+      window.location.hash = "#/search";
+    }
+  }, [query]);
 
   const handleNavigate = useCallback((hash: string) => {
     // Use the same hash protocol as the rest of the app so all
@@ -363,6 +379,18 @@ export default function DesktopShell({
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => {
+                  // A bare focus jumps to the search page with no
+                  // pre-fill, so the user can start fresh. Typing a
+                  // value first then focusing keeps the value in the
+                  // input.
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleSearchSubmit();
+                  }
+                }}
                 placeholder={`Search ${appName}…`}
                 aria-label="Search"
                 className="w-full rounded-xl border border-slate-200/80 bg-slate-50/80 py-2 pl-10 pr-9 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"

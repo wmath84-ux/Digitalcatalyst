@@ -290,7 +290,8 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
      stretched 2-col layout). */
   [data-home-grid],
   [data-store-grid],
-  [data-pdp-grid] {
+  [data-pdp-grid],
+  [data-search-grid] {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 
@@ -299,10 +300,24 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   [data-myday-content],
   [data-revision-content],
   [data-profile-content],
-  [data-notifications-content] {
+  [data-notifications-content],
+  [data-search-content] {
     max-width: 720px;
     margin-inline: auto;
     width: 100%;
+  }
+
+  /* Search page: the dedicated search bar stays sticky to the top
+     of the viewport on phone + tablet (the desktop top bar is not
+     yet present, so the search bar IS the page's main input).
+     On desktop the desktop shell provides the top bar — the page's
+     own sticky bar must release so it never overlaps the rail
+     chrome. We achieve that by NOT setting `position: sticky` on
+     the data-search-bar at this breakpoint. The element is plain
+     block on desktop; the content scrolls with the page, which is
+     the expected pattern for a desktop search results page. */
+  [data-search-bar] {
+    position: static !important;
   }
 
   /* The bottom nav (floating magic pill) sits at 720 px wide on a
@@ -443,7 +458,8 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   [data-pdp-scroll],
   [data-cart-row],
   [data-favorites-row],
-  [data-myday-create-row] {
+  [data-myday-create-row],
+  [data-search-content] {
     max-width: 1280px;
     margin-inline: auto;
     width: 100%;
@@ -455,7 +471,8 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
      like a real storefront). */
   [data-home-grid],
   [data-store-grid],
-  [data-pdp-grid] {
+  [data-pdp-grid],
+  [data-search-grid] {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 

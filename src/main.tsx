@@ -22,6 +22,7 @@ import AdminLoginApp from "./AdminLoginApp";
 import AdminApp from "./admin/AdminApp";
 import FlowPathApp from "./FlowPathApp";
 import NotificationsPage from "./components/NotificationsPage";
+import SearchPage from "./components/SearchPage";
 import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -97,6 +98,7 @@ const CART_HASH = "#/cart";
 const FAVORITES_HASH = "#/favorites";
 const SUBSCRIPTION_HASH = "#/subscription";
 const NOTIFICATIONS_HASH = "#/notifications";
+const SEARCH_HASH = "#/search";
 // Developer sandbox for the expiry / renewal messaging. Pure preview:
 // it synthesises a subscription document and never touches Firestore.
 const RENEWAL_PREVIEW_HASH = "#/dev/subscription-preview";
@@ -857,6 +859,39 @@ function RootPage(): ReactNode {
           else if (tab === "store") window.location.hash = STORE_HASH;
           else if (tab === "purchases") window.location.hash = `${STORE_HASH}/purchases`;
           else if (tab === "profile") window.location.hash = PROFILE_HASH;
+        }}
+      />
+    );
+  }
+  if (hash.startsWith(SEARCH_HASH)) {
+    return (
+      <SearchPage
+        favoriteIds={favoriteIds}
+        onToggleFavorite={handleToggleFavorite}
+        onNavigateToProduct={navigateToProduct}
+        onNavigateToStore={() => {
+          window.location.hash = STORE_HASH;
+        }}
+        onNavigateToHome={() => {
+          window.location.hash = HOME_HASH;
+        }}
+        onNavigateToMyDay={() => {
+          window.location.hash = MY_DAY_HASH;
+        }}
+        onNavigateToProfile={() => {
+          window.location.hash = PROFILE_HASH;
+        }}
+        onNavigateToPurchases={() => {
+          window.location.hash = `${STORE_HASH}/purchases`;
+        }}
+        onNavigateToCart={() => {
+          window.location.hash = CART_HASH;
+        }}
+        onNavigateToSubscription={() => {
+          window.location.hash = SUBSCRIPTION_HASH;
+        }}
+        onNavigateToNotifications={() => {
+          window.location.hash = NOTIFICATIONS_HASH;
         }}
       />
     );
