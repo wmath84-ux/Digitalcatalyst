@@ -11,13 +11,19 @@ export const MAX_TOPIC_LENGTH: number;
 /** Which side of the centre a root-level branch hangs off. */
 export type MindMapSide = "left" | "right" | null;
 
-/** One node record. The root is implicit (`parentId: null`, id `"root"`). */
+/**
+ * One node record. The root is implicit (`parentId: null`, id `"root"`).
+ * `fx`/`fy` are the node's MANUAL position (top-left, flow coordinates) from
+ * a hand drag — `null` means "ride the automatic tidy-tree layout".
+ */
 export interface MindMapNode {
   id: string;
   topic: string;
   parentId: string | null;
   side: MindMapSide;
   collapsed: boolean;
+  fx: number | null;
+  fy: number | null;
 }
 
 /** A whole mind map, as stored in Firestore and as held in editor state. */
@@ -25,6 +31,9 @@ export interface MindMap {
   version: number;
   title: string;
   rootTopic: string;
+  /** Manual position of the centre box, or null when it rides the layout. */
+  rootX?: number | null;
+  rootY?: number | null;
   nodes: MindMapNode[];
 }
 
@@ -63,6 +72,8 @@ export interface LaidOutNode {
   collapsed: boolean;
   childCount: number;
   isRoot: boolean;
+  /** True when this box sits at a hand-dragged position, not the auto tree. */
+  manual: boolean;
 }
 
 export interface LaidOutEdge {
@@ -100,6 +111,8 @@ export interface StoredMindMap {
   version: number;
   title: string;
   rootTopic: string;
+  rootX: number | null;
+  rootY: number | null;
   nodes: MindMapNode[];
   nodeCount: number;
   updatedAt: number;
@@ -140,6 +153,11 @@ export function addChildNodes(
   topics?: string[],
 ): { mind: MindMap; nodeIds: string[] };
 export function setNodeTopic(mind: MindMap, id: string | number, topic: string): MindMap;
+/**
+ * Pin a node (root included) to a hand-dragged position. Non-finite
+ * coordinates are refused; finite ones are rounded and clamped.
+ */
+export function setNodePosition(mind: MindMap, id: string | number, x: number, y: number): MindMap;
 export function removeNode(mind: MindMap, id: string | number): MindMap;
 export function toggleCollapsed(mind: MindMap, id: string | number): MindMap;
 export function setCollapsed(mind: MindMap, id: string | number, collapsed: boolean): MindMap;

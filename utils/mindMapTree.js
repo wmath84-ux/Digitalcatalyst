@@ -17,7 +17,7 @@
 // ── Model ─────────────────────────────────────────────────────────────────
 // A mind map is a FLAT node list, not a nested object:
 //
-//   { version: 1, title, rootTopic, nodes: [{ id, topic, parentId, side, collapsed }] }
+//   { version: 1, title, rootTopic, rootX, rootY, nodes: [{ id, topic, parentId, side, collapsed, fx, fy }] }
 //
 // Flat wins for Firestore: no nesting depth to trip the 20-level / 1 MB doc
 // limits, and a single-node edit is a one-element array change rather than a
@@ -26,6 +26,12 @@
 // `side` is only meaningful on the root's direct children ("left" | "right").
 // Deeper nodes inherit their branch's side, which is what keeps a classic
 // two-sided mind map from tangling.
+//
+// `fx`/`fy` (and `rootX`/`rootY` for the centre) are MANUAL positions. When a
+// node carries them the learner has dragged it there by hand and the tidy
+// tree gives way: the node renders exactly at its stored spot and its
+// descendants inherit the same offset so the branch stays glued together.
+// Nodes without them keep riding the automatic layout.
 
 /** Bumped when the stored shape changes so old docs can be migrated. */
 export const MIND_MAP_VERSION = 1;
@@ -76,6 +82,25 @@ const flatten = (value) =>
 export const sanitizeTopic = (value) => flatten(value).slice(0, MAX_TOPIC_LENGTH);
 
 export const sanitizeTitle = (value) => flatten(value).slice(0, 120);
+
+// ── Manual positions ──────────────────────────────────────────────────────
+// The learner can drag any node anywhere. Those coordinates are written into
+// Firestore, so they are coerced to a finite number, rounded to one decimal
+// (keeps the doc small after hundreds of drops) and clamped — a wild fling
+// must never wedge the document with Infinity / NaN, which the Firestore
+// client rejects outright.
+
+/** Furthest a node may sit from the origin, in flow coordinates. */
+export const MAX_NODE_POSITION = 100000;
+
+const sanitizePosition = (value) => {
+  // `Number(null)` is 0, so an absent position must be caught before the
+  // coercion — otherwise "never placed" would read as "pinned at origin".
+  if (value == null) return null;
+  const n = Math.round((Number(value) + Number.EPSILON) * 10) / 10;
+  if (!Number.isFinite(n)) return null;
+  return Math.max(-MAX_NODE_POSITION, Math.min(MAX_NODE_POSITION, n));
+};
 
 // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -166,7 +191,7 @@ export const addChildNode = (mind, parentId, topic = "New idea", options = {}) =
   return {
     mind: {
       ...mind,
-      nodes: [...mind.nodes, { id: nodeId, topic: clean, parentId: String(parentId), side, collapsed: false }],
+      nodes: [...mind.nodes, { id: nodeId, topic: clean, parentId: String(parentId), side, collapsed: false, fx: null, fy: null }],
     },
     nodeId,
   };
@@ -241,6 +266,34 @@ export const setBranchSide = (mind, id, side) => {
     ...mind,
     nodes: mind.nodes.map((item) =>
       String(item.id) === String(id) ? { ...item, side } : item,
+    ),
+  };
+};
+
+/**
+ * Pin a node to a manual position — the drop point of a drag, in React
+ * Flow's top-left coordinates. The root is pinned through `rootX`/`rootY`
+ * on the map itself because it is not part of the node list. Non-finite
+ * coordinates are refused outright; finite ones are rounded and clamped.
+ *
+ * Only the DRAGGED node records a position. Its descendants follow it in the
+ * layout (they inherit the same offset), which keeps the stored doc small and
+ * means deleting one stale pin can never desync a whole subtree.
+ */
+export const setNodePosition = (mind, id, x, y) => {
+  if (!isMindMap(mind)) return mind;
+  const nx = sanitizePosition(x);
+  const ny = sanitizePosition(y);
+  if (nx == null || ny == null) return mind;
+  if (String(id) === ROOT_ID) {
+    if (mind.rootX === nx && mind.rootY === ny) return mind;
+    return { ...mind, rootX: nx, rootY: ny };
+  }
+  if (!findNode(mind, id)) return mind;
+  return {
+    ...mind,
+    nodes: mind.nodes.map((node) =>
+      String(node.id) === String(id) ? { ...node, fx: nx, fy: ny } : node,
     ),
   };
 };
@@ -338,6 +391,12 @@ export const DEFAULT_LAYOUT = Object.freeze({
  * Collapsed branches are treated as leaves: their hidden descendants are
  * omitted from both the node list and the vertical extent, which is what makes
  * collapsing actually reclaim screen space.
+ *
+ * MANUAL positions override the tidy tree: a node the learner dragged by hand
+ * renders exactly at its stored spot (marked `manual: true`), and every
+ * descendant inherits the same offset so a branch never tears itself apart
+ * when its head is re-placed. Nodes without a manual position keep riding the
+ * automatic layout relative to their (possibly moved) ancestors.
  */
 export const layoutMindMap = (mind, options = {}) => {
   const layout = { ...DEFAULT_LAYOUT, ...options };
@@ -356,6 +415,24 @@ export const layoutMindMap = (mind, options = {}) => {
   const visibleChildren = (id) => childrenOf(mind, id);
   const isCollapsed = (id) => String(id) !== ROOT_ID && Boolean(findNode(mind, id)?.collapsed);
 
+  // The manual spot for one node, or null when it still rides the auto tree.
+  // The root's position lives on the map itself (rootX/rootY), everyone
+  // else's on their own record (fx/fy). `Number(null)` is 0, so null has to
+  // be excluded explicitly — otherwise every freshly added node would be
+  // "pinned" at the origin.
+  const manualOf = (node, depth) => {
+    if (depth === 0) {
+      if (mind.rootX == null || mind.rootY == null) return null;
+      const rx = Number(mind.rootX);
+      const ry = Number(mind.rootY);
+      return Number.isFinite(rx) && Number.isFinite(ry) ? { x: rx, y: ry } : null;
+    }
+    if (node.fx == null || node.fy == null) return null;
+    const fx = Number(node.fx);
+    const fy = Number(node.fy);
+    return Number.isFinite(fx) && Number.isFinite(fy) ? { x: fx, y: fy } : null;
+  };
+
   const spanOf = (node) => {
     if (isCollapsed(node.id)) return sizeOf(node).height;
     const kids = visibleChildren(node.id);
@@ -367,22 +444,31 @@ export const layoutMindMap = (mind, options = {}) => {
   const nodes = [];
   const edges = [];
 
-  const place = (node, side, top, depth, parentX, parentWidth) => {
+  // `shiftX/shiftY` is the accumulated manual offset inherited from ancestors;
+  // children of a hand-placed node are placed relative to its PURE auto spot
+  // plus that shift, so the branch moves as one rigid group.
+  const place = (node, side, top, depth, parentX, parentWidth, shiftX, shiftY) => {
     const span = spanOf(node);
     const { width, height } = sizeOf(node);
     const centerY = top + span / 2;
-    const y = centerY - height / 2;
 
-    let x;
+    const autoY = centerY - height / 2;
+    let autoX;
     let branchSide = side;
     if (depth === 0) {
-      x = -width / 2;
+      autoX = -width / 2;
       branchSide = null;
     } else if (side === "left") {
-      x = parentX - layout.hGap - width;
+      autoX = parentX - layout.hGap - width;
     } else {
-      x = parentX + parentWidth + layout.hGap;
+      autoX = parentX + parentWidth + layout.hGap;
     }
+
+    const manual = manualOf(node, depth);
+    const x = manual ? manual.x : autoX + shiftX;
+    const y = manual ? manual.y : autoY + shiftY;
+    const nextShiftX = x - autoX;
+    const nextShiftY = y - autoY;
 
     nodes.push({
       id: String(node.id),
@@ -395,6 +481,7 @@ export const layoutMindMap = (mind, options = {}) => {
       collapsed: isCollapsed(node.id),
       childCount: visibleChildren(node.id).length,
       isRoot: depth === 0,
+      manual: Boolean(manual),
     });
 
     const kids = isCollapsed(node.id) ? [] : visibleChildren(node.id);
@@ -405,14 +492,14 @@ export const layoutMindMap = (mind, options = {}) => {
     for (const kid of kids) {
       edges.push({ id: `e-${node.id}-${kid.id}`, source: String(node.id), target: String(kid.id), side });
       const kidSide = depth === 0 ? (kid.side === "left" ? "left" : "right") : side;
-      place(kid, kidSide, cursor, depth + 1, x, width);
+      place(kid, kidSide, cursor, depth + 1, autoX, width, nextShiftX, nextShiftY);
       cursor += spanOf(kid) + layout.vGap;
     }
   };
 
   const rootNode = { id: ROOT_ID, topic: mind.rootTopic || "" };
   const rootSpan = spanOf(rootNode);
-  place(rootNode, "right", -rootSpan / 2, 0, 0, 0);
+  place(rootNode, "right", -rootSpan / 2, 0, 0, 0, 0, 0);
 
   const bounds = nodes.reduce(
     (box, node) => ({
@@ -458,13 +545,24 @@ export const parseMindMap = (raw) => {
     ? raw.nodes
         .filter((node) => node && node.id != null && String(node.id) !== ROOT_ID)
         .slice(0, MAX_MIND_MAP_NODES)
-        .map((node) => ({
-          id: String(node.id),
-          topic: sanitizeTopic(node.topic) || "Idea",
-          parentId: node.parentId == null ? ROOT_ID : String(node.parentId),
-          side: node.side === "left" ? "left" : node.side === "right" ? "right" : null,
-          collapsed: Boolean(node.collapsed),
-        }))
+        .map((node) => {
+          // A hand-placed node keeps its spot; anything unreadable is dropped
+          // and the node quietly returns to the automatic layout. A position
+          // only counts when BOTH halves exist — a lone half is junk the
+          // layout would ignore anyway, so the pair is cleared entirely.
+          const fx = sanitizePosition(node.fx);
+          const fy = sanitizePosition(node.fy);
+          const paired = fx != null && fy != null;
+          return {
+            id: String(node.id),
+            topic: sanitizeTopic(node.topic) || "Idea",
+            parentId: node.parentId == null ? ROOT_ID : String(node.parentId),
+            side: node.side === "left" ? "left" : node.side === "right" ? "right" : null,
+            collapsed: Boolean(node.collapsed),
+            fx: paired ? fx : null,
+            fy: paired ? fy : null,
+          };
+        })
     : [];
 
   // Drop nodes whose parent vanished, walking outward from the root so a whole
@@ -481,10 +579,18 @@ export const parseMindMap = (raw) => {
     }
   }
 
+  // Pair the root position the same way as node positions — a lone half is
+  // dropped so the centre quietly returns to x-centre zero.
+  const rootX = sanitizePosition(raw.rootX);
+  const rootY = sanitizePosition(raw.rootY);
+  const rootPlaced = rootX != null && rootY != null;
+
   return {
     version: MIND_MAP_VERSION,
     title: sanitizeTitle(raw.title),
     rootTopic: sanitizeTopic(raw.rootTopic) || "Central idea",
+    rootX: rootPlaced ? rootX : null,
+    rootY: rootPlaced ? rootY : null,
     nodes: nodes.filter((node) => reachable.has(node.id)),
   };
 };
@@ -500,12 +606,18 @@ export const toFirestoreMindMap = (mind, meta = {}) => {
     version: MIND_MAP_VERSION,
     title: safe.title,
     rootTopic: safe.rootTopic,
+    // Manual positions ride along so a hand-arranged map looks the same on
+    // every device. `null` (auto-placed) is a Firestore-safe value.
+    rootX: safe.rootX,
+    rootY: safe.rootY,
     nodes: safe.nodes.map((node) => ({
       id: node.id,
       topic: node.topic,
       parentId: node.parentId,
       side: node.side,
       collapsed: node.collapsed,
+      fx: node.fx,
+      fy: node.fy,
     })),
     nodeCount: safe.nodes.length + 1,
     updatedAt: typeof meta.updatedAt === "number" ? meta.updatedAt : Date.now(),

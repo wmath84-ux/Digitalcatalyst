@@ -1087,6 +1087,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           status={mindMap.status}
           errorMessage={mindMap.errorMessage}
           onFlush={mindMap.flush}
+          // The map renders in the player's current theme (dark or white)
+          // until the learner flips the map's own sun/moon toolbar button.
+          playerTheme={theme}
           landscape={useLandscapeRails}
         />
       )}

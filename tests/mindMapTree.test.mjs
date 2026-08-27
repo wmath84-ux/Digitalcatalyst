@@ -36,6 +36,7 @@ import {
   parseMindMap,
   removeNode,
   rootId,
+  setNodePosition,
   setBranchSide,
   setCollapsed,
   setNodeTopic,
@@ -275,6 +276,117 @@ test("toggleCollapsed flips the flag, and never on the root", () => {
   assert.equal(findNode(toggleCollapsed(collapsed, a), a).collapsed, false);
   assert.equal(toggleCollapsed(mind, rootId()), mind);
   assert.equal(findNode(setCollapsed(mind, a, true), a).collapsed, true);
+});
+
+// ---------------------------------------------------------------------------
+// 5b. Manual (hand-dragged) positions
+// ---------------------------------------------------------------------------
+
+test("setNodePosition pins a node anywhere on the canvas, rounded to one decimal", () => {
+  const { mind, a, b } = deepChain();
+  const moved = setNodePosition(mind, a, 480.26, -120.04);
+  assert.equal(findNode(moved, a).fx, 480.3);
+  assert.equal(findNode(moved, a).fy, -120);
+  // Only the dragged node records a position — everyone else keeps riding
+  // the auto layout until they are dragged themselves.
+  assert.equal(findNode(moved, b).fx, null);
+  assert.equal(findNode(moved, b).fy, null);
+  // Copy-on-write: the input map is untouched.
+  assert.equal(findNode(mind, a).fx, null);
+});
+
+test("setNodePosition can move the root through the map-level rootX/rootY", () => {
+  const { mind } = deepChain();
+  const moved = setNodePosition(mind, rootId(), 100, 50);
+  assert.equal(moved.rootX, 100);
+  assert.equal(moved.rootY, 50);
+  assert.equal(moved.nodes, mind.nodes, "no node record changes for a root move");
+});
+
+test("setNodePosition refuses garbage and clamps wild coordinates", () => {
+  const { mind, a } = deepChain();
+  assert.equal(setNodePosition(mind, a, "x", 5), mind, "a non-numeric x is refused");
+  assert.equal(setNodePosition(mind, a, 10, Infinity), mind, "Infinity is refused");
+  assert.equal(setNodePosition(mind, "ghost", 1, 1), mind, "an unknown id is refused");
+  const clamped = setNodePosition(mind, a, 1e9, -1e9);
+  assert.equal(findNode(clamped, a).fx, 100000, "a wild fling clamps instead of wedging the doc");
+  assert.equal(findNode(clamped, a).fy, -100000);
+});
+
+test("the layout honours a manual position exactly", () => {
+  const { mind, a } = deepChain();
+  const auto = layoutMindMap(mind).nodes.find((node) => node.id === a);
+  const moved = setNodePosition(mind, a, auto.x + 500, auto.y + 300);
+  const placed = layoutMindMap(moved).nodes.find((node) => node.id === a);
+  assert.equal(placed.x, auto.x + 500);
+  assert.equal(placed.y, auto.y + 300);
+  assert.equal(placed.manual, true);
+  assert.equal(layoutMindMap(mind).nodes.find((node) => node.id === a).manual, false);
+});
+
+test("a manually placed node carries its whole subtree with it", () => {
+  // Dragging a branch head must not tear the branch apart: the descendants
+  // inherit the same offset, so the diagram stays readable mid-arrangement.
+  const { mind, a, b, c } = deepChain();
+  const auto = new Map(layoutMindMap(mind).nodes.map((node) => [node.id, node]));
+  const moved = setNodePosition(mind, a, 1000, 800);
+  const after = new Map(layoutMindMap(moved).nodes.map((node) => [node.id, node]));
+  const dx = after.get(a).x - auto.get(a).x;
+  const dy = after.get(a).y - auto.get(a).y;
+  for (const id of [b, c]) {
+    assert.equal(after.get(id).x - auto.get(id).x, dx, `${id} keeps its horizontal offset`);
+    assert.equal(after.get(id).y - auto.get(id).y, dy, `${id} keeps its vertical offset`);
+  }
+});
+
+test("a manually moved root keeps its children glued to it", () => {
+  const { mind, a } = deepChain();
+  const auto = new Map(layoutMindMap(mind).nodes.map((node) => [node.id, node]));
+  const moved = setNodePosition(mind, rootId(), 700, 400);
+  const after = new Map(layoutMindMap(moved).nodes.map((node) => [node.id, node]));
+  const dx = after.get(rootId()).x - auto.get(rootId()).x;
+  const dy = after.get(rootId()).y - auto.get(rootId()).y;
+  assert.equal(after.get(a).x - auto.get(a).x, dx);
+  assert.equal(after.get(a).y - auto.get(a).y, dy);
+});
+
+test("an unplaced node keeps following the automatic tidy tree", () => {
+  // Moving one branch must not disturb the geometry of its untouched
+  // siblings — the tidy tree still owns every node without a manual spot.
+  let mind = createMindMap("Root");
+  const first = addChildNode(mind, rootId(), "First");
+  mind = addChildNode(first.mind, rootId(), "Second").mind;
+  const before = new Map(layoutMindMap(mind).nodes.map((node) => [node.id, node]));
+  const moved = setNodePosition(mind, first.nodeId, 900, -900);
+  const after = new Map(layoutMindMap(moved).nodes.map((node) => [node.id, node]));
+  const second = after.get("n2");
+  assert.equal(second.x, before.get("n2").x);
+  assert.equal(second.y, before.get("n2").y);
+});
+
+test("manual positions survive the Firestore round trip", () => {
+  const { mind, a } = deepChain();
+  const moved = setNodePosition(setNodePosition(mind, a, 123.4, -56.7), rootId(), 10, 20);
+  const stored = toFirestoreMindMap(moved);
+  assert.equal(stored.nodes.find((node) => node.id === a).fx, 123.4);
+  assert.equal(stored.rootX, 10);
+  const restored = parseMindMap(stored);
+  assert.equal(findNode(restored, a).fx, 123.4);
+  assert.equal(findNode(restored, a).fy, -56.7);
+  assert.equal(restored.rootX, 10);
+  assert.equal(restored.rootY, 20);
+});
+
+test("parseMindMap drops unreadable positions instead of guessing them", () => {
+  const parsed = parseMindMap({
+    rootTopic: "Root",
+    nodes: [
+      { id: "a", topic: "A", parentId: "root", fx: "x", fy: 10 },
+      { id: "b", topic: "B", parentId: "root", fx: 5, fy: null },
+    ],
+  });
+  assert.equal(findNode(parsed, "a").fx, null, "a non-numeric x is discarded");
+  assert.equal(findNode(parsed, "b").fx, null, "a half-set pair is discarded");
 });
 
 // ---------------------------------------------------------------------------
