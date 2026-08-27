@@ -29,6 +29,7 @@ const coursePlayer = readSource("src/CoursePlayerApp.tsx");
 const panel = readSource("src/course/MindMapPanel.tsx");
 const hook = readSource("src/course/useCourseMindMap.ts");
 const rules = readSource("firestore.rules");
+const styles = readSource("src/index.css");
 const deps = JSON.parse(readSource("package.json"));
 
 // ---------------------------------------------------------------------------
@@ -178,10 +179,36 @@ test("the rules reject privilege-escalation fields on a mind map doc", () => {
 // Editor interaction contract
 // ---------------------------------------------------------------------------
 
-test("every node exposes a + button, and the root cannot be deleted", () => {
+test("every node exposes a + button, and the per-node delete button is gone", () => {
   assert.match(panel, /data-mind-node-add=\{id\}/);
-  assert.match(panel, /\{!isRoot \? \(/);
-  assert.match(panel, /data-mind-node-delete=\{id\}/);
+  // Delete moved OUT of the node into the toolbar: the old in-node trash sat
+  // millimetres from the rename input and a mis-tap cost a whole branch.
+  assert.doesNotMatch(panel, /data-mind-node-delete=/, "the trash must not render inside a node");
+  assert.doesNotMatch(panel, /\{!isRoot \? \(/, "no in-node root guard remains");
+});
+
+test("the toolbar carries the delete: trash acts on the selected branch, never the root", () => {
+  assert.match(panel, /data-course-mindmap-delete/);
+  assert.match(panel, /const canDeleteSelected = selectedId != null && selectedId !== rootId\(\);/);
+  assert.match(panel, /disabled=\{!canDeleteSelected\}/);
+  // The model still refuses to delete the centre of the map.
+  const tree = readSource("utils/mindMapTree.js");
+  assert.match(tree, /if \(String\(id\) === ROOT_ID\) return mind;/);
+});
+
+test("double-tap delete is an explicit, toggleable mode (off by default)", () => {
+  // The toggle lives in the toolbar, exposes its armed state, and persists.
+  assert.match(panel, /data-course-mindmap-dbl-delete/);
+  assert.match(panel, /aria-pressed=\{doubleTapDelete\}/);
+  assert.match(panel, /const dblTapDeleteStorageKey = "dc.mindMapDblTapDelete";/);
+  // The armed mode is opt-in: a learner who never touched the toggle can
+  // never lose a branch to a stray second tap.
+  assert.match(panel, /localStorage.getItem\(dblTapDeleteStorageKey\) === "on"/);
+  // Double-tap detection runs on pointer events (d3-drag preventDefaults
+  // touchstart, which swallows synthetic click/dblclick on many phones) and
+  // the root is exempt.
+  assert.match(panel, /const DOUBLE_TAP_MS = 350;/);
+  assert.match(panel, /if \(deleteOnDoubleTap && !isRoot\) \{/);
 });
 
 test("tapping + puts the new node straight into rename mode", () => {
@@ -189,10 +216,20 @@ test("tapping + puts the new node straight into rename mode", () => {
   assert.match(panel, /const result = addChildNode\(current, parentId, "New idea"\)/);
 });
 
-test("nodes are not hand-positioned — the layout owns placement", () => {
-  assert.match(panel, /nodesDraggable=\{false\}/);
+test("nodes are hand-positionable — drag and drop anywhere, persisted per node", () => {
+  // The learner can drag any node (root included) and the drop is committed
+  // as that node's manual position; the tidy tree still owns every node that
+  // was never dragged.
+  assert.match(panel, /nodesDraggable\b/);
+  assert.doesNotMatch(panel, /nodesDraggable=\{false\}/);
+  assert.match(panel, /draggable: true/);
   assert.match(panel, /nodesConnectable=\{false\}/);
   assert.match(panel, /const layout = useMemo\(\(\) => layoutMindMap\(mind\), \[mind\]\)/);
+  assert.match(panel, /onNodeDragStop=/);
+  assert.match(panel, /setNodePosition\(current, node\.id, node\.position\.x, node\.position\.y\)/);
+  // Buttons inside a node must never start a drag.
+  assert.match(panel, /nodrag absolute top-1\/2/);
+  assert.match(panel, /nodrag grid h-5 w-5/);
 });
 
 test("zoom is available on touch as well as by button", () => {
@@ -215,18 +252,36 @@ test("the panel flushes its pending write when it unmounts", () => {
 
 test("every node opens the inline editor on a single tap (no separate pencil)", () => {
   // The redesign collapsed "tap to rename" and "tap to select" into one
-  // interaction: a phone double-tap was unreliable (React Flow's
-  // tap-vs-drag disambiguator swallowed one or the other), so the only
-  // rename trigger is now a single tap on the node body. The editor opens
-  // automatically, and the input is in the same DOM tree as the rendered
-  // text so the soft keyboard lands in the right place.
+  // interaction: the only rename trigger is a single tap on the node body,
+  // and the input is in the same DOM tree as the rendered text so the soft
+  // keyboard lands in the right place. Taps are measured with pointerup +
+  // a small slop because React Flow's d3-drag preventDefaults touchstart,
+  // which suppresses the synthetic click on many phones once nodes are
+  // draggable.
   assert.match(panel, /onNodeClick=\{[\s\S]*setSelectedId\(node\.id\)[\s\S]*setEditingId\(node\.id\)/);
-  assert.match(panel, /const openEditor = /);
-  assert.match(panel, /onClick=\{[\s\S]*openEditor\(event\)/);
-  // The persisted action (trash) still requires an explicit button — it is
-  // NOT a rename trigger, it only mounts while the node is selected.
-  assert.match(panel, /data-mind-node-delete=\{id\}/);
-  assert.match(panel, /!isRoot \? \(/);
+  assert.match(panel, /const TAP_SLOP_PX = 4;/);
+  assert.match(panel, /onPointerUp=\{handlePointerUp\}/);
+  assert.match(panel, /onOpenEditor\(id\);/);
+  // The click that trails a real drag must not pop the editor open.
+  assert.match(panel, /if \(dragMovedRef\.current\) return;/);
+});
+
+test("the mind map follows the Course Player theme and can be flipped for the map window alone", () => {
+  // White mode: the panel ships a dark AND a light palette; it starts in
+  // whatever theme the player is in and the shell exposes the active one.
+  assert.match(panel, /playerTheme = "dark"/);
+  assert.match(panel, /const mindTheme: MindMapTheme = themeOverride \?\? \(playerTheme === "light" \? "light" : "dark"\);/);
+  assert.match(panel, /data-mindmap-theme=\{mindTheme\}/);
+  assert.match(panel, /course-mindmap-shell/);
+  // The toolbar button next to Fit flips ONLY this window and remembers the
+  // choice per device; the player keeps its own theme.
+  assert.match(panel, /data-course-mindmap-theme/);
+  assert.match(panel, /setThemeOverride\(mindTheme === "dark" \? "light" : "dark"\)/);
+  assert.match(panel, /const mindMapThemeStorageKey = "dc.mindMapThemeOverride";/);
+  // The parent hands the player's live theme down.
+  assert.match(coursePlayer, /playerTheme=\{theme\}/);
+  // The palette itself lives in the stylesheet as scoped variables.
+  assert.match(styles, /\.course-mindmap-shell\[data-mindmap-theme="light"\]/);
 });
 
 test("the toolbar slot is replaced by a slim status strip in both orientations", () => {

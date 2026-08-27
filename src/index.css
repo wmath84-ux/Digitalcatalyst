@@ -1108,6 +1108,44 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   background-color: rgb(124 58 237 / 0.12);
 }
 
+/* ── Mind map — scoped dark / white palette ───────────────────────────────
+   The mind map panel tracks the Course Player theme by default and can be
+   flipped independently from its own toolbar (the sun/moon button next to
+   Fit), so a learner can read a dark lesson while brainstorming on white —
+   or keep the map dark on a bright white course. The variables inherit
+   through the canvas dots, node borders, toolbar tiles and the SVG edge
+   strokes without touching the site or player theme. */
+.course-mindmap-shell {
+  --mm-bg: #0b0b16;
+  --mm-surface: #11111d;
+  --mm-border: rgb(255 255 255 / 0.1);
+  --mm-text: #e2e8f0;
+  --mm-muted: #94a3b8;
+  --mm-soft: rgb(255 255 255 / 0.08);
+  --mm-soft-hover: rgb(255 255 255 / 0.15);
+  --mm-dot: rgb(255 255 255 / 0.07);
+  --mm-edge-left: rgb(167 139 250 / 0.55);
+  --mm-edge-right: rgb(129 140 248 / 0.55);
+  background-color: var(--mm-bg);
+  color: var(--mm-text);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+/* White mode: an off-white canvas keeps the white leaf cards visible, and
+   the wire colours deepen so the diagram reads on paper-white. */
+.course-mindmap-shell[data-mindmap-theme="light"] {
+  --mm-bg: #f8fafc;
+  --mm-surface: #ffffff;
+  --mm-border: rgb(15 23 42 / 0.12);
+  --mm-text: #0f172a;
+  --mm-muted: #64748b;
+  --mm-soft: rgb(15 23 42 / 0.06);
+  --mm-soft-hover: rgb(15 23 42 / 0.12);
+  --mm-dot: rgb(15 23 42 / 0.16);
+  --mm-edge-left: rgb(124 58 237 / 0.6);
+  --mm-edge-right: rgb(79 70 229 / 0.6);
+}
+
 .course-player-shell[data-course-theme="light"] [data-course-preview-badge] {
   color: #0369a1;
   background-color: rgb(14 165 233 / 0.12);
