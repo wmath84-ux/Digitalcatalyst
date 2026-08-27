@@ -1,0 +1,323 @@
+// src/flowpath/components/BulkRevisionCreator.tsx
+//
+// The "2-3 tests at once" flow the user explicitly asked for.
+//
+//   • Toggle "Create multiple" to expand the form into 2 or 3
+//     slots (the UI supports up to 5; the server's bulk cap is
+//     50 so admin-only flows can go higher).
+//   • Each slot has its own test config (subjects, difficulty,
+//     question count, mode, estimated time). Slots are independent
+//     so an admin can ship "easy / medium / hard" in one click
+//     or "Math / Physics / Chemistry" in another.
+//   • All slots share a single `batchId` so the audit feed groups
+//     them as one logical action and the user's Revision bank
+//     shows them as a cluster.
+//   • Each slot becomes its own FlowPath activity in the master
+//     copy; the server mirrors the ones that pass capacity +
+//     plan gates into users/{uid}/revisionTests/{id} and the
+//     others get a per-slot error in the response.
+
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Plus, Trash2, X } from "lucide-react";
+import type { FlowPathActivity } from "../types/flowpath";
+
+interface BulkRevisionCreatorProps {
+  open: boolean;
+  onClose: () => void;
+  uid: string;
+  onBulkCreate: (items: Array<Partial<FlowPathActivity>>) => Promise<{ ok: boolean; error?: string; results?: Array<{ ok: boolean; error?: string }> }>;
+}
+
+const DEFAULT_TEST_CONFIG = {
+  totalQuestions: 10,
+  difficulty: "medium" as const,
+  questionMode: "mixed" as const,
+  estimatedMinutes: 15,
+};
+
+const DIFFICULTY_PRESETS: Record<"easy" | "medium" | "hard" | "mixed", { questions: number; minutes: number; label: string }> = {
+  easy: { questions: 10, minutes: 12, label: "Easy" },
+  medium: { questions: 15, minutes: 20, label: "Medium" },
+  hard: { questions: 20, minutes: 30, label: "Hard" },
+  mixed: { questions: 15, minutes: 20, label: "Mixed" },
+};
+
+export function BulkRevisionCreator({ open, onClose, uid, onBulkCreate }: BulkRevisionCreatorProps) {
+  const [slots, setSlots] = useState<Array<{ title: string; difficulty: keyof typeof DIFFICULTY_PRESETS; questions: number; minutes: number }>>([
+    { title: "Revision Test 1 — Easy", difficulty: "easy", questions: 10, minutes: 12 },
+    { title: "Revision Test 2 — Medium", difficulty: "medium", questions: 15, minutes: 20 },
+    { title: "Revision Test 3 — Hard", difficulty: "hard", questions: 20, minutes: 30 },
+  ]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [results, setResults] = useState<Array<{ ok: boolean; error?: string }> | null>(null);
+  const [scheduledFor, setScheduledFor] = useState<string>("");
+  const [timeStr, setTimeStr] = useState<string>("");
+  const [applyPreset, setApplyPreset] = useState<"easy-medium-hard" | "manual" | "subjects">("easy-medium-hard");
+
+  const setSlot = (index: number, patch: Partial<typeof slots[number]>) => {
+    setSlots((current) => current.map((slot, i) => (i === index ? { ...slot, ...patch } : slot)));
+  };
+
+  const addSlot = () => {
+    if (slots.length >= 5) return;
+    setSlots((current) => [
+      ...current,
+      { title: `Revision Test ${current.length + 1}`, difficulty: "medium", questions: 15, minutes: 20 },
+    ]);
+  };
+
+  const removeSlot = (index: number) => {
+    if (slots.length <= 1) return;
+    setSlots((current) => current.filter((_, i) => i !== index));
+  };
+
+  const applyPresetEazyMediumHard = () => {
+    setSlots([
+      { title: "Revision Test 1 — Easy", difficulty: "easy", questions: 10, minutes: 12 },
+      { title: "Revision Test 2 — Medium", difficulty: "medium", questions: 15, minutes: 20 },
+      { title: "Revision Test 3 — Hard", difficulty: "hard", questions: 20, minutes: 30 },
+    ]);
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setError(null);
+    setResults(null);
+    try {
+      const batchId = `batch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const computed = scheduledFor ? computeScheduledFor(scheduledFor, timeStr) : null;
+      const items: Array<Partial<FlowPathActivity>> = slots.map((slot, i) => ({
+        id: `${batchId}-${i}`,
+        uid,
+        kind: "revision",
+        title: slot.title,
+        description: `Batch of ${slots.length} tests. Slot ${i + 1} of ${slots.length}.`,
+        status: "active",
+        scheduledFor: computed,
+        createdBy: uid,
+        source: "admin",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        batchId,
+        batchIndex: i,
+        testConfig: {
+          ...DEFAULT_TEST_CONFIG,
+          totalQuestions: slot.questions,
+          difficulty: slot.difficulty,
+          questionMode: slot.difficulty === "hard" ? "application" : slot.difficulty === "easy" ? "theory" : "mixed",
+          estimatedMinutes: slot.minutes,
+        },
+      }));
+      const result = await onBulkCreate(items);
+      if (result.ok) {
+        setResults(result.results || items.map(() => ({ ok: true })));
+        // Close after a short delay so the user sees the green checkmarks.
+        setTimeout(() => onClose(), 1200);
+      } else {
+        setError(result.error || "Bulk create failed.");
+        if (result.results) setResults(result.results);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bulk create failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4 backdrop-blur-md"
+          role="dialog"
+          aria-modal="true"
+          data-bulk-revision-creator
+          onClick={(e) => { if (e.target === e.currentTarget && !submitting) onClose(); }}
+        >
+          <motion.div
+            initial={{ scale: 0.96, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.96, opacity: 0, y: 20 }}
+            className="relative flex max-h-[88vh] w-full max-w-[680px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl shadow-slate-900/20"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-white px-5 py-3">
+              <div>
+                <h3 className="text-base font-black tracking-tight text-slate-900">Create multiple tests</h3>
+                <p className="mt-0.5 text-xs font-medium text-slate-500">
+                  Ship 2-3 revision tests in one click. Each slot becomes its own test in the bank.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                aria-label="Close"
+                className="grid h-9 w-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 disabled:opacity-40"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => { setApplyPreset("easy-medium-hard"); applyPresetEazyMediumHard(); }}
+                  data-preset="easy-medium-hard"
+                  className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                    applyPreset === "easy-medium-hard" ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Easy / Medium / Hard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApplyPreset("manual")}
+                  data-preset="manual"
+                  className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                    applyPreset === "manual" ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Manual per slot
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {slots.map((slot, i) => (
+                  <div
+                    key={i}
+                    className="grid grid-cols-12 gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5"
+                    data-slot-index={i}
+                  >
+                    <input
+                      type="text"
+                      value={slot.title}
+                      onChange={(e) => setSlot(i, { title: e.target.value })}
+                      placeholder={`Test ${i + 1} title`}
+                      className="col-span-5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                    />
+                    <select
+                      value={slot.difficulty}
+                      onChange={(e) => {
+                        const diff = e.target.value as keyof typeof DIFFICULTY_PRESETS;
+                        const preset = DIFFICULTY_PRESETS[diff];
+                        setSlot(i, { difficulty: diff, questions: preset.questions, minutes: preset.minutes });
+                      }}
+                      className="col-span-3 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                    >
+                      {Object.entries(DIFFICULTY_PRESETS).map(([k, v]) => (
+                        <option key={k} value={k}>{v.label}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={slot.questions}
+                      onChange={(e) => setSlot(i, { questions: Number(e.target.value || 0) })}
+                      className="col-span-2 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-indigo-500"
+                      title="Question count"
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      max={240}
+                      value={slot.minutes}
+                      onChange={(e) => setSlot(i, { minutes: Number(e.target.value || 0) })}
+                      className="col-span-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-indigo-500"
+                      title="Estimated minutes"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSlot(i)}
+                      disabled={slots.length <= 1}
+                      aria-label="Remove slot"
+                      className="col-span-1 grid place-items-center rounded-lg border border-rose-200 bg-white text-rose-500 transition hover:bg-rose-50 disabled:opacity-30"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={addSlot}
+                disabled={slots.length >= 5}
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-white py-2 text-xs font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 disabled:opacity-40"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add slot ({slots.length}/5)
+              </button>
+
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Schedule (optional)</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">Leave blank to send immediately.</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={scheduledFor}
+                    onChange={(e) => setScheduledFor(e.target.value)}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                  />
+                  <input
+                    type="time"
+                    value={timeStr}
+                    onChange={(e) => setTimeStr(e.target.value)}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {error ? (
+                <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
+              ) : null}
+              {results ? (
+                <div className="mt-3 space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  {results.map((r, i) => (
+                    <p key={i} className={`text-xs ${r.ok ? "text-emerald-700" : "text-rose-600"}`}>
+                      Test {i + 1}: {r.ok ? "✓ Created" : r.error}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/60 px-5 py-3">
+              <span className="text-[11px] text-slate-500">{slots.length} test{slots.length === 1 ? "" : "s"} will be created with shared batchId.</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={submitting}
+                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitting || slots.length === 0}
+                  data-submit-bulk
+                  className="h-10 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-40"
+                >
+                  {submitting ? "Creating…" : `Create ${slots.length} test${slots.length === 1 ? "" : "s"}`}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+function computeScheduledFor(dateStr: string, timeStr: string): number | null {
+  if (!dateStr || !timeStr) return null;
+  const ts = Date.parse(`${dateStr}T${timeStr}:00`);
+  return Number.isFinite(ts) ? ts : null;
+}

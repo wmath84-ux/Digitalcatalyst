@@ -4,6 +4,8 @@ import { Trash2 } from "lucide-react";
 import type { Activity, ActivityType } from "../../flowpath/types/flowpath";
 import { ACTIVITY_TYPE_META } from "../../flowpath/types/flowpath";
 import { useFlowPath } from "../../flowpath/hooks/useFlowPath";
+import { useFlowPathFirestore } from "../../flowpath/hooks/useFlowPathFirestore";
+import { useFlowPathSync } from "../../flowpath/hooks/useFlowPathSync";
 import { useTheme } from "../../flowpath/hooks/useTheme";
 import {
   buildRows,
@@ -130,6 +132,56 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
     justCreatedId,
     clearJustCreated,
   } = useFlowPath();
+  const { items: firestoreItems } = useFlowPathFirestore();
+  // Mirror every local change to the server multiplexer so the item
+  // appears in the user's My Day / Revision pages + gets the FCM +
+  // Web Push + local alarm treatment. See useFlowPathSync for the
+  // offline replay queue.
+  useFlowPathSync(items);
+  // Merge Firestore activities (admin-created, server-created, or
+  // cross-device edits) into the local items so the 3D flow shows
+  // the full picture. Map the FlowPathActivity shape to the
+  // local Activity shape so the rest of the component is unchanged.
+  const mergedItems = useMemo(() => {
+    const seen = new Set(items.map((i) => i.activity.id));
+    const merged = [...items];
+    for (const fp of firestoreItems) {
+      if (seen.has(fp.id)) continue;
+      // Convert FlowPathActivity to local Activity. The minimum
+      // required fields are id, type, title, datetime, createdAt,
+      // order. Extra fields are stored on the union type.
+      const datetime = fp.scheduledFor ? new Date(fp.scheduledFor).toISOString() : new Date(fp.createdAt || Date.now()).toISOString();
+      const localActivity: Activity = {
+        id: fp.id,
+        type: fp.kind,
+        title: fp.title,
+        description: fp.description,
+        datetime,
+        timeLabel: "",
+        createdAt: fp.createdAt || Date.now(),
+        order: merged.length + 1,
+        ...(fp.taskPriority ? { priority: fp.taskPriority } : {}),
+        ...(fp.taskStatus ? { status: fp.taskStatus } : {}),
+        ...(fp.taskSubject ? { subject: fp.taskSubject } : {}),
+        ...(fp.reminderTime ? { time: fp.reminderTime } : {}),
+        ...(fp.scheduleStartTime ? { startTime: fp.scheduleStartTime } : {}),
+        ...(fp.scheduleEndTime ? { endTime: fp.scheduleEndTime } : {}),
+        ...(fp.scheduleType ? { type: fp.scheduleType } : {}),
+        ...(fp.noteColor ? { color: fp.noteColor } : {}),
+        ...(fp.testConfig ? {
+          totalQuestions: fp.testConfig.totalQuestions,
+          difficulty: fp.testConfig.difficulty,
+          questionMode: fp.testConfig.questionMode,
+          estimatedMinutes: fp.testConfig.estimatedMinutes,
+        } : {}),
+        ...(fp.testId ? { testId: fp.testId } : {}),
+        ...(fp.completedAt ? { completedAt: fp.completedAt } : {}),
+        ...(fp.progress !== undefined ? { progress: fp.progress } : {}),
+      } as unknown as Activity;
+      merged.push({ activity: localActivity, status: fp.status === "completed" ? "completed" : "current" });
+    }
+    return merged;
+  }, [items, firestoreItems]);
   const { mode: themeMode, resolved: resolvedTheme, toggle: toggleTheme } = useTheme();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -157,7 +209,7 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
   }, [curve]);
 
   const hasAutoScrolled = useRef(false);
-  const isEmpty = items.length === 0;
+  const isEmpty = mergedItems.length === 0;
 
   // measure container width responsively
   useEffect(() => {
@@ -174,7 +226,7 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
   }, []);
 
   const config = useMemo(() => getLayoutConfig(width, curve), [width, curve]);
-  const { rows, totalHeight } = useMemo(() => buildRows(items, config), [items, config]);
+  const { rows, totalHeight } = useMemo(() => buildRows(mergedItems, config), [mergedItems, config]);
 
   const chunks = useMemo(() => chunkRows(rows, CHUNK_SIZE), [rows]);
 
