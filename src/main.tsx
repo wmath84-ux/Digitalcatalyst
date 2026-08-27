@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
+import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
@@ -44,6 +44,9 @@ import { disablePageZoom } from "./utils/disablePageZoom";
 import { setThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/themeColor";
 import { recordRouteVisit } from "./utils/routeHistory";
 import { requiresAuthentication } from "./utils/appRoutes";
+import AppShell from "./components/AppShell";
+import { resolveActiveFromHash } from "./components/DesktopShell";
+import { useResponsiveCategory } from "./utils/responsive";
 import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
 import { collectDueMyDayItems, type MyDayDocData } from "../utils/pushScheduler";
 import { playSfxAdd, playSfxError, playSfxRemove } from "./utils/sfx";
@@ -243,6 +246,70 @@ function RenewalNotice() {
 }
 
 function Root() {
+  // Root is the desktop shell's host. Mobile + tablet get the same
+  // page body, but the per-page chrome (Header + BottomNav) is still
+  // rendered inside each app — the desktop CSS hides it on >= 1024 px.
+  // The shell (left rail + top bar) takes over from there.
+  return (
+    <DesktopAppHost>
+      <RootPage />
+    </DesktopAppHost>
+  );
+}
+
+/**
+ * Tiny wrapper that conditionally mounts the desktop shell on
+ * viewports >= 1024 px. Uses the same responsive hook as
+ * AppShell, but here it lives at the routing level (above RootPage)
+ * so every page — including the landing, checkout and auth pages —
+ * gets the desktop chrome for free. Mobile + tablet just pass the
+ * children through unchanged.
+ */
+function DesktopAppHost({ children }: { children: ReactNode }) {
+  const category = useResponsiveCategory();
+  const [hash, setHash] = useState<string>(() => (typeof window !== "undefined" ? window.location.hash : ""));
+  // Re-render on hash change so the active rail item follows the URL.
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const onChange = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+
+  if (category !== "desktop") {
+    return <>{children}</>;
+  }
+
+  // Skip the shell on routes that are designed as full-screen experiences
+  // (checkout has its own payment iframe, the course player has its own
+  // immersive layout, the admin has its own shell). On those routes
+  // the mobile + tablet chrome is hidden too — keeping the desktop
+  // shell out of the way preserves the full-bleed experience.
+  if (
+    hash.startsWith("#/checkout")
+    || hash.startsWith("#/auth")
+    || hash.startsWith("#/admin")
+    || hash.startsWith("#/admin-login")
+    || hash.startsWith("#/course/")
+    || hash.startsWith("#/flowpath")
+  ) {
+    return <>{children}</>;
+  }
+
+  return (
+    <AppShell active={resolveActiveFromHash(hash)}>
+      {children}
+    </AppShell>
+  );
+}
+
+/**
+ * The routing + auth-guard + chrome logic. Returns the page element
+ * (or a splash / loading / landing fallback) without knowing about the
+ * desktop shell — the desktop wrapper lives in `Root` above so the
+ * whole routing tree can be wrapped in a single AppShell.
+ */
+function RootPage(): ReactNode {
   const { user, loading, logout } = useAuth();
   const { openingAnimationEnabled } = useBranding();
   const { products: catalogProducts, purchasedIds, loading: catalogLoading } = useCatalog();
@@ -251,6 +318,10 @@ function Root() {
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
   const [desktopLocked, setDesktopLocked] = useState(() => isDesktopBrowserLocked());
   const [installedMobilePwa, setInstalledMobilePwa] = useState(() => isInstalledMobilePwa());
+  // Live viewport category so the AppShell wrapper re-renders when the
+  // learner resizes across the desktop / tablet / mobile boundaries.
+  // Tablet + mobile get the existing per-page chrome; desktop gets the
+  // new DesktopShell (persistent left rail + sticky top bar).
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const landingRouteRequested = !hash || hash.startsWith(LANDING_HASH);
   // Mobile + installed PWA: never show landing. Everyone else on mobile

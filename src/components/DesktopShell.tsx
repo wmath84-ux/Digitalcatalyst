@@ -1,0 +1,560 @@
+// src/components/DesktopShell.tsx
+//
+// The first-class desktop experience.
+//
+// The app is mobile-first: every screen has a phone-shaped frame
+// (`max-w-md`, rounded corners, big drop shadow) and a floating
+// bottom-nav pill. On a tablet we drop the phone frame and let
+// content use a 720 px column. On a desktop we go further — the
+// phone framing disappears, a PERSISTENT LEFT SIDEBAR takes over
+// from the bottom nav, and a global TOP BAR provides search,
+// notifications and a quick profile switcher.
+//
+// This shell is the single place that owns the desktop chrome. Every
+// app page (Home, Store, MyDay, Profile, Revision, …) renders inside
+// it. The shell:
+//   1. Reads the current hash to highlight the active rail item.
+//   2. Renders the right rail for the current page (Store vs MyDay
+//      vs Revision all have different secondary surfaces).
+//   3. Wires the global top-bar search to the page's own search
+//      handler (passed in as a prop, with the store search used as
+//      the default for every page that does not opt out).
+//
+// The shell is RENDERED ON DESKTOP ONLY. Mobile + tablet fall back to
+// the existing per-page chrome and the bottom nav. The desktop CSS
+// lives in `src/index.css` under `@media (min-width: 1024px)`.
+
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  Bell,
+  CalendarDays,
+  Crown,
+  Heart,
+  Home,
+  LogOut,
+  Search,
+  Settings,
+  ShoppingBag,
+  Sparkles,
+  Store,
+  UserRound,
+  X,
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { useBranding } from "../context/BrandingContext";
+import { useCommerce } from "../context/CommerceContext";
+import { useCatalog } from "../context/CatalogContext";
+import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
+import BrandMark from "./BrandMark";
+import { DEFAULT_LOGO_URL } from "@/utils/branding";
+import { APP_FRAME_MAX_WIDTHS } from "../utils/responsive";
+
+/** The hash-prefixed routes the rail can drive. Each one navigates by
+ *  setting `window.location.hash` so the change is persistent + the
+ *  global `Root` switch in `main.tsx` picks the right page. */
+export type DesktopRailKey =
+  | "home"
+  | "store"
+  | "purchases"
+  | "favorites"
+  | "myday"
+  | "revision"
+  | "profile"
+  | "settings";
+
+interface RailEntry {
+  key: DesktopRailKey;
+  label: string;
+  description: string;
+  Icon: typeof Home;
+  hash: string;
+  /** Optional badge counter (cart / favorites / notifications). */
+  badge?: number;
+  group: "primary" | "workspace";
+}
+
+interface DesktopShellProps {
+  /** Active rail entry, derived from the current hash. */
+  active: DesktopRailKey;
+  /**
+   * Page body — rendered inside the desktop content frame, beside the
+   * persistent left rail.
+   */
+  children: ReactNode;
+  /**
+   * Page-specific quick actions rendered on the right side of the
+   * top bar (e.g. "Add to cart" on a product page). Most pages leave
+   * this empty and the top bar shows only the global actions.
+   */
+  topBarRight?: ReactNode;
+  /**
+   * Top-bar search handler. The search input lives in the shell so
+   * every page shares the same input style; the page decides what
+   * the query does. Pass `null` to hide the search input on this
+   * page (e.g. a media player where the keyboard is busy).
+   */
+  onSearch?: (query: string) => void;
+  /**
+   * Initial search query (used to keep the input in sync when a page
+   * already has a query in state — e.g. the Home page's product
+   * search).
+   */
+  initialSearchQuery?: string;
+  /**
+   * Right-side panel content for the page (e.g. the My Day right rail
+   * with streak + quick actions, or the PDP's "you may also like"
+   * list). Stacks on tablet, side-by-side on desktop.
+   */
+  sidePanel?: ReactNode;
+  /**
+   * Headline displayed in the top bar — usually the page's own
+   * heading. When omitted, the rail's `label` for the active page
+   * is used.
+   */
+  pageTitle?: string;
+  /**
+   * Subtitle displayed under the page title in the top bar.
+   */
+  pageSubtitle?: string;
+}
+
+const PRIMARY_RAIL: RailEntry[] = [
+  { key: "home", label: "Home", description: "Today's learning", Icon: Home, hash: "#/home", group: "primary" },
+  { key: "store", label: "Store", description: "Browse the catalog", Icon: Store, hash: "#/store", group: "primary" },
+  { key: "purchases", label: "My Library", description: "Courses you own", Icon: ShoppingBag, hash: "#/store/purchases", group: "primary" },
+  { key: "myday", label: "My Day", description: "Tasks & schedule", Icon: CalendarDays, hash: "#/my-day", group: "primary" },
+  { key: "revision", label: "Revision", description: "Tests & smart session", Icon: Sparkles, hash: "#/revision", group: "primary" },
+];
+
+const WORKSPACE_RAIL: RailEntry[] = [
+  { key: "favorites", label: "Favorites", description: "Saved for later", Icon: Heart, hash: "#/favorites", group: "workspace" },
+  { key: "profile", label: "Profile", description: "Account & plan", Icon: UserRound, hash: "#/profile", group: "workspace" },
+  { key: "settings", label: "Settings", description: "Preferences & privacy", Icon: Settings, hash: "#/profile", group: "workspace" },
+];
+
+const ALL_RAIL: RailEntry[] = [...PRIMARY_RAIL, ...WORKSPACE_RAIL];
+
+/** Resolve a hash to a rail key so the active entry lights up. */
+function resolveActiveFromHash(hash: string): DesktopRailKey {
+  if (!hash || hash.startsWith("#/home") || hash.startsWith("#/leaderboard")) return "home";
+  if (hash.startsWith("#/store/purchases") || hash.startsWith("#/course/")) return "purchases";
+  if (hash.startsWith("#/store") || hash.startsWith("#/product/")) return "store";
+  if (hash.startsWith("#/favorites")) return "favorites";
+  if (hash.startsWith("#/cart")) return "purchases";
+  if (hash.startsWith("#/my-day")) return "myday";
+  if (hash.startsWith("#/revision")) return "revision";
+  if (hash.startsWith("#/profile")) return "profile";
+  if (hash.startsWith("#/checkout") || hash.startsWith("#/subscription")) return "store";
+  return "home";
+}
+
+export default function DesktopShell({
+  active,
+  children,
+  topBarRight,
+  onSearch,
+  initialSearchQuery = "",
+  sidePanel,
+  pageTitle,
+  pageSubtitle,
+}: DesktopShellProps) {
+  const { user, logout } = useAuth();
+  const { appName, logoUrl } = useBranding();
+  const { cartIds, favoriteIds } = useCommerce();
+  const { purchasedIds } = useCatalog();
+  const liveNotificationCount = useUnreadNotificationCount();
+  const [query, setQuery] = useState(initialSearchQuery);
+
+  // Keep the search input in sync with the page's own query when the
+  // page changes the initial value. The dependency is the string so
+  // we re-sync on hash navigation (where initialSearchQuery may flip).
+  useEffect(() => {
+    setQuery(initialSearchQuery);
+  }, [initialSearchQuery]);
+
+  // Bubble the typed query back to the page (debounced 180 ms so the
+  // page's filter pipeline does not run on every keystroke).
+  useEffect(() => {
+    if (!onSearch) return undefined;
+    const timer = window.setTimeout(() => onSearch(query), 180);
+    return () => window.clearTimeout(timer);
+  }, [query, onSearch]);
+
+  const handleNavigate = useCallback((hash: string) => {
+    // Use the same hash protocol as the rest of the app so all
+    // sessionStorage + auth guards see the change.
+    window.location.hash = hash;
+  }, []);
+
+  const initials = useMemo(() => {
+    if (!user?.name) return "U";
+    return user.name
+      .trim()
+      .split(/\s+/)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  }, [user?.name]);
+
+  const activeEntry = ALL_RAIL.find((entry) => entry.key === active) ?? PRIMARY_RAIL[0];
+  const resolvedTitle = pageTitle ?? activeEntry.label;
+  const resolvedSubtitle = pageSubtitle ?? activeEntry.description;
+
+  // The cart / favorites / notifications badges come from the live
+  // commerce / catalog / notification streams. The pill counter
+  // is the same on desktop and mobile so the value the learner sees
+  // in the rail matches the bottom nav they used to have.
+  const cartCount = cartIds.size;
+  const favoritesCount = favoriteIds.size;
+  const ownedCount = purchasedIds.size;
+  const notifications = liveNotificationCount ?? 0;
+  const railEntries: RailEntry[] = [
+    ...PRIMARY_RAIL.map((entry) =>
+      entry.key === "purchases" ? { ...entry, badge: ownedCount } : entry
+    ),
+    ...WORKSPACE_RAIL.map((entry) => {
+      if (entry.key === "favorites") return { ...entry, badge: favoritesCount };
+      return entry;
+    }),
+  ];
+
+  const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
+
+  return (
+    <div className="dc-desktop-shell flex min-h-[100dvh] w-full bg-[#f6f7fb] text-slate-900" data-desktop-shell>
+      {/* ── Persistent left rail ───────────────────────────────────── */}
+      <aside
+        data-desktop-rail
+        className="sticky top-0 z-40 flex h-[100dvh] w-[260px] shrink-0 flex-col border-r border-slate-200/80 bg-white/85 backdrop-blur-2xl"
+        aria-label="Primary"
+      >
+        {/* Brand block — same logo + name that lives in the mobile header,
+            so the rail feels like a continuation of the app's identity
+            rather than a separate desktop chrome. */}
+        <div className="flex items-center gap-3 px-5 py-5">
+          <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/40">
+            {customLogo ? <BrandMark className="h-11 w-11" /> : <Sparkles className="h-5 w-5" />}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[15px] font-black tracking-tight text-slate-900">{appName}</p>
+            <p className="truncate text-[11px] font-semibold text-slate-400">Learning workspace</p>
+          </div>
+        </div>
+
+        {/* Primary nav — the screens a learner visits every day. Each
+            entry has a hover background + active accent so the eye
+            lands on the current page in a single glance. The icon +
+            label + 1-line description match the visual rhythm of
+            Notion / Linear / Figma — every entry tells you what the
+            page does, not just where it is. */}
+        <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="Primary navigation">
+          <RailGroup label="Workspace">
+            {railEntries
+              .filter((entry) => entry.group === "primary")
+              .map((entry) => (
+                <RailItem
+                  key={entry.key}
+                  entry={entry}
+                  active={active === entry.key}
+                  onNavigate={handleNavigate}
+                />
+              ))}
+          </RailGroup>
+
+          <RailGroup label="Account">
+            {railEntries
+              .filter((entry) => entry.group === "workspace")
+              .map((entry) => (
+                <RailItem
+                  key={entry.key}
+                  entry={entry}
+                  active={active === entry.key}
+                  onNavigate={handleNavigate}
+                />
+              ))}
+          </RailGroup>
+
+          {/* Quick stats card — gives the rail a little "personality"
+              rather than a flat list of links. Shows the learner's
+              cart size + favorites so the rail doubles as a status
+              indicator. */}
+          <div className="mx-2 mt-3 rounded-2xl border border-slate-200/70 bg-gradient-to-br from-slate-50 to-white p-3">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Quick stats</p>
+            <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
+              <RailStat label="Cart" value={cartCount} />
+              <RailStat label="Favorites" value={favoritesCount} />
+              <RailStat label="Owned" value={ownedCount} />
+              <RailStat label="Inbox" value={notifications} highlight={notifications > 0} />
+            </dl>
+            <button
+              type="button"
+              onClick={() => handleNavigate("#/my-day")}
+              className="mt-3 w-full rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-3 py-2 text-[11px] font-black text-white shadow-sm transition hover:brightness-110 active:scale-95"
+            >
+              Plan today in My Day
+            </button>
+          </div>
+        </nav>
+
+        {/* Profile footer — the rail always shows the signed-in learner
+            at the bottom, with a one-click logout. Keeping the rail
+            signed-in-aware means the desktop chrome is never an
+            anonymous sidebar. */}
+        <div className="border-t border-slate-200/80 p-3">
+          {user ? (
+            <div className="flex items-center gap-2.5 rounded-2xl p-2 transition hover:bg-slate-50">
+              {user.photoURL ? (
+                <img src={user.photoURL} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-slate-200" />
+              ) : (
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-black text-white">
+                  {initials}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[12px] font-black text-slate-900">{user.name}</p>
+                <p className="truncate text-[10px] font-semibold text-slate-400">{user.email}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })}
+                aria-label="Log out"
+                title="Log out"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleNavigate("#/auth?mode=login")}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2.5 text-xs font-black text-white transition hover:bg-slate-800"
+            >
+              <Crown size={13} /> Sign in
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* ── Main column (top bar + page body + optional side panel) ── */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Top bar — global actions shared across every page. */}
+        <header
+          data-desktop-topbar
+          className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-slate-200/80 bg-white/85 px-6 backdrop-blur-2xl"
+        >
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-base font-black tracking-tight text-slate-900" data-desktop-page-title>
+              {resolvedTitle}
+            </h1>
+            <p className="truncate text-[11px] font-semibold text-slate-400" data-desktop-page-subtitle>
+              {resolvedSubtitle}
+            </p>
+          </div>
+
+          {/* Search input — appears on every page that provides an
+              onSearch handler. The input is hidden on pages that
+              have no handler (e.g. media viewers, fullscreen flows). */}
+          {onSearch ? (
+            <div className="relative flex w-[320px] max-w-[36vw] items-center">
+              <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-slate-400" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={`Search ${appName}…`}
+                aria-label="Search"
+                className="w-full rounded-xl border border-slate-200/80 bg-slate-50/80 py-2 pl-10 pr-9 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                data-desktop-search
+              />
+              {query ? (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  className="absolute right-2 grid h-6 w-6 place-items-center rounded-full text-slate-400 transition hover:bg-slate-200/60 hover:text-slate-700"
+                >
+                  <X size={12} />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* Top-bar quick actions: notifications, cart, favorites, plans. */}
+          <div className="flex items-center gap-1.5" data-desktop-topbar-actions>
+            {topBarRight}
+            <TopBarButton
+              ariaLabel="Notifications"
+              icon={<Bell size={16} />}
+              badge={notifications > 0 ? notifications : undefined}
+              onClick={() => handleNavigate("#/notifications")}
+              active={active === "profile" && (window.location.hash.includes("notifications") || false)}
+            />
+            <TopBarButton
+              ariaLabel="Favorites"
+              icon={<Heart size={16} />}
+              badge={favoritesCount > 0 ? favoritesCount : undefined}
+              onClick={() => handleNavigate("#/favorites")}
+            />
+            <TopBarButton
+              ariaLabel="Cart"
+              icon={<ShoppingBag size={16} />}
+              badge={cartCount > 0 ? cartCount : undefined}
+              onClick={() => handleNavigate("#/cart")}
+            />
+            <TopBarButton
+              ariaLabel="Subscription"
+              icon={<Crown size={16} />}
+              onClick={() => handleNavigate("#/subscription")}
+              active={false}
+            />
+          </div>
+        </header>
+
+        {/* ── Page body + optional side panel ─────────────────────
+            The page is the main column. When the page supplies a
+            `sidePanel`, it gets its own column on the right with
+            a max-width of 320 px, so the panel never eats the page
+            on a mid-sized desktop monitor. The grid only flips on
+            when the panel is present — pages without a panel
+            continue to use the full content width. */}
+        <div
+          className={`flex min-h-0 flex-1 gap-6 px-6 py-6 ${sidePanel ? "xl:px-8" : ""}`}
+          data-desktop-content
+        >
+          <main
+            className="min-w-0 flex-1"
+            style={{ maxWidth: APP_FRAME_MAX_WIDTHS.desktop }}
+          >
+            {children}
+          </main>
+          {sidePanel ? (
+            <aside
+              data-desktop-side-panel
+              className="hidden w-[320px] shrink-0 xl:block"
+            >
+              {sidePanel}
+            </aside>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RailGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mt-4 first:mt-2">
+      <p className="px-3 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </p>
+      <div className="flex flex-col gap-0.5">{children}</div>
+    </div>
+  );
+}
+
+function RailItem({
+  entry,
+  active,
+  onNavigate,
+}: {
+  entry: RailEntry;
+  active: boolean;
+  onNavigate: (hash: string) => void;
+}) {
+  const Icon = entry.Icon;
+  return (
+    <button
+      type="button"
+      onClick={() => onNavigate(entry.hash)}
+      aria-current={active ? "page" : undefined}
+      data-desktop-rail-item={entry.key}
+      data-active={active ? "true" : "false"}
+      className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition ${
+        active
+          ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/30"
+          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+      }`}
+      title={entry.description}
+    >
+      <span
+        className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${
+          active
+            ? "bg-white/20 text-white"
+            : "bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-indigo-600"
+        }`}
+      >
+        <Icon size={15} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-bold leading-tight">{entry.label}</span>
+        <span
+          className={`block truncate text-[10.5px] font-medium leading-tight ${
+            active ? "text-white/80" : "text-slate-400"
+          }`}
+        >
+          {entry.description}
+        </span>
+      </span>
+      {entry.badge && entry.badge > 0 ? (
+        <span
+          className={`grid h-5 min-w-[20px] place-items-center rounded-full px-1.5 text-[10px] font-black ${
+            active ? "bg-white text-indigo-700" : "bg-indigo-100 text-indigo-700"
+          }`}
+        >
+          {entry.badge > 99 ? "99+" : entry.badge}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function RailStat({ label, value, highlight = false }: { label: string; value: number; highlight?: boolean }) {
+  return (
+    <div className="rounded-xl border border-slate-200/70 bg-white/80 px-2 py-1.5">
+      <dt className="text-[9px] font-black uppercase tracking-wider text-slate-400">{label}</dt>
+      <dd className={`mt-0.5 text-base font-black ${highlight ? "text-indigo-600" : "text-slate-900"}`}>
+        {value > 99 ? "99+" : value}
+      </dd>
+    </div>
+  );
+}
+
+function TopBarButton({
+  ariaLabel,
+  icon,
+  badge,
+  onClick,
+  active = false,
+}: {
+  ariaLabel: string;
+  icon: ReactNode;
+  badge?: number;
+  onClick: () => void;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      title={ariaLabel}
+      data-desktop-topbar-button={ariaLabel.toLowerCase()}
+      className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-xl transition ${
+        active
+          ? "bg-indigo-50 text-indigo-600"
+          : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+      }`}
+    >
+      {icon}
+      {badge && badge > 0 ? (
+        <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white ring-2 ring-white">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+export { resolveActiveFromHash, ALL_RAIL, PRIMARY_RAIL, WORKSPACE_RAIL };

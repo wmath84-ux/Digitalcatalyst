@@ -46,8 +46,12 @@ export function isMobileScreenSize(): boolean {
 }
 
 /**
- * Wide desktop browser (not the installed PWA). The learner app stays closed
- * here — landing is the only public surface until the PWA is installed.
+ * Wide desktop browser (not the installed PWA). The landing page is the
+ * default entry for these users — the desktop experience inside the app
+ * is fully supported (it is a real desktop layout with a left rail), but
+ * new desktop visitors get to see the marketing landing first, exactly
+ * like a normal website. After they tap "Open App" the hash routes into
+ * the desktop shell, and re-visits land directly inside the app.
  */
 export function isDesktopBrowserLocked(): boolean {
   return !isMobileScreenSize() && !isPwaInstalled();

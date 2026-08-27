@@ -352,6 +352,213 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   Desktop layout (>= 1024 px) — first-class desktop experience.
+   ─────────────────────────────────────────────────────────────────────
+   The mobile + tablet layouts live in the same phone-shaped frame or
+   a 720 px column. On a desktop the framing goes away entirely —
+   the app gets a real "workspace" layout:
+
+   1. Persistent left rail (260 px) with brand + nav + signed-in
+      learner footer. Replaces the bottom nav. Hover/active states
+      are now proper desktop affordances (background, gradient, label
+      colour change) rather than the mobile tap targets.
+   2. Sticky top bar (64 px) with page title + global search + global
+      actions (notifications, favorites, cart, plans). The bar uses
+      a backdrop blur so content underneath is still visible while
+      the bar floats.
+   3. The page body uses a 1280 px content max so a 27" monitor
+      never turns the app into a thin ribbon of content. The shell
+      itself extends to fill the rest of the viewport.
+   4. Every existing per-page chrome (the phone header, the phone
+      footer pill, the phone-sized card spacing) is hidden — the
+      desktop rail + top bar is the chrome, nothing else.
+
+   The page body is wrapped in `data-desktop-content`. The left rail
+   is `data-desktop-rail` and the top bar is `data-desktop-topbar`.
+   These selectors are the only places that need to read the desktop
+   media query — every per-page rule is scoped to mobile + tablet
+   and gracefully disappears on desktop.
+   ───────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  /* The whole app shell stops pretending to be a phone: no max-w-md,
+     no rounded corners, no big drop shadow. The content goes to
+     the real edges of the viewport. */
+  [data-app-frame] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 100dvh;
+    height: auto;
+    border-radius: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* The shell: a soft surface that supports the rail + top bar
+     without competing with them. */
+  .dc-app-shell {
+    background:
+      radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.10), transparent 50%),
+      radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.08), transparent 44%),
+      linear-gradient(180deg, #f7f8fc 0%, #eef1f8 48%, #f6f7fb 100%);
+  }
+
+  /* The mobile + tablet per-page chrome is hidden on desktop. The
+     rail + top bar is the only chrome. */
+  [data-site-header],
+  [data-site-footer].dc-footer-shell {
+    display: none !important;
+  }
+
+  /* Page bodies that rendered with `pb-2` (mobile bottom-nav offset)
+     no longer need that padding on desktop. The desktop main column
+     handles its own padding through the shell. */
+  [data-app-frame] > main {
+    max-width: none;
+    width: 100%;
+    padding: 0;
+  }
+
+  /* ── Page-specific rules: every page that opted into the tablet
+     layout's content width now opts into the desktop content width
+     (1280 px) instead. Below 1024 px the tablet rules still apply
+     (720 px), so the breakpoints stay clean. */
+  [data-home-hero],
+  [data-home-category-nav],
+  [data-home-continue],
+  [data-home-trending],
+  [data-home-reviews] {
+    max-width: 1280px;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  [data-myday-content],
+  [data-revision-content],
+  [data-profile-content],
+  [data-notifications-content],
+  [data-pdp-scroll],
+  [data-cart-row],
+  [data-favorites-row],
+  [data-myday-create-row] {
+    max-width: 1280px;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  /* Grids: the home / store / PDP cards become 4- or 5-column on
+     desktop (the 2- or 3-column tablet layout was a step towards a
+     real product list — desktop is the step where the list feels
+     like a real storefront). */
+  [data-home-grid],
+  [data-store-grid],
+  [data-pdp-grid] {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  /* The hero carousel grows even taller on desktop — a real product
+     hero on the home page should command the viewport. */
+  [data-home-hero] .h-44,
+  [data-home-hero] .h-56 {
+    height: 22rem;
+  }
+
+  /* The My Day overview's create button is the page's primary CTA;
+     on desktop it should be visually prominent but not enormous.
+     96x96 reads as "click me" without overflowing a 720 px column. */
+  [data-myday-create-row] button[aria-label="Create item"] {
+    height: 6rem;
+    width: 6rem;
+  }
+}
+
+/* ── The desktop shell itself: persistent left rail + sticky top
+   bar. Defined outside the media query so the JS-rendered class
+   names are usable even when the page is mounted before the media
+   query is matched (initial render). */
+.dc-desktop-shell {
+  /* The shell's content area: a single column that hosts the rail
+     (sticky to the left edge) and the main area (top bar + body). */
+  --desktop-rail-width: 260px;
+  --desktop-topbar-height: 64px;
+}
+
+@media (max-width: 1023px) {
+  /* The shell is render-free on mobile / tablet — the mobile +
+     tablet per-page chrome takes over. */
+  .dc-desktop-shell { display: none !important; }
+}
+
+/* The left rail — capsule-shaped icons on hover, gradient fill
+   on the active item. The styling is desktop-only (it's inside the
+   shell that hides on mobile + tablet). */
+.dc-desktop-shell [data-desktop-rail] [data-desktop-rail-item] {
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+.dc-desktop-shell [data-desktop-rail] [data-desktop-rail-item]:hover:not([data-active="true"]) {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.dc-desktop-shell [data-desktop-rail] [data-desktop-rail-item][data-active="true"] {
+  /* The active item is a gradient pill — same brand colour as the
+     mobile / tablet accent, but rendered as a proper desktop button
+     rather than a tap target. */
+  background-image: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+  box-shadow:
+    0 6px 16px -8px rgba(99, 102, 241, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.dc-desktop-shell [data-desktop-rail] [data-desktop-rail-item][data-active="true"] > span:first-child {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+/* The top bar — pill-style icon buttons, an inline search input, a
+   page title that mirrors the current section. */
+.dc-desktop-shell [data-desktop-topbar] {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.86));
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.dc-desktop-shell [data-desktop-topbar-button]:hover {
+  background: #f1f5f9 !important;
+  color: #4f46e5 !important;
+}
+
+/* Page body: comfortable gutters, but the content still caps at a
+   reading-friendly max width. Pages that want to use the full width
+   (the landing hero, a wide media viewer) opt out by setting
+   `data-desktop-full-width`. */
+.dc-desktop-shell [data-desktop-content] {
+  align-items: flex-start;
+}
+
+.dc-desktop-shell [data-desktop-content] > main {
+  width: 100%;
+  /* Let the page choose its own inner max-width. Pages that want the
+     full width opt out by removing the default. The shell leaves the
+     default at the global desktop content max so the column is
+     comfortable on a 27" monitor. */
+}
+
+/* Tablet adaptations of the desktop shell — keep the rail but let
+   the page body fill the rest of the viewport so a portrait tablet
+   does not leave a 200 px gutter on the right. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .dc-desktop-shell {
+    --desktop-rail-width: 220px;
+    --desktop-topbar-height: 56px;
+  }
+  .dc-desktop-shell [data-desktop-rail] { width: 220px !important; }
+}
+
 @media (max-width: 374px) {
   .dc-footer-pill button {
     font-size: 10px;
