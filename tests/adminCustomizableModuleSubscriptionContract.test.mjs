@@ -4,6 +4,7 @@ import fs from "node:fs";
 
 const builder = fs.readFileSync("src/components/pdp/PdpPurchaseBuilder.tsx", "utf8");
 const editor = fs.readFileSync("src/components/admin/products/ProductEditor.tsx", "utf8");
+const modulesEditor = fs.readFileSync("src/components/admin/products/ModulesResourcesEditor.tsx", "utf8");
 const adminClient = fs.readFileSync("src/lib/admin/client.ts", "utf8");
 const adminSubs = fs.readFileSync("src/admin/pages/SubscriptionsPage.tsx", "utf8");
 const serverQuotes = fs.readFileSync("utils/serverQuotes.js", "utf8");
@@ -23,11 +24,14 @@ test("selected modules flow into server-authoritative checkout", () => {
 });
 
 test("admin product editor customizes module availability, regular and sale prices", () => {
-  assert.match(editor, /Individually purchasable/);
-  assert.match(editor, /Cash price \(₹\)/);
-  assert.match(editor, /Sale price \(₹\)/);
+  // The module-level fields moved with the drill-down editor.
+  assert.match(modulesEditor, /Individually purchasable/);
+  assert.match(modulesEditor, /Cash price \(₹\)/);
+  assert.match(modulesEditor, /Sale price \(₹\)/);
+  // The validation message + accessLevel coercion live in the
+  // new editor (the parent still runs the validation block).
   assert.match(editor, /sale price must be between ₹0 and its cash price/);
-  assert.match(editor, /accessLevel === "purchasable" \? true/);
+  assert.match(modulesEditor, /accessLevel === "purchasable" \? true/);
 });
 
 test("admin subscription adapters persist canonical plan and My Day prices", () => {
