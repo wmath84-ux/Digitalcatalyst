@@ -125,13 +125,13 @@ test("flowpath control multiplexer writes an audit log entry per action", () => 
   assert.match(flowpathControl, /delivery/);
 });
 
-test("flowpath control multiplexer caps bulk create at 50 items", () => {
-  // 50 is the per-call ceiling. Higher volumes need a server-side
-  // job; the dashboard never needs to ship more than 50 in one
-  // click (the bulk UI caps at 5 slots + the 50 server cap is a
-  // safety net for future "import from CSV" flows).
-  assert.match(flowpathControl, /items\.length > 50/);
-  assert.match(flowpathControl, /Bulk limit is 50 items\./);
+test("flowpath control multiplexer caps bulk create at 100 items", () => {
+  // 100 is the per-call ceiling (was 50; raised so the lecture
+  // planner's "schedule every fresh course for every user" admin
+  // flow stays bounded but the user-facing picker can still
+  // ship a 20-lecture batch in one click).
+  assert.match(flowpathControl, /items\.length > 100/);
+  assert.match(flowpathControl, /Bulk limit is 100 items\./);
 });
 
 test("flowpath control multiplexer allows admin to act on any user", () => {

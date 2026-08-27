@@ -76,6 +76,19 @@ export async function resolveFlowPathAccess(
   kind: FlowPathActivityKind,
 ): Promise<FlowPathAccess> {
   const now = Date.now();
+  // ---------- Lecture: every user can schedule lectures. Preview-only
+  // courses (not yet purchased) are allowed but the activity carries
+  // a `lecturePreviewOnly` flag and the deep link goes to the
+  // product page instead of the course player. No gate here.
+  if (kind === "lecture") {
+    return {
+      canCreate: true,
+      planId: "basic",
+      planName: "Basic",
+      cycle: "monthly",
+      freeRemaining: -1,
+    };
+  }
   // ---------- Revision: needs active subscription with `revision` feature
   if (kind === "revision" || kind === "mcq") {
     const feature = await db.collection("subscriptionFeatures").doc("revision").get();

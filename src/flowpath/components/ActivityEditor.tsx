@@ -25,7 +25,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, Clock, Repeat, X } from "lucide-react";
 import type { FlowPathActivity, FlowPathActivityKind } from "../types/flowpath";
-import { ACTIVITY_TYPE_META } from "../types/flowpath";
+import { FLOW_PATH_KIND_META } from "../types/flowpath";
 
 export type ActivityEditorMode = "create" | "edit";
 
@@ -44,6 +44,7 @@ const KIND_TABS: { key: FlowPathActivityKind; label: string }[] = [
   { key: "reminder", label: "Reminder" },
   { key: "schedule", label: "Schedule" },
   { key: "note", label: "Note" },
+  { key: "lecture", label: "Lecture" },
   { key: "revision", label: "Revision" },
   { key: "mcq", label: "MCQ" },
 ];
@@ -237,7 +238,7 @@ export function ActivityEditor({
                     type="text"
                     value={form.title || ""}
                     onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                    placeholder={`${ACTIVITY_TYPE_META[kind].label} title`}
+                    placeholder={`${FLOW_PATH_KIND_META[kind].label} title`}
                     className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
                     data-field="title"
                   />
@@ -509,7 +510,7 @@ export function ActivityEditor({
                   data-submit-activity
                   className="h-10 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-40"
                 >
-                  {submitting ? "Saving…" : mode === "create" ? `Create ${ACTIVITY_TYPE_META[kind].label}` : "Save changes"}
+                  {submitting ? "Saving…" : mode === "create" ? `Create ${FLOW_PATH_KIND_META[kind].label}` : "Save changes"}
                 </button>
               </div>
             </div>

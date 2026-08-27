@@ -112,3 +112,37 @@ export const flowpathBroadcast = (input: { title: string; body: string; url?: st
     action: "flowpath.broadcast",
     ...input,
   });
+
+/* ------------------------------------------------------------------ */
+/*  Lecture picker helpers — pure reads, no side effects              */
+/* ------------------------------------------------------------------ */
+
+export type FlowPathLectureCourse = {
+  id: string;
+  title: string;
+  category: string | null;
+  productType: string | null;
+  image: string | null;
+  moduleCount: number;
+  previewOnly: boolean;
+};
+
+export type FlowPathLectureModule = {
+  id: string;
+  title: string;
+  description: string | null;
+  order: number;
+};
+
+export const flowpathLectureCourses = (uid: string, q = "") =>
+  flowpathControl<{ courses: FlowPathLectureCourse[] }>({
+    action: "flowpath.lecture.courses",
+    uid,
+    q,
+  });
+
+export const flowpathLectureModules = (productId: string) =>
+  flowpathControl<{ modules: FlowPathLectureModule[] }>({
+    action: "flowpath.lecture.modules",
+    productId,
+  });

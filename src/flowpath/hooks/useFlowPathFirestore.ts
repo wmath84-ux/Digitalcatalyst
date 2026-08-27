@@ -358,7 +358,7 @@ export function useFlowPathFirestore(targetUidOverride?: string) {
   // Derived: items grouped by kind for the dashboard.
   const byKind = useMemo(() => {
     const groups: Record<FlowPathActivityKind, FlowPathActivity[]> = {
-      task: [], reminder: [], schedule: [], note: [], revision: [], mcq: [], other: [],
+      task: [], reminder: [], schedule: [], note: [], revision: [], mcq: [], lecture: [], other: [],
     };
     for (const item of items) {
       if (groups[item.kind]) groups[item.kind].push(item);

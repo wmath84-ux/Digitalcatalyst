@@ -1,12 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Trash2 } from "lucide-react";
+import { Trash2, BookOpen } from "lucide-react";
 import type { Activity, ActivityType } from "../../flowpath/types/flowpath";
 import { ACTIVITY_TYPE_META } from "../../flowpath/types/flowpath";
 import { useFlowPath } from "../../flowpath/hooks/useFlowPath";
 import { useFlowPathFirestore } from "../../flowpath/hooks/useFlowPathFirestore";
 import { useFlowPathSync } from "../../flowpath/hooks/useFlowPathSync";
 import { useTheme } from "../../flowpath/hooks/useTheme";
+import { LecturePicker, type LectureCourseOption, type LectureModuleOption } from "../../flowpath/components/LecturePicker";
+import { flowpathLectureCourses, flowpathLectureModules, flowpathBulk } from "../../flowpath/lib/flowpathControlClient";
+import { auth } from "../../../firebase";
+
+/** The signed-in user's uid, fetched synchronously. The auth
+ *  context is not imported here to keep FlowPathView's dep graph
+ *  flat; firebase/auth keeps the currentUser reference live. */
+const lecturePickerUid = (): string => {
+  try { return auth?.currentUser?.uid || ""; } catch { return ""; }
+};
 import {
   buildRows,
   buildSmoothPath,
@@ -65,14 +75,25 @@ function saveCurveOverride(value: CurveOverride) {
   }
 }
 
-const ACTIVITY_RADIAL_ITEMS: RadialItem[] = (
-  Object.keys(ACTIVITY_TYPE_META) as ActivityType[]
-).map((t) => ({
-  id: t,
-  label: ACTIVITY_TYPE_META[t].label,
-  icon: ACTIVITY_ICONS[t],
-  color: ACTIVITY_TYPE_META[t].color,
-}));
+const ACTIVITY_RADIAL_ITEMS: RadialItem[] = (() => {
+  const items: RadialItem[] = (Object.keys(ACTIVITY_TYPE_META) as ActivityType[]).map((t) => ({
+    id: t,
+    label: ACTIVITY_TYPE_META[t].label,
+    icon: ACTIVITY_ICONS[t],
+    color: ACTIVITY_TYPE_META[t].color,
+  }));
+  // Append the "Lecture" entry that drives the 3-step picker
+  // (course + module + schedule). Same radial menu surface so
+  // the user can reach it from the same + button they use for
+  // every other kind.
+  items.push({
+    id: "lecture",
+    label: "Lecture",
+    icon: BookOpen,
+    color: "#22d3ee",
+  });
+  return items;
+})();
 
 interface PendingMenu {
   afterId: string | null;
@@ -199,6 +220,8 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
+  const [lecturePickerOpen, setLecturePickerOpen] = useState<boolean>(false);
+  const [lectureSubmitting, setLectureSubmitting] = useState<boolean>(false);
 
   // Mirror every curve change to localStorage so the user's customisation
   // survives reloads and revisits. We persist on every change rather than
@@ -368,6 +391,13 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
     (id: string) => {
       const afterId = menu?.afterId ?? null;
       setMenu(null);
+      // Lecture: open the 3-step picker instead of the regular
+      // CreateModal. The picker drives a separate flow that picks
+      // the course + module + schedule, then submits a bulk create.
+      if (id === "lecture") {
+        setLecturePickerOpen(true);
+        return;
+      }
       setCreateType({ type: id as ActivityType, afterId });
     },
     [menu]
@@ -525,6 +555,35 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
         editing={editingActivity}
       />
 
+      <LecturePicker
+        open={lecturePickerOpen}
+        onClose={() => setLecturePickerOpen(false)}
+        fetchCourses={async (q: string) => {
+          const res = await flowpathLectureCourses(lecturePickerUid(), q);
+          if (!res.ok) return [];
+          return ((res as { courses?: LectureCourseOption[] }).courses || []) as LectureCourseOption[];
+        }}
+        fetchModules={async (productId: string) => {
+          const res = await flowpathLectureModules(productId);
+          if (!res.ok) return [];
+          return ((res as { modules?: LectureModuleOption[] }).modules || []) as LectureModuleOption[];
+        }}
+        submitting={lectureSubmitting}
+        onSubmit={async (lectures) => {
+          setLectureSubmitting(true);
+          try {
+            const res = await flowpathBulk(lecturePickerUid(), lectures as Array<Record<string, unknown>>);
+            if (res.ok) {
+              setToast({ msg: `Scheduled ${lectures.length} lecture${lectures.length === 1 ? "" : "s"}`, key: Date.now() });
+              return { ok: true };
+            }
+            return { ok: false, error: res.error || "Failed." };
+          } finally {
+            setLectureSubmitting(false);
+          }
+        }}
+      />
+
       <CurveSettingsModal
         open={curveOpen}
         onClose={() => setCurveOpen(false)}
@@ -533,7 +592,14 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
       />
 
       <BottomDock
-        onCreateType={(type) => setCreateType({ type, afterId: currentId })}
+        onCreateType={(type) => {
+          if (type === ("lecture" as unknown as ActivityType)) {
+            setLecturePickerOpen(true);
+            return;
+          }
+          setCreateType({ type, afterId: currentId });
+        }}
+        onPlanLectures={() => setLecturePickerOpen(true)}
         onStub={(group, label) => setToast({ msg: `${group} · ${label}`, key: Date.now() })}
         onNavigateToHome={onNavigateToHome}
       />

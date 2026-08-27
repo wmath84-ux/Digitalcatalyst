@@ -321,15 +321,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             id: `flowpath:${jobActivityId}`,
             title,
             body,
-            category: activity.kind === "revision" || activity.kind === "mcq" ? "course" : "mayday",
+            category: activity.kind === "revision" || activity.kind === "mcq" || activity.kind === "lecture" ? "course" : "mayday",
             read: false,
             source: "system",
             createdAt: Timestamp.fromMillis(now),
             target: {
-              type: activity.kind === "revision" || activity.kind === "mcq" ? "product" : "mayday",
+              type: activity.kind === "revision" || activity.kind === "mcq" || activity.kind === "lecture" ? "product" : "mayday",
               section: activity.kind === "task" ? "tasks" : activity.kind === "reminder" ? "reminders" : activity.kind === "schedule" ? "schedule" : activity.kind === "note" ? "notes" : undefined,
               itemId: jobActivityId,
-              productId: activity.kind === "revision" || activity.kind === "mcq" ? String(activity.testId || jobActivityId) : undefined,
+              productId: activity.kind === "revision" || activity.kind === "mcq"
+                ? String(activity.testId || jobActivityId)
+                : activity.kind === "lecture"
+                ? String(activity.lectureProductId || jobActivityId)
+                : undefined,
             },
           }, { merge: true });
           const sent = await sendPush(db, jobUid, title, body, { tag, url });

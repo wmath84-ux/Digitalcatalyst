@@ -87,17 +87,22 @@ interface MenuState {
 
 interface BottomDockProps {
   onCreateType: (type: ActivityType) => void;
+  /** Optional callback that opens the FlowPath lecture planner
+   *  (3-step course + module + schedule wizard). When omitted, the
+   *  dock hides the Plan-lectures shortcut. */
+  onPlanLectures?: () => void;
   onStub: (group: string, label: string) => void;
   onNavigateToHome?: () => void;
 }
 
-export function BottomDock({ onCreateType, onStub, onNavigateToHome }: BottomDockProps) {
+export function BottomDock({ onCreateType, onPlanLectures, onStub, onNavigateToHome }: BottomDockProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   const homeRef = useRef<HTMLButtonElement>(null);
   const mydayRef = useRef<HTMLButtonElement>(null);
   const createRef = useRef<HTMLButtonElement>(null);
   const revisionRef = useRef<HTMLButtonElement>(null);
+  const lectureRef = useRef<HTMLButtonElement>(null);
 
   const createItems: RadialItem[] = (Object.keys(ACTIVITY_TYPE_META) as ActivityType[]).map(
     (t) => ({
@@ -175,6 +180,15 @@ export function BottomDock({ onCreateType, onStub, onNavigateToHome }: BottomDoc
             label="Revision"
             onClick={() => openMenu(revisionRef, REVISION_ITEMS, "Revision")}
           />
+
+          {onPlanLectures ? (
+            <DockButton
+              buttonRef={lectureRef}
+              icon={Sunrise}
+              label="Lectures"
+              onClick={onPlanLectures}
+            />
+          ) : null}
         </motion.div>
       </div>
 

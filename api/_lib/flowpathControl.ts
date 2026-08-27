@@ -58,6 +58,7 @@ import { fcmPushToAllDevices, fcmPushToUser, fcmConfigured, type FcmPayload } fr
 import { pushToAllDevices, pushToUser, pushConfigured, type PushPayload } from "./pushNotify.js";
 import { getNotificationBrandChrome } from "./branding.js";
 import { resolveFlowPathAccess, type FlowPathAccess } from "./flowpathAccess.js";
+import { resolveLectureAccess, getLectureModules, getPurchasedProductIds } from "./lecturePlanner.js";
 
 /* -------------------------------------------------------------------------- */
 /*  Type definitions (kept in sync with src/flowpath/types/flowpath.ts)       */
@@ -70,6 +71,7 @@ export type FlowPathActivityKind =
   | "note"
   | "revision"
   | "mcq"
+  | "lecture"
   | "other";
 
 export type FlowPathActivityStatus =
@@ -118,6 +120,14 @@ export type FlowPathActivity = {
     estimatedMinutes: number;
   };
   testId?: number; // revisionTests doc id (when kind is revision/mcq)
+  // Lecture fields (when kind is "lecture" — schedule a course / module reading slot)
+  lectureProductId?: string;
+  lectureProductTitle?: string;
+  lectureModuleId?: string | null;
+  lectureModuleTitle?: string | null;
+  lectureEstimatedMinutes?: number;
+  lecturePreviewOnly?: boolean; // true when the user does not own the course
+  lectureProgress?: number; // 0-100, last reported by the course player
   // Provenance
   source: "user" | "admin" | "ai";
   createdBy: string;
@@ -167,7 +177,7 @@ const asActivity = (raw: unknown, fallback: { uid: string; createdBy: string }):
   const kind = text(r.kind, 30) as FlowPathActivityKind;
   const title = text(r.title, 400);
   if (!id || !title) return null;
-  const validKinds: FlowPathActivityKind[] = ["task", "reminder", "schedule", "note", "revision", "mcq", "other"];
+  const validKinds: FlowPathActivityKind[] = ["task", "reminder", "schedule", "note", "revision", "mcq", "lecture", "other"];
   if (!validKinds.includes(kind)) return null;
   const status = text(r.status, 30) as FlowPathActivityStatus;
   const validStatus: FlowPathActivityStatus[] = ["draft", "active", "completed", "cancelled", "overdue"];
@@ -193,6 +203,13 @@ const asActivity = (raw: unknown, fallback: { uid: string; createdBy: string }):
     reminderTime: r.reminderTime ? text(r.reminderTime, 5) : undefined,
     testConfig: r.testConfig ? asRecord(r.testConfig) as FlowPathActivity["testConfig"] : undefined,
     testId: r.testId ? number(r.testId) : undefined,
+    lectureProductId: r.lectureProductId ? text(r.lectureProductId, 200) : undefined,
+    lectureProductTitle: r.lectureProductTitle ? text(r.lectureProductTitle, 400) : undefined,
+    lectureModuleId: r.lectureModuleId ? text(r.lectureModuleId, 200) : (r.lectureModuleId === null ? null : undefined),
+    lectureModuleTitle: r.lectureModuleTitle ? text(r.lectureModuleTitle, 400) : (r.lectureModuleTitle === null ? null : undefined),
+    lectureEstimatedMinutes: r.lectureEstimatedMinutes ? number(r.lectureEstimatedMinutes) : undefined,
+    lecturePreviewOnly: r.lecturePreviewOnly === true,
+    lectureProgress: r.lectureProgress !== undefined ? number(r.lectureProgress) : undefined,
     source: (text(r.source, 20) as FlowPathActivity["source"]) || "user",
     createdBy: text(r.createdBy, 120) || fallback.createdBy,
     createdAt: r.createdAt ? millis(r.createdAt) : Date.now(),
@@ -319,6 +336,19 @@ function deepLinkForActivity(activity: FlowPathActivity): string {
     case "revision":
     case "mcq":
       return `/#/revision?testId=${encodeURIComponent(String(activity.testId ?? activity.id))}`;
+    case "lecture": {
+      // Preview-only courses deep-link to the product page so the
+      // user can buy; owned courses open the course player straight
+      // at the chosen module (falling back to the course root).
+      const productId = activity.lectureProductId || activity.id;
+      if (activity.lecturePreviewOnly) {
+        return `/#/product/${encodeURIComponent(productId)}?lecture=${encodeURIComponent(activity.id)}`;
+      }
+      const moduleParam = activity.lectureModuleId
+        ? `?module=${encodeURIComponent(activity.lectureModuleId)}&lecture=${encodeURIComponent(activity.id)}`
+        : `?lecture=${encodeURIComponent(activity.id)}`;
+      return `/#/course/${encodeURIComponent(productId)}${moduleParam}`;
+    }
     default:
       return "/#/my-day";
   }
@@ -479,6 +509,28 @@ export async function handleFlowPathControl(req: VercelRequest, res: VercelRespo
       return void res.status(200).json({ ok: true, entries });
     }
 
+    // -------------------------------------------------- lecture picker support
+    // The 3-step LecturePicker modal calls these to populate the
+    // course dropdown and the module dropdown. They never write
+    // anything to Firestore — pure read helpers. The picker calls
+    // them with the signed-in user's id so the server can decide
+    // which courses are "preview only" (the user does not own them).
+    if (action === "flowpath.lecture.courses") {
+      const targetUid = text(body.uid, 120) || caller.uid;
+      if (targetUid !== caller.uid) {
+        return void res.status(403).json({ ok: false, error: "Cannot read another user's lectures." });
+      }
+      const q = text(body.q, 200);
+      const list = await getLectureCourses(targetUid, q);
+      return void res.status(200).json({ ok: true, courses: list });
+    }
+    if (action === "flowpath.lecture.modules") {
+      const productId = text(body.productId, 200);
+      if (!productId) return void res.status(400).json({ ok: false, error: "Missing productId." });
+      const list = await getLectureModules(productId);
+      return void res.status(200).json({ ok: true, modules: list });
+    }
+
     // ------------------------------------------------------------------ list
     if (action === "flowpath.list") {
       const targetUid = text(body.uid, 120) || caller.uid;
@@ -564,6 +616,51 @@ export async function handleFlowPathControl(req: VercelRequest, res: VercelRespo
           throw err;
         }
       }
+      // 3b. Lecture: validate the product + module exist, then
+      //     resolve the user's purchase status. Preview-only
+      //     courses are allowed (the user is planning ahead), but
+      //     the deep link routes to the product page instead of
+      //     the course player.
+      if (activity.kind === "lecture") {
+        const productId = activity.lectureProductId;
+        if (!productId) {
+          await db.collection("users").doc(activity.uid).collection("flowpathActivities").doc(activity.id).delete();
+          return void res.status(400).json({ ok: false, error: "Lecture activity is missing a productId." });
+        }
+        const modules = await getLectureModules(productId);
+        if (modules.length === 0) {
+          await db.collection("users").doc(activity.uid).collection("flowpathActivities").doc(activity.id).delete();
+          return void res.status(404).json({ ok: false, error: "That course has no modules to schedule." });
+        }
+        if (activity.lectureModuleId && !modules.some((m) => m.id === activity.lectureModuleId)) {
+          // The selected module was deleted since the picker ran;
+          // fall back to the first module instead of failing the
+          // whole schedule.
+          const first = modules[0];
+          activity.lectureModuleId = first.id;
+          activity.lectureModuleTitle = first.title;
+        }
+        // Resolve preview-only by comparing against the user's
+        // purchased product ids (same source the picker reads).
+        const purchased = await getPurchasedProductIds(activity.uid);
+        const idKeys = [productId, Number(productId)].filter((v) => Number.isFinite(v));
+        const owned = idKeys.some((k) => purchased.has(String(k))) || purchased.has(productId);
+        activity.lecturePreviewOnly = !owned;
+        if (!owned) {
+          // The title the user picked may be the course title; for
+          // preview items we annotate the title so the bell entry
+          // makes the buy-step obvious.
+          activity.title = activity.title || activity.lectureProductTitle || "Course preview";
+        }
+        // Persist the updated activity with the resolved flags.
+        await db.collection("users").doc(activity.uid).collection("flowpathActivities").doc(activity.id).set({
+          lecturePreviewOnly: activity.lecturePreviewOnly,
+          lectureModuleId: activity.lectureModuleId,
+          lectureModuleTitle: activity.lectureModuleTitle,
+          title: activity.title,
+          updatedAt: Date.now(),
+        }, { merge: true });
+      }
       // 4. Dispatch (immediate or scheduled).
       const immediate = activity.scheduledFor === null || activity.scheduledFor <= Date.now() + 10_000;
       const delivery = await dispatchActivity(db, activity, immediate);
@@ -600,7 +697,12 @@ export async function handleFlowPathControl(req: VercelRequest, res: VercelRespo
       if (!isAdminEmail) return void res.status(403).json({ ok: false, error: "Admin only." });
       const items = Array.isArray(body.items) ? body.items : [];
       if (items.length === 0) return void res.status(400).json({ ok: false, error: "No items." });
-      if (items.length > 50) return void res.status(413).json({ ok: false, error: "Bulk limit is 50 items." });
+      // Bulk cap is 100. The dashboard UI caps the visible "Add
+      // another" list at 20, but admin-only flows (e.g. a "send
+      // every fresh course to every user" campaign) may need
+      // higher volumes. 100 keeps the request bounded without
+      // pushing the function past its execution-time limit.
+      if (items.length > 100) return void res.status(413).json({ ok: false, error: "Bulk limit is 100 items." });
       const batchId = text(body.batchId, 60) || randomUUID();
       const results: Array<{ ok: boolean; activity?: FlowPathActivity; error?: string }> = [];
       for (let i = 0; i < items.length; i += 1) {
@@ -617,6 +719,25 @@ export async function handleFlowPathControl(req: VercelRequest, res: VercelRespo
           if (["task", "reminder", "schedule", "note"].includes(activity.kind)) {
             await mirrorToMyDay(db, activity);
           }
+          // Lecture validation in bulk: same checks as the single-
+          // create path. Failures on a single item do not abort the
+          // whole batch — the rest still schedule.
+          if (activity.kind === "lecture") {
+            const productId = activity.lectureProductId;
+            if (productId) {
+              const modules = await getLectureModules(productId);
+              if (modules.length > 0) {
+                if (activity.lectureModuleId && !modules.some((m) => m.id === activity.lectureModuleId)) {
+                  const first = modules[0];
+                  activity.lectureModuleId = first.id;
+                  activity.lectureModuleTitle = first.title;
+                }
+                const purchased = await getPurchasedProductIds(activity.uid);
+                const idKeys = [productId, Number(productId)].filter((v) => Number.isFinite(v));
+                activity.lecturePreviewOnly = !(idKeys.some((k) => purchased.has(String(k))) || purchased.has(productId));
+              }
+            }
+          }
           const immediate = activity.scheduledFor === null || activity.scheduledFor <= Date.now() + 10_000;
           const delivery = await dispatchActivity(db, activity, immediate);
           const jobId = await scheduleJob(db, activity, caller.uid);
@@ -625,7 +746,14 @@ export async function handleFlowPathControl(req: VercelRequest, res: VercelRespo
             .doc(activity.uid)
             .collection("flowpathActivities")
             .doc(activity.id)
-            .set({ lastDelivery: delivery, scheduledJobId: jobId || null, updatedAt: Date.now() }, { merge: true });
+            .set({
+              lecturePreviewOnly: activity.lecturePreviewOnly,
+              lectureModuleId: activity.lectureModuleId,
+              lectureModuleTitle: activity.lectureModuleTitle,
+              lastDelivery: delivery,
+              scheduledJobId: jobId || null,
+              updatedAt: Date.now(),
+            }, { merge: true });
           results.push({ ok: true, activity: { ...activity, lastDelivery: delivery, scheduledJobId: jobId || null } });
         } catch (err) {
           results.push({ ok: false, error: err instanceof Error ? err.message : "Failed." });
