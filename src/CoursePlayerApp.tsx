@@ -780,6 +780,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // complement, so the parent needs to know which sheet is the open one.
   const [mindMapSplitMode, setMindMapSplitMode] = useState(false);
   const handleMindMapSplitChange = useCallback((active: boolean) => setMindMapSplitMode(active), []);
+  // Live landscape split ratio (panel percent). Defaults: notes 40, mind map 50.
+  // The overlay reports every drag frame so the lesson and the sheet stay
+  // glued to the same centre handle.
+  const [splitPanelPercent, setSplitPanelPercent] = useState<number | null>(null);
+  const handleSplitRatioChange = useCallback((percent: number | null) => setSplitPanelPercent(percent), []);
   useEffect(() => {
     if (dockTab !== "mindmap" && mindMapSplitMode) setMindMapSplitMode(false);
   }, [dockTab, mindMapSplitMode]);
@@ -1091,9 +1096,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           // until the learner flips the map's own sun/moon toolbar button.
           playerTheme={theme}
           landscape={useLandscapeRails}
+          onClose={() => {
+            mindMap.flush();
+            setDockOpen(false);
+          }}
         />
       )}
       onMindMapSplitChange={handleMindMapSplitChange}
+      onSplitRatioChange={handleSplitRatioChange}
       notesSaveSignal={notesSaveSignal}
     />
   );
@@ -1172,17 +1182,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         data-course-landscape-content
         data-split-mode={notesSplitMode || mindMapSplitMode ? "true" : "false"}
         data-split-kind={mindMapSplitMode ? "mindmap" : notesSplitMode ? "notes" : "none"}
+        data-split-percent={splitPanelPercent == null ? undefined : String(splitPanelPercent)}
       >
         <div
-          className={`flex min-h-0 flex-col overflow-hidden transition-[flex-basis,max-width] duration-300 ${
-            notesSplitMode
-              ? "basis-[calc(60%-4rem)] max-w-[calc(60%-4rem)] shrink-0 grow-0"
-              // The mind map claims a wider half of the screen than the notes
-              // editor, so the lesson shrinks to 50% instead of 60%.
-              : mindMapSplitMode
-                ? "basis-[calc(50%-4rem)] max-w-[calc(50%-4rem)] shrink-0 grow-0"
-                : "basis-full max-w-full flex-1"
+          className={`flex min-h-0 flex-col overflow-hidden ${
+            notesSplitMode || mindMapSplitMode ? "shrink-0 grow-0" : "basis-full max-w-full flex-1"
           }`}
+          style={
+            notesSplitMode || mindMapSplitMode
+              ? {
+                  flexBasis: `calc(${100 - (splitPanelPercent ?? (mindMapSplitMode ? 50 : 40))}% - 4rem)`,
+                  maxWidth: `calc(${100 - (splitPanelPercent ?? (mindMapSplitMode ? 50 : 40))}% - 4rem)`,
+                }
+              : undefined
+          }
           data-course-landscape-content-inner
         >
           <div className="min-h-0 flex-1 overflow-hidden">{viewerStack}</div>

@@ -157,9 +157,10 @@ test("While the keyboard is up over the notes editor the sheet lifts above it", 
 });
 
 test("The landscape split keeps lesson + notes side by side (60/40)", () => {
-  assert.match(coursePlayer, /basis-\[calc\(60%-4rem\)\]/);
-  assert.match(overlay, /const splitEditorWidth = "min\(40%, 520px\)"/);
+  assert.match(overlay, /const DEFAULT_NOTES_SPLIT = 40;/);
+  assert.match(coursePlayer, /100 - \(splitPanelPercent \?\? \(mindMapSplitMode \? 50 : 40\)\)/);
   assert.match(overlay, /onSplitModeChange/);
+  assert.match(overlay, /data-course-split-handle/);
 });
 
 test("The landscape dock rail stays pinned to the far-right edge in split mode", () => {

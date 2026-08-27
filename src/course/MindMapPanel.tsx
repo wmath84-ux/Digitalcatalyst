@@ -16,8 +16,6 @@
 //   tap outside    → any open editor saves its content (blur behaves the
 //                    same way, so closing the editor and tapping the canvas
 //                    is one and the same action).
-//   ▸ / ▾          → collapse / expand a branch (action bar on the selected
-//                    node, never visible by default).
 //   double-tap     → with "double-tap delete" switched ON from the toolbar,
 //                    a double-tap deletes the node and its whole branch.
 //                    The mode is OFF by default and is toggled by the
@@ -63,19 +61,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   BackgroundVariant,
+  BaseEdge,
   Handle,
   Position,
   ReactFlow,
   ReactFlowProvider,
+  applyNodeChanges,
   useReactFlow,
   type Edge,
+  type EdgeProps,
   type Node,
+  type NodeChange,
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Maximize, Minus, MousePointerClick, Moon, Plus, Sun, Trash2, TriangleAlert } from "lucide-react";
+import { Maximize, Minus, MousePointerClick, Moon, Plus, Sun, Trash2, TriangleAlert, X } from "lucide-react";
 import {
   addChildNode,
+  collectSubtreeIds,
   countNodes,
   layoutMindMap,
   maxDepth,
@@ -83,7 +86,6 @@ import {
   rootId,
   setNodePosition,
   setNodeTopic,
-  toggleCollapsed,
   type MindMap,
 } from "../../utils/mindMapTree";
 import type { MindMapSaveStatus } from "./useCourseMindMap";
@@ -134,7 +136,6 @@ interface MindNodeData extends Record<string, unknown> {
   /** True while the toolbar's double-tap delete mode is armed. */
   deleteOnDoubleTap: boolean;
   onAddChild: (id: string) => void;
-  onToggleCollapse: (id: string) => void;
   onDelete: (id: string) => void;
   onOpenEditor: (id: string) => void;
   onCloseEditor: (id: string) => void;
@@ -168,15 +169,12 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
     topic,
     depth,
     side,
-    collapsed,
-    childCount,
     isRoot,
     selected,
     editing,
     theme,
     deleteOnDoubleTap,
     onAddChild,
-    onToggleCollapse,
     onDelete,
     onOpenEditor,
     onCloseEditor,
@@ -374,44 +372,6 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
         ) : (
           <span className="line-clamp-4 min-h-0 flex-1 break-words">{topic}</span>
         )}
-
-        {/* Action bar — rendered INSIDE the node so the control can never
-            land outside the React Flow viewport on a phone. Only the
-            selected node shows it, and only while it has a branch to fold.
-            The trash deliberately no longer lives here: deleting a branch is
-            done from the toolbar (or the optional double-tap mode) so the
-            destructive action is never one mis-tap away from the editor. */}
-        {selected && childCount > 0 ? (
-          <div
-            className="mt-1 flex shrink-0 items-center gap-1 border-t border-[var(--mm-border)] pt-1"
-            data-mind-node-actions={id}
-            // Stop the React Flow canvas from re-selecting while the user
-            // taps a button — without this, a tap on the chevron can land on
-            // the canvas instead of the button on slow devices.
-            onMouseDown={(event) => event.stopPropagation()}
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onToggleCollapse(id);
-              }}
-              className={`nodrag grid h-5 w-5 place-items-center rounded-full border text-[10px] font-black transition ${
-                theme === "light"
-                  ? "border-slate-900/15 bg-white/85 text-slate-700 hover:bg-white"
-                  : "border-white/15 bg-black/60 text-slate-200 hover:bg-black/80"
-              }`}
-              aria-label={collapsed ? "Branch kholein" : "Branch chhupayein"}
-              title={collapsed ? "Expand" : "Collapse"}
-              data-mind-node-collapse={id}
-            >
-              {collapsed ? childCount : "–"}
-            </button>
-          </div>
-        ) : null}
       </div>
 
       {/* ── The `+`: one tap appends a child to THIS node ──────────────── */}
@@ -437,6 +397,102 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
 // Defined once at module scope: a fresh object each render makes React Flow
 // tear down and rebuild every node, losing focus mid-typing.
 const NODE_TYPES = { mindNode: MindNode };
+
+// ── Rope edges (n8n-style flexible cables) ────────────────────────────────
+//
+// `smoothstep` draws rigid right-angle corridors. n8n (and Figma, tldraw)
+// instead use a cubic Bézier whose control points sit OUT along each
+// handle's facing, so the cable leaves the node straight, then sags toward
+// the other end like a rope. The offset scales with distance — close nodes
+// get a tight loop, far nodes get a long lazy curve — which is what makes
+// the wiring feel "lacheela" instead of a drawn polyline.
+//
+// A second, thinner highlight stroke rides the same path so the cable reads
+// as a round wire rather than a flat SVG line.
+
+/** How far the Bézier control point is pushed along the handle, as a fraction of span. */
+const ROPE_OFFSET_RATIO = 0.45;
+const ROPE_OFFSET_MIN = 36;
+const ROPE_OFFSET_MAX = 220;
+/** Extra downward sag so a long span hangs like a cable, not a taut string. */
+const ROPE_SAG_RATIO = 0.14;
+const ROPE_SAG_MAX = 56;
+
+const handleOut = (x: number, y: number, position: Position, offset: number, sag: number) => {
+  switch (position) {
+    case Position.Left:
+      return { x: x - offset, y: y + sag * 0.35 };
+    case Position.Right:
+      return { x: x + offset, y: y + sag * 0.35 };
+    case Position.Top:
+      return { x: x, y: y - offset };
+    case Position.Bottom:
+    default:
+      return { x: x, y: y + offset };
+  }
+};
+
+/** Cubic Bézier path that leaves each handle along its facing, then sags. */
+export const buildRopePath = (
+  sourceX: number,
+  sourceY: number,
+  targetX: number,
+  targetY: number,
+  sourcePosition: Position,
+  targetPosition: Position,
+): string => {
+  const dx = Math.abs(targetX - sourceX);
+  const dy = Math.abs(targetY - sourceY);
+  const dist = Math.hypot(dx, dy);
+  const offset = Math.max(ROPE_OFFSET_MIN, Math.min(ROPE_OFFSET_MAX, dist * ROPE_OFFSET_RATIO));
+  const sag = Math.min(ROPE_SAG_MAX, dist * ROPE_SAG_RATIO);
+  const c1 = handleOut(sourceX, sourceY, sourcePosition, offset, sag);
+  const c2 = handleOut(targetX, targetY, targetPosition, offset, sag);
+  return `M ${sourceX},${sourceY} C ${c1.x},${c1.y} ${c2.x},${c2.y} ${targetX},${targetY}`;
+};
+
+function RopeEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style,
+}: EdgeProps) {
+  const path = buildRopePath(sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition);
+  const stroke = (style && typeof style.stroke === "string" ? style.stroke : undefined) || "var(--mm-edge-right)";
+  const width = typeof style?.strokeWidth === "number" ? style.strokeWidth : 2.4;
+  return (
+    <>
+      <BaseEdge
+        id={`${id}-glow`}
+        path={path}
+        style={{
+          stroke,
+          strokeWidth: width + 3,
+          strokeLinecap: "round",
+          fill: "none",
+          opacity: 0.22,
+        }}
+      />
+      <BaseEdge
+        id={id}
+        path={path}
+        style={{
+          ...style,
+          stroke,
+          strokeWidth: width,
+          strokeLinecap: "round",
+          fill: "none",
+        }}
+      />
+    </>
+  );
+}
+
+const EDGE_TYPES = { rope: RopeEdge };
 
 // ── Save-status pill ──────────────────────────────────────────────────────
 
@@ -472,10 +528,12 @@ export interface MindMapPanelProps {
    * offered is lost.
    */
   landscape?: boolean;
+  /** Close the mind map sheet (toolbar X). */
+  onClose?: () => void;
 }
 
 function MindMapCanvas(props: MindMapPanelProps) {
-  const { mind, onMindChange, status, errorMessage, onFlush, playerTheme = "dark", landscape: _landscape } = props;
+  const { mind, onMindChange, status, errorMessage, onFlush, onClose, playerTheme = "dark", landscape: _landscape } = props;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Theme: null → track the Course Player; a value → the learner's own pick
@@ -487,6 +545,17 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // Set while a real node drag is in progress, so the click that follows a
   // drop can be told apart from a genuine tap on the node.
   const dragMovedRef = useRef(false);
+  // While a box is being dragged we must NOT rebuild nodes from the tidy-tree
+  // layout — that would snap the box back every frame. React Flow 12 is fully
+  // controlled: without applyNodeChanges the node never actually moves, and
+  // the rope never follows.
+  const draggingRef = useRef(false);
+  const dragSessionRef = useRef<{
+    id: string;
+    origin: { x: number; y: number };
+    starts: Map<string, { x: number; y: number }>;
+    moving: Set<string>;
+  } | null>(null);
 
   const mindTheme: MindMapTheme = themeOverride ?? (playerTheme === "light" ? "light" : "dark");
 
@@ -547,11 +616,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
     [onMindChange],
   );
 
-  const handleToggleCollapse = useCallback(
-    (id: string) => onMindChange((current) => toggleCollapsed(current, id)),
-    [onMindChange],
-  );
-
   const handleDelete = useCallback(
     (id: string) => {
       onMindChange((current) => removeNode(current, id));
@@ -582,7 +646,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const canDeleteSelected = selectedId != null && selectedId !== rootId();
 
   // ── React Flow nodes + edges, derived from the layout ──────────────────
-  const nodes: Node<MindNodeData>[] = useMemo(() => {
+  const layoutNodes: Node<MindNodeData>[] = useMemo(() => {
     const topicById = new Map<string, string>([[rootId(), mind.rootTopic]]);
     for (const node of mind.nodes) topicById.set(String(node.id), node.topic);
 
@@ -607,7 +671,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
         theme: mindTheme,
         deleteOnDoubleTap: doubleTapDelete,
         onAddChild: handleAddChild,
-        onToggleCollapse: handleToggleCollapse,
         onDelete: handleDelete,
         onOpenEditor: handleOpenEditor,
         onCloseEditor: handleCloseEditor,
@@ -623,12 +686,30 @@ function MindMapCanvas(props: MindMapPanelProps) {
     mindTheme,
     doubleTapDelete,
     handleAddChild,
-    handleToggleCollapse,
     handleDelete,
     handleOpenEditor,
     handleCloseEditor,
     handleCommitTopic,
   ]);
+
+  const [nodes, setNodes] = useState<Node<MindNodeData>[]>(layoutNodes);
+
+  useEffect(() => {
+    setNodes((prev) => {
+      if (!draggingRef.current) return layoutNodes;
+      // Mid-drag: keep the live positions (and the branch riding with them)
+      // but pick up any data/style updates from the layout pass.
+      const live = new Map(prev.map((node) => [node.id, node.position]));
+      return layoutNodes.map((node) => {
+        const position = live.get(node.id);
+        return position ? { ...node, position } : node;
+      });
+    });
+  }, [layoutNodes]);
+
+  const onNodesChange = useCallback((changes: NodeChange<Node<MindNodeData>>[]) => {
+    setNodes((current) => applyNodeChanges(changes, current));
+  }, []);
 
   const edges: Edge[] = useMemo(
     () =>
@@ -646,11 +727,11 @@ function MindMapCanvas(props: MindMapPanelProps) {
           target: edge.target,
           sourceHandle: goesLeft ? "src-left" : "src-right",
           targetHandle: goesLeft ? "right" : "left",
-          type: "smoothstep",
+          type: "rope",
           animated: false,
           style: {
             stroke: goesLeft ? "var(--mm-edge-left)" : "var(--mm-edge-right)",
-            strokeWidth: 2,
+            strokeWidth: 2.4,
           },
         };
       }),
@@ -679,6 +760,9 @@ function MindMapCanvas(props: MindMapPanelProps) {
           nodes={nodes}
           edges={edges}
           nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
+          defaultEdgeOptions={{ type: "rope" }}
+          onNodesChange={onNodesChange}
           fitView
           fitViewOptions={{ padding: 0.18 }}
           minZoom={0.15}
@@ -710,14 +794,43 @@ function MindMapCanvas(props: MindMapPanelProps) {
             setSelectedId(null);
             setEditingId(null);
           }}
-          onNodeDrag={() => {
+          onNodeDragStart={(_event, node) => {
+            draggingRef.current = true;
+            const moving = new Set(collectSubtreeIds(mind, node.id));
+            const starts = new Map<string, { x: number; y: number }>();
+            for (const item of nodes) {
+              if (moving.has(item.id)) starts.set(item.id, { x: item.position.x, y: item.position.y });
+            }
+            dragSessionRef.current = {
+              id: node.id,
+              origin: { x: node.position.x, y: node.position.y },
+              starts,
+              moving,
+            };
+          }}
+          onNodeDrag={(_event, node) => {
             dragMovedRef.current = true;
+            const session = dragSessionRef.current;
+            if (!session || session.id !== node.id) return;
+            const dx = node.position.x - session.origin.x;
+            const dy = node.position.y - session.origin.y;
+            if (session.moving.size <= 1 || (dx === 0 && dy === 0)) return;
+            setNodes((current) =>
+              current.map((item) => {
+                if (item.id === node.id || !session.moving.has(item.id)) return item;
+                const start = session.starts.get(item.id);
+                if (!start) return item;
+                return { ...item, position: { x: start.x + dx, y: start.y + dy } };
+              }),
+            );
           }}
           onNodeDragStop={(_event, node) => {
             // Commit the drop as this node's manual position — the branch
             // under it inherits the same offset in the next layout pass, so
             // a hand-moved parent keeps its children glued on.
             onMindChange((current) => setNodePosition(current, node.id, node.position.x, node.position.y));
+            draggingRef.current = false;
+            dragSessionRef.current = null;
             // The dropped node becomes the selection so the toolbar trash
             // can act on it straight away.
             setSelectedId(node.id);
@@ -890,6 +1003,21 @@ function MindMapCanvas(props: MindMapPanelProps) {
           >
             <MousePointerClick size={13} />
           </button>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={() => {
+                onFlush?.();
+                onClose();
+              }}
+              className={`${toolButton} hover:text-rose-400`}
+              aria-label="Mind map band karein"
+              title="Close mind map"
+              data-course-mindmap-close
+            >
+              <X size={13} />
+            </button>
+          ) : null}
         </div>
       </div>
 
