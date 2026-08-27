@@ -76,7 +76,7 @@ test("the overlay renders the mind map panel for its tab and degrades without on
 // ---------------------------------------------------------------------------
 
 test("in landscape the mind map sheet claims 50% and always splits", () => {
-  assert.match(overlay, /const mindMapSplitWidth = "min\(50%, 760px\)"/);
+  assert.match(overlay, /const DEFAULT_MINDMAP_SPLIT = 50;/);
   assert.match(overlay, /const mindMapSplit = landscape && mindMapActive;/);
   assert.match(overlay, /mindMapSplit \? mindMapSplitWidth : splitMode \? splitEditorWidth : sheetHeight/);
 });
@@ -87,16 +87,18 @@ test("in portrait the mind map sheet takes the bottom half", () => {
 });
 
 test("the notes split keeps its own 40% so the two sheets never fight", () => {
-  // The notes editor and the mind map take DIFFERENT widths, so the parent has
-  // to be told which one is open.
-  assert.match(overlay, /const splitEditorWidth = "min\(40%, 520px\)"/);
+  // The notes editor and the mind map take DIFFERENT default widths, so the
+  // parent has to be told which one is open. Both are now live-resizable.
+  assert.match(overlay, /const DEFAULT_NOTES_SPLIT = 40;/);
   assert.match(overlay, /onSplitModeChange\?\.\(splitMode\)/);
   assert.match(overlay, /onMindMapSplitChange\?\.\(mindMapSplit\)/);
 });
 
 test("the lesson shrinks to the complement of whichever sheet is open", () => {
-  assert.match(coursePlayer, /basis-\[calc\(60%-4rem\)\]/, "notes split: lesson keeps 60%");
-  assert.match(coursePlayer, /basis-\[calc\(50%-4rem\)\]/, "mind map split: lesson keeps 50%");
+  assert.match(coursePlayer, /100 - \(splitPanelPercent \?\? \(mindMapSplitMode \? 50 : 40\)\)/);
+  assert.match(overlay, /data-course-split-handle/);
+  assert.match(overlay, /onSplitRatioChange/);
+  assert.match(coursePlayer, /onSplitRatioChange=\{handleSplitRatioChange\}/);
 });
 
 test("each split sheet keeps the dock pinned to the far-right edge", () => {
@@ -216,6 +218,18 @@ test("tapping + puts the new node straight into rename mode", () => {
   assert.match(panel, /const result = addChildNode\(current, parentId, "New idea"\)/);
 });
 
+test("wires between nodes are n8n-style cubic-bezier ropes, not rigid smoothstep", () => {
+  // smoothstep draws right-angle corridors; the learner asked for cables that
+  // leave each handle along its facing and sag like a rope (n8n / Figma).
+  assert.match(panel, /type: "rope"/);
+  assert.match(panel, /const EDGE_TYPES = \{ rope: RopeEdge \}/);
+  assert.match(panel, /export const buildRopePath/);
+  assert.match(panel, /C \$\{c1\.x\},\$\{c1\.y\} \$\{c2\.x\},\$\{c2\.y\}/);
+  assert.doesNotMatch(panel, /type: "smoothstep"/);
+  assert.match(panel, /edgeTypes=\{EDGE_TYPES\}/);
+  assert.match(panel, /defaultEdgeOptions=\{\{ type: "rope" \}\}/);
+});
+
 test("nodes are hand-positionable — drag and drop anywhere, persisted per node", () => {
   // The learner can drag any node (root included) and the drop is committed
   // as that node's manual position; the tidy tree still owns every node that
@@ -226,10 +240,14 @@ test("nodes are hand-positionable — drag and drop anywhere, persisted per node
   assert.match(panel, /nodesConnectable=\{false\}/);
   assert.match(panel, /const layout = useMemo\(\(\) => layoutMindMap\(mind\), \[mind\]\)/);
   assert.match(panel, /onNodeDragStop=/);
+  assert.match(panel, /onNodesChange=\{onNodesChange\}/);
+  assert.match(panel, /applyNodeChanges\(changes, current\)/);
+  assert.match(panel, /onNodeDragStart=/);
+  assert.match(panel, /collectSubtreeIds\(mind, node\.id\)/);
   assert.match(panel, /setNodePosition\(current, node\.id, node\.position\.x, node\.position\.y\)/);
   // Buttons inside a node must never start a drag.
   assert.match(panel, /nodrag absolute top-1\/2/);
-  assert.match(panel, /nodrag grid h-5 w-5/);
+  assert.doesNotMatch(panel, /data-mind-node-collapse=/);
 });
 
 test("zoom is available on touch as well as by button", () => {
@@ -282,6 +300,14 @@ test("the mind map follows the Course Player theme and can be flipped for the ma
   assert.match(coursePlayer, /playerTheme=\{theme\}/);
   // The palette itself lives in the stylesheet as scoped variables.
   assert.match(styles, /\.course-mindmap-shell\[data-mindmap-theme="light"\]/);
+});
+
+test("the mind map toolbar has a close button that shuts the sheet", () => {
+  assert.match(panel, /data-course-mindmap-close/);
+  assert.match(panel, /onClose\(\);/);
+  assert.match(coursePlayer, /onClose=\{\(\) => \{/);
+  assert.match(coursePlayer, /mindMap\.flush\(\);/);
+  assert.match(coursePlayer, /setDockOpen\(false\);/);
 });
 
 test("the toolbar slot is replaced by a slim status strip in both orientations", () => {

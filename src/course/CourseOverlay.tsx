@@ -156,6 +156,13 @@ interface CourseOverlayProps {
   /** Reports when the mind map sheet is claiming the landscape half-screen. */
   onMindMapSplitChange?: (active: boolean) => void;
   /**
+   * Live width of the landscape split sheet as a percent of the content
+   * section (notes default 40, mind map default 50). `null` when no split
+   * is open. The parent sizes the lesson to the complement so dragging the
+   * centre handle resizes BOTH panes together.
+   */
+  onSplitRatioChange?: (percent: number | null) => void;
+  /**
    * Monotonic counter the parent increments when the overlay is about to
    * close (outside-click, tab switch, Escape). Each increment tells NotesPanel
    * to flush any open draft to localStorage / state immediately, before the
@@ -309,11 +316,6 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   const notesEditorHeight = landscape ? "min(92vw, 620px)" : "88dvh";
   const defaultHeight = landscape ? "min(78vw, 460px)" : "72dvh";
   const splitMode = landscape && tab === "notes" && notesEditorOpen;
-  // The split-pane width is expressed as a percentage of the parent so it
-  // always matches the content area's 60% (parent_width − 40% − dock 4rem
-  // already handled by `right` above). The cap keeps very wide screens
-  // from giving the editor an absurdly wide column.
-  const splitEditorWidth = "min(40%, 520px)";
 
   // ── Mind map sheet sizing ───────────────────────────────────────────────
   // The mind map claims HALF the screen — more than the notes' 40% — because
@@ -324,8 +326,73 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // sheet simply takes the bottom half.
   const mindMapActive = tab === "mindmap";
   const mindMapSplit = landscape && mindMapActive;
-  const mindMapSplitWidth = "min(50%, 760px)";
   const mindMapHeight = "50dvh";
+
+  // ── Draggable landscape split ratio ─────────────────────────────────────
+  // Defaults stay 40% (notes) / 50% (mind map). Grab the centre handle
+  // (sheet's left edge) to set any ratio between SPLIT_MIN and SPLIT_MAX.
+  const SPLIT_MIN = 28;
+  const SPLIT_MAX = 72;
+  const DEFAULT_NOTES_SPLIT = 40;
+  const DEFAULT_MINDMAP_SPLIT = 50;
+  const loadSplitPercent = (key: string, fallback: number) => {
+    try {
+      const raw = Number(localStorage.getItem(key));
+      if (Number.isFinite(raw)) return clamp(raw, SPLIT_MIN, SPLIT_MAX);
+    } catch { /* private mode */ }
+    return fallback;
+  };
+  const [notesSplitPercent, setNotesSplitPercent] = useState(() => loadSplitPercent("dc.courseSplit.notes", DEFAULT_NOTES_SPLIT));
+  const [mindMapSplitPercent, setMindMapSplitPercent] = useState(() => loadSplitPercent("dc.courseSplit.mindmap", DEFAULT_MINDMAP_SPLIT));
+  const [splitDragging, setSplitDragging] = useState(false);
+  const splitDragRef = useRef<{ id: number } | null>(null);
+  const splitPercent = mindMapSplit ? mindMapSplitPercent : notesSplitPercent;
+  const splitEditorWidth = `${notesSplitPercent}%`;
+  const mindMapSplitWidth = `${mindMapSplitPercent}%`;
+
+  useEffect(() => {
+    try { localStorage.setItem("dc.courseSplit.notes", String(notesSplitPercent)); } catch { /* ignore */ }
+  }, [notesSplitPercent]);
+  useEffect(() => {
+    try { localStorage.setItem("dc.courseSplit.mindmap", String(mindMapSplitPercent)); } catch { /* ignore */ }
+  }, [mindMapSplitPercent]);
+
+  const applySplitPercent = (percent: number) => {
+    const next = Math.round(clamp(percent, SPLIT_MIN, SPLIT_MAX) * 10) / 10;
+    if (mindMapSplit) setMindMapSplitPercent(next);
+    else setNotesSplitPercent(next);
+  };
+
+  const onSplitPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    splitDragRef.current = { id: event.pointerId };
+    setSplitDragging(true);
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* ignore */ }
+  };
+
+  const onSplitPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const st = splitDragRef.current;
+    if (!st || st.id !== event.pointerId) return;
+    const section = event.currentTarget.closest("[data-course-landscape-content]") as HTMLElement | null;
+    const parent = section || (event.currentTarget.offsetParent as HTMLElement | null);
+    if (!parent) return;
+    const rect = parent.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const dock = parent.querySelector("[data-course-dock]") as HTMLElement | null;
+    const dockW = dock ? dock.getBoundingClientRect().width : 64;
+    const sheetPx = rect.right - dockW - event.clientX;
+    applySplitPercent((sheetPx / rect.width) * 100);
+  };
+
+  const onSplitPointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const st = splitDragRef.current;
+    if (!st || st.id !== event.pointerId) return;
+    splitDragRef.current = null;
+    setSplitDragging(false);
+    try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
+  };
 
   const sheetHeight = mindMapActive
     ? mindMapHeight
@@ -354,11 +421,17 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // Same bubble-up for the mind map, on its own callback: the two sheets take
   // DIFFERENT widths (notes 40%, mind map 50%), so the parent has to know
   // which one is open to shrink the lesson to the matching complement.
-  const { onMindMapSplitChange } = props;
+  const { onMindMapSplitChange, onSplitRatioChange } = props;
   useEffect(() => {
     onMindMapSplitChange?.(mindMapSplit);
     return () => onMindMapSplitChange?.(false);
   }, [mindMapSplit, onMindMapSplitChange]);
+
+  const splitActive = splitMode || mindMapSplit;
+  useEffect(() => {
+    onSplitRatioChange?.(splitActive ? splitPercent : null);
+    return () => onSplitRatioChange?.(null);
+  }, [splitActive, splitPercent, onSplitRatioChange]);
 
   const flatModules = useMemo(() => flattenModules(props.modules), [props.modules]);
   // Only unlocked modules are listed in the "Module" tab, so the header
@@ -439,7 +512,24 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         data-orientation={orientation}
         data-split-mode={splitMode || mindMapSplit ? "true" : "false"}
         data-split-kind={mindMapSplit ? "mindmap" : splitMode ? "notes" : "none"}
+        data-split-percent={splitActive ? String(splitPercent) : undefined}
+        data-split-dragging={splitDragging ? "true" : "false"}
       >
+        {landscape && splitActive ? (
+          <button
+            type="button"
+            aria-label="Split ratio badlein — lesson aur panel ke beech drag karein"
+            title="Drag karke lesson / panel ka size badlein"
+            className="absolute left-0 top-0 z-50 flex h-full w-4 -translate-x-1/2 cursor-col-resize touch-none items-center justify-center"
+            onPointerDown={onSplitPointerDown}
+            onPointerMove={onSplitPointerMove}
+            onPointerUp={onSplitPointerUp}
+            onPointerCancel={onSplitPointerUp}
+            data-course-split-handle
+          >
+            <span className={`block h-16 w-1.5 rounded-full ${splitDragging ? "bg-violet-400" : "bg-violet-400/70"} shadow-[0_0_10px_rgba(167,139,250,0.7)]`} />
+          </button>
+        ) : null}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-violet-500/10 to-transparent" />
 
         {/* Grab handle (portrait only, hidden while the writing box is open
