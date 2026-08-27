@@ -1835,3 +1835,32 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   }
 }
 /* ==================== End FlowPath Styles ==================== */
+
+/* ── Mind Map — React Flow edge wires ────────────────────────────────────
+   The @xyflow/react dist stylesheet is imported in MindMapPanel.tsx, but
+   some global resets can zero-out SVG stroke values or set `overflow:hidden`
+   on the edge container, hiding the connecting wires between nodes.
+   These rules ensure the edge paths are always visible inside the canvas. */
+[data-course-mindmap] .react-flow__edge path,
+[data-course-mindmap] .react-flow__edge-path {
+  stroke-opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+[data-course-mindmap] .react-flow__edges {
+  overflow: visible !important;
+  pointer-events: none;
+}
+
+[data-course-mindmap] .react-flow__handle {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-width: unset !important;
+  min-height: unset !important;
+  border: none !important;
+  background: transparent !important;
+}
+/* ==================== End Mind Map Styles ==================== */

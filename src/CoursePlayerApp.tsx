@@ -671,6 +671,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     userSelectedRef.current = true;
     setSelectedFile(file);
     // Close the overlay so the user sees the freshly opened content.
+    // Fire save signal first in case the notes editor is open mid-draft.
+    if (dockTab === "notes") fireSaveSignal();
     setDockOpen(false);
     if (window.innerWidth < 768) document.getElementById("course-viewer")?.scrollIntoView({ behavior: "smooth" });
     if (user && progressRef) {
@@ -699,10 +701,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   // Tapping the active toggle collapses the sheet; tapping a different
   // toggle keeps the SAME sheet open and swaps its content in place.
+  // If the notes tab is currently open and has a draft, fire the save signal
+  // BEFORE closing / switching so the draft is committed first.
   const handleDockTabChange = (next: DockTab) => {
     if (next === dockTab) {
+      // Toggling the same tab — if it's the notes tab, fire save first.
+      if (dockTab === "notes") fireSaveSignal();
       setDockOpen((open) => !open);
     } else {
+      // Switching tabs — if leaving notes, fire save first.
+      if (dockTab === "notes") fireSaveSignal();
       setDockTab(next);
       setDockOpen(true);
     }
@@ -741,6 +749,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const selectedEmbedKind = selectedFile ? getCourseEmbed(selectedFile).kind : "none";
   const showViewportToggle = VIEWPORT_AWARE_KINDS.includes(selectedEmbedKind);
 
+  // ── Notes auto-save signal ────────────────────────────────────────────────
+  // Incremented every time the overlay is about to close while the notes tab
+  // is active. NotesPanel listens to this signal and immediately flushes any
+  // open draft to localStorage before the sheet animates away, so outside-
+  // click / Escape / tab-switch never discards work in progress.
+  const [notesSaveSignal, setNotesSaveSignal] = useState(0);
+  const fireSaveSignal = useCallback(() => {
+    setNotesSaveSignal((n) => n + 1);
+  }, []);
+
   // ── Notes split mode (landscape) ────────────────────────────────────────
   // CourseOverlay reports when the notes editor is open in landscape — that
   // is the moment the lesson can be split into a 60/40 layout: course on
@@ -749,11 +767,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // the editor sheet.
   const [notesSplitMode, setNotesSplitMode] = useState(false);
   const handleSplitModeChange = useCallback((active: boolean) => setNotesSplitMode(active), []);
-  // Reset split state when the notes tab closes, so the lesson smoothly
-  // expands back to full width without an awkward half-rendered state.
+  // Reset split state when the notes tab closes OR when the overlay closes,
+  // so the lesson expands back to full width without a white gap.
   useEffect(() => {
-    if (dockTab !== "notes" && notesSplitMode) setNotesSplitMode(false);
-  }, [dockTab, notesSplitMode]);
+    if ((dockTab !== "notes" || !dockOpen) && notesSplitMode) setNotesSplitMode(false);
+  }, [dockTab, dockOpen, notesSplitMode]);
 
   // ── Mind map split mode (landscape) ─────────────────────────────────────
   // Tracked separately from `notesSplitMode` because the two sheets claim
@@ -1033,8 +1051,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       tab={dockTab}
       onTabChange={handleDockTabChange}
       open={dockOpen}
-      onToggle={() => setDockOpen((open) => !open)}
-      onClose={() => setDockOpen(false)}
+      onToggle={() => {
+        // If we're about to CLOSE (open→false) while on notes tab, save first.
+        if (dockOpen && dockTab === "notes") fireSaveSignal();
+        setDockOpen((open) => !open);
+      }}
+      onClose={() => {
+        // Outside-click / Escape close: save any open notes draft first.
+        if (dockTab === "notes") fireSaveSignal();
+        setDockOpen(false);
+      }}
       modules={modules}
       selectedFileId={selectedFile?.id}
       ownedUpdateIds={ownedUpdateIds}
@@ -1065,6 +1091,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         />
       )}
       onMindMapSplitChange={handleMindMapSplitChange}
+      notesSaveSignal={notesSaveSignal}
     />
   );
 

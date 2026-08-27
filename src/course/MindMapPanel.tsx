@@ -58,6 +58,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   BackgroundVariant,
+  Handle,
+  Position,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -168,6 +170,23 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
     onOpenEditor(id);
   };
 
+  // ── Connection Handles ─────────────────────────────────────────────────
+  // React Flow needs explicit Handle elements on custom nodes to know WHERE
+  // to start and end each edge path. Without them the SVG wire falls back to
+  // (0,0) and renders as a tiny invisible dot. We render four handles — one
+  // on each side — so the smoothstep router always picks the cleanest path
+  // regardless of which direction the parent sits. All four are visually
+  // invisible (opacity-0, pointer-events-none) so they never interfere with
+  // the node's own tap-to-edit interaction.
+  const handleStyle: React.CSSProperties = {
+    opacity: 0,
+    pointerEvents: "none",
+    width: 1,
+    height: 1,
+    border: "none",
+    background: "transparent",
+  };
+
   return (
     <div
       className="group relative h-full w-full"
@@ -176,6 +195,12 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
       data-mind-node-side={side ?? "center"}
       data-mind-node-selected={selected ? "true" : "false"}
     >
+      {/* Invisible connection handles — required by React Flow to route edges */}
+      <Handle type="target" position={Position.Left} id="left" style={handleStyle} />
+      <Handle type="target" position={Position.Right} id="right" style={handleStyle} />
+      <Handle type="source" position={Position.Left} id="src-left" style={handleStyle} />
+      <Handle type="source" position={Position.Right} id="src-right" style={handleStyle} />
+
       <div
         onClick={(event) => {
           // A plain click on the text body opens the editor. A double-click
@@ -460,14 +485,26 @@ function MindMapCanvas(props: MindMapPanelProps) {
 
   const edges: Edge[] = useMemo(
     () =>
-      layout.edges.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        type: "smoothstep",
-        animated: false,
-        style: { stroke: edge.side === "left" ? "rgba(167,139,250,0.45)" : "rgba(129,140,248,0.45)", strokeWidth: 1.75 },
-      })),
+      layout.edges.map((edge) => {
+        // For left-side branches: parent exports from its left handle,
+        // child receives on its right handle.
+        // For right-side (and root) branches: parent exports from its right
+        // handle, child receives on its left handle.
+        const goesLeft = edge.side === "left";
+        return {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: goesLeft ? "src-left" : "src-right",
+          targetHandle: goesLeft ? "right" : "left",
+          type: "smoothstep",
+          animated: false,
+          style: {
+            stroke: goesLeft ? "rgba(167,139,250,0.55)" : "rgba(129,140,248,0.55)",
+            strokeWidth: 2,
+          },
+        };
+      }),
     [layout.edges],
   );
 

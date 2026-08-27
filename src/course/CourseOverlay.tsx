@@ -155,6 +155,13 @@ interface CourseOverlayProps {
   mindMapPanel?: ReactNode;
   /** Reports when the mind map sheet is claiming the landscape half-screen. */
   onMindMapSplitChange?: (active: boolean) => void;
+  /**
+   * Monotonic counter the parent increments when the overlay is about to
+   * close (outside-click, tab switch, Escape). Each increment tells NotesPanel
+   * to flush any open draft to localStorage / state immediately, before the
+   * panel unmounts and the draft would otherwise be lost.
+   */
+  notesSaveSignal?: number;
 }
 
 const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; icon: (active: boolean) => ReactNode }> = [
@@ -178,6 +185,24 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   const landscape = orientation === "landscape";
   // NotesPanel reports when its big editor is open so the sheet can grow.
   const [notesEditorOpen, setNotesEditorOpen] = useState(false);
+
+  // ── Reset notesEditorOpen when the overlay closes ─────────────────────
+  // When the user taps outside (scrim click) or otherwise closes the overlay
+  // while the notes editor is open, `open` goes false but `notesEditorOpen`
+  // stays true inside this component — which keeps `splitMode` true and
+  // leaves the left content window shrunk with a white gap.
+  // We reset it here so the split layout collapses the moment the overlay
+  // closes, regardless of HOW it was closed.
+  const prevOpen = useRef(open);
+  useEffect(() => {
+    if (prevOpen.current && !open) {
+      // Overlay just closed — reset editor-open flag immediately so the
+      // parent's split mode gets cleared and the content expands back.
+      setNotesEditorOpen(false);
+    }
+    prevOpen.current = open;
+  }, [open]);
+
   // Writing mode = the rich-text writing box is open (compose or edit). In
   // this mode the sheet keeps NO headers at all — nothing but the
   // formatting toolbar on top, the writing surface in the middle and the
@@ -355,16 +380,26 @@ export default function CourseOverlay(props: CourseOverlayProps) {
 
   return (
     <>
-      {/* ── Scrim: closes the sheet when the content behind it is tapped ── */}
-      <div
-        onClick={props.onClose}
-        aria-hidden={!open}
-        className={`absolute z-30 bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${
-          landscape ? "bottom-0 left-0 top-0" : "inset-x-0 bottom-16 top-0"
-        } ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
-        style={landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : undefined}
-        data-course-overlay-scrim
-      />
+      {/* ── Scrim: closes the sheet when the content behind it is tapped ──
+          In landscape SPLIT mode (notes editor open or mind map active) the
+          left half of the screen must stay fully visible and interactive —
+          the whole point of split mode is that the learner can watch the
+          lesson AND take notes/draw a diagram side-by-side. Showing a dark
+          blurred scrim over the left half defeats that purpose. We therefore
+          suppress the scrim entirely in landscape split mode. In portrait and
+          in non-split landscape (modules / resources / paid tabs) the scrim
+          keeps its usual "tap outside to close" role. */}
+      {!(landscape && (splitMode || mindMapSplit)) ? (
+        <div
+          onClick={props.onClose}
+          aria-hidden={!open}
+          className={`absolute z-30 bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${
+            landscape ? "bottom-0 left-0 top-0" : "inset-x-0 bottom-16 top-0"
+          } ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
+          style={landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : undefined}
+          data-course-overlay-scrim
+        />
+      ) : null}
 
       {/* ── Overlay sheet ─────────────────────────────────────────────── */}
       <div
@@ -483,6 +518,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
               onDelete={props.onDeleteNote}
               onEditorOpenChange={setNotesEditorOpen}
               composerOpenSignal={composerSignal}
+              saveSignal={props.notesSaveSignal}
             />
           ) : tab === "mindmap" ? (
             // The parent owns the map state + Firestore hook, so the panel is
