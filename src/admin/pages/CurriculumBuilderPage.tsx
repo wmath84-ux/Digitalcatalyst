@@ -972,14 +972,14 @@ export default function CurriculumBuilderPage() {
   // expose a retry button.
   if (loading && !catalog) {
     return (
-      <div className="space-y-3 pb-6">
+      <div className="space-y-3 pb-6 lg:space-y-4">
         <LoadingState label="Loading curriculum…" />
       </div>
     );
   }
   if (error && !catalog) {
     return (
-      <div className="space-y-3 pb-6">
+      <div className="space-y-3 pb-6 lg:space-y-4">
         <SectionCard title="Curriculum Builder">
           <p className="text-sm text-red-500">{error}</p>
           <PrimaryButton className="mt-3" onClick={reload}>Retry</PrimaryButton>
@@ -989,19 +989,19 @@ export default function CurriculumBuilderPage() {
   }
   if (!catalog) {
     return (
-      <div className="space-y-3 pb-6">
+      <div className="space-y-3 pb-6 lg:space-y-4">
         <LoadingState label="Preparing editor…" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <SectionCard
         title="🧠 Curriculum Builder"
         description="Edit the Class → Subject → Chapter → Concept tree that drives the student AI question generator. Pick a class from the rail, drill into a subject, then a chapter — only the focused item is editable so nothing scrolls out of view."
       >
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Board">
             <input className={inputClass} value={board} onChange={(e) => setBoard(e.target.value)} placeholder="CBSE" />
           </Field>

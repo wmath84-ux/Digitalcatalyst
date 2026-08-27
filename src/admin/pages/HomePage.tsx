@@ -266,7 +266,7 @@ export default function AdminHomePage() {
   if (loading) return <LoadingState label="Loading home slides…" />;
   if (error)
     return (
-      <div className="space-y-3 pb-6">
+      <div className="space-y-3 pb-6 lg:space-y-4">
         <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
         </div>
@@ -274,7 +274,7 @@ export default function AdminHomePage() {
     );
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-3">
         <p className="text-sm font-semibold text-slate-900">Home · Hero Slides</p>
         <p className="mt-0.5 text-xs leading-relaxed text-slate-500">

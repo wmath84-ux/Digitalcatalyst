@@ -59,9 +59,9 @@ export default function AnalyticsPage() {
   const { notify } = useToast();
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <Tabs tabs={ANALYTICS_TABS} active={tab} onChange={setTab} />
-      <div className="mt-3">
+      <div className="mt-3 lg:mt-4">
         {tab === "overview" && <OverviewTab notify={notify} />}
         {tab === "products" && <ProductsTab notify={notify} />}
         {tab === "revenue" && <RevenueTab notify={notify} />}
@@ -136,11 +136,11 @@ function OverviewTab({ notify: _notify }: { notify: ReturnType<typeof useToast>[
   if (!data) return <LoadingState label="Loading analytics…" />;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 lg:space-y-4">
       <DateRangeSelector range={range} onRange={setRange} />
 
       <SectionCard title="Revenue & orders">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3 lg:gap-4">
           <StatCard label="Revenue" value={`₹${data.revenue.toLocaleString("en-IN")}`} />
           <StatCard label="Verified orders" value={data.orders} />
           <StatCard label="Avg order value" value={`₹${data.averageOrderValue.toLocaleString("en-IN")}`} />
@@ -148,24 +148,26 @@ function OverviewTab({ notify: _notify }: { notify: ReturnType<typeof useToast>[
         </div>
       </SectionCard>
 
-      <SectionCard title="Users">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
-          <StatCard label="New users" value={data.newUsers} />
-          <StatCard
-            label="Payment success"
-            value={`${data.paymentSuccessRate}%`}
-            tone={data.paymentSuccessRate >= 90 ? "ok" : data.paymentSuccessRate >= 70 ? "warn" : "danger"}
-          />
-          <StatCard label="Failed payments" value={data.failedPayments} tone={data.failedPayments > 0 ? "danger" : undefined} />
-        </div>
-      </SectionCard>
+      <div className="grid gap-3 lg:grid-cols-3 lg:gap-4">
+        <SectionCard title="Users" className="lg:col-span-2">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 lg:gap-4">
+            <StatCard label="New users" value={data.newUsers} />
+            <StatCard
+              label="Payment success"
+              value={`${data.paymentSuccessRate}%`}
+              tone={data.paymentSuccessRate >= 90 ? "ok" : data.paymentSuccessRate >= 70 ? "warn" : "danger"}
+            />
+            <StatCard label="Failed payments" value={data.failedPayments} tone={data.failedPayments > 0 ? "danger" : undefined} />
+          </div>
+        </SectionCard>
 
-      <SectionCard title="Subscriptions & reviews">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
-          <StatCard label="Active subs" value={data.activeSubscriptionPlans} />
-          <StatCard label="Avg rating" value={`${data.averageReviewRating.toFixed(1)} ⭐`} />
-        </div>
-      </SectionCard>
+        <SectionCard title="Subscriptions & reviews" className="lg:col-span-1">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 lg:gap-4">
+            <StatCard label="Active subs" value={data.activeSubscriptionPlans} tone="ok" />
+            <StatCard label="Avg rating" value={`${data.averageReviewRating.toFixed(1)} ⭐`} />
+          </div>
+        </SectionCard>
+      </div>
     </div>
   );
 }
@@ -182,14 +184,14 @@ function ProductsTab({ notify: _notify }: { notify: ReturnType<typeof useToast>[
   if (!data) return <LoadingState label="Loading product analytics…" />;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 lg:space-y-4">
       <DateRangeSelector range={range} onRange={setRange} />
 
       <SectionCard title="Top products by activity" description="Rankings are based on reviews within the selected date range.">
         {data.topProducts.length === 0 ? (
           <EmptyState title="No product data for this period" />
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
             {data.topProducts.map((p, i) => (
               <RecordCard key={p.id}>
                 <div className="flex items-center justify-between">
@@ -228,15 +230,17 @@ function RevenueTab({ notify: _notify }: { notify: ReturnType<typeof useToast>["
   if (!data) return <LoadingState label="Loading revenue analytics…" />;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 lg:space-y-4">
       <DateRangeSelector range={range} onRange={setRange} />
 
       <SectionCard title="Revenue breakdown">
-        <KeyValue label="Total verified revenue" value={`₹${data.revenue.toLocaleString("en-IN")}`} />
-        <KeyValue label="Verified orders" value={data.orders} />
-        <KeyValue label="Average order value" value={`₹${data.averageOrderValue.toLocaleString("en-IN")}`} />
-        <KeyValue label="Payment success rate" value={`${data.paymentSuccessRate}%`} />
-        <KeyValue label="Failed payments" value={data.failedPayments} />
+        <div className="grid gap-2 lg:grid-cols-2 lg:gap-x-8">
+          <KeyValue label="Total verified revenue" value={`₹${data.revenue.toLocaleString("en-IN")}`} />
+          <KeyValue label="Verified orders" value={data.orders} />
+          <KeyValue label="Average order value" value={`₹${data.averageOrderValue.toLocaleString("en-IN")}`} />
+          <KeyValue label="Payment success rate" value={`${data.paymentSuccessRate}%`} />
+          <KeyValue label="Failed payments" value={data.failedPayments} />
+        </div>
       </SectionCard>
     </div>
   );
@@ -254,11 +258,11 @@ function CustomersTab({ notify: _notify }: { notify: ReturnType<typeof useToast>
   if (!data) return <LoadingState label="Loading customer analytics…" />;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 lg:space-y-4">
       <DateRangeSelector range={range} onRange={setRange} />
 
       <SectionCard title="Customer metrics">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 lg:grid-cols-4 lg:gap-4">
           <StatCard label="New users" value={data.newUsers} />
           <StatCard label="Unique buyers" value={data.uniqueBuyers} />
         </div>
@@ -279,11 +283,11 @@ function SubscriptionsTab({ notify: _notify }: { notify: ReturnType<typeof useTo
   if (!data) return <LoadingState label="Loading subscription analytics…" />;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 lg:space-y-4">
       <DateRangeSelector range={range} onRange={setRange} />
 
       <SectionCard title="Subscription overview">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 lg:grid-cols-4 lg:gap-4">
           <StatCard label="Active plans" value={data.activeSubscriptionPlans} tone="ok" />
         </div>
       </SectionCard>
@@ -303,12 +307,14 @@ function CoursesTab({ notify: _notify }: { notify: ReturnType<typeof useToast>["
   if (!data) return <LoadingState label="Loading course analytics…" />;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 lg:space-y-4">
       <DateRangeSelector range={range} onRange={setRange} />
 
       <SectionCard title="Course engagement">
-        <KeyValue label="Total reviews" value={data.reviewsInRange} />
-        <KeyValue label="Average rating" value={`${data.averageReviewRating.toFixed(1)} ⭐`} />
+        <div className="grid gap-2 lg:grid-cols-2 lg:gap-x-8">
+          <KeyValue label="Total reviews" value={data.reviewsInRange} />
+          <KeyValue label="Average rating" value={`${data.averageReviewRating.toFixed(1)} ⭐`} />
+        </div>
       </SectionCard>
     </div>
   );
@@ -333,9 +339,9 @@ function ExportsTab({ notify }: { notify: ReturnType<typeof useToast>["notify"] 
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 lg:space-y-4">
       <SectionCard title="Export data" description="Downloads are generated server-side and include all records.">
-        <div className="space-y-2">
+        <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
           {exports.map((exp) => (
             <SecondaryButton key={exp.type} className="w-full" onClick={() => handleExport(exp.type)}>
               {exp.label}

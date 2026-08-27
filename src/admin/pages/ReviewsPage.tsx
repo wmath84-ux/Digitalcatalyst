@@ -84,22 +84,24 @@ export default function ReviewsPage() {
   if (!reviews) return <LoadingState />;
 
   return (
-    <div className="space-y-3 pb-6">
-      <select className={selectClass} value={status} onChange={(e) => setStatus(e.target.value)}>
-        <option value="">All statuses</option>
-        {["pending", "published", "rejected", "flagged"].map((s) => <option key={s} value={s}>{s}</option>)}
-      </select>
+    <div className="space-y-3 pb-6 lg:space-y-4">
+      <div className="flex items-center gap-2">
+        <select className={selectClass + " lg:max-w-[260px]"} value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          {["pending", "published", "rejected", "flagged"].map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
 
       {reviews.length === 0 ? <EmptyState title="No reviews found" /> : (
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3 lg:grid-cols-3 lg:gap-4">
           {reviews.map((r) => (
             <RecordCard key={r.id}>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-900">{r.productTitle || r.productId}</span>
+                <span className="truncate text-sm font-semibold text-slate-900 lg:text-[15px]">{r.productTitle || r.productId}</span>
                 <Pill tone={r.status === "published" ? "success" : r.status === "rejected" ? "danger" : "warn"}>{r.status}</Pill>
               </div>
-              <p className="mt-0.5 text-xs text-slate-500">{r.customerName} · ⭐ {r.rating} {r.verifiedPurchase && "· verified purchase"}</p>
-              <p className="mt-1 text-sm text-slate-700">{r.comment}</p>
+              <p className="mt-0.5 text-xs text-slate-500 lg:text-[13px]">{r.customerName} · ⭐ {r.rating} {r.verifiedPurchase && "· verified purchase"}</p>
+              <p className="mt-1 text-sm text-slate-700 lg:text-[15px]">{r.comment}</p>
               {r.adminReply && <p className="mt-1 rounded-md bg-slate-50 p-2 text-xs text-slate-600">Reply: {r.adminReply}</p>}
               {r.reportReason && <p className="mt-1 text-xs text-red-500">Reason: {r.reportReason}</p>}
               <div className="mt-2 flex flex-wrap gap-2">

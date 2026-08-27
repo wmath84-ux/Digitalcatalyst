@@ -83,7 +83,7 @@ export default function CustomerDetailPage({ uid }: { uid: string }) {
   if (!customer) return <LoadingState label="Loading customer…" />;
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <SectionCard title={customer.name || "Unnamed user"} action={<Pill tone={customer.status === "active" ? "success" : "danger"}>{customer.status}</Pill>}>
         <KeyValue label="Firebase UID" value={customer.uid} />
         <KeyValue label="Email" value={customer.email} />

@@ -140,7 +140,7 @@ export default function AppContentPage() {
   if (!settings) return <LoadingState label="Loading content settings…" />;
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <SectionCard title="Google file editing">
         <p className="text-xs text-slate-500">
           Choose what learners get when they open each kind of Google file inside the Course Player — every type has its own switch.

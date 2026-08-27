@@ -86,7 +86,7 @@ export default function AdminSessionPage() {
     : "Unknown";
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <SectionCard title="Admin session details">
         <KeyValue label="Email" value={session.email} />
         <KeyValue label="Admin ID" value={session.adminId} />

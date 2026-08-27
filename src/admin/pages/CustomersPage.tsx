@@ -55,29 +55,29 @@ export default function CustomersPage() {
   if (!customers) return <LoadingState label="Loading customers…" />;
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <form onSubmit={(e) => { e.preventDefault(); load(); }} className="flex gap-2">
         <input className={inputClass + " flex-1"} placeholder="Search name, email, UID" value={q} onChange={(e) => setQ(e.target.value)} />
         <SecondaryButton onClick={() => setFiltersOpen(true)}>Filters</SecondaryButton>
       </form>
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-500">{customers.length} customer(s)</p>
+        <p className="text-xs text-slate-500 lg:text-sm">{customers.length} customer(s)</p>
         <SecondaryButton onClick={exportCsv}>Export CSV</SecondaryButton>
       </div>
 
       {customers.length === 0 ? (
         <EmptyState title="No customers found" />
       ) : (
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
           {customers.map((c) => (
             <Link key={c.uid} href={`/admin/customers/${c.uid}`}>
               <RecordCard>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-900">{c.name || "Unnamed user"}</span>
+                  <span className="text-sm font-semibold text-slate-900 lg:text-[15px]">{c.name || "Unnamed user"}</span>
                   <Pill tone={c.status === "active" ? "success" : "danger"}>{c.status}</Pill>
                 </div>
-                <p className="text-xs text-slate-500">{c.email} · {c.mobile || "no phone"}</p>
-                <p className="mt-1 text-xs text-slate-600">{c.provider} · {c.purchaseCount} purchase(s)</p>
+                <p className="text-xs text-slate-500 lg:text-[13px]">{c.email} · {c.mobile || "no phone"}</p>
+                <p className="mt-1 text-xs text-slate-600 lg:text-[13px]">{c.provider} · {c.purchaseCount} purchase(s)</p>
               </RecordCard>
             </Link>
           ))}

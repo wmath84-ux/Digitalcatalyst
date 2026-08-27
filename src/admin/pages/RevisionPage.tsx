@@ -188,7 +188,7 @@ export default function RevisionPage() {
   };
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <SectionCard
         title="AI Configuration"
         description="Publish the default AI students can use. Curriculum editing lives on its own page — open Curriculum Builder from the side menu to edit classes, subjects, chapters and concepts."

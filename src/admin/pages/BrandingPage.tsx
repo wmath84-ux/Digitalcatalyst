@@ -177,7 +177,7 @@ export default function BrandingPage() {
   );
 
   return (
-    <div className="space-y-3 pb-6" data-branding-page>
+    <div className="space-y-3 pb-6 lg:space-y-4" data-branding-page>
       <div className="rounded-xl border border-slate-200 bg-white p-3">
         <p className="text-sm font-semibold text-slate-900">App branding</p>
         <p className="mt-0.5 text-xs leading-relaxed text-slate-500">

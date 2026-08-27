@@ -80,28 +80,28 @@ export default function CouponsPage() {
   if (!coupons) return <LoadingState />;
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <form onSubmit={(e) => { e.preventDefault(); load(); }} className="flex gap-2">
         <input className={inputClass + " flex-1"} placeholder="Search coupon code" value={q} onChange={(e) => setQ(e.target.value)} />
       </form>
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-500">{coupons.length} coupon(s)</p>
+        <p className="text-xs text-slate-500 lg:text-sm">{coupons.length} coupon(s)</p>
         <PrimaryButton onClick={() => setEditing(EMPTY)}>+ Add coupon</PrimaryButton>
       </div>
 
       {coupons.length === 0 ? <EmptyState title="No coupons yet" /> : (
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3 lg:grid-cols-3 lg:gap-4">
           {coupons.map((c) => (
             <RecordCard key={c.id}>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-900">{c.code}</span>
+                <span className="text-sm font-semibold text-slate-900 lg:text-[15px]">{c.code}</span>
                 <Pill tone={c.active ? "success" : "default"}>{c.active ? "active" : "inactive"}</Pill>
               </div>
-              <p className="mt-1 text-xs text-slate-600">
+              <p className="mt-1 text-xs text-slate-600 lg:text-[13px]">
                 {c.discountType === "percentage" ? `${c.value}% off` : `₹${c.value} off`} · min order ₹{c.minOrder}
               </p>
-              <p className="mt-0.5 text-xs text-slate-500">Used {c.usedCount}{c.globalUsageLimit ? ` / ${c.globalUsageLimit}` : ""}</p>
-              <div className="mt-2 flex gap-2">
+              <p className="mt-0.5 text-xs text-slate-500 lg:text-[13px]">Used {c.usedCount}{c.globalUsageLimit ? ` / ${c.globalUsageLimit}` : ""}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
                 <SecondaryButton className="h-9 flex-1 text-xs" onClick={() => setEditing(c)}>Edit</SecondaryButton>
                 <SecondaryButton className="h-9 flex-1 text-xs" onClick={() => toggleActive(c)}>{c.active ? "Deactivate" : "Activate"}</SecondaryButton>
                 <SecondaryButton className="h-9 flex-1 text-xs" onClick={() => duplicate(c)}>Duplicate</SecondaryButton>
@@ -116,7 +116,7 @@ export default function CouponsPage() {
         {editing && (
           <div className="space-y-3">
             <Field label="Code" required><input className={inputClass} value={editing.code ?? ""} onChange={(e) => setEditing({ ...editing, code: e.target.value.toUpperCase() })} /></Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
               <Field label="Discount type">
                 <select className={selectClass} value={editing.discountType ?? "percentage"} onChange={(e) => setEditing({ ...editing, discountType: e.target.value })}>
                   <option value="percentage">Percentage</option>

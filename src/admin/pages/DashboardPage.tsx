@@ -58,101 +58,153 @@ export default function DashboardPage() {
   if (error || !data) return <ErrorState message={error ?? "Unable to load dashboard."} onRetry={load} />;
 
   return (
-    <div className="space-y-4 pb-6">
-      <SectionCard title="Products">
-        <div className="grid grid-cols-3 gap-2">
-          <StatCard label="Active" value={data.products.total - data.products.hidden} />
-          <StatCard label="Hidden" value={data.products.hidden} />
-          <StatCard label="Unavailable" value={data.products.unavailable} />
+    <div className="space-y-4 pb-6 lg:space-y-5">
+      {/* Hero / overview row — on desktop the four key numbers (revenue,
+          active users, verified orders, attention queue size) sit in a
+          single row at the top so the admin can scan the health of the
+          store in one glance. On mobile + tablet they collapse into
+          the existing section cards below. */}
+      <div className="hidden lg:grid lg:grid-cols-4 lg:gap-4">
+        <StatCard label="Verified revenue" value={`₹${data.revenue.total.toLocaleString("en-IN")}`} sub="Across all orders" />
+        <StatCard label="Active users" value={data.users.active} sub={`of ${data.users.total} total`} tone="ok" />
+        <StatCard label="Verified orders" value={data.orders.verified} sub={`${data.orders.pending} pending`} tone="ok" />
+        <StatCard
+          label="Needs attention"
+          value={data.attentionQueue.length}
+          sub={data.attentionQueue.length === 0 ? "All clear" : data.attentionQueue[0]?.label ?? ""}
+          tone={data.attentionQueue.length > 0 ? "warn" : "ok"}
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <SectionCard title="Products" className="lg:col-span-1">
+          <div className="grid grid-cols-3 gap-2 md:gap-3 lg:gap-3">
+            <StatCard label="Active" value={data.products.total - data.products.hidden} />
+            <StatCard label="Hidden" value={data.products.hidden} />
+            <StatCard label="Unavailable" value={data.products.unavailable} />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Users" className="lg:col-span-1">
+          <div className="grid grid-cols-3 gap-2 md:gap-3 lg:gap-3">
+            <StatCard label="Total" value={data.users.total} />
+            <StatCard label="Active" value={data.users.active} tone="ok" />
+            <StatCard label="Blocked" value={data.users.blocked} tone={data.users.blocked > 0 ? "danger" : undefined} />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Orders" className="lg:col-span-1">
+          <div className="grid grid-cols-3 gap-2 md:gap-3 lg:gap-3">
+            <StatCard label="Verified" value={data.orders.verified} tone="ok" />
+            <StatCard label="Pending" value={data.orders.pending} tone="warn" />
+            <StatCard label="Failed" value={data.orders.failed} tone={data.orders.failed > 0 ? "danger" : undefined} />
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* On mobile + tablet the revenue card lives inside the Orders
+          section above; on desktop it gets its own wider card so the
+          big number reads at full prominence. */}
+      <SectionCard title="Verified revenue" className="lg:flex lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-3">
+          <p className="text-2xl font-black tracking-tight text-slate-900 lg:text-3xl">
+            ₹{data.revenue.total.toLocaleString("en-IN")}
+          </p>
+          <p className="text-xs text-slate-500 lg:text-sm">Total verified across all orders · {data.orders.verified} orders</p>
         </div>
+        <Link
+          href="/admin/analytics"
+          className="mt-3 inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 lg:mt-0"
+        >
+          Open analytics →
+        </Link>
       </SectionCard>
 
-      <SectionCard title="Users">
-        <div className="grid grid-cols-3 gap-2 md:gap-3">
-          <StatCard label="Total" value={data.users.total} />
-          <StatCard label="Active" value={data.users.active} tone="ok" />
-          <StatCard label="Blocked" value={data.users.blocked} tone={data.users.blocked > 0 ? "danger" : undefined} />
-        </div>
-      </SectionCard>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <SectionCard title="Subscriptions" className="lg:col-span-1">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
+            <StatCard label="Active" value={data.subscriptions.active} />
+            <StatCard label="Expiring soon" value={data.subscriptions.expiring} />
+          </div>
+        </SectionCard>
 
-      <SectionCard title="Orders & revenue">
-        <div className="grid grid-cols-3 gap-2 md:gap-3">
-          <StatCard label="Verified" value={data.orders.verified} tone="ok" />
-          <StatCard label="Pending" value={data.orders.pending} tone="warn" />
-          <StatCard label="Failed" value={data.orders.failed} tone={data.orders.failed > 0 ? "danger" : undefined} />
-        </div>
-        <div className="mt-2">
-          <StatCard label="Total verified revenue" value={`₹${data.revenue.total.toLocaleString("en-IN")}`} />
-        </div>
-      </SectionCard>
+        <SectionCard title="Reviews" className="lg:col-span-1">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
+            <StatCard label="Pending reviews" value={data.reviews.pending} tone={data.reviews.pending > 0 ? "warn" : undefined} />
+          </div>
+        </SectionCard>
 
-      <SectionCard title="Subscriptions">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
-          <StatCard label="Active" value={data.subscriptions.active} />
-          <StatCard label="Expiring soon" value={data.subscriptions.expiring} />
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Reviews">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
-          <StatCard label="Pending reviews" value={data.reviews.pending} tone={data.reviews.pending > 0 ? "warn" : undefined} />
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Attention queue">
-        {data.attentionQueue.length === 0 ? (
-          <p className="text-sm text-slate-500">Nothing needs your attention right now.</p>
-        ) : (
-          <ul className="space-y-2">
-            {data.attentionQueue.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                {item.label}
-                <Pill tone="warn">{item.type}</Pill>
-              </li>
+        <SectionCard title="Quick actions" className="lg:col-span-1">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
+            {QUICK_ACTIONS.slice(0, 4).map((action) => (
+              <Link
+                key={action.label}
+                href={action.href}
+                className="flex h-11 items-center justify-center rounded-lg border border-slate-300 px-2 text-center text-xs font-medium text-slate-700 transition lg:hover:border-indigo-200 lg:hover:bg-indigo-50/40 lg:hover:text-indigo-700 lg:active:bg-slate-100"
+              >
+                {action.label}
+              </Link>
             ))}
-          </ul>
-        )}
-      </SectionCard>
+          </div>
+          {QUICK_ACTIONS.length > 4 ? (
+            <div className="mt-2 hidden grid-cols-1 gap-2 lg:grid">
+              <Link
+                href={QUICK_ACTIONS[4].href}
+                className="flex h-11 items-center justify-center rounded-lg border border-slate-300 px-2 text-center text-xs font-medium text-slate-700 transition lg:hover:border-indigo-200 lg:hover:bg-indigo-50/40 lg:hover:text-indigo-700"
+              >
+                {QUICK_ACTIONS[4].label}
+              </Link>
+            </div>
+          ) : null}
+        </SectionCard>
+      </div>
 
-      <SectionCard title="Recent orders" action={<Link href="/admin/orders" className="text-xs font-medium text-slate-500 underline">View all</Link>}>
-        {data.recentOrders.length === 0 ? (
-          <p className="text-sm text-slate-500">No orders yet.</p>
-        ) : (
-          <ul className="space-y-2">
-            {data.recentOrders.map((order) => (
-              <li key={order.id}>
-                <Link href={`/admin/orders/${order.id}`} className="block rounded-lg border border-slate-200 p-3 active:bg-slate-50">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-900">{order.id}</span>
-                    <Pill tone={order.paymentStatus === "verified" || order.paymentStatus === "captured" ? "success" : order.paymentStatus === "failed" ? "danger" : "warn"}>
-                      {order.paymentStatus}
-                    </Pill>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">{order.customerName || "Unknown customer"}</p>
-                  <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
-                    <span>{order.items?.map((i) => i.title).join(", ") || "—"}</span>
-                    <span className="font-semibold text-slate-900">₹{Number(order.finalAmount).toLocaleString("en-IN")}</span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </SectionCard>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <SectionCard title="Attention queue" className="lg:col-span-1">
+          {data.attentionQueue.length === 0 ? (
+            <p className="text-sm text-slate-500">Nothing needs your attention right now.</p>
+          ) : (
+            <ul className="space-y-2">
+              {data.attentionQueue.map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  {item.label}
+                  <Pill tone="warn">{item.type}</Pill>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
 
-      <SectionCard title="Quick actions">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
-          {QUICK_ACTIONS.map((action) => (
-            <Link
-              key={action.label}
-              href={action.href}
-              className="flex h-11 items-center justify-center rounded-lg border border-slate-300 px-2 text-center text-xs font-medium text-slate-700 active:bg-slate-100"
-            >
-              {action.label}
-            </Link>
-          ))}
-        </div>
-      </SectionCard>
+        <SectionCard
+          title="Recent orders"
+          className="lg:col-span-2"
+          action={<Link href="/admin/orders" className="text-xs font-medium text-slate-500 underline lg:text-sm">View all</Link>}
+        >
+          {data.recentOrders.length === 0 ? (
+            <p className="text-sm text-slate-500">No orders yet.</p>
+          ) : (
+            <ul className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
+              {data.recentOrders.map((order) => (
+                <li key={order.id}>
+                  <Link href={`/admin/orders/${order.id}`} className="block rounded-lg border border-slate-200 p-3 transition active:bg-slate-50 lg:hover:border-indigo-200 lg:hover:shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-slate-900">{order.id}</span>
+                      <Pill tone={order.paymentStatus === "verified" || order.paymentStatus === "captured" ? "success" : order.paymentStatus === "failed" ? "danger" : "warn"}>
+                        {order.paymentStatus}
+                      </Pill>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">{order.customerName || "Unknown customer"}</p>
+                    <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+                      <span className="truncate">{order.items?.map((i) => i.title).join(", ") || "—"}</span>
+                      <span className="ml-2 shrink-0 font-semibold text-slate-900">₹{Number(order.finalAmount).toLocaleString("en-IN")}</span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+      </div>
     </div>
   );
 }
