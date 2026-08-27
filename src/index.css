@@ -14,6 +14,105 @@
   .snap-center-item {
     scroll-snap-align: center;
   }
+
+  /*
+   * Mobile header glow.
+   *
+   * The site header sits sticky at the top of every page. On mobile
+   * (<= 767px) the user scrolls quickly through long lists, so the
+   * header needs a more pronounced visual edge to feel anchored.
+   *
+   * Two layered effects on the bottom edge:
+   *   1. A soft blue gradient shadow (indigo-500 -> sky-300 -> transparent)
+   *      that fades out over 18px so it never feels like a hard line.
+   *   2. A 12px-tall frosted glass strip just under the header that
+   *      blurs the content scrolling behind it (the strip itself
+   *      fades from white/45 to white/0).
+   *
+   * Both effects are built with pseudo-elements (::before + ::after)
+   * so they don't affect layout. The shadow sits below the header
+   * (z-index 0 on the header pushes it back); the frosted strip is
+   * a child of the header so it scrolls with the header.
+   *
+   * On desktop (>= 768px) the effect reduces to the original subtle
+   * shadow (already in use before this change) so tablet and desktop
+   * users still see a quiet, professional chrome.
+   */
+  .mobile-header-glow {
+    position: sticky;
+    border-bottom: 1px solid rgb(226 232 240 / 0.5);
+    box-shadow: 0 4px 20px -10px rgb(0 0 0 / 0.08);
+    overflow: visible;
+  }
+
+  .mobile-header-glow::before,
+  .mobile-header-glow::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+  }
+
+  /* Layer 1: blue gradient shadow that fades to transparent. */
+  .mobile-header-glow::before {
+    bottom: -18px;
+    height: 18px;
+    background: linear-gradient(
+      to bottom,
+      rgba(99, 102, 241, 0.18) 0%,
+      rgba(56, 189, 248, 0.10) 45%,
+      rgba(56, 189, 248, 0) 100%
+    );
+    filter: blur(8px);
+    z-index: -1;
+  }
+
+  /* Layer 2: frosted-glass strip just under the header. */
+  .mobile-header-glow::after {
+    bottom: -12px;
+    left: -8px;
+    right: -8px;
+    height: 12px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.45) 0%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    backdrop-filter: blur(6px) saturate(140%);
+    -webkit-backdrop-filter: blur(6px) saturate(140%);
+  }
+
+  /* Mobile: stronger glow + taller frosted strip so scrolling
+     long lists still feels anchored. */
+  @media (max-width: 767px) {
+    .mobile-header-glow {
+      box-shadow:
+        0 6px 24px -10px rgba(99, 102, 241, 0.28),
+        0 2px 8px -2px rgba(56, 189, 248, 0.18);
+    }
+
+    .mobile-header-glow::before {
+      bottom: -22px;
+      height: 22px;
+      background: linear-gradient(
+        to bottom,
+        rgba(99, 102, 241, 0.28) 0%,
+        rgba(56, 189, 248, 0.16) 50%,
+        rgba(56, 189, 248, 0) 100%
+      );
+      filter: blur(10px);
+    }
+
+    .mobile-header-glow::after {
+      bottom: -16px;
+      left: -12px;
+      right: -12px;
+      height: 16px;
+      backdrop-filter: blur(10px) saturate(150%);
+      -webkit-backdrop-filter: blur(10px) saturate(150%);
+    }
+  }
 }
 
 html,

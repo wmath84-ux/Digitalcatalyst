@@ -82,7 +82,7 @@ export default function Header({
     <header
       data-site-header
       className={`sticky top-0 z-30 bg-white/75 px-4 py-3 sm:px-5 md:px-8 md:py-4 backdrop-blur-xl transition-all duration-300 ${
-        hideFrameBorders ? "" : "border-b border-slate-200/50 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.08)]"
+        hideFrameBorders ? "" : "mobile-header-glow"
       }`}
     >
       <div className="flex items-center justify-between gap-3">
