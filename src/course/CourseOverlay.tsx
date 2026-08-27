@@ -164,10 +164,11 @@ const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; 
   // Mind Map sits immediately after Note, so the two private-study tools are
   // neighbours in the dock. It opens the same way — a sheet over the lesson —
   // but claims HALF the screen instead of the notes' 40%, because a diagram
-  // needs both width and height to stay readable. The hint used to live here
-  // ("Is module ka apna diagram banayein") but the user asked for the
-  // header to be clean — only the heading now shows under the mind map tab.
-  { key: "mindmap", label: "Mind map", heading: "Mind map", hint: "", icon: () => <Network size={18} /> },
+  // needs both width and height to stay readable. The hint is kept in source
+  // for completeness, but the entire header row is hidden for this tab so
+  // the canvas renders flush against the top of the sheet (see the
+  // `tab === "mindmap"` branch in the render below).
+  { key: "mindmap", label: "Mind map", heading: "Mind map", hint: "Is module ka apna diagram banayein", icon: () => <Network size={18} /> },
   { key: "paid", label: "Paid", heading: "Paid content", hint: "Upgrades still locked", icon: () => <ShoppingBag size={18} /> },
 ];
 
@@ -417,13 +418,15 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           />
         ) : null}
 
-        {/* Main header — shown only while the note LIST (or any other tab)
-            is open. While the writing box is open the header disappears
-            entirely: the sheet is nothing but toolbar / writing surface /
-            Save + Cancel, maximum space for writing in both orientations.
-            The "+" (new note) moved up here from the panel's old secondary
-            header. */}
-        {notesWriting ? null : (
+        {/* Main header — shown for every tab EXCEPT the mind map. The mind
+            map sheet is meant to be a clean diagram canvas with no chrome
+            above it, so the entire header (heading + hint + close button +
+            module count) is omitted for that one tab. The dock still sits
+            at the bottom and the sheet can be closed by tapping the scrim
+            or the dock pill, which is what the user asked for. The notes
+            writing mode does the same thing for the same reason: maximum
+            space for the actual content (composer / canvas). */}
+        {notesWriting || tab === "mindmap" ? null : (
         <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--course-border)] px-4 py-3">
           <div className="min-w-0">
             <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-[var(--course-muted)]" data-course-overlay-title>
@@ -432,9 +435,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
             {(() => {
               // The hint below the heading is contextual: it shows the visible
               // module count for "Module" and a one-liner for every other
-              // tab. When a tab intentionally has no hint (e.g. the mind map
-              // header should be clean), the paragraph is omitted entirely
-              // instead of leaving an empty line under the heading.
+              // tab. When a tab intentionally has no hint, the paragraph is
+              // omitted entirely instead of leaving an empty line under the
+              // heading.
               const subtitle = tab === "modules"
                 ? `${visibleModuleCount} connected ${visibleModuleCount === 1 ? "module" : "modules"}`
                 : activeTab.hint;

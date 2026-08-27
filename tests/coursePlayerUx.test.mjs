@@ -200,10 +200,12 @@ test("The single + button lives in the overlay's main header, not the panel", ()
 test("The overlay hides its main header + grab handle while the writing box is open", () => {
   // Writing mode = notes tab + editor open. In that mode the sheet keeps no
   // chrome at all: toolbar / writing surface / Save + Cancel only, so the
-  // box gets maximum space in both portrait and landscape.
+  // box gets maximum space in both portrait and landscape. The mind map tab
+  // also hides the header (per the user's "header hata do" request) so the
+  // diagram canvas is flush against the top of the sheet.
   assert.match(overlay, /const notesWriting = tab === "notes" && notesEditorOpen;/);
   assert.match(overlay, /\{!landscape && !notesWriting \? \(/);
-  assert.match(overlay, /\{notesWriting \? null : \(/);
+  assert.match(overlay, /\{notesWriting \|\| tab === "mindmap" \? null : \(/);
 });
 
 test("CourseOverlay wires NotesPanel into the notes tab", () => {
