@@ -130,7 +130,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
         <div className="flex-1">
           <h2 className="text-base font-extrabold text-slate-900 sm:text-lg">Quick Notes</h2>
           <p className="text-xs font-medium text-slate-500">
-            {notes.length} note{notes.length !== 1 ? "s" : ""} • Click to expand
+            {notes.length} note{notes.length !== 1 ? "s" : ""} • Click to edit
           </p>
         </div>
       </div>
@@ -268,7 +268,16 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
                         "px-3.5 py-3 cursor-pointer",
                         isLong && "cursor-pointer"
                       )}
-                      onClick={() => isLong && toggleExpand(note.id)}
+                      onClick={() => startEdit(note)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          startEdit(note);
+                        }
+                      }}
+                      aria-label={`Edit note: ${note.text}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">

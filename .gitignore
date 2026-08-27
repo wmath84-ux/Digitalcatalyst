@@ -28,3 +28,27 @@ dist-ssr
 
 # Vercel CLI artifacts
 .vercel/
+
+# Android / Capacitor
+# Local keystore + signing material — never commit. The release
+# keystore is generated with `keytool -genkey -v -keystore
+# android/app/eduvora.keystore -alias eduvora -keyalg RSA` and
+# referenced by env vars (EDUVORA_KEYSTORE_FILE etc.) so the
+# signing material itself stays out of Git.
+android/app/*.keystore
+android/app/*.jks
+android/keystore.properties
+android/app/google-services.json
+
+# Build artifacts
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/captures/
+android/.idea/
+android/*.iml
+android/app/*.iml
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json

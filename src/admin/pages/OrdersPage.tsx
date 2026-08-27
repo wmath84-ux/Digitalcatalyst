@@ -67,30 +67,30 @@ export default function OrdersPage() {
   if (!orders) return <LoadingState label="Loading orders…" />;
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <form onSubmit={(e) => { e.preventDefault(); load(); }} className="flex gap-2">
         <input className={inputClass + " flex-1"} placeholder="Search order ID, customer, email" value={q} onChange={(e) => setQ(e.target.value)} />
         <SecondaryButton onClick={() => setFiltersOpen(true)}>Filters</SecondaryButton>
       </form>
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-500">{orders.length} order(s)</p>
+        <p className="text-xs text-slate-500 lg:text-sm">{orders.length} order(s)</p>
         <SecondaryButton onClick={exportCsv}>Export CSV</SecondaryButton>
       </div>
 
       {orders.length === 0 ? (
         <EmptyState title="No orders found" />
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
           {orders.map((o) => (
             <Link key={o.id} href={`/admin/orders/${o.id}`}>
               <RecordCard>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-900">{o.id}</span>
+                  <span className="text-sm font-semibold text-slate-900 lg:text-[15px]">{o.id}</span>
                   <Pill tone={STATUS_TONE[o.paymentStatus] ?? "default"}>{o.paymentStatus}</Pill>
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">{o.customerName || o.customerEmail || "Unknown"} · {new Date(o.createdAt).toLocaleString()}</p>
-                <p className="mt-1 text-xs text-slate-600">{o.items?.map((i) => i.title).join(", ") || "—"}</p>
-                <div className="mt-1 flex items-center justify-between text-xs">
+                <p className="mt-0.5 text-xs text-slate-500 lg:text-[13px]">{o.customerName || o.customerEmail || "Unknown"} · {new Date(o.createdAt).toLocaleString()}</p>
+                <p className="mt-1 text-xs text-slate-600 lg:text-[13px]">{o.items?.map((i) => i.title).join(", ") || "—"}</p>
+                <div className="mt-1 flex items-center justify-between text-xs lg:text-[13px]">
                   <span className="text-slate-500">{o.purchaseKind} {o.couponCode ? `· coupon ${o.couponCode}` : ""}</span>
                   <span className="font-semibold text-slate-900">₹{Number(o.finalAmount).toLocaleString("en-IN")}</span>
                 </div>

@@ -347,7 +347,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
                 /* 2-column grid pair */
                 const next = filtered[i + 1];
                 rows.push(
-                  <div key={`pair-${p.id}`} className="grid grid-cols-2 gap-3">
+                  <div key={`pair-${p.id}`} data-store-grid className="grid grid-cols-2 gap-3">
                     <ProductCard
                       product={p}
                       wishlisted={wishlist.has(p.id)}
@@ -380,7 +380,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
         </div>
       ) : (
         /* ── Default grid view ── */
-        <div className="grid grid-cols-1 gap-4 px-4 pt-4 sm:grid-cols-2">
+        <div data-store-grid className="grid grid-cols-1 gap-4 px-4 pt-4 sm:grid-cols-2">
           {filtered.map((product) => (
             <ProductCard
               key={product.id}

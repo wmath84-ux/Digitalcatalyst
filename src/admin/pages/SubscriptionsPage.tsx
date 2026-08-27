@@ -303,11 +303,11 @@ export default function SubscriptionsPage() {
   if (!plans || !features) return <LoadingState />;
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <Tabs tabs={[{ key: "plans", label: "Plans" }, { key: "features", label: "Features" }, { key: "products", label: "Products" }, { key: "referrals", label: "Referrals" }]} active={tab} onChange={setTab} />
 
       {tab === "plans" && (
-        <div className="space-y-3">
+        <div className="space-y-3 lg:space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-xs text-slate-500">{plans.length} plan(s)</p>
             <PrimaryButton onClick={() => setEditingPlan(EMPTY_PLAN)}>+ Add plan</PrimaryButton>
@@ -325,7 +325,7 @@ export default function SubscriptionsPage() {
             </p>
           </div>
           {plans.length === 0 ? <EmptyState title="No plans yet" /> : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3 lg:grid-cols-3 lg:gap-4">
               {plans.map((p) => (
                 <RecordCard key={p.id}>
                   <div className="flex items-center justify-between">
@@ -352,13 +352,13 @@ export default function SubscriptionsPage() {
       )}
 
       {tab === "features" && (
-        <div className="space-y-3">
+        <div className="space-y-3 lg:space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-xs text-slate-500">{features.length} feature(s) · Configure My Day or any feature · Delete/deactivate to remove its subscription gate</p>
             <PrimaryButton onClick={() => setEditingFeature({ ...EMPTY_FEATURE })}>+ Add feature</PrimaryButton>
           </div>
           {features.length === 0 ? <EmptyState title="No features yet" /> : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3 lg:grid-cols-3 lg:gap-4">
               {features.map((f) => (
                 <RecordCard key={f.id}>
                   <div className="flex items-center justify-between">
@@ -390,7 +390,7 @@ export default function SubscriptionsPage() {
       )}
 
       {tab === "products" && (
-        <div className="space-y-3">
+        <div className="space-y-3 lg:space-y-4">
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] leading-relaxed text-emerald-900">
             <p className="font-semibold">🔄 Auto-sync enabled</p>
             <p className="mt-0.5">Jo bhi naya product aap Products section me add karenge, wo yahan <strong>directly dikhega</strong> — har 15 second me list refresh hoti hai. Naye product ko subscription feature me add karne ke liye <strong>+ Add product</strong> dabayein.</p>
@@ -403,7 +403,7 @@ export default function SubscriptionsPage() {
             </div>
           </div>
           {(subscriptionProducts || []).length === 0 ? <EmptyState title="No subscription products yet" description="Click + Add product to choose from your available products." /> : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3 lg:grid-cols-3 lg:gap-4">
               {(subscriptionProducts || []).map((sp) => (
                 <RecordCard key={sp.id}>
                   <div className="flex items-center justify-between">

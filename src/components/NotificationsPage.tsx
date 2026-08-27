@@ -214,7 +214,7 @@ export default function NotificationsPage({
 
   return (
     <div className="min-h-screen bg-white sm:py-6">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200 md:max-w-none md:rounded-none md:border-0 md:shadow-none md:bg-transparent">
         <Header
           cartCount={cartCount}
           notifCount={unread}
@@ -269,7 +269,7 @@ export default function NotificationsPage({
           )}
         </Header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main data-notifications-content className="flex-1 overflow-y-auto md:px-8">
 
           {pushPermission === "default" && (
             <div className="mx-4 mt-1 flex items-center justify-between gap-3 rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-100">

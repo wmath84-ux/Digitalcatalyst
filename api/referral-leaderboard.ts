@@ -4,6 +4,7 @@ import { handleEmbedProxy } from "./_lib/embedProxy.js";
 import { handleRevisionGenerate } from "./_lib/revisionGenerate.js";
 import { handleRevisionData } from "./_lib/revisionData.js";
 import { handleMyDay } from "./_lib/myDay.js";
+import { handleFlowPathControl } from "./_lib/flowpathControl.js";
 import { handleManifest } from "./_lib/manifest.js";
 import { handleBrandIcon } from "./_lib/brandIcon.js";
 
@@ -102,6 +103,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (action.startsWith("myday.")) {
       return handleMyDay(req, res);
+    }
+    if (action.startsWith("flowpath.")) {
+      return handleFlowPathControl(req, res);
     }
     return handleRevisionGenerate(req, res);
   }

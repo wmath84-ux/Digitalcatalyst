@@ -90,10 +90,10 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
   const percentOffset = (dragOffset / widthRef.current) * 100;
 
   return (
-    <div className="px-5 pt-4">
+    <div className="px-5 pt-4 md:px-8">
       <div
         ref={trackRef}
-        className="dc-glass relative select-none overflow-hidden rounded-[28px] shadow-[0_22px_52px_-24px_rgba(79,70,229,0.55)] touch-pan-y"
+        className="dc-glass relative select-none overflow-hidden rounded-[28px] shadow-[0_22px_52px_-24px_rgba(79,70,229,0.55)] touch-pan-y md:rounded-[36px]"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={endDrag}
@@ -124,22 +124,22 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
                   aria-label={linked ? `Open: ${banner.title}` : undefined}
                   data-banner-id={banner.id}
                   data-banner-linked={linked ? "true" : "false"}
-                  className={`relative flex h-44 w-full items-center overflow-hidden bg-gradient-to-br px-5 ${
+                  className={`relative flex h-44 w-full items-center overflow-hidden bg-gradient-to-br px-5 md:h-56 md:px-8 ${
                     linked ? "cursor-pointer active:brightness-95" : ""
                   } ${banner.gradient}`}
                 >
                   <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-black/10" />
                   <div aria-hidden className="pointer-events-none absolute -right-10 top-0 h-36 w-36 rounded-full bg-white/12 blur-3xl" />
                   <div aria-hidden className="pointer-events-none absolute -left-8 bottom-0 h-28 w-28 rounded-full bg-cyan-200/12 blur-3xl" />
-                  <div className="relative z-10 max-w-[62%] text-white">
-                    <span className="inline-block rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-bold tracking-wider backdrop-blur-sm">
+                  <div className="relative z-10 max-w-[62%] text-white md:max-w-[58%]">
+                    <span className="inline-block rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-bold tracking-wider backdrop-blur-sm md:text-xs">
                       {banner.eyebrow}
                     </span>
-                    <h3 className="mt-2 text-lg font-bold leading-tight drop-shadow-sm">
+                    <h3 className="mt-2 text-lg font-bold leading-tight drop-shadow-sm md:text-2xl">
                       {banner.title}
                     </h3>
-                    <p className="mt-1 text-xs text-white/85 leading-snug">{banner.subtitle}</p>
-                    <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-xs font-bold text-slate-900 shadow-sm transition active:scale-95">
+                    <p className="mt-1 text-xs text-white/85 leading-snug md:text-sm md:mt-2 md:max-w-md">{banner.subtitle}</p>
+                    <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-xs font-bold text-slate-900 shadow-sm transition active:scale-95 md:mt-4 md:px-5 md:py-2 md:text-sm">
                       {banner.cta}
                       {linked && (
                         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}>

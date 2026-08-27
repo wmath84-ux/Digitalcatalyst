@@ -213,22 +213,33 @@ test("the panel flushes its pending write when it unmounts", () => {
   assert.match(panel, /useEffect\(\(\) => \(\) => \{ onFlush\?\.\(\); \}, \[onFlush\]\)/);
 });
 
-test("every node exposes an explicit pencil edit button", () => {
-  // A phone double-tap is unreliable, so each node carries a pencil that opens
-  // the same inline editor — existing boxes' text stays editable.
-  assert.match(panel, /data-mind-node-edit=\{id\}/);
-  assert.match(panel, /onOpenEditor\(id\)/);
-  assert.match(panel, /Pencil size=\{10\}/);
-  // The edit button is always reachable on touch, not hidden until hover.
-  assert.match(panel, /max-md:opacity-100/);
+test("every node opens the inline editor on a single tap (no separate pencil)", () => {
+  // The redesign collapsed "tap to rename" and "tap to select" into one
+  // interaction: a phone double-tap was unreliable (React Flow's
+  // tap-vs-drag disambiguator swallowed one or the other), so the only
+  // rename trigger is now a single tap on the node body. The editor opens
+  // automatically, and the input is in the same DOM tree as the rendered
+  // text so the soft keyboard lands in the right place.
+  assert.match(panel, /onNodeClick=\{[\s\S]*setSelectedId\(node\.id\)[\s\S]*setEditingId\(node\.id\)/);
+  assert.match(panel, /const openEditor = /);
+  assert.match(panel, /onClick=\{[\s\S]*openEditor\(event\)/);
+  // The persisted action (trash) still requires an explicit button — it is
+  // NOT a rename trigger, it only mounts while the node is selected.
+  assert.match(panel, /data-mind-node-delete=\{id\}/);
+  assert.match(panel, /!isRoot \? \(/);
 });
 
-test("the toolbar is hidden in landscape so the diagram fills the sheet", () => {
-  // The Branch / stats / zoom toolbar disappears in landscape, giving the map
-  // the whole sheet; the + buttons and pinch-zoom keep editing possible.
-  assert.match(panel, /landscape \? null : \(/);
-  assert.match(panel, /data-course-mindmap-toolbar/);
-  // The parent passes the same landscape flag it uses for the overlay rails.
+test("the toolbar slot is replaced by a slim status strip in both orientations", () => {
+  // The old landscape-only "hide the toolbar" rule is gone — the
+  // branch / stats / zoom controls are now a single status strip that is
+  // always mounted, and the diagram fills the rest of the sheet.
+  assert.match(panel, /data-course-mindmap-status/);
+  assert.match(panel, /data-course-mindmap-zoom-in/);
+  assert.match(panel, /data-course-mindmap-zoom-out/);
+  assert.match(panel, /data-course-mindmap-fit/);
+  // The parent still hands the same landscape flag it uses for the
+  // overlay rails, so the status strip / canvas can adapt later if
+  // needed.
   assert.match(coursePlayer, /landscape=\{useLandscapeRails\}/);
 });
 

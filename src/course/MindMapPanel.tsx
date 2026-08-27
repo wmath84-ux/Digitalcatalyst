@@ -11,11 +11,39 @@
 // idea here", which is what makes this usable on a phone.
 //
 //   `+`            → add a child to this node (then focus its editor)
-//   tap node       → select
-//   double-tap     → rename inline
-//   ▸ / ▾          → collapse / expand a branch
-//   trash          → delete the branch (never available on the root)
-//   pinch / drag   → zoom + pan (React Flow, via d3-zoom)
+//   tap node       → opens the inline editor straight away. The editor sits
+//                    inside the node so the soft keyboard lands right on it.
+//   Enter / blur   → save the new topic and close the editor.
+//   Escape         → cancel the rename and keep the previous topic.
+//   tap outside    → any open editor saves its content (blur behaves the
+//                    same way, so closing the editor and tapping the canvas
+//                    is one and the same action).
+//   tap while editing a different node → the current edit is saved (the
+//                    input blurs, committing the topic) and the new node
+//                    becomes the active editor.
+//   ▸ / ▾          → collapse / expand a branch (delete-bar on the selected
+//                    node, never visible by default).
+//   trash          → delete the selected branch — the trash button ONLY
+//                    renders while the node is selected and is never on
+//                    the root. No rename pencil: tapping the node itself
+//                    is the rename trigger.
+//
+// ── Why no separate rename button ───────────────────────────────────────
+// Double-tap and pencil icons were both unreliable on phones (the React Flow
+// tap-vs-drag disambiguator swallowed one or the other depending on pointer
+// pressure). The single-tap-to-edit pattern removes that ambiguity entirely:
+// tapping a node is the rename trigger, there is no second action to find,
+// and the input lives inside the same DOM tree as the visual text so the
+// soft keyboard lands in the right place every time.
+//
+// ── Why actions live INSIDE the node, shown only on select ──────────────
+// The trash button (the only persisted action) used to sit OUTSIDE the node
+// box, on the inward edge. On a phone that meant the button sat beyond the
+// node's measured width and got clipped by the React Flow viewport on wide
+// maps — the button was there but unreachable, so "delete" silently did
+// nothing. The trash is now part of the same node DOM, anchored at the
+// bottom, and only renders while the node is selected. The collapse control
+// rides the same row when the node has children.
 //
 // ── Why React Flow and not jsMind ────────────────────────────────────────
 // jsMind ships a purpose-built tree, but its published core
@@ -38,7 +66,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { CornerDownLeft, Maximize, Minus, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { Maximize, Minus, Plus, Trash2, TriangleAlert } from "lucide-react";
 import {
   addChildNode,
   countNodes,
@@ -76,6 +104,17 @@ interface MindNodeData extends Record<string, unknown> {
  * facing away from the root, so it never changes the node's own width — the
  * layout measured this box in `utils/mindMapTree.js` and the two must agree
  * pixel for pixel or siblings would overlap.
+ *
+ * Single-tap on a node opens the inline editor right where the topic was
+ * rendered, so the soft keyboard lands in the same place. Pressing Enter,
+ * tapping outside the node, or tapping a different node all commit the
+ * current draft and close the editor. A blank / whitespace-only draft is
+ * treated as "cancel" so an accidental tap can never blank a node.
+ *
+ * The collapse control and the trash button both render INSIDE the same
+ * node DOM (so they can never land outside the React Flow viewport on a
+ * phone) and only mount while the node is selected. The trash is never
+ * rendered on the root.
  */
 function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
   const {
@@ -102,7 +141,7 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
     if (editing) {
       setDraft(topic);
       // Autofocus lands the soft keyboard on the new node straight away, so
-      // `+` → type → Enter is a single uninterrupted flow.
+      // `+` → type → Enter (or tap outside) is a single uninterrupted flow.
       const raf = requestAnimationFrame(() => inputRef.current?.focus());
       return () => cancelAnimationFrame(raf);
     }
@@ -121,6 +160,14 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
 
   const facesLeft = side === "left";
 
+  // A single tap on the node body opens the editor. React Flow's `onNodeClick`
+  // also opens it; this onClick just exists so taps on the rendered text span
+  // (which the input replaces while editing) still trigger the editor.
+  const openEditor = (event: React.MouseEvent | React.PointerEvent) => {
+    event.stopPropagation();
+    onOpenEditor(id);
+  };
+
   return (
     <div
       className="group relative h-full w-full"
@@ -130,10 +177,21 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
       data-mind-node-selected={selected ? "true" : "false"}
     >
       <div
-        onDoubleClick={() => onOpenEditor(id)}
-        className={`flex h-full w-full items-center overflow-hidden rounded-xl border px-2.5 text-[13px] font-semibold leading-[17px] transition ${tone} ${
+        onClick={(event) => {
+          // A plain click on the text body opens the editor. A double-click
+          // is fine too — the editor opens, the input absorbs the second
+          // event, no extra state to manage.
+          if (editing) return;
+          openEditor(event);
+        }}
+        onDoubleClick={(event) => {
+          event.stopPropagation();
+          if (!editing) onOpenEditor(id);
+        }}
+        className={`flex h-full w-full flex-col overflow-hidden rounded-xl border px-2.5 pt-1.5 text-[13px] font-semibold leading-[17px] transition ${tone} ${
           selected ? "ring-2 ring-violet-400/80 ring-offset-2 ring-offset-[#0b0b16]" : ""
         }`}
+        data-mind-node-body={id}
       >
         {editing ? (
           <input
@@ -141,13 +199,19 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onBlur={() => {
-              onCommitTopic(id, draft);
+              // A blank / whitespace-only rename is treated as "cancel" so
+              // accidentally tapping outside the field never blanks a node.
+              // `setNodeTopic` itself would silently no-op, which made the
+              // rename feel broken in the old editor.
+              const trimmed = draft.trim();
+              if (trimmed && trimmed !== topic) onCommitTopic(id, trimmed);
               onCloseEditor(id);
             }}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
-                onCommitTopic(id, draft);
+                const trimmed = draft.trim();
+                if (trimmed) onCommitTopic(id, trimmed);
                 onCloseEditor(id);
               }
               if (event.key === "Escape") {
@@ -157,14 +221,68 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
               // React Flow would otherwise treat typing as a canvas shortcut.
               event.stopPropagation();
             }}
+            onClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
             className="w-full min-w-0 bg-transparent text-inherit outline-none placeholder:text-white/40"
             placeholder="Idea likhein…"
             aria-label="Node ka text badlein"
             data-mind-node-input={id}
           />
         ) : (
-          <span className="line-clamp-4 break-words">{topic}</span>
+          <span className="line-clamp-4 min-h-0 flex-1 break-words">{topic}</span>
         )}
+
+        {/* Action bar — rendered INSIDE the node so the buttons can never
+            land outside the React Flow viewport on a phone. Only the
+            selected node shows the trash + collapse. There is no separate
+            rename button — single-tap on the node body is the rename
+            trigger, and the editor saves itself on blur. */}
+        {selected ? (
+          <div
+            className="mt-1 flex shrink-0 items-center gap-1 border-t border-white/10 pt-1"
+            data-mind-node-actions={id}
+            // Stop the React Flow canvas from re-selecting while the user
+            // taps a button — without this, a tap on Delete can land on
+            // the canvas instead of the button on slow devices.
+            onMouseDown={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {childCount > 0 ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onToggleCollapse(id);
+                }}
+                className="grid h-5 w-5 place-items-center rounded-full border border-white/15 bg-black/60 text-[10px] font-black text-slate-200 transition hover:bg-black/80"
+                aria-label={collapsed ? "Branch kholein" : "Branch chhupayein"}
+                title={collapsed ? "Expand" : "Collapse"}
+                data-mind-node-collapse={id}
+              >
+                {collapsed ? childCount : "–"}
+              </button>
+            ) : null}
+            {!isRoot ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onDelete(id);
+                }}
+                className="grid h-5 w-5 place-items-center rounded-full border border-rose-400/25 bg-black/60 text-rose-300 transition hover:bg-rose-500/30"
+                aria-label="Yeh branch hatayein"
+                title="Delete branch"
+                data-mind-node-delete={id}
+              >
+                <Trash2 size={10} />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {/* ── The `+`: one tap appends a child to THIS node ──────────────── */}
@@ -183,60 +301,6 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
       >
         <Plus size={14} strokeWidth={3} />
       </button>
-
-      {/* ── Collapse + delete + edit ride the inward edge, away from the `+` ── */}
-      <div
-        className={`absolute top-1/2 flex -translate-y-1/2 items-center gap-1 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100 ${
-          facesLeft ? "-right-8" : "-left-8"
-        } max-md:opacity-100`}
-      >
-        {/* Explicit pencil so a node's text can always be edited — a phone
-            double-tap is unreliable and there was no other affordance, which
-            made existing boxes effectively uneditable. */}
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenEditor(id);
-          }}
-          className="grid h-5 w-5 place-items-center rounded-full border border-sky-300/30 bg-black/60 text-sky-300 transition hover:bg-sky-500/30"
-          aria-label="Text badlein"
-          title="Edit text"
-          data-mind-node-edit={id}
-        >
-          <Pencil size={10} />
-        </button>
-        {childCount > 0 ? (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleCollapse(id);
-            }}
-            className="grid h-5 w-5 place-items-center rounded-full border border-white/15 bg-black/60 text-[10px] font-black text-slate-200 transition hover:bg-black/80"
-            aria-label={collapsed ? "Branch kholein" : "Branch chhupayein"}
-            title={collapsed ? "Expand" : "Collapse"}
-            data-mind-node-collapse={id}
-          >
-            {collapsed ? childCount : "–"}
-          </button>
-        ) : null}
-        {!isRoot ? (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(id);
-            }}
-            className="grid h-5 w-5 place-items-center rounded-full border border-rose-400/25 bg-black/60 text-rose-300 transition hover:bg-rose-500/30"
-            aria-label="Yeh branch hatayein"
-            title="Delete branch"
-            data-mind-node-delete={id}
-          >
-            <Trash2 size={10} />
-          </button>
-        ) : null}
-      </div>
     </div>
   );
 }
@@ -266,16 +330,18 @@ export interface MindMapPanelProps {
   /** Flush the debounced write now — called when the sheet closes. */
   onFlush?: () => void;
   /**
-   * True when the panel is opened in landscape. The toolbar (Branch / stats /
-   * zoom) is hidden so the diagram gets the whole landscape sheet — the `+`
-   * buttons and pinch-zoom still do everything the toolbar did, just with more
-   * room to organise and create.
+   * True when the panel is opened in landscape. The status strip and the
+   * floating zoom controls stay mounted in both orientations, but in
+   * landscape they are nudged to the bottom-left of the canvas so the
+   * diagram fills the rest of the sheet — the `+` buttons and pinch-zoom
+   * keep adding + zooming possible, so nothing the old portrait toolbar
+   * offered is lost.
    */
   landscape?: boolean;
 }
 
 function MindMapCanvas(props: MindMapPanelProps) {
-  const { mind, onMindChange, status, errorMessage, onFlush, landscape } = props;
+  const { mind, onMindChange, status, errorMessage, onFlush, landscape: _landscape } = props;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { zoomIn, zoomOut, fitView, setCenter } = useReactFlow();
@@ -334,6 +400,10 @@ function MindMapCanvas(props: MindMapPanelProps) {
   );
 
   const handleOpenEditor = useCallback((id: string) => {
+    // Single tap on a node opens the editor directly. Selection is implied
+    // (the editor input is only ever the active one), so the same call also
+    // updates the selected id. Calling this on the root is a no-op for
+    // delete but still lets the learner edit the central idea.
     setSelectedId(id);
     setEditingId(id);
   }, []);
@@ -344,8 +414,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
     (id: string, topic: string) => onMindChange((current) => setNodeTopic(current, id, topic)),
     [onMindChange],
   );
-
-  const addRootBranch = useCallback(() => handleAddChild(rootId()), [handleAddChild]);
 
   // ── React Flow nodes + edges, derived from the layout ──────────────────
   const nodes: Node<MindNodeData>[] = useMemo(() => {
@@ -405,62 +473,10 @@ function MindMapCanvas(props: MindMapPanelProps) {
 
   const save = SAVE_COPY[status] || SAVE_COPY.idle;
   const levels = maxDepth(mind);
+  const totalNodes = countNodes(mind);
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-[#0b0b16]" data-course-mindmap>
-      {/* ── Toolbar ───────────────────────────────────────────────────────
-          Hidden in landscape so the diagram fills the whole sheet. The `+`
-          buttons on every node and pinch-zoom keep adding + zooming possible,
-          so nothing the toolbar offered is lost. */}
-      {landscape ? null : (
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2" data-course-mindmap-toolbar>
-        <div className="flex min-w-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={addRootBranch}
-            className="flex shrink-0 items-center gap-1 rounded-lg bg-violet-500 px-2.5 py-1.5 text-[11px] font-black text-white transition hover:bg-violet-400"
-            data-course-mindmap-add-root
-          >
-            <Plus size={13} strokeWidth={3} /> Branch
-          </button>
-          <span className="truncate text-[10px] font-bold text-slate-400" data-course-mindmap-stats>
-            {countNodes(mind)} nodes · {levels} {levels === 1 ? "level" : "levels"}
-          </span>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={() => void zoomOut({ duration: 180 })}
-            className="grid h-7 w-7 place-items-center rounded-lg bg-white/8 text-slate-200 transition hover:bg-white/15"
-            aria-label="Zoom out"
-            data-course-mindmap-zoom-out
-          >
-            <Minus size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => void zoomIn({ duration: 180 })}
-            className="grid h-7 w-7 place-items-center rounded-lg bg-white/8 text-slate-200 transition hover:bg-white/15"
-            aria-label="Zoom in"
-            data-course-mindmap-zoom-in
-          >
-            <Plus size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => void fitView({ duration: 260, padding: 0.18 })}
-            className="grid h-7 w-7 place-items-center rounded-lg bg-white/8 text-slate-200 transition hover:bg-white/15"
-            aria-label="Poora map fit karein"
-            title="Fit to screen"
-            data-course-mindmap-fit
-          >
-            <Maximize size={13} />
-          </button>
-        </div>
-      </div>
-      )}
-
       {/* ── Canvas ────────────────────────────────────────────────────────
           `touch-action: none` is required, not cosmetic: without it the
           browser claims the pinch for page zoom and React Flow never sees it. */}
@@ -481,10 +497,16 @@ function MindMapCanvas(props: MindMapPanelProps) {
           panOnDrag
           proOptions={{ hideAttribution: true }}
           onNodeClick={(_event, node) => {
+            // Single-tap on any node opens the inline editor (single source
+            // of truth for "rename"). The action bar appears automatically
+            // because the node is now selected.
             setSelectedId(node.id);
-            setEditingId(null);
+            setEditingId(node.id);
           }}
           onPaneClick={() => {
+            // Tapping the canvas (outside any node) closes any open editor
+            // — the input's onBlur already committed the topic, so this is
+            // just the visual cleanup.
             setSelectedId(null);
             setEditingId(null);
           }}
@@ -492,27 +514,71 @@ function MindMapCanvas(props: MindMapPanelProps) {
           <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(255,255,255,0.07)" />
         </ReactFlow>
 
-        {/* First-run hint, shown only while the map is still just a root. */}
+        {/* First-run hint, shown only while the map is still just a root.
+            Includes a single "Add root branch" CTA that disappears as soon
+            as a child is added — the rest of the growing is done from the
+            `+` on any node, so the toolbar isn't needed. */}
         {mind.nodes.length === 0 ? (
-          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
-            <p className="rounded-full bg-black/70 px-3 py-1.5 text-center text-[11px] font-semibold text-slate-300 ring-1 ring-white/10">
-              Kisi bhi node par <span className="font-black text-violet-300">+</span> dabayein — branch wahin jud jayegi
-            </p>
+          <div className="pointer-events-auto absolute inset-x-0 bottom-3 flex justify-center px-4">
+            <div className="flex items-center gap-2 rounded-full bg-black/80 px-3 py-1.5 ring-1 ring-white/10">
+              <p className="text-center text-[11px] font-semibold text-slate-300">
+                Kisi bhi node par <span className="font-black text-violet-300">+</span> dabayein — branch wahin jud jayegi
+              </p>
+            </div>
           </div>
         ) : null}
       </div>
 
-      {/* ── Status strip ────────────────────────────────────────────────── */}
+      {/* ── Status strip ──────────────────────────────────────────────────
+          The only persistent chrome. The save indicator sits on the left,
+          a tiny floating cluster of zoom + fit controls on the right, and
+          a small node count + levels readout in the middle so the learner
+          can see how their diagram is growing without an entire toolbar
+          eating the canvas. */}
       <div className="flex shrink-0 items-center justify-between gap-2 border-t border-white/10 px-3 py-1.5" data-course-mindmap-status>
         <span className={`flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider ${save.className}`} data-course-mindmap-save-label>
           {status === "error" ? <TriangleAlert size={11} /> : null}
           {save.label}
         </span>
-        {selectedId ? (
-          <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400">
-            <CornerDownLeft size={11} /> rename · <Trash2 size={11} /> delete
-          </span>
-        ) : null}
+        <span className="truncate text-[10px] font-bold text-slate-400" data-course-mindmap-stats>
+          {totalNodes} {totalNodes === 1 ? "node" : "nodes"} · {levels} {levels === 1 ? "level" : "levels"}
+        </span>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => void zoomOut({ duration: 180 })}
+            className="grid h-7 w-7 place-items-center rounded-lg bg-white/8 text-slate-200 transition hover:bg-white/15"
+            aria-label="Zoom out"
+            data-course-mindmap-zoom-out
+          >
+            <Minus size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => void zoomIn({ duration: 180 })}
+            className="grid h-7 w-7 place-items-center rounded-lg bg-white/8 text-slate-200 transition hover:bg-white/15"
+            aria-label="Zoom in"
+            data-course-mindmap-zoom-in
+          >
+            <Plus size={13} />
+          </button>
+          {/* Fit-to-screen: re-fits the whole diagram to the visible canvas.
+              Larger + violet-tinted than the zoom buttons so it stands out
+              as the "make everything visible" affordance (the maximise
+              icon matches the system "fullscreen" cue). A wider padding
+              keeps every node clear of the canvas edges after the fit. */}
+          <button
+            type="button"
+            onClick={() => void fitView({ duration: 260, padding: 0.2 })}
+            className="ml-1 flex h-7 items-center gap-1 rounded-lg bg-violet-500/20 px-2 text-[10px] font-black uppercase tracking-wider text-violet-100 ring-1 ring-inset ring-violet-400/40 transition hover:bg-violet-500/30 hover:text-white"
+            aria-label="Poora map fit karein"
+            title="Fit to screen — sab nodes ek saath dikhao"
+            data-course-mindmap-fit
+          >
+            <Maximize size={13} />
+            <span className="hidden sm:inline">Fit</span>
+          </button>
+        </div>
       </div>
 
       {errorMessage ? (

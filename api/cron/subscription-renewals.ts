@@ -34,6 +34,7 @@ import {
 } from "../../utils/pushScheduler.js";
 import { runReferralRepairOnce } from "../_lib/referrals.js";
 import { getNotificationBrandChrome } from "../_lib/branding.js";
+import { fcmPushToAllDevices, fcmPushToUser, fcmConfigured, type FcmPayload } from "../_lib/fcm.js";
 
 const bearer = (req: VercelRequest) => {
   const raw = req.headers?.authorization;
@@ -68,37 +69,78 @@ async function sendToSubscriptionDoc(item: { ref: { delete: () => Promise<unknow
 }
 
 async function sendPush(db: Firestore, uid: string, title: string, body: string, target?: { tag?: string; url?: string }) {
-  if (!vapidConfigured()) return 0;
+  // Fan out to Web Push AND FCM in parallel. The Web Push side covers
+  // browsers (still useful for desktop web users); the FCM side wakes
+  // the installed Android TWA reliably — that's the channel the user
+  // was missing exact-time delivery on before this change.
   const brand = await getNotificationBrandChrome();
-  const subscriptions = await db.collection("users").doc(uid).collection("webPushSubscriptions").get();
-  const payloadString = JSON.stringify({
+  const fcmPayload: FcmPayload = {
     title,
     body,
     tag: target?.tag || "eduvora",
     url: target?.url || "/",
     icon: brand.icon,
     badge: brand.badge,
-  });
-  let sent = 0;
-  for (const item of subscriptions.docs) sent += await sendToSubscriptionDoc(item, payloadString);
-  return sent;
+  };
+  const [webSent, fcmSent] = await Promise.all([
+    vapidConfigured()
+      ? (async () => {
+          const subscriptions = await db.collection("users").doc(uid).collection("webPushSubscriptions").get();
+          const payloadString = JSON.stringify({
+            title,
+            body,
+            tag: target?.tag || "eduvora",
+            url: target?.url || "/",
+            icon: brand.icon,
+            badge: brand.badge,
+          });
+          let n = 0;
+          for (const item of subscriptions.docs) n += await sendToSubscriptionDoc(item, payloadString);
+          return n;
+        })()
+      : Promise.resolve(0),
+    fcmPushToUser(db, uid, fcmPayload),
+  ]);
+  return webSent + fcmSent;
 }
 
 async function sendPushToAll(db: Firestore, payload: PushPayload) {
-  if (!vapidConfigured()) return { sent: 0, devices: 0 };
+  // Same fan-out as `sendPush`, but covers every user. The web
+  // read uses the legacy webPushSubscriptions collection; the FCM
+  // read uses the new fcmTokens collection. Either side may be empty
+  // for any given device — both run.
   const brand = await getNotificationBrandChrome();
-  const snapshot = await db.collectionGroup("webPushSubscriptions").get();
-  const payloadString = JSON.stringify({
+  const fcmPayload: FcmPayload = {
     title: payload.title,
     body: payload.body,
     tag: payload.tag || "eduvora-content",
     url: payload.url || "/",
     icon: brand.icon,
     badge: brand.badge,
-  });
-  let sent = 0;
-  for (const item of snapshot.docs) sent += await sendToSubscriptionDoc(item, payloadString);
-  return { sent, devices: snapshot.size };
+  };
+  const [webResult, fcmResult] = await Promise.all([
+    vapidConfigured()
+      ? (async () => {
+          const snapshot = await db.collectionGroup("webPushSubscriptions").get();
+          const payloadString = JSON.stringify({
+            title: payload.title,
+            body: payload.body,
+            tag: payload.tag || "eduvora-content",
+            url: payload.url || "/",
+            icon: brand.icon,
+            badge: brand.badge,
+          });
+          let sent = 0;
+          for (const item of snapshot.docs) sent += await sendToSubscriptionDoc(item, payloadString);
+          return { sent, devices: snapshot.size };
+        })()
+      : Promise.resolve({ sent: 0, devices: 0 }),
+    fcmPushToAllDevices(db, fcmPayload),
+  ]);
+  return {
+    sent: webResult.sent + fcmResult.sent,
+    devices: webResult.devices + fcmResult.devices,
+  };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -210,6 +252,105 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       summary.myDay = { scanned: myDaySnap.size, usersWithDueItems: processed, items: logged, pushed };
+    }
+
+    // ----------------------------------------------- 2b. FlowPath scheduled jobs
+    // The FlowPath control center (api/_lib/flowpathControl.ts) writes a
+    // scheduled-job doc every time a user / admin creates an activity with
+    // scheduledFor in the future. This block fires each job at (or after)
+    // its time, fans out to FCM + Web Push + the in-app bell, then marks
+    // the job as fired. A failed job stays pending so the next ping will
+    // retry; we cap retries at 5 to avoid an infinite loop on a job whose
+    // owner deleted the activity.
+    {
+      const jobsSnap = await db
+        .collection("settings")
+        .doc("adminScheduledJobs")
+        .collection("jobs")
+        .where("status", "==", "pending")
+        .where("scheduledFor", "<=", Timestamp.fromMillis(now))
+        .limit(100)
+        .get();
+      let fired = 0;
+      let failed = 0;
+      let pushed = 0;
+      for (const jobDoc of jobsSnap.docs) {
+        const jobData = jobDoc.data() || {};
+        const jobActivityId = String(jobData.activityId || "");
+        const jobUid = String(jobData.uid || "");
+        if (!jobActivityId || !jobUid) {
+          await jobDoc.ref.update({ status: "failed", lastError: "missing activityId or uid", updatedAt: Timestamp.fromMillis(now) });
+          failed += 1;
+          continue;
+        }
+        const attempts = Number(jobData.attempts || 0);
+        if (attempts >= 5) {
+          await jobDoc.ref.update({ status: "cancelled", lastError: "max attempts reached", updatedAt: Timestamp.fromMillis(now) });
+          failed += 1;
+          continue;
+        }
+        // Re-read the activity so a deleted / cancelled item does not fire.
+        const activitySnap = await db
+          .collection("users")
+          .doc(jobUid)
+          .collection("flowpathActivities")
+          .doc(jobActivityId)
+          .get();
+        if (!activitySnap.exists) {
+          await jobDoc.ref.update({ status: "cancelled", lastError: "activity deleted", updatedAt: Timestamp.fromMillis(now) });
+          failed += 1;
+          continue;
+        }
+        const activity = activitySnap.data() || {};
+        if (activity.status === "completed" || activity.status === "cancelled") {
+          await jobDoc.ref.update({ status: "cancelled", lastError: `activity ${activity.status}`, updatedAt: Timestamp.fromMillis(now) });
+          failed += 1;
+          continue;
+        }
+        const payload = (jobData.payload && typeof jobData.payload === "object") ? jobData.payload as Record<string, unknown> : {};
+        const title = String(payload.title || activity.title || "Eduvora reminder");
+        const body = String(payload.body || activity.description || activity.title || "You have a new task.");
+        const url = String(payload.url || (activity.kind === "revision" || activity.kind === "mcq" ? `/#/revision?testId=${activity.testId || activity.id}` : `/#/my-day?section=${activity.kind === "task" ? "tasks" : activity.kind === "reminder" ? "reminders" : activity.kind === "schedule" ? "schedule" : "notes"}&item=${encodeURIComponent(activity.id)}`));
+        const tag = String(payload.tag || `flowpath-${activity.id}`);
+        // Bell entry + cross-device push. The activity status flips to
+        // "active" if it was "draft" so the user's own My Day / Revision
+        // page sees it as a live item.
+        try {
+          const bellRef = db.collection("users").doc(jobUid).collection("notifications").doc(`flowpath:${jobActivityId}`);
+          await bellRef.set({
+            id: `flowpath:${jobActivityId}`,
+            title,
+            body,
+            category: activity.kind === "revision" || activity.kind === "mcq" || activity.kind === "lecture" ? "course" : "mayday",
+            read: false,
+            source: "system",
+            createdAt: Timestamp.fromMillis(now),
+            target: {
+              type: activity.kind === "revision" || activity.kind === "mcq" || activity.kind === "lecture" ? "product" : "mayday",
+              section: activity.kind === "task" ? "tasks" : activity.kind === "reminder" ? "reminders" : activity.kind === "schedule" ? "schedule" : activity.kind === "note" ? "notes" : undefined,
+              itemId: jobActivityId,
+              productId: activity.kind === "revision" || activity.kind === "mcq"
+                ? String(activity.testId || jobActivityId)
+                : activity.kind === "lecture"
+                ? String(activity.lectureProductId || jobActivityId)
+                : undefined,
+            },
+          }, { merge: true });
+          const sent = await sendPush(db, jobUid, title, body, { tag, url });
+          pushed += sent;
+          // If the activity was a draft, flip to active now that it fired.
+          if (activity.status === "draft") {
+            await activitySnap.ref.update({ status: "active", updatedAt: Timestamp.fromMillis(now) });
+          }
+          // Mark job as fired (terminal state) so we never re-fire it.
+          await jobDoc.ref.update({ status: "fired", firedAt: Timestamp.fromMillis(now), attempts: attempts + 1, updatedAt: Timestamp.fromMillis(now) });
+          fired += 1;
+        } catch (err) {
+          await jobDoc.ref.update({ status: "pending", attempts: attempts + 1, lastError: err instanceof Error ? err.message : "unknown", updatedAt: Timestamp.fromMillis(now) });
+          failed += 1;
+        }
+      }
+      summary.flowPathJobs = { scanned: jobsSnap.size, fired, failed, pushed };
     }
 
     // ------------------------------------------------------- 3. content announces

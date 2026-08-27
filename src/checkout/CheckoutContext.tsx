@@ -463,7 +463,7 @@ export function CheckoutProvider({
           settled = true;
           resolve(user);
         };
-        const unsubscribe = auth.onAuthStateChanged((user) => {
+        const unsubscribe = auth.onAuthStateChanged((user: typeof auth.currentUser) => {
           unsubscribe();
           finish(user);
         });

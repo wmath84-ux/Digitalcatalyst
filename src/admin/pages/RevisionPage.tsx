@@ -2,12 +2,16 @@
 
 // Admin · Revision — AI Configuration only.
 //
-// Every other admin customization surface (settings, questions, subjects &
-// topics, classes, customization limits, AI question generator, bulk import)
-// has been removed on purpose: users now customize and generate their own
-// tests directly from their profile (AI test generator + bulk import).
-// The admin's single remaining job here is the AI configuration that is
-// published as the default for every learner.
+// The previous "Revision" admin page bundled two unrelated jobs into
+// one long form: configuring the school's AI provider (which every
+// student sees in their AI Configuration page) and editing the
+// Class → Subject → Chapter → Concept tree the AI question generator
+// reads from. The latter has moved to its own page
+// (`/admin/curriculum`) so neither job has to scroll past the other.
+//
+// Behaviour of the AI Configuration page is unchanged: the same
+// provider, key, model, "school-provided AI" status panel, usage
+// limits, model pricing and publish flow are all here, byte-for-byte.
 
 import { useEffect, useState } from "react";
 import {
@@ -18,12 +22,10 @@ import {
   inputClass,
   selectClass,
 } from "@/components/admin/ui";
-import { useConfirm, useToast } from "@/components/admin/AdminProviders";
+import { useConfirm, useToast, useRevisionCatalog } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
 import { type RevisionCatalog } from "@/revision/engine/catalogService";
 import AiConfigForm from "@/revision/components/AiConfigForm";
-import RevisionCurriculumSection from "@/admin/pages/RevisionCurriculumSection";
-import ManualCurriculumEditor from "@/admin/pages/ManualCurriculumEditor";
 import {
   defaultCatalogAiSettings,
   getProvider,
@@ -41,8 +43,10 @@ import {
 export default function RevisionPage() {
   const { notify } = useToast();
   const confirm = useConfirm();
-  const [catalog, setCatalog] = useState<RevisionCatalog | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // The catalog now lives in the AdminProviders context, loaded
+  // once when the admin shell mounts. Both this page and the
+  // Curriculum Builder consume the same instance.
+  const { catalog, error, reload, setCatalog } = useRevisionCatalog();
 
   // The admin's own AI connection — stored only in this browser.
   const [adminCfg, setAdminCfg] = useState<UserAiConfig>(() => loadAdminAiConfig());
@@ -63,38 +67,30 @@ export default function RevisionPage() {
   const [estimatedOutputTokensPerQuestion, setEstimatedOutputTokensPerQuestion] = useState(350);
   const [publishing, setPublishing] = useState(false);
 
-  const load = async () => {
-    setError(null);
-    try {
-      const res = await adminFetch<{ catalog: RevisionCatalog; isDefault: boolean }>("/api/admin/revision");
-      setCatalog(res.catalog);
-      const published = res.catalog.aiSettings ?? defaultCatalogAiSettings();
-      // The published default model must belong to the provider the admin is
-      // currently connected to. Otherwise the picker starts with a model from
-      // a different provider and publishing it would silently break every
-      // student's "School-provided AI" generation.
-      setPublishModel(
-        published.provider === adminCfg.config.provider && published.model
-          ? published.model
-          : (mergeModelLists(adminCfg.config.provider, [])[0]?.id ?? ""),
-      );
-      setPublishModelOverridden(false);
-      setShareKey(Boolean(published.sharedApiKey));
-      setDailyLimit(published.dailyLimit ?? 20);
-      setWindowHours(published.windowHours ?? 5);
-      setWindowLimit(published.windowLimit ?? 10);
-      setAllowancePolicy(published.allowancePolicy ?? "generation-only");
-      setModelPricing(published.modelPricing ?? []);
-      setEstimatedOutputTokensPerQuestion(published.estimatedOutputTokensPerQuestion ?? 350);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load revision AI configuration.");
-    }
-  };
-
+  // The form fields are seeded from the published catalog the first
+  // time it loads. After that they live in this page's local state
+  // so the admin can edit freely — only the "Publish" button pushes
+  // them back to the catalog.
   useEffect(() => {
-    load();
+    if (!catalog) return;
+    const published = catalog.aiSettings ?? defaultCatalogAiSettings();
+    setPublishModel(
+      published.provider === adminCfg.config.provider && published.model
+        ? published.model
+        : (mergeModelLists(adminCfg.config.provider, [])[0]?.id ?? ""),
+    );
+    setPublishModelOverridden(false);
+    setShareKey(Boolean(published.sharedApiKey));
+    setDailyLimit(published.dailyLimit ?? 20);
+    setWindowHours(published.windowHours ?? 5);
+    setWindowLimit(published.windowLimit ?? 10);
+    setAllowancePolicy(published.allowancePolicy ?? "generation-only");
+    setModelPricing(published.modelPricing ?? []);
+    setEstimatedOutputTokensPerQuestion(published.estimatedOutputTokensPerQuestion ?? 350);
+    // We deliberately depend on the catalog identity so the seed
+    // only runs once per published revision, not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [catalog?.aiSettings?.updatedAt]);
 
   const persistAdminCfg = (cfg: UserAiConfig) => {
     setAdminCfg(cfg);
@@ -103,9 +99,9 @@ export default function RevisionPage() {
 
   if (error) {
     return (
-      <SectionCard title="Revision · AI Configuration">
+      <SectionCard title="AI Configuration">
         <p className="text-sm text-red-500">{error}</p>
-        <PrimaryButton className="mt-3" onClick={load}>Retry</PrimaryButton>
+        <PrimaryButton className="mt-3" onClick={reload}>Retry</PrimaryButton>
       </SectionCard>
     );
   }
@@ -192,10 +188,10 @@ export default function RevisionPage() {
   };
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <SectionCard
         title="AI Configuration"
-        description="Publish the default AI students can use, and keep the Class → Subject → Chapter → Concept lists on the latest exam year."
+        description="Publish the default AI students can use. Curriculum editing lives on its own page — open Curriculum Builder from the side menu to edit classes, subjects, chapters and concepts."
       >
         <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs leading-relaxed text-indigo-700">
           ✨ Question generation, class/subject/chapter/topic selection and bulk import now live on the
@@ -478,16 +474,11 @@ export default function RevisionPage() {
         </p>
       </SectionCard>
 
-      <RevisionCurriculumSection
-        catalog={catalog}
-        adminConfig={adminCfg.config}
-        onCatalog={setCatalog}
-      />
-
-      <ManualCurriculumEditor
-        catalog={catalog}
-        onCatalog={setCatalog}
-      />
+      {/* Curriculum editor moved to its own page at
+          `/admin/curriculum` so the AI Configuration form does not
+          scroll past the curriculum tree on a phone. The two share
+          the same catalog via AdminProviders' `useRevisionCatalog`
+          context. */}
     </div>
   );
 }

@@ -69,7 +69,7 @@ export default function ProductsPage() {
   if (!products) return <LoadingState label="Loading products…" />;
 
   return (
-    <div className="space-y-3 pb-24">
+    <div className="space-y-3 pb-24 lg:space-y-4">
       <form onSubmit={onSearchSubmit} className="flex gap-2">
         <input
           className={inputClass + " flex-1"}
@@ -83,7 +83,7 @@ export default function ProductsPage() {
       </form>
 
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-500">{products.length} product(s)</p>
+        <p className="text-xs text-slate-500 lg:text-sm">{products.length} product(s)</p>
         <Link href="/admin/products/new">
           <PrimaryButton>+ Add product</PrimaryButton>
         </Link>
@@ -92,37 +92,37 @@ export default function ProductsPage() {
       {products.length === 0 ? (
         <EmptyState title="No products found" description="Try adjusting filters or add your first product." />
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
           {products.map((p) => (
             <Link key={p.id} href={`/admin/products/${p.id}`}>
               <RecordCard>
                 <div className="flex gap-3">
-                  <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                  <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100 lg:h-20 lg:w-20">
                     {p.images?.[0]?.url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={p.images[0].url} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-lg">🎓</div>
+                      <div className="flex h-full w-full items-center justify-center text-lg lg:text-2xl">🎓</div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-semibold text-slate-900">{p.title}</p>
+                      <p className="truncate text-sm font-semibold text-slate-900 lg:text-[15px]">{p.title}</p>
                     </div>
-                    <p className="text-[11px] text-slate-500">{p.id} · {p.category || "Uncategorized"}</p>
+                    <p className="text-[11px] text-slate-500 lg:text-xs">{p.id} · {p.category || "Uncategorized"}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <Pill tone={p.visibility === "visible" ? "success" : "default"}>{p.visibility}</Pill>
                       <Pill tone={p.availableForSale ? "success" : "warn"}>{p.availableForSale ? "on sale" : "unavailable"}</Pill>
                       {p.isFree && <Pill tone="info">free</Pill>}
                     </div>
-                    <div className="mt-1 flex items-center justify-between text-xs text-slate-600">
+                    <div className="mt-1 flex items-center justify-between text-xs text-slate-600 lg:text-[13px]">
                       <span>
                         ₹{effectivePrice(p).toLocaleString("en-IN")}
                         {p.salePrice && <span className="ml-1 text-slate-400 line-through">₹{Number(p.regularPrice).toLocaleString("en-IN")}</span>}
                       </span>
                       <span>⭐ {Number(p.rating ?? 0).toFixed(1)} ({p.reviewCount})</span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-slate-400">{p.modules?.length ?? 0} module(s)</p>
+                    <p className="mt-0.5 text-[11px] text-slate-400 lg:text-xs">{p.modules?.length ?? 0} module(s)</p>
                   </div>
                 </div>
               </RecordCard>

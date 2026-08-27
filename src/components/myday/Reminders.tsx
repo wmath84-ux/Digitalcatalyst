@@ -120,8 +120,18 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
                   <div
                     key={rem.id}
                     data-highlight={rem.id}
+                    onClick={() => openEdit(rem)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openEdit(rem);
+                      }
+                    }}
+                    aria-label={`Edit reminder: ${rem.text}`}
                     className={cn(
-                      "group flex items-center gap-3 rounded-xl border p-3 transition-all shadow-sm",
+                      "group flex items-center gap-3 rounded-xl border p-3 transition-all shadow-sm cursor-pointer hover:border-amber-300/70",
                       rem.id === highlightId && "ring-2 ring-amber-400 ring-offset-2 ring-offset-white",
                       status === "done"
                         ? "border-emerald-200 bg-white shadow-emerald-100/50"
@@ -134,7 +144,7 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
                   >
                     {/* Toggle */}
                     <button
-                      onClick={() => onToggle(rem.id)}
+                      onClick={(e) => { e.stopPropagation(); onToggle(rem.id); }}
                       className={cn(
                         "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
                         rem.done
@@ -165,16 +175,19 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
                     </div>
 
                     {/* Actions */}
-                    <div className="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                    >
                       <button
-                        onClick={() => openEdit(rem)}
+                        onClick={(e) => { e.stopPropagation(); openEdit(rem); }}
                         aria-label="Edit reminder"
                         className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-amber-600"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        onClick={() => onDelete(rem.id)}
+                        onClick={(e) => { e.stopPropagation(); onDelete(rem.id); }}
                         aria-label="Delete reminder"
                         className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-rose-600"
                       >

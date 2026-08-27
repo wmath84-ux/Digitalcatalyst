@@ -1,11 +1,19 @@
 // Admin can generate the latest-year Class → Subject → Chapter → Concept
 // tree with AI and one-click replace the lists students see on planning.
+//
+// The planner used to live in the same page as the AI Configuration
+// form. After the mobile-first split it moved to its own
+// `/admin/curriculum` page; the contract still holds — the AI
+// generation panel is reachable from the curriculum builder, the
+// engine helpers are unchanged, and the resulting tree is still
+// persisted on the shared revision catalog.
 
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const adminPage = fs.readFileSync("src/admin/pages/RevisionPage.tsx", "utf8");
+const curriculumPage = fs.readFileSync("src/admin/pages/CurriculumBuilderPage.tsx", "utf8");
 const section = fs.readFileSync("src/admin/pages/RevisionCurriculumSection.tsx", "utf8");
 const catalog = fs.readFileSync("src/revision/engine/catalogService.ts", "utf8");
 const engine = fs.readFileSync("src/revision/engine/curriculumCatalog.ts", "utf8");
@@ -14,8 +22,12 @@ const server = fs.readFileSync("api/_lib/revisionGenerate.ts", "utf8");
 const aiConfig = fs.readFileSync("src/revision/engine/aiConfig.ts", "utf8");
 const client = fs.readFileSync("src/lib/admin/client.ts", "utf8");
 
-test("admin revision page has a latest-year curriculum planner beside AI configuration", () => {
-  assert.match(adminPage, /RevisionCurriculumSection/);
+test("admin exposes a latest-year curriculum planner on its own page", () => {
+  // The AI Configuration page no longer renders the planner (the
+  // Curriculum Builder page does). The planner component is still
+  // the source of truth for the AI generation flow.
+  assert.doesNotMatch(adminPage, /<RevisionCurriculumSection/);
+  assert.match(curriculumPage, /RevisionCurriculumSection/);
   assert.match(section, /Latest-year curriculum/);
   assert.match(section, /Generate latest-year syllabus/);
   assert.match(section, /Replace live student lists/);

@@ -1,10 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Trash2 } from "lucide-react";
-import type { ActivityType } from "../../flowpath/types/flowpath";
+import { Trash2, BookOpen } from "lucide-react";
+import type { Activity, ActivityType } from "../../flowpath/types/flowpath";
 import { ACTIVITY_TYPE_META } from "../../flowpath/types/flowpath";
 import { useFlowPath } from "../../flowpath/hooks/useFlowPath";
+import { useFlowPathFirestore } from "../../flowpath/hooks/useFlowPathFirestore";
+import { useFlowPathSync } from "../../flowpath/hooks/useFlowPathSync";
 import { useTheme } from "../../flowpath/hooks/useTheme";
+import { LecturePicker, type LectureCourseOption, type LectureModuleOption } from "../../flowpath/components/LecturePicker";
+import { flowpathLectureCourses, flowpathLectureModules, flowpathBulk } from "../../flowpath/lib/flowpathControlClient";
+import { auth } from "../../../firebase";
+
+/** The signed-in user's uid, fetched synchronously. The auth
+ *  context is not imported here to keep FlowPathView's dep graph
+ *  flat; firebase/auth keeps the currentUser reference live. */
+const lecturePickerUid = (): string => {
+  try { return auth?.currentUser?.uid || ""; } catch { return ""; }
+};
 import {
   buildRows,
   buildSmoothPath,
@@ -31,14 +43,57 @@ import { ACTIVITY_ICONS } from "./icons";
 const SCROLL_BUFFER = 2000;
 const CHUNK_SIZE = 8;
 
-const ACTIVITY_RADIAL_ITEMS: RadialItem[] = (
-  Object.keys(ACTIVITY_TYPE_META) as ActivityType[]
-).map((t) => ({
-  id: t,
-  label: ACTIVITY_TYPE_META[t].label,
-  icon: ACTIVITY_ICONS[t],
-  color: ACTIVITY_TYPE_META[t].color,
-}));
+/** localStorage key for the persisted flow curve customisation. */
+const CURVE_OVERRIDE_STORAGE_KEY = "flowpath:curve-override";
+
+function loadCurveOverride(): CurveOverride {
+  if (typeof window === "undefined") return DEFAULT_CURVE_OVERRIDE;
+  try {
+    const raw = window.localStorage.getItem(CURVE_OVERRIDE_STORAGE_KEY);
+    if (!raw) return DEFAULT_CURVE_OVERRIDE;
+    const parsed = JSON.parse(raw) as Partial<CurveOverride> | null;
+    if (!parsed || typeof parsed !== "object") return DEFAULT_CURVE_OVERRIDE;
+    return {
+      amplitude:
+        typeof parsed.amplitude === "number" ? parsed.amplitude : DEFAULT_CURVE_OVERRIDE.amplitude,
+      frequency:
+        typeof parsed.frequency === "number" ? parsed.frequency : DEFAULT_CURVE_OVERRIDE.frequency,
+      spacing: typeof parsed.spacing === "number" ? parsed.spacing : DEFAULT_CURVE_OVERRIDE.spacing,
+    };
+  } catch {
+    return DEFAULT_CURVE_OVERRIDE;
+  }
+}
+
+function saveCurveOverride(value: CurveOverride) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(CURVE_OVERRIDE_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // localStorage may be unavailable (private mode, quota) — silently ignore,
+    // the in-memory state still reflects the user's last tweak for the session.
+  }
+}
+
+const ACTIVITY_RADIAL_ITEMS: RadialItem[] = (() => {
+  const items: RadialItem[] = (Object.keys(ACTIVITY_TYPE_META) as ActivityType[]).map((t) => ({
+    id: t,
+    label: ACTIVITY_TYPE_META[t].label,
+    icon: ACTIVITY_ICONS[t],
+    color: ACTIVITY_TYPE_META[t].color,
+  }));
+  // Append the "Lecture" entry that drives the 3-step picker
+  // (course + module + schedule). Same radial menu surface so
+  // the user can reach it from the same + button they use for
+  // every other kind.
+  items.push({
+    id: "lecture",
+    label: "Lecture",
+    icon: BookOpen,
+    color: "#22d3ee",
+  });
+  return items;
+})();
 
 interface PendingMenu {
   afterId: string | null;
@@ -91,11 +146,63 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
     currentId,
     createActivity,
     completeActivity,
+    uncompleteActivity,
+    updateActivity,
     deleteActivity,
     pulseToken,
     justCreatedId,
     clearJustCreated,
   } = useFlowPath();
+  const { items: firestoreItems } = useFlowPathFirestore();
+  // Mirror every local change to the server multiplexer so the item
+  // appears in the user's My Day / Revision pages + gets the FCM +
+  // Web Push + local alarm treatment. See useFlowPathSync for the
+  // offline replay queue.
+  useFlowPathSync(items);
+  // Merge Firestore activities (admin-created, server-created, or
+  // cross-device edits) into the local items so the 3D flow shows
+  // the full picture. Map the FlowPathActivity shape to the
+  // local Activity shape so the rest of the component is unchanged.
+  const mergedItems = useMemo(() => {
+    const seen = new Set(items.map((i) => i.activity.id));
+    const merged = [...items];
+    for (const fp of firestoreItems) {
+      if (seen.has(fp.id)) continue;
+      // Convert FlowPathActivity to local Activity. The minimum
+      // required fields are id, type, title, datetime, createdAt,
+      // order. Extra fields are stored on the union type.
+      const datetime = fp.scheduledFor ? new Date(fp.scheduledFor).toISOString() : new Date(fp.createdAt || Date.now()).toISOString();
+      const localActivity: Activity = {
+        id: fp.id,
+        type: fp.kind,
+        title: fp.title,
+        description: fp.description,
+        datetime,
+        timeLabel: "",
+        createdAt: fp.createdAt || Date.now(),
+        order: merged.length + 1,
+        ...(fp.taskPriority ? { priority: fp.taskPriority } : {}),
+        ...(fp.taskStatus ? { status: fp.taskStatus } : {}),
+        ...(fp.taskSubject ? { subject: fp.taskSubject } : {}),
+        ...(fp.reminderTime ? { time: fp.reminderTime } : {}),
+        ...(fp.scheduleStartTime ? { startTime: fp.scheduleStartTime } : {}),
+        ...(fp.scheduleEndTime ? { endTime: fp.scheduleEndTime } : {}),
+        ...(fp.scheduleType ? { type: fp.scheduleType } : {}),
+        ...(fp.noteColor ? { color: fp.noteColor } : {}),
+        ...(fp.testConfig ? {
+          totalQuestions: fp.testConfig.totalQuestions,
+          difficulty: fp.testConfig.difficulty,
+          questionMode: fp.testConfig.questionMode,
+          estimatedMinutes: fp.testConfig.estimatedMinutes,
+        } : {}),
+        ...(fp.testId ? { testId: fp.testId } : {}),
+        ...(fp.completedAt ? { completedAt: fp.completedAt } : {}),
+        ...(fp.progress !== undefined ? { progress: fp.progress } : {}),
+      } as unknown as Activity;
+      merged.push({ activity: localActivity, status: fp.status === "completed" ? "completed" : "current" });
+    }
+    return merged;
+  }, [items, firestoreItems]);
   const { mode: themeMode, resolved: resolvedTheme, toggle: toggleTheme } = useTheme();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -109,12 +216,23 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
   const [pulseSegment, setPulseSegment] = useState<{ key: number; d: string } | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [curveOpen, setCurveOpen] = useState(false);
-  const [curve, setCurve] = useState<CurveOverride>(DEFAULT_CURVE_OVERRIDE);
+  const [curve, setCurve] = useState<CurveOverride>(loadCurveOverride);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
+  const [lecturePickerOpen, setLecturePickerOpen] = useState<boolean>(false);
+  const [lectureSubmitting, setLectureSubmitting] = useState<boolean>(false);
+
+  // Mirror every curve change to localStorage so the user's customisation
+  // survives reloads and revisits. We persist on every change rather than
+  // only on modal close so background saves (rare browser crashes, etc.)
+  // don't drop the user's tweaks.
+  useEffect(() => {
+    saveCurveOverride(curve);
+  }, [curve]);
 
   const hasAutoScrolled = useRef(false);
-  const isEmpty = items.length === 0;
+  const isEmpty = mergedItems.length === 0;
 
   // measure container width responsively
   useEffect(() => {
@@ -131,7 +249,7 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
   }, []);
 
   const config = useMemo(() => getLayoutConfig(width, curve), [width, curve]);
-  const { rows, totalHeight } = useMemo(() => buildRows(items, config), [items, config]);
+  const { rows, totalHeight } = useMemo(() => buildRows(mergedItems, config), [mergedItems, config]);
 
   const chunks = useMemo(() => chunkRows(rows, CHUNK_SIZE), [rows]);
 
@@ -273,6 +391,13 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
     (id: string) => {
       const afterId = menu?.afterId ?? null;
       setMenu(null);
+      // Lecture: open the 3-step picker instead of the regular
+      // CreateModal. The picker drives a separate flow that picks
+      // the course + module + schedule, then submits a bulk create.
+      if (id === "lecture") {
+        setLecturePickerOpen(true);
+        return;
+      }
       setCreateType({ type: id as ActivityType, afterId });
     },
     [menu]
@@ -280,6 +405,19 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
 
   const handleCreate = useCallback(
     (data: { title: string; description?: string; datetime: string; extra?: Record<string, unknown> }) => {
+      // If we are editing an existing activity, route the modal submit through
+      // the update path so the same form can both create and edit.
+      if (editingActivity) {
+        updateActivity(editingActivity.id, {
+          title: data.title,
+          description: data.description,
+          datetime: data.datetime,
+          extra: data.extra,
+        });
+        setEditingActivity(null);
+        setCreateType(null);
+        return;
+      }
       if (!createType) return;
       createActivity({
         type: createType.type,
@@ -291,8 +429,25 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
       });
       setCreateType(null);
     },
-    [createType, createActivity]
+    [createType, createActivity, editingActivity, updateActivity]
   );
+
+  const handleEditActivity = useCallback((activity: Activity) => {
+    setEditingActivity(activity);
+    setCreateType({ type: activity.type, afterId: null });
+  }, []);
+
+  const handleUncompleteActivity = useCallback(
+    (id: string) => {
+      uncompleteActivity(id);
+    },
+    [uncompleteActivity]
+  );
+
+  const closeCreateModal = useCallback(() => {
+    setCreateType(null);
+    setEditingActivity(null);
+  }, []);
 
   const handleComplete = useCallback(
     (id: string) => {
@@ -365,6 +520,8 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
               config={config}
               width={width}
               onComplete={() => handleComplete(row.activity!.activity.id)}
+              onEdit={() => handleEditActivity(row.activity!.activity)}
+              onUncomplete={() => handleUncompleteActivity(row.activity!.activity.id)}
               completing={completingIds.has(row.activity!.activity.id)}
               highlighted={highlightId === row.id}
               armed={armedDeleteId === row.id}
@@ -393,8 +550,38 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
 
       <CreateModal
         type={createType?.type ?? null}
-        onClose={() => setCreateType(null)}
+        onClose={closeCreateModal}
         onCreate={handleCreate}
+        editing={editingActivity}
+      />
+
+      <LecturePicker
+        open={lecturePickerOpen}
+        onClose={() => setLecturePickerOpen(false)}
+        fetchCourses={async (q: string) => {
+          const res = await flowpathLectureCourses(lecturePickerUid(), q);
+          if (!res.ok) return [];
+          return ((res as { courses?: LectureCourseOption[] }).courses || []) as LectureCourseOption[];
+        }}
+        fetchModules={async (productId: string) => {
+          const res = await flowpathLectureModules(productId);
+          if (!res.ok) return [];
+          return ((res as { modules?: LectureModuleOption[] }).modules || []) as LectureModuleOption[];
+        }}
+        submitting={lectureSubmitting}
+        onSubmit={async (lectures) => {
+          setLectureSubmitting(true);
+          try {
+            const res = await flowpathBulk(lecturePickerUid(), lectures as Array<Record<string, unknown>>);
+            if (res.ok) {
+              setToast({ msg: `Scheduled ${lectures.length} lecture${lectures.length === 1 ? "" : "s"}`, key: Date.now() });
+              return { ok: true };
+            }
+            return { ok: false, error: res.error || "Failed." };
+          } finally {
+            setLectureSubmitting(false);
+          }
+        }}
       />
 
       <CurveSettingsModal
@@ -405,7 +592,14 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
       />
 
       <BottomDock
-        onCreateType={(type) => setCreateType({ type, afterId: currentId })}
+        onCreateType={(type) => {
+          if (type === ("lecture" as unknown as ActivityType)) {
+            setLecturePickerOpen(true);
+            return;
+          }
+          setCreateType({ type, afterId: currentId });
+        }}
+        onPlanLectures={() => setLecturePickerOpen(true)}
         onStub={(group, label) => setToast({ msg: `${group} · ${label}`, key: Date.now() })}
         onNavigateToHome={onNavigateToHome}
       />
@@ -460,6 +654,8 @@ function ActivityRowItem({
   config,
   width,
   onComplete,
+  onEdit,
+  onUncomplete,
   completing,
   highlighted,
   armed,
@@ -470,6 +666,8 @@ function ActivityRowItem({
   config: LayoutConfig;
   width: number;
   onComplete: () => void;
+  onEdit: () => void;
+  onUncomplete: () => void;
   completing: boolean;
   highlighted: boolean;
   armed: boolean;
@@ -549,6 +747,8 @@ function ActivityRowItem({
           status={status}
           side={row.side}
           onComplete={onComplete}
+          onEdit={onEdit}
+          onUncomplete={onUncomplete}
           completing={completing}
         />
       </div>

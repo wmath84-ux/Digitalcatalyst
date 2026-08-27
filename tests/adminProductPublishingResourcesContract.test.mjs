@@ -9,6 +9,7 @@ import {
 } from "../utils/productMapping.js";
 
 const editor = fs.readFileSync("src/components/admin/products/ProductEditor.tsx", "utf8");
+const modulesEditor = fs.readFileSync("src/components/admin/products/ModulesResourcesEditor.tsx", "utf8");
 const client = fs.readFileSync("src/lib/admin/client.ts", "utf8");
 const catalog = fs.readFileSync("src/context/CatalogContext.tsx", "utf8");
 
@@ -33,13 +34,17 @@ test("module customization keeps each module and its resource URL controls toget
   assert.doesNotMatch(editor, /\{ key: "resources", label: "Resources" \}/);
   assert.match(editor, /\{ key: "modules", label: "Modules & Resources" \}/);
   assert.doesNotMatch(editor, /function ResourcesEditor/);
-  assert.match(editor, /Modules and their resources/);
-  assert.match(editor, /Resources & URLs/);
-  assert.match(editor, /Resource URL \/ YouTube ID \/ iframe code/);
-  assert.match(editor, /\+ Add resource/);
-  assert.match(editor, /moveResourceToModule/);
-  assert.match(editor, /Delete resource/);
-  assert.match(editor, /normalizeResourceUrl\(resource\.url, resource\.type\)/);
+  // After the mobile-first redesign the editor lives in its own
+  // component; the drill-down pill rail, the URL / type / image
+  // fields, the Cloudinary upload, the move-between-modules and
+  // the per-resource delete all moved with it.
+  assert.match(modulesEditor, /Modules and resources/);
+  assert.match(modulesEditor, /Resource URL \/ YouTube ID \/ iframe code/);
+  assert.match(modulesEditor, /Delete resource/);
+  assert.match(modulesEditor, /moveResourceToModule/);
+  assert.match(modulesEditor, /normalizeResourceUrl\(resource\.url, resource\.type\)/);
+  // The new page must still mount the editor.
+  assert.match(editor, /ModulesResourcesEditor/);
 });
 
 test("module image resources reuse the product Cloudinary upload plus a custom URL field", () => {
@@ -47,13 +52,15 @@ test("module image resources reuse the product Cloudinary upload plus a custom U
   assert.match(uploadField, /uploadImageToCloudinary/);
   assert.match(uploadField, /Choose image to upload/);
   assert.match(uploadField, /isCloudinaryImageUploadConfigured/);
+  // The image-resource UX moved to the new modules editor.
+  // The product image uploader is still wired up here.
   assert.match(editor, /CloudinaryImageUploadField/);
   assert.match(editor, /folder="product-images"/);
-  assert.match(editor, /folder="module-images"/);
-  assert.match(editor, /resource\.type === "image_url"/);
-  assert.match(editor, /Your image \/ embed URL/);
-  assert.match(editor, /Image \(URL or Cloudinary\)/);
-  assert.match(editor, /Paste your own public or embed URL, or upload directly to Cloudinary/);
+  assert.match(modulesEditor, /folder="module-images"/);
+  assert.match(modulesEditor, /resource\.type === "image_url"/);
+  assert.match(modulesEditor, /Your image \/ embed URL/);
+  assert.match(modulesEditor, /Image \(URL or Cloudinary\)/);
+  assert.match(modulesEditor, /Paste your own public or embed URL, or upload directly to Cloudinary/);
 });
 
 test("iframe snippets and pasted YouTube links become player-safe URLs", () => {

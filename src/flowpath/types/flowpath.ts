@@ -74,6 +74,84 @@ export interface ActivityWithStatus {
   status: ActivityStatus;
 }
 
+/* ------------------------------------------------------------------ */
+/*  FlowPath activity = the master shape the dashboard reads.       */
+/*  Mirrors api/_lib/flowpathControl.ts so the client and server     */
+/*  always agree on the field names. Activities written by the user   */
+/*  on the My Day or Revision pages are mirrored into this collection */
+/*  by the server multiplexer, so the dashboard sees the full        */
+/*  picture regardless of which surface created the item.             */
+/* ------------------------------------------------------------------ */
+
+export type FlowPathActivityKind = ActivityType | "lecture";
+export type FlowPathActivityStatus = "draft" | "active" | "completed" | "cancelled" | "overdue";
+export type FlowPathRecurrence = {
+  freq: "daily" | "weekly" | "monthly";
+  byDay?: number[];
+  until?: number;
+};
+
+export interface FlowPathActivity {
+  id: string;
+  uid: string;
+  kind: FlowPathActivityKind;
+  title: string;
+  description?: string;
+  /** epoch ms in UTC. null = "no scheduled time, just visible". */
+  scheduledFor: number | null;
+  recurrence?: FlowPathRecurrence;
+  durationMinutes?: number;
+  status: FlowPathActivityStatus;
+  progress?: number;
+  completedAt?: number;
+  // My Day fields
+  taskPriority?: "low" | "medium" | "high";
+  taskSubject?: string;
+  taskStatus?: "pending" | "in-progress" | "completed";
+  scheduleStartTime?: string;
+  scheduleEndTime?: string;
+  scheduleType?: "class" | "study" | "break" | "personal" | "exam";
+  noteColor?: "amber" | "sky" | "rose" | "emerald" | "violet";
+  reminderTime?: string;
+  // Revision fields
+  testConfig?: {
+    classIds?: number[];
+    subjectIds?: number[];
+    topicIds?: number[];
+    chapterIds?: number[];
+    totalQuestions: number;
+    difficulty: "easy" | "medium" | "hard" | "mixed";
+    questionMode: "theory" | "application" | "mixed";
+    estimatedMinutes: number;
+  };
+  testId?: number;
+  // Lecture fields (when kind is "lecture" — schedule a course / module reading slot)
+  lectureProductId?: string;
+  lectureProductTitle?: string;
+  lectureModuleId?: string | null;
+  lectureModuleTitle?: string | null;
+  lectureEstimatedMinutes?: number;
+  lecturePreviewOnly?: boolean; // true when the user does not own the course
+  lectureProgress?: number; // 0-100, last reported by the course player
+  // Provenance
+  source: "user" | "admin" | "ai";
+  createdBy: string;
+  createdAt: number;
+  updatedAt: number;
+  batchId?: string;
+  batchIndex?: number;
+  // Delivery stats from the most recent dispatch (filled by the
+  // server so the audit feed can show "FCM: 1 / Web: 1" alongside
+  // the entry).
+  lastDelivery?: {
+    fcm?: number;
+    web?: number;
+    localAlarm?: boolean;
+    immediate?: boolean;
+  };
+  scheduledJobId?: string | null;
+}
+
 export const ACTIVITY_TYPE_META: Record<
   ActivityType,
   { label: string; color: string; glow: string }
@@ -85,4 +163,12 @@ export const ACTIVITY_TYPE_META: Record<
   revision: { label: "Revision", color: "#60a5fa", glow: "rgba(96,165,250,0.5)" },
   mcq: { label: "MCQ", color: "#34d399", glow: "rgba(52,211,153,0.5)" },
   other: { label: "Other", color: "#fb7185", glow: "rgba(251,113,133,0.5)" },
+};
+
+export const FLOW_PATH_KIND_META: Record<
+  FlowPathActivityKind,
+  { label: string; color: string; glow: string }
+> = {
+  ...ACTIVITY_TYPE_META,
+  lecture: { label: "Lecture", color: "#22d3ee", glow: "rgba(34,211,238,0.55)" },
 };

@@ -47,8 +47,11 @@ test("pre-JavaScript and React loading screens use the exact PWA icon", () => {
   // the icon the loaders use is genuinely declared at that size.
   const icons192 = manifest.icons.filter((icon) => icon.sizes === "192x192").map((icon) => icon.src);
   assert.ok(icons192.includes("/icons/icon-192x192.svg"), `192x192 SVG missing from manifest: ${icons192.join(", ")}`);
+  // Pre-JS boot screen uses the literal SVG path; the React splash uses
+  // the live branding logo URL from BrandingContext.
   assert.match(html, /src="\/icons\/icon-192x192\.svg"/);
-  assert.match(main, /src="\/icons\/icon-192x192\.svg"/);
+  assert.match(main, /logoUrl/);
+  assert.match(main, /className="app-boot-icon"/);
 });
 
 test("launch screen has transition, reduced-motion support and progress bar", () => {

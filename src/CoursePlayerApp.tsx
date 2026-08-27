@@ -212,7 +212,14 @@ const loadLocalNotes = (uid: string, productId: string): CoursePlayerNote[] => {
     const raw = localStorage.getItem(notesStorageKey(uid, productId));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    // Migrate older notes that pre-date the `links` field. We materialise
+    // an empty array on read so the rest of the code can rely on
+    // `note.links` always being an array.
+    return parsed.map((note: any) => ({
+      ...note,
+      links: Array.isArray(note?.links) ? note.links.filter((id: unknown) => typeof id === "string") : [],
+    }));
   } catch {
     return [];
   }
@@ -326,7 +333,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // lives on the strip when the strip is visible, and migrates to the main
   // header row when the strip is hidden — so the learner is never stuck
   // without a way to bring the controls back.
-  const [secondaryStripHidden, setSecondaryStripHidden] = useState(false);
+  //
+  // Defaulted to TRUE: the secondary strip is HIDDEN on first open so the
+  // lesson gets the extra vertical real estate immediately, and the toggle
+  // button lives on the main header row (where it is still one tap away).
+  // Tapping the toggle shows the strip; tapping it again hides it. This is
+  // what the latest UX feedback asked for — the strip used to be on by
+  // default and the user wanted the lesson to start with a clean header.
+  const [secondaryStripHidden, setSecondaryStripHidden] = useState(true);
   // Desktop request mode for embedded documents — a Google Doc / Sheet /
   // Slides deck rendered at desktop width is unreadable on a phone, so the
   // learner can flip the same embed to its mobile rendering.
@@ -603,10 +617,51 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   const deleteNote = (id: string) => {
     if (!user) return;
-    const next = notes.filter((note) => note.id !== id);
+    // Deleting a note must also drop any incoming wires from other notes,
+    // so the wire layer in `NotesPanel` never tries to draw a line to a
+    // card that no longer exists. The outbound side is gone with the note
+    // itself; the inbound side is pruned in this pass.
+    const next = notes
+      .filter((note) => note.id !== id)
+      .map((note) => note.links && note.links.includes(id)
+        ? { ...note, links: note.links.filter((linkId) => linkId !== id) }
+        : note);
     setNotes(next);
     persistLocalNotes(user.id, product.id, next);
     playSfxRemove();
+  };
+
+  /**
+   * Symmetric link update. The panel reports the new `links` list of one
+   * note (e.g. "wire A to B, drop wire to C"). We:
+   *   1. Write the new list into the source note.
+   *   2. Add the source's id to the `links` list of every newly-linked
+   *      target so the wire shows up in both directions.
+   *   3. Remove the source's id from the `links` list of every previously-
+   *      linked target that the new list drops.
+   * The wires are symmetric on purpose — that way the picker on either
+   * side shows the same "linked" state, and the wire layer can draw a
+   * single line for each pair instead of two.
+   */
+  const linkNote = (sourceId: string, nextLinks: string[]) => {
+    if (!user) return;
+    const allowed = new Set(notes.map((note) => note.id));
+    allowed.delete(sourceId);
+    const cleanNext = Array.from(new Set(nextLinks.filter((id) => allowed.has(id))));
+    const before = new Set((notes.find((note) => note.id === sourceId)?.links) || []);
+    const after = new Set(cleanNext);
+    const added = [...after].filter((id) => !before.has(id));
+    const removed = [...before].filter((id) => !after.has(id));
+    const next = notes.map((note) => {
+      if (note.id === sourceId) return { ...note, links: cleanNext };
+      const current = new Set(note.links || []);
+      let changed = false;
+      if (added.includes(note.id) && !current.has(sourceId)) { current.add(sourceId); changed = true; }
+      if (removed.includes(note.id) && current.has(sourceId)) { current.delete(sourceId); changed = true; }
+      return changed ? { ...note, links: [...current] } : note;
+    });
+    setNotes(next);
+    persistLocalNotes(user.id, product.id, next);
   };
 
   const selectFile = (file: CourseFile) => {
@@ -994,6 +1049,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onAddNote={(text) => saveNote(text)}
       onEditNote={(id, text) => editNote(id, text)}
       onDeleteNote={(id) => deleteNote(id)}
+      onLinkNote={(id, links) => linkNote(id, links)}
       onSplitModeChange={handleSplitModeChange}
       // The mind map editor is owned here (not inside the overlay) so its
       // Firestore hook and canvas state survive the sheet being closed and

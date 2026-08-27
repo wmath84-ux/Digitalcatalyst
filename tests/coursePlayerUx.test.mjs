@@ -200,10 +200,12 @@ test("The single + button lives in the overlay's main header, not the panel", ()
 test("The overlay hides its main header + grab handle while the writing box is open", () => {
   // Writing mode = notes tab + editor open. In that mode the sheet keeps no
   // chrome at all: toolbar / writing surface / Save + Cancel only, so the
-  // box gets maximum space in both portrait and landscape.
+  // box gets maximum space in both portrait and landscape. The mind map tab
+  // also hides the header (per the user's "header hata do" request) so the
+  // diagram canvas is flush against the top of the sheet.
   assert.match(overlay, /const notesWriting = tab === "notes" && notesEditorOpen;/);
   assert.match(overlay, /\{!landscape && !notesWriting \? \(/);
-  assert.match(overlay, /\{notesWriting \? null : \(/);
+  assert.match(overlay, /\{notesWriting \|\| tab === "mindmap" \? null : \(/);
 });
 
 test("CourseOverlay wires NotesPanel into the notes tab", () => {
@@ -401,11 +403,17 @@ test("Custom AudioPlayer replaces the native audio element with a transport", ()
 });
 
 test("CoursePlayer header uses the website logo in the back slot and keeps onBack", () => {
+  // The logo comes from BrandingContext (logoUrl) so admin can swap it
+  // without a redeploy — the hardcoded `/icons/icon-192x192.svg` is the
+  // pre-JS boot-screen fallback only. The onClick is wrapped in a
+  // long-press-aware handler (the logo doubles as the Home opener when
+  // held), so a regex for the raw `onBack` doesn't match — assert the
+  // call inside the handler instead.
   assert.match(coursePlayer, /data-course-back/);
   assert.match(coursePlayer, /data-course-logo-back/);
   assert.match(coursePlayer, /data-course-logo/);
-  assert.match(coursePlayer, /src="\/icons\/icon-192x192\.svg"/);
-  assert.match(coursePlayer, /onClick=\{onBack\}/);
+  assert.match(coursePlayer, /src=\{logoUrl\}/);
+  assert.match(coursePlayer, /onClick=\{\(\) => \{[\s\S]*onBack\(\)/);
   assert.doesNotMatch(coursePlayer, /<ArrowLeft/);
 });
 

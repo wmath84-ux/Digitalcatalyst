@@ -45,7 +45,7 @@ export default function OrderDetailPage({ id }: { id: string }) {
   if (!order) return <LoadingState label="Loading order…" />;
 
   return (
-    <div className="space-y-3 pb-6">
+    <div className="space-y-3 pb-6 lg:space-y-4">
       <SectionCard title={`Order ${order.id}`} action={<Pill tone={order.paymentStatus === "failed" ? "danger" : "success"}>{order.paymentStatus}</Pill>}>
         <KeyValue label="Customer" value={order.customerName || order.customerEmail || "—"} />
         <KeyValue label="Firebase / customer UID" value={order.customerId} />

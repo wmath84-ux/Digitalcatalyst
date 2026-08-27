@@ -31,7 +31,7 @@ export default function CartPage({ cartProducts, onRemove, onClearAll, onCheckou
   return (
     <div className="flex h-full flex-col">
       <PageHeader title="My Cart" subtitle={`${cartProducts.length} item${cartProducts.length > 1 ? "s" : ""}`} right={<button onClick={onClearAll} className="flex items-center gap-1 rounded-full border border-white/70 bg-rose-50/80 px-3 py-1.5 text-[11px] font-bold text-rose-500 shadow-sm backdrop-blur"><Trash2 size={12} /> Clear</button>} />
-      <div className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
+      <div data-cart-row className="flex-1 overflow-y-auto px-4 pb-4 pt-3">
         <div className="flex flex-col gap-2.5">{cartProducts.map((product) => <CartItemCard key={product.id} product={product} onRemove={onRemove} onOpen={onOpenProduct} />)}</div>
         <div className="dc-glass mt-4 rounded-[1.6rem] p-4 shadow-[0_18px_42px_-24px_rgba(79,70,229,0.42)]">
           <div className="flex items-center gap-2 pb-3"><ShieldCheck size={16} className="text-indigo-500" /><h3 className="text-sm font-bold text-slate-900">Server-verified price</h3></div>

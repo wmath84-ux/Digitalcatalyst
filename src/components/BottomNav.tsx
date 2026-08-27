@@ -9,7 +9,7 @@ type BottomNavProps = {
   storeBadge?: number;
   purchasesBadge?: number;
   /**
-   * Action fired after a 3-second hold on the Home button. Enabled on every
+   * Action fired after a 1-second hold on the Home button. Enabled on every
    * screen that renders this footer — defaults to opening the FlowPath
    * (task-planning) dashboard, but a caller may override it.
    */
@@ -25,12 +25,13 @@ const TABS: { key: TabKey; label: string; icon: typeof HomeIcon }[] = [
   { key: "revision", label: "Revision", icon: SparkBookIcon },
 ];
 
-const HOLD_DURATION = 3000; // 3 seconds
+const HOLD_DURATION = 1000; // 1 second — shortened from 3s so the Home
+// long-press is quicker to trigger on the main app footer.
 const RING_R = 18;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_R;
 
 // "Task planning" = the FlowPath dashboard. The Home button's long-press is
-// enabled on every screen that renders this footer, so a 3-second hold is
+// enabled on every screen that renders this footer, so a 1-second hold is
 // always a shortcut to FlowPath — not just on the home page.
 const DEFAULT_LONG_PRESS_HOME = () => {
   window.location.hash = "#/flowpath";
@@ -44,7 +45,7 @@ const DEFAULT_LONG_PRESS_HOME = () => {
  * .dc-footer-glow in src/index.css). Icons and labels are crisp black;
  * the active tab keeps its blue accent exactly as it was.
  *
- * The Home button supports a 3-second long-press to open FlowPath:
+ * The Home button supports a 1-second long-press to open FlowPath:
  *  - A circular SVG ring animates around the button during the hold
  *  - On completing the hold, a liquid expand effect fills the screen
  *  - Then navigates to the FlowPath dashboard
@@ -108,10 +109,10 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
       )}
 
       <nav
-        className="pointer-events-none sticky bottom-0 z-30 w-full px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-1"
+        className="pointer-events-none sticky bottom-0 z-30 w-full px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-1 md:px-6"
         aria-label="Primary"
       >
-        <div className="dc-footer-shell pointer-events-auto">
+        <div className="dc-footer-shell pointer-events-auto md:mx-auto md:max-w-[720px]">
           <div className="dc-footer-glow" aria-hidden="true" />
           <div
             data-site-footer

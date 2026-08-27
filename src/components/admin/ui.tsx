@@ -4,28 +4,28 @@ import { type ReactNode, useEffect } from "react";
 
 export function StatCard({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: string; tone?: "warn" | "danger" | "ok" }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
+    <div className="rounded-xl border border-slate-200 bg-white p-3 md:p-4 lg:p-5">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 md:text-xs">{label}</p>
       <p
-        className={`mt-1 text-xl font-semibold ${
+        className={`mt-1 text-xl font-semibold md:text-2xl lg:text-[28px] lg:leading-tight ${
           tone === "danger" ? "text-red-600" : tone === "warn" ? "text-amber-600" : tone === "ok" ? "text-emerald-600" : "text-slate-900"
         }`}
       >
         {value}
       </p>
-      {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
+      {sub && <p className="mt-0.5 text-xs text-slate-500 md:text-[13px]">{sub}</p>}
     </div>
   );
 }
 
-export function SectionCard({ title, action, children, description }: { title?: string; action?: ReactNode; children: ReactNode; description?: string }) {
+export function SectionCard({ title, action, children, description, className = "" }: { title?: string; action?: ReactNode; children: ReactNode; description?: string; className?: string }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4">
+    <section className={`rounded-xl border border-slate-200 bg-white p-4 md:p-5 lg:p-6 lg:shadow-sm ${className}`}>
       {(title || action) && (
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="mb-3 flex items-center justify-between gap-2 lg:mb-4">
           <div>
-            {title && <h2 className="text-sm font-semibold text-slate-900">{title}</h2>}
-            {description && <p className="mt-0.5 text-xs text-slate-500">{description}</p>}
+            {title && <h2 className="text-sm font-semibold text-slate-900 md:text-base lg:text-[17px]">{title}</h2>}
+            {description && <p className="mt-0.5 text-xs text-slate-500 md:text-sm">{description}</p>}
           </div>
           {action}
         </div>
@@ -92,9 +92,9 @@ export function Field({ label, hint, children, required }: { label: string; hint
 }
 
 export const inputClass =
-  "h-11 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-900 outline-none focus:border-slate-500";
+  "h-11 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-900 outline-none transition lg:h-10 focus:border-slate-500";
 export const textareaClass =
-  "w-full min-h-[90px] rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500";
+  "w-full min-h-[90px] rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500";
 export const selectClass = inputClass + " bg-white";
 
 export function PrimaryButton({
@@ -223,7 +223,7 @@ export function RecordCard({ children, onClick }: { children: ReactNode; onClick
   return (
     <Comp
       onClick={onClick}
-      className={`block w-full rounded-xl border border-slate-200 bg-white p-3 text-left ${onClick ? "active:bg-slate-50" : ""}`}
+      className={`block w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition lg:p-4 ${onClick ? "active:bg-slate-50 lg:hover:border-indigo-200 lg:hover:shadow-sm" : ""}`}
     >
       {children}
     </Comp>

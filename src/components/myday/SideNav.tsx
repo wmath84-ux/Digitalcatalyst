@@ -22,7 +22,7 @@ export default function SideNav({ active, onNavigate }: SideNavProps) {
   const { logoUrl, appName } = useBranding();
   const custom = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
   return (
-    <aside className="dc-glass sticky top-[65px] hidden h-fit w-60 shrink-0 flex-col gap-1 rounded-3xl p-4 shadow-[0_20px_48px_-28px_rgba(79,70,229,0.4)] lg:flex xl:w-64">
+    <aside className="dc-glass sticky top-[65px] hidden h-fit w-60 shrink-0 flex-col gap-1 rounded-3xl p-4 shadow-[0_20px_48px_-28px_rgba(79,70,229,0.4)] md:flex md:w-56 md:p-3 lg:w-60 xl:w-64">
       <div className="mb-5 flex items-center gap-2.5 px-1">
         <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200">
           {custom ? <BrandMark className="h-10 w-10" /> : <LayoutGrid className="h-5 w-5" />}

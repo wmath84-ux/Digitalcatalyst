@@ -10,6 +10,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { type RevisionCatalog } from "@/revision/engine/catalogService";
+import { adminFetch } from "@/lib/admin/client";
 
 /* ------------------------------------------------------------------ */
 /* Toast feedback                                                      */
@@ -81,6 +83,31 @@ export function useConnectionStatus() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Revision catalog (shared by AI Configuration + Curriculum Builder)  */
+/* ------------------------------------------------------------------ */
+// The two admin pages read the same Firestore-backed revision
+// catalog. Loading it once in a provider saves a round-trip when
+// the admin navigates between them, and keeps both pages in sync
+// when either one publishes an update.
+
+type CatalogContextValue = {
+  catalog: RevisionCatalog | null;
+  error: string | null;
+  loading: boolean;
+  reload: () => Promise<void>;
+  /** Replace the in-memory catalog after a successful publish. */
+  setCatalog: (next: RevisionCatalog) => void;
+};
+
+const CatalogContext = createContext<CatalogContextValue | null>(null);
+
+export function useRevisionCatalog() {
+  const ctx = useContext(CatalogContext);
+  if (!ctx) throw new Error("useRevisionCatalog must be used within AdminProviders");
+  return ctx;
+}
+
+/* ------------------------------------------------------------------ */
 /* Provider                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -89,6 +116,9 @@ export function AdminProviders({ children }: { children: ReactNode }) {
   const idRef = useRef(0);
   const [dirty, setDirty] = useState(false);
   const [online, setOnline] = useState(true);
+  const [catalog, setCatalogState] = useState<RevisionCatalog | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState<boolean>(true);
 
   const [confirmState, setConfirmState] = useState<
     (ConfirmOptions & { resolve: (v: { confirmed: boolean; reason?: string }) => void }) | null
@@ -130,6 +160,42 @@ export function AdminProviders({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
 
+  // Load the revision catalog once when the admin shell mounts.
+  // Both pages (AI Configuration + Curriculum Builder) consume it
+  // via `useRevisionCatalog`. The initial fetch mirrors what
+  // `RevisionPage` used to do on its own.
+  const loadCatalog = useCallback(async () => {
+    setCatalogLoading(true);
+    setCatalogError(null);
+    try {
+      const res = await adminFetch<{ catalog: RevisionCatalog; isDefault: boolean }>("/api/admin/revision");
+      setCatalogState(res.catalog);
+    } catch (err) {
+      setCatalogError(err instanceof Error ? err.message : "Failed to load revision catalog.");
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCatalog();
+  }, [loadCatalog]);
+
+  const setCatalog = useCallback((next: RevisionCatalog) => {
+    setCatalogState(next);
+  }, []);
+
+  const catalogValue = useMemo<CatalogContextValue>(
+    () => ({
+      catalog,
+      error: catalogError,
+      loading: catalogLoading,
+      reload: loadCatalog,
+      setCatalog,
+    }),
+    [catalog, catalogError, catalogLoading, loadCatalog, setCatalog],
+  );
+
   const unsavedValue = useMemo(() => ({ isDirty: dirty, setDirty }), [dirty]);
   const connectionValue = useMemo(() => ({ online }), [online]);
   const toastValue = useMemo(() => ({ notify }), [notify]);
@@ -140,7 +206,8 @@ export function AdminProviders({ children }: { children: ReactNode }) {
       <ConfirmContext.Provider value={confirmValue}>
         <UnsavedContext.Provider value={unsavedValue}>
           <ConnectionContext.Provider value={connectionValue}>
-            {children}
+            <CatalogContext.Provider value={catalogValue}>
+              {children}
 
             {/* Toast stack */}
             <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+8px)] z-[70] flex flex-col items-center gap-2 px-3">
@@ -207,6 +274,7 @@ export function AdminProviders({ children }: { children: ReactNode }) {
                 </div>
               </div>
             )}
+            </CatalogContext.Provider>
           </ConnectionContext.Provider>
         </UnsavedContext.Provider>
       </ConfirmContext.Provider>

@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
+import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
@@ -22,6 +22,7 @@ import AdminLoginApp from "./AdminLoginApp";
 import AdminApp from "./admin/AdminApp";
 import FlowPathApp from "./FlowPathApp";
 import NotificationsPage from "./components/NotificationsPage";
+import SearchPage from "./components/SearchPage";
 import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -44,9 +45,21 @@ import { disablePageZoom } from "./utils/disablePageZoom";
 import { setThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/themeColor";
 import { recordRouteVisit } from "./utils/routeHistory";
 import { requiresAuthentication } from "./utils/appRoutes";
+import AppShell from "./components/AppShell";
+import { resolveActiveFromHash } from "./components/DesktopShell";
+import { useResponsiveCategory } from "./utils/responsive";
 import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
 import { collectDueMyDayItems, type MyDayDocData } from "../utils/pushScheduler";
 import { playSfxAdd, playSfxError, playSfxRemove } from "./utils/sfx";
+import {
+  isAndroidNative,
+  isNativeApp,
+  onLocalAlarmTap,
+  registerForPush,
+  scheduleLocalAlarm,
+  cancelLocalAlarms,
+  type LocalAlarmItem,
+} from "./utils/capacitorBridge";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -94,6 +107,7 @@ const CART_HASH = "#/cart";
 const FAVORITES_HASH = "#/favorites";
 const SUBSCRIPTION_HASH = "#/subscription";
 const NOTIFICATIONS_HASH = "#/notifications";
+const SEARCH_HASH = "#/search";
 // Developer sandbox for the expiry / renewal messaging. Pure preview:
 // it synthesises a subscription document and never touches Firestore.
 const RENEWAL_PREVIEW_HASH = "#/dev/subscription-preview";
@@ -243,6 +257,70 @@ function RenewalNotice() {
 }
 
 function Root() {
+  // Root is the desktop shell's host. Mobile + tablet get the same
+  // page body, but the per-page chrome (Header + BottomNav) is still
+  // rendered inside each app — the desktop CSS hides it on >= 1024 px.
+  // The shell (left rail + top bar) takes over from there.
+  return (
+    <DesktopAppHost>
+      <RootPage />
+    </DesktopAppHost>
+  );
+}
+
+/**
+ * Tiny wrapper that conditionally mounts the desktop shell on
+ * viewports >= 1024 px. Uses the same responsive hook as
+ * AppShell, but here it lives at the routing level (above RootPage)
+ * so every page — including the landing, checkout and auth pages —
+ * gets the desktop chrome for free. Mobile + tablet just pass the
+ * children through unchanged.
+ */
+function DesktopAppHost({ children }: { children: ReactNode }) {
+  const category = useResponsiveCategory();
+  const [hash, setHash] = useState<string>(() => (typeof window !== "undefined" ? window.location.hash : ""));
+  // Re-render on hash change so the active rail item follows the URL.
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const onChange = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+
+  if (category !== "desktop") {
+    return <>{children}</>;
+  }
+
+  // Skip the shell on routes that are designed as full-screen experiences
+  // (checkout has its own payment iframe, the course player has its own
+  // immersive layout, the admin has its own shell). On those routes
+  // the mobile + tablet chrome is hidden too — keeping the desktop
+  // shell out of the way preserves the full-bleed experience.
+  if (
+    hash.startsWith("#/checkout")
+    || hash.startsWith("#/auth")
+    || hash.startsWith("#/admin")
+    || hash.startsWith("#/admin-login")
+    || hash.startsWith("#/course/")
+    || hash.startsWith("#/flowpath")
+  ) {
+    return <>{children}</>;
+  }
+
+  return (
+    <AppShell active={resolveActiveFromHash(hash)}>
+      {children}
+    </AppShell>
+  );
+}
+
+/**
+ * The routing + auth-guard + chrome logic. Returns the page element
+ * (or a splash / loading / landing fallback) without knowing about the
+ * desktop shell — the desktop wrapper lives in `Root` above so the
+ * whole routing tree can be wrapped in a single AppShell.
+ */
+function RootPage(): ReactNode {
   const { user, loading, logout } = useAuth();
   const { openingAnimationEnabled } = useBranding();
   const { products: catalogProducts, purchasedIds, loading: catalogLoading } = useCatalog();
@@ -251,6 +329,10 @@ function Root() {
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
   const [desktopLocked, setDesktopLocked] = useState(() => isDesktopBrowserLocked());
   const [installedMobilePwa, setInstalledMobilePwa] = useState(() => isInstalledMobilePwa());
+  // Live viewport category so the AppShell wrapper re-renders when the
+  // learner resizes across the desktop / tablet / mobile boundaries.
+  // Tablet + mobile get the existing per-page chrome; desktop gets the
+  // new DesktopShell (persistent left rail + sticky top bar).
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const landingRouteRequested = !hash || hash.startsWith(LANDING_HASH);
   // Mobile + installed PWA: never show landing. Everyone else on mobile
@@ -346,10 +428,50 @@ function Root() {
     return () => window.removeEventListener("pointerdown", subscribeOnGesture, { capture: true });
   }, [user]);
 
+  // Capacitor / TWA wiring. On the installed Android app the web-push
+  // helper is irrelevant (it can never wake the device reliably because
+  // the TWA service worker is throttled like any other background tab).
+  // We register for FCM instead and route local taps through the same
+  // hash deep-link the SW uses. The TWA also installs a local-alarm
+  // tap listener once so foreground + backgrounded alarms land on the
+  // right page.
+  useEffect(() => {
+    if (!user || !isNativeApp()) return undefined;
+    void registerForPush(async () => {
+      // The Firebase Auth id token is what /api/push/fcm-register expects.
+      // The AuthContext already keeps a fresh idToken in memory; we
+      // surface a getter so the TWA never has to re-implement Firebase
+      // auth.
+      try {
+        const { auth } = await import("../firebase");
+        if (!auth?.currentUser) return null;
+        return await auth.currentUser.getIdToken(true);
+      } catch {
+        return null;
+      }
+    });
+    // Tapping a local notification deep-links to its URL — the data we
+    // pass when scheduling the alarm carries the same hash routes the
+    // web uses (e.g. "/#/my-day?section=tasks&item=abc").
+    void onLocalAlarmTap((url) => {
+      const hashIndex = url.indexOf("#");
+      if (hashIndex >= 0) window.location.hash = url.slice(hashIndex);
+    });
+    return undefined;
+  }, [user]);
+
   // Foreground safety net for My Day. Server Web Push is still responsible
   // when the PWA is closed; while it is open this clock guarantees every due
   // task, schedule event and reminder becomes an Android/system notification
   // even if the external minute scheduler is delayed.
+  //
+  // On the TWA we go one step further and ALSO schedule a local
+  // notification at the exact wall-clock time. Local alarms (Android
+  // AlarmManager) fire even when the app process is killed, the
+  // device is locked, or doze mode is on — they are the only delivery
+  // mechanism that actually gives a "1 minute exact" guarantee on
+  // Android. The local alarm has a stable numeric id derived from the
+  // item key, so updating the My Day doc re-schedules cleanly.
   useEffect(() => {
     if (!user) return undefined;
     let current: MyDayDocData | null = null;
@@ -357,6 +479,14 @@ function Root() {
     const shownKey = `eduvora.myDaySystemNotifications.v1:${user.id}`;
     const readShown = (): Record<string, number> => {
       try { return JSON.parse(localStorage.getItem(shownKey) || "{}"); } catch { return {}; }
+    };
+    // Hash the item key into a stable 31-bit alarm id. Android limits
+    // notification ids to 32-bit signed; SHA-1 mod 2^31 keeps the value
+    // in range and stable across re-renders of the same item.
+    const alarmId = (key: string) => {
+      let hash = 0;
+      for (let i = 0; i < key.length; i += 1) hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0;
+      return Math.abs(hash) || 1;
     };
     const checkDue = () => {
       if (!current) return;
@@ -369,6 +499,19 @@ function Root() {
         // Deep-link the system alert to the exact My Day tab + item so the
         // tap lands on the task/schedule/reminder that fired, not the overview.
         const itemUrl = `/${getMyDayItemDeepLink(item.section, item.itemId)}`;
+        // On the TWA the local alarm is the source of truth — the
+        // FCM payload that woke us is a bonus, not the only path.
+        if (isAndroidNative()) {
+          const alarm: LocalAlarmItem = {
+            id: alarmId(item.key),
+            at: item.dueAt,
+            title: item.title,
+            body: item.body,
+            url: itemUrl,
+            tag: `myday-${item.key}`,
+          };
+          void scheduleLocalAlarm(alarm);
+        }
         void showLocalSystemNotification(item.title, item.body, itemUrl, `myday-${item.key}`)
           .then((displayed) => {
             // Do not dedupe a failed display (for example before permission is
@@ -384,16 +527,65 @@ function Root() {
       Object.keys(shown).forEach((key) => { if (shown[key] < cutoff) delete shown[key]; });
       try { localStorage.setItem(shownKey, JSON.stringify(shown)); } catch { /* restricted storage */ }
     };
+    // Schedule the upcoming alarms (the ones that haven't fired yet) the
+    // moment the doc is read or updated. This is what gives the TWA its
+    // exact-time guarantee: even if the server push never arrives, the
+    // local AlarmManager fires on the dot.
+    const scheduleUpcoming = () => {
+      if (!isAndroidNative() || !current) return;
+      const now = Date.now();
+      const items = collectDueMyDayItems(current, now + 6 * 60 * 60 * 1000, new Date().getTimezoneOffset());
+      // Cancel every previously-scheduled My Day alarm and re-create the
+      // ones still in the future. This keeps the schedule authoritative
+      // against the latest doc — adding/removing a task in the app
+      // updates the alarms immediately.
+      const seen = new Set<number>();
+      for (const item of items) {
+        if (item.dueAt <= now) continue;
+        const id = alarmId(item.key);
+        seen.add(id);
+        const itemUrl = `/${getMyDayItemDeepLink(item.section, item.itemId)}`;
+        void scheduleLocalAlarm({
+          id,
+          at: item.dueAt,
+          title: item.title,
+          body: item.body,
+          url: itemUrl,
+          tag: `myday-${item.key}`,
+        });
+      }
+      // Wipe any orphans (alarms that no longer correspond to a live
+      // item). LocalNotifications has no "list" API, so we keep a
+      // small id cache in localStorage and cancel the diff.
+      try {
+        const cacheKey = `eduvora.myDayAlarmIds.v1:${user.id}`;
+        const prior: number[] = JSON.parse(localStorage.getItem(cacheKey) || "[]");
+        const orphans = prior.filter((id) => !seen.has(id));
+        if (orphans.length) void cancelLocalAlarms(orphans);
+        localStorage.setItem(cacheKey, JSON.stringify(Array.from(seen)));
+      } catch {
+        // ignore — next pass will reconcile.
+      }
+    };
+    const onDocChange = () => {
+      checkDue();
+      scheduleUpcoming();
+    };
     const unsubscribe = onSnapshot(doc(db, "users", user.id, "myDay", "current"), (snapshot) => {
       current = snapshot.exists() ? snapshot.data() as MyDayDocData : null;
-      checkDue();
+      onDocChange();
     });
     const timer = window.setInterval(checkDue, 15_000);
+    // Re-schedule upcoming alarms every 5 minutes as a safety net — if
+    // the user kept the app in the background for hours the schedule
+    // stays warm.
+    const reschedule = window.setInterval(scheduleUpcoming, 5 * 60_000);
     const onVisible = () => { if (document.visibilityState === "visible") checkDue(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       unsubscribe();
       window.clearInterval(timer);
+      window.clearInterval(reschedule);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [user]);
@@ -786,6 +978,39 @@ function Root() {
           else if (tab === "store") window.location.hash = STORE_HASH;
           else if (tab === "purchases") window.location.hash = `${STORE_HASH}/purchases`;
           else if (tab === "profile") window.location.hash = PROFILE_HASH;
+        }}
+      />
+    );
+  }
+  if (hash.startsWith(SEARCH_HASH)) {
+    return (
+      <SearchPage
+        favoriteIds={favoriteIds}
+        onToggleFavorite={handleToggleFavorite}
+        onNavigateToProduct={navigateToProduct}
+        onNavigateToStore={() => {
+          window.location.hash = STORE_HASH;
+        }}
+        onNavigateToHome={() => {
+          window.location.hash = HOME_HASH;
+        }}
+        onNavigateToMyDay={() => {
+          window.location.hash = MY_DAY_HASH;
+        }}
+        onNavigateToProfile={() => {
+          window.location.hash = PROFILE_HASH;
+        }}
+        onNavigateToPurchases={() => {
+          window.location.hash = `${STORE_HASH}/purchases`;
+        }}
+        onNavigateToCart={() => {
+          window.location.hash = CART_HASH;
+        }}
+        onNavigateToSubscription={() => {
+          window.location.hash = SUBSCRIPTION_HASH;
+        }}
+        onNavigateToNotifications={() => {
+          window.location.hash = NOTIFICATIONS_HASH;
         }}
       />
     );

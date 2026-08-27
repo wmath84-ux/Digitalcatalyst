@@ -1,4 +1,5 @@
-import type { CourseModule, Product, ProductWithRating } from '../App';
+import type { CourseModule, CourseFile } from '../src/types/course';
+import type { Product } from '../src/data/products';
 
 const STOP_WORDS = new Set(['a', 'an', 'the', 'for', 'and', 'or', 'of', 'to', 'in', 'on']);
 
@@ -25,9 +26,35 @@ export const parseKeywordList = (value: unknown): string[] => {
 
 const collectCourseText = (modules: CourseModule[] = []): string[] => modules.flatMap(module => [
   module.title,
-  ...(module.files || []).flatMap(file => [file.name, file.type, file.content, file.paidUpdateTitle]),
+  ...(module.files || []).flatMap((file: CourseFile) => [file.name, file.type, file.paidUpdateTitle]),
   ...collectCourseText(module.modules || []),
 ].filter(Boolean) as string[]);
+
+// Optional product fields referenced by the search index. These are not on
+// the canonical `Product` shape, so we type the input as a permissive union
+// (Product + optional extras) rather than `Partial<Product>`.
+type ProductSearchInput = Product & {
+  description?: string;
+  longDescription?: string;
+  fileFormat?: string;
+  dimensions?: string;
+  sku?: string;
+  isVisible?: boolean;
+  keywords?: string[];
+  status?: string;
+  isDeleted?: boolean;
+  productType?: string;
+  class?: string;
+  grade?: string;
+  subject?: string;
+  board?: string;
+  exam?: string;
+  language?: string;
+  publisher?: string;
+  edition?: string;
+  format?: string;
+  author?: string;
+};
 
 const compactLetters = (value: string): string => value.replace(/\s+/g, '');
 
@@ -37,8 +64,8 @@ const buildAcronym = (value: string): string => value
   .map(word => word[0])
   .join('');
 
-export const buildProductSearchIndex = (product: Partial<Product>) => {
-  const keywords = parseKeywordList((product as any).keywords || (product as any).searchKeywords || []);
+export const buildProductSearchIndex = (product: ProductSearchInput) => {
+  const keywords = parseKeywordList(product.keywords || (product as Partial<Product> & { searchKeywords?: string[] }).searchKeywords || []);
   const searchableParts = [
     product.title,
     product.category,
@@ -47,17 +74,17 @@ export const buildProductSearchIndex = (product: Partial<Product>) => {
     product.fileFormat,
     product.dimensions,
     product.sku,
-    (product as any).productType,
-    (product as any).class,
-    (product as any).grade,
-    (product as any).subject,
-    (product as any).board,
-    (product as any).exam,
-    (product as any).language,
-    (product as any).publisher,
-    (product as any).edition,
-    (product as any).format,
-    (product as any).author,
+    product.productType,
+    product.class,
+    product.grade,
+    product.subject,
+    product.board,
+    product.exam,
+    product.language,
+    product.publisher,
+    product.edition,
+    product.format,
+    product.author,
     ...(product.tags || []),
     ...(product.features || []),
     ...keywords,
@@ -80,12 +107,12 @@ export const buildProductSearchIndex = (product: Partial<Product>) => {
   };
 };
 
-export const withProductSearchIndex = <T extends Partial<Product>>(product: T): T => ({
+export const withProductSearchIndex = <T extends ProductSearchInput>(product: T): T => ({
   ...product,
   ...buildProductSearchIndex(product),
 });
 
-export const isProductSearchVisible = (product: Product): boolean => product.isVisible !== false && (product as any).status !== 'draft' && (product as any).status !== 'archived' && (product as any).isDeleted !== true;
+export const isProductSearchVisible = (product: ProductSearchInput): boolean => product.isVisible !== false && product.status !== 'draft' && product.status !== 'archived' && product.isDeleted !== true;
 
 const boundedTokenDistance = (left: string, right: string, maxDistance: number): number => {
   if (left === right) return 0;
@@ -113,7 +140,7 @@ const looseTokenMatch = (queryToken: string, fieldToken: string): boolean => {
   return maxDistance > 0 && boundedTokenDistance(queryToken, fieldToken, maxDistance) <= maxDistance;
 };
 
-export const rankProductForQuery = (product: ProductWithRating, query: string): number => {
+export const rankProductForQuery = (product: ProductSearchInput, query: string): number => {
   const normalizedQuery = normalizeSearchValue(query);
   const tokens = splitSearchTokens(normalizedQuery);
   if (!normalizedQuery) return 1;
@@ -121,7 +148,7 @@ export const rankProductForQuery = (product: ProductWithRating, query: string): 
   const title = index.normalizedTitle;
   const categories = [index.normalizedCategory, ...(product.tags || []).map(normalizeSearchValue)];
   const keywords = index.normalizedKeywords;
-  const description = normalizeSearchValue([product.description, product.longDescription].join(' '));
+  const description = normalizeSearchValue([product.description, product.longDescription ?? ''].join(' '));
   const compactQuery = compactLetters(normalizedQuery);
   const lettersMatch = compactQuery.length >= 2 && (index.compactText.includes(compactQuery) || index.acronymText.includes(compactQuery));
   const allTokensMatch = tokens.every(token =>

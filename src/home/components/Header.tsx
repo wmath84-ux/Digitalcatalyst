@@ -106,26 +106,53 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       </div>
 
       <div className="relative mt-5">
-        <div className="dc-glass-toolbar flex items-center gap-2 rounded-2xl px-4 py-3">
+        <div
+          className="dc-glass-toolbar flex cursor-pointer items-center gap-2 rounded-2xl px-4 py-3 transition active:scale-[0.99]"
+          onClick={() => {
+            const trimmed = query.trim();
+            window.location.hash = trimmed ? `#/search?q=${encodeURIComponent(trimmed)}` : "#/search";
+          }}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              const trimmed = query.trim();
+              window.location.hash = trimmed ? `#/search?q=${encodeURIComponent(trimmed)}` : "#/search";
+            }
+          }}
+        >
           <Search size={18} className="shrink-0 text-slate-400" strokeWidth={2.4} />
           <input
             ref={ref}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
+            onFocus={() => {
+              const trimmed = query.trim();
+              window.location.hash = trimmed ? `#/search?q=${encodeURIComponent(trimmed)}` : "#/search";
+            }}
             type="text"
             inputMode="search"
             placeholder="Search courses, PDFs, e-books..."
-            className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+            className="w-full cursor-pointer bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+            readOnly
           />
-          {query && (
+          {query ? (
             <button
               type="button"
-              onClick={() => onQueryChange("")}
+              onClick={(e) => {
+                e.stopPropagation();
+                onQueryChange("");
+              }}
               aria-label="Clear search"
               className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-slate-500 transition active:scale-90"
             >
               <X size={13} strokeWidth={2.6} />
             </button>
+          ) : (
+            <span className="hidden shrink-0 rounded-md bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 sm:inline">
+              Tap to search
+            </span>
           )}
         </div>
 

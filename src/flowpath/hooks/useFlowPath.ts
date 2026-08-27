@@ -88,6 +88,39 @@ export function useFlowPath() {
     );
   }, []);
 
+  const updateActivity = useCallback(
+    (id: string, patch: {
+      title?: string;
+      description?: string;
+      datetime?: string;
+      extra?: Record<string, unknown>;
+    }) => {
+      setActivities((prev) =>
+        prev.map((a) => {
+          if (a.id !== id) return a;
+          // Build the next activity without erasing the per-type required
+          // fields (priority for task, progress for revision, etc.). We only
+          // touch title / description / datetime from the patch, then merge
+          // any extra overrides for type-specific fields.
+          const next: Activity = { ...a };
+          if (patch.title !== undefined) next.title = patch.title;
+          if (patch.description !== undefined) next.description = patch.description;
+          if (patch.datetime !== undefined) {
+            next.datetime = patch.datetime;
+            next.timeLabel = buildTimeLabel(new Date(patch.datetime));
+          }
+          if (patch.extra) {
+            for (const [k, v] of Object.entries(patch.extra)) {
+              (next as unknown as Record<string, unknown>)[k] = v;
+            }
+          }
+          return next;
+        })
+      );
+    },
+    []
+  );
+
   const deleteActivity = useCallback((id: string) => {
     setActivities((prev) => {
       const filtered = prev.filter((a) => a.id !== id);
@@ -102,6 +135,7 @@ export function useFlowPath() {
     createActivity,
     completeActivity,
     uncompleteActivity,
+    updateActivity,
     deleteActivity,
     pulseToken,
     justCreatedId,

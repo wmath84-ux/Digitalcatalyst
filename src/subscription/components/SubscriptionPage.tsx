@@ -212,11 +212,11 @@ export default function SubscriptionPage({
     const firebaseUser = auth.currentUser;
     if (!firebaseUser || firebaseUser.uid !== user.id) return;
     repairedOrderIdsRef.current.add(orderId);
-    void firebaseUser.getIdToken().then((token) => fetch("/api/razorpay/verify-payment", {
+    void firebaseUser.getIdToken().then((token: string) => fetch("/api/razorpay/verify-payment", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ orderId }),
-    })).then((response) => {
+    })).then((response: Response) => {
       if (!response.ok) repairedOrderIdsRef.current.delete(orderId);
     }).catch(() => repairedOrderIdsRef.current.delete(orderId));
   }, [activeSubscription, user]);
@@ -765,7 +765,7 @@ export default function SubscriptionPage({
   // ---------- Render ----------
   return (
     <div className="min-h-screen bg-white sm:py-6">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200 md:max-w-none md:rounded-none md:border-0 md:shadow-none md:bg-transparent">
         <Header
           cartCount={cartCount}
           notifCount={0}

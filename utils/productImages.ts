@@ -1,4 +1,4 @@
-import { Product } from '../App';
+import type { Product } from '../src/data/products';
 import { buildProductImageFallback, resolveProductImage, resolveProductImageCandidates } from './mediaCompat';
 
 export type ProductImageSlot = 'card' | 'detailMobile' | 'detailDesktop' | 'homeTopRated' | 'homeList' | 'purchaseSquare' | 'purchaseCard' | 'galleryThumb';
@@ -14,7 +14,7 @@ export const PRODUCT_IMAGE_SLOTS: Record<ProductImageSlot, { label: string; rati
   galleryThumb: { label: 'Gallery Thumbnail', ratio: '1:1', aspectClass: 'aspect-square', recommendedSize: '512x512', ratioValue: 1 },
 };
 
-export const getProductImageFallback = (product: Pick<Product, 'images' | 'imageSeed' | 'title' | 'category'>): string => buildProductImageFallback(product);
+export const getProductImageFallback = (product: { images?: string[]; imageSeed?: string; title: string; category: string }): string => buildProductImageFallback(product);
 
 const PRODUCT_IMAGE_SLOT_FALLBACKS: Record<ProductImageSlot, ProductImageSlot[]> = {
   card: ['card', 'detailMobile', 'purchaseCard', 'galleryThumb', 'homeTopRated'],

@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 export const REVIEW_STABLE_MODE =
   String(import.meta.env.VITE_REVIEW_STABLE_MODE || '').toLowerCase() === 'true';
 
