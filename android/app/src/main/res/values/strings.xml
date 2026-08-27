@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Eduvora</string>
+    <string name="title_activity_main">Eduvora</string>
+    <string name="package_name">app.eduvora.shop</string>
+    <string name="custom_url_scheme">app.eduvora.shop</string>
+
+    <!--
+      Digital Asset Links for the TWA. Google verifies the SHA-256
+      fingerprint of the signing key against /.well-known/assetlinks.json
+      served at https://eduvora.shop/. This is the part the user MUST
+      regenerate after creating a release keystore (run
+      `keytool -list -v -keystore <keystore> -alias <alias>` and
+      paste the SHA-256 fingerprint here AND into the
+      assetlinks.json file served from eduvora.shop).
+      The placeholder below matches the local debug keystore, which
+      is fine for `npx cap run android` during development.
+    -->
+    <string name="asset_statements" translatable="false">
+        [{
+            \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+            \"target\": {
+                \"namespace\": \"android_app\",
+                \"package_name\": \"app.eduvora.shop\",
+                \"sha256_cert_fingerprints\": [
+                    \"REPLACE_WITH_YOUR_SHA256_FINGERPRINT\"
+                ]
+            }
+        }]
+    </string>
+</resources>

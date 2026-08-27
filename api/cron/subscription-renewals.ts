@@ -34,6 +34,7 @@ import {
 } from "../../utils/pushScheduler.js";
 import { runReferralRepairOnce } from "../_lib/referrals.js";
 import { getNotificationBrandChrome } from "../_lib/branding.js";
+import { fcmPushToAllDevices, fcmPushToUser, fcmConfigured, type FcmPayload } from "../_lib/fcm.js";
 
 const bearer = (req: VercelRequest) => {
   const raw = req.headers?.authorization;
@@ -68,37 +69,78 @@ async function sendToSubscriptionDoc(item: { ref: { delete: () => Promise<unknow
 }
 
 async function sendPush(db: Firestore, uid: string, title: string, body: string, target?: { tag?: string; url?: string }) {
-  if (!vapidConfigured()) return 0;
+  // Fan out to Web Push AND FCM in parallel. The Web Push side covers
+  // browsers (still useful for desktop web users); the FCM side wakes
+  // the installed Android TWA reliably — that's the channel the user
+  // was missing exact-time delivery on before this change.
   const brand = await getNotificationBrandChrome();
-  const subscriptions = await db.collection("users").doc(uid).collection("webPushSubscriptions").get();
-  const payloadString = JSON.stringify({
+  const fcmPayload: FcmPayload = {
     title,
     body,
     tag: target?.tag || "eduvora",
     url: target?.url || "/",
     icon: brand.icon,
     badge: brand.badge,
-  });
-  let sent = 0;
-  for (const item of subscriptions.docs) sent += await sendToSubscriptionDoc(item, payloadString);
-  return sent;
+  };
+  const [webSent, fcmSent] = await Promise.all([
+    vapidConfigured()
+      ? (async () => {
+          const subscriptions = await db.collection("users").doc(uid).collection("webPushSubscriptions").get();
+          const payloadString = JSON.stringify({
+            title,
+            body,
+            tag: target?.tag || "eduvora",
+            url: target?.url || "/",
+            icon: brand.icon,
+            badge: brand.badge,
+          });
+          let n = 0;
+          for (const item of subscriptions.docs) n += await sendToSubscriptionDoc(item, payloadString);
+          return n;
+        })()
+      : Promise.resolve(0),
+    fcmPushToUser(db, uid, fcmPayload),
+  ]);
+  return webSent + fcmSent;
 }
 
 async function sendPushToAll(db: Firestore, payload: PushPayload) {
-  if (!vapidConfigured()) return { sent: 0, devices: 0 };
+  // Same fan-out as `sendPush`, but covers every user. The web
+  // read uses the legacy webPushSubscriptions collection; the FCM
+  // read uses the new fcmTokens collection. Either side may be empty
+  // for any given device — both run.
   const brand = await getNotificationBrandChrome();
-  const snapshot = await db.collectionGroup("webPushSubscriptions").get();
-  const payloadString = JSON.stringify({
+  const fcmPayload: FcmPayload = {
     title: payload.title,
     body: payload.body,
     tag: payload.tag || "eduvora-content",
     url: payload.url || "/",
     icon: brand.icon,
     badge: brand.badge,
-  });
-  let sent = 0;
-  for (const item of snapshot.docs) sent += await sendToSubscriptionDoc(item, payloadString);
-  return { sent, devices: snapshot.size };
+  };
+  const [webResult, fcmResult] = await Promise.all([
+    vapidConfigured()
+      ? (async () => {
+          const snapshot = await db.collectionGroup("webPushSubscriptions").get();
+          const payloadString = JSON.stringify({
+            title: payload.title,
+            body: payload.body,
+            tag: payload.tag || "eduvora-content",
+            url: payload.url || "/",
+            icon: brand.icon,
+            badge: brand.badge,
+          });
+          let sent = 0;
+          for (const item of snapshot.docs) sent += await sendToSubscriptionDoc(item, payloadString);
+          return { sent, devices: snapshot.size };
+        })()
+      : Promise.resolve({ sent: 0, devices: 0 }),
+    fcmPushToAllDevices(db, fcmPayload),
+  ]);
+  return {
+    sent: webResult.sent + fcmResult.sent,
+    devices: webResult.devices + fcmResult.devices,
+  };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

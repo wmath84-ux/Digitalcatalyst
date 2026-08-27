@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  TWA Trusted URLs — the app's primary origin the launcher icon opens.
+  The launch URL is read from the web manifest, but this resource
+  declares it for the Play Store metadata and the SplashScreen API
+  fallback path. Keep it in sync with the public PWA start URL.
+-->
+<resources>
+    <array name="trusted_web_activities">
+        <item>app.eduvora.shop</item>
+    </array>
+</resources>

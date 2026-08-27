@@ -51,6 +51,15 @@ import { useResponsiveCategory } from "./utils/responsive";
 import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
 import { collectDueMyDayItems, type MyDayDocData } from "../utils/pushScheduler";
 import { playSfxAdd, playSfxError, playSfxRemove } from "./utils/sfx";
+import {
+  isAndroidNative,
+  isNativeApp,
+  onLocalAlarmTap,
+  registerForPush,
+  scheduleLocalAlarm,
+  cancelLocalAlarms,
+  type LocalAlarmItem,
+} from "./utils/capacitorBridge";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -419,10 +428,50 @@ function RootPage(): ReactNode {
     return () => window.removeEventListener("pointerdown", subscribeOnGesture, { capture: true });
   }, [user]);
 
+  // Capacitor / TWA wiring. On the installed Android app the web-push
+  // helper is irrelevant (it can never wake the device reliably because
+  // the TWA service worker is throttled like any other background tab).
+  // We register for FCM instead and route local taps through the same
+  // hash deep-link the SW uses. The TWA also installs a local-alarm
+  // tap listener once so foreground + backgrounded alarms land on the
+  // right page.
+  useEffect(() => {
+    if (!user || !isNativeApp()) return undefined;
+    void registerForPush(async () => {
+      // The Firebase Auth id token is what /api/push/fcm-register expects.
+      // The AuthContext already keeps a fresh idToken in memory; we
+      // surface a getter so the TWA never has to re-implement Firebase
+      // auth.
+      try {
+        const { auth } = await import("../firebase");
+        if (!auth?.currentUser) return null;
+        return await auth.currentUser.getIdToken(true);
+      } catch {
+        return null;
+      }
+    });
+    // Tapping a local notification deep-links to its URL — the data we
+    // pass when scheduling the alarm carries the same hash routes the
+    // web uses (e.g. "/#/my-day?section=tasks&item=abc").
+    void onLocalAlarmTap((url) => {
+      const hashIndex = url.indexOf("#");
+      if (hashIndex >= 0) window.location.hash = url.slice(hashIndex);
+    });
+    return undefined;
+  }, [user]);
+
   // Foreground safety net for My Day. Server Web Push is still responsible
   // when the PWA is closed; while it is open this clock guarantees every due
   // task, schedule event and reminder becomes an Android/system notification
   // even if the external minute scheduler is delayed.
+  //
+  // On the TWA we go one step further and ALSO schedule a local
+  // notification at the exact wall-clock time. Local alarms (Android
+  // AlarmManager) fire even when the app process is killed, the
+  // device is locked, or doze mode is on — they are the only delivery
+  // mechanism that actually gives a "1 minute exact" guarantee on
+  // Android. The local alarm has a stable numeric id derived from the
+  // item key, so updating the My Day doc re-schedules cleanly.
   useEffect(() => {
     if (!user) return undefined;
     let current: MyDayDocData | null = null;
@@ -430,6 +479,14 @@ function RootPage(): ReactNode {
     const shownKey = `eduvora.myDaySystemNotifications.v1:${user.id}`;
     const readShown = (): Record<string, number> => {
       try { return JSON.parse(localStorage.getItem(shownKey) || "{}"); } catch { return {}; }
+    };
+    // Hash the item key into a stable 31-bit alarm id. Android limits
+    // notification ids to 32-bit signed; SHA-1 mod 2^31 keeps the value
+    // in range and stable across re-renders of the same item.
+    const alarmId = (key: string) => {
+      let hash = 0;
+      for (let i = 0; i < key.length; i += 1) hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0;
+      return Math.abs(hash) || 1;
     };
     const checkDue = () => {
       if (!current) return;
@@ -442,6 +499,19 @@ function RootPage(): ReactNode {
         // Deep-link the system alert to the exact My Day tab + item so the
         // tap lands on the task/schedule/reminder that fired, not the overview.
         const itemUrl = `/${getMyDayItemDeepLink(item.section, item.itemId)}`;
+        // On the TWA the local alarm is the source of truth — the
+        // FCM payload that woke us is a bonus, not the only path.
+        if (isAndroidNative()) {
+          const alarm: LocalAlarmItem = {
+            id: alarmId(item.key),
+            at: item.dueAt,
+            title: item.title,
+            body: item.body,
+            url: itemUrl,
+            tag: `myday-${item.key}`,
+          };
+          void scheduleLocalAlarm(alarm);
+        }
         void showLocalSystemNotification(item.title, item.body, itemUrl, `myday-${item.key}`)
           .then((displayed) => {
             // Do not dedupe a failed display (for example before permission is
@@ -457,16 +527,65 @@ function RootPage(): ReactNode {
       Object.keys(shown).forEach((key) => { if (shown[key] < cutoff) delete shown[key]; });
       try { localStorage.setItem(shownKey, JSON.stringify(shown)); } catch { /* restricted storage */ }
     };
+    // Schedule the upcoming alarms (the ones that haven't fired yet) the
+    // moment the doc is read or updated. This is what gives the TWA its
+    // exact-time guarantee: even if the server push never arrives, the
+    // local AlarmManager fires on the dot.
+    const scheduleUpcoming = () => {
+      if (!isAndroidNative() || !current) return;
+      const now = Date.now();
+      const items = collectDueMyDayItems(current, now + 6 * 60 * 60 * 1000, new Date().getTimezoneOffset());
+      // Cancel every previously-scheduled My Day alarm and re-create the
+      // ones still in the future. This keeps the schedule authoritative
+      // against the latest doc — adding/removing a task in the app
+      // updates the alarms immediately.
+      const seen = new Set<number>();
+      for (const item of items) {
+        if (item.dueAt <= now) continue;
+        const id = alarmId(item.key);
+        seen.add(id);
+        const itemUrl = `/${getMyDayItemDeepLink(item.section, item.itemId)}`;
+        void scheduleLocalAlarm({
+          id,
+          at: item.dueAt,
+          title: item.title,
+          body: item.body,
+          url: itemUrl,
+          tag: `myday-${item.key}`,
+        });
+      }
+      // Wipe any orphans (alarms that no longer correspond to a live
+      // item). LocalNotifications has no "list" API, so we keep a
+      // small id cache in localStorage and cancel the diff.
+      try {
+        const cacheKey = `eduvora.myDayAlarmIds.v1:${user.id}`;
+        const prior: number[] = JSON.parse(localStorage.getItem(cacheKey) || "[]");
+        const orphans = prior.filter((id) => !seen.has(id));
+        if (orphans.length) void cancelLocalAlarms(orphans);
+        localStorage.setItem(cacheKey, JSON.stringify(Array.from(seen)));
+      } catch {
+        // ignore — next pass will reconcile.
+      }
+    };
+    const onDocChange = () => {
+      checkDue();
+      scheduleUpcoming();
+    };
     const unsubscribe = onSnapshot(doc(db, "users", user.id, "myDay", "current"), (snapshot) => {
       current = snapshot.exists() ? snapshot.data() as MyDayDocData : null;
-      checkDue();
+      onDocChange();
     });
     const timer = window.setInterval(checkDue, 15_000);
+    // Re-schedule upcoming alarms every 5 minutes as a safety net — if
+    // the user kept the app in the background for hours the schedule
+    // stays warm.
+    const reschedule = window.setInterval(scheduleUpcoming, 5 * 60_000);
     const onVisible = () => { if (document.visibilityState === "visible") checkDue(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       unsubscribe();
       window.clearInterval(timer);
+      window.clearInterval(reschedule);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [user]);

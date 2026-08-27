@@ -29,6 +29,10 @@
     {
       "source": "/api/myday",
       "destination": "/api/referral-leaderboard"
+    },
+    {
+      "source": "/api/push/fcm-register",
+      "destination": "/api/push/send"
     }
   ]
 }

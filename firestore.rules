@@ -175,6 +175,25 @@ service cloud.firestore {
         allow delete: if isOwner(uid) || isAdmin();
       }
 
+      // Capacitor / TWA Android device tokens (FCM). The TWA's
+      // PushNotifications plugin delivers an FCM token on every fresh
+      // install and again every time Google Play Services rotates the
+      // token. The id is the SHA-256 of the token, so re-registering
+      // with the same value is a no-op and a different value writes a
+      // new doc. Server-side dispatcher in api/_lib/fcm.ts reads this
+      // collection to fan out guaranteed-delivery Android pushes.
+      match /fcmTokens/{tokenId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.token is string
+          && request.resource.data.token.size() > 8
+          && request.resource.data.token.size() <= 4096
+          && request.resource.data.platform in ['android', 'ios', 'web']
+          && !request.resource.data.keys().hasAny(['email', 'phone', 'apiKey', 'authorization', 'secret', 'rawHtml']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
 
       // Cloud Revision Test Bank. Test documents and capacity counters are
       // server-authoritative (Admin SDK only) so a client cannot bypass its
