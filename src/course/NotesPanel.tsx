@@ -20,8 +20,21 @@
 //
 // Notes are stored in the user's localStorage (per user + product) so they
 // stay on the device and don't collide with Firestore course progress.
+//
+// ── Draft persistence ────────────────────────────────────────────────────
+// Draft state is kept in a ref (not just local state) so it survives the
+// panel unmounting and remounting (tab switches, overlay closing, outside
+// clicks). The current draft is restored the moment the panel reopens, so
+// a learner who accidentally taps outside mid-note never loses their work.
+//
+// ── Auto-save on close ───────────────────────────────────────────────────
+// When the overlay closes or the user navigates away while a note is open,
+// the draft is automatically saved if it contains any content. The parent
+// triggers this via `saveSignal` — a monotonically incrementing number that
+// tells the panel "save right now, whatever you have." The panel also saves
+// on unmount via a cleanup effect.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
 import type { CoursePlayerNote } from "../types/course";
 import RichTextEditor from "./RichTextEditor";
@@ -41,6 +54,12 @@ interface NotesPanelProps {
    * of owning its own header row.
    */
   composerOpenSignal?: number;
+  /**
+   * Monotonic counter from the overlay/parent. Each increment means "save
+   * whatever draft is currently open, right now." Used for auto-save when
+   * the user closes the panel by clicking outside or switching tabs.
+   */
+  saveSignal?: number;
 }
 
 // Older notes were stored as plain text. Render them through the same
@@ -66,24 +85,144 @@ function PremiumDeleteIcon({ size = 13 }: { size?: number }) {
   );
 }
 
-export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpenChange, composerOpenSignal }: NotesPanelProps) {
-  const [composing, setComposing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState("");
+// ── Module-level draft persistence ────────────────────────────────────────
+// Kept outside the component so it survives unmount/remount cycles.
+// When the panel closes (tab switch, outside click, overlay close) the draft
+// stays here and is restored the next time the panel mounts.
+const persistedDraft = {
+  mode: null as null | "compose" | "edit",
+  composeDraft: "" as string,
+  editId: null as string | null,
+  editDraft: "" as string,
+};
+
+export default function NotesPanel({
+  notes,
+  onAdd,
+  onEdit,
+  onDelete,
+  onEditorOpenChange,
+  composerOpenSignal,
+  saveSignal,
+}: NotesPanelProps) {
+  // Restore draft from the persisted store on mount.
+  const [composing, setComposing] = useState(() => persistedDraft.mode === "compose");
+  const [draft, setDraft] = useState(() => persistedDraft.composeDraft);
+  const [editingId, setEditingId] = useState<string | null>(() =>
+    persistedDraft.mode === "edit" ? persistedDraft.editId : null,
+  );
+  const [editDraft, setEditDraft] = useState(() =>
+    persistedDraft.mode === "edit" ? persistedDraft.editDraft : "",
+  );
 
   const editorOpen = composing || Boolean(editingId);
+
+  // Keep the persisted store in sync on every render so that any state change
+  // is immediately available for auto-save, even if the component unmounts
+  // before the next effect fires.
+  const syncPersisted = useCallback(() => {
+    if (composing) {
+      persistedDraft.mode = "compose";
+      persistedDraft.composeDraft = draft;
+      persistedDraft.editId = null;
+      persistedDraft.editDraft = "";
+    } else if (editingId) {
+      persistedDraft.mode = "edit";
+      persistedDraft.composeDraft = "";
+      persistedDraft.editId = editingId;
+      persistedDraft.editDraft = editDraft;
+    } else {
+      persistedDraft.mode = null;
+      persistedDraft.composeDraft = "";
+      persistedDraft.editId = null;
+      persistedDraft.editDraft = "";
+    }
+  }, [composing, draft, editingId, editDraft]);
+
+  useEffect(() => { syncPersisted(); });
 
   // The overlay expands the notes sheet while the editor is open so the
   // writing surface gets the full notes area.
   useEffect(() => { onEditorOpenChange?.(editorOpen); }, [editorOpen, onEditorOpenChange]);
-  useEffect(() => () => onEditorOpenChange?.(false), [onEditorOpenChange]);
+  useEffect(() => () => { onEditorOpenChange?.(false); }, [onEditorOpenChange]);
+
+  // ── Auto-save helpers (stable refs so they work inside cleanup effects) ─
+  // We keep the latest handlers in refs so the unmount cleanup always has
+  // current values, even after the component props change between renders.
+  const onAddRef = useRef(onAdd);
+  const onEditRef = useRef(onEdit);
+  useEffect(() => { onAddRef.current = onAdd; }, [onAdd]);
+  useEffect(() => { onEditRef.current = onEdit; }, [onEdit]);
+
+  /**
+   * Save whatever draft is currently open. Safe to call at any time.
+   * Returns true if something was saved, false otherwise.
+   */
+  const flushDraft = useCallback(() => {
+    // Read from persistedDraft (always up-to-date) rather than stale closure
+    // values so this works correctly inside cleanup effects too.
+    if (persistedDraft.mode === "compose") {
+      const html = persistedDraft.composeDraft;
+      if (!isEmptyRichText(html)) {
+        onAddRef.current(html);
+        // Clear the persisted draft so the same note isn't saved twice.
+        persistedDraft.mode = null;
+        persistedDraft.composeDraft = "";
+        return true;
+      }
+    } else if (persistedDraft.mode === "edit") {
+      const id = persistedDraft.editId;
+      const html = persistedDraft.editDraft;
+      if (id && !isEmptyRichText(html)) {
+        onEditRef.current(id, html);
+        persistedDraft.mode = null;
+        persistedDraft.editId = null;
+        persistedDraft.editDraft = "";
+        return true;
+      }
+    }
+    return false;
+  }, []);
+
+  // Auto-save on unmount (tab switch, outside click, overlay close, etc.)
+  // The cleanup runs synchronously before the component is removed from the
+  // DOM, so the save always fires even if the parent re-renders immediately.
+  useEffect(() => {
+    return () => {
+      flushDraft();
+    };
+    // flushDraft is stable (no deps change identity); onAddRef / onEditRef
+    // are always current because we update them in their own effects above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Save signal from parent ──────────────────────────────────────────────
+  // The parent sends a save signal when the overlay is about to close so the
+  // draft is committed before the sheet animates away. This is a belt-AND-
+  // suspenders approach alongside the unmount flush above — whichever fires
+  // first commits the draft, the second one is a no-op because persistedDraft
+  // was already cleared.
+  const prevSaveSignal = useRef(saveSignal ?? 0);
+  useEffect(() => {
+    if ((saveSignal ?? 0) > prevSaveSignal.current) {
+      prevSaveSignal.current = saveSignal ?? 0;
+      const saved = flushDraft();
+      if (saved) {
+        // Update local state so the UI reflects the save immediately.
+        setComposing(false);
+        setDraft("");
+        setEditingId(null);
+        setEditDraft("");
+      }
+    }
+  }, [saveSignal, flushDraft]);
 
   const draftEmpty = isEmptyRichText(draft);
   const editDraftEmpty = isEmptyRichText(editDraft);
 
   const openComposer = () => {
     setEditingId(null);
+    setEditDraft("");
     setComposing(true);
     setDraft("");
   };
@@ -100,10 +239,14 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
     onAdd(draft);
     setDraft("");
     setComposing(false);
+    // Clear persisted state so the restored draft isn't the just-saved one.
+    persistedDraft.mode = null;
+    persistedDraft.composeDraft = "";
   };
 
   const startEdit = (note: CoursePlayerNote) => {
     setComposing(false);
+    setDraft("");
     setEditingId(note.id);
     setEditDraft(noteHtml(note));
   };
@@ -112,6 +255,9 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
     if (editingId && !isEmptyRichText(editDraft)) onEdit(editingId, editDraft);
     setEditingId(null);
     setEditDraft("");
+    persistedDraft.mode = null;
+    persistedDraft.editId = null;
+    persistedDraft.editDraft = "";
   };
 
   // The composer and the inline editor both take over the whole panel so the
@@ -121,6 +267,11 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
     const value = editing ? editDraft : draft;
     const empty = editing ? editDraftEmpty : draftEmpty;
     const cancel = () => {
+      // Cancel discards the draft without saving.
+      persistedDraft.mode = null;
+      persistedDraft.composeDraft = "";
+      persistedDraft.editId = null;
+      persistedDraft.editDraft = "";
       if (editing) { setEditingId(null); setEditDraft(""); }
       else { setComposing(false); setDraft(""); }
     };
@@ -132,7 +283,7 @@ export default function NotesPanel({ notes, onAdd, onEdit, onDelete, onEditorOpe
         <div className="flex min-h-0 flex-1 flex-col p-3" data-course-notes-composer>
           <RichTextEditor
             value={value}
-            onChange={editing ? setEditDraft : setDraft}
+            onChange={editing ? (html) => { setEditDraft(html); persistedDraft.editDraft = html; } : (html) => { setDraft(html); persistedDraft.composeDraft = html; }}
             autoFocus
             surfaceClassName="min-h-0"
             ariaLabel={editing ? "Edit note" : "New note"}
