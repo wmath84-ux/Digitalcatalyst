@@ -647,7 +647,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   --desktop-topbar-height: 64px;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 767px) {
   /* The shell is render-free on mobile / tablet — the mobile +
      tablet per-page chrome takes over. */
   .dc-desktop-shell { display: none !important; }
@@ -2140,4 +2140,15 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   [data-profile-page] [data-profile-content] { padding-top: 26px; padding-bottom: 34px; }
   [data-profile-layout] > section { border-radius: 24px; }
   [data-profile-layout] > .grid { align-self: stretch; }
+}
+
+.is-desktop [data-desktop-side-panel],
+.is-tablet [data-desktop-side-panel],
+{
+  display: block;
+}
+
+.is-mobile [data-desktop-side-panel]
+{
+  display: none;
 }
