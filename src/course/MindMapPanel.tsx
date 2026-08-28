@@ -3,6 +3,13 @@
 // The learner-facing mind map editor, opened from the Course Player dock next
 // to the Note tab.
 //
+// The panel's HOME screen is the map library — the grid of every map this
+// module holds — so opening the tab always lands on a choice ("konsi map
+// kholni hai / nayi banani hai") instead of dropping straight onto whatever
+// canvas was open last. Tapping a card opens that diagram for editing; "New
+// map" starts a fresh one. The library also returns every time the sheet is
+// reopened after being closed, never leaving a lone stale canvas behind.
+//
 // ── Interaction contract ─────────────────────────────────────────────────
 //   `+`            → add a child to this node (then focus its editor)
 //   tap node       → opens the inline editor straight away. The editor sits
@@ -546,6 +553,14 @@ export interface MindMapPanelProps {
   landscape?: boolean;
   /** Close the mind map sheet (toolbar X). */
   onClose?: () => void;
+  /**
+   * True while the mind map sheet itself is open. The map library (the grid
+   * of this module's maps) is the panel's HOME screen: it shows first on
+   * mount and comes back every time the sheet is reopened, so the learner
+   * always picks which map to open / edit — or taps "New map" — before
+   * landing on a canvas.
+   */
+  open?: boolean;
 
   // ── The module's list of maps (Notes-style: many maps, not one) ────────
   /** Every map the learner has in the active module. */
@@ -576,6 +591,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
     onClose,
     playerTheme = "dark",
     landscape: _landscape,
+    open = true,
     maps = [],
     activeMapKey = "main",
     onSelectMap,
@@ -585,8 +601,10 @@ function MindMapCanvas(props: MindMapPanelProps) {
     mapsLoading = false,
     atMapLimit = false,
   } = props;
-  /** The map library sheet (list of this module's maps) is closed by default. */
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  /** The map library sheet (grid of this module's maps) is the HOME screen:
+   *  it is open by default so the learner picks a map to edit — or creates a
+   *  new one — before ever landing on a canvas. */
+  const [libraryOpen, setLibraryOpen] = useState(true);
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -631,6 +649,22 @@ function MindMapCanvas(props: MindMapPanelProps) {
       /* ignore */
     }
   }, [doubleTapDelete]);
+
+  // The library is the panel's home screen. It opens on mount, and if the
+  // learner closes the sheet with the same-tab dock toggle and opens it again,
+  // the library comes straight back — with any in-progress node edit cleared —
+  // so they can pick another map or start a new one.
+  const prevOpenRef = useRef(open);
+  useEffect(() => {
+    if (open && !prevOpenRef.current) {
+      setLibraryOpen(true);
+      setRenamingKey(null);
+      setRenameDraft("");
+      setSelectedId(null);
+      setEditingId(null);
+    }
+    prevOpenRef.current = open;
+  }, [open]);
 
   // Flush the debounced write when the panel unmounts. The overlay unmounts
   // this on a tab switch, so this is the safety net that pairs with the
@@ -1046,6 +1080,19 @@ function MindMapCanvas(props: MindMapPanelProps) {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              {/* While the index is still loading, show skeletons instead of a
+                  fake single card — the grid is this panel's first screen, so
+                  it should never look emptier than it really is. */}
+              {mapsLoading ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-loading>
+                  {[0, 1, 2].map((index) => (
+                    <div
+                      key={index}
+                      className="aspect-square animate-pulse rounded-2xl bg-[var(--mm-soft)] ring-1 ring-[var(--mm-border)]"
+                    />
+                  ))}
+                </div>
+              ) : (
               <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-list>
                 {maps.map((entry) => {
                   const active = entry.mapKey === activeMapKey;
@@ -1130,6 +1177,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
                   );
                 })}
               </ul>
+              )}
             </div>
           </div>
         ) : null}

@@ -325,7 +325,12 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // beside the diagram. Portrait has no room for a side-by-side split, so the
   // sheet simply takes the bottom half.
   const mindMapActive = tab === "mindmap";
-  const mindMapSplit = landscape && mindMapActive;
+  // The split ONLY applies while the sheet is actually OPEN. Tapping the same
+  // Mind map dock button closes the sheet (`open` → false) but keeps the tab
+  // selected; if the split did not follow `open`, the lesson would stay
+  // shrunk to the mind map's 50% and the other half of the screen would be
+  // left blank even though the sheet is gone.
+  const mindMapSplit = landscape && mindMapActive && open;
   const mindMapHeight = "50dvh";
 
   // ── Draggable landscape split ratio ─────────────────────────────────────
