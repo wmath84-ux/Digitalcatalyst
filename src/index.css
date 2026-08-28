@@ -2447,16 +2447,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   }
 }
 
-/* Revision Studio desktop experience --------------------------------------
-   Desktop gets a deliberate workspace composition rather than a wider phone:
-   generous but bounded canvas, denser statistics, and an editorial two-column
-   lower section. */
+/* Revision Studio desktop experience - OPTIMIZED compact, no empty space */
 @media (min-width: 960px) {
-  /* The desktop shell's page column is bounded, but its `main` was
-     `align-self: flex-start`, so the app shell inside it stayed
-     content-sized. Only when the Revision app is the page do we stretch
-     that main and pin the app to it - the revision pages then scroll
-     inside their own PageShell main instead of relying on the document. */
   .dc-desktop-shell:has([data-revision-app]) {
     height: 100dvh;
     overflow: hidden;
@@ -2468,72 +2460,299 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     height: 100%;
     min-height: 0;
     overflow: hidden;
+    background: transparent !important;
   }
   .dc-desktop-shell [data-revision-app] [data-revision-frame] {
     height: 100%;
     min-height: 0;
     max-height: 100%;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
   }
-
   .dc-desktop-shell [data-revision-page-main] {
     overflow-y: auto;
     height: 100%;
     scrollbar-gutter: stable;
+    padding: clamp(12px, 1.2vw, 20px) clamp(12px, 1.5vw, 24px) !important;
   }
-
   .dc-desktop-shell [data-revision-content] {
     max-width: none;
     width: 100%;
   }
 
-  /* Every revision page gets a centred, bounded canvas. Pages other than
-     the dashboard keep a plain block layout (the old selector applied the
-     dashboard's two-column grid to every page, which squeezed e.g. the
-     Test Bank's saved tests into a ~300 px right-hand column). */
+  /* All revision pages - centered bounded canvas, compact */
   .dc-desktop-shell [data-revision-page-main] > .animate-fade-in {
-    max-width: 1180px;
+    max-width: 1200px;
     margin-inline: auto;
-    padding: 4px 0 32px;
+    padding: 0 0 24px;
     display: block;
+    gap: clamp(10px, 1vw, 14px);
   }
 
-  /* Dashboard only: primary plan across the canvas, supporting cards below. */
+  /* Dashboard: 12-col compact grid - left 7 (carousel), right 5 (stats+cards) */
   .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] {
-    display: grid;
-    grid-template-columns: minmax(0, 1.45fr) minmax(300px, .85fr);
-    align-content: start;
-    gap: 20px;
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: clamp(10px, 1vw, 14px);
+    align-items: start;
+    max-width: 1200px;
+  }
+  .dc-desktop-shell [data-rev-layout="dashboard"] {
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: clamp(10px, 1vw, 14px);
+    align-items: start;
+  }
+  .dc-desktop-shell [data-rev-layout="dashboard"] > .lg\:col-span-7 {
+    grid-column: span 7;
+  }
+  .dc-desktop-shell [data-rev-layout="dashboard"] > .lg\:col-span-5 {
+    grid-column: span 5;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 1vw, 14px);
   }
   .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > .grid.grid-cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
+    gap: 10px;
   }
 
-  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > .grid.grid-cols-3 + .rounded-3xl,
-  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > .grid.grid-cols-3 ~ .rounded-3xl {
-    min-width: 0;
+  /* Progress: 4-8 split compact */
+  .dc-desktop-shell [data-rev-layout="progress"] {
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: clamp(10px, 1vw, 14px);
+    align-items: start;
+  }
+  .dc-desktop-shell [data-rev-layout="progress"] > .lg\:col-span-4 {
+    grid-column: span 4;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .dc-desktop-shell [data-rev-layout="progress"] > .lg\:col-span-8 {
+    grid-column: span 8;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
-  /* Make adjacent Weak Topics / Revision Bank read as a dashboard pair. */
-  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > .grid.grid-cols-3 ~ .rounded-3xl {
-    display: block;
+  /* Profile: 12-col already handled but ensure compact */
+  .dc-desktop-shell [data-revision-profile-layout] {
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: clamp(10px, 1vw, 14px);
+    max-width: 1200px;
+    margin-inline: auto;
+    align-items: start;
   }
-
-  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > :first-child,
-  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > .grid.grid-cols-3 {
+  .dc-desktop-shell [data-revision-profile-layout] > .dc-glass-hero {
     grid-column: 1 / -1;
+    border-radius: 16px !important;
+    padding: 16px !important;
+    min-height: auto !important;
   }
-  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > :nth-child(3),
-  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > :nth-child(4) {
-    min-height: 100%;
-    margin: 0;
+  .dc-desktop-shell [data-rev-col="left"] {
+    grid-column: span 4;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .dc-desktop-shell [data-rev-col="middle"] {
+    grid-column: span 5;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .dc-desktop-shell [data-rev-col="right"] {
+    grid-column: span 3;
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
   }
 
-  /* Keep hero actions calm on large screens; no oversized stretched card. */
+  /* Cards compact on desktop */
+  .dc-desktop-shell [data-revision-page-main] .rev-card,
+  .dc-desktop-shell [data-revision-page-main] .rounded-3xl,
+  .dc-desktop-shell [data-revision-page-main] .rounded-2xl {
+    border-radius: clamp(12px, 1vw, 16px) !important;
+    box-shadow: 0 2px 12px -8px rgba(15,23,42,0.08), 0 1px 4px -2px rgba(15,23,42,0.06) !important;
+  }
+  .dc-desktop-shell [data-revision-page-main] .rev-card {
+    padding: clamp(10px, 0.9vw, 14px) !important;
+  }
+
+  /* Test Bank grid: 4 cols on desktop, compact */
+  .dc-desktop-shell [data-saved-tests-grid] {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+    gap: 12px !important;
+    max-width: 1200px;
+    margin-inline: auto;
+  }
+  .dc-desktop-shell [data-saved-test-card] {
+    border-radius: 16px !important;
+    aspect-ratio: auto !important;
+    min-height: auto !important;
+  }
+
+  /* Weak topics, bulk import, ai pages centered compact */
+  .dc-desktop-shell [data-rev-layout="weak"],
+  .dc-desktop-shell [data-rev-layout="aigenerate"],
+  .dc-desktop-shell [data-rev-layout="aisettings"],
+  .dc-desktop-shell [data-rev-layout="bulkimport"],
+  .dc-desktop-shell [data-rev-layout="testplayer"],
+  .dc-desktop-shell [data-rev-layout="testresult"],
+  .dc-desktop-shell [data-rev-layout="testreview"],
+  .dc-desktop-shell [data-rev-layout="revisionsession"],
+  .dc-desktop-shell [data-rev-layout="revisionsessionresult"] {
+    max-width: 900px;
+    margin-inline: auto;
+    gap: 12px;
+  }
+
+  /* Keep hero actions calm */
   .dc-desktop-shell [data-revision-page-main] .min-h-\[270px\] {
-    min-height: 230px;
+    min-height: 200px !important;
+  }
+  .dc-desktop-shell [data-revision-page-main] .min-h-\[270px\] > div {
+    min-height: 200px !important;
+    padding: 16px !important;
+  }
+
+  /* Hide bottom nav on desktop revision */
+  .dc-desktop-shell [data-revision-app] [data-site-footer] {
+    display: none !important;
   }
 }
+
+/* Tablet portrait revision optimization - 2 col compact */
+@media (min-width: 640px) and (max-width: 959px) and (orientation: portrait) {
+  [data-revision-page-main] > .animate-fade-in {
+    max-width: 720px;
+    margin-inline: auto;
+    padding: 16px clamp(12px, 3vw, 20px) 20px;
+    gap: 12px;
+  }
+  [data-rev-layout="dashboard"] {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  [data-rev-layout="dashboard"] > .lg\:col-span-7,
+  [data-rev-layout="dashboard"] > .lg\:col-span-5 {
+    grid-column: span 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  [data-revision-profile-layout] {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    max-width: 720px;
+    margin-inline: auto;
+  }
+  [data-revision-profile-layout] > .dc-glass-hero {
+    grid-column: 1 / -1;
+  }
+  [data-rev-col="left"],
+  [data-rev-col="middle"] {
+    grid-column: span 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  [data-rev-col="right"] {
+    display: none !important;
+  }
+  [data-rev-layout="progress"] {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  [data-saved-tests-grid] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  [data-revision-page-main] .rev-card {
+    padding: 14px !important;
+    border-radius: 16px !important;
+  }
+}
+
+/* Tablet landscape revision - 12-col like desktop but compact */
+@media (min-width: 640px) and (max-width: 1023px) and (orientation: landscape) {
+  [data-revision-app] {
+    height: 100dvh !important;
+    min-height: 0 !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+  [data-revision-app] [data-revision-frame] {
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+  [data-revision-page-main] {
+    padding: 12px clamp(10px, 1.5vw, 16px) !important;
+  }
+  [data-revision-page-main] > .animate-fade-in {
+    max-width: 100% !important;
+    padding: 0 0 16px;
+    gap: 10px;
+  }
+  [data-rev-layout="dashboard"] {
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 10px;
+  }
+  [data-rev-layout="dashboard"] > .lg\:col-span-7 {
+    grid-column: span 7;
+  }
+  [data-rev-layout="dashboard"] > .lg\:col-span-5 {
+    grid-column: span 5;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  [data-revision-profile-layout] {
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 10px;
+    max-width: 100%;
+  }
+  [data-revision-profile-layout] > .dc-glass-hero {
+    grid-column: 1 / -1;
+    border-radius: 14px !important;
+    padding: 12px !important;
+  }
+  [data-rev-col="left"] { grid-column: span 4; display: flex; flex-direction: column; gap: 8px; }
+  [data-rev-col="middle"] { grid-column: span 5; display: flex; flex-direction: column; gap: 8px; }
+  [data-rev-col="right"] { grid-column: span 3; display: flex !important; flex-direction: column; gap: 8px; }
+
+  [data-saved-tests-grid] {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+    gap: 10px !important;
+  }
+  [data-revision-page-main] .rev-card {
+    padding: 10px !important;
+    border-radius: 12px !important;
+  }
+  [data-revision-page-main] .rounded-3xl {
+    border-radius: 14px !important;
+  }
+  [data-revision-page-main] .min-h-\[270px\] {
+    min-height: 180px !important;
+  }
+  [data-revision-page-main] .min-h-\[270px\] > div {
+    min-height: 180px !important;
+    padding: 12px !important;
+  }
+  .dc-desktop-shell {
+    display: flex !important;
+  }
+}
+
 
 /* Profile Studio: OPTIMIZED desktop/tablet - compact, no empty space, fit both */
 @media (min-width: 960px) {

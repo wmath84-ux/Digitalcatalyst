@@ -93,22 +93,25 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
       rightSlot={streakSlot}
       mergeIntoMainHeader
     >
-      <div data-revision-page="dashboard" className="animate-fade-in space-y-4 px-4 py-4 pb-8">
+      <div data-revision-page="dashboard" data-rev-layout="dashboard" className="animate-fade-in space-y-4 px-4 py-4 pb-8 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0 lg:py-0 lg:pb-0 lg:max-w-[1200px] lg:mx-auto">
+        <div className="lg:col-span-7 lg:space-y-3">
         {revisionPlans.length === 0 ? (
           <FirstRevisionCard onGenerate={openGenerator} />
         ) : (
           <RevisionPlanCarousel plans={revisionPlans} onOpen={openPlan} />
         )}
+        </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="space-y-4 lg:col-span-5 lg:space-y-3">
+        <div className="grid grid-cols-3 gap-3 lg:gap-2">
           <StatChip icon={<ChartIcon className="h-5 w-5 text-indigo-600" />} label="Revisions" value={String(data.quickStats.testsCompleted)} />
           <StatChip icon={<TargetIcon className="h-5 w-5 text-emerald-600" />} label="Accuracy" value={`${data.quickStats.overallAccuracy}%`} />
           <StatChip icon={<FlameIcon className="h-5 w-5 text-orange-600" />} label="Streak" value={`${data.quickStats.streak}d`} />
         </div>
-
+        <div className="space-y-4 lg:space-y-3">
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[15px] font-bold text-slate-900">Weak Topics</h2>
+            <h2 className="text-[15px] font-bold text-slate-900 lg:text-[14px]">Weak Topics</h2>
             <button type="button" onClick={() => navigate("#/revision/weak-topics")} className="text-xs font-semibold text-indigo-600">
               View all
             </button>
@@ -157,6 +160,8 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
             </p>
           )}
         </Card>
+        </div>
+        </div>
       </div>
     </PageShell>
   );
@@ -164,11 +169,11 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
 
 function FirstRevisionCard({ onGenerate }: { onGenerate: () => void }) {
   return (
-    <div className="relative min-h-[270px] overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-0 text-white shadow-[0_20px_46px_-28px_rgba(79,70,229,0.42)]">
+    <div className="relative min-h-[270px] overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-0 text-white shadow-[0_20px_46px_-28px_rgba(79,70,229,0.42)] lg:rounded-2xl lg:min-h-[220px]">
       <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/10" />
       <div className="absolute -bottom-16 -left-12 h-44 w-44 rounded-full bg-indigo-300/10" />
-      <div className="relative flex min-h-[270px] flex-col p-5">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 shadow-sm backdrop-blur">
+      <div className="relative flex min-h-[270px] flex-col p-5 lg:min-h-[220px] lg:p-4">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 shadow-sm backdrop-blur lg:h-10 lg:w-10 lg:rounded-xl">
           <SparklesIcon className="h-6 w-6" />
         </span>
         <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-violet-100">Your first revision plan</p>
@@ -304,8 +309,8 @@ function PlanRow({ label, value }: { label: string; value: string }) {
 
 function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-white py-3 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)]">
-      {icon}<span className="text-base font-bold text-slate-900">{value}</span><span className="text-[10px] font-medium text-slate-500">{label}</span>
+    <div className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-white py-3 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)] lg:rounded-xl lg:py-2 lg:shadow-sm">
+      {icon}<span className="text-base font-bold text-slate-900 lg:text-sm">{value}</span><span className="text-[10px] font-medium text-slate-500 lg:text-[9px]">{label}</span>
     </div>
   );
 }

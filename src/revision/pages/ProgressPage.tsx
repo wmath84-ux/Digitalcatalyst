@@ -88,19 +88,20 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
 
   return (
     <PageShell route={route} title="Progress" subtitle="Your learning journey" mergeIntoMainHeader>
-      <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
-        <div className="grid grid-cols-2 gap-2.5">
+      <div data-rev-layout="progress" className="animate-fade-in space-y-4 px-4 py-4 pb-8 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0 lg:py-0 lg:pb-0 lg:max-w-[1200px] lg:mx-auto">
+        <div className="lg:col-span-4 lg:space-y-3"><div className="grid grid-cols-2 gap-2.5 lg:gap-2">
           <TotalCard icon={<CheckIcon className="h-5 w-5 text-indigo-600" />} label="Tests Completed" value={data.totals.testsCompleted} />
           <TotalCard icon={<ChartIcon className="h-5 w-5 text-emerald-600" />} label="Overall Accuracy" value={`${data.totals.overallAccuracy}%`} />
           <TotalCard icon={<SparklesIcon className="h-5 w-5 text-sky-600" />} label="Questions Attempted" value={data.totals.questionsAttempted} />
           <TotalCard icon={<XIcon className="h-5 w-5 text-rose-600" />} label="Incorrect Answers" value={data.totals.questionsIncorrect} />
           <TotalCard icon={<TrophyIcon className="h-5 w-5 text-amber-600" />} label="Mastered" value={data.totals.masteredCount} />
           <TotalCard icon={<FlameIcon className="h-5 w-5 text-orange-600" />} label="Current Streak" value={`${data.totals.currentStreak}d`} />
-        </div>
+        </div></div>
 
+        <div className="space-y-4 lg:col-span-8 lg:space-y-3">
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[15px] font-bold text-slate-900">Activity</h2>
+            <h2 className="text-[15px] font-bold text-slate-900 lg:text-[14px]">Activity</h2>
             <div className="flex rounded-full bg-slate-100 p-0.5 text-xs font-semibold">
               {RANGE_TABS.map((r) => (
                 <button
@@ -155,6 +156,7 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
             </div>
           )}
         </Card>
+        </div>
       </div>
     </PageShell>
   );
@@ -162,7 +164,7 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
 
 function TotalCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
   return (
-    <div className="rev-card flex items-center gap-3 rounded-2xl p-3">
+    <div className="rev-card flex items-center gap-3 rounded-2xl p-3 lg:rounded-xl lg:p-2.5 lg:shadow-sm">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">{icon}</span>
       <div className="min-w-0 flex-1">
         <span className="block truncate text-lg font-bold leading-tight text-slate-900">{value}</span>

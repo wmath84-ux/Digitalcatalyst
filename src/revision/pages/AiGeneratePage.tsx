@@ -577,7 +577,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
 
   return (
     <PageShell route={route} title="AI Revision Generator" subtitle="Build a focused revision plan" backHref="#/revision/profile">
-      <div className="animate-fade-in space-y-4 px-4 py-4 pb-10">
+      <div data-rev-layout="aigenerate" className="animate-fade-in space-y-4 px-4 py-4 pb-10 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
         {/* Provider strip */}
         <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)]">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white">

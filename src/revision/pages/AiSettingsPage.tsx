@@ -176,7 +176,7 @@ export default function AiSettingsPage({ uid, route }: Props) {
 
   return (
     <PageShell route={route} title="AI Configuration" subtitle="Set up in under a minute" backHref="#/revision/profile">
-      <div className="animate-fade-in space-y-4 px-4 py-4 pb-10">
+      <div data-rev-layout="aisettings" className="animate-fade-in space-y-4 px-4 py-4 pb-10 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
         <Card>
           <div className="flex items-center justify-between">
             <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">Current setup</h3>
