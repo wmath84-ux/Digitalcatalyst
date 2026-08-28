@@ -973,6 +973,55 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   .dc-desktop-shell [data-desktop-rail] { width: 220px !important; }
 }
 
+/* ── Page tabs — the tablet / desktop text nav under the header ──────────
+   My Day and Revision render <PageTabs> (src/components/ui/PageTabs.tsx):
+   the floating bottom pill that carries those page buttons on a phone is
+   hidden from 768 px up, so on a tablet or a desktop the pages are reached
+   from this single quiet text row instead.
+
+   It sits on the page itself (never in the header), so:
+
+     • Revision — the row is the flex sibling ABOVE the page's own scroller
+       (`[data-revision-page-main]`), so it stays visible while the page body
+       scrolls underneath it.
+     • My Day — the row is the first line of the page body, right under the
+       phone header, exactly where a desktop user looks for tabs.
+
+   `top` follows whichever header is on screen, because that swap is driven by
+   the app's own tablet/desktop bands and not by a single Tailwind breakpoint:
+
+     • 768–959 px (tablet portrait) → the phone header is the chrome: `md:py-4`
+       around the 3rem brand tile the tablet band gives it, plus its 1 px
+       hairline ≈ 81 px.
+     • ≥ 960 px, and tablet landscape once `html[data-tablet-landscape-desktop]`
+       is set → the phone header is hidden and the desktop shell's sticky top bar
+       (`h-16` = 64 px) is the chrome.
+
+   `z-index: 20` keeps the row under the header (z-30) but over page cards, and
+   ties with My Day's create dropdown, which comes later in the DOM and so keeps
+   painting on top of it. */
+.dc-page-tabs {
+  position: sticky;
+  z-index: 20;
+  top: 68px;
+}
+
+@media (min-width: 768px) {
+  .dc-page-tabs {
+    top: 80px;
+  }
+}
+
+@media (min-width: 960px) {
+  .dc-page-tabs {
+    top: 64px;
+  }
+}
+
+html[data-tablet-landscape-desktop="true"] .dc-page-tabs {
+  top: 64px;
+}
+
 @media (max-width: 374px) {
   .dc-footer-pill button {
     font-size: 10px;

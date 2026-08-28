@@ -21,6 +21,7 @@ import QuickNotes from "./components/myday/QuickNotes";
 import Reminders from "./components/myday/Reminders";
 import SideNav from "./components/myday/SideNav";
 import BottomNav from "./components/myday/BottomNav";
+import PageTabs, { type PageTabItem } from "./components/ui/PageTabs";
 import ConfirmDialog from "./components/ui/ConfirmDialog";
 import Toast from "./components/ui/Toast";
 import type { ToastMessage } from "./components/ui/Toast";
@@ -49,6 +50,20 @@ const CREATE_OPTIONS: { id: DaySection; label: string; hint: string; icon: typeo
   { id: "schedule", label: "Daily Schedule", hint: "Block time for classes and study", icon: CalendarClock },
   { id: "reminders", label: "Reminder", hint: "Get pinged at the right moment", icon: Bell },
   { id: "notes", label: "Quick Note", hint: "Capture a thought in seconds", icon: NotebookPen },
+];
+
+/**
+ * Text-only page tabs for tablet + desktop (see src/components/ui/PageTabs).
+ * These mirror the phone's bottom-pill destinations so a wide screen never
+ * needs the floating footer to move between My Day pages. "Day" is the
+ * feature's landing section (`overview`), matching the bottom nav's label.
+ */
+const DAY_TABS: PageTabItem[] = [
+  { id: "overview", label: "Day", hint: "Today at a glance" },
+  { id: "tasks", label: "Tasks", hint: "Today's task list" },
+  { id: "schedule", label: "Schedule", hint: "Time-blocked events" },
+  { id: "reminders", label: "Reminders", hint: "Alerts you set" },
+  { id: "notes", label: "Notes", hint: "Quick captured notes" },
 ];
 
 export default function App() {
@@ -513,6 +528,20 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* Tablet + desktop page tabs — the first line of the page body, right
+            under the header. The floating bottom pill that carries these
+            destinations on a phone is hidden from 768 px up, so this quiet text
+            row is how a wide screen moves between Day / Tasks / Schedule /
+            Reminders / Notes. Same section swap as the pill and the side rail. */}
+        <PageTabs
+          items={DAY_TABS}
+          activeId={activeSection}
+          onSelect={handleNavigate}
+          ariaLabel="My Day pages"
+          feature="myday"
+          onHome={() => { window.location.hash = "#/home"; }}
+        />
 
         <div data-myday-content className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 pt-6 sm:px-6 md:gap-8 md:px-8 lg:px-10">
           <SideNav active={activeSection} onNavigate={handleNavigate} />
