@@ -343,6 +343,13 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // full-screen (SPLIT_MAX). Releasing the handle at the closed end closes
   // the sheet; the same edge can then be grabbed again and dragged back
   // toward the centre to reopen the panel.
+  //
+  // The ratio is a percentage of the SECTION width, but the sheet is
+  // docked 4rem in from the right, so on phones the sheet reaches its
+  // physical maximum (left edge flush with the section's left edge) before
+  // 100%. `splitWidthCss` below caps the rendered width at that point —
+  // the handle never leaves the visible box, so a full-screen sheet can
+  // always be dragged back.
   const SPLIT_MIN = 0;
   const SPLIT_MAX = 95;
   /** Below this ratio a released drag counts as "close the panel". */
@@ -368,8 +375,25 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // needs it even though the state update may not have committed yet.
   const splitDragValueRef = useRef<number>(0);
   const splitPercent = tab === "mindmap" ? mindMapSplitPercent : notesSplitPercent;
-  const splitEditorWidth = `${notesSplitPercent}%`;
-  const mindMapSplitWidth = `${mindMapSplitPercent}%`;
+  /**
+   * The sheet's width as CSS. The sheet is anchored `4rem` (the dock's slot)
+   * in from the section's RIGHT edge, so at 100% it can at most span the
+   * USABLE width between the section's left edge and the dock. `min()`
+   * enforces that cap. Without it, dragging the centre handle all the way to
+   * full screen pushes the sheet's left edge — and the split handle riding
+   * on it — past the section's left edge, out of the section's
+   * `overflow-hidden` box: the panel sits "full screen" with no reachable
+   * handle, so the learner can neither drag it back (restore) nor drag it
+   * past the close threshold. The ratio the learner left behind is persisted,
+   * so every reopen landed on the same stuck state — for the mind map (whose
+   * header row is fully hidden) that read as "it can't be closed at all".
+   * Capped, the sheet can genuinely reach full screen while the handle stays
+   * visible at the left edge in every state.
+   */
+  const splitWidthCss = (percent: number) =>
+    `min(${percent}%, calc(100% - 4rem - env(safe-area-inset-right, 0px)))`;
+  const splitEditorWidth = splitWidthCss(notesSplitPercent);
+  const mindMapSplitWidth = splitWidthCss(mindMapSplitPercent);
 
   useEffect(() => {
     try { localStorage.setItem("dc.courseSplit.notes", String(notesSplitPercent)); } catch { /* ignore */ }
@@ -581,7 +605,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           // use the real available space and never slide underneath the
           // sticky header.
           ...(landscape
-            ? { width: edgeDragging ? `${splitPercent}%` : mindMapSplit ? mindMapSplitWidth : splitMode ? splitEditorWidth : sheetHeight }
+            ? { width: edgeDragging ? splitWidthCss(splitPercent) : mindMapSplit ? mindMapSplitWidth : splitMode ? splitEditorWidth : sheetHeight }
             : portraitFullHeight
               ? { top: 0, height: "auto" }
               : { height: sheetHeight }),

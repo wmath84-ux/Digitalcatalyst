@@ -239,3 +239,19 @@ test("The editor exposes inline formatting controls and keyboard shortcuts", () 
   assert.match(richEditor, /if \(key === "i"\)/);
   assert.match(richEditor, /if \(key === "u"\)/);
 });
+
+test("The heading / color / font dropdowns hide on any outside tap", () => {
+  // The three FormatMenus (heading, text color, font) used to stay open
+  // until the same toggle was tapped again or an item was picked — a stray
+  // tap on the writing surface left the menu floating over the note. A
+  // document-level pointerdown listener, armed only while a menu is open,
+  // must close it whenever the press lands outside the toolbar (which wraps
+  // both the toggles and the open dropdown, so those keep their own
+  // click behaviour).
+  assert.match(richEditor, /const toolbarRef = useRef<HTMLDivElement>\(null\);/);
+  assert.match(richEditor, /ref=\{toolbarRef\}[^>]*data-course-rich-toolbar/);
+  assert.match(richEditor, /if \(openMenu === null\) return undefined;/);
+  assert.match(richEditor, /toolbarRef\.current\?\.contains\(node\)/);
+  assert.match(richEditor, /document\.addEventListener\("pointerdown", onPointerDown, true\)/);
+  assert.match(richEditor, /document\.removeEventListener\("pointerdown", onPointerDown, true\)/);
+});

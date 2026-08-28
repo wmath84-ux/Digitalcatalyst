@@ -73,6 +73,9 @@ export default function RichTextEditor({
 }: RichTextEditorProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLDivElement>(null);
+  // Wraps the toggle buttons AND the open dropdown, so "outside" can be
+  // decided against one element for any of the three menus.
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const [openMenu, setOpenMenu] = useState<"heading" | "color" | "font" | null>(null);
   // Tracks what we last pushed upward so re-renders never clobber the caret.
   const lastEmitted = useRef<string>(value);
@@ -81,6 +84,29 @@ export default function RichTextEditor({
   const hydratedHeading = useRef(false);
 
   const showHeading = heading !== undefined;
+
+  // The heading / text color / font dropdowns must close the moment the
+  // learner taps ANYWHERE outside them — previously only tapping the same
+  // toggle (or picking an item) closed them, so a stray tap on the writing
+  // surface left the menu floating over the note. The listener is armed only
+  // while a menu is open and checks the press against the whole toolbar
+  // (toggles + open dropdown), so:
+  //   · tapping the same toggle still flips it (its own onClick runs);
+  //   · tapping an item still applies the format (items close themselves);
+  //   · tapping the surface / Save / Cancel / the lesson dismisses the menu.
+  // It listens for pointerdown (not focus/blur) and never preventDefaults,
+  // so the caret in the contentEditable surface is exactly where the tap
+  // puts it afterwards — no focus stealing, no lost selection.
+  useEffect(() => {
+    if (openMenu === null) return undefined;
+    const onPointerDown = (event: PointerEvent) => {
+      const node = event.target instanceof Node ? event.target : null;
+      if (node && toolbarRef.current?.contains(node)) return;
+      setOpenMenu(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [openMenu]);
 
   const syncEmptyFlag = (surface: HTMLDivElement) => {
     // contentEditable leaves a stray <br> behind after the last character is
@@ -253,7 +279,7 @@ export default function RichTextEditor({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-course-rich-editor>
-      <div className="flex shrink-0 flex-wrap items-center gap-1 rounded-t-xl border border-b-0 border-[var(--course-border)] bg-[var(--course-soft)] px-1.5 py-1.5" data-course-rich-toolbar>
+      <div ref={toolbarRef} className="flex shrink-0 flex-wrap items-center gap-1 rounded-t-xl border border-b-0 border-[var(--course-border)] bg-[var(--course-soft)] px-1.5 py-1.5" data-course-rich-toolbar>
         <FormatMenu label="Heading" icon={<Type size={14} />} open={openMenu === "heading"} onToggle={() => setOpenMenu(openMenu === "heading" ? null : "heading")}>
           {[1, 2, 3, 4, 5].map(level => <MenuItem key={level} label={`Heading ${level}`} onClick={() => { exec("formatBlock", `h${level}`); emit(); setOpenMenu(null); }} />)}
         </FormatMenu>
