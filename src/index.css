@@ -349,60 +349,72 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
       linear-gradient(180deg, #f6f8ff 0%, #eef3ff 46%, #f8fafc 100%);
   }
 
-  /* Standard inner content max-width: gives the page a comfortable
-     reading column on a tablet without leaving the gutters empty. The
-     720 px figure was chosen so a 768 px iPad portrait gets a 24 px
-     gutter on either side. Landscape iPad (1024 px) is at the
-     tablet/desktop boundary; the next block opens it up further. */
+  /* Inner content uses the real tablet width so the page fills the
+     screen. Each page keeps its own fluid padding; we only remove the
+     old fixed 720 px column that was creating the empty gutters. */
   .dc-app-shell > main,
   .dc-app-shell > [data-app-frame] > main {
-    max-width: 720px;
-    margin-inline: auto;
+    max-width: none;
+    margin-inline: 0;
     width: 100%;
   }
 
   /* Header row inside the tablet frame: keep the brand block on the
-     left and the action cluster on the right, but cap the row width
-     so the page is centred with the same 24 px gutter. */
+     left and the action cluster on the right, using the same fluid
+     gutter as the content. */
   [data-site-header] {
-    max-width: 720px;
-    margin-inline: auto;
+    max-width: none;
+    margin-inline: 0;
     width: 100%;
   }
 
   /* The hero carousel, the product grids, the category nav, the
-     "Continue learning" row and the reviews section all get the same
-     centered 720 px treatment so the visual rhythm matches. */
+     "Continue learning" row and the reviews section all fill the
+     available tablet width. */
   [data-home-hero],
   [data-home-category-nav],
   [data-home-continue],
   [data-home-trending],
   [data-home-reviews] {
-    max-width: 720px;
-    margin-inline: auto;
+    max-width: none;
+    margin-inline: 0;
     width: 100%;
   }
 
-  /* Grids: the home / store / PDP cards live in a 2-col grid on
-     phones. On a tablet they become 3 columns (the same cards at a
-     smaller scale feel much more like a real product list than a
-     stretched 2-col layout). */
+  /* Grids: the cards auto-fit the available width, so a 768 px
+     portrait tablet and a 1023 px landscape tablet both use the
+     whole area instead of leaving a fixed-width column floating
+     in the middle. */
   [data-home-grid],
   [data-store-grid],
   [data-pdp-grid],
   [data-search-grid] {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;
+  }
+
+  /* Store's rectangular-card view and My Library rows also tile
+     across the full tablet width instead of becoming one huge
+     stretched card with empty space on the right. */
+  [data-store-list],
+  [data-library-list] {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+    align-items: start;
+  }
+  [data-library-list] > h2 {
+    grid-column: 1 / -1;
   }
 
   /* The My Day / Revision / Profile / Notification content
-     containers get the same 720 px ceiling and auto gutters. */
+     containers also use the full tablet area. */
   [data-myday-content],
   [data-revision-content],
   [data-profile-content],
   [data-notifications-content],
   [data-search-content] {
-    max-width: 720px;
-    margin-inline: auto;
+    max-width: none;
+    margin-inline: 0;
     width: 100%;
   }
 
@@ -419,35 +431,34 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
     position: static !important;
   }
 
-  /* The bottom nav (floating magic pill) sits at 720 px wide on a
-     tablet — the same look as the phone, just wider, with a 24 px
-     gutter to the device edge. */
+  /* The bottom nav spans the real tablet width; the nav's own px-3 /
+     md:px-6 gutters keep it off the screen edges. */
   [data-site-footer].dc-footer-shell {
-    max-width: 720px;
-    margin-inline: auto;
-    width: calc(100% - 48px);
-  }
-
-  /* The My Day overview's big create button sits centred in its
-     720 px column instead of stretching edge-to-edge. */
-  [data-myday-create-row] {
-    max-width: 720px;
+    max-width: none;
     margin-inline: auto;
     width: 100%;
   }
 
-  /* PDP carousel + body content: cap the row so the layout looks
-     like a real tablet product page (no stretched phone mock). */
-  [data-pdp-scroll] {
-    max-width: 720px;
+  /* The My Day overview's big create button fills its fluid row. */
+  [data-myday-create-row] {
+    max-width: none;
     margin-inline: auto;
+    width: 100%;
   }
 
-  /* Cart / favorites rows: same ceiling. */
+  /* PDP carousel + body content use the full tablet area. */
+  [data-pdp-scroll] {
+    max-width: none;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  /* Cart / favorites rows fill the available tablet width. */
   [data-cart-row],
   [data-favorites-row] {
-    max-width: 720px;
+    max-width: none;
     margin-inline: auto;
+    width: 100%;
   }
 
   /* Header brand block gets a bit more breathing room on a tablet. */
@@ -529,24 +540,29 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
 
   /* Page bodies that rendered with `pb-2` (mobile bottom-nav offset)
      no longer need that padding on desktop. The desktop main column
-     handles its own padding through the shell. */
+     handles its own padding through the shell. The phone shell's own
+     `sm:py-6` wrapper padding is also removed so the content starts
+     at the top bar edge instead of floating inside it. */
+  .dc-app-shell {
+    padding: 0;
+  }
   [data-app-frame] > main {
     max-width: none;
     width: 100%;
     padding: 0;
   }
 
-  /* ── Page-specific rules: every page that opted into the tablet
-     layout's content width now opts into the desktop content width
-     (1280 px) instead. Below 1024 px the tablet rules still apply
-     (720 px), so the breakpoints stay clean. */
+  /* ── Page-specific rules: the desktop page body uses the real
+     available width (behind the left rail). Sections no longer cap
+     themselves at 1280 px, because on a large monitor that left a
+     visible band of unused space on both sides. */
   [data-home-hero],
   [data-home-category-nav],
   [data-home-continue],
   [data-home-trending],
   [data-home-reviews] {
-    max-width: 1280px;
-    margin-inline: auto;
+    max-width: none;
+    margin-inline: 0;
     width: 100%;
   }
 
@@ -559,20 +575,31 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   [data-favorites-row],
   [data-myday-create-row],
   [data-search-content] {
-    max-width: 1280px;
-    margin-inline: auto;
+    max-width: none;
+    margin-inline: 0;
     width: 100%;
   }
 
-  /* Grids: the home / store / PDP cards become 4- or 5-column on
-     desktop (the 2- or 3-column tablet layout was a step towards a
-     real product list — desktop is the step where the list feels
-     like a real storefront). */
+  /* Grids: cards auto-fit the full desktop area, so they scale with
+     the monitor instead of leaving empty wallpaper on wide screens. */
   [data-home-grid],
   [data-store-grid],
   [data-pdp-grid],
   [data-search-grid] {
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+  }
+
+  /* Store's rectangular-card view and My Library rows fill the
+     desktop area in a responsive tiled layout. */
+  [data-store-list],
+  [data-library-list] {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  [data-library-list] > h2 {
+    grid-column: 1 / -1;
   }
 
   /* The hero carousel grows even taller on desktop — a real product

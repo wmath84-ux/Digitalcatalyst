@@ -47,7 +47,6 @@ import { useCatalog } from "../context/CatalogContext";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
 import BrandMark from "./BrandMark";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
-import { APP_FRAME_MAX_WIDTHS } from "../utils/responsive";
 
 /** The hash-prefixed routes the rail can drive. Each one navigates by
  *  setting `window.location.hash` so the change is persistent + the
@@ -451,10 +450,7 @@ export default function DesktopShell({
           className={`flex min-h-0 flex-1 gap-6 px-6 py-6 ${sidePanel ? "xl:px-8" : ""}`}
           data-desktop-content
         >
-          <main
-            className="min-w-0 flex-1"
-            style={{ maxWidth: APP_FRAME_MAX_WIDTHS.desktop }}
-          >
+          <main className="min-w-0 flex-1">
             {children}
           </main>
           {sidePanel ? (
