@@ -134,7 +134,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
 
   return (
     <PageShell route={route} title="Bulk Import" subtitle="Paste a full revision plan" backHref="#/revision/profile">
-      <div className="animate-fade-in space-y-4 px-4 py-4 pb-10">
+      <div data-rev-layout="bulkimport" className="animate-fade-in space-y-4 px-4 py-4 pb-10 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
         {ready ? (
           <Card className="overflow-hidden border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50">
             <div className="flex flex-col items-center gap-3 py-4 text-center">

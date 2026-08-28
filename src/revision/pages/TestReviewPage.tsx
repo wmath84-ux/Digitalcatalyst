@@ -23,7 +23,7 @@ export default function TestReviewPage({ uid, route, attemptId }: { uid: string;
         <EmptyState title="Nothing to review" description="This test doesn't have any questions yet." />
       )}
       {data && data.length > 0 && (
-        <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
+        <div data-rev-layout="testreview" className="animate-fade-in space-y-4 px-4 py-4 pb-8 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
           {data.map((q, idx) => {
             const status = q.isSkipped ? "skipped" : q.isCorrect ? "correct" : "wrong";
             const statusStyles =

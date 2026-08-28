@@ -126,12 +126,12 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
     : snap.allowed ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700";
 
   return (
-    <section data-ai-quota-card aria-live="polite" className="relative rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_14px_40px_-24px_rgba(49,46,129,0.35)]">
+    <section data-ai-quota-card aria-live="polite" className="relative rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_14px_40px_-24px_rgba(49,46,129,0.35)] lg:rounded-2xl lg:p-3.5 lg:shadow-sm">
       <div className="relative">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-700 ring-1 ring-violet-100">
-              <Sparkles className="h-6 w-6" />
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-700 ring-1 ring-violet-100 lg:h-9 lg:w-9 lg:rounded-xl">
+              <Sparkles className="h-6 w-6 lg:h-4 lg:w-4" />
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600">School AI allowance</p>

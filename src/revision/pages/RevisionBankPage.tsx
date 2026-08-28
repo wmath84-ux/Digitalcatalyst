@@ -202,7 +202,7 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
 
   return (
     <PageShell route={route} title="Test Bank" subtitle={view === "tests" ? capacityLabel : `${summary.due} questions ready for Smart Revision`} mergeIntoMainHeader>
-      <div className="dc-glass-toolbar border-b border-white/60 px-4 pb-3 pt-3">
+      <div className="dc-glass-toolbar border-b border-white/60 px-4 pb-3 pt-3 lg:px-0 lg:max-w-[1200px] lg:mx-auto lg:rounded-2xl lg:mt-2">
         <div className="dc-glass-soft grid grid-cols-2 rounded-2xl p-1">
           <button
             type="button"
@@ -373,7 +373,7 @@ function SavedTestsView({
           ) : <SecondaryButton className="mt-2 w-auto px-6" onClick={() => onSearch("")}>Clear search</SecondaryButton>}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-3 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3" data-saved-tests-grid>
+        <div className="grid grid-cols-1 gap-3 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 lg:px-0 lg:gap-3 lg:max-w-[1200px] lg:mx-auto" data-saved-tests-grid>
           {tests.map((test) => (
             <SavedTestCard
               key={test.id}

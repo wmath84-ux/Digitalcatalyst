@@ -22,7 +22,7 @@ export default function RevisionSessionResultPage({ uid, route, sessionId }: { u
     <PageShell route={route} title="Revision Results" backHref="#/revision/bank">
       {error && <ErrorState message={error} />}
       {data && (
-        <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
+        <div data-rev-layout="revisionsessionresult" className="animate-fade-in space-y-4 px-4 py-4 pb-8 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
           <Card className="bg-gradient-to-br from-emerald-600 to-teal-600 text-center text-white">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-100">Revision Complete</p>
             <p className="mt-1 text-5xl font-extrabold">{data.accuracy}%</p>

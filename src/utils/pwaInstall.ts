@@ -34,14 +34,35 @@ export function showDesktopMaintenanceNotice() {
 /**
  * Screen-size-based mobile detection.
  * Returns true when the viewport width is at or below the mobile/portrait
- * breakpoint (768 px).  This is intentionally a *screen-size* check, not a
- * device-type check, so that a desktop user running the app inside a narrow
- * floating window (portrait-sized) is treated the same as a mobile user.
+ * breakpoint (768 px) AND not in tablet landscape desktop mode.
+ * 
+ * NEW: Tablet landscape (>=640 landscape) and wide tablet >=960 show desktop,
+ * so they are NOT considered mobile.
  */
 export const MOBILE_BREAKPOINT = 768;
+export const TABLET_LANDSCAPE_MIN = 640;
+export const WIDE_TABLET_THRESHOLD = 960;
+
+function isTabletLandscapeDesktop(): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const landscape = w > h;
+  let isTablet = false;
+  try {
+    const sw = window.screen?.width ?? 0;
+    const sh = window.screen?.height ?? 0;
+    isTablet = Math.min(sw, sh) >= 600;
+  } catch {
+    isTablet = w >= TABLET_LANDSCAPE_MIN;
+  }
+  return w >= WIDE_TABLET_THRESHOLD || (landscape && isTablet && w >= TABLET_LANDSCAPE_MIN);
+}
 
 export function isMobileScreenSize(): boolean {
   if (typeof window === "undefined") return false;
+  // Tablet landscape desktop should NOT be considered mobile
+  if (isTabletLandscapeDesktop()) return false;
   return window.innerWidth <= MOBILE_BREAKPOINT;
 }
 

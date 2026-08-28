@@ -3,10 +3,15 @@
 // Wraps every app page (Home, Store, MyDay, Profile, Revision, …) and
 // decides which chrome to render:
 //
-//   - mobile  / tablet  → the existing per-page chrome (phone
-//                           header + bottom-nav pill)
-//   - desktop (>= 1024 px) → the new DesktopShell (persistent left
-//                             rail + sticky top bar)
+//   - mobile  → the existing per-page chrome (phone header + bottom-nav pill)
+//   - tablet portrait (640-959 portrait) → tablet chrome (wider grids, still mobile header)
+//   - tablet landscape OR width >=960 (1.5x mobile) OR desktop (>=1024) → DesktopShell
+//     with side panel (persistent left rail + sticky top bar)
+//
+// NEW REQUIREMENT:
+//   - Tablet landscape = desktop interface
+//   - Width 1.5x mobile (960px+) = full desktop with side panel on tablet
+//   - Elements scale with tablet size via CSS clamp
 //
 // The wrapper is intentionally lightweight: it just picks one of two
 // layouts based on the viewport category. Each app page passes its
@@ -16,11 +21,10 @@
 // because the shell renders its own rail + top bar.
 //
 // The hook `useResponsiveCategory()` re-evaluates the viewport on
-// resize, so flipping a phone into landscape (and back) flips the
-// chrome live. The rail is only ever mounted on desktop, so its
-// state is naturally consistent across navigation.
+// resize + orientation change, so flipping a tablet into landscape
+// flips the chrome live to desktop.
 
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import DesktopShell, { type DesktopRailKey, resolveActiveFromHash } from "./DesktopShell";
 import { useResponsiveCategory } from "../utils/responsive";
 
@@ -53,6 +57,7 @@ interface AppShellProps {
   /**
    * Optional right-rail panel (e.g. My Day's streak + quick
    * actions). Stacks on tablet, side-by-side on desktop.
+   * On tablet landscape/desktop this panel is visible as side panel.
    */
   sidePanel?: ReactNode;
 }
@@ -68,9 +73,57 @@ export default function AppShell({
   sidePanel,
 }: AppShellProps) {
   const category = useResponsiveCategory();
+  const [isTabletLandscapeDesktop, setIsTabletLandscapeDesktop] = useState(false);
+
+  // Extra check for tablet landscape that should show desktop
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const check = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const landscape = w > h;
+      let isTablet = false;
+      try {
+        const sw = window.screen?.width ?? 0;
+        const sh = window.screen?.height ?? 0;
+        isTablet = Math.min(sw, sh) >= 600;
+      } catch {
+        isTablet = w >= 640;
+      }
+      const wide = w >= 960;
+      const shouldDesktop = wide || (landscape && isTablet && w >= 640);
+      setIsTabletLandscapeDesktop(shouldDesktop);
+      
+      // Set data attributes for CSS
+      if (shouldDesktop) {
+        document.documentElement.setAttribute("data-tablet-landscape-desktop", "true");
+      } else {
+        document.documentElement.removeAttribute("data-tablet-landscape-desktop");
+      }
+      if (landscape && isTablet) {
+        document.documentElement.setAttribute("data-tablet-landscape", "true");
+      } else {
+        document.documentElement.removeAttribute("data-tablet-landscape");
+      }
+    };
+    check();
+    window.addEventListener("resize", check);
+    window.addEventListener("orientationchange", check);
+    return () => {
+      window.removeEventListener("resize", check);
+      window.removeEventListener("orientationchange", check);
+    };
+  }, []);
+
   const resolvedActive = active ?? resolveActiveFromHash(typeof window !== "undefined" ? window.location.hash : "");
 
-  if (category === "desktop") {
+  // Show desktop shell for:
+  // - desktop category (>=1024)
+  // - tablet landscape (640+ landscape tablet)
+  // - wide tablet >=960 (1.5x mobile)
+  const showDesktopShell = category === "desktop" || isTabletLandscapeDesktop;
+
+  if (showDesktopShell) {
     return (
       <DesktopShell
         active={resolvedActive}
@@ -85,7 +138,7 @@ export default function AppShell({
       </DesktopShell>
     );
   }
-  // Mobile + tablet: the per-page chrome is in charge. The wrapper
+  // Mobile + tablet portrait: the per-page chrome is in charge. The wrapper
   // is render-free for the page body, so the existing JSX structure
   // stays exactly as it was.
   return <>{children}</>;

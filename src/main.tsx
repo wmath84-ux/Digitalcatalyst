@@ -282,6 +282,35 @@ function Root() {
 function DesktopAppHost({ children }: { children: ReactNode }) {
   const category = useResponsiveCategory();
   const [hash, setHash] = useState<string>(() => (typeof window !== "undefined" ? window.location.hash : ""));
+  const [isTabletDesktop, setIsTabletDesktop] = useState(false);
+
+  // Tablet landscape = desktop detection
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const checkTabletDesktop = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const landscape = w > h;
+      let isTabletDevice = false;
+      try {
+        const sw = window.screen?.width ?? 0;
+        const sh = window.screen?.height ?? 0;
+        isTabletDevice = Math.min(sw, sh) >= 600;
+      } catch {
+        isTabletDevice = w >= 640;
+      }
+      const shouldDesktop = w >= 960 || (landscape && isTabletDevice && w >= 640);
+      setIsTabletDesktop(shouldDesktop);
+    };
+    checkTabletDesktop();
+    window.addEventListener("resize", checkTabletDesktop);
+    window.addEventListener("orientationchange", checkTabletDesktop);
+    return () => {
+      window.removeEventListener("resize", checkTabletDesktop);
+      window.removeEventListener("orientationchange", checkTabletDesktop);
+    };
+  }, []);
+
   // Re-render on hash change so the active rail item follows the URL.
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -290,7 +319,8 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("hashchange", onChange);
   }, []);
 
-  if (category !== "desktop") {
+  // Show desktop shell for desktop OR tablet landscape/wide tablet
+  if (category !== "desktop" && !isTabletDesktop) {
     return <>{children}</>;
   }
 

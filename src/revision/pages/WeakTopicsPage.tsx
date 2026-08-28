@@ -81,7 +81,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
         />
       )}
       {data.hasData && (
-        <div className="animate-fade-in space-y-5 px-4 py-4 pb-8">
+        <div data-rev-layout="weak" className="animate-fade-in space-y-5 px-4 py-4 pb-8 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0 lg:py-0 lg:pb-0 lg:max-w-[1200px] lg:mx-auto">
           {errorMsg && (
             <div className="flex items-center gap-2 rounded-2xl bg-rose-100/70 px-4 py-3 text-sm font-medium text-rose-800">
               <AlertIcon className="h-4 w-4 shrink-0" /> {errorMsg}

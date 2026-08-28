@@ -52,7 +52,7 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
     <PageShell route={route} title="Test Result" backHref="#/revision">
       {error && <ErrorState message={error} />}
       {data && (
-        <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
+        <div data-rev-layout="testresult" className="animate-fade-in space-y-4 px-4 py-4 pb-8 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
           <Card className="bg-gradient-to-br from-indigo-600 to-violet-600 text-center text-white">
             <p className="line-clamp-1 text-xs font-semibold text-indigo-100">{data.testTitle}</p>
             <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-200">{data.attemptKind === "skipped" ? "Skipped-question attempt" : "Full attempt"}</p>
