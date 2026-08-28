@@ -610,10 +610,20 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
     border-radius: clamp(1rem, 1.5vw, 1.5rem) !important;
   }
 
-  /* Ensure search bar and top bar scale */
+  /* Ensure search bar and top bar scale.
+     The height belongs to the top bar's FIRST row, not to the bar itself: a
+     page that publishes its own page-switcher (`data-topbar-tabs`) grows the
+     bar with a second row, and pinning the whole bar would clip it. */
   .dc-desktop-shell [data-desktop-topbar] {
-    height: var(--desktop-topbar-height) !important;
     padding-inline: clamp(12px, 1.5vw, 24px) !important;
+  }
+
+  .dc-desktop-shell [data-desktop-topbar-row] {
+    height: var(--desktop-topbar-height) !important;
+  }
+
+  .dc-desktop-shell [data-desktop-topbar-tabs] {
+    font-size: clamp(0.75rem, 1vw, 0.8125rem) !important;
   }
 
   .dc-desktop-shell [data-desktop-topbar] input {
@@ -973,19 +983,26 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   .dc-desktop-shell [data-desktop-rail] { width: 220px !important; }
 }
 
-/* ── Page tabs — the tablet / desktop text nav under the header ──────────
-   My Day and Revision render <PageTabs> (src/components/ui/PageTabs.tsx):
-   the floating bottom pill that carries those page buttons on a phone is
-   hidden from 768 px up, so on a tablet or a desktop the pages are reached
-   from this single quiet text row instead.
+/* ── Page tabs — the tablet text nav under the header ────────────────────
+   Revision renders <PageTabs> (src/components/ui/PageTabs.tsx): the floating
+   bottom pill that carries those page buttons on a phone is hidden from
+   768 px up, so on a tablet the pages are reached from this single quiet text
+   row instead.
 
-   It sits on the page itself (never in the header), so:
+   It sits on the page itself (never in the header) and only exists while the
+   PHONE header is the chrome:
 
-     • Revision — the row is the flex sibling ABOVE the page's own scroller
-       (`[data-revision-page-main]`), so it stays visible while the page body
-       scrolls underneath it.
-     • My Day — the row is the first line of the page body, right under the
-       phone header, exactly where a desktop user looks for tabs.
+     • 768–959 px (tablet portrait) → the row is the flex sibling ABOVE the
+       revision page's own scroller (`[data-revision-page-main]`), so it stays
+       visible while the page body scrolls underneath it.
+     • ≥ 960 px, and tablet landscape once
+       `html[data-tablet-landscape-desktop]` is set → the desktop shell owns the
+       chrome, Revision publishes the SAME tabs into the shell's top bar
+       (`[data-desktop-topbar-tabs]`, see src/components/TopBarTabsContext.tsx)
+       and this in-body row is not rendered at all.
+
+   My Day no longer renders the row — its side rail (`SideNav`) and phone
+   bottom pill already carry those destinations.
 
    `top` follows whichever header is on screen, because that swap is driven by
    the app's own tablet/desktop bands and not by a single Tailwind breakpoint:
@@ -995,7 +1012,8 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
        hairline ≈ 81 px.
      • ≥ 960 px, and tablet landscape once `html[data-tablet-landscape-desktop]`
        is set → the phone header is hidden and the desktop shell's sticky top bar
-       (`h-16` = 64 px) is the chrome.
+       (`h-16` = 64 px) is the chrome. Kept for the bands where a feature still
+       renders the row (and harmless where it does not).
 
    `z-index: 20` keeps the row under the header (z-30) but over page cards, and
    ties with My Day's create dropdown, which comes later in the DOM and so keeps
