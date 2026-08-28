@@ -1048,6 +1048,15 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   animation: eq 0.8s ease-in-out infinite;
 }
 
+/* Course Player — the notes LIST now opens as a landscape split exactly
+   like the note editor. Inside the split sheet (which can be dragged
+   anywhere from ~10% to 95% wide) the note grid tiles by available width
+   instead of the fixed 2/3 phone columns, so a narrow 40% sheet gets 2
+   comfortable columns and a dragged-out wide sheet gets more. */
+[data-course-overlay][data-split-kind="notes"] [data-course-notes-grid] {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
 /* Course Player — square note cards lift off the panel with a mixed
    blue gradient glow so the boxes stay readable against both themes. */
 [data-course-notes-grid] [data-course-note] {
@@ -1964,11 +1973,64 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 @media (max-width: 767px) { [data-app-frame] { overscroll-behavior: none; } [data-revision-content] { overflow: hidden; } }
 
+/* Revision Studio scroll frame -------------------------------------------
+   Every revision page scrolls inside its own PageShell main
+   (`[data-revision-page-main]` is `flex-1 min-h-0 overflow-y-auto`). For
+   that container to actually scroll, the whole chain above it needs a
+   definite height.
+
+   - Mobile (<= 639 px): the base `[data-app-frame]` rule already pins the
+     frame to 100dvh, so the inner scroll works.
+   - Tablet (640-1023 px) and desktop (>= 1024 px): the frame switched to
+     `height: auto; min-height: 100dvh` (full-bleed app), which unbounded
+     the flex chain - the page main grew with its content and the inner
+     scroll container never engaged, so the revision pages could not be
+     scrolled at all. Below we re-bind the revision app to the viewport
+     (same pattern the Profile Studio uses) so the inner main scrolls on
+     tablet and desktop too. */
+@media (min-width: 640px) and (max-width: 1023px) {
+  [data-revision-app] {
+    height: 100dvh;
+    min-height: 0;
+    max-height: 100dvh;
+    overflow: hidden;
+    padding: 0;
+  }
+  [data-revision-app] [data-revision-frame] {
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+  }
+}
+
 /* Revision Studio desktop experience --------------------------------------
    Desktop gets a deliberate workspace composition rather than a wider phone:
    generous but bounded canvas, denser statistics, and an editorial two-column
    lower section. */
 @media (min-width: 1024px) {
+  /* The desktop shell's page column is bounded, but its `main` was
+     `align-self: flex-start`, so the app shell inside it stayed
+     content-sized. Only when the Revision app is the page do we stretch
+     that main and pin the app to it - the revision pages then scroll
+     inside their own PageShell main instead of relying on the document. */
+  .dc-desktop-shell:has([data-revision-app]) {
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .dc-desktop-shell [data-desktop-content]:has(> main > [data-revision-app]) {
+    align-items: stretch;
+  }
+  .dc-desktop-shell [data-revision-app] {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .dc-desktop-shell [data-revision-app] [data-revision-frame] {
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+  }
+
   .dc-desktop-shell [data-revision-page-main] {
     overflow-y: auto;
     height: 100%;
@@ -1980,40 +2042,45 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     width: 100%;
   }
 
+  /* Every revision page gets a centred, bounded canvas. Pages other than
+     the dashboard keep a plain block layout (the old selector applied the
+     dashboard's two-column grid to every page, which squeezed e.g. the
+     Test Bank's saved tests into a ~300 px right-hand column). */
   .dc-desktop-shell [data-revision-page-main] > .animate-fade-in {
     max-width: 1180px;
     margin-inline: auto;
     padding: 4px 0 32px;
-  }
-
-  /* Dashboard: primary plan across the canvas, supporting cards below. */
-  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > .grid.grid-cols-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-  }
-
-  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > .grid.grid-cols-3 + .rounded-3xl,
-  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > .grid.grid-cols-3 ~ .rounded-3xl {
-    min-width: 0;
-  }
-
-  /* Make adjacent Weak Topics / Revision Bank read as a dashboard pair. */
-  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > .grid.grid-cols-3 ~ .rounded-3xl {
     display: block;
   }
 
-  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in {
+  /* Dashboard only: primary plan across the canvas, supporting cards below. */
+  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] {
     display: grid;
     grid-template-columns: minmax(0, 1.45fr) minmax(300px, .85fr);
     align-content: start;
     gap: 20px;
   }
-  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > :first-child,
-  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > .grid.grid-cols-3 {
+  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > .grid.grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > .grid.grid-cols-3 + .rounded-3xl,
+  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > .grid.grid-cols-3 ~ .rounded-3xl {
+    min-width: 0;
+  }
+
+  /* Make adjacent Weak Topics / Revision Bank read as a dashboard pair. */
+  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > .grid.grid-cols-3 ~ .rounded-3xl {
+    display: block;
+  }
+
+  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > :first-child,
+  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > .grid.grid-cols-3 {
     grid-column: 1 / -1;
   }
-  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > :nth-child(3),
-  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > :nth-child(4) {
+  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > :nth-child(3),
+  .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] > :nth-child(4) {
     min-height: 100%;
     margin: 0;
   }

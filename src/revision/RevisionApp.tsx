@@ -194,8 +194,8 @@ export default function RevisionApp() {
   }
 
   return (
-    <div className="dc-app-shell min-h-screen sm:py-6">
-      <div data-app-frame className="dc-app-frame relative mx-auto flex h-dvh w-full max-w-md flex-col overflow-hidden sm:h-[calc(100vh-3rem)] sm:rounded-[2rem] md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0">
+    <div data-revision-app className="dc-app-shell min-h-screen sm:py-6">
+      <div data-app-frame data-revision-frame className="dc-app-frame relative mx-auto flex h-dvh w-full max-w-md flex-col overflow-hidden sm:h-[calc(100vh-3rem)] sm:rounded-[2rem] md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0">
         <ExitGuardProvider onNavigate={(href) => { window.location.hash = href; }}>
           <RevisionHeaderProvider>
             <RevisionStoreHeader cartCount={cartIds.size} />
