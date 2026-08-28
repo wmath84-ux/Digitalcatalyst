@@ -12,8 +12,8 @@
 // A plain-text paste (Ctrl/Cmd + Shift + V, or a source with no HTML flavour)
 // keeps its line breaks and indentation instead of collapsing to one line.
 
-import { useEffect, useRef, type ClipboardEvent, type KeyboardEvent } from "react";
-import { Bold, Code, Italic, List, ListOrdered, Quote, Strikethrough, Underline, Eraser } from "lucide-react";
+import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type CSSProperties, type ReactNode } from "react";
+import { Bold, Code, Italic, List, ListOrdered, Quote, Strikethrough, Underline, Eraser, Palette, Type, ChevronDown } from "lucide-react";
 import { plainToRichText, sanitizeRichText } from "../utils/richText";
 
 interface RichTextEditorProps {
@@ -36,12 +36,19 @@ type ToolbarAction = {
 };
 
 const exec = (command: string, value?: string) => {
-  try {
-    document.execCommand(command, false, value);
-  } catch {
-    /* unsupported command — the surface stays editable either way */
-  }
+  try { document.execCommand(command, false, value); } catch { /* unsupported command */ }
 };
+
+function MenuItem({ label, onClick, style }: { label: string; onClick: () => void; style?: CSSProperties }) {
+  return <button type="button" style={style} onMouseDown={e => e.preventDefault()} onClick={onClick} className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100">{label}</button>;
+}
+
+function FormatMenu({ label, icon, open, onToggle, children }: { label: string; icon: ReactNode; open: boolean; onToggle: () => void; children: ReactNode }) {
+  return <div className="relative">
+    <button type="button" aria-label={label} title={label} onMouseDown={e => e.preventDefault()} onClick={onToggle} className="flex h-8 items-center gap-1 rounded-lg px-2 text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"><span>{icon}</span><span className="hidden text-xs sm:inline">{label}</span><ChevronDown size={11} /></button>
+    {open && <div className="absolute left-0 top-9 z-20 min-w-[145px] rounded-lg border border-slate-200 bg-white p-1 shadow-xl">{children}</div>}
+  </div>;
+}
 
 export default function RichTextEditor({
   value,
@@ -53,6 +60,7 @@ export default function RichTextEditor({
   dataAttribute,
 }: RichTextEditorProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const [openMenu, setOpenMenu] = useState<"heading" | "color" | "font" | null>(null);
   // Tracks what we last pushed upward so re-renders never clobber the caret.
   const lastEmitted = useRef<string>(value);
   const hydrated = useRef(false);
@@ -153,24 +161,20 @@ export default function RichTextEditor({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-course-rich-editor>
       <div className="flex shrink-0 flex-wrap items-center gap-1 rounded-t-xl border border-b-0 border-[var(--course-border)] bg-[var(--course-soft)] px-1.5 py-1.5" data-course-rich-toolbar>
+        <FormatMenu label="Heading" icon={<Type size={14} />} open={openMenu === "heading"} onToggle={() => setOpenMenu(openMenu === "heading" ? null : "heading")}>
+          {[1, 2, 3, 4, 5].map(level => <MenuItem key={level} label={`Heading ${level}`} onClick={() => { exec("formatBlock", `h${level}`); emit(); setOpenMenu(null); }} />)}
+        </FormatMenu>
+        <FormatMenu label="Text color" icon={<Palette size={14} />} open={openMenu === "color"} onToggle={() => setOpenMenu(openMenu === "color" ? null : "color")}>
+          <div className="grid grid-cols-6 gap-2 p-2">
+            {["#202124", "#d93025", "#e37400", "#fbbc04", "#34a853", "#1a73e8", "#9334e8", "#e91e63", "#795548", "#607d8b", "#ffffff", "#eeeeee"].map(color => <button key={color} type="button" aria-label={color} className="h-6 w-6 rounded-full border border-black/15 shadow-sm" style={{ backgroundColor: color }} onMouseDown={e => e.preventDefault()} onClick={() => { surfaceRef.current?.focus(); exec("foreColor", color); emit(); setOpenMenu(null); }} />)}
+            <label className="col-span-6 flex cursor-pointer items-center gap-2 border-t border-slate-100 pt-2 text-xs text-slate-600"><span className="h-5 w-5 rounded-full border" style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }} />Custom color<input type="color" className="sr-only" onChange={e => { surfaceRef.current?.focus(); exec("foreColor", e.target.value); emit(); setOpenMenu(null); }} /></label>
+          </div>
+        </FormatMenu>
+        <FormatMenu label="Font" icon={<span className="text-xs font-bold">Aa</span>} open={openMenu === "font"} onToggle={() => setOpenMenu(openMenu === "font" ? null : "font")}>
+          {['Arial','Calibri','Cambria','Comic Sans MS','Courier New','Georgia','Helvetica','Roboto','Times New Roman','Trebuchet MS','Verdana'].map(font => <MenuItem key={font} label={font} style={{ fontFamily: font }} onClick={() => { exec("fontName", font); emit(); setOpenMenu(null); }} />)}
+        </FormatMenu>
         {actions.map(({ key, label, icon: Icon, run }) => (
-          <button
-            key={key}
-            type="button"
-            // `onMouseDown` keeps the caret / selection inside the surface.
-            onMouseDown={(event) => {
-              event.preventDefault();
-              surfaceRef.current?.focus();
-              run();
-              emit();
-            }}
-            className="grid h-8 w-8 place-items-center rounded-lg text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
-            aria-label={label}
-            title={label}
-            data-course-rich-action={key}
-          >
-            <Icon size={14} />
-          </button>
+          <button key={key} type="button" onMouseDown={(event) => { event.preventDefault(); surfaceRef.current?.focus(); run(); emit(); }} className="grid h-8 w-8 rounded-lg place-items-center text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]" aria-label={label} title={label} data-course-rich-action={key}><Icon size={14} /><span className="sr-only">{label}</span></button>
         ))}
       </div>
       <div
