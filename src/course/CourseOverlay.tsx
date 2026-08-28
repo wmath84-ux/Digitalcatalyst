@@ -191,24 +191,15 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   const activeIndex = Math.max(0, TABS.findIndex((item) => item.key === tab));
   const landscape = orientation === "landscape";
   // NotesPanel reports when its big editor is open so the sheet can grow.
+  // This is a MIRROR of the panel's live editor state — it must never be
+  // force-reset while the panel is still mounted, because the panel keeps
+  // its own `composing` / `editingId` state (an empty draft does not
+  // auto-save) and only re-reports when that state changes. Resetting the
+  // mirror here used to desync the two: close the sheet with the editor
+  // still open, reopen it, and the mirror stayed false while the panel was
+  // still in editor mode — so the sheet came back as a plain right-side
+  // overlay instead of the swipeable 60/40 split.
   const [notesEditorOpen, setNotesEditorOpen] = useState(false);
-
-  // ── Reset notesEditorOpen when the overlay closes ─────────────────────
-  // When the user taps outside (scrim click) or otherwise closes the overlay
-  // while the notes editor is open, `open` goes false but `notesEditorOpen`
-  // stays true inside this component — which keeps `splitMode` true and
-  // leaves the left content window shrunk with a white gap.
-  // We reset it here so the split layout collapses the moment the overlay
-  // closes, regardless of HOW it was closed.
-  const prevOpen = useRef(open);
-  useEffect(() => {
-    if (prevOpen.current && !open) {
-      // Overlay just closed — reset editor-open flag immediately so the
-      // parent's split mode gets cleared and the content expands back.
-      setNotesEditorOpen(false);
-    }
-    prevOpen.current = open;
-  }, [open]);
 
   // Writing mode = the rich-text writing box is open (compose or edit). In
   // this mode the sheet keeps NO headers at all — nothing but the
@@ -315,7 +306,15 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   const notesHeight = landscape ? "52vw" : "50dvh";
   const notesEditorHeight = landscape ? "min(92vw, 620px)" : "88dvh";
   const defaultHeight = landscape ? "min(78vw, 460px)" : "72dvh";
-  const splitMode = landscape && tab === "notes" && notesEditorOpen;
+  // The split ONLY applies while the sheet is actually OPEN — exactly like
+  // `mindMapSplit` below. Gating on `open` is what makes the split collapse
+  // the moment the sheet closes (no white gap, however it was closed: dock
+  // button, scrim, Escape) even though `notesEditorOpen` may legitimately
+  // stay true — the panel stays mounted while the sheet is hidden, and an
+  // empty draft keeps its editor state. And on the next open the split is
+  // already true, so the sheet lands straight back in the 60/40
+  // swipe-and-adjust layout instead of a plain overlay.
+  const splitMode = landscape && open && tab === "notes" && notesEditorOpen;
 
   // ── Mind map sheet sizing ───────────────────────────────────────────────
   // The mind map claims HALF the screen — more than the notes' 40% — because
