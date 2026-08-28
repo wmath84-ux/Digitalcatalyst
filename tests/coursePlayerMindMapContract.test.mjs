@@ -130,7 +130,7 @@ test("leaving the mind map tab flushes the pending save exactly once", () => {
 test("maps are stored per learner + course + module under users/{uid}", () => {
   assert.equal(mindMapDocId("u1", "7", "m2"), "u1__7__m2");
   assert.match(hook, /doc\(db, "users", String\(uid\), "mindMaps", docKey\)/);
-  assert.match(hook, /doc\(db, "users", String\(currentUid\), "mindMaps", key\)/);
+  assert.match(hook, /doc\(db, "users", signedInUid, "mindMaps", key\)/);
 });
 
 test("a refused or failed cloud write never strands the learner's map", () => {
@@ -244,6 +244,7 @@ test("nodes are hand-positionable — drag and drop anywhere, persisted per node
   assert.match(panel, /applyNodeChanges\(changes, current\)/);
   assert.match(panel, /onNodeDragStart=/);
   assert.match(panel, /collectSubtreeIds\(mind, node\.id\)/);
+  assert.match(panel, /position: \{ x: node\.position\.x, y: node\.position\.y \}/);
   assert.match(panel, /setNodePosition\(current, node\.id, node\.position\.x, node\.position\.y\)/);
   // Buttons inside a node must never start a drag.
   assert.match(panel, /nodrag absolute top-1\/2/);

@@ -195,7 +195,7 @@ const collectModuleTitleById = (modules: CourseModule[]): Record<string, string>
 const collectModuleIdByFileId = (modules: CourseModule[]): Record<string, string> => {
   const map: Record<string, string> = {};
   const visit = (node: CourseModule) => {
-    (node.files || []).forEach((file) => {
+    filesInModule(node).forEach((file) => {
       if (file?.id != null && node.id != null) map[String(file.id)] = String(node.id);
     });
     (node.modules || []).forEach(visit);

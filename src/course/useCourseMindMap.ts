@@ -20,7 +20,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "../../firebase";
+import { auth, db } from "../../firebase";
 import {
   createMindMap,
   isMindMap,
@@ -105,18 +105,23 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
   const scopeRef = useRef({ uid, productId, moduleId, docKey, scoped });
   scopeRef.current = { uid, productId, moduleId, docKey, scoped };
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryAttemptRef = useRef(0);
+  const readyRef = useRef(false);
   /** Bumped on every local edit so a slower in-flight write cannot clobber it. */
   const revisionRef = useRef(0);
 
   // ── Load: Firestore first, then the device mirror ───────────────────────
   useEffect(() => {
     if (!scoped || !docKey) {
+      readyRef.current = false;
       setLoading(false);
       setStatus("idle");
       return undefined;
     }
 
     let cancelled = false;
+    readyRef.current = false;
     setLoading(true);
     setStatus("loading");
 
@@ -153,7 +158,10 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
           setErrorMessage("Mind map load nahi ho paya. Aap draw karna shuru kar sakte hain — hum dobara save try karenge.");
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          readyRef.current = true;
+          setLoading(false);
+        }
       }
     })();
 
@@ -168,7 +176,22 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
   // ── Save: debounced write, mirrored locally on the way out ──────────────
   const persist = useCallback(() => {
     const { uid: currentUid, productId: currentProduct, moduleId: currentModule, docKey: key, scoped: isScoped } = scopeRef.current;
-    if (!isScoped || !key) return;
+    if (!isScoped || !key || !readyRef.current) return;
+    const signedInUid = typeof auth?.currentUser?.uid === "string" ? auth.currentUser.uid : "";
+    if (!signedInUid || signedInUid !== String(currentUid)) {
+      setStatus("error");
+      setErrorMessage("Cloud save fail hua — map is device par safe hai, aur thodi der me dobara try hoga.");
+      const attempt = retryAttemptRef.current + 1;
+      retryAttemptRef.current = attempt;
+      if (attempt <= 8) {
+        if (retryRef.current) clearTimeout(retryRef.current);
+        retryRef.current = setTimeout(() => {
+          retryRef.current = null;
+          persist();
+        }, Math.min(8000, 400 * attempt));
+      }
+      return;
+    }
     const current = mindRef.current;
 
     // The local mirror is written synchronously and unconditionally: even if
@@ -177,20 +200,18 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
 
     setStatus("saving");
     const revision = revisionRef.current;
+    const payload = JSON.parse(JSON.stringify(toFirestoreMindMap(current, {
+      uid: signedInUid,
+      productId: String(currentProduct),
+      moduleId: String(currentModule),
+      updatedAt: Date.now(),
+    })));
 
-    void setDoc(
-      doc(db, "users", String(currentUid), "mindMaps", key),
-      toFirestoreMindMap(current, {
-        uid: currentUid,
-        productId: currentProduct,
-        moduleId: currentModule,
-        updatedAt: Date.now(),
-      }),
-      { merge: true },
-    )
+    void setDoc(doc(db, "users", signedInUid, "mindMaps", key), payload)
       .then(() => {
         // A newer edit may already be queued; don't downgrade its status.
         if (revisionRef.current !== revision) return;
+        retryAttemptRef.current = 0;
         setStatus("saved");
         setErrorMessage(null);
         setLastSavedAt(Date.now());
@@ -199,6 +220,15 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
         if (revisionRef.current !== revision) return;
         setStatus("error");
         setErrorMessage("Cloud save fail hua — map is device par safe hai, aur thodi der me dobara try hoga.");
+        const attempt = retryAttemptRef.current + 1;
+        retryAttemptRef.current = attempt;
+        if (attempt > 8) return;
+        if (retryRef.current) clearTimeout(retryRef.current);
+        const delay = Math.min(20000, 700 * 2 ** Math.min(attempt, 5));
+        retryRef.current = setTimeout(() => {
+          retryRef.current = null;
+          persist();
+        }, delay);
       });
   }, []);
 

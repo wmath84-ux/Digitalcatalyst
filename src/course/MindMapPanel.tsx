@@ -814,10 +814,18 @@ function MindMapCanvas(props: MindMapPanelProps) {
             if (!session || session.id !== node.id) return;
             const dx = node.position.x - session.origin.x;
             const dy = node.position.y - session.origin.y;
-            if (session.moving.size <= 1 || (dx === 0 && dy === 0)) return;
+            // Apply the dragged node AND its branch every frame. Skipping the
+            // dragged id (the old path) left the root on its last committed
+            // layout spot until pointer-up — children looked live, the centre
+            // did not. React Flow's own change is merged in via onNodesChange,
+            // but a parent drag's setNodes can win a stale frame; writing the
+            // live position here keeps the primary node in lock-step.
             setNodes((current) =>
               current.map((item) => {
-                if (item.id === node.id || !session.moving.has(item.id)) return item;
+                if (!session.moving.has(item.id)) return item;
+                if (item.id === node.id) {
+                  return { ...item, position: { x: node.position.x, y: node.position.y } };
+                }
                 const start = session.starts.get(item.id);
                 if (!start) return item;
                 return { ...item, position: { x: start.x + dx, y: start.y + dy } };
