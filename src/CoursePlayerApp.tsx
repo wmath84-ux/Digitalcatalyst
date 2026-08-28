@@ -1107,6 +1107,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           // until the learner flips the map's own sun/moon toolbar button.
           playerTheme={theme}
           landscape={useLandscapeRails}
+          // True only while the mind map sheet is actually open. The panel
+          // uses this to bring the map library (its first/home screen) back
+          // every time the tab is reopened, instead of resuming straight on
+          // a canvas.
+          open={dockOpen && dockTab === "mindmap"}
           onClose={() => {
             mindMap.flush();
             setDockOpen(false);

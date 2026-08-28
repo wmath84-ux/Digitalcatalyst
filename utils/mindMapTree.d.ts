@@ -161,6 +161,23 @@ export function setNodeTopic(mind: MindMap, id: string | number, topic: string):
  * coordinates are refused; finite ones are rounded and clamped.
  */
 export function setNodePosition(mind: MindMap, id: string | number, x: number, y: number): MindMap;
+
+/**
+ * Commit a finished drag as one rigid group: the picked node is pinned at
+ * `(x, y)` and every descendant that already has its own manual pin is
+ * translated by the same delta, so the whole connected branch (or the whole
+ * map when the primary node is moved) travels together instead of snapping
+ * back after the drop. `fromX/fromY` is the node's rendered position at
+ * pointer-down. A zero-movement event is refused (no accidental pinning).
+ */
+export function moveNodeSubtree(
+  mind: MindMap,
+  id: string | number,
+  x: number,
+  y: number,
+  fromX: number,
+  fromY: number,
+): MindMap;
 export function removeNode(mind: MindMap, id: string | number): MindMap;
 export function toggleCollapsed(mind: MindMap, id: string | number): MindMap;
 export function setCollapsed(mind: MindMap, id: string | number, collapsed: boolean): MindMap;

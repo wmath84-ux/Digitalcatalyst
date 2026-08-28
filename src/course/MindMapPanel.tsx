@@ -3,6 +3,13 @@
 // The learner-facing mind map editor, opened from the Course Player dock next
 // to the Note tab.
 //
+// The panel's HOME screen is the map library — the grid of every map this
+// module holds — so opening the tab always lands on a choice ("konsi map
+// kholni hai / nayi banani hai") instead of dropping straight onto whatever
+// canvas was open last. Tapping a card opens that diagram for editing; "New
+// map" starts a fresh one. The library also returns every time the sheet is
+// reopened after being closed, never leaving a lone stale canvas behind.
+//
 // ── Interaction contract ─────────────────────────────────────────────────
 //   `+`            → add a child to this node (then focus its editor)
 //   tap node       → opens the inline editor straight away. The editor sits
@@ -98,9 +105,9 @@ import {
   hasManualPositions,
   layoutMindMap,
   maxDepth,
+  moveNodeSubtree,
   removeNode,
   rootId,
-  setNodePosition,
   setNodeTopic,
   type MindMap,
 } from "../../utils/mindMapTree";
@@ -546,6 +553,14 @@ export interface MindMapPanelProps {
   landscape?: boolean;
   /** Close the mind map sheet (toolbar X). */
   onClose?: () => void;
+  /**
+   * True while the mind map sheet itself is open. The map library (the grid
+   * of this module's maps) is the panel's HOME screen: it shows first on
+   * mount and comes back every time the sheet is reopened, so the learner
+   * always picks which map to open / edit — or taps "New map" — before
+   * landing on a canvas.
+   */
+  open?: boolean;
 
   // ── The module's list of maps (Notes-style: many maps, not one) ────────
   /** Every map the learner has in the active module. */
@@ -576,6 +591,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
     onClose,
     playerTheme = "dark",
     landscape: _landscape,
+    open = true,
     maps = [],
     activeMapKey = "main",
     onSelectMap,
@@ -585,8 +601,10 @@ function MindMapCanvas(props: MindMapPanelProps) {
     mapsLoading = false,
     atMapLimit = false,
   } = props;
-  /** The map library sheet (list of this module's maps) is closed by default. */
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  /** The map library sheet (grid of this module's maps) is the HOME screen:
+   *  it is open by default so the learner picks a map to edit — or creates a
+   *  new one — before ever landing on a canvas. */
+  const [libraryOpen, setLibraryOpen] = useState(true);
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -631,6 +649,22 @@ function MindMapCanvas(props: MindMapPanelProps) {
       /* ignore */
     }
   }, [doubleTapDelete]);
+
+  // The library is the panel's home screen. It opens on mount, and if the
+  // learner closes the sheet with the same-tab dock toggle and opens it again,
+  // the library comes straight back — with any in-progress node edit cleared —
+  // so they can pick another map or start a new one.
+  const prevOpenRef = useRef(open);
+  useEffect(() => {
+    if (open && !prevOpenRef.current) {
+      setLibraryOpen(true);
+      setRenamingKey(null);
+      setRenameDraft("");
+      setSelectedId(null);
+      setEditingId(null);
+    }
+    prevOpenRef.current = open;
+  }, [open]);
 
   // Flush the debounced write when the panel unmounts. The overlay unmounts
   // this on a tab switch, so this is the safety net that pairs with the
@@ -808,8 +842,32 @@ function MindMapCanvas(props: MindMapPanelProps) {
     });
   }, [layoutNodes]);
 
+  // React Flow reports the picked node's live position through `onNodesChange`
+  // on EVERY pointer move. That callback is therefore the single place the
+  // whole connected group is moved: when a drag session is active, the picked
+  // node's position change is applied and EVERY node in its subtree is
+  // shifted by the same delta in the SAME state update. One write per frame
+  // means the primary node and its branches can never fall out of lock-step
+  // (two competing setNodes calls could win a stale frame), so the movement
+  // is visible live while the finger is still down.
   const onNodesChange = useCallback((changes: NodeChange<Node<MindNodeData>>[]) => {
-    setNodes((current) => applyNodeChanges(changes, current));
+    setNodes((current) => {
+      const session = dragSessionRef.current;
+      const dragChange = session
+        ? changes.find((change) => change.type === "position" && change.id === session.id)
+        : undefined;
+      const next = applyNodeChanges(changes, current);
+      if (!session || !dragChange) return next;
+      const moved = next.find((item) => item.id === session.id);
+      if (!moved) return next;
+      const dx = moved.position.x - session.origin.x;
+      const dy = moved.position.y - session.origin.y;
+      return next.map((item) => {
+        if (item.id === session.id || !session.moving.has(item.id)) return item;
+        const start = session.starts.get(item.id);
+        return start ? { ...item, position: { x: start.x + dx, y: start.y + dy } } : item;
+      });
+    });
   }, []);
 
   const edges: Edge[] = useMemo(
@@ -909,40 +967,39 @@ function MindMapCanvas(props: MindMapPanelProps) {
               moving,
             };
           }}
-          onNodeDrag={(_event, node) => {
+          onNodeDrag={() => {
+            // The actual live movement of the node AND its whole connected
+            // branch is applied in `onNodesChange` above — one position
+            // change per frame, one state update. This handler only marks
+            // that a real move happened, so the click that trails the drop
+            // is never mistaken for a tap that should open the editor.
             dragMovedRef.current = true;
-            const session = dragSessionRef.current;
-            if (!session || session.id !== node.id) return;
-            const dx = node.position.x - session.origin.x;
-            const dy = node.position.y - session.origin.y;
-            // Apply the dragged node AND its branch every frame. Skipping the
-            // dragged id (the old path) left the root on its last committed
-            // layout spot until pointer-up — children looked live, the centre
-            // did not. React Flow's own change is merged in via onNodesChange,
-            // but a parent drag's setNodes can win a stale frame; writing the
-            // live position here keeps the primary node in lock-step.
-            setNodes((current) =>
-              current.map((item) => {
-                if (!session.moving.has(item.id)) return item;
-                if (item.id === node.id) {
-                  return { ...item, position: { x: node.position.x, y: node.position.y } };
-                }
-                const start = session.starts.get(item.id);
-                if (!start) return item;
-                return { ...item, position: { x: start.x + dx, y: start.y + dy } };
-              }),
-            );
           }}
           onNodeDragStop={(_event, node) => {
-            // Commit the drop as this node's manual position — the branch
-            // under it inherits the same offset in the next layout pass, so
-            // a hand-moved parent keeps its children glued on.
-            onMindChange((current) => setNodePosition(current, node.id, node.position.x, node.position.y));
-            draggingRef.current = false;
+            const session = dragSessionRef.current;
             dragSessionRef.current = null;
-            // The dropped node becomes the selection so the toolbar trash
-            // can act on it straight away.
-            setSelectedId(node.id);
+            draggingRef.current = false;
+            // React Flow fires drag start/stop even for a PLAIN TAP (its
+            // nodeDragThreshold is 0), so guard on real travel: a tap must
+            // never pin the node — every tapped node would silently freeze
+            // at its current spot and a later primary-node drag would leave
+            // it behind.
+            const travelled = session
+              ? Math.hypot(node.position.x - session.origin.x, node.position.y - session.origin.y)
+              : 0;
+            if (session && travelled >= TAP_SLOP_PX) {
+              // Commit the drop as one rigid group: the picked node is
+              // pinned at the drop point AND every connected node — even
+              // ones the learner had hand-placed earlier — moves by exactly
+              // the same delta. The map never tears: dragging the primary
+              // node carries its whole connected map with it.
+              onMindChange((current) =>
+                moveNodeSubtree(current, node.id, node.position.x, node.position.y, session.origin.x, session.origin.y),
+              );
+              // The dropped node becomes the selection so the toolbar trash
+              // can act on it straight away.
+              setSelectedId(node.id);
+            }
             // A drag must never end with the rename keyboard popping up: if
             // an editor is open anywhere, blur it so its draft commits and
             // the sheet stays quiet.
@@ -1046,6 +1103,19 @@ function MindMapCanvas(props: MindMapPanelProps) {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              {/* While the index is still loading, show skeletons instead of a
+                  fake single card — the grid is this panel's first screen, so
+                  it should never look emptier than it really is. */}
+              {mapsLoading ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-loading>
+                  {[0, 1, 2].map((index) => (
+                    <div
+                      key={index}
+                      className="aspect-square animate-pulse rounded-2xl bg-[var(--mm-soft)] ring-1 ring-[var(--mm-border)]"
+                    />
+                  ))}
+                </div>
+              ) : (
               <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-list>
                 {maps.map((entry) => {
                   const active = entry.mapKey === activeMapKey;
@@ -1130,6 +1200,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
                   );
                 })}
               </ul>
+              )}
             </div>
           </div>
         ) : null}
