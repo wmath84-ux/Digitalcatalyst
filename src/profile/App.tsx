@@ -99,13 +99,14 @@ const TIER_ICONS: Record<MembershipTier, ReactNode> = {
    solid white cards on a soft indigo wash, and the brand CTA gradient
    (indigo → violet → fuchsia) used for actions only. No glassmorphism,
    no aurora orbs, no animated gradients — flat, calm and readable. */
-const CARD = "rounded-3xl border border-slate-100 bg-white shadow-[0_14px_40px_-24px_rgba(49,46,129,0.35)]";
+const CARD = "rounded-3xl border border-slate-100 bg-white p-4 shadow-[0_14px_40px_-24px_rgba(49,46,129,0.35)] lg:rounded-2xl lg:p-3.5 lg:shadow-sm lg:border-slate-200/70 xl:p-4";
+const CARD_COMPACT = "rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm lg:p-3.5";
 const BTN_PRIMARY =
-  "flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 py-3.5 text-sm font-black text-white shadow-lg shadow-indigo-500/30 transition hover:brightness-110 active:scale-[0.99]";
+  "flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 py-3.5 text-sm font-black text-white shadow-lg shadow-indigo-500/30 transition hover:brightness-110 active:scale-[0.99] lg:py-2.5 lg:text-[13px] lg:rounded-xl";
 const BTN_SECONDARY =
   "flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.99]";
 const EYEBROW = "text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600";
-const ICON_CHIP = "grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100";
+const ICON_CHIP = "grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 lg:h-9 lg:w-9 lg:rounded-xl";
 const STAT_CHIP = "rounded-2xl bg-slate-50 px-2.5 py-2.5 text-center ring-1 ring-slate-100";
 const INPUT = "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100";
 
@@ -326,11 +327,11 @@ export default function ProfileApp() {
   return (
     <div
       data-profile-page
-      className="min-h-screen bg-gradient-to-b from-indigo-50 via-slate-50 to-white text-slate-900 sm:py-6"
+      className="min-h-screen bg-gradient-to-b from-indigo-50 via-slate-50 to-white text-slate-900 sm:py-0 lg:py-0"
     >
       <div
         data-app-frame
-        className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200"
+        className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 lg:max-w-full lg:rounded-none lg:border-0"
       >
         <Header
           cartCount={cartIds.size}
@@ -340,14 +341,14 @@ export default function ProfileApp() {
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
         />
 
-        <main ref={mainRef} data-profile-content className="relative z-[1] flex-1 overflow-y-auto px-4 pt-3 pb-6 md:px-8">
-          <div data-profile-layout className="space-y-4">
-            {/* ── Page header ─────────────────────────────────────────── */}
-            <header className="flex items-end justify-between gap-3 px-1 pb-1">
+        <main ref={mainRef} data-profile-content className="relative z-[1] flex-1 overflow-y-auto px-4 pt-3 pb-6 md:px-6 lg:px-6 xl:px-8">
+          <div data-profile-layout className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-4 lg:items-start lg:max-w-[1200px] lg:mx-auto">
+            {/* ── Page header ── Compact identity zone for desktop */}
+            <header className="flex items-end justify-between gap-3 px-1 pb-1 lg:col-span-12 lg:px-1 lg:pb-2">
               <div>
                 <p className={EYEBROW}>Your space</p>
-                <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">Profile</h1>
-                <p className="mt-0.5 text-xs font-medium text-slate-500">Account, plan and library — in one place.</p>
+                <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 lg:text-[1.6rem]">Profile</h1>
+                <p className="mt-0.5 text-xs font-medium text-slate-500 lg:text-[0.8rem]">Account, plan and library — in one place.</p>
               </div>
               <div className="flex flex-col items-end gap-2 pb-0.5">
                 {membershipBadge}
@@ -358,11 +359,14 @@ export default function ProfileApp() {
             {message && (
               <div
                 role="status"
-                className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"
+                className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 lg:col-span-12"
               >
                 {message}
               </div>
             )}
+
+            {/* ── LEFT COLUMN: Identity + Quick Stats + Referral ── */}
+            <div className="space-y-4 lg:col-span-4 lg:space-y-3" data-profile-col="left">
 
             {/* ── Identity card ──────────────────────────────────────────
                 Clean white card: avatar, name, email, member-since and the
@@ -370,18 +374,18 @@ export default function ProfileApp() {
                 that borrows the store brand colours. */}
             <section className={CARD}>
               <div className="flex items-center gap-4">
-                <div className="shrink-0 rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 p-[2px] shadow-md shadow-indigo-500/20">
+                <div className="shrink-0 rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 p-[2px] shadow-md shadow-indigo-500/20 lg:rounded-xl">
                   {user.photoURL ? (
-                    <img src={user.photoURL} alt="" className="h-16 w-16 rounded-[14px] object-cover" />
+                    <img src={user.photoURL} alt="" className="h-16 w-16 rounded-[14px] object-cover lg:h-12 lg:w-12 lg:rounded-[10px]" />
                   ) : (
-                    <div className="grid h-16 w-16 place-items-center rounded-[14px] bg-indigo-50 text-xl font-black text-indigo-700">
+                    <div className="grid h-16 w-16 place-items-center rounded-[14px] bg-indigo-50 text-xl font-black text-indigo-700 lg:h-12 lg:w-12 lg:rounded-[10px] lg:text-base">
                       {initials}
                     </div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-xl font-black tracking-tight text-slate-950">{user.name}</h2>
-                  <p className="truncate text-sm font-medium text-slate-500">{user.email}</p>
+                  <h2 className="truncate text-xl font-black tracking-tight text-slate-950 lg:text-[1.1rem]">{user.name}</h2>
+                  <p className="truncate text-sm font-medium text-slate-500 lg:text-xs">{user.email}</p>
                   <p className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
                     <CalendarDays className="h-3.5 w-3.5" /> Member since {memberSince}
                   </p>
@@ -433,7 +437,43 @@ export default function ProfileApp() {
                 onClick={() => { window.location.hash = "#/cart"; }}
               />
             </div>
+            {referralCode ? (
+              <section className={`${CARD} p-4 lg:p-3.5`} data-profile-referral>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-600">Your referral code</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500 lg:text-[11px]">{`Share it with a learner joining ${appName}.`}</p>
+                  </div>
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-100 lg:h-8 lg:w-8">
+                    <Sparkles className="h-5 w-5 lg:h-4 lg:w-4" />
+                  </span>
+                </div>
+                {referralUsed ? (
+                  <div data-profile-referral-used className="mt-3">
+                    <div className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
+                      <code className="min-w-0 truncate text-sm font-black text-slate-400 line-through decoration-2 decoration-rose-400 lg:text-xs">{referralCode}</code>
+                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-amber-800">Used</span>
+                    </div>
+                    <p className="mt-1.5 text-[11px] font-medium text-slate-400">This referral ID has been used and is no longer active.</p>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-2.5">
+                    <code className="min-w-0 truncate text-sm font-black text-indigo-900 lg:text-xs">{referralCode}</code>
+                    <button
+                      type="button"
+                      onClick={() => void navigator.clipboard?.writeText(referralCode)}
+                      className="shrink-0 rounded-lg bg-white px-2.5 py-1 text-[10px] font-black text-indigo-700 shadow-sm ring-1 ring-indigo-100"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                )}
+              </section>
+            ) : null}
+            </div>
 
+            {/* ── MIDDLE COLUMN: Membership + Allowances ── */}
+            <div className="space-y-4 lg:col-span-5 lg:space-y-3" data-profile-col="middle">
             {/* ── Subscription / upgrade section ─────────────────────── */}
             {membership.subscriber ? (
               <section
@@ -544,41 +584,10 @@ export default function ProfileApp() {
                 usage limits before any plan exists would display limits that
                 do not apply to them. */}
             {membership.subscriber ? <AiQuotaCard uid={user.id} /> : null}
+            </div>
 
-            {referralCode ? (
-              <section className={CARD}>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-600">Your referral code</p>
-                    <p className="mt-1 text-xs font-medium text-slate-500">{`Share it with a learner joining ${appName}.`}</p>
-                  </div>
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-amber-100">
-                    <Sparkles className="h-5 w-5" />
-                  </span>
-                </div>
-                {referralUsed ? (
-                  <div data-profile-referral-used className="mt-4">
-                    <div className="flex items-center justify-between gap-2 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
-                      <code className="min-w-0 truncate text-sm font-black text-slate-400 line-through decoration-2 decoration-rose-400">{referralCode}</code>
-                      <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-amber-800">Used</span>
-                    </div>
-                    <p className="mt-1.5 text-[11px] font-medium text-slate-400">This referral ID has been used and is no longer active.</p>
-                  </div>
-                ) : (
-                  <div className="mt-4 flex items-center justify-between gap-2 rounded-2xl border border-indigo-100 bg-indigo-50/60 px-4 py-3">
-                    <code className="min-w-0 truncate text-sm font-black text-indigo-900">{referralCode}</code>
-                    <button
-                      type="button"
-                      onClick={() => void navigator.clipboard?.writeText(referralCode)}
-                      className="shrink-0 rounded-xl bg-white px-3 py-1.5 text-[10px] font-black text-indigo-700 shadow-sm ring-1 ring-indigo-100"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                )}
-              </section>
-            ) : null}
-
+            {/* ── RIGHT COLUMN: Library + Preferences + Actions ── */}
+            <div className="space-y-4 lg:col-span-3 lg:space-y-3" data-profile-col="right">
             {/* ── Library container ───────────────────────────────────── */}
             <section className={CARD}>
               <div className="flex items-center justify-between gap-3">
@@ -656,9 +665,10 @@ export default function ProfileApp() {
                 type="button"
                 data-profile-open-dashboard
                 onClick={() => { window.location.hash = "#/admin-login"; }}
-                className="mx-auto mt-7 block text-[9px] font-medium tracking-wide text-slate-400 transition hover:text-slate-500"
+                className="mx-auto mt-4 block text-[9px] font-medium tracking-wide text-slate-400 transition hover:text-slate-500 lg:mt-2"
               >Open dashboard</button>
             ) : null}
+            </div>
           </div>
         </main>
 
@@ -796,11 +806,11 @@ function QuickStat({ icon, value, label, tone, onClick }: { icon: ReactNode; val
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-slate-100 bg-white p-3 text-center shadow-[0_8px_24px_-18px_rgba(49,46,129,0.5)] transition hover:border-indigo-100 active:scale-[0.97]"
+      className="rounded-2xl border border-slate-100 bg-white p-3 text-center shadow-[0_8px_24px_-18px_rgba(49,46,129,0.5)] transition hover:border-indigo-100 active:scale-[0.97] lg:rounded-xl lg:p-2.5 lg:shadow-sm"
     >
-      <span className={`mx-auto grid h-10 w-10 place-items-center rounded-xl ring-1 ${tone}`}>{icon}</span>
-      <span className="mt-2 block text-2xl font-black text-slate-950">{value}</span>
-      <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</span>
+      <span className={`mx-auto grid h-10 w-10 place-items-center rounded-xl ring-1 lg:h-8 lg:w-8 lg:rounded-lg ${tone}`}>{icon}</span>
+      <span className="mt-2 block text-2xl font-black text-slate-950 lg:mt-1.5 lg:text-xl">{value}</span>
+      <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 lg:text-[9px]">{label}</span>
     </button>
   );
 }
@@ -811,10 +821,10 @@ function UpgradePoint({ children }: { children: ReactNode }) {
 
 function LibraryStat({ icon, value, label, onClick, tone = "text-violet-600" }: { icon: ReactNode; value: number; label: string; onClick: () => void; tone?: string }) {
   return (
-    <button type="button" onClick={onClick} className="block w-full rounded-2xl border border-slate-100 bg-white p-3 text-center shadow-[0_8px_24px_-18px_rgba(49,46,129,0.5)] transition hover:border-indigo-100 active:scale-[0.97]">
-      <span className={`mx-auto grid h-9 w-9 place-items-center rounded-xl ${tone} bg-indigo-50 ring-1 ring-indigo-100`}>{icon}</span>
-      <span className="mt-2 block text-xl font-black text-slate-950">{value}</span>
-      <span className="block text-[10px] font-bold text-slate-500">{label}</span>
+    <button type="button" onClick={onClick} className="block w-full rounded-2xl border border-slate-100 bg-white p-3 text-center shadow-[0_8px_24px_-18px_rgba(49,46,129,0.5)] transition hover:border-indigo-100 active:scale-[0.97] lg:rounded-xl lg:p-2.5 lg:shadow-sm">
+      <span className={`mx-auto grid h-8 w-8 place-items-center rounded-lg lg:h-7 lg:w-7 ${tone} bg-indigo-50 ring-1 ring-indigo-100`}>{icon}</span>
+      <span className="mt-1.5 block text-lg font-black text-slate-950 lg:text-base">{value}</span>
+      <span className="block text-[10px] font-bold text-slate-500 lg:text-[9px]">{label}</span>
     </button>
   );
 }

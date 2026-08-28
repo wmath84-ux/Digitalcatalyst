@@ -2535,56 +2535,232 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   }
 }
 
-/* Profile Studio: intentional desktop/tablet compositions. The profile keeps a
-   readable canvas and uses columns for information hierarchy instead of
-   allowing a mobile stack to become a long, stretched sheet. */
+/* Profile Studio: OPTIMIZED desktop/tablet - compact, no empty space, fit both */
 @media (min-width: 960px) {
   [data-profile-page] {
     min-height: 100dvh;
+    background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 40%, #ffffff 100%);
   }
   [data-profile-page] [data-app-frame] {
-    max-width: 1280px !important;
-    min-height: calc(100vh - 48px);
-    overflow: hidden;
-    border-radius: 28px;
-    border: 1px solid rgba(226,232,240,.9);
-    background: rgba(255,255,255,.78);
-    box-shadow: 0 24px 70px -34px rgba(30,41,59,.28);
+    max-width: 100% !important;
+    min-height: 100dvh;
+    height: auto;
+    overflow: visible;
+    border-radius: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
   }
   [data-profile-page] [data-profile-content] {
     max-width: none;
-    padding: 30px clamp(32px, 5vw, 72px) 40px;
+    width: 100%;
+    padding: clamp(16px, 2vw, 24px) clamp(16px, 2.5vw, 32px) clamp(20px, 3vw, 32px);
+  }
+  /* Optimized grid: 12 columns, compact gaps, no empty space */
+  [data-profile-layout] {
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: clamp(12px, 1.2vw, 16px);
+    max-width: 1200px;
+    margin-inline: auto;
+    align-items: start;
+  }
+  [data-profile-layout] > header {
+    grid-column: 1 / -1;
+    padding-bottom: clamp(4px, 0.5vw, 8px);
+  }
+  [data-profile-layout] > header h1 {
+    font-size: clamp(1.4rem, 1.8vw, 1.75rem) !important;
+  }
+  [data-profile-layout] > [role="status"] {
+    grid-column: 1 / -1;
+  }
+  /* Column wrappers */
+  [data-profile-col="left"] {
+    grid-column: span 4;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(12px, 1vw, 14px);
+  }
+  [data-profile-col="middle"] {
+    grid-column: span 5;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(12px, 1vw, 14px);
+  }
+  [data-profile-col="right"] {
+    grid-column: span 3;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(12px, 1vw, 14px);
+  }
+  /* Cards compact on desktop */
+  [data-profile-layout] section {
+    padding: clamp(14px, 1.2vw, 18px) !important;
+    border-radius: clamp(14px, 1vw, 18px) !important;
+    box-shadow: 0 4px 20px -12px rgba(15,23,42,0.12), 0 2px 8px -6px rgba(15,23,42,0.08) !important;
+    border: 1px solid rgba(226,232,240,0.8) !important;
+    min-width: 0;
+  }
+  [data-profile-layout] section h3 {
+    font-size: clamp(0.95rem, 1vw, 1.05rem) !important;
+    line-height: 1.3 !important;
+  }
+  [data-profile-layout] section p {
+    font-size: clamp(0.8rem, 0.85vw, 0.875rem) !important;
+    line-height: 1.5 !important;
+  }
+  /* Quick stats grid compact */
+  [data-profile-col="left"] > .grid {
+    gap: clamp(8px, 0.8vw, 10px) !important;
+  }
+  /* Buttons compact */
+  [data-profile-layout] button {
+    font-size: clamp(0.8rem, 0.85vw, 0.875rem) !important;
+  }
+  /* Logout button full width but compact */
+  [data-profile-col="right"] > button {
+    padding-block: clamp(10px, 0.8vw, 12px) !important;
+  }
+  /* Legal nav */
+  [data-profile-col="right"] > nav {
+    padding-top: 4px;
+    font-size: clamp(10px, 0.7vw, 11px) !important;
+  }
+  /* Hide bottom nav on desktop (desktop shell has rail) */
+  [data-profile-page] [data-site-footer] {
+    display: none !important;
+  }
+  [data-profile-page] [data-site-header] {
+    display: none !important;
+  }
+}
+
+/* Tablet portrait (640-959) - 2 column compact */
+@media (min-width: 640px) and (max-width: 959px) and (orientation: portrait) {
+  [data-profile-page] [data-profile-content] {
+    padding: 20px clamp(16px, 3vw, 24px) 24px;
   }
   [data-profile-layout] {
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(260px, .78fr);
-    gap: 20px;
-    max-width: 1120px;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    max-width: 720px;
     margin-inline: auto;
   }
   [data-profile-layout] > header,
   [data-profile-layout] > [role="status"] {
     grid-column: 1 / -1;
   }
-  [data-profile-layout] > section,
-  [data-profile-layout] > .grid {
-    min-width: 0;
+  [data-profile-col="left"] {
+    grid-column: span 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
-  [data-profile-layout] > section:nth-of-type(1) { grid-column: span 2; }
-  [data-profile-layout] > section:nth-of-type(2) { grid-column: 3; }
-  [data-profile-layout] > section:nth-of-type(3) { grid-column: span 2; }
-  [data-profile-layout] > section:nth-of-type(4),
-  [data-profile-layout] > section:nth-of-type(5) { grid-column: span 1; }
-  [data-profile-layout] > section:nth-of-type(n+6) { grid-column: span 1; }
-  [data-profile-layout] > button { grid-column: 1 / -1; max-width: 360px; margin-inline: auto; }
-  [data-profile-layout] > nav { grid-column: 1 / -1; }
+  [data-profile-col="middle"] {
+    grid-column: span 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  [data-profile-col="right"] {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  [data-profile-col="right"] > section:first-of-type {
+    grid-column: span 1;
+  }
+  [data-profile-col="right"] > section:nth-of-type(2) {
+    grid-column: span 1;
+  }
+  [data-profile-col="right"] > button,
+  [data-profile-col="right"] > nav {
+    grid-column: 1 / -1;
+  }
+  [data-profile-layout] section {
+    padding: 16px !important;
+    border-radius: 20px !important;
+  }
 }
 
-@media (min-width: 640px) and (max-width: 1023px) {
-  [data-profile-page] [data-profile-content] { padding-top: 26px; padding-bottom: 34px; }
-  [data-profile-layout] > section { border-radius: 24px; }
-  [data-profile-layout] > .grid { align-self: stretch; }
+/* Tablet landscape (640+ landscape) - 3 column like desktop but more compact */
+@media (min-width: 640px) and (max-width: 1023px) and (orientation: landscape) {
+  [data-profile-page] [data-profile-content] {
+    padding: 16px clamp(14px, 2vw, 20px) 20px;
+  }
+  [data-profile-layout] {
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 12px;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  [data-profile-layout] > header {
+    grid-column: 1 / -1;
+  }
+  [data-profile-col="left"] {
+    grid-column: span 4;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  [data-profile-col="middle"] {
+    grid-column: span 5;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  [data-profile-col="right"] {
+    grid-column: span 3;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  [data-profile-layout] section {
+    padding: 12px !important;
+    border-radius: 16px !important;
+    box-shadow: 0 2px 12px -8px rgba(15,23,42,0.1) !important;
+  }
+  [data-profile-layout] section h3 {
+    font-size: 0.9rem !important;
+  }
+  [data-profile-layout] section p {
+    font-size: 0.8rem !important;
+  }
+  [data-profile-page] [data-site-header],
+  [data-profile-page] [data-site-footer] {
+    display: none !important;
+  }
+  .dc-desktop-shell {
+    display: flex !important;
+  }
 }
+
+/* Ensure profile inside desktop shell is optimized */
+@media (min-width: 960px) {
+  .dc-desktop-shell [data-profile-page] {
+    background: transparent !important;
+  }
+  .dc-desktop-shell [data-profile-page] [data-app-frame] {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: 0 !important;
+  }
+  .dc-desktop-shell [data-profile-content] {
+    padding: 0 !important;
+  }
+  .dc-desktop-shell [data-profile-layout] {
+    max-width: 100% !important;
+    padding: 0;
+  }
+}
+
+
+/* Old tablet portrait removed - replaced by optimized 2-col */
 
 
 /* ── FINAL: Ensure tablet landscape elements scale properly ─────────────
