@@ -251,6 +251,38 @@ test("nodes are hand-positionable — drag and drop anywhere, persisted per node
   assert.doesNotMatch(panel, /data-mind-node-collapse=/);
 });
 
+test("the dragged node tracks the pointer LIVE — the primary node included", () => {
+  // Regression contract for the learner-reported bug: dragging the PRIMARY
+  // (root) node updated its location only on drop, while every other node
+  // was seen moving live. The drag loop must therefore write the dragged
+  // node's OWN live position on EVERY frame — never rely on React Flow's
+  // onNodesChange alone for the box under the finger (a parent drag's
+  // setNodes can win a stale frame and leave the centre behind).
+  // 1. The live-drag handler exists and runs against the drag session.
+  assert.match(panel, /onNodeDrag=\{\(_event, node\) => \{/);
+  assert.match(panel, /const session = dragSessionRef\.current;/);
+  // 2. The dragged node itself is written from `node.position` (live), not
+  //    left on its last committed layout spot until pointer-up.
+  assert.match(
+    panel,
+    /if \(item\.id === node\.id\) \{\s*return \{ \.\.\.item, position: \{ x: node\.position\.x, y: node\.position\.y \} \};\s*\}/,
+  );
+  // 3. Its branch rides along at the same rigid offset every frame.
+  assert.match(
+    panel,
+    /const start = session\.starts\.get\(item\.id\);\s*if \(!start\) return item;\s*return \{ \.\.\.item, position: \{ x: start\.x \+ dx, y: start\.y \+ dy \} \};/,
+  );
+  // 4. Mid-drag, a layout pass must not snap nodes back to the tidy tree:
+  //    live positions win while `draggingRef` is armed, and the flag is
+  //    armed from drag START (before the first move can land).
+  assert.match(panel, /onNodeDragStart=\{\(_event, node\) => \{\s*draggingRef\.current = true;/);
+  assert.match(panel, /if \(!draggingRef\.current\) return layoutNodes;/);
+  assert.match(panel, /const live = new Map\(prev\.map\(\(node\) => \[node\.id, node\.position\]\)\);/);
+  // 5. The root's drop is committed through the map-level rootX/rootY pin
+  //    (utils/mindMapTree.js), so the live position survives save + reload.
+  assert.match(panel, /setNodePosition\(current, node\.id, node\.position\.x, node\.position\.y\)/);
+});
+
 test("zoom is available on touch as well as by button", () => {
   assert.match(panel, /zoomOnPinch/);
   assert.match(panel, /data-course-mindmap-zoom-in/);
