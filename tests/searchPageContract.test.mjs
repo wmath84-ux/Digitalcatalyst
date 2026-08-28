@@ -152,12 +152,13 @@ test("SearchPage CSS keeps the grid responsive — not stretched", () => {
   // layouts (e.g. grid-template-columns: 1fr) are explicitly
   // banned.
   assert.match(indexCss, /\[data-search-grid\]/);
-  // The grid must have an explicit column count at the desktop
-  // breakpoint (>= 1024 px) — same as home / store.
-  assert.match(
-    indexCss,
-    /@media \(min-width: 1024px\)[\s\S]*?\[data-search-grid\][\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\) !important/,
-  );
+  // The grid must have an explicit column definition at the desktop
+  // breakpoint (>= 960 px now - 1.5x mobile rule) — same as home / store.
+  // Updated: desktop now uses auto-fill with clamp for tablet scaling, or 4-col fixed
+  const hasResponsiveGrid = 
+    /@media \(min-width: (960|1024)px\)[\s\S]*?\[data-search-grid\][\s\S]*?grid-template-columns:\s*repeat\(auto-fill/.test(indexCss) ||
+    /@media \(min-width: (960|1024)px\)[\s\S]*?\[data-search-grid\][\s\S]*?grid-template-columns:\s*repeat\(4,/.test(indexCss);
+  assert.ok(hasResponsiveGrid, "expected responsive grid at desktop breakpoint (auto-fill or 4-col)");
   // The search content caps at 1280 px on desktop so a 27"
   // monitor doesn't stretch the page.
   assert.match(indexCss, /\[data-search-content\][\s\S]*?max-width: 1280px/);

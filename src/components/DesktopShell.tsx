@@ -161,18 +161,54 @@ export default function DesktopShell({
   const { user, logout } = useAuth();
   const screenSize = useScreenSize();
 
-  // Set a body class for CSS-based theming based on screen size
+  // Set a body class for CSS-based theming based on screen size + tablet landscape
   useEffect(() => {
     const updateBodyClass = () => {
-      const classes = ["is-desktop", "is-tablet", "is-mobile"];
+      const classes = ["is-desktop", "is-tablet", "is-mobile", "is-tablet-landscape", "is-wide-tablet"];
       classes.forEach((c) => document.body.classList.remove(c));
       if (screenSize === "desktop") document.body.classList.add("is-desktop");
       if (screenSize === "tablet") document.body.classList.add("is-tablet");
       if (screenSize === "mobile") document.body.classList.add("is-mobile");
+
+      // Tablet landscape detection for CSS
+      try {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        const landscape = w > h;
+        let isTabletDevice = false;
+        try {
+          const sw = window.screen?.width ?? 0;
+          const sh = window.screen?.height ?? 0;
+          isTabletDevice = Math.min(sw, sh) >= 600;
+        } catch {
+          isTabletDevice = w >= 640;
+        }
+        if (landscape && isTabletDevice && w >= 640) {
+          document.body.classList.add("is-tablet-landscape");
+          document.documentElement.setAttribute("data-tablet-landscape", "true");
+        } else {
+          document.documentElement.removeAttribute("data-tablet-landscape");
+        }
+        if (w >= 960) {
+          document.body.classList.add("is-wide-tablet");
+          document.documentElement.setAttribute("data-wide-tablet", "true");
+        } else {
+          document.documentElement.removeAttribute("data-wide-tablet");
+        }
+        if ((landscape && isTabletDevice && w >= 640) || w >= 960) {
+          document.documentElement.setAttribute("data-tablet-landscape-desktop", "true");
+        } else {
+          document.documentElement.removeAttribute("data-tablet-landscape-desktop");
+        }
+      } catch {}
     };
     updateBodyClass();
     window.addEventListener("resize", updateBodyClass);
-    return () => window.removeEventListener("resize", updateBodyClass);
+    window.addEventListener("orientationchange", updateBodyClass);
+    return () => {
+      window.removeEventListener("resize", updateBodyClass);
+      window.removeEventListener("orientationchange", updateBodyClass);
+    };
   }, [screenSize]);
   const { appName, logoUrl } = useBranding();
   const { cartIds, favoriteIds } = useCommerce();
@@ -253,12 +289,15 @@ export default function DesktopShell({
   const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
 
   return (
-    <div className="dc-desktop-shell flex min-h-[100dvh] w-full bg-[#f6f7fb] text-slate-900" data-desktop-shell>
-      {/* ── Persistent left rail ───────────────────────────────────── */}
+    <div className="dc-desktop-shell flex min-h-[100dvh] w-full bg-[#f6f7fb] text-slate-900" data-desktop-shell data-tablet-responsive>
+      {/* ── Persistent left rail ─────────────────────────────────────
+          Tablet landscape: width scales with clamp() so it fits tablet screens
+      */}
       <aside
         data-desktop-rail
-        className="sticky top-0 z-40 flex h-[100dvh] w-[260px] shrink-0 flex-col border-r border-slate-200/80 bg-white/85 backdrop-blur-2xl"
+        className="sticky top-0 z-40 flex h-[100dvh] w-[260px] shrink-0 flex-col border-r border-slate-200/80 bg-white/85 backdrop-blur-2xl max-[1023px]:w-[clamp(200px,22vw,260px)] landscape:max-[1023px]:w-[clamp(200px,22vw,240px)]"
         aria-label="Primary"
+        style={{ width: 'clamp(200px, 22vw, 260px)' } as any}
       >
         {/* Brand block — same logo + name that lives in the mobile header,
             so the rail feels like a continuation of the app's identity
@@ -472,7 +511,8 @@ export default function DesktopShell({
           {sidePanel ? (
             <aside
               data-desktop-side-panel
-              className="w-[320px] shrink-0"
+              className="w-[320px] shrink-0 max-[1023px]:w-[clamp(280px,30vw,320px)]"
+              style={{ width: 'clamp(280px, 30vw, 320px)' } as any}
             >
               {sidePanel}
             </aside>

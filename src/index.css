@@ -334,7 +334,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
 
    The desktop polish (1024 px +) lands in a follow-up.
    ───────────────────────────────────────────────────────────────────── */
-@media (min-width: 640px) and (max-width: 1023px) {
+@media (min-width: 640px) and (max-width: 1023px) and (orientation: portrait) {
   /* Drop the phone-shaped frame: the app is a real tablet app, not a
      scaled-up phone. No rounded corners, no phone shadow, no fake
      "device bezel" — the content sits in a real window. */
@@ -495,8 +495,255 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   }
 }
 
+
 /* ─────────────────────────────────────────────────────────────────────
-   Desktop layout (>= 1024 px) — first-class desktop experience.
+   TABLET LANDSCAPE = DESKTOP INTERFACE
+   ─────────────────────────────────────────────────────────────────────
+   NEW REQUIREMENT:
+   - Agar tablet user landscape mode mein hai to usko desktop jaisa interface mile
+   - Agar chaudai mobile ki chaudai se 1.5x zyada ho (640*1.5=960) to side panel ke saath pura desktop interface tablet per bhi dikhe
+   - Elements boxes text tablet size ke according adjust ho
+
+   This block makes tablet landscape behave like desktop:
+   • Shows persistent left rail (desktop shell)
+   • Hides mobile header/footer pill
+   • Scales all elements with clamp() for tablet size
+   • Shows side panel when present
+   ───────────────────────────────────────────────────────────────────── */
+@media (min-width: 640px) and (max-width: 1023px) and (orientation: landscape),
+       (min-width: 960px) and (max-width: 1023px) {
+  /* Tablet landscape gets desktop shell */
+  .dc-desktop-shell {
+    display: flex !important;
+    --desktop-rail-width: clamp(200px, 22vw, 260px);
+    --desktop-topbar-height: clamp(56px, 7vh, 64px);
+  }
+
+  /* Hide mobile chrome, show desktop chrome */
+  [data-site-header],
+  [data-site-footer].dc-footer-shell {
+    display: none !important;
+  }
+
+  /* App frame full bleed like desktop */
+  [data-app-frame] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 100dvh;
+    height: auto;
+    border-radius: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .dc-app-shell {
+    background:
+      radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.10), transparent 50%),
+      radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.08), transparent 44%),
+      linear-gradient(180deg, #f7f8fc 0%, #eef1f8 48%, #f6f7fb 100%);
+    padding: 0;
+  }
+
+  .dc-app-shell > main,
+  .dc-app-shell > [data-app-frame] > main {
+    max-width: none;
+    margin-inline: 0;
+    width: 100%;
+  }
+
+  /* Desktop shell content adjustments for tablet landscape */
+  .dc-desktop-shell [data-desktop-rail] {
+    width: var(--desktop-rail-width) !important;
+  }
+
+  .dc-desktop-shell [data-desktop-content] {
+    padding: clamp(12px, 1.5vw, 24px) !important;
+    gap: clamp(12px, 1.5vw, 24px) !important;
+  }
+
+  .dc-desktop-shell [data-desktop-content] > main {
+    min-width: 0;
+  }
+
+  /* Side panel visible on tablet landscape when width >=960 */
+  .dc-desktop-shell [data-desktop-side-panel] {
+    display: block !important;
+    width: clamp(280px, 30vw, 320px) !important;
+  }
+
+  /* Tablet landscape grid adjustments - fluid scaling */
+  [data-home-grid],
+  [data-store-grid],
+  [data-pdp-grid],
+  [data-search-grid] {
+    grid-template-columns: repeat(auto-fill, minmax(clamp(160px, 18vw, 220px), 1fr)) !important;
+    gap: clamp(10px, 1.2vw, 16px) !important;
+  }
+
+  [data-store-list],
+  [data-library-list] {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(clamp(280px, 32vw, 380px), 1fr));
+    gap: clamp(12px, 1.5vw, 16px);
+    align-items: start;
+  }
+
+  [data-home-hero] .h-44,
+  [data-home-hero] .h-56 {
+    height: clamp(14rem, 28vh, 20rem) !important;
+  }
+
+  /* Fluid typography for tablet */
+  [data-desktop-page-title] {
+    font-size: clamp(1rem, 1.5vw, 1.125rem) !important;
+  }
+  [data-desktop-page-subtitle] {
+    font-size: clamp(0.65rem, 1vw, 0.7rem) !important;
+  }
+
+  /* Cards, boxes, text scale with tablet */
+  .dc-desktop-shell [data-desktop-content] .rounded-2xl,
+  .dc-desktop-shell [data-desktop-content] .rounded-3xl {
+    border-radius: clamp(1rem, 1.5vw, 1.5rem) !important;
+  }
+
+  /* Ensure search bar and top bar scale */
+  .dc-desktop-shell [data-desktop-topbar] {
+    height: var(--desktop-topbar-height) !important;
+    padding-inline: clamp(12px, 1.5vw, 24px) !important;
+  }
+
+  .dc-desktop-shell [data-desktop-topbar] input {
+    font-size: clamp(0.8rem, 1.1vw, 0.875rem) !important;
+  }
+}
+
+/* ── Fluid scaling for all tablet sizes (640-1023) ───────────────────────
+   Ensures boxes, text, elements adjust according to tablet size using clamp()
+   ───────────────────────────────────────────────────────────────────── */
+@media (min-width: 640px) and (max-width: 1023px) {
+  :root {
+    --tablet-scale: clamp(0.85, 0.9 + 0.2vw, 1);
+  }
+
+  /* Fluid text scaling */
+  [data-home-hero] h2,
+  [data-home-hero] h3 {
+    font-size: clamp(1.25rem, 2.5vw, 1.75rem) !important;
+  }
+
+  [data-home-category-nav] button,
+  [data-home-continue] h3,
+  [data-home-trending] h3 {
+    font-size: clamp(0.9rem, 1.3vw, 1.1rem) !important;
+  }
+
+  /* Cards scale */
+  [data-home-grid] > *,
+  [data-store-grid] > *,
+  [data-pdp-grid] > * {
+    transform: scale(var(--tablet-scale));
+    transform-origin: top left;
+  }
+
+  /* But for landscape desktop mode, we override scale to 1 */
+  @media (orientation: landscape) {
+    [data-home-grid] > *,
+    [data-store-grid] > *,
+    [data-pdp-grid] > * {
+      transform: none !important;
+    }
+  }
+
+  /* Boxes padding fluid */
+  .dc-glass,
+  .dc-glass-soft,
+  .rev-card {
+    padding: clamp(12px, 1.8vw, 20px) !important;
+  }
+
+  /* Text inside cards fluid */
+  .dc-glass h3,
+  .dc-glass-soft h3,
+  .rev-card h3 {
+    font-size: clamp(0.95rem, 1.4vw, 1.15rem) !important;
+  }
+
+  .dc-glass p,
+  .dc-glass-soft p,
+  .rev-card p {
+    font-size: clamp(0.8rem, 1.1vw, 0.9rem) !important;
+  }
+}
+
+/* ── Wide tablet (960px+) = Full desktop with side panel ─────────────────
+   When width is 1.5x mobile (960px), show full desktop interface with side panel
+   ───────────────────────────────────────────────────────────────────── */
+@media (min-width: 960px) and (max-width: 1023px) and (orientation: portrait) {
+  /* Even in portrait, if width >=960, show desktop with side panel */
+  .dc-desktop-shell {
+    display: flex !important;
+    --desktop-rail-width: 240px;
+    --desktop-topbar-height: 60px;
+  }
+  [data-site-header],
+  [data-site-footer].dc-footer-shell {
+    display: none !important;
+  }
+  [data-app-frame] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 100dvh;
+    height: auto;
+    border-radius: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+  .dc-app-shell {
+    padding: 0;
+    background:
+      radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.10), transparent 50%),
+      radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.08), transparent 44%),
+      linear-gradient(180deg, #f7f8fc 0%, #eef1f8 48%, #f6f7fb 100%);
+  }
+  .dc-desktop-shell [data-desktop-side-panel] {
+    display: block !important;
+    width: 300px !important;
+  }
+}
+
+/* ── Desktop shell adjustments for tablet landscape ────────────────────── */
+@media (min-width: 640px) and (max-width: 1023px) and (orientation: landscape) {
+  /* Ensure revision and profile also get desktop treatment in landscape */
+  [data-revision-app] {
+    height: 100dvh !important;
+    min-height: 0 !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+  [data-profile-page] [data-app-frame] {
+    max-width: none !important;
+    height: auto !important;
+    min-height: 100dvh !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  [data-profile-page] [data-profile-content] {
+    padding: clamp(16px, 2vw, 24px) !important;
+  }
+  [data-profile-layout] {
+    gap: clamp(12px, 1.5vw, 20px) !important;
+  }
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────
+   Desktop layout (>= 960 px) — first-class desktop experience + tablet landscape.
+   NEW: Tablet landscape (640px+ landscape) and wide tablet >=960px (1.5x mobile) now get desktop.
    ─────────────────────────────────────────────────────────────────────
    The mobile + tablet layouts live in the same phone-shaped frame or
    a 720 px column. On a desktop the framing goes away entirely —
@@ -523,7 +770,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
    media query — every per-page rule is scoped to mobile + tablet
    and gracefully disappears on desktop.
    ───────────────────────────────────────────────────────────────────── */
-@media (min-width: 1024px) {
+@media (min-width: 960px) {
   /* The whole app shell stops pretending to be a phone: no max-w-md,
      no rounded corners, no big drop shadow. The content goes to
      the real edges of the viewport. */
@@ -647,9 +894,15 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   --desktop-topbar-height: 64px;
 }
 
-@media (max-width: 767px) {
-  /* The shell is render-free on mobile / tablet — the mobile +
-     tablet per-page chrome takes over. */
+/* Desktop shell visibility rules:
+   - Hidden on mobile (<=639px) always
+   - Hidden on tablet portrait 640-959 portrait (keeps mobile chrome)
+   - Visible on tablet landscape (640+ landscape) and wide tablet >=960 and desktop >=1024
+*/
+@media (max-width: 639px) {
+  .dc-desktop-shell { display: none !important; }
+}
+@media (min-width: 640px) and (max-width: 959px) and (orientation: portrait) {
   .dc-desktop-shell { display: none !important; }
 }
 
@@ -712,7 +965,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
 /* Tablet adaptations of the desktop shell — keep the rail but let
    the page body fill the rest of the viewport so a portrait tablet
    does not leave a 200 px gutter on the right. */
-@media (min-width: 768px) and (max-width: 1023px) {
+@media (min-width: 640px) and (max-width: 1023px) and (orientation: landscape), (min-width: 960px) and (max-width: 1023px) {
   .dc-desktop-shell {
     --desktop-rail-width: 220px;
     --desktop-topbar-height: 56px;
@@ -2198,7 +2451,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    Desktop gets a deliberate workspace composition rather than a wider phone:
    generous but bounded canvas, denser statistics, and an editorial two-column
    lower section. */
-@media (min-width: 1024px) {
+@media (min-width: 960px) {
   /* The desktop shell's page column is bounded, but its `main` was
      `align-self: flex-start`, so the app shell inside it stayed
      content-sized. Only when the Revision app is the page do we stretch
@@ -2285,7 +2538,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 /* Profile Studio: intentional desktop/tablet compositions. The profile keeps a
    readable canvas and uses columns for information hierarchy instead of
    allowing a mobile stack to become a long, stretched sheet. */
-@media (min-width: 1024px) {
+@media (min-width: 960px) {
   [data-profile-page] {
     min-height: 100dvh;
   }
@@ -2332,6 +2585,150 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   [data-profile-layout] > section { border-radius: 24px; }
   [data-profile-layout] > .grid { align-self: stretch; }
 }
+
+
+/* ── FINAL: Ensure tablet landscape elements scale properly ─────────────
+   All boxes, text, elements adjust according to tablet size
+   ───────────────────────────────────────────────────────────────────── */
+@media (min-width: 640px) and (max-width: 1366px) and (orientation: landscape) {
+  html {
+    font-size: clamp(14px, 1.1vw + 0.5vh, 16px);
+  }
+  /* Scale down slightly on smaller tablets, full size on larger */
+  body {
+    --tablet-font-scale: clamp(0.9, 0.85 + 0.15vw, 1);
+  }
+  /* Ensure all cards use fluid sizing */
+  [data-app-frame] {
+    font-size: var(--tablet-font-scale);
+  }
+  /* Side panel always visible on landscape tablet >=640 */
+  [data-desktop-side-panel] {
+    display: block !important;
+  }
+}
+
+/* Ensure desktop shell is visible for tablet landscape via data attribute fallback */
+html[data-tablet-landscape-desktop="true"] .dc-desktop-shell {
+  display: flex !important;
+}
+html[data-tablet-landscape-desktop="true"] [data-site-header],
+html[data-tablet-landscape-desktop="true"] [data-site-footer].dc-footer-shell {
+  display: none !important;
+}
+
+
+
+/* ── Tablet Size-Based Scaling - Elements, Boxes, Text ──────────────────
+   Ensures all elements scale according to tablet size
+   Uses clamp() for fluid responsive design
+   ───────────────────────────────────────────────────────────────────── */
+@media (min-width: 640px) and (max-width: 1366px) {
+  /* Fluid base scaling */
+  [data-app-frame] {
+    --tablet-vw: 1vw;
+    --tablet-scale-factor: clamp(0.875, 0.8 + 0.3vw, 1.125);
+  }
+
+  /* Text elements fluid scaling */
+  h1 {
+    font-size: clamp(1.5rem, 2.5vw, 2rem) !important;
+  }
+  h2 {
+    font-size: clamp(1.25rem, 2vw, 1.5rem) !important;
+  }
+  h3 {
+    font-size: clamp(1.1rem, 1.6vw, 1.25rem) !important;
+  }
+  p, span, div {
+    /* Keep default but ensure readable */
+  }
+
+  /* Boxes and cards fluid */
+  .rounded-2xl {
+    border-radius: clamp(0.75rem, 1.2vw, 1rem) !important;
+  }
+  .rounded-3xl {
+    border-radius: clamp(1rem, 1.5vw, 1.5rem) !important;
+  }
+
+  /* Buttons fluid */
+  button {
+    font-size: clamp(0.8rem, 1vw, 0.9rem);
+  }
+
+  /* Grid gaps fluid */
+  .gap-3 {
+    gap: clamp(0.5rem, 0.8vw, 0.75rem) !important;
+  }
+  .gap-4 {
+    gap: clamp(0.75rem, 1vw, 1rem) !important;
+  }
+  .gap-6 {
+    gap: clamp(1rem, 1.5vw, 1.5rem) !important;
+  }
+
+  /* Padding fluid for cards */
+  .p-3 {
+    padding: clamp(0.5rem, 0.8vw, 0.75rem) !important;
+  }
+  .p-4 {
+    padding: clamp(0.75rem, 1vw, 1rem) !important;
+  }
+  .p-5 {
+    padding: clamp(0.9rem, 1.2vw, 1.25rem) !important;
+  }
+  .p-6 {
+    padding: clamp(1rem, 1.5vw, 1.5rem) !important;
+  }
+}
+
+/* Tablet landscape specific: more aggressive scaling for desktop-like UI */
+@media (min-width: 640px) and (max-width: 1366px) and (orientation: landscape) {
+  /* Desktop shell content scales with tablet */
+  [data-desktop-content] {
+    font-size: clamp(13px, 0.9vw + 0.3vh, 15px);
+  }
+
+  /* Rail items scale */
+  [data-desktop-rail-item] {
+    font-size: clamp(0.8rem, 0.9vw, 0.875rem) !important;
+  }
+
+  /* Top bar scales */
+  [data-desktop-topbar] {
+    font-size: clamp(0.85rem, 1vw, 0.9rem);
+  }
+
+  /* Side panel scales */
+  [data-desktop-side-panel] {
+    font-size: clamp(0.85rem, 0.95vw, 0.9rem);
+  }
+
+  /* Product cards in desktop mode on tablet */
+  [data-desktop-content] [data-home-grid] > *,
+  [data-desktop-content] [data-store-grid] > * {
+    font-size: clamp(0.8rem, 0.9vw, 0.9rem);
+  }
+}
+
+/* Ensure images and media scale */
+@media (min-width: 640px) and (max-width: 1366px) {
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  /* Prevent overflow */
+  * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  [data-app-frame] * {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+}
+
 
 /* ── HARD RULE: Mobile Portrait Lock ───────────────────────────────────────
    Mobile phones (<768px) are locked to portrait everywhere except course player.
