@@ -75,11 +75,27 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Maximize, Minus, MousePointerClick, Moon, Plus, Sun, Trash2, TriangleAlert, X } from "lucide-react";
+import {
+  Check,
+  Layers,
+  Maximize,
+  Minus,
+  MousePointerClick,
+  Moon,
+  Pencil,
+  Plus,
+  Sparkles,
+  Sun,
+  Trash2,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import {
   addChildNode,
+  autoArrangeMindMap,
   collectSubtreeIds,
   countNodes,
+  hasManualPositions,
   layoutMindMap,
   maxDepth,
   removeNode,
@@ -88,7 +104,7 @@ import {
   setNodeTopic,
   type MindMap,
 } from "../../utils/mindMapTree";
-import type { MindMapSaveStatus } from "./useCourseMindMap";
+import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
 
 // ── Theme ─────────────────────────────────────────────────────────────────
 
@@ -530,10 +546,49 @@ export interface MindMapPanelProps {
   landscape?: boolean;
   /** Close the mind map sheet (toolbar X). */
   onClose?: () => void;
+
+  // ── The module's list of maps (Notes-style: many maps, not one) ────────
+  /** Every map the learner has in the active module. */
+  maps?: MindMapSummary[];
+  /** Which map the canvas is showing. */
+  activeMapKey?: string;
+  /** Open another map from the list. */
+  onSelectMap?: (mapKey: string) => void;
+  /** Start a brand-new, empty map in this module. */
+  onCreateMap?: (title?: string) => void;
+  /** Rename any map in the list. */
+  onRenameMap?: (mapKey: string, title: string) => void;
+  /** Delete a map from the list. */
+  onDeleteMap?: (mapKey: string) => void;
+  /** True while the module's list is still loading. */
+  mapsLoading?: boolean;
+  /** True when the module already holds the maximum number of maps. */
+  atMapLimit?: boolean;
 }
 
 function MindMapCanvas(props: MindMapPanelProps) {
-  const { mind, onMindChange, status, errorMessage, onFlush, onClose, playerTheme = "dark", landscape: _landscape } = props;
+  const {
+    mind,
+    onMindChange,
+    status,
+    errorMessage,
+    onFlush,
+    onClose,
+    playerTheme = "dark",
+    landscape: _landscape,
+    maps = [],
+    activeMapKey = "main",
+    onSelectMap,
+    onCreateMap,
+    onRenameMap,
+    onDeleteMap,
+    mapsLoading = false,
+    atMapLimit = false,
+  } = props;
+  /** The map library sheet (list of this module's maps) is closed by default. */
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [renamingKey, setRenamingKey] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Theme: null → track the Course Player; a value → the learner's own pick
@@ -640,6 +695,52 @@ function MindMapCanvas(props: MindMapPanelProps) {
     (id: string, topic: string) => onMindChange((current) => setNodeTopic(current, id, topic)),
     [onMindChange],
   );
+
+  // ── One-click clean-up ─────────────────────────────────────────────────
+  // Every hand-dragged node stores its own pin, and enough dragging turns a
+  // map into spaghetti. "Auto arrange" drops every pin (and re-balances the
+  // two wings) so the tidy-tree layout in utils/mindMapTree.js re-organises
+  // the WHOLE diagram in one tap, then the view re-fits so the learner sees
+  // the result straight away. The maths is pure and unit tested; this
+  // handler only wires the button to it.
+  const handleAutoArrange = useCallback(() => {
+    onMindChange((current) => autoArrangeMindMap(current));
+    // Let the layout pass land before re-framing, otherwise fitView measures
+    // the OLD bounds and the freshly tidied map sits off-centre.
+    window.setTimeout(() => void fitView({ duration: 320, padding: 0.2 }), 60);
+  }, [onMindChange, fitView]);
+
+  /** A tidy map has no pins left, so the button has nothing to clean up. */
+  const messy = hasManualPositions(mind);
+
+  // ── Map library helpers ────────────────────────────────────────────────
+  /** Name of the map currently on the canvas, for the switcher button. */
+  const activeMapName =
+    maps.find((entry) => entry.mapKey === activeMapKey)?.title || mind.title || mind.rootTopic || "Mind map";
+
+  const openMap = useCallback(
+    (mapKey: string) => {
+      if (mapKey !== activeMapKey) onSelectMap?.(mapKey);
+      setRenamingKey(null);
+      setLibraryOpen(false);
+      setSelectedId(null);
+      setEditingId(null);
+    },
+    [activeMapKey, onSelectMap],
+  );
+
+  const startRename = useCallback((entry: MindMapSummary) => {
+    setRenamingKey(entry.mapKey);
+    setRenameDraft(entry.title || entry.rootTopic || "");
+  }, []);
+
+  const commitRename = useCallback(() => {
+    const key = renamingKey;
+    const name = renameDraft.trim();
+    setRenamingKey(null);
+    setRenameDraft("");
+    if (key && name) onRenameMap?.(key, name);
+  }, [renamingKey, renameDraft, onRenameMap]);
 
   // The root can never be deleted, so the toolbar trash only arms itself for
   // a real branch selection.
@@ -897,6 +998,141 @@ function MindMapCanvas(props: MindMapPanelProps) {
             </div>
           </div>
         ) : null}
+
+        {/* ── Map library ───────────────────────────────────────────────────
+            The Notes panel keeps a grid of separate notes; a module keeps a
+            grid of separate MIND MAPS the same way. It slides over the canvas
+            (rather than living in a header) so the diagram surface stays
+            completely clean when the library is closed. Each card opens its
+            map on tap, and carries its own rename / delete actions. */}
+        {libraryOpen ? (
+          <div className="absolute inset-0 z-20 flex flex-col bg-[var(--mm-bg)]/97 backdrop-blur-sm" data-course-mindmap-library>
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--mm-border)] px-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-[var(--mm-text)]">
+                  Is module ke mind maps
+                </p>
+                <p className="mt-0.5 truncate text-[10px] font-semibold text-[var(--mm-muted)]">
+                  {mapsLoading ? "Loading…" : `${maps.length} ${maps.length === 1 ? "map" : "maps"} · tap karke kholein`}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCreateMap?.();
+                    setLibraryOpen(false);
+                    setSelectedId(null);
+                    setEditingId(null);
+                  }}
+                  disabled={atMapLimit || !onCreateMap}
+                  className="flex items-center gap-1 rounded-lg bg-violet-500 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-violet-400 disabled:opacity-40"
+                  aria-label="Naya mind map banayein"
+                  title={atMapLimit ? "Is module me maps ki limit poori ho gayi" : "New map — naya khaali mind map"}
+                  data-course-mindmap-new
+                >
+                  <Plus size={13} strokeWidth={3} /> New map
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setLibraryOpen(false); setRenamingKey(null); }}
+                  className={toolButton}
+                  aria-label="Map list band karein"
+                  data-course-mindmap-library-close
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-list>
+                {maps.map((entry) => {
+                  const active = entry.mapKey === activeMapKey;
+                  const renaming = renamingKey === entry.mapKey;
+                  return (
+                    <li
+                      key={entry.mapKey}
+                      className={`relative flex aspect-square flex-col overflow-hidden rounded-2xl p-2.5 ring-1 transition ${
+                        active
+                          ? "bg-violet-500/15 ring-violet-400/60"
+                          : "bg-[var(--mm-soft)] ring-[var(--mm-border)] hover:bg-[var(--mm-soft-hover)]"
+                      }`}
+                      data-course-mindmap-map-card
+                      data-map-key={entry.mapKey}
+                      data-active={active ? "true" : "false"}
+                    >
+                      {renaming ? (
+                        <input
+                          value={renameDraft}
+                          onChange={(event) => setRenameDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") commitRename();
+                            if (event.key === "Escape") { setRenamingKey(null); setRenameDraft(""); }
+                          }}
+                          onBlur={commitRename}
+                          autoFocus
+                          maxLength={120}
+                          className="w-full rounded-lg bg-[var(--mm-bg)] px-2 py-1 text-[11px] font-bold text-[var(--mm-text)] outline-none ring-1 ring-violet-400/60"
+                          aria-label="Map ka naam"
+                          data-course-mindmap-rename-input
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openMap(entry.mapKey)}
+                          className="min-h-0 flex-1 text-left"
+                          data-course-mindmap-open-map={entry.mapKey}
+                        >
+                          <p className="line-clamp-3 text-[11px] font-black leading-snug text-[var(--mm-text)]">
+                            {entry.title || "Untitled map"}
+                          </p>
+                          <p className="mt-1 text-[10px] font-semibold text-[var(--mm-muted)]">
+                            {entry.nodeCount} {entry.nodeCount === 1 ? "node" : "nodes"}
+                          </p>
+                        </button>
+                      )}
+                      <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1.5">
+                        {renaming ? (
+                          <button
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={commitRename}
+                            className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-500 text-white"
+                            aria-label="Naam save karein"
+                            data-course-mindmap-rename-save
+                          >
+                            <Check size={13} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startRename(entry)}
+                            className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500/90 text-white transition hover:brightness-110"
+                            aria-label="Map rename karein"
+                            data-course-mindmap-rename
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => onDeleteMap?.(entry.mapKey)}
+                          className="grid h-7 w-7 place-items-center rounded-lg bg-rose-500/90 text-white transition hover:brightness-110"
+                          aria-label="Map delete karein"
+                          title="Yeh mind map delete karein"
+                          data-course-mindmap-delete-map
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* ── Status strip — the mind map's toolbar ──────────────────────────
@@ -905,9 +1141,12 @@ function MindMapCanvas(props: MindMapPanelProps) {
           the working set of controls: zoom, fit-to-screen, the map's own
           light/dark toggle, delete-selected and the double-tap-delete arm
           switch. Every button is icon-sized so all six fit on a phone. */}
-      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-[var(--mm-border)] px-3 py-1.5" data-course-mindmap-status>
+      <div
+        className="flex shrink-0 items-center justify-between gap-2 overflow-x-auto border-t border-[var(--mm-border)] px-3 py-1.5"
+        data-course-mindmap-status
+      >
         <span
-          className={`flex min-w-0 items-center gap-1.5 text-[10px] font-black uppercase tracking-wider ${
+          className={`flex min-w-0 max-w-[34%] shrink-0 items-center gap-1.5 truncate text-[10px] font-black uppercase tracking-wider ${
             mindTheme === "light" ? save.light : save.dark
           }`}
           data-course-mindmap-save-label
@@ -915,7 +1154,33 @@ function MindMapCanvas(props: MindMapPanelProps) {
           {status === "error" ? <TriangleAlert size={11} /> : null}
           {save.label}
         </span>
-        <span className="min-w-0 truncate text-[10px] font-bold text-[var(--mm-muted)]" data-course-mindmap-stats>
+        {/* ── Map switcher ────────────────────────────────────────────────
+            Notes are a LIST, and so are mind maps now: this button opens the
+            module's map library (every diagram the learner made here), with
+            "New map", rename and delete inside. The active map's name rides
+            on the button so the learner always knows which one is open. */}
+        <button
+          type="button"
+          onClick={() => setLibraryOpen((open) => !open)}
+          aria-expanded={libraryOpen}
+          className={`flex min-w-0 max-w-[38%] shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-bold transition ${
+            libraryOpen
+              ? "bg-violet-500/25 text-violet-100 ring-1 ring-inset ring-violet-400/50"
+              : "bg-[var(--mm-soft)] text-[var(--mm-text)] hover:bg-[var(--mm-soft-hover)]"
+          }`}
+          aria-label="Is module ke saare mind maps"
+          title="Maps — is module ke sabhi mind maps"
+          data-course-mindmap-maps
+          data-map-count={maps.length}
+          data-active-map={activeMapKey}
+        >
+          <Layers size={12} />
+          <span className="min-w-0 truncate">{activeMapName}</span>
+          <span className="shrink-0 rounded-full bg-[var(--mm-soft-hover)] px-1.5 text-[9px] font-black">
+            {maps.length}
+          </span>
+        </button>
+        <span className="hidden min-w-0 truncate text-[10px] font-bold text-[var(--mm-muted)] sm:inline" data-course-mindmap-stats>
           {totalNodes} {totalNodes === 1 ? "node" : "nodes"} · {levels} {levels === 1 ? "level" : "levels"}
         </span>
         <div className="flex shrink-0 items-center gap-1">
@@ -936,6 +1201,28 @@ function MindMapCanvas(props: MindMapPanelProps) {
             data-course-mindmap-zoom-in
           >
             <Plus size={13} />
+          </button>
+          {/* ── Auto arrange: the one-tap clean-up ────────────────────────
+              However badly the map was dragged around, this drops every
+              hand-placed pin and hands the whole diagram back to the tidy
+              tree — nodes line up, branches re-balance, ropes stop crossing
+              — then the view re-fits. Stays lit only while there is actual
+              mess to clean, so it never looks like a no-op button. */}
+          <button
+            type="button"
+            onClick={handleAutoArrange}
+            className={`flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-black uppercase tracking-wider transition ${
+              messy
+                ? "bg-emerald-500/25 text-emerald-100 ring-1 ring-inset ring-emerald-400/50 hover:bg-emerald-500/35"
+                : "bg-[var(--mm-soft)] text-[var(--mm-muted)] hover:bg-[var(--mm-soft-hover)] hover:text-[var(--mm-text)]"
+            }`}
+            aria-label="Ek click me poora mind map organise karein"
+            title="Auto arrange — sabhi nodes ek click me saaf-suthre organise"
+            data-course-mindmap-auto-arrange
+            data-messy={messy ? "true" : "false"}
+          >
+            <Sparkles size={13} />
+            <span className="hidden sm:inline">Arrange</span>
           </button>
           {/* Fit-to-screen: re-fits the whole diagram to the visible canvas.
               Larger + violet-tinted than the zoom buttons so it stands out
