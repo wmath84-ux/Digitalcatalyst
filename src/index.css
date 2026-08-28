@@ -647,7 +647,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   --desktop-topbar-height: 64px;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 767px) {
   /* The shell is render-free on mobile / tablet — the mobile +
      tablet per-page chrome takes over. */
   .dc-desktop-shell { display: none !important; }
