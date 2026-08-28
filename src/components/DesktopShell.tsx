@@ -19,6 +19,10 @@
 //   3. Wires the global top-bar search to the page's own search
 //      handler (passed in as a prop, with the store search used as
 //      the default for every page that does not opt out).
+//   4. Hosts a page's own page-switcher inside the top bar. A page
+//      publishes it with `useRegisterTopBarTabs` (Revision does), and
+//      the bar grows a second row of text tabs for as long as that
+//      page is mounted — no other page ever sees the row.
 //
 // The shell is RENDERED ON DESKTOP ONLY. Mobile + tablet fall back to
 // the existing per-page chrome and the bottom nav. The desktop CSS
@@ -48,6 +52,8 @@ import { useCatalog } from "../context/CatalogContext";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
 import BrandMark from "./BrandMark";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
+import { cn } from "../utils/cn";
+import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";
 
 /** The hash-prefixed routes the rail can drive. Each one navigates by
  *  setting `window.location.hash` so the change is persistent + the
@@ -215,6 +221,10 @@ export default function DesktopShell({
   const { purchasedIds } = useCatalog();
   const liveNotificationCount = useUnreadNotificationCount();
   const [query, setQuery] = useState(initialSearchQuery);
+  // Page-switcher published by the mounted page (Revision is the first user).
+  // `null` on every other page, so the extra header row only exists while the
+  // publishing page is mounted.
+  const [topBarTabs, setTopBarTabs] = useState<TopBarTabsConfig | null>(null);
 
   // Keep the search input in sync with the page's own query when the
   // page changes the initial value. The dependency is the string so
@@ -409,89 +419,101 @@ export default function DesktopShell({
 
       {/* ── Main column (top bar + page body + optional side panel) ── */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top bar — global actions shared across every page. */}
+        {/* Top bar — global actions shared across every page.
+            A page can publish its own page-switcher into this bar through
+            `useRegisterTopBarTabs` (see src/components/TopBarTabsContext.tsx);
+            when one is registered the bar grows a second row of text tabs and
+            carries `data-topbar-tabs="<feature>"`. */}
         <header
           data-desktop-topbar
-          className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b border-slate-200/80 bg-white/85 px-6 backdrop-blur-2xl"
+          data-topbar-tabs={topBarTabs ? topBarTabs.feature : undefined}
+          className="sticky top-0 z-30 shrink-0 border-b border-slate-200/80 bg-white/85 px-6 backdrop-blur-2xl"
         >
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-black tracking-tight text-slate-900" data-desktop-page-title>
-              {resolvedTitle}
-            </h1>
-            <p className="truncate text-[11px] font-semibold text-slate-400" data-desktop-page-subtitle>
-              {resolvedSubtitle}
-            </p>
-          </div>
-
-          {/* Search input — appears on every page that provides an
-              onSearch handler. The input is hidden on pages that
-              have no handler (e.g. media viewers, fullscreen flows). */}
-          {onSearch ? (
-            <div className="relative flex w-[320px] max-w-[36vw] items-center">
-              <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-slate-400" />
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onFocus={() => {
-                  // A bare focus jumps to the search page with no
-                  // pre-fill, so the user can start fresh. Typing a
-                  // value first then focusing keeps the value in the
-                  // input.
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleSearchSubmit();
-                  }
-                }}
-                placeholder={`Search ${appName}…`}
-                aria-label="Search"
-                className="w-full rounded-xl border border-slate-200/80 bg-slate-50/80 py-2 pl-10 pr-9 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
-                data-desktop-search
-              />
-              {query ? (
-                <button
-                  type="button"
-                  onClick={() => setQuery("")}
-                  aria-label="Clear search"
-                  className="absolute right-2 grid h-6 w-6 place-items-center rounded-full text-slate-400 transition hover:bg-slate-200/60 hover:text-slate-700"
-                >
-                  <X size={12} />
-                </button>
-              ) : null}
+          <div data-desktop-topbar-row className="flex h-16 items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-base font-black tracking-tight text-slate-900" data-desktop-page-title>
+                {resolvedTitle}
+              </h1>
+              <p className="truncate text-[11px] font-semibold text-slate-400" data-desktop-page-subtitle>
+                {resolvedSubtitle}
+              </p>
             </div>
-          ) : null}
 
-          {/* Top-bar quick actions: notifications, cart, favorites, plans. */}
-          <div className="flex items-center gap-1.5" data-desktop-topbar-actions>
-            {topBarRight}
-            <TopBarButton
-              ariaLabel="Notifications"
-              icon={<Bell size={16} />}
-              badge={notifications > 0 ? notifications : undefined}
-              onClick={() => handleNavigate("#/notifications")}
-              active={active === "profile" && (window.location.hash.includes("notifications") || false)}
-            />
-            <TopBarButton
-              ariaLabel="Favorites"
-              icon={<Heart size={16} />}
-              badge={favoritesCount > 0 ? favoritesCount : undefined}
-              onClick={() => handleNavigate("#/favorites")}
-            />
-            <TopBarButton
-              ariaLabel="Cart"
-              icon={<ShoppingBag size={16} />}
-              badge={cartCount > 0 ? cartCount : undefined}
-              onClick={() => handleNavigate("#/cart")}
-            />
-            <TopBarButton
-              ariaLabel="Subscription"
-              icon={<Crown size={16} />}
-              onClick={() => handleNavigate("#/subscription")}
-              active={false}
-            />
+            {/* Search input — appears on every page that provides an
+                onSearch handler. The input is hidden on pages that
+                have no handler (e.g. media viewers, fullscreen flows). */}
+            {onSearch ? (
+              <div className="relative flex w-[320px] max-w-[36vw] items-center">
+                <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onFocus={() => {
+                    // A bare focus jumps to the search page with no
+                    // pre-fill, so the user can start fresh. Typing a
+                    // value first then focusing keeps the value in the
+                    // input.
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleSearchSubmit();
+                    }
+                  }}
+                  placeholder={`Search ${appName}…`}
+                  aria-label="Search"
+                  className="w-full rounded-xl border border-slate-200/80 bg-slate-50/80 py-2 pl-10 pr-9 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                  data-desktop-search
+                />
+                {query ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    aria-label="Clear search"
+                    className="absolute right-2 grid h-6 w-6 place-items-center rounded-full text-slate-400 transition hover:bg-slate-200/60 hover:text-slate-700"
+                  >
+                    <X size={12} />
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* Top-bar quick actions: notifications, cart, favorites, plans. */}
+            <div className="flex items-center gap-1.5" data-desktop-topbar-actions>
+              {topBarRight}
+              <TopBarButton
+                ariaLabel="Notifications"
+                icon={<Bell size={16} />}
+                badge={notifications > 0 ? notifications : undefined}
+                onClick={() => handleNavigate("#/notifications")}
+                active={active === "profile" && (window.location.hash.includes("notifications") || false)}
+              />
+              <TopBarButton
+                ariaLabel="Favorites"
+                icon={<Heart size={16} />}
+                badge={favoritesCount > 0 ? favoritesCount : undefined}
+                onClick={() => handleNavigate("#/favorites")}
+              />
+              <TopBarButton
+                ariaLabel="Cart"
+                icon={<ShoppingBag size={16} />}
+                badge={cartCount > 0 ? cartCount : undefined}
+                onClick={() => handleNavigate("#/cart")}
+              />
+              <TopBarButton
+                ariaLabel="Subscription"
+                icon={<Crown size={16} />}
+                onClick={() => handleNavigate("#/subscription")}
+                active={false}
+              />
+            </div>
           </div>
+
+          {/* The page's own page-switcher, published by the page itself. Only
+              the mounted page's tabs are here — Revision's row disappears the
+              moment the learner leaves the Revision screens. */}
+          {topBarTabs ? <TopBarTabRow config={topBarTabs} /> : null}
         </header>
 
         {/* ── Page body + optional side panel ─────────────────────
@@ -501,23 +523,25 @@ export default function DesktopShell({
             on a mid-sized desktop monitor. The grid only flips on
             when the panel is present — pages without a panel
             continue to use the full content width. */}
-        <div
-          className={`flex min-h-0 flex-1 gap-6 px-6 py-6 ${sidePanel ? "xl:px-8" : ""}`}
-          data-desktop-content
-        >
-          <main className="min-w-0 flex-1">
-            {children}
-          </main>
-          {sidePanel ? (
-            <aside
-              data-desktop-side-panel
-              className="w-[320px] shrink-0 max-[1023px]:w-[clamp(280px,30vw,320px)]"
-              style={{ width: 'clamp(280px, 30vw, 320px)' } as any}
-            >
-              {sidePanel}
-            </aside>
-          ) : null}
-        </div>
+        <TopBarTabsProvider setTabs={setTopBarTabs}>
+          <div
+            className={`flex min-h-0 flex-1 gap-6 px-6 py-6 ${sidePanel ? "xl:px-8" : ""}`}
+            data-desktop-content
+          >
+            <main className="min-w-0 flex-1">
+              {children}
+            </main>
+            {sidePanel ? (
+              <aside
+                data-desktop-side-panel
+                className="w-[320px] shrink-0 max-[1023px]:w-[clamp(280px,30vw,320px)]"
+                style={{ width: 'clamp(280px, 30vw, 320px)' } as any}
+              >
+                {sidePanel}
+              </aside>
+            ) : null}
+          </div>
+        </TopBarTabsProvider>
       </div>
     </div>
   );
@@ -598,6 +622,68 @@ function RailStat({ label, value, highlight = false }: { label: string; value: n
         {value > 99 ? "99+" : value}
       </dd>
     </div>
+  );
+}
+
+/**
+ * The second row of the top bar: the mounted page's own page-switcher.
+ *
+ * It is the desktop-header twin of `src/components/ui/PageTabs.tsx` — plain
+ * text labels, the active page marked by colour + an underline on the row's
+ * rule, no icons and no pills — so moving these destinations into the header
+ * does not change how they read. The row scrolls sideways on narrow desktops
+ * instead of wrapping, which keeps the bar a single fixed-height strip.
+ */
+function TopBarTabRow({ config }: { config: TopBarTabsConfig }) {
+  return (
+    <nav
+      data-desktop-topbar-tabs={config.feature}
+      aria-label={config.ariaLabel}
+      className="flex items-center gap-x-0.5 overflow-x-auto border-t border-slate-200/70 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <div className="-mb-px flex min-w-0 items-center gap-x-0.5">
+        {config.items.map((item) => {
+          const isActive = item.id === config.activeId;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => config.onSelect(item.id)}
+              title={item.hint}
+              aria-current={isActive ? "page" : undefined}
+              data-topbar-tab={item.id}
+              data-active={isActive ? "true" : "false"}
+              className={cn(
+                "relative shrink-0 rounded-t-xl px-3 py-2.5 text-[13px] font-bold outline-none transition-colors duration-200",
+                "focus-visible:ring-2 focus-visible:ring-indigo-300/70",
+                isActive ? "text-indigo-600" : "text-slate-500 hover:bg-slate-100/70 hover:text-slate-900",
+              )}
+            >
+              {item.label}
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "absolute inset-x-2 bottom-0 h-[3px] rounded-full transition-opacity duration-200",
+                  isActive ? "bg-gradient-to-r from-indigo-500 to-violet-500 opacity-100" : "opacity-0",
+                )}
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      {config.onHome ? (
+        <button
+          type="button"
+          onClick={config.onHome}
+          data-topbar-tab="home"
+          title={`Back to ${config.homeLabel ?? "Home"}`}
+          className="ml-auto shrink-0 rounded-xl px-2 py-2.5 text-[13px] font-bold text-slate-400 outline-none transition-colors duration-200 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-300/70"
+        >
+          {config.homeLabel ?? "Home"}
+        </button>
+      ) : null}
+    </nav>
   );
 }
 

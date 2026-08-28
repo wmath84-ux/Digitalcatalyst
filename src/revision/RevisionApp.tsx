@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import StoreHeader from "../components/Header";
 import PageTabs, { type PageTabItem } from "../components/ui/PageTabs";
+import { useRegisterTopBarTabs, useTopBarTabsHost } from "../components/TopBarTabsContext";
 import { ExitGuardProvider, useExitGuard } from "./components/ExitGuardContext";
 import { RevisionHeaderProvider, useRevisionHeader } from "./components/RevisionHeaderContext";
 import DashboardPage from "./pages/DashboardPage";
@@ -59,13 +60,21 @@ function RevisionStoreHeader({ cartCount }: { cartCount: number }) {
 }
 
 /**
- * Text-only page tabs for tablet + desktop (see src/components/ui/PageTabs).
+ * The Revision page-switcher for tablet + desktop.
  *
  * The revision footer pill carries these destinations on a phone and is
  * hidden from 768 px up, so a wide screen needs the same pages reachable in
  * one click. Each tab opens its own route — the same `#/revision/...` hashes
  * the footer uses — through the feature's exit guard so an in-progress test
  * still asks before the learner walks away.
+ *
+ * Where the row renders depends on which chrome is on screen:
+ *   • Tablet portrait (768–959 px) — the phone header is the chrome, so the
+ *     tabs render as a text row in the page body (src/components/ui/PageTabs).
+ *   • Tablet landscape + desktop — the desktop shell owns the header, so the
+ *     SAME tabs are published into that header as its second row (see
+ *     `useRegisterTopBarTabs`) and the in-body strip is skipped. They live
+ *     there only while Revision is mounted, so no other page shows them.
  */
 const REVISION_TABS: PageTabItem[] = [
   { id: "dashboard", label: "Dashboard", href: "#/revision", hint: "Today's revision overview" },
@@ -107,9 +116,35 @@ export function isRevisionFocusRoute(path: string): boolean {
     || /^#\/revision\/session\/\d+$/.test(path);
 }
 
-function RevisionPageTabs({ path }: { path: string }) {
+export function RevisionPageTabs({ path }: { path: string }) {
   const { navigate } = useExitGuard();
   const activeId = resolveRevisionTabId(path);
+  // `null` unless the desktop shell is mounted and owns the header.
+  const topBarHost = useTopBarTabsHost();
+  const focusRoute = isRevisionFocusRoute(path);
+
+  // Publish the row into the desktop header. Registering `null` on the focused
+  // test-taking surfaces — and clearing on unmount, which `useRegisterTopBarTabs`
+  // does for us — is what keeps the tabs inside the header ONLY on Revision.
+  useRegisterTopBarTabs(
+    topBarHost && !focusRoute
+      ? {
+          feature: "revision",
+          ariaLabel: "Revision pages",
+          items: REVISION_TABS,
+          activeId,
+          onSelect: (id) => {
+            const href = REVISION_TABS.find((tab) => tab.id === id)?.href;
+            if (href && href !== path) navigate(href);
+          },
+          onHome: () => navigate("#/home"),
+        }
+      : null,
+  );
+
+  // The desktop header already shows them; the focused routes show neither.
+  if (topBarHost || focusRoute) return null;
+
   return (
     <PageTabs
       items={REVISION_TABS}
@@ -268,10 +303,12 @@ export default function RevisionApp() {
           <RevisionHeaderProvider>
             <RevisionStoreHeader cartCount={cartIds.size} />
 
-            {/* Tablet + desktop page tabs, directly under the shared header.
-                They are skipped on the focused test-taking surfaces, exactly
-                like the feature's own bottom nav. */}
-            {!isRevisionFocusRoute(path) && <RevisionPageTabs path={path} />}
+            {/* The Revision page-switcher. It publishes itself into the desktop
+                shell's header when the shell owns the chrome, and renders as a
+                text row under the shared header otherwise. Either way it is
+                skipped on the focused test-taking surfaces, exactly like the
+                feature's own bottom nav. */}
+            <RevisionPageTabs path={path} />
 
             {revisionAccessLoading || revisionDataLoading ? (
               <div data-revision-access-loading data-revision-content className="grid min-h-0 flex-1 place-items-center bg-transparent px-4">
