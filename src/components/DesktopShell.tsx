@@ -477,6 +477,7 @@ export default function DesktopShell({
               {sidePanel}
             </aside>
           ) : null}
+        </div>
       </div>
     </div>
   );
