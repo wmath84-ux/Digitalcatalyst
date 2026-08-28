@@ -1,10 +1,12 @@
 // src/components/PortraitOnlyGuard.tsx
 //
 // HARD RULE - Mobile Portrait Only (except Course Player):
-// - Mobile phones (<768px) are locked to portrait EVERYWHERE except course player
-// - If a mobile user rotates to landscape outside course player, show "Rotate your phone" overlay
+// - Phones are locked to portrait EVERYWHERE except course player. The phone
+//   is detected orientation-independently (see isPhoneDevice in appOrientation),
+//   so a phone held in landscape is still recognised as a phone.
+// - If a phone user rotates to landscape outside course player, show "Rotate your phone" overlay
 // - This applies to ALL contexts: PWA, mobile browser, Capacitor native app
-// - Tablet/desktop (>=768px) NEVER show overlay - their layouts work in landscape
+// - Tablet/desktop NEVER show overlay - their layouts work in landscape
 // - Course player is the ONLY screen allowed to be landscape on phones
 //
 // Enforcement layers:
@@ -17,41 +19,39 @@ import { useEffect, useState } from "react";
 import { RotateCcw } from "lucide-react";
 import {
   isCoursePlayerRotationActive,
+  isPhoneDevice,
   lockAppToPortrait,
   onCoursePlayerRotationChange,
 } from "../utils/appOrientation";
-import { isMobileDevice } from "../utils/courseStatusBar";
 import { useBranding } from "../context/BrandingContext";
-import { isMobileScreenSize } from "../utils/responsive";
 
 export default function PortraitOnlyGuard() {
   const { appName } = useBranding();
   const [playerOpen, setPlayerOpen] = useState<boolean>(isCoursePlayerRotationActive);
   const [landscape, setLandscape] = useState(false);
-  const [mobile, setMobile] = useState(false);
-  const [phoneViewport, setPhoneViewport] = useState(true);
+  const [phone, setPhone] = useState(isPhoneDevice);
 
   useEffect(() => {
-    setMobile(isMobileDevice());
-    setPhoneViewport(isMobileScreenSize());
+    setPhone(isPhoneDevice());
 
     const updateViewport = () => {
       const isLandscape = window.innerWidth > window.innerHeight;
       setLandscape(isLandscape);
-      setPhoneViewport(isMobileScreenSize());
-      setMobile(isMobileDevice());
+      setPhone(isPhoneDevice());
 
-      // HARD RULE: Re-lock to portrait whenever viewport changes and we're NOT in course player
-      // This handles cases where user rotates with auto-rotate ON
-      if (!isCoursePlayerRotationActive() && isMobileScreenSize() && window.innerWidth < 768) {
+      // HARD RULE: Re-lock to portrait whenever the viewport changes and we're NOT in course player.
+      // `isPhoneDevice()` is orientation-independent, so a phone that is rotated to landscape
+      // (auto-rotate ON) is still recognised as a phone and gets re-locked + overlay — it can
+      // never slip through as a "tablet" just because its width grew past 768px.
+      if (!isCoursePlayerRotationActive() && isPhoneDevice()) {
         lockAppToPortrait();
       }
     };
 
     updateViewport();
 
-    // Initial hard lock for mobile phones outside course player
-    if (!isCoursePlayerRotationActive() && isMobileScreenSize() && window.innerWidth < 768) {
+    // Initial hard lock for phones outside course player
+    if (!isCoursePlayerRotationActive() && isPhoneDevice()) {
       lockAppToPortrait();
       // Retry after short delay for PWA/Capacitor
       setTimeout(() => {
@@ -78,15 +78,14 @@ export default function PortraitOnlyGuard() {
   }, []);
 
   // HARD RULE LOGIC:
-  // - Show overlay ONLY on mobile phones in landscape outside course player
+  // - Show overlay ONLY on phones in landscape outside course player
   // - Tablet/desktop never show it (layouts work in landscape)
   // - Course player never shows it (only screen allowed to rotate)
+  // - `isPhoneDevice()` is orientation-independent, so a phone rotated to
+  //   landscape is still detected as a phone and the overlay shows — the old
+  //   `innerWidth < 768` check failed here because landscape width exceeds 768.
   // - This applies to ALL mobile contexts: browser, PWA, Capacitor
-  if (!mobile || !phoneViewport || playerOpen || !landscape) return null;
-
-  // Extra safety: ensure we're actually on a phone-sized viewport (<768px)
-  // and landscape
-  if (typeof window !== "undefined" && window.innerWidth >= 768) return null;
+  if (!phone || playerOpen || !landscape) return null;
 
   return (
     <div

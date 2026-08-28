@@ -1,13 +1,15 @@
 // src/utils/appOrientation.ts
 //
 // HARD RULE - Mobile Portrait Lock:
-// - Mobile phones (<768px) are LOCKED to portrait EVERYWHERE except Course Player.
+// - Mobile phones are LOCKED to portrait EVERYWHERE except Course Player.
 // - Course Player is the ONLY screen where rotation is allowed.
-// - This respects "auto-rotate OFF" behavior: outside course player, app never rotates
-//   even if system auto-rotate is ON (hard lock). Inside course player, rotation is
-//   allowed and uses FULL_SENSOR on native so it can rotate even if auto-rotate OFF
-//   (like YouTube).
-// - Tablet/desktop (>=768px) are NEVER locked - their layouts work in any orientation.
+// - This is a HARD rule that applies whether the user has system auto-rotate
+//   ON or OFF, and whether the phone is currently held in landscape or portrait:
+//   outside the course player the app NEVER rotates (native hard lock +
+//   Screen Orientation API + full-screen overlay fallback on web). Inside the
+//   course player, rotation is allowed and uses FULL_SENSOR on native so it can
+//   rotate even if auto-rotate OFF (like YouTube).
+// - Tablet/desktop are NEVER locked - their layouts work in any orientation.
 //
 // Three layers for enforcement:
 //   1. AndroidManifest.xml: android:screenOrientation="portrait" (native hard lock)
@@ -15,7 +17,7 @@
 //   3. JS: Screen Orientation API + Capacitor plugins (runtime lock/unlock)
 //   4. PortraitOnlyGuard overlay: Visual fallback when API lock fails (browser tabs, iOS)
 
-import { isMobileScreenSize } from "./responsive";
+import { isMobileDevice } from "./courseStatusBar";
 
 type RotationListener = () => void;
 
@@ -27,6 +29,28 @@ const rotationListeners = new Set<RotationListener>();
 
 /** True while the Course Player is mounted — the only rotation-unlocked state. */
 let coursePlayerActive = false;
+
+/**
+ * Is this a phone-sized device, independent of the current orientation?
+ * The old logic used `window.innerWidth < 768`, but `innerWidth` grows past 768
+ * the instant a phone is rotated to landscape, which made the app believe it was
+ * on a tablet/desktop and silently skipped BOTH the portrait lock and the
+ * "rotate your phone" overlay. A phone is a phone no matter which way it is held,
+ * so we detect it from the device's *smaller* physical CSS dimension: a phone's
+ * short side stays well under 600px in every orientation, while tablets/desktops
+ * are always >= 600px.
+ */
+export const isPhoneDevice = (): boolean => {
+  if (typeof window === "undefined") return false;
+  if (!isMobileDevice()) return false;
+  try {
+    const w = window.screen?.width ?? 0;
+    const h = window.screen?.height ?? 0;
+    return Math.min(w, h) < 600;
+  } catch {
+    return true;
+  }
+};
 
 export const onCoursePlayerRotationChange = (listener: RotationListener): (() => void) => {
   rotationListeners.add(listener);
@@ -40,14 +64,15 @@ const notifyRotationChange = (): void => {
   for (const listener of rotationListeners) listener();
 };
 
-/** Check if current viewport is mobile phone size that should be locked */
+/**
+ * Should this device be locked to portrait? True only for phones (never for
+ * tablet/desktop), REGARDLESS of which way the phone is currently held. This is
+ * what makes the rule "hard": a phone in landscape still gets locked.
+ */
 const shouldLockForCurrentViewport = (): boolean => {
   if (typeof window === "undefined") return false;
   // Tablet/desktop never locked
-  if (window.innerWidth >= 768) return false;
-  // Also check isMobileScreenSize for consistency
-  if (!isMobileScreenSize()) return false;
-  return true;
+  return isPhoneDevice();
 };
 
 const setHtmlOrientationAttributes = (): void => {
