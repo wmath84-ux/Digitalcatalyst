@@ -32,6 +32,9 @@ importers:
       '@capacitor/push-notifications':
         specifier: ^7.0.7
         version: 7.0.7(@capacitor/core@7.6.8)
+      '@capacitor/screen-orientation':
+        specifier: ^7.0.4
+        version: 7.0.4(@capacitor/core@7.6.8)
       '@react-three/drei':
         specifier: ^10.7.8
         version: 10.7.8(@react-three/fiber@9.7.0(@types/react@19.2.7)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(three@0.185.1))(@types/react@19.2.7)(@types/three@0.185.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(three@0.185.1)
@@ -239,6 +242,11 @@ packages:
 
   '@capacitor/push-notifications@7.0.7':
     resolution: {integrity: sha512-TgFsPV4uOez0RtFKsWPz3XCrLxc9th+UyAkillUY9vL6ezVKT35te9Sn4vGR0jeU2U0KUNU7Dt6oSCALnSiEKg==}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
+
+  '@capacitor/screen-orientation@7.0.4':
+    resolution: {integrity: sha512-xWeWnZsV6z1bXxlOnSi3ynrFMK/JICryAuLnIvGL069BHS05nvxwu15d0xMZiMZWkoucNEAN60vyIYGGqz5IWA==}
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
 
@@ -2825,6 +2833,10 @@ snapshots:
       '@capacitor/core': 7.6.8
 
   '@capacitor/push-notifications@7.0.7(@capacitor/core@7.6.8)':
+    dependencies:
+      '@capacitor/core': 7.6.8
+
+  '@capacitor/screen-orientation@7.0.4(@capacitor/core@7.6.8)':
     dependencies:
       '@capacitor/core': 7.6.8
 
