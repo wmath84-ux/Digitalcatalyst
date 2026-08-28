@@ -1059,11 +1059,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onToggle={() => {
         // If we're about to CLOSE (open→false) while on notes tab, save first.
         if (dockOpen && dockTab === "notes") fireSaveSignal();
+        // …and flush the mind map's pending debounced write the same way, so
+        // a dock-tap close never leaves a fresh branch waiting to save.
+        if (dockOpen && dockTab === "mindmap") mindMap.flush();
         setDockOpen((open) => !open);
       }}
       onClose={() => {
-        // Outside-click / Escape close: save any open notes draft first.
+        // Outside-click / Escape / header-X close: save any open notes draft
+        // and flush the mind map's pending write first.
         if (dockTab === "notes") fireSaveSignal();
+        if (dockTab === "mindmap") mindMap.flush();
         setDockOpen(false);
       }}
       modules={modules}

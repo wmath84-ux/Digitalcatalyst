@@ -201,11 +201,12 @@ test("The overlay hides its main header + grab handle while the writing box is o
   // Writing mode = notes tab + editor open. In that mode the sheet keeps no
   // chrome at all: toolbar / writing surface / Save + Cancel only, so the
   // box gets maximum space in both portrait and landscape. The mind map tab
-  // also hides the header (per the user's "header hata do" request) so the
-  // diagram canvas is flush against the top of the sheet.
+  // does the same in LANDSCAPE (clean split canvas flush against the top of
+  // the sheet), but in PORTRAIT it keeps the standard header (title +
+  // close X) like every other sheet, so the grab pill gives way to it there.
   assert.match(overlay, /const notesWriting = tab === "notes" && notesEditorOpen;/);
-  assert.match(overlay, /\{!landscape && !notesWriting \? \(/);
-  assert.match(overlay, /\{notesWriting \|\| tab === "mindmap" \? null : \(/);
+  assert.match(overlay, /\{!landscape && !notesWriting && tab !== "mindmap" \? \(/);
+  assert.match(overlay, /\{notesWriting \|\| \(tab === "mindmap" && landscape\) \? null : \(/);
 });
 
 test("CourseOverlay wires NotesPanel into the notes tab", () => {
