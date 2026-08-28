@@ -2142,13 +2142,44 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   [data-profile-layout] > .grid { align-self: stretch; }
 }
 
-.is-desktop [data-desktop-side-panel],
-.is-tablet [data-desktop-side-panel]
-{
-  display: block;
+/* ── HARD RULE: Mobile Portrait Lock ───────────────────────────────────────
+   Mobile phones (<768px) are locked to portrait everywhere except course player.
+   - AndroidManifest.xml: portrait
+   - Web Manifest: portrait
+   - JS: Screen Orientation API + Capacitor
+   - This CSS is the final fallback: if somehow landscape content renders,
+     the PortraitOnlyGuard overlay covers it with z-[500].
+   - Course player sets data-course-player-active="true" on html to allow landscape.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@media screen and (orientation: landscape) and (max-width: 767px) {
+  /* Prevent horizontal scroll glitches when rotating */
+  html[data-orientation-locked="portrait"]:not([data-course-player-active="true"]) {
+    overflow: hidden;
+  }
+  
+  /* Ensure overlay is always on top in landscape */
+  html[data-orientation-locked="portrait"]:not([data-course-player-active="true"]) [data-app-portrait-overlay] {
+    display: grid !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
 }
 
-.is-mobile [data-desktop-side-panel]
-{
-  display: none;
+/* Course player active - allow landscape */
+html[data-course-player-active="true"] {
+  /* Remove any portrait restrictions */
+  overflow: auto;
+}
+
+/* Extra safety: Hide any landscape-specific UI outside course player on mobile */
+@media screen and (orientation: landscape) and (max-width: 767px) {
+  html:not([data-course-player-active="true"]) body {
+    /* Prevent content from being interactive in landscape - overlay handles it */
+    touch-action: none;
+  }
+  
+  html[data-course-player-active="true"] body {
+    touch-action: auto;
+  }
 }

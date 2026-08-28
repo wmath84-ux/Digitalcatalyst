@@ -43,6 +43,7 @@ import type { PaidCourseUpdate } from "./types/course";
 import { isDesktopBrowserLocked, isInstalledMobilePwa, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
 import { disablePageZoom } from "./utils/disablePageZoom";
 import { setThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/themeColor";
+import { initOrientationLock } from "./utils/appOrientation";
 import { recordRouteVisit } from "./utils/routeHistory";
 import { requiresAuthentication } from "./utils/appRoutes";
 import AppShell from "./components/AppShell";
@@ -89,6 +90,8 @@ if ("serviceWorker" in navigator) {
 
 if (typeof window !== "undefined") {
   disablePageZoom();
+  // HARD RULE: Mobile portrait lock - everywhere except course player
+  initOrientationLock();
 }
 
 const LANDING_HASH = "#/landing";
@@ -1123,6 +1126,11 @@ function RootPage(): ReactNode {
 // Drive the footer's outside magic glow with the page's scroll energy
 // (see src/utils/footerGlow.ts). Runs once for the whole app shell.
 initFooterGlow();
+// HARD RULE: Ensure portrait lock is active on app start (mobile only)
+if (typeof window !== "undefined") {
+  // Double-init for safety (initOrientationLock is idempotent)
+  try { initOrientationLock(); } catch {}
+}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
