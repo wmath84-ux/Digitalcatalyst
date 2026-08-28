@@ -306,7 +306,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
         </div>
       ) : viewMode === "list" ? (
         /* ── Rectangular cards / list view ── */
-        <div className="flex flex-col gap-3 px-4 pt-4">
+        <div data-store-list className="flex flex-col gap-3 px-4 pt-4">
           {filtered.map((product) => (
             <ProductCardList
               key={product.id}

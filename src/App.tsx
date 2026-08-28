@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Header from "./components/Header";
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import StorePage from "./components/StorePage";
@@ -38,9 +38,14 @@ export default function App({
   onNavigateToCart,
 }: AppProps) {
   const { purchasedIds: purchased } = useCatalog();
-  const [activeTab, setActiveTab] = useState<TabKey>(() =>
-    window.location.hash.startsWith("#/store/purchases") ? "purchases" : "store"
-  );
+  // Keep the tab in sync with the URL hash. On desktop the left rail and
+  // top bar drive navigation by changing `#/store` vs `#/store/purchases`,
+  // so the tab must be derived from the hash instead of holding a local
+  // copy (otherwise clicking Store / My Library can leave the old page on
+  // screen). On mobile/tablet the bottom nav also writes the hash, so the
+  // two sources never drift.
+  const activeTab: TabKey =
+    window.location.hash.startsWith("#/store/purchases") ? "purchases" : "store";
   const cartCount = cartIds.size;
   const purchasesBadge = useMemo(() => purchased.size, [purchased]);
 
@@ -83,7 +88,12 @@ export default function App({
             if (tab === "home") onNavigateToHome();
             else if (tab === "myday") onNavigateToMyDay();
             else if (tab === "profile") onNavigateToProfile();
-            else setActiveTab(tab);
+            // Mirror Store / My Library in the URL too. This keeps the
+            // desktop rail's active state and browser history in sync, and
+            // prevents the old "hash stays #/store while the screen shows
+            // purchases" state that made switching unreliable.
+            else if (tab === "purchases") window.location.hash = "#/store/purchases";
+            else window.location.hash = "#/store";
           }}
           storeBadge={1}
           purchasesBadge={purchasesBadge}

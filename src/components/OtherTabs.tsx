@@ -33,7 +33,7 @@ export function PurchasesTab({
   }
 
   return (
-    <div className="space-y-3 px-4 pb-8 pt-6">
+    <div data-library-list className="space-y-3 px-4 pb-8 pt-6">
       <h2 className="text-lg font-extrabold text-slate-900">Your purchases</h2>
       {items.map((item) => (
         <div
