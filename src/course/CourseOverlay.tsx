@@ -178,10 +178,11 @@ const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; 
   // Mind Map sits immediately after Note, so the two private-study tools are
   // neighbours in the dock. It opens the same way — a sheet over the lesson —
   // but claims HALF the screen instead of the notes' 40%, because a diagram
-  // needs both width and height to stay readable. The hint is kept in source
-  // for completeness, but the entire header row is hidden for this tab so
-  // the canvas renders flush against the top of the sheet (see the
-  // `tab === "mindmap"` branch in the render below).
+  // needs both width and height to stay readable. In landscape the entire
+  // header row is hidden for this tab so the canvas renders flush against
+  // the top of the split sheet; in portrait the standard header (title +
+  // close) stays visible — see the `tab === "mindmap"` branch in the render
+  // below.
   { key: "mindmap", label: "Mind map", heading: "Mind map", hint: "Is module ka apna diagram banayein", icon: () => <Network size={18} /> },
   { key: "paid", label: "Paid", heading: "Paid content", hint: "Upgrades still locked", icon: () => <ShoppingBag size={18} /> },
 ];
@@ -604,10 +605,20 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           // the section's top (just below the header) to the dock, so they
           // use the real available space and never slide underneath the
           // sticky header.
+          //
+          // Their BOTTOM edge anchors at the dock pill's TOP, not just 4rem
+          // above the section's bottom: the dock's 4rem pill ALSO carries a
+          // bottom margin of `max(safe-area-inset-bottom, 10px)`, and the
+          // class-based `bottom-16` (4rem) cleared only the pill's height.
+          // The sheet's bottom 10px+ used to slide under the pill, covering
+          // the last row of the mind map's bottom toolbar ("toolbar footer
+          // ke neeche dab gaya") and the notes editor's Save row on
+          // gesture-nav phones. Matching the pill's exact top keeps the whole
+          // toolbar strip visible in every state.
           ...(landscape
             ? { width: edgeDragging ? splitWidthCss(splitPercent) : mindMapSplit ? mindMapSplitWidth : splitMode ? splitEditorWidth : sheetHeight }
             : portraitFullHeight
-              ? { top: 0, height: "auto" }
+              ? { top: 0, height: "auto", bottom: "calc(4rem + max(env(safe-area-inset-bottom, 0px), 10px))" }
               : { height: sheetHeight }),
           // When the soft keyboard is up over the notes editor, lift the sheet
           // above it so the editor + Save buttons stay visible. The lesson on
@@ -642,8 +653,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-violet-500/10 to-transparent" />
 
         {/* Grab handle (portrait only, hidden while the writing box is open
-            so the editor gets every pixel). */}
-        {!landscape && !notesWriting ? (
+            so the editor gets every pixel, and hidden for the mind map
+            because its portrait header now carries the title + close). */}
+        {!landscape && !notesWriting && tab !== "mindmap" ? (
           <button
             type="button"
             onClick={props.onClose}
@@ -652,15 +664,15 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           />
         ) : null}
 
-        {/* Main header — shown for every tab EXCEPT the mind map. The mind
-            map sheet is meant to be a clean diagram canvas with no chrome
-            above it, so the entire header (heading + hint + close button +
-            module count) is omitted for that one tab. The dock still sits
-            at the bottom and the sheet can be closed by tapping the scrim
-            or the dock pill, which is what the user asked for. The notes
-            writing mode does the same thing for the same reason: maximum
-            space for the actual content (composer / canvas). */}
-        {notesWriting || tab === "mindmap" ? null : (
+        {/* Main header — shown for every tab. The mind map is the one
+            exception in LANDSCAPE, where the sheet is a clean split canvas
+            next to the lesson and any chrome above it would shrink the
+            diagram. In PORTRAIT the mind map sheet keeps the standard
+            header ("Mind map" title + hint + close X) like every other
+            sheet, so the tab is identifiable and one-tap closeable. The
+            notes writing mode omits the header for the same maximum-space
+            reason in both orientations. */}
+        {notesWriting || (tab === "mindmap" && landscape) ? null : (
         <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--course-border)] px-4 py-3">
           <div className="min-w-0">
             <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-[var(--course-muted)]" data-course-overlay-title>

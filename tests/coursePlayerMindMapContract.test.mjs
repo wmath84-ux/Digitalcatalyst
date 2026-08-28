@@ -115,6 +115,34 @@ test("in portrait the mind map sheet takes the bottom half", () => {
   assert.match(overlay, /const sheetHeight = mindMapActive\s*\?\s*mindMapHeight/);
 });
 
+test("the mind map sheet gets the standard header in portrait but stays chrome-free in landscape", () => {
+  // In landscape the split sheet is a clean diagram canvas next to the
+  // lesson — the header row is omitted there. In portrait the sheet keeps
+  // the standard header (title + hint + close X) like every other tab, so
+  // the map is identifiable and one-tap closeable.
+  assert.match(overlay, /\{notesWriting \|\| \(tab === "mindmap" && landscape\) \? null : \(/);
+  assert.match(overlay, /data-course-overlay-close/);
+  // The small grab pill gives way to the header for this tab in portrait.
+  assert.match(overlay, /!landscape && !notesWriting && tab !== "mindmap"/);
+});
+
+test("the portrait full-height sheet clears the dock's bottom margin, not just the pill", () => {
+  // The dock pill (4rem) sits on a bottom margin of max(safe-area-inset,
+  // 10px). The old class-based `bottom-16` (4rem) cleared only the pill's
+  // height, so the sheet's bottom row slid under the pill — the mind map's
+  // bottom toolbar was half-covered ("footer ke neeche dab gaya"). The
+  // bottom edge must anchor at the pill's exact top.
+  assert.match(overlay, /bottom: "calc\(4rem \+ max\(env\(safe-area-inset-bottom, 0px\), 10px\)\)"/);
+});
+
+test("closing the overlay flushes the mind map's pending save", () => {
+  // The header X, scrim tap, Escape and dock tap all go through onToggle /
+  // onClose — a 700ms-debounced write left pending must be flushed there,
+  // the same way the mind map toolbar's own X flushes via onFlush.
+  assert.match(coursePlayer, /if \(dockOpen && dockTab === "mindmap"\) mindMap\.flush\(\);/);
+  assert.match(coursePlayer, /if \(dockTab === "mindmap"\) mindMap\.flush\(\);/);
+});
+
 test("the notes split keeps its own 40% so the two sheets never fight", () => {
   // The notes editor and the mind map take DIFFERENT default widths, so the
   // parent has to be told which one is open. Both are now live-resizable.
