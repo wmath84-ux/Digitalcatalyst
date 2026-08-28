@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import StoreHeader from "../components/Header";
-import { ExitGuardProvider } from "./components/ExitGuardContext";
+import PageTabs, { type PageTabItem } from "../components/ui/PageTabs";
+import { ExitGuardProvider, useExitGuard } from "./components/ExitGuardContext";
 import { RevisionHeaderProvider, useRevisionHeader } from "./components/RevisionHeaderContext";
 import DashboardPage from "./pages/DashboardPage";
 import RevisionBankPage from "./pages/RevisionBankPage";
@@ -53,6 +54,73 @@ function RevisionStoreHeader({ cartCount }: { cartCount: number }) {
       title={header.title ? `${appName} ${header.title}` : undefined}
       subtitle={header.subtitle}
       action={header.rightSlot}
+    />
+  );
+}
+
+/**
+ * Text-only page tabs for tablet + desktop (see src/components/ui/PageTabs).
+ *
+ * The revision footer pill carries these destinations on a phone and is
+ * hidden from 768 px up, so a wide screen needs the same pages reachable in
+ * one click. Each tab opens its own route — the same `#/revision/...` hashes
+ * the footer uses — through the feature's exit guard so an in-progress test
+ * still asks before the learner walks away.
+ */
+const REVISION_TABS: PageTabItem[] = [
+  { id: "dashboard", label: "Dashboard", href: "#/revision", hint: "Today's revision overview" },
+  { id: "bank", label: "Test Bank", href: "#/revision/bank", hint: "Saved tests and questions due today" },
+  { id: "weak", label: "Weak Topics", href: "#/revision/weak-topics", hint: "Where to focus next" },
+  { id: "progress", label: "Progress", href: "#/revision/progress", hint: "Scores over time" },
+  { id: "profile", label: "Profile", href: "#/revision/profile", hint: "Plan, subjects and AI settings" },
+];
+
+/** Which tab the current route belongs to (`null` = none of them). */
+export function resolveRevisionTabId(path: string): string | null {
+  // Test Bank stays highlighted while a Smart Revision session is open, since
+  // sessions are driven by the bank (same pairing as the footer's matcher).
+  if (path.startsWith("#/revision/bank") || path.startsWith("#/revision/session")) return "bank";
+  if (path.startsWith("#/revision/weak-topics")) return "weak";
+  if (path.startsWith("#/revision/progress")) return "progress";
+  // The generator, bulk import and AI config screens are reached from the
+  // revision profile, so the row keeps Profile lit while they are open.
+  if (
+    path.startsWith("#/revision/profile")
+    || path.startsWith("#/revision/customize")
+    || path.startsWith("#/revision/ai-")
+    || path.startsWith("#/revision/bulk-import")
+  ) {
+    return "profile";
+  }
+  if (path === "#/revision" || path === "#/revision/") return "dashboard";
+  return null;
+}
+
+/**
+ * True on the focused test-taking surfaces, where the feature also hides its
+ * own bottom nav (`PageShell hideNav`): a running test and an in-progress
+ * Smart Revision session. The tab row steps out of the way there too, so the
+ * learner is never one mis-click away from leaving an attempt.
+ */
+export function isRevisionFocusRoute(path: string): boolean {
+  return /^#\/revision\/test\/play(?:-attempt)?(?:\/\d+)?$/.test(path)
+    || /^#\/revision\/session\/\d+$/.test(path);
+}
+
+function RevisionPageTabs({ path }: { path: string }) {
+  const { navigate } = useExitGuard();
+  const activeId = resolveRevisionTabId(path);
+  return (
+    <PageTabs
+      items={REVISION_TABS}
+      activeId={activeId}
+      ariaLabel="Revision pages"
+      feature="revision"
+      onSelect={(id) => {
+        const href = REVISION_TABS.find((tab) => tab.id === id)?.href;
+        if (href && href !== path) navigate(href);
+      }}
+      onHome={() => navigate("#/home")}
     />
   );
 }
@@ -199,6 +267,12 @@ export default function RevisionApp() {
         <ExitGuardProvider onNavigate={(href) => { window.location.hash = href; }}>
           <RevisionHeaderProvider>
             <RevisionStoreHeader cartCount={cartIds.size} />
+
+            {/* Tablet + desktop page tabs, directly under the shared header.
+                They are skipped on the focused test-taking surfaces, exactly
+                like the feature's own bottom nav. */}
+            {!isRevisionFocusRoute(path) && <RevisionPageTabs path={path} />}
+
             {revisionAccessLoading || revisionDataLoading ? (
               <div data-revision-access-loading data-revision-content className="grid min-h-0 flex-1 place-items-center bg-transparent px-4">
                 <div className="dc-glass flex flex-col items-center gap-2 rounded-3xl px-8 py-7 text-slate-400">
