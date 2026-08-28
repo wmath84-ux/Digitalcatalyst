@@ -34,7 +34,7 @@ export default function PageShell({
       {!mergeIntoMainHeader && (
         <AppHeader title={title} subtitle={subtitle} backHref={backHref} rightSlot={rightSlot} />
       )}
-      <main className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</main>
+      <main data-revision-page-main className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">{children}</main>
       {!hideNav && <BottomNav route={route} />}
     </>
   );

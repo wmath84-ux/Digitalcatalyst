@@ -207,7 +207,7 @@ export default function RevisionApp() {
                 </div>
               </div>
             ) : (
-              <div data-revision-content className="min-h-0 flex-1">
+              <div data-revision-content className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <Fragment key={syncKey}>{page}</Fragment>
               </div>
             )}

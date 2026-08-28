@@ -1902,3 +1902,130 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   background: transparent !important;
 }
 /* ==================== End Mind Map Styles ==================== */
+
+/* Stability + tablet pass: keep revision's nested content scrollable. */
+[data-revision-content] { min-height: 0; }
+@media (min-width: 640px) and (max-width: 1023px) {
+  [data-profile-page] [data-app-frame] { height: 100dvh; min-height: 100dvh; max-width: none !important; overflow: hidden; border-radius: 0 !important; box-shadow: none !important; }
+  [data-profile-page] [data-profile-content] { min-height: 0; padding-inline: clamp(24px, 5vw, 48px); }
+  [data-profile-layout] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; max-width: 900px; margin-inline: auto; }
+  [data-profile-layout] > header, [data-profile-layout] > section:first-of-type { grid-column: 1 / -1; }
+  [data-profile-layout] > section { min-width: 0; }
+}
+@media (max-width: 1023px) and (prefers-reduced-motion: reduce), (max-width: 767px) and (update: slow) {
+  .dc-app-shell, [data-profile-page] { background: #f4f6fb !important; background-image: none !important; }
+  .dc-app-shell::before, .dc-app-shell::after, .dc-glass::before, [data-profile-page] .dc-glass-hero > div { display: none !important; }
+  .dc-glass, .dc-glass-soft, .dc-glass-toolbar, .dc-glass-chip, .dc-glass-input, .dc-modal-glass, .dc-glass-hero { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+}
+@media (max-width: 767px) { [data-app-frame] { overscroll-behavior: none; } [data-revision-content] { overflow: hidden; } }
+
+/* Revision Studio desktop experience --------------------------------------
+   Desktop gets a deliberate workspace composition rather than a wider phone:
+   generous but bounded canvas, denser statistics, and an editorial two-column
+   lower section. */
+@media (min-width: 1024px) {
+  .dc-desktop-shell [data-revision-page-main] {
+    overflow-y: auto;
+    height: 100%;
+    scrollbar-gutter: stable;
+  }
+
+  .dc-desktop-shell [data-revision-content] {
+    max-width: none;
+    width: 100%;
+  }
+
+  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in {
+    max-width: 1180px;
+    margin-inline: auto;
+    padding: 4px 0 32px;
+  }
+
+  /* Dashboard: primary plan across the canvas, supporting cards below. */
+  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > .grid.grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > .grid.grid-cols-3 + .rounded-3xl,
+  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > .grid.grid-cols-3 ~ .rounded-3xl {
+    min-width: 0;
+  }
+
+  /* Make adjacent Weak Topics / Revision Bank read as a dashboard pair. */
+  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > .grid.grid-cols-3 ~ .rounded-3xl {
+    display: block;
+  }
+
+  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(300px, .85fr);
+    align-content: start;
+    gap: 20px;
+  }
+  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > :first-child,
+  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > .grid.grid-cols-3 {
+    grid-column: 1 / -1;
+  }
+  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > :nth-child(3),
+  .dc-desktop-shell [data-revision-page-main] > .animate-fade-in > :nth-child(4) {
+    min-height: 100%;
+    margin: 0;
+  }
+
+  /* Keep hero actions calm on large screens; no oversized stretched card. */
+  .dc-desktop-shell [data-revision-page-main] .min-h-\[270px\] {
+    min-height: 230px;
+  }
+}
+
+/* Profile Studio: intentional desktop/tablet compositions. The profile keeps a
+   readable canvas and uses columns for information hierarchy instead of
+   allowing a mobile stack to become a long, stretched sheet. */
+@media (min-width: 1024px) {
+  [data-profile-page] {
+    min-height: 100dvh;
+  }
+  [data-profile-page] [data-app-frame] {
+    max-width: 1280px !important;
+    min-height: calc(100vh - 48px);
+    overflow: hidden;
+    border-radius: 28px;
+    border: 1px solid rgba(226,232,240,.9);
+    background: rgba(255,255,255,.78);
+    box-shadow: 0 24px 70px -34px rgba(30,41,59,.28);
+  }
+  [data-profile-page] [data-profile-content] {
+    max-width: none;
+    padding: 30px clamp(32px, 5vw, 72px) 40px;
+  }
+  [data-profile-layout] {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(260px, .78fr);
+    gap: 20px;
+    max-width: 1120px;
+    margin-inline: auto;
+  }
+  [data-profile-layout] > header,
+  [data-profile-layout] > [role="status"] {
+    grid-column: 1 / -1;
+  }
+  [data-profile-layout] > section,
+  [data-profile-layout] > .grid {
+    min-width: 0;
+  }
+  [data-profile-layout] > section:nth-of-type(1) { grid-column: span 2; }
+  [data-profile-layout] > section:nth-of-type(2) { grid-column: 3; }
+  [data-profile-layout] > section:nth-of-type(3) { grid-column: span 2; }
+  [data-profile-layout] > section:nth-of-type(4),
+  [data-profile-layout] > section:nth-of-type(5) { grid-column: span 1; }
+  [data-profile-layout] > section:nth-of-type(n+6) { grid-column: span 1; }
+  [data-profile-layout] > button { grid-column: 1 / -1; max-width: 360px; margin-inline: auto; }
+  [data-profile-layout] > nav { grid-column: 1 / -1; }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  [data-profile-page] [data-profile-content] { padding-top: 26px; padding-bottom: 34px; }
+  [data-profile-layout] > section { border-radius: 24px; }
+  [data-profile-layout] > .grid { align-self: stretch; }
+}
