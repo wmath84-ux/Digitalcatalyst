@@ -2143,7 +2143,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 
 .is-desktop [data-desktop-side-panel],
-.is-tablet [data-desktop-side-panel],
+.is-tablet [data-desktop-side-panel]
 {
   display: block;
 }
