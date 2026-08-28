@@ -307,6 +307,63 @@ export const setNodePosition = (mind, id, x, y) => {
 };
 
 /**
+ * Commit a finished drag as ONE RIGID GROUP.
+ *
+ * A drag is visually a group motion: the picked node and every connected
+ * node beneath it slide together. The drop must keep that promise. This
+ * function pins the picked node at the drop point AND translates every
+ * descendant that already carries its own hand-dragged pin by the exact
+ * same delta — otherwise a previously hand-arranged branch snaps back to
+ * its old spot the moment the head (or the map's primary node) is
+ * re-placed, which reads as "the connected nodes did not move together".
+ *
+ * `fromX/fromY` is where the picked node STARTED (its rendered layout spot
+ * at pointer-down). It has to be passed in because an unpinned node has no
+ * stored position to read the delta back from.
+ *
+ * Descendants WITHOUT a pin need no storage at all: `layoutMindMap`
+ * already inherits their ancestor's shift, so they keep riding the tree
+ * relative to the moved head.
+ *
+ * A sub-pixel / zero-movement event (a plain tap) is refused outright, so
+ * tapping a node can never silently freeze it at its current spot.
+ */
+export const moveNodeSubtree = (mind, id, x, y, fromX, fromY) => {
+  if (!isMindMap(mind)) return mind;
+  const nx = sanitizePosition(x);
+  const ny = sanitizePosition(y);
+  const sx = Number(fromX);
+  const sy = Number(fromY);
+  if (nx == null || ny == null || !Number.isFinite(sx) || !Number.isFinite(sy)) return mind;
+  if (!findNode(mind, id)) return mind;
+  const dx = nx - sx;
+  const dy = ny - sy;
+  if (dx === 0 && dy === 0) return mind;
+
+  const subtree = new Set(collectSubtreeIds(mind, id));
+  const translatePin = (value, delta) =>
+    value == null ? value : sanitizePosition(Number(value) + delta);
+
+  const nodes = mind.nodes.map((node) => {
+    const nodeId = String(node.id);
+    // The picked node itself stores the exact drop point.
+    if (String(id) !== ROOT_ID && nodeId === String(id)) {
+      return { ...node, fx: nx, fy: ny };
+    }
+    if (!subtree.has(nodeId)) return node;
+    // A pinned descendant moves with its head: shift its stored pin by the
+    // same delta so the hand-arranged shape travels intact.
+    if (node.fx == null || node.fy == null) return node;
+    return { ...node, fx: translatePin(node.fx, dx), fy: translatePin(node.fy, dy) };
+  });
+
+  if (String(id) === ROOT_ID) {
+    return { ...mind, rootX: nx, rootY: ny, nodes };
+  }
+  return { ...mind, nodes };
+};
+
+/**
  * Re-parent a branch under a new parent. Refuses moves that would create a
  * cycle (dropping a node inside its own subtree) and refuses to exceed the
  * node cap — both would otherwise corrupt the stored map.

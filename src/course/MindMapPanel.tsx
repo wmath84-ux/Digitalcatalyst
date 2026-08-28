@@ -105,9 +105,9 @@ import {
   hasManualPositions,
   layoutMindMap,
   maxDepth,
+  moveNodeSubtree,
   removeNode,
   rootId,
-  setNodePosition,
   setNodeTopic,
   type MindMap,
 } from "../../utils/mindMapTree";
@@ -842,8 +842,32 @@ function MindMapCanvas(props: MindMapPanelProps) {
     });
   }, [layoutNodes]);
 
+  // React Flow reports the picked node's live position through `onNodesChange`
+  // on EVERY pointer move. That callback is therefore the single place the
+  // whole connected group is moved: when a drag session is active, the picked
+  // node's position change is applied and EVERY node in its subtree is
+  // shifted by the same delta in the SAME state update. One write per frame
+  // means the primary node and its branches can never fall out of lock-step
+  // (two competing setNodes calls could win a stale frame), so the movement
+  // is visible live while the finger is still down.
   const onNodesChange = useCallback((changes: NodeChange<Node<MindNodeData>>[]) => {
-    setNodes((current) => applyNodeChanges(changes, current));
+    setNodes((current) => {
+      const session = dragSessionRef.current;
+      const dragChange = session
+        ? changes.find((change) => change.type === "position" && change.id === session.id)
+        : undefined;
+      const next = applyNodeChanges(changes, current);
+      if (!session || !dragChange) return next;
+      const moved = next.find((item) => item.id === session.id);
+      if (!moved) return next;
+      const dx = moved.position.x - session.origin.x;
+      const dy = moved.position.y - session.origin.y;
+      return next.map((item) => {
+        if (item.id === session.id || !session.moving.has(item.id)) return item;
+        const start = session.starts.get(item.id);
+        return start ? { ...item, position: { x: start.x + dx, y: start.y + dy } } : item;
+      });
+    });
   }, []);
 
   const edges: Edge[] = useMemo(
@@ -943,40 +967,39 @@ function MindMapCanvas(props: MindMapPanelProps) {
               moving,
             };
           }}
-          onNodeDrag={(_event, node) => {
+          onNodeDrag={() => {
+            // The actual live movement of the node AND its whole connected
+            // branch is applied in `onNodesChange` above — one position
+            // change per frame, one state update. This handler only marks
+            // that a real move happened, so the click that trails the drop
+            // is never mistaken for a tap that should open the editor.
             dragMovedRef.current = true;
-            const session = dragSessionRef.current;
-            if (!session || session.id !== node.id) return;
-            const dx = node.position.x - session.origin.x;
-            const dy = node.position.y - session.origin.y;
-            // Apply the dragged node AND its branch every frame. Skipping the
-            // dragged id (the old path) left the root on its last committed
-            // layout spot until pointer-up — children looked live, the centre
-            // did not. React Flow's own change is merged in via onNodesChange,
-            // but a parent drag's setNodes can win a stale frame; writing the
-            // live position here keeps the primary node in lock-step.
-            setNodes((current) =>
-              current.map((item) => {
-                if (!session.moving.has(item.id)) return item;
-                if (item.id === node.id) {
-                  return { ...item, position: { x: node.position.x, y: node.position.y } };
-                }
-                const start = session.starts.get(item.id);
-                if (!start) return item;
-                return { ...item, position: { x: start.x + dx, y: start.y + dy } };
-              }),
-            );
           }}
           onNodeDragStop={(_event, node) => {
-            // Commit the drop as this node's manual position — the branch
-            // under it inherits the same offset in the next layout pass, so
-            // a hand-moved parent keeps its children glued on.
-            onMindChange((current) => setNodePosition(current, node.id, node.position.x, node.position.y));
-            draggingRef.current = false;
+            const session = dragSessionRef.current;
             dragSessionRef.current = null;
-            // The dropped node becomes the selection so the toolbar trash
-            // can act on it straight away.
-            setSelectedId(node.id);
+            draggingRef.current = false;
+            // React Flow fires drag start/stop even for a PLAIN TAP (its
+            // nodeDragThreshold is 0), so guard on real travel: a tap must
+            // never pin the node — every tapped node would silently freeze
+            // at its current spot and a later primary-node drag would leave
+            // it behind.
+            const travelled = session
+              ? Math.hypot(node.position.x - session.origin.x, node.position.y - session.origin.y)
+              : 0;
+            if (session && travelled >= TAP_SLOP_PX) {
+              // Commit the drop as one rigid group: the picked node is
+              // pinned at the drop point AND every connected node — even
+              // ones the learner had hand-placed earlier — moves by exactly
+              // the same delta. The map never tears: dragging the primary
+              // node carries its whole connected map with it.
+              onMindChange((current) =>
+                moveNodeSubtree(current, node.id, node.position.x, node.position.y, session.origin.x, session.origin.y),
+              );
+              // The dropped node becomes the selection so the toolbar trash
+              // can act on it straight away.
+              setSelectedId(node.id);
+            }
             // A drag must never end with the rename keyboard popping up: if
             // an editor is open anywhere, blur it so its draft commits and
             // the sheet stays quiet.

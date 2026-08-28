@@ -32,6 +32,7 @@ import {
   measureTopic,
   mindMapDocId,
   moveNode,
+  moveNodeSubtree,
   nextNodeId,
   parseMindMap,
   removeNode,
@@ -348,6 +349,71 @@ test("a manually moved root keeps its children glued to it", () => {
   const dy = after.get(rootId()).y - auto.get(rootId()).y;
   assert.equal(after.get(a).x - auto.get(a).x, dx);
   assert.equal(after.get(a).y - auto.get(a).y, dy);
+});
+
+test("moveNodeSubtree moves the primary node and its whole map as one rigid group", () => {
+  // A descendant was hand-placed BEFORE the root drag. The rigid drop must
+  // translate that stored pin too — otherwise it snaps back to its old spot
+  // the moment the primary node is re-placed.
+  const { mind, a, b, c } = deepChain();
+  const auto = new Map(layoutMindMap(mind).nodes.map((node) => [node.id, node]));
+  const pinned = setNodePosition(mind, b, auto.get(b).x + 300, auto.get(b).y + 150);
+  // The map's shape right before the drag — b sits at its hand-placed spot.
+  const before = new Map(layoutMindMap(pinned).nodes.map((node) => [node.id, node]));
+
+  const rootStart = before.get(rootId());
+  const moved = moveNodeSubtree(pinned, rootId(), rootStart.x + 420, rootStart.y - 260, rootStart.x, rootStart.y);
+
+  assert.equal(moved.rootX, rootStart.x + 420);
+  assert.equal(moved.rootY, rootStart.y - 260);
+  // The previously hand-placed descendant kept its ARRANGED shape relative
+  // to the map: its stored pin travelled by exactly the same delta.
+  assert.equal(findNode(moved, b).fx, auto.get(b).x + 300 + 420);
+  assert.equal(findNode(moved, b).fy, auto.get(b).y + 150 - 260);
+  // Copy-on-write — the input map is untouched.
+  assert.equal(findNode(pinned, b).fx, auto.get(b).x + 300);
+
+  // Every connected node (pinned or not) renders at its old spot + delta —
+  // zero of them snap back when the primary node is re-placed.
+  const after = new Map(layoutMindMap(moved).nodes.map((node) => [node.id, node]));
+  for (const id of [rootId(), a, b, c]) {
+    assert.equal(after.get(id).x - before.get(id).x, 420, `${id} moves horizontally with the primary node`);
+    assert.equal(after.get(id).y - before.get(id).y, -260, `${id} moves vertically with the primary node`);
+  }
+});
+
+test("moveNodeSubtree moves a branch head with a hand-placed descendant attached", () => {
+  const { mind, a, b, c } = deepChain();
+  const auto = new Map(layoutMindMap(mind).nodes.map((node) => [node.id, node]));
+  const pinned = setNodePosition(mind, c, auto.get(c).x - 120, auto.get(c).y + 90);
+  const before = new Map(layoutMindMap(pinned).nodes.map((node) => [node.id, node]));
+  const start = before.get(a);
+
+  const moved = moveNodeSubtree(pinned, a, start.x + 250, start.y + 180, start.x, start.y);
+
+  // The picked branch head is pinned exactly where it was dropped…
+  assert.equal(findNode(moved, a).fx, start.x + 250);
+  assert.equal(findNode(moved, a).fy, start.y + 180);
+  // …and the hand-placed leaf travelled with it instead of staying behind.
+  assert.equal(findNode(moved, c).fx, auto.get(c).x - 120 + 250);
+  assert.equal(findNode(moved, c).fy, auto.get(c).y + 90 + 180);
+
+  const after = new Map(layoutMindMap(moved).nodes.map((node) => [node.id, node]));
+  for (const id of [a, b, c]) {
+    assert.equal(after.get(id).x - before.get(id).x, 250, `${id} slides with its branch head`);
+    assert.equal(after.get(id).y - before.get(id).y, 180, `${id} slides with its branch head`);
+  }
+});
+
+test("moveNodeSubtree refuses a zero-movement event (a tap never pins a node)", () => {
+  const { mind, a, b } = deepChain();
+  const auto = layoutMindMap(mind).nodes.find((node) => node.id === a);
+  const same = moveNodeSubtree(mind, a, auto.x, auto.y, auto.x, auto.y);
+  assert.equal(same, mind, "no movement → no write, no accidental pin");
+  assert.equal(findNode(same, b).fx, null, "a tap on the branch leaves descendants unpinned");
+  const rootAuto = layoutMindMap(mind).nodes.find((node) => node.id === rootId());
+  const rootSame = moveNodeSubtree(mind, rootId(), rootAuto.x, rootAuto.y, rootAuto.x, rootAuto.y);
+  assert.equal(rootSame, mind, "the primary node is not pinned by a plain tap either");
 });
 
 test("an unplaced node keeps following the automatic tidy tree", () => {
