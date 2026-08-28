@@ -42,7 +42,7 @@ const ALLOWED_STYLES = new Set([
 const SAFE_URL = /^(https?:|mailto:|tel:)/i;
 const SAFE_IMAGE_URL = /^(https?:|data:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml);)/i;
 
-const escapeHtml = (value: string) =>
+export const escapeHtml = (value: string) =>
   value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -189,6 +189,33 @@ export const firstRichTextBlock = (html: string): string => {
   // Last resort: an image on its own.
   const image = body.querySelector("img");
   return image ? image.outerHTML : "";
+};
+
+/**
+ * Pull the note's leading heading out as its TITLE: when the saved HTML
+ * starts with a heading block, that block becomes `heading` (plain text)
+ * and everything after it becomes `body`. A single `<hr>` divider directly
+ * after the heading is dropped — the editor re-adds it whenever a title is
+ * saved, so the round-trip is stable. Notes without a leading heading keep
+ * the whole content as the body.
+ */
+export const splitFirstHeading = (html: string): { heading: string; body: string } => {
+  const input = String(html || "");
+  if (!input.trim()) return { heading: "", body: "" };
+  if (typeof window === "undefined" || typeof window.DOMParser === "undefined") {
+    return { heading: "", body: input };
+  }
+  const parsed = new window.DOMParser().parseFromString(`<body>${input}</body>`, "text/html");
+  const body = parsed.body;
+  const first = body.firstElementChild;
+  if (first && /^H[1-6]$/i.test(first.tagName) && (first.textContent || "").trim()) {
+    const heading = (first.textContent || "").replace(/\u200b/g, "").trim();
+    const next = first.nextElementSibling;
+    if (next && next.tagName.toLowerCase() === "hr") next.remove();
+    first.remove();
+    return { heading, body: body.innerHTML.trim() };
+  }
+  return { heading: "", body: input };
 };
 
 /** Plain text → HTML, preserving line breaks and runs of spaces. */

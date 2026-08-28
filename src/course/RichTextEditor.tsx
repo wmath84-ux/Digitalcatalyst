@@ -13,12 +13,21 @@
 // keeps its line breaks and indentation instead of collapsing to one line.
 
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type CSSProperties, type ReactNode } from "react";
-import { Bold, Code, Italic, List, ListOrdered, Quote, Strikethrough, Underline, Eraser, Palette, Type, ChevronDown } from "lucide-react";
-import { plainToRichText, sanitizeRichText } from "../utils/richText";
+import { Bold, Code, Italic, List, ListOrdered, Quote, Strikethrough, Underline, Eraser, Palette, Type, ChevronDown, SeparatorHorizontal } from "lucide-react";
+import { plainToRichText, richTextToPlain, sanitizeRichText } from "../utils/richText";
 
 interface RichTextEditorProps {
   value: string;
   onChange: (html: string) => void;
+  /**
+   * Optional note HEADING (title) shown above the writing surface, separated
+   * by a horizontal rule like mainstream note apps. When provided, a heading
+   * area is rendered and its HTML is reported through `onHeadingChange`.
+   */
+  heading?: string;
+  onHeadingChange?: (html: string) => void;
+  /** Focus the heading field on mount instead of the writing surface. */
+  headingAutoFocus?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
   /** Tailwind classes controlling the writing surface height. */
@@ -53,6 +62,9 @@ function FormatMenu({ label, icon, open, onToggle, children }: { label: string; 
 export default function RichTextEditor({
   value,
   onChange,
+  heading,
+  onHeadingChange,
+  headingAutoFocus = false,
   placeholder = "Write your note…",
   autoFocus = false,
   surfaceClassName = "min-h-[42vh]",
@@ -60,10 +72,15 @@ export default function RichTextEditor({
   dataAttribute,
 }: RichTextEditorProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLDivElement>(null);
   const [openMenu, setOpenMenu] = useState<"heading" | "color" | "font" | null>(null);
   // Tracks what we last pushed upward so re-renders never clobber the caret.
   const lastEmitted = useRef<string>(value);
   const hydrated = useRef(false);
+  const lastHeadingEmitted = useRef<string>(heading ?? "");
+  const hydratedHeading = useRef(false);
+
+  const showHeading = heading !== undefined;
 
   const syncEmptyFlag = (surface: HTMLDivElement) => {
     // contentEditable leaves a stray <br> behind after the last character is
@@ -86,6 +103,21 @@ export default function RichTextEditor({
     syncEmptyFlag(surface);
   }, [value]);
 
+  // Heading field — hydrated exactly like the body, so switching between
+  // notes (or reopening an editor) never shows a stale or blank title.
+  useEffect(() => {
+    const el = headingRef.current;
+    if (!el) return;
+    if (hydratedHeading.current && heading === lastHeadingEmitted.current) {
+      syncEmptyFlag(el);
+      return;
+    }
+    el.innerHTML = heading || "";
+    lastHeadingEmitted.current = heading ?? "";
+    hydratedHeading.current = true;
+    syncEmptyFlag(el);
+  }, [heading]);
+
   useEffect(() => {
     if (!autoFocus) return;
     const surface = surfaceRef.current;
@@ -100,6 +132,66 @@ export default function RichTextEditor({
     selection.removeAllRanges();
     selection.addRange(range);
   }, [autoFocus]);
+
+  // A fresh note starts with the heading focused (like Notion / Keep); an
+  // existing note being edited keeps the caret in the body instead.
+  useEffect(() => {
+    if (!headingAutoFocus) return;
+    const el = headingRef.current;
+    if (!el) return;
+    el.focus();
+    const selection = window.getSelection?.();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, [headingAutoFocus]);
+
+  const emitHeading = () => {
+    const el = headingRef.current;
+    if (!el) return;
+    const html = el.innerHTML;
+    lastHeadingEmitted.current = html;
+    syncEmptyFlag(el);
+    onHeadingChange?.(html);
+  };
+
+  // Enter in the title jumps to the body (like Notion / Keep) — the title
+  // stays a single line; the caret simply moves into the writing surface.
+  const handleHeadingKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const surface = surfaceRef.current;
+      if (surface) {
+        surface.focus();
+        const selection = window.getSelection?.();
+        if (!selection) return;
+        const range = document.createRange();
+        range.selectNodeContents(surface);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    }
+  };
+
+  // Pasting into the heading keeps it plain — the title is stored as a
+  // single text line, so formatting pasted there would only be flattened
+  // away on save anyway.
+  const handleHeadingPaste = (event: ClipboardEvent<HTMLDivElement>) => {
+    const clipboard = event.clipboardData;
+    if (!clipboard) return;
+    const html = clipboard.getData("text/html");
+    const plain = clipboard.getData("text/plain");
+    if (!html && !plain) return;
+    event.preventDefault();
+    const markup = plainToRichText(plain || richTextToPlain(html));
+    if (!markup) return;
+    exec("insertHTML", markup);
+    emitHeading();
+  };
 
   const emit = () => {
     const surface = surfaceRef.current;
@@ -156,6 +248,7 @@ export default function RichTextEditor({
     { key: "quote", label: "Quote", icon: Quote, run: () => exec("formatBlock", "blockquote") },
     { key: "code", label: "Code block", icon: Code, run: () => exec("formatBlock", "pre") },
     { key: "clear", label: "Clear formatting", icon: Eraser, run: () => exec("removeFormat") },
+    { key: "divider", label: "Horizontal line", icon: SeparatorHorizontal, run: () => exec("insertHorizontalRule") },
   ];
 
   return (
@@ -177,6 +270,31 @@ export default function RichTextEditor({
           <button key={key} type="button" onMouseDown={(event) => { event.preventDefault(); surfaceRef.current?.focus(); run(); emit(); }} className="grid h-8 w-8 rounded-lg place-items-center text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]" aria-label={label} title={label} data-course-rich-action={key}><Icon size={14} /><span className="sr-only">{label}</span></button>
         ))}
       </div>
+      {/* Heading (title) area — a default title field above the body,
+          separated by a horizontal rule exactly like mainstream note
+          editors (Notion, Keep, Apple Notes). The divider line is part of
+          the editor chrome; the body's own <hr> button inserts dividers
+          INSIDE the note. */}
+      {showHeading && (
+        <div className="shrink-0 border-x border-[var(--course-border)] bg-[var(--course-soft)] px-3 pt-3" data-course-note-heading>
+          <div
+            ref={headingRef}
+            contentEditable
+            suppressContentEditableWarning
+            role="textbox"
+            aria-label="Note heading"
+            aria-multiline="false"
+            data-placeholder="Heading…"
+            data-course-note-heading-input="true"
+            onInput={emitHeading}
+            onBlur={emitHeading}
+            onPaste={handleHeadingPaste}
+            onKeyDown={handleHeadingKeyDown}
+            className="course-note-title outline-none"
+          />
+          <hr className="course-note-title-divider" />
+        </div>
+      )}
       <div
         ref={surfaceRef}
         contentEditable
@@ -190,7 +308,7 @@ export default function RichTextEditor({
         onPaste={handlePaste}
         onDrop={handleDrop}
         onKeyDown={handleKeyDown}
-        className={`course-rich-surface min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-b-xl border border-[var(--course-border)] bg-[var(--course-soft)] p-3 text-sm leading-relaxed text-[var(--course-text)] outline-none focus:border-violet-400 ${surfaceClassName}`}
+        className={`course-rich-surface min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-b-xl bg-[var(--course-soft)] p-3 text-sm leading-relaxed text-[var(--course-text)] outline-none focus:border-violet-400 ${showHeading ? "border-x border-b border-[var(--course-border)]" : "border border-[var(--course-border)]"} ${surfaceClassName}`}
         {...(dataAttribute ? { [dataAttribute]: "true" } : {})}
       />
     </div>

@@ -1369,6 +1369,36 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   pointer-events: none;
 }
 
+/* Course Player — the note editor's HEADING (title) area, with the divider
+   that separates it from the body — the classic layout of mainstream note
+   editors (Notion, Google Keep, Apple Notes). The heading is its own
+   single-line field above the writing surface; the horizontal rule below it
+   is editor chrome, distinct from the <hr> button in the toolbar which
+   inserts dividers inside the note body. */
+.course-note-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--course-text);
+  min-height: 1.6em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.course-note-title:empty::before,
+.course-note-title[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: var(--course-muted);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.course-note-title-divider {
+  border: 0;
+  border-top: 1.5px solid var(--course-border);
+  margin: 0.55rem 0 0.85rem;
+}
+
 .course-rich-surface :is(h1, h2, h3, h4, h5, h6) {
   font-weight: 800;
   line-height: 1.25;

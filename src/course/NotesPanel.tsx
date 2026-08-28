@@ -38,7 +38,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
 import type { CoursePlayerNote } from "../types/course";
 import RichTextEditor from "./RichTextEditor";
-import { firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain } from "../utils/richText";
+import { escapeHtml, firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain, splitFirstHeading } from "../utils/richText";
 
 interface NotesPanelProps {
   notes: CoursePlayerNote[];
@@ -73,6 +73,17 @@ const notePreview = (note: CoursePlayerNote) => richTextToPlain(noteHtml(note)) 
 // card from ever rendering blank.
 const noteCardHtml = (note: CoursePlayerNote) => firstRichTextBlock(noteHtml(note)) || notePreview(note);
 
+// The heading lives at the top of the stored note as its first block,
+// separated from the body by a horizontal rule — the same layout the editor
+// shows, and exactly what the saved card previews. No heading → the note is
+// stored exactly as the body alone, so legacy notes round-trip untouched.
+const combineHtml = (titleHtml: string, bodyHtml: string) => {
+  const title = richTextToPlain(titleHtml).trim();
+  if (!title) return bodyHtml;
+  const body = String(bodyHtml || "").trim();
+  return body ? `<h1>${escapeHtml(title)}</h1><hr>${body}` : `<h1>${escapeHtml(title)}</h1>`;
+};
+
 /** Filled, high-contrast action marks — heavier than the old outline icons. */
 function PremiumEditIcon({ size = 13 }: { size?: number }) {
   return (
@@ -98,8 +109,10 @@ function PremiumDeleteIcon({ size = 13 }: { size?: number }) {
 const persistedDraft = {
   mode: null as null | "compose" | "edit",
   composeDraft: "" as string,
+  composeTitle: "" as string,
   editId: null as string | null,
   editDraft: "" as string,
+  editTitle: "" as string,
 };
 
 export default function NotesPanel({
@@ -114,11 +127,15 @@ export default function NotesPanel({
   // Restore draft from the persisted store on mount.
   const [composing, setComposing] = useState(() => persistedDraft.mode === "compose");
   const [draft, setDraft] = useState(() => persistedDraft.composeDraft);
+  const [draftTitle, setDraftTitle] = useState(() => persistedDraft.composeTitle);
   const [editingId, setEditingId] = useState<string | null>(() =>
     persistedDraft.mode === "edit" ? persistedDraft.editId : null,
   );
   const [editDraft, setEditDraft] = useState(() =>
     persistedDraft.mode === "edit" ? persistedDraft.editDraft : "",
+  );
+  const [editTitle, setEditTitle] = useState(() =>
+    persistedDraft.mode === "edit" ? persistedDraft.editTitle : "",
   );
 
   const editorOpen = composing || Boolean(editingId);
@@ -130,20 +147,26 @@ export default function NotesPanel({
     if (composing) {
       persistedDraft.mode = "compose";
       persistedDraft.composeDraft = draft;
+      persistedDraft.composeTitle = draftTitle;
       persistedDraft.editId = null;
       persistedDraft.editDraft = "";
+      persistedDraft.editTitle = "";
     } else if (editingId) {
       persistedDraft.mode = "edit";
       persistedDraft.composeDraft = "";
+      persistedDraft.composeTitle = "";
       persistedDraft.editId = editingId;
       persistedDraft.editDraft = editDraft;
+      persistedDraft.editTitle = editTitle;
     } else {
       persistedDraft.mode = null;
       persistedDraft.composeDraft = "";
+      persistedDraft.composeTitle = "";
       persistedDraft.editId = null;
       persistedDraft.editDraft = "";
+      persistedDraft.editTitle = "";
     }
-  }, [composing, draft, editingId, editDraft]);
+  }, [composing, draft, draftTitle, editingId, editDraft, editTitle]);
 
   useEffect(() => { syncPersisted(); });
 
@@ -177,22 +200,24 @@ export default function NotesPanel({
     // Read from persistedDraft (always up-to-date) rather than stale closure
     // values so this works correctly inside cleanup effects too.
     if (persistedDraft.mode === "compose") {
-      const html = persistedDraft.composeDraft;
+      const html = combineHtml(persistedDraft.composeTitle, persistedDraft.composeDraft);
       if (!isEmptyRichText(html)) {
         onAddRef.current(html);
         // Clear the persisted draft so the same note isn't saved twice.
         persistedDraft.mode = null;
         persistedDraft.composeDraft = "";
+        persistedDraft.composeTitle = "";
         return true;
       }
     } else if (persistedDraft.mode === "edit") {
       const id = persistedDraft.editId;
-      const html = persistedDraft.editDraft;
+      const html = combineHtml(persistedDraft.editTitle, persistedDraft.editDraft);
       if (id && !isEmptyRichText(html)) {
         onEditRef.current(id, html);
         persistedDraft.mode = null;
         persistedDraft.editId = null;
         persistedDraft.editDraft = "";
+        persistedDraft.editTitle = "";
         return true;
       }
     }
@@ -226,20 +251,26 @@ export default function NotesPanel({
         // Update local state so the UI reflects the save immediately.
         setComposing(false);
         setDraft("");
+        setDraftTitle("");
         setEditingId(null);
         setEditDraft("");
+        setEditTitle("");
       }
     }
   }, [saveSignal, flushDraft]);
 
-  const draftEmpty = isEmptyRichText(draft);
-  const editDraftEmpty = isEmptyRichText(editDraft);
+  // A note counts as non-empty when EITHER its title or its body has
+  // content — a heading-only note is a perfectly valid note.
+  const draftEmpty = isEmptyRichText(combineHtml(draftTitle, draft));
+  const editDraftEmpty = isEmptyRichText(combineHtml(editTitle, editDraft));
 
   const openComposer = () => {
     setEditingId(null);
     setEditDraft("");
+    setEditTitle("");
     setComposing(true);
     setDraft("");
+    setDraftTitle("");
   };
 
   // The main header's "+" (in the overlay) asks for a fresh composer.
@@ -250,29 +281,40 @@ export default function NotesPanel({
   }, [composerOpenSignal]);
 
   const submitAdd = () => {
-    if (isEmptyRichText(draft)) return;
-    onAdd(draft);
+    const html = combineHtml(draftTitle, draft);
+    if (isEmptyRichText(html)) return;
+    onAdd(html);
     setDraft("");
+    setDraftTitle("");
     setComposing(false);
     // Clear persisted state so the restored draft isn't the just-saved one.
     persistedDraft.mode = null;
     persistedDraft.composeDraft = "";
+    persistedDraft.composeTitle = "";
   };
 
   const startEdit = (note: CoursePlayerNote) => {
     setComposing(false);
     setDraft("");
+    setDraftTitle("");
+    // The stored note's leading heading becomes the title field; the rest
+    // (minus the divider that separated them) stays in the body.
+    const { heading, body } = splitFirstHeading(noteHtml(note));
     setEditingId(note.id);
-    setEditDraft(noteHtml(note));
+    setEditTitle(heading);
+    setEditDraft(body);
   };
 
   const submitEdit = () => {
-    if (editingId && !isEmptyRichText(editDraft)) onEdit(editingId, editDraft);
+    const html = combineHtml(editTitle, editDraft);
+    if (editingId && !isEmptyRichText(html)) onEdit(editingId, html);
     setEditingId(null);
     setEditDraft("");
+    setEditTitle("");
     persistedDraft.mode = null;
     persistedDraft.editId = null;
     persistedDraft.editDraft = "";
+    persistedDraft.editTitle = "";
   };
 
   // The composer and the inline editor both take over the whole panel so the
@@ -280,26 +322,33 @@ export default function NotesPanel({
   if (editorOpen) {
     const editing = Boolean(editingId);
     const value = editing ? editDraft : draft;
+    const titleValue = editing ? editTitle : draftTitle;
     const empty = editing ? editDraftEmpty : draftEmpty;
     const cancel = () => {
       // Cancel discards the draft without saving.
       persistedDraft.mode = null;
       persistedDraft.composeDraft = "";
+      persistedDraft.composeTitle = "";
       persistedDraft.editId = null;
       persistedDraft.editDraft = "";
-      if (editing) { setEditingId(null); setEditDraft(""); }
-      else { setComposing(false); setDraft(""); }
+      persistedDraft.editTitle = "";
+      if (editing) { setEditingId(null); setEditDraft(""); setEditTitle(""); }
+      else { setComposing(false); setDraft(""); setDraftTitle(""); }
     };
     return (
       <div className="flex h-full flex-col overflow-hidden" data-course-notes-panel data-course-notes-mode={editing ? "edit" : "compose"}>
         {/* No header here: with the overlay's main header hidden in writing
-            mode, the sheet is exactly toolbar (top) / writing surface
-            (middle) / Save + Cancel (bottom) — maximum writing space. */}
+            mode, the sheet is exactly toolbar (top) / heading + divider
+            / writing surface (middle) / Save + Cancel (bottom) — maximum
+            writing space. */}
         <div className="flex min-h-0 flex-1 flex-col p-3" data-course-notes-composer>
           <RichTextEditor
             value={value}
             onChange={editing ? (html) => { setEditDraft(html); persistedDraft.editDraft = html; } : (html) => { setDraft(html); persistedDraft.composeDraft = html; }}
-            autoFocus
+            heading={titleValue}
+            onHeadingChange={editing ? (html) => { setEditTitle(html); persistedDraft.editTitle = html; } : (html) => { setDraftTitle(html); persistedDraft.composeTitle = html; }}
+            headingAutoFocus={!editing}
+            autoFocus={editing}
             surfaceClassName="min-h-0"
             ariaLabel={editing ? "Edit note" : "New note"}
             dataAttribute={editing ? "data-course-note-edit-input" : "data-course-notes-input"}
