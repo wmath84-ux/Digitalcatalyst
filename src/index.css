@@ -297,13 +297,26 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
-   Tablet layout (768 – 1023 px)
+   Tablet layout (640 – 1023 px)
    ─────────────────────────────────────────────────────────────────────
    The phone-shaped frame (max-w-md, rounded-[2rem], big drop shadow) was
    never meant to live on a tablet — on a 768 px wide iPad it would
    just sit in the middle of the screen with a 160 px gutter on either
    side, which is the "stretched and failed" feeling the latest UX
    feedback called out.
+
+   The band starts at 640 px (not 768 px) on purpose. 640 px is
+   Tailwind's `sm` breakpoint, and it is where the *phone* override
+   above (`@media (max-width: 639px)` → frame = 100vw) stops applying.
+   Everything between 640 px and 767 px therefore fell back to the raw
+   utility classes: a 448 px `max-w-md` card, centred, with rounded
+   corners, a border and a drop shadow. On a real phone that is
+   invisible (the viewport IS 448 px), but on a laptop it is the
+   "phone-sized window dragged a little wider" case — the content
+   freezes at phone width and a growing band of empty space opens up
+   on BOTH sides (≈125 px each at 700 px wide, ≈160 px each at
+   767 px). So: the phone frame is only honest while the window really
+   is a phone. From 640 px up the app grows with the window.
 
    This block reshapes the app shell for tablet:
 
@@ -321,7 +334,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
 
    The desktop polish (1024 px +) lands in a follow-up.
    ───────────────────────────────────────────────────────────────────── */
-@media (min-width: 768px) and (max-width: 1023px) {
+@media (min-width: 640px) and (max-width: 1023px) {
   /* Drop the phone-shaped frame: the app is a real tablet app, not a
      scaled-up phone. No rounded corners, no phone shadow, no fake
      "device bezel" — the content sits in a real window. */
@@ -347,6 +360,11 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
       radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.16), transparent 42%),
       radial-gradient(88% 62% at 50% 100%, rgba(244, 114, 182, 0.10), transparent 48%),
       linear-gradient(180deg, #f6f8ff 0%, #eef3ff 46%, #f8fafc 100%);
+    /* `sm:py-6` exists to float the phone card inside the window. Once
+       the card is gone it only leaves a 24 px band of dead background
+       above and below the page (plus 48 px of extra scroll), so the
+       shell goes edge-to-edge here and on desktop. */
+    padding: 0;
   }
 
   /* Inner content uses the real tablet width so the page fills the
