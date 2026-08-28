@@ -1150,6 +1150,75 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     0 0 0 1px rgb(59 130 246 / 0.16);
 }
 
+/* Course Player — a saved note card shows ONLY the note's first heading or
+   first line of text, in its original format, centred in the square. The
+   block keeps its formatting (a heading stays a heading, bold / colour stay
+   bold / coloured) but sizes are capped and margins zeroed so the single
+   block sits balanced in the middle of a small card instead of overflowing
+   it — that's the "centre mein thoda look kharab" adjustment: nothing drifts
+   off-centre, and a long first paragraph can never bury the action buttons. */
+.course-note-card-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+}
+
+.course-note-card-preview > * {
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.course-note-card-preview > :is(h1, h2, h3, h4, h5, h6, p, div, li, blockquote, pre, figcaption, dd, dt, td, th) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+  /* Centred is the requirement — a pasted block's own inline text-align
+     must not drag the card's preview off-centre. */
+  text-align: center !important;
+}
+
+.course-note-card-preview :is(h1, h2, h3, h4, h5, h6) {
+  font-size: 1.05rem !important;
+  font-weight: 800;
+}
+
+.course-note-card-preview :is(p, div, li, td, th, figcaption, dd, dt) {
+  font-size: 0.8rem !important;
+}
+
+/* Code and quoted blocks read better left-aligned (a centered code line or a
+   quote with a left border looks broken), so they opt out of the centering —
+   they still sit vertically centred in the card. */
+.course-note-card-preview pre {
+  font-size: 0.72rem !important;
+  white-space: pre-wrap;
+  text-align: left !important;
+}
+
+.course-note-card-preview blockquote {
+  font-size: 0.8rem !important;
+  padding-left: 0.4rem;
+  border-left: 2px solid currentColor;
+  text-align: left !important;
+}
+
+.course-note-card-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  margin-inline: auto;
+}
+
 /* Course Player — overlay content swap (tab switch) */
 @keyframes course-overlay-in {
   from { opacity: 0; transform: translateY(14px); }

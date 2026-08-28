@@ -1330,14 +1330,15 @@ function MindMapCanvas(props: MindMapPanelProps) {
                         <button
                           type="button"
                           onClick={() => openMap(entry.mapKey)}
-                          className="min-h-0 flex-1 text-left"
+                          className="flex min-h-0 w-full flex-1 items-center justify-center px-1 text-center"
                           data-course-mindmap-open-map={entry.mapKey}
                         >
-                          <p className="line-clamp-3 text-[11px] font-black leading-snug text-[var(--mm-text)]">
-                            {entry.title || "Untitled map"}
-                          </p>
-                          <p className="mt-1 text-[10px] font-semibold text-[var(--mm-muted)]">
-                            {entry.nodeCount} {entry.nodeCount === 1 ? "node" : "nodes"}
+                          {/* The card shows ONLY the map's primary (central)
+                              node text — exactly what is written on the
+                              centre box — so the library reads like the maps
+                              themselves, not their auto "Mind map 3" names. */}
+                          <p className="line-clamp-4 text-[12px] font-black leading-snug text-[var(--mm-text)]">
+                            {entry.rootTopic || entry.title || "Untitled map"}
                           </p>
                         </button>
                       )}

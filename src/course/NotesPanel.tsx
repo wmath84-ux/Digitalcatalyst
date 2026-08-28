@@ -38,7 +38,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
 import type { CoursePlayerNote } from "../types/course";
 import RichTextEditor from "./RichTextEditor";
-import { isEmptyRichText, plainToRichText, richTextToPlain } from "../utils/richText";
+import { firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain } from "../utils/richText";
 
 interface NotesPanelProps {
   notes: CoursePlayerNote[];
@@ -66,6 +66,12 @@ interface NotesPanelProps {
 // pipeline so nothing in the list ever disappears after the upgrade.
 const noteHtml = (note: CoursePlayerNote) => note.html || plainToRichText(note.text || "");
 const notePreview = (note: CoursePlayerNote) => richTextToPlain(noteHtml(note)) || note.text || "";
+
+// A saved card shows ONLY the note's first heading (or its first line of
+// text), in its original format, centred in the square — the full note is
+// one tap away in the editor. Falling back to the plain preview keeps a
+// card from ever rendering blank.
+const noteCardHtml = (note: CoursePlayerNote) => firstRichTextBlock(noteHtml(note)) || notePreview(note);
 
 /** Filled, high-contrast action marks — heavier than the old outline icons. */
 function PremiumEditIcon({ size = 13 }: { size?: number }) {
@@ -348,9 +354,12 @@ export default function NotesPanel({
                   style={{ background: "#ffffff", border: "1px solid rgba(148,163,184,0.35)", boxShadow: "0 4px 14px -4px rgba(15,23,42,0.18), 0 2px 6px -2px rgba(15,23,42,0.1)" }}
                 >
                   <div className="flex h-full flex-col overflow-hidden">
-                    <p className="min-h-0 flex-1 overflow-hidden text-xs leading-snug text-slate-600 line-clamp-5" title={preview}>
-                      {preview}
-                    </p>
+                    <div
+                      className="course-note-card-preview min-h-0 w-full flex-1"
+                      title={preview}
+                      data-course-note-preview
+                      dangerouslySetInnerHTML={{ __html: noteCardHtml(note) }}
+                    />
                     <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1.5">
                       <button
                         type="button"
