@@ -306,15 +306,20 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   const notesHeight = landscape ? "52vw" : "50dvh";
   const notesEditorHeight = landscape ? "min(92vw, 620px)" : "88dvh";
   const defaultHeight = landscape ? "min(78vw, 460px)" : "72dvh";
+  // In landscape the NOTES tab always opens as a side-by-side split — both
+  // the "all notes" grid and the big editor — so the lesson stays visible
+  // beside the sheet and the centre handle can resize either view, exactly
+  // like the note editor. `notesEditorOpen` is only used for the sheet's
+  // height/portrait treatment below.
+  //
   // The split ONLY applies while the sheet is actually OPEN — exactly like
   // `mindMapSplit` below. Gating on `open` is what makes the split collapse
   // the moment the sheet closes (no white gap, however it was closed: dock
-  // button, scrim, Escape) even though `notesEditorOpen` may legitimately
-  // stay true — the panel stays mounted while the sheet is hidden, and an
-  // empty draft keeps its editor state. And on the next open the split is
-  // already true, so the sheet lands straight back in the 60/40
-  // swipe-and-adjust layout instead of a plain overlay.
-  const splitMode = landscape && open && tab === "notes" && notesEditorOpen;
+  // button, scrim, Escape, full-left drag) even though the tab may
+  // legitimately stay selected. And on the next open the split is already
+  // true, so the sheet lands straight back in the swipe-and-adjust layout
+  // instead of a plain overlay.
+  const splitMode = landscape && open && tab === "notes";
 
   // ── Mind map sheet sizing ───────────────────────────────────────────────
   // The mind map claims HALF the screen — more than the notes' 40% — because
@@ -334,9 +339,14 @@ export default function CourseOverlay(props: CourseOverlayProps) {
 
   // ── Draggable landscape split ratio ─────────────────────────────────────
   // Defaults stay 40% (notes) / 50% (mind map). Grab the centre handle
-  // (sheet's left edge) to set any ratio between SPLIT_MIN and SPLIT_MAX.
-  const SPLIT_MIN = 28;
-  const SPLIT_MAX = 72;
+  // (sheet's left edge) to set any ratio from fully closed (0%) to nearly
+  // full-screen (SPLIT_MAX). Releasing the handle at the closed end closes
+  // the sheet; the same edge can then be grabbed again and dragged back
+  // toward the centre to reopen the panel.
+  const SPLIT_MIN = 0;
+  const SPLIT_MAX = 95;
+  /** Below this ratio a released drag counts as "close the panel". */
+  const CLOSE_THRESHOLD = 10;
   const DEFAULT_NOTES_SPLIT = 40;
   const DEFAULT_MINDMAP_SPLIT = 50;
   const loadSplitPercent = (key: string, fallback: number) => {
@@ -349,8 +359,15 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   const [notesSplitPercent, setNotesSplitPercent] = useState(() => loadSplitPercent("dc.courseSplit.notes", DEFAULT_NOTES_SPLIT));
   const [mindMapSplitPercent, setMindMapSplitPercent] = useState(() => loadSplitPercent("dc.courseSplit.mindmap", DEFAULT_MINDMAP_SPLIT));
   const [splitDragging, setSplitDragging] = useState(false);
+  // True while the user is dragging the closed sheet's edge handle inward to
+  // reopen the panel. During such a drag the sheet is shown live so the user
+  // sees exactly how wide it will land.
+  const [edgeDragging, setEdgeDragging] = useState(false);
   const splitDragRef = useRef<{ id: number } | null>(null);
-  const splitPercent = mindMapSplit ? mindMapSplitPercent : notesSplitPercent;
+  // Live value of the most recently applied ratio — the pointer-up handler
+  // needs it even though the state update may not have committed yet.
+  const splitDragValueRef = useRef<number>(0);
+  const splitPercent = tab === "mindmap" ? mindMapSplitPercent : notesSplitPercent;
   const splitEditorWidth = `${notesSplitPercent}%`;
   const mindMapSplitWidth = `${mindMapSplitPercent}%`;
 
@@ -363,7 +380,8 @@ export default function CourseOverlay(props: CourseOverlayProps) {
 
   const applySplitPercent = (percent: number) => {
     const next = Math.round(clamp(percent, SPLIT_MIN, SPLIT_MAX) * 10) / 10;
-    if (mindMapSplit) setMindMapSplitPercent(next);
+    splitDragValueRef.current = next;
+    if (tab === "mindmap") setMindMapSplitPercent(next);
     else setNotesSplitPercent(next);
   };
 
@@ -372,6 +390,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
     event.preventDefault();
     event.stopPropagation();
     splitDragRef.current = { id: event.pointerId };
+    splitDragValueRef.current = splitPercent;
     setSplitDragging(true);
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* ignore */ }
   };
@@ -395,8 +414,42 @@ export default function CourseOverlay(props: CourseOverlayProps) {
     if (!st || st.id !== event.pointerId) return;
     splitDragRef.current = null;
     setSplitDragging(false);
+    setEdgeDragging(false);
+    try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
+    const current = splitDragValueRef.current;
+    if (current <= CLOSE_THRESHOLD) {
+      // Dragged fully closed: reset to the default ratio so the next open
+      // lands at a sensible width. If the sheet was open, close it for real
+      // (the lesson returns to full width). If it was already closed (edge
+      // drag that did not cross the threshold), it simply stays closed.
+      applySplitPercent(tab === "mindmap" ? DEFAULT_MINDMAP_SPLIT : DEFAULT_NOTES_SPLIT);
+      if (open) props.onClose();
+    } else if (!open) {
+      // Edge drag crossed the threshold — reopen the panel at the dragged
+      // width (the ratio was already applied while dragging).
+      props.onToggle();
+    }
+  };
+
+  // Edge handle on the closed sheet: a slim grabber flush against the dock.
+  // Dragging it toward the centre reopens the panel at that width.
+  const edgeHandleActive = landscape && !open && (tab === "notes" || tab === "mindmap");
+  const onEdgePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    setEdgeDragging(true);
+    onSplitPointerDown(event);
+  };
+  // A cancelled gesture (browser takes the pointer over) must only clean up
+  // the drag state — it must never close or reopen the sheet.
+  const onSplitPointerCancel = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const st = splitDragRef.current;
+    if (!st || st.id !== event.pointerId) return;
+    splitDragRef.current = null;
+    setSplitDragging(false);
+    setEdgeDragging(false);
     try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
   };
+  // The sheet's live visibility: open, or being dragged open from its edge.
+  const sheetVisible = open || edgeDragging;
 
   const sheetHeight = mindMapActive
     ? mindMapHeight
@@ -457,6 +510,32 @@ export default function CourseOverlay(props: CourseOverlayProps) {
 
   return (
     <>
+      {/* ── Closed-sheet edge handle (landscape) ──────────────────────────
+          When the notes / mind map sheet is fully closed in landscape, a
+          slim grabber stays pinned against the dock. Dragging it toward the
+          centre reopens the panel at exactly the width the pointer reaches,
+          so a panel closed by a full-left drag can be brought straight back
+          (and left "only notes / only mind map" is one full-right drag).
+          The sheet itself previews live at the dragged width while the
+          handle moves. */}
+      {edgeHandleActive ? (
+        <button
+          type="button"
+          aria-label="Panel kholne ke liye centre ki taraf drag karein"
+          title="Drag inward to reopen the panel"
+          className="absolute bottom-0 top-0 z-50 flex w-4 cursor-col-resize touch-none items-center justify-center"
+          style={{ right: `calc(4rem + env(safe-area-inset-right, 0px) + ${edgeDragging ? splitPercent : 0}%)` }}
+          onPointerDown={onEdgePointerDown}
+          onPointerMove={onSplitPointerMove}
+          onPointerUp={onSplitPointerUp}
+          onPointerCancel={onSplitPointerCancel}
+          data-course-split-edge-handle
+          data-edge-dragging={edgeDragging ? "true" : "false"}
+        >
+          <span className={`block h-16 w-1.5 rounded-full ${edgeDragging ? "bg-violet-400" : "bg-violet-400/50"} shadow-[0_0_10px_rgba(167,139,250,0.7)]`} />
+        </button>
+      ) : null}
+
       {/* ── Scrim: closes the sheet when the content behind it is tapped ──
           In landscape SPLIT mode (notes editor open or mind map active) the
           left half of the screen must stay fully visible and interactive —
@@ -484,7 +563,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           landscape
             ? "bottom-0 top-0 border-l"
             : "inset-x-0 bottom-16 rounded-t-[1.75rem] border-t"
-        } ${open
+        } ${sheetVisible
           ? "pointer-events-auto translate-x-0 translate-y-0 opacity-100"
           : `pointer-events-none invisible opacity-0 ${landscape ? "translate-x-full" : "translate-y-full"}`
         }`}
@@ -494,13 +573,15 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           // In split mode the editor takes the right 40% of the section
           // (minus the 4rem dock) so the lesson keeps the left 60%.
           ...(landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : null),
-          // Landscape → width (split editor / mind map / default). Portrait →
-          // normally a height, but the notes writing box and the mind map
-          // instead stretch from the section's top (just below the header) to
-          // the dock, so they use the real available space and never slide
-          // underneath the sticky header.
+          // Landscape → width (split editor / mind map / default). While the
+          // closed sheet is being dragged open from its edge, the sheet
+          // previews live at the dragged ratio. Portrait → normally a height,
+          // but the notes writing box and the mind map instead stretch from
+          // the section's top (just below the header) to the dock, so they
+          // use the real available space and never slide underneath the
+          // sticky header.
           ...(landscape
-            ? { width: mindMapSplit ? mindMapSplitWidth : splitMode ? splitEditorWidth : sheetHeight }
+            ? { width: edgeDragging ? `${splitPercent}%` : mindMapSplit ? mindMapSplitWidth : splitMode ? splitEditorWidth : sheetHeight }
             : portraitFullHeight
               ? { top: 0, height: "auto" }
               : { height: sheetHeight }),
@@ -512,14 +593,14 @@ export default function CourseOverlay(props: CourseOverlayProps) {
             : null),
         }}
         data-course-overlay
-        data-open={open ? "true" : "false"}
+        data-open={sheetVisible ? "true" : "false"}
         data-orientation={orientation}
         data-split-mode={splitMode || mindMapSplit ? "true" : "false"}
         data-split-kind={mindMapSplit ? "mindmap" : splitMode ? "notes" : "none"}
         data-split-percent={splitActive ? String(splitPercent) : undefined}
         data-split-dragging={splitDragging ? "true" : "false"}
       >
-        {landscape && splitActive ? (
+        {landscape && splitActive && !edgeDragging ? (
           <button
             type="button"
             aria-label="Split ratio badlein — lesson aur panel ke beech drag karein"
@@ -528,7 +609,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
             onPointerDown={onSplitPointerDown}
             onPointerMove={onSplitPointerMove}
             onPointerUp={onSplitPointerUp}
-            onPointerCancel={onSplitPointerUp}
+            onPointerCancel={onSplitPointerCancel}
             data-course-split-handle
           >
             <span className={`block h-16 w-1.5 rounded-full ${splitDragging ? "bg-violet-400" : "bg-violet-400/70"} shadow-[0_0_10px_rgba(167,139,250,0.7)]`} />

@@ -373,7 +373,7 @@ function SavedTestsView({
           ) : <SecondaryButton className="mt-2 w-auto px-6" onClick={() => onSearch("")}>Clear search</SecondaryButton>}
         />
       ) : (
-        <div className="space-y-3 px-4 py-4">
+        <div className="grid grid-cols-1 gap-3 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3" data-saved-tests-grid>
           {tests.map((test) => (
             <SavedTestCard
               key={test.id}
@@ -389,7 +389,7 @@ function SavedTestsView({
               onDelete={() => onDelete(test)}
             />
           ))}
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          <div className="grid grid-cols-2 gap-2 pt-1 sm:col-span-2 lg:col-span-3">
             <SecondaryButton onClick={onCreateAi}><SparklesIcon className="h-4 w-4" /> Generate</SecondaryButton>
             <SecondaryButton onClick={onImport}><BookOpenCheck className="h-4 w-4" /> Import</SecondaryButton>
           </div>
@@ -427,33 +427,33 @@ function SavedTestCard({
   const progress = test.status === "in_progress" ? Math.min(100, ((test.currentIndex + 1) / progressTotal) * 100) : 0;
 
   return (
-    <Card className="overflow-hidden p-0">
-      <div className="p-4">
-        <div className="flex items-start gap-3">
-          <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${test.source === "bulk" ? "bg-amber-50 text-amber-600" : "bg-violet-50 text-violet-600"}`}>
-            {test.source === "bulk" ? <BookOpenCheck className="h-5 w-5" /> : <SparklesIcon className="h-5 w-5" />}
+    <Card className="relative aspect-square overflow-hidden p-0" data-saved-test-card>
+      <div className="flex h-full flex-col p-3.5">
+        <div className="flex items-start gap-2.5">
+          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${test.source === "bulk" ? "bg-amber-50 text-amber-600" : "bg-violet-50 text-violet-600"}`}>
+            {test.source === "bulk" ? <BookOpenCheck className="h-4.5 w-4.5" /> : <SparklesIcon className="h-4.5 w-4.5" />}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-2"><h3 className="min-w-0 flex-1 text-[15px] font-black leading-snug text-slate-900">{test.title}</h3><Badge tone={test.status === "completed" ? "mastered" : test.status === "in_progress" ? "learning" : "neutral"}>{test.status === "in_progress" ? "in progress" : test.status}</Badge></div>
-            <p className="mt-1 text-[11px] font-medium text-slate-500">{sourceLabel(test.source)} · {test.totalQuestions} questions · {test.estimatedMinutes} min</p>
+            <div className="flex items-start gap-1.5"><h3 className="min-w-0 flex-1 text-[13px] font-black leading-snug text-slate-900 line-clamp-2">{test.title}</h3><Badge tone={test.status === "completed" ? "mastered" : test.status === "in_progress" ? "learning" : "neutral"}>{test.status === "in_progress" ? "in progress" : test.status}</Badge></div>
+            <p className="mt-0.5 text-[10px] font-medium text-slate-500">{sourceLabel(test.source)} · {test.totalQuestions} questions · {test.estimatedMinutes} min</p>
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {labels.map((label) => <span key={label} className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600">{label}</span>)}
-          <span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-600">{questionModeLabel(test.planDetails.questionMode)}</span>
-          <span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold capitalize text-slate-600">{test.planDetails.difficulty}</span>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {labels.map((label) => <span key={label} className="rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-bold text-slate-600">{label}</span>)}
+          <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-bold text-indigo-600">{questionModeLabel(test.planDetails.questionMode)}</span>
+          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-bold capitalize text-slate-600">{test.planDetails.difficulty}</span>
         </div>
 
         {test.status === "in_progress" && (
-          <div className="mt-3 rounded-xl bg-indigo-100/70 p-3">
-            <div className="flex justify-between text-[11px] font-bold text-indigo-700"><span>Attempt in progress</span><span>{Math.min(test.currentIndex + 1, test.totalQuestions)}/{test.totalQuestions}</span></div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${progress}%` }} /></div>
+          <div className="mt-2 rounded-xl bg-indigo-100/70 px-2.5 py-2">
+            <div className="flex justify-between text-[10px] font-bold text-indigo-700"><span>Attempt in progress</span><span>{Math.min(test.currentIndex + 1, test.totalQuestions)}/{test.totalQuestions}</span></div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${progress}%` }} /></div>
           </div>
         )}
 
         {test.status === "completed" && (
-          <div className="mt-3 grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-2.5 text-center">
+          <div className="mt-2 grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-2 text-center">
             <ResultMetric value={`${test.score ?? 0}%`} label="Score" />
             <ResultMetric value={String(test.correctCount)} label="Correct" tone="text-emerald-600" />
             <ResultMetric value={String(test.wrongCount)} label="Wrong" tone="text-rose-600" />
@@ -461,56 +461,66 @@ function SavedTestCard({
           </div>
         )}
 
-        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-          <span className="flex items-center gap-1"><History className="h-3.5 w-3.5" /> {test.attemptCount} completed attempt{test.attemptCount === 1 ? "" : "s"}</span>
+        <div className="min-h-0 flex-1" />
+
+        <div className="flex items-center justify-between text-[10px] text-slate-500">
+          <span className="flex items-center gap-1"><History className="h-3 w-3" /> {test.attemptCount} completed attempt{test.attemptCount === 1 ? "" : "s"}</span>
           <span>{relativeDate(test.completedAt)}</span>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-2 flex flex-col gap-1.5">
           {test.status === "available" ? (
-            <PrimaryButton className="col-span-2" onClick={onStart}><Play className="h-4 w-4" /> Start Test</PrimaryButton>
+            <PrimaryButton className="w-full min-h-[38px] rounded-xl text-xs" onClick={onStart}><Play className="h-3.5 w-3.5" /> Start Test</PrimaryButton>
           ) : test.status === "in_progress" && test.attemptId ? (
-            <PrimaryButton className="col-span-2" onClick={() => onOpenAttempt(test.attemptId!)}><Play className="h-4 w-4" /> Continue Attempt</PrimaryButton>
+            <PrimaryButton className="w-full min-h-[38px] rounded-xl text-xs" onClick={() => onOpenAttempt(test.attemptId!)}><Play className="h-3.5 w-3.5" /> Continue Attempt</PrimaryButton>
           ) : (
             <>
-              <PrimaryButton onClick={onReviseAgain}><RotateCcw className="h-4 w-4" /> Revise Again</PrimaryButton>
-              <SecondaryButton disabled={test.skippedCount === 0} onClick={onReviseSkipped}><ListRestart className="h-4 w-4" /> Revise Skipped</SecondaryButton>
+              <PrimaryButton className="w-full min-h-[38px] rounded-xl text-xs" onClick={onReviseAgain}><RotateCcw className="h-3.5 w-3.5" /> Revise Again</PrimaryButton>
+              <div className="grid grid-cols-2 gap-1.5">
+                <SecondaryButton className="min-h-[32px] rounded-lg text-[10px]" disabled={test.skippedCount === 0} onClick={onReviseSkipped}><ListRestart className="h-3 w-3" /> Revise Skipped</SecondaryButton>
+                {test.attemptId ? (
+                  <SecondaryButton className="min-h-[32px] rounded-lg text-[10px]" onClick={() => onOpenResult(test.attemptId!)}><BarChart3 className="h-3 w-3" /> Result</SecondaryButton>
+                ) : null}
+              </div>
             </>
           )}
         </div>
-        {test.status === "completed" && test.attemptId && (
-          <button type="button" onClick={() => onOpenResult(test.attemptId!)} className="mt-2 flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-50 text-xs font-black text-emerald-700"><BarChart3 className="h-4 w-4" /> View latest result</button>
-        )}
 
-        <div className="mt-2 flex gap-2 border-t border-slate-200 pt-2">
-          <button type="button" onClick={onExpand} className="flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-xl text-xs font-bold text-slate-600 active:bg-slate-100">
-            <History className="h-4 w-4" /> Attempt history {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        <div className="mt-1.5 flex items-center gap-1 border-t border-slate-200 pt-1.5">
+          <button type="button" onClick={onExpand} className="flex min-h-[30px] flex-1 items-center justify-center gap-1.5 rounded-lg text-[10px] font-bold text-slate-600 active:bg-slate-100">
+            <History className="h-3.5 w-3.5" /> Attempt history {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </button>
-          <button type="button" onClick={onDelete} className="grid h-[38px] w-10 place-items-center rounded-xl text-rose-500 active:bg-rose-50" aria-label={`Delete ${test.title}`}><Trash2 className="h-4 w-4" /></button>
+          <button type="button" onClick={onDelete} className="grid h-8 w-9 place-items-center rounded-lg text-rose-500 active:bg-rose-50" aria-label={`Delete ${test.title}`}><Trash2 className="h-4 w-4" /></button>
         </div>
       </div>
 
       {expanded && (
-        <div className="border-t border-slate-200 bg-slate-50/80 px-4 py-3">
-          {attempts.length === 0 ? <p className="py-2 text-center text-xs text-slate-500">No attempts yet.</p> : (
-            <div className="space-y-2">
-              {attempts.map((attempt, index) => (
-                <button
-                  key={attempt.id}
-                  type="button"
-                  onClick={() => attempt.status === "completed" ? onOpenResult(attempt.id) : onOpenAttempt(attempt.id)}
-                  className="flex min-h-[52px] w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 text-left shadow-sm"
-                >
-                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-black ${attempt.status === "completed" ? "bg-emerald-50 text-emerald-700" : "bg-indigo-50 text-indigo-700"}`}>{attempts.length - index}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-xs font-black text-slate-700">{attempt.attemptKind === "skipped" ? "Skipped questions" : "Full test"} · {attempt.questionCount} questions</span>
-                    <span className="mt-0.5 block text-[10px] text-slate-500">{relativeDate(attempt.completedAt ?? attempt.startedAt)}</span>
-                  </span>
-                  <span className="text-right"><span className="block text-xs font-black text-slate-700">{attempt.status === "completed" ? `${attempt.score}%` : "Continue"}</span><span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">{attempt.status}</span></span>
-                </button>
-              ))}
-            </div>
-          )}
+        <div className="absolute inset-0 z-20 flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl" data-saved-test-attempts>
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-3 py-2.5">
+            <p className="text-xs font-black text-slate-700">Attempt history</p>
+            <button type="button" onClick={onExpand} className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200" aria-label="Close attempt history"><ChevronUp className="h-4 w-4" /></button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5">
+            {attempts.length === 0 ? <p className="py-2 text-center text-xs text-slate-500">No attempts yet.</p> : (
+              <div className="space-y-2">
+                {attempts.map((attempt, index) => (
+                  <button
+                    key={attempt.id}
+                    type="button"
+                    onClick={() => attempt.status === "completed" ? onOpenResult(attempt.id) : onOpenAttempt(attempt.id)}
+                    className="flex min-h-[50px] w-full items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-2.5 text-left shadow-sm"
+                  >
+                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-black ${attempt.status === "completed" ? "bg-emerald-50 text-emerald-700" : "bg-indigo-50 text-indigo-700"}`}>{attempts.length - index}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[11px] font-black text-slate-700">{attempt.attemptKind === "skipped" ? "Skipped questions" : "Full test"} · {attempt.questionCount} questions</span>
+                      <span className="mt-0.5 block text-[9px] text-slate-500">{relativeDate(attempt.completedAt ?? attempt.startedAt)}</span>
+                    </span>
+                    <span className="text-right"><span className="block text-[11px] font-black text-slate-700">{attempt.status === "completed" ? `${attempt.score}%` : "Continue"}</span><span className="text-[8px] font-bold uppercase tracking-wide text-slate-500">{attempt.status}</span></span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </Card>
@@ -518,7 +528,7 @@ function SavedTestCard({
 }
 
 function ResultMetric({ value, label, tone = "text-slate-800" }: { value: string; label: string; tone?: string }) {
-  return <div><p className={`text-sm font-black ${tone}`}>{value}</p><p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-500">{label}</p></div>;
+  return <div><p className={`text-[11px] font-black ${tone}`}>{value}</p><p className="mt-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-500">{label}</p></div>;
 }
 
 function SmartRevisionView({ bankData, summary, search, statusTab, activeFilterCount, startingSession, onSearch, onStatus, onFilters, onStart, onClear }: {

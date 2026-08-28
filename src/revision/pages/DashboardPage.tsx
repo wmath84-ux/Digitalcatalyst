@@ -93,7 +93,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
       rightSlot={streakSlot}
       mergeIntoMainHeader
     >
-      <div className="animate-fade-in space-y-4 px-4 py-4 pb-8">
+      <div data-revision-page="dashboard" className="animate-fade-in space-y-4 px-4 py-4 pb-8">
         {revisionPlans.length === 0 ? (
           <FirstRevisionCard onGenerate={openGenerator} />
         ) : (
