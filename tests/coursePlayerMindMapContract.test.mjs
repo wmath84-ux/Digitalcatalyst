@@ -218,6 +218,23 @@ test("tapping + puts the new node straight into rename mode", () => {
   assert.match(panel, /const result = addChildNode\(current, parentId, "New idea"\)/);
 });
 
+test("the rename editor wraps long text instead of overflowing sideways", () => {
+  // The editor must be a soft-wrapping textarea, not a single-line input:
+  // the old input scrolled its text horizontally inside the fixed node box.
+  assert.match(panel, /<textarea[\s\S]*?ref=\{inputRef\}/);
+  assert.doesNotMatch(panel, /<input\s+ref=\{inputRef\}/, "the single-line rename input must be gone");
+  assert.match(panel, /rows=\{1\}/);
+  assert.match(panel, /wrap="soft"/);
+  assert.match(panel, /resize-none/);
+  assert.match(panel, /whitespace-pre-wrap break-words/, "long words must fold, not spill out of the box");
+  // The editor grows with the wrapped draft (capped, then it scrolls), and
+  // the node's box is allowed to grow with it while editing — a fixed box
+  // would clip the extra lines behind overflow-hidden.
+  assert.match(panel, /el\.style\.height = "auto"/);
+  assert.match(panel, /const height = Math\.max\(EDITOR_MIN_HEIGHT_PX, Math\.min\(el\.scrollHeight, EDITOR_MAX_HEIGHT_PX\)\);/);
+  assert.match(panel, /minHeight: placed\.height, height: "auto"/);
+});
+
 test("wires between nodes are n8n-style cubic-bezier ropes, not rigid smoothstep", () => {
   // smoothstep draws right-angle corridors; the learner asked for cables that
   // leave each handle along its facing and sag like a rope (n8n / Figma).

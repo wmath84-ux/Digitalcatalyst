@@ -18,7 +18,9 @@
 //                    ANYWHERE by hand. The drop is remembered per node, so
 //                    the hand-arranged map survives save / reload. Nodes the
 //                    learner never dragged keep riding the tidy-tree layout.
-//   Enter / blur   → save the new topic and close the editor.
+//   Enter / blur   → save the new topic and close the editor. Long text
+//                    wraps inside the editor (the box grows while typing),
+//                    so nothing overflows the node sideways.
 //   Escape         → cancel the rename and keep the previous topic.
 //   tap outside    → any open editor saves its content (blur behaves the
 //                    same way, so closing the editor and tapping the canvas
@@ -64,7 +66,7 @@
 // drag-pan AND node dragging, and a custom node is just a React component,
 // so the `+` button is ordinary JSX rather than DOM surgery.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -169,6 +171,10 @@ interface MindNodeData extends Record<string, unknown> {
 const TAP_SLOP_PX = 4;
 /** Two taps on the same node within this window count as a double-tap. */
 const DOUBLE_TAP_MS = 350;
+/** The editor's own minimum height — exactly one line of the 17px label leading. */
+const EDITOR_MIN_HEIGHT_PX = 17;
+/** The editor stops growing here (~7 lines) and scrolls internally instead. */
+const EDITOR_MAX_HEIGHT_PX = 119;
 
 /**
  * One mind map box. The `+` sits just outside the measured box on the side
@@ -177,9 +183,11 @@ const DOUBLE_TAP_MS = 350;
  * pixel for pixel or siblings would overlap.
  *
  * Single-tap on a node opens the inline editor right where the topic was
- * rendered, so the soft keyboard lands in the same place. Pressing Enter,
- * tapping outside the node, or tapping a different node all commit the
- * current draft and close the editor. A blank / whitespace-only draft is
+ * rendered, so the soft keyboard lands in the same place. The editor is a
+ * wrapping textarea: long drafts fold onto further lines and the box grows
+ * with the text (up to a cap) instead of overflowing sideways. Pressing
+ * Enter, tapping outside the node, or tapping a different node all commit
+ * the current draft and close the editor. A blank / whitespace-only draft is
  * treated as "cancel" so an accidental tap can never blank a node.
  *
  * The whole box is ALSO a drag handle: React Flow moves it anywhere on the
@@ -205,7 +213,7 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
   } = data;
 
   const [draft, setDraft] = useState(topic);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   // Pointer bookkeeping for tap-vs-drag + double-tap detection (see the
   // header comment for why this cannot rely on click events).
   const pressStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -226,11 +234,38 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
       settledRef.current = false;
       // Autofocus lands the soft keyboard on the new node straight away, so
       // `+` → type → Enter (or tap outside) is a single uninterrupted flow.
-      const raf = requestAnimationFrame(() => inputRef.current?.focus());
+      // The caret is parked at the end so the existing topic is appended to,
+      // never overwritten by mistake.
+      const raf = requestAnimationFrame(() => {
+        const el = inputRef.current;
+        el?.focus();
+        if (el) {
+          const end = el.value.length;
+          try {
+            el.setSelectionRange(end, end);
+          } catch {
+            /* value-length race on some mobile browsers — harmless */
+          }
+        }
+      });
       return () => cancelAnimationFrame(raf);
     }
     return undefined;
   }, [editing, topic]);
+
+  // The editor is a wrapping textarea, so long drafts fold onto further
+  // lines instead of sliding sideways out of the box. Its height follows the
+  // content (so the node can grow with it) but stops at EDITOR_MAX_HEIGHT_PX
+  // so a wall of text can never eat the canvas — beyond the cap the field
+  // scrolls vertically inside the box.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const height = Math.max(EDITOR_MIN_HEIGHT_PX, Math.min(el.scrollHeight, EDITOR_MAX_HEIGHT_PX));
+    el.style.height = `${height}px`;
+    el.style.overflowY = el.scrollHeight > height ? "auto" : "hidden";
+  }, [draft, editing]);
 
   // The commit-on-teardown counterpart of the safety net above. Runs when
   // editing ends (blur already committed → settled → no-op) or when the
@@ -283,6 +318,10 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
     // Buttons own their taps — the `+` adds a branch, the collapse chevron
     // toggles; neither should ever read as a tap on the node body.
     if (event.target instanceof Element && event.target.closest("button")) return;
+    // Text-selection taps inside the open editor belong to the field, not
+    // the node: they must never re-open the editor or count toward the
+    // double-tap that deletes a branch.
+    if (event.target instanceof Element && event.target.closest("[data-mind-node-input]")) return;
     const travelled = Math.hypot(event.clientX - start.x, event.clientY - start.y);
     if (travelled > TAP_SLOP_PX) {
       // The tail of a drag — React Flow has already moved the node.
@@ -348,9 +387,11 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
         data-mind-node-body={id}
       >
         {editing ? (
-          <input
+          <textarea
             ref={inputRef}
             value={draft}
+            rows={1}
+            wrap="soft"
             onChange={(event) => {
               setDraft(event.target.value);
               draftRef.current = event.target.value;
@@ -385,7 +426,7 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
             }}
             onClick={(event) => event.stopPropagation()}
             onDoubleClick={(event) => event.stopPropagation()}
-            className={`nodrag w-full min-w-0 bg-transparent text-inherit outline-none ${
+            className={`nodrag w-full min-w-0 resize-none overflow-x-hidden whitespace-pre-wrap break-words bg-transparent p-0 text-inherit outline-none ${
               theme === "light" ? "placeholder:text-slate-400" : "placeholder:text-white/40"
             }`}
             placeholder="Idea likhein…"
@@ -793,7 +834,15 @@ function MindMapCanvas(props: MindMapPanelProps) {
       // canvas and the drop is committed on release (see onNodeDragStop).
       draggable: true,
       selectable: true,
-      style: { width: placed.width, height: placed.height },
+      // While a node's editor is open its box is allowed to grow with the
+      // wrapping draft (fixed boxes would clip the extra lines — the body
+      // keeps overflow-hidden for its rounded corners). The layout
+      // re-measures on commit, so neighbours step out of the way the moment
+      // the edit lands.
+      style:
+        editingId === placed.id
+          ? { width: placed.width, minHeight: placed.height, height: "auto" }
+          : { width: placed.width, height: placed.height },
       data: {
         topic: topicById.get(placed.id) || "Idea",
         depth: placed.depth,
