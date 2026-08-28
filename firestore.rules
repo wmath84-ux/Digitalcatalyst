@@ -154,14 +154,18 @@ service cloud.firestore {
         allow delete: if isOwner(uid) || isAdmin();
       }
 
-      // Per-student Course Player mind maps. One doc per learner + course +
-      // module, so every student's diagram is private and each module keeps
-      // its own map. The doc id is the composite `{uid}__{productId}__
-      // {moduleId}` built by `mindMapDocId()` in utils/mindMapTree.js, and the
-      // rules re-derive it here so one student cannot write into another's
-      // namespace by choosing an id. Writes go straight from the client (the
-      // map is the learner's own data and needs Firestore's offline queue to
-      // survive a dropped connection mid-session).
+      // Per-student Course Player mind maps. A module holds as MANY maps as
+      // the learner wants (same as notes), each in its own document, so every
+      // student's diagrams are private and each module keeps its own set.
+      // The doc id is the composite `{uid}__{productId}__{moduleId}` for the
+      // first map (key `main`, the id every pre-multi-map doc already uses)
+      // and `…__{mapKey}` for the rest — both built by `mindMapDocId()` in
+      // utils/mindMapTree.js. The rules re-derive the id here so one student
+      // cannot write into another's namespace by choosing an id, and the map
+      // key inside the document must match the key in the id so a doc cannot
+      // masquerade as a different map. Writes go straight from the client
+      // (the map is the learner's own data and needs Firestore's offline
+      // queue to survive a dropped connection mid-session).
       match /mindMaps/{mapId} {
         allow read: if isOwner(uid) || isAdmin();
         allow create, update: if isOwner(uid)
@@ -170,7 +174,17 @@ service cloud.firestore {
           && request.resource.data.moduleId is string
           && request.resource.data.productId.size() > 0
           && request.resource.data.moduleId.size() > 0
-          && mapId == uid + '__' + request.resource.data.productId + '__' + request.resource.data.moduleId
+          && request.resource.data.mapKey is string
+          && request.resource.data.mapKey.size() > 0
+          && request.resource.data.mapKey.size() <= 40
+          && request.resource.data.mapKey.matches('^[a-z0-9-]+$')
+          && (
+            (request.resource.data.mapKey == 'main'
+              && mapId == uid + '__' + request.resource.data.productId + '__' + request.resource.data.moduleId)
+            || mapId == uid + '__' + request.resource.data.productId + '__' + request.resource.data.moduleId + '__' + request.resource.data.mapKey
+          )
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 120
           && (request.resource.data.version is int || request.resource.data.version is float)
           && request.resource.data.rootTopic is string
           && request.resource.data.rootTopic.size() <= 400

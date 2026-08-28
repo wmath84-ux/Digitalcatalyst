@@ -223,6 +223,14 @@ export const setNodeTopic = (mind, id, topic) => {
   };
 };
 
+/** Rename the MAP itself (the name shown in the module's map list). */
+export const setMindMapTitle = (mind, title) => {
+  if (!isMindMap(mind)) return mind;
+  const clean = sanitizeTitle(title);
+  if (clean === sanitizeTitle(mind.title)) return mind;
+  return { ...mind, title: clean };
+};
+
 /**
  * Delete a node AND its whole subtree. The root cannot be deleted — a mind map
  * without a centre is not a mind map, and every layout assumption starts there.
@@ -523,16 +531,157 @@ export const layoutMindMap = (mind, options = {}) => {
   };
 };
 
+// ── One-click auto arrange ────────────────────────────────────────────────
+//
+// Hand dragging is what makes a map messy: every dropped node stores an
+// `fx`/`fy` (and the centre stores `rootX`/`rootY`) that OVERRIDES the tidy
+// tree, so a map dragged around for ten minutes ends up with overlapping
+// boxes and crossing ropes. Clearing every manual pin hands the whole diagram
+// back to the deterministic tidy-tree layout in `layoutMindMap` — that is the
+// entire "ek click me sab organise" behaviour, and it is pure so it can be
+// unit tested without a canvas.
+//
+// While we are re-organising we also REBALANCE the root's branches: a map
+// where every branch drifted to one side reads badly even after the pins are
+// gone. Branch weight (how many nodes hang off it) is distributed greedily
+// between left and right so both wings end up roughly equal, and creation
+// order inside each wing is preserved so nothing appears to jump about.
+
+/** Nodes in the subtree rooted at `id`, `id` itself included. */
+const subtreeWeight = (mind, id) => collectSubtreeIds(mind, id).length;
+
+/**
+ * Re-balance the root's direct children between the two sides. Deeper nodes
+ * carry `side: null` and inherit their branch's side, so only the first ring
+ * is ever touched.
+ */
+export const rebalanceBranchSides = (mind) => {
+  if (!isMindMap(mind)) return mind;
+  const roots = childrenOf(mind, ROOT_ID);
+  if (roots.length === 0) return mind;
+
+  const sideById = new Map();
+  let leftLoad = 0;
+  let rightLoad = 0;
+  for (const child of roots) {
+    const weight = subtreeWeight(mind, child.id);
+    // Ties go right, which matches how `addChildNode` seeds a brand-new map.
+    const side = leftLoad < rightLoad ? "left" : "right";
+    if (side === "left") leftLoad += weight;
+    else rightLoad += weight;
+    sideById.set(String(child.id), side);
+  }
+
+  // A map whose wings are already balanced comes back byte-identical, so
+  // "arrange" on a tidy map is a genuine no-op and never triggers a save.
+  let changed = false;
+  const nodes = mind.nodes.map((node) => {
+    const side = sideById.get(String(node.id));
+    if (!side || node.side === side) return node;
+    changed = true;
+    return { ...node, side };
+  });
+  return changed ? { ...mind, nodes } : mind;
+};
+
+/**
+ * ONE-CLICK CLEAN-UP. Drops every hand-placed position (nodes + centre) and
+ * re-balances the two wings, so however badly a map was dragged around it
+ * snaps back to a readable tidy tree. Returns a NEW map; the input is never
+ * mutated, and a map that was already tidy comes back untouched.
+ */
+export const autoArrangeMindMap = (mind) => {
+  if (!isMindMap(mind)) return mind;
+  // An already-tidy map is returned untouched (same reference), so the
+  // button cannot spend a Firestore write on a map with nothing to fix.
+  const cleared = hasManualPositions(mind)
+    ? {
+        ...mind,
+        rootX: null,
+        rootY: null,
+        nodes: mind.nodes.map((node) =>
+          node.fx == null && node.fy == null ? node : { ...node, fx: null, fy: null },
+        ),
+      }
+    : mind;
+  return rebalanceBranchSides(cleared);
+};
+
+/** True when at least one node (or the centre) still carries a manual pin. */
+export const hasManualPositions = (mind) => {
+  if (!isMindMap(mind)) return false;
+  if (mind.rootX != null && mind.rootY != null) return true;
+  return (mind.nodes || []).some((node) => node.fx != null || node.fy != null);
+};
+
+// ── Multiple maps per module ──────────────────────────────────────────────
+//
+// Notes are a LIST — the learner writes as many as they like — and the mind
+// map now works the same way: one module can hold several separate diagrams
+// ("Chapter summary", "Formula sheet", …). Each diagram is its own Firestore
+// document, keyed by a short map key that is appended to the existing
+// composite id.
+//
+// The first map keeps the LEGACY id (`{uid}__{productId}__{moduleId}`) so
+// every map drawn before this feature shipped stays exactly where it is —
+// that map's key is `main`.
+
+/** Key of the first / legacy map in a module. */
+export const MIND_MAP_DEFAULT_KEY = "main";
+
+/** Safety cap so one module cannot spawn an unbounded pile of documents. */
+export const MAX_MAPS_PER_MODULE = 30;
+
+/**
+ * Map keys land inside a Firestore document id, so they are restricted to
+ * lowercase alphanumerics and dashes. Anything else is stripped rather than
+ * rejected, because the key is generated, never typed by the learner.
+ */
+export const sanitizeMapKey = (value) => {
+  const clean = String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "")
+    .slice(0, 40);
+  return clean || MIND_MAP_DEFAULT_KEY;
+};
+
+/**
+ * A fresh key that no existing map in this module uses. Time-based so the
+ * natural sort matches creation order, with a random tail so two devices
+ * creating a map in the same millisecond cannot collide.
+ */
+export const createMapKey = (takenKeys = []) => {
+  const taken = new Set((takenKeys || []).map((key) => sanitizeMapKey(key)));
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const key = sanitizeMapKey(
+      `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}${attempt ? attempt : ""}`,
+    );
+    if (key !== MIND_MAP_DEFAULT_KEY && !taken.has(key)) return key;
+  }
+  return sanitizeMapKey(`m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
+};
+
+/** The name shown in the map list — the given title, else the centre topic. */
+export const mindMapDisplayTitle = (mind, fallback = "Untitled map") =>
+  sanitizeTitle(mind?.title) || sanitizeTopic(mind?.rootTopic) || fallback;
+
 // ── Firestore persistence ─────────────────────────────────────────────────
 
 /**
- * Document id for one learner's map inside one course module. Scoping by all
- * three means two students never share a doc, and the same student gets a
- * separate map per module — which is what "kisi bhi active module ke saath"
- * needs. Firestore ids may not contain `/`, so separators are fixed.
+ * Document id for ONE of a learner's maps inside one course module. Scoping
+ * by uid + product + module means two students never share a doc and each
+ * module keeps its own diagrams; the optional 4th segment is the map key, so
+ * a module can hold several maps side by side.
+ *
+ * The default key (`main`) deliberately produces the ORIGINAL three-part id,
+ * so every map saved before multi-map support keeps its document.
+ * Firestore ids may not contain `/`, so separators are fixed.
  */
-export const mindMapDocId = (uid, productId, moduleId) =>
-  `${String(uid).trim()}__${String(productId).trim()}__${String(moduleId).trim()}`;
+export const mindMapDocId = (uid, productId, moduleId, mapKey = MIND_MAP_DEFAULT_KEY) => {
+  const base = `${String(uid).trim()}__${String(productId).trim()}__${String(moduleId).trim()}`;
+  const key = sanitizeMapKey(mapKey);
+  return key === MIND_MAP_DEFAULT_KEY ? base : `${base}__${key}`;
+};
 
 /**
  * Parse whatever Firestore returned into a valid mind map, tolerating the
@@ -624,5 +773,9 @@ export const toFirestoreMindMap = (mind, meta = {}) => {
     uid: meta.uid == null ? null : String(meta.uid),
     productId: meta.productId == null ? null : String(meta.productId),
     moduleId: meta.moduleId == null ? null : String(meta.moduleId),
+    // Which of the module's maps this document is. Always written (never
+    // undefined) so the security rules can tie the document id to the key —
+    // a legacy three-part id is the `main` map.
+    mapKey: sanitizeMapKey(meta.mapKey),
   };
 };

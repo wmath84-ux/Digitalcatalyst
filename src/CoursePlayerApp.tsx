@@ -1092,6 +1092,17 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           status={mindMap.status}
           errorMessage={mindMap.errorMessage}
           onFlush={mindMap.flush}
+          // A module holds a LIST of maps (exactly like notes): the library
+          // inside the panel creates, opens, renames and deletes them, while
+          // the hook keeps each one in its own Firestore document.
+          maps={mindMap.maps}
+          activeMapKey={mindMap.activeMapKey}
+          onSelectMap={mindMap.selectMap}
+          onCreateMap={mindMap.createMap}
+          onRenameMap={mindMap.renameMap}
+          onDeleteMap={mindMap.deleteMap}
+          mapsLoading={mindMap.mapsLoading}
+          atMapLimit={mindMap.atMapLimit}
           // The map renders in the player's current theme (dark or white)
           // until the learner flips the map's own sun/moon toolbar button.
           playerTheme={theme}

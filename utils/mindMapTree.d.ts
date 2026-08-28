@@ -103,6 +103,8 @@ export interface MindMapMeta {
   uid?: string | number | null;
   productId?: string | number | null;
   moduleId?: string | number | null;
+  /** Which of the module's maps this document holds (default `"main"`). */
+  mapKey?: string | null;
   updatedAt?: number;
 }
 
@@ -119,6 +121,7 @@ export interface StoredMindMap {
   uid: string | null;
   productId: string | null;
   moduleId: string | null;
+  mapKey: string;
 }
 
 // ── Construction ──────────────────────────────────────────────────────────
@@ -170,7 +173,32 @@ export const DEFAULT_LAYOUT: Readonly<{ hGap: number; vGap: number; minNodeHeigh
 export function measureTopic(topic: string, measure?: MeasureOptions): TopicBox;
 export function layoutMindMap(mind: MindMap, options?: LayoutOptions): MindMapLayout;
 
+// ── One-click auto arrange ────────────────────────────────────────────────
+/** Re-balance the root's branches between the two wings. */
+export function rebalanceBranchSides(mind: MindMap): MindMap;
+/**
+ * ONE-CLICK CLEAN-UP: drop every hand-dragged position and re-balance the
+ * wings, handing the whole diagram back to the tidy-tree layout.
+ */
+export function autoArrangeMindMap(mind: MindMap): MindMap;
+/** True while any node (or the centre) still sits at a hand-dragged spot. */
+export function hasManualPositions(mind: MindMap): boolean;
+
+// ── Multiple maps per module ──────────────────────────────────────────────
+export const MIND_MAP_DEFAULT_KEY: "main";
+export const MAX_MAPS_PER_MODULE: number;
+export function sanitizeMapKey(value: unknown): string;
+export function createMapKey(takenKeys?: string[]): string;
+export function mindMapDisplayTitle(mind: MindMap, fallback?: string): string;
+/** Set a map's display name (shown in the map list). */
+export function setMindMapTitle(mind: MindMap, title: string): MindMap;
+
 // ── Persistence ───────────────────────────────────────────────────────────
-export function mindMapDocId(uid: string | number, productId: string | number, moduleId: string | number): string;
+export function mindMapDocId(
+  uid: string | number,
+  productId: string | number,
+  moduleId: string | number,
+  mapKey?: string,
+): string;
 export function parseMindMap(raw: unknown): MindMap;
 export function toFirestoreMindMap(mind: MindMap, meta?: MindMapMeta): StoredMindMap;
