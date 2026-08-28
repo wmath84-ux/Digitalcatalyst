@@ -55,7 +55,8 @@ export async function handleManifest(_req: VercelRequest, res: VercelResponse) {
     start_url: "/#/home",
     scope: "/",
     display: "standalone",
-    orientation: "any",
+    // HARD RULE: Portrait by default everywhere. Course player unlocks rotation via JS.
+    orientation: "portrait",
     theme_color: "#2563eb",
     background_color: "#ffffff",
     categories: ["education", "productivity"],
