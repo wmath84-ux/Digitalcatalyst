@@ -81,119 +81,136 @@ export default function WeakTopicsPage({ uid, route }: Props) {
         />
       )}
       {data.hasData && (
-        <div data-rev-layout="weak" className="animate-fade-in space-y-5 px-4 py-4 pb-8 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0 lg:py-0 lg:pb-0 lg:max-w-[1200px] lg:mx-auto">
+        /* Two-zone layout. Phones (and tablet portrait, via index.css) keep
+           the original single-column story — `display: contents` on the zone
+           wrappers lets each section sit directly in the phone column and the
+           `order-*` classes preserve the original section order exactly.
+           Tablet landscape + desktop (>= 960 px, same threshold the shell
+           uses) re-flow the zones into a 12-col grid: topic focus on the
+           left (7 cols), supporting breakdowns on the right (5 cols). */
+        <div
+          data-rev-layout="weak"
+          className="animate-fade-in flex flex-col gap-5 px-4 py-4 pb-8 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0 lg:py-0 lg:pb-0 lg:max-w-[1200px] lg:mx-auto"
+        >
           {errorMsg && (
-            <div className="flex items-center gap-2 rounded-2xl bg-rose-100/70 px-4 py-3 text-sm font-medium text-rose-800">
+            <div
+              data-rev-banner
+              className="order-first flex items-center gap-2 rounded-2xl bg-rose-100/70 px-4 py-3 text-sm font-medium text-rose-800 lg:col-span-12"
+            >
               <AlertIcon className="h-4 w-4 shrink-0" /> {errorMsg}
             </div>
           )}
 
-          {data.recommendedTopics.length > 0 && (
-            <section>
-              <h2 className="mb-2 text-[15px] font-bold text-slate-900">Recommended for you</h2>
-              <div className="space-y-3">
-                {data.recommendedTopics.map((t) => (
-                  <Card key={t.topicId} className="border-indigo-200 bg-indigo-50/70">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{t.subjectIcon}</span>
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">{t.topicName}</p>
-                          <p className="text-xs text-slate-600">{t.subjectName}</p>
+          <div data-rev-col="weak-primary" className="contents lg:col-span-7 lg:flex lg:flex-col lg:gap-3">
+            {data.recommendedTopics.length > 0 && (
+              <section className="order-1">
+                <h2 className="mb-2 text-[15px] font-bold text-slate-900 lg:text-[14px]">Recommended for you</h2>
+                <div className="grid gap-3 min-[960px]:grid-cols-2">
+                  {data.recommendedTopics.map((t) => (
+                    <Card key={t.topicId} className="border-indigo-200 bg-indigo-50/70">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{t.subjectIcon}</span>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{t.topicName}</p>
+                            <p className="text-xs text-slate-600">{t.subjectName}</p>
+                          </div>
+                        </div>
+                        <span className="text-sm font-bold text-rose-600">{t.accuracy}%</span>
+                      </div>
+                      <ProgressBar value={t.accuracy} className="mt-2" />
+                      <button
+                        type="button"
+                        onClick={() => handleRevise(t.topicId)}
+                        disabled={revisingTopicId === t.topicId}
+                        className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-sm font-bold text-white shadow-md shadow-indigo-200 transition hover:brightness-105 active:scale-[0.98] disabled:opacity-60 disabled:shadow-none"
+                      >
+                        <SparklesIcon className="h-4 w-4" />
+                        {revisingTopicId === t.topicId ? "Starting…" : "Revise Now"}
+                      </button>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section className="order-3">
+              <h2 className="mb-2 text-[15px] font-bold text-slate-900 lg:text-[14px]">All Weak Topics</h2>
+              <Card>
+                <div className="flex flex-col gap-4 lg:gap-2.5">
+                  {data.weakestTopics.map((t) => (
+                    <div key={t.topicId}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span>{t.subjectIcon}</span>
+                          <p className="truncate text-sm font-medium text-slate-800">{t.topicName}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <TrendBadge trend={t.trend} />
+                          <span className="text-xs font-bold text-slate-600">{t.accuracy}%</span>
                         </div>
                       </div>
-                      <span className="text-sm font-bold text-rose-600">{t.accuracy}%</span>
+                      <ProgressBar value={t.accuracy} className="mt-1.5" />
                     </div>
-                    <ProgressBar value={t.accuracy} className="mt-2" />
-                    <button
-                      type="button"
-                      onClick={() => handleRevise(t.topicId)}
-                      disabled={revisingTopicId === t.topicId}
-                      className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-sm font-bold text-white shadow-md shadow-indigo-200 transition active:scale-[0.98] disabled:opacity-60 disabled:shadow-none"
-                    >
-                      <SparklesIcon className="h-4 w-4" />
-                      {revisingTopicId === t.topicId ? "Starting…" : "Revise Now"}
-                    </button>
-                  </Card>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </Card>
             </section>
-          )}
+          </div>
 
-          {data.weakestSubjects.length > 0 && (
-            <section>
-              <h2 className="mb-2 text-[15px] font-bold text-slate-900">Weakest Subjects</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {data.weakestSubjects.map((s) => (
-                  <Card key={s.subjectId} className="text-center">
-                    <p className="text-2xl">{s.icon}</p>
-                    <p className="mt-1 truncate text-sm font-semibold text-slate-800">{s.name}</p>
-                    <p className="mt-0.5 text-lg font-bold text-slate-900">{s.accuracy}%</p>
-                    <ProgressBar value={s.accuracy} className="mt-1.5" />
-                  </Card>
-                ))}
-              </div>
-            </section>
-          )}
+          <div data-rev-col="weak-secondary" className="contents lg:col-span-5 lg:flex lg:flex-col lg:gap-3">
+            {data.weakestSubjects.length > 0 && (
+              <section className="order-2">
+                <h2 className="mb-2 text-[15px] font-bold text-slate-900 lg:text-[14px]">Weakest Subjects</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  {data.weakestSubjects.map((s) => (
+                    <Card key={s.subjectId} className="text-center">
+                      <p className="text-2xl">{s.icon}</p>
+                      <p className="mt-1 truncate text-sm font-semibold text-slate-800">{s.name}</p>
+                      <p className="mt-0.5 text-lg font-bold text-slate-900">{s.accuracy}%</p>
+                      <ProgressBar value={s.accuracy} className="mt-1.5" />
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            )}
 
-          <section>
-            <h2 className="mb-2 text-[15px] font-bold text-slate-900">All Weak Topics</h2>
-            <Card>
-              <div className="space-y-4">
-                {data.weakestTopics.map((t) => (
-                  <div key={t.topicId}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span>{t.subjectIcon}</span>
-                        <p className="truncate text-sm font-medium text-slate-800">{t.topicName}</p>
+            {data.mostMissedTopics.length > 0 && (
+              <section className="order-4">
+                <h2 className="mb-2 text-[15px] font-bold text-slate-900 lg:text-[14px]">Most Missed Topics</h2>
+                <Card>
+                  <div className="divide-y divide-slate-200">
+                    {data.mostMissedTopics.map((t) => (
+                      <div key={t.topicId} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
+                        <span className="flex items-center gap-2 text-sm text-slate-700">
+                          {t.subjectIcon} {t.topicName}
+                        </span>
+                        <span className="text-xs font-bold text-rose-600">{t.wrong} missed</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <TrendBadge trend={t.trend} />
-                        <span className="text-xs font-bold text-slate-600">{t.accuracy}%</span>
-                      </div>
-                    </div>
-                    <ProgressBar value={t.accuracy} className="mt-1.5" />
+                    ))}
                   </div>
-                ))}
-              </div>
-            </Card>
-          </section>
+                </Card>
+              </section>
+            )}
 
-          {data.mostMissedTopics.length > 0 && (
-            <section>
-              <h2 className="mb-2 text-[15px] font-bold text-slate-900">Most Missed Topics</h2>
-              <Card>
-                <div className="divide-y divide-slate-200">
-                  {data.mostMissedTopics.map((t) => (
-                    <div key={t.topicId} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-                      <span className="flex items-center gap-2 text-sm text-slate-700">
-                        {t.subjectIcon} {t.topicName}
-                      </span>
-                      <span className="text-xs font-bold text-rose-600">{t.wrong} missed</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </section>
-          )}
-
-          {data.frequentlySkippedTopics.length > 0 && (
-            <section>
-              <h2 className="mb-2 text-[15px] font-bold text-slate-900">Frequently Skipped</h2>
-              <Card>
-                <div className="divide-y divide-slate-200">
-                  {data.frequentlySkippedTopics.map((t) => (
-                    <div key={t.topicId} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-                      <span className="flex items-center gap-2 text-sm text-slate-700">
-                        {t.subjectIcon} {t.topicName}
-                      </span>
-                      <span className="text-xs font-bold text-slate-600">{t.skipped} skipped</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </section>
-          )}
+            {data.frequentlySkippedTopics.length > 0 && (
+              <section className="order-5">
+                <h2 className="mb-2 text-[15px] font-bold text-slate-900 lg:text-[14px]">Frequently Skipped</h2>
+                <Card>
+                  <div className="divide-y divide-slate-200">
+                    {data.frequentlySkippedTopics.map((t) => (
+                      <div key={t.topicId} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
+                        <span className="flex items-center gap-2 text-sm text-slate-700">
+                          {t.subjectIcon} {t.topicName}
+                        </span>
+                        <span className="text-xs font-bold text-slate-600">{t.skipped} skipped</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </section>
+            )}
+          </div>
         </div>
       )}
     </PageShell>

@@ -2663,8 +2663,36 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     min-height: auto !important;
   }
 
-  /* Weak topics, bulk import, ai pages centered compact */
-  .dc-desktop-shell [data-rev-layout="weak"],
+  /* Weak Topics: 12-col split - primary 7 (recommended + all weak topics),
+     secondary 5 (subjects, missed, skipped). Previously the page fell into
+     the generic 900px single-column strip below, which wasted the width a
+     desktop has, and the component's bare `lg:grid lg:grid-cols-12`
+     auto-placed every section into a 1/12-wide cell. */
+  .dc-desktop-shell [data-rev-layout="weak"] {
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: clamp(10px, 1vw, 14px);
+    align-items: start;
+    max-width: 1200px;
+    margin-inline: auto;
+  }
+  .dc-desktop-shell [data-rev-layout="weak"] > [data-rev-banner] {
+    grid-column: 1 / -1;
+  }
+  .dc-desktop-shell [data-rev-col="weak-primary"] {
+    grid-column: span 7;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 1vw, 14px);
+  }
+  .dc-desktop-shell [data-rev-col="weak-secondary"] {
+    grid-column: span 5;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 1vw, 14px);
+  }
+
+  /* Bulk import, ai pages centered compact */
   .dc-desktop-shell [data-rev-layout="aigenerate"],
   .dc-desktop-shell [data-rev-layout="aisettings"],
   .dc-desktop-shell [data-rev-layout="bulkimport"],
@@ -2738,6 +2766,24 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     grid-template-columns: 1fr;
     gap: 12px;
   }
+  /* Weak Topics: two compact columns in portrait - topic focus left,
+     supporting breakdowns right (same 2-col rhythm the dashboard uses) */
+  [data-rev-layout="weak"] {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+  [data-rev-layout="weak"] > [data-rev-banner] {
+    grid-column: 1 / -1;
+  }
+  [data-rev-layout="weak"] > [data-rev-col="weak-primary"],
+  [data-rev-layout="weak"] > [data-rev-col="weak-secondary"] {
+    grid-column: span 1;
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+  }
   [data-saved-tests-grid] {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 10px !important;
@@ -2777,6 +2823,29 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     grid-column: span 7;
   }
   [data-rev-layout="dashboard"] > .lg\:col-span-5 {
+    grid-column: span 5;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  /* Weak Topics: same 7-5 split as the desktop shell, compacted for the
+     narrower landscape tablets that the desktop shell also serves (< 960 px) */
+  [data-rev-layout="weak"] {
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 10px;
+    align-items: start;
+  }
+  [data-rev-layout="weak"] > [data-rev-banner] {
+    grid-column: 1 / -1;
+  }
+  [data-rev-layout="weak"] > [data-rev-col="weak-primary"] {
+    grid-column: span 7;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  [data-rev-layout="weak"] > [data-rev-col="weak-secondary"] {
     grid-column: span 5;
     display: flex;
     flex-direction: column;
