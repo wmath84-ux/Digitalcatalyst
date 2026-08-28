@@ -25,6 +25,7 @@
 // lives in `src/index.css` under `@media (min-width: 1024px)`.
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import useScreenSize from "@/hooks/useScreenSize";
 import {
   Bell,
   CalendarDays,
@@ -158,6 +159,21 @@ export default function DesktopShell({
   pageSubtitle,
 }: DesktopShellProps) {
   const { user, logout } = useAuth();
+  const screenSize = useScreenSize();
+
+  // Set a body class for CSS-based theming based on screen size
+  useEffect(() => {
+    const updateBodyClass = () => {
+      const classes = ["is-desktop", "is-tablet", "is-mobile"];
+      classes.forEach((c) => document.body.classList.remove(c));
+      if (screenSize === "desktop") document.body.classList.add("is-desktop");
+      if (screenSize === "tablet") document.body.classList.add("is-tablet");
+      if (screenSize === "mobile") document.body.classList.add("is-mobile");
+    };
+    updateBodyClass();
+    window.addEventListener("resize", updateBodyClass);
+    return () => window.removeEventListener("resize", updateBodyClass);
+  }, [screenSize]);
   const { appName, logoUrl } = useBranding();
   const { cartIds, favoriteIds } = useCommerce();
   const { purchasedIds } = useCatalog();
@@ -456,12 +472,11 @@ export default function DesktopShell({
           {sidePanel ? (
             <aside
               data-desktop-side-panel
-              className="hidden w-[320px] shrink-0 xl:block"
+              className="w-[320px] shrink-0"
             >
               {sidePanel}
             </aside>
           ) : null}
-        </div>
       </div>
     </div>
   );

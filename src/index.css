@@ -2141,3 +2141,14 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   [data-profile-layout] > section { border-radius: 24px; }
   [data-profile-layout] > .grid { align-self: stretch; }
 }
+
+.is-desktop [data-desktop-side-panel],
+.is-tablet [data-desktop-side-panel],
+{
+  display: block;
+}
+
+.is-mobile [data-desktop-side-panel]
+{
+  display: none;
+}
