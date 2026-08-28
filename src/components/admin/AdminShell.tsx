@@ -185,7 +185,7 @@ export function AdminShell({
       ) : (
         <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur pt-[env(safe-area-inset-top)]">
           <div
-            className="mx-auto flex h-14 items-center gap-2 px-3 max-w-[480px] md:max-w-[calc(720px+240px)] md:pl-6 md:pr-8"
+            className="mx-auto flex h-14 items-center gap-2 px-3 max-w-[480px] sm:max-w-[720px] sm:px-6 md:max-w-[calc(720px+240px)] md:pl-6 md:pr-8"
             data-admin-topbar
           >
             <button
@@ -383,7 +383,7 @@ export function AdminShell({
         ) : null}
 
         <main
-          className="mx-auto max-w-[480px] px-3 py-3 md:max-w-[720px] md:px-6 md:py-5 lg:max-w-none lg:px-8 lg:py-8"
+          className="mx-auto max-w-[480px] px-3 py-3 sm:max-w-[720px] sm:px-6 sm:py-5 lg:max-w-none lg:px-8 lg:py-8"
           data-admin-main
         >
           {children}

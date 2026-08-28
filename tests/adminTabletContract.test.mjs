@@ -69,8 +69,20 @@ test("admin shell widens the top bar on tablet to clear the rail", () => {
 test("admin shell widens the main content to 720 px on tablet", () => {
   // Same content column the rest of the app uses on tablet.
   assert.match(shell, /data-admin-main/);
-  assert.match(shell, /md:max-w-\[720px\]/);
-  assert.match(shell, /md:px-6/);
+  assert.match(shell, /sm:max-w-\[720px\]/);
+  assert.match(shell, /sm:px-6/);
+});
+
+test("admin shell stops using the 480 px phone column from 640 px up", () => {
+  // The admin used to keep its 480 px phone column until `md`
+  // (768 px). On a laptop that is exactly the "phone-sized window
+  // dragged a little wider" case: the content froze at 480 px and a
+  // band of dead background opened up on both sides. The column now
+  // starts growing at `sm` (640 px) — the same threshold where the
+  // main app drops its phone frame — while the rail-driven tablet
+  // composition (`md:` / `lg:`) is unchanged.
+  assert.match(shell, /max-w-\[480px\] sm:max-w-\[720px\]/);
+  assert.doesNotMatch(shell, /md:max-w-\[720px\]/);
 });
 
 /* ------------------------------------------------------------------ */
