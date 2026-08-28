@@ -1,6 +1,6 @@
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import {
   getAuth,
@@ -31,7 +31,15 @@ try {
     console.error("Firebase initialization error:", error);
 }
 
-export const db = app ? getFirestore(app) : {} as any;
+function getDb() {
+  if (!app) return {} as any;
+  try {
+    return initializeFirestore(app, { ignoreUndefinedProperties: true });
+  } catch {
+    return getFirestore(app);
+  }
+}
+export const db = getDb();
 export const storage = app ? getStorage(app) : {} as any;
 
 function getFirebaseAuth() {
