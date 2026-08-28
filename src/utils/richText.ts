@@ -42,7 +42,7 @@ const ALLOWED_STYLES = new Set([
 const SAFE_URL = /^(https?:|mailto:|tel:)/i;
 const SAFE_IMAGE_URL = /^(https?:|data:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml);)/i;
 
-const escapeHtml = (value: string) =>
+export const escapeHtml = (value: string) =>
   value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -139,6 +139,83 @@ export const richTextToPlain = (html: string): string => {
     node.append(parsed.createTextNode(" "));
   });
   return (parsed.body.textContent || "").replace(/\s+/g, " ").trim();
+};
+
+// Block tags that can START a note's card preview — the first heading if the
+// note begins with one, otherwise its first paragraph / line of text.
+const FIRST_BLOCK_TAGS = "h1,h2,h3,h4,h5,h6,p,div,li,blockquote,pre,figcaption,dd,dt,td,th";
+
+const blockHasContent = (el: Element) =>
+  Boolean((el.textContent || "").replace(/\u200b/g, "").trim()) || Boolean(el.querySelector("img"));
+
+/**
+ * The FIRST block of a saved note — its first heading if the note starts
+ * with one, otherwise its first paragraph/line — returned as a single HTML
+ * fragment. The square saved-note card renders exactly this one block (with
+ * its original formatting: heading size, bold, colour, …) centred in the
+ * box, instead of dumping the whole note body onto the card. Everything
+ * after the first block is dropped.
+ */
+export const firstRichTextBlock = (html: string): string => {
+  const input = String(html || "");
+  if (!input.trim()) return "";
+  if (typeof window === "undefined" || typeof window.DOMParser === "undefined") {
+    return input;
+  }
+  const parsed = new window.DOMParser().parseFromString(`<body>${input}</body>`, "text/html");
+  const body = parsed.body;
+
+  // Bare text with no wrapper at all (contentEditable normally wraps, but a
+  // hand-written fragment might not) is itself the first block.
+  for (const node of Array.from(body.childNodes)) {
+    if (node.nodeType === 3 && String(node.textContent || "").trim()) {
+      return `<p>${escapeHtml(String(node.textContent || "").trim())}</p>`;
+    }
+  }
+
+  // Walk the blocks in document order. A container whose content lives
+  // entirely in a nested block is skipped (that nested block comes later and
+  // gets picked on its own) — but a container with its OWN text keeps its
+  // text: nested blocks are stripped from a clone, so
+  // `<div><p>Title</p></div>` yields just the title paragraph, while
+  // `<div>Hello<div>more</div></div>` yields `<div>Hello</div>`.
+  for (const el of Array.from(body.querySelectorAll(FIRST_BLOCK_TAGS))) {
+    if (!blockHasContent(el)) continue;
+    const clone = el.cloneNode(true) as Element;
+    clone.querySelectorAll(FIRST_BLOCK_TAGS).forEach((nested) => nested.remove());
+    if (blockHasContent(clone)) return clone.outerHTML;
+  }
+
+  // Last resort: an image on its own.
+  const image = body.querySelector("img");
+  return image ? image.outerHTML : "";
+};
+
+/**
+ * Pull the note's leading heading out as its TITLE: when the saved HTML
+ * starts with a heading block, that block becomes `heading` (plain text)
+ * and everything after it becomes `body`. A single `<hr>` divider directly
+ * after the heading is dropped — the editor re-adds it whenever a title is
+ * saved, so the round-trip is stable. Notes without a leading heading keep
+ * the whole content as the body.
+ */
+export const splitFirstHeading = (html: string): { heading: string; body: string } => {
+  const input = String(html || "");
+  if (!input.trim()) return { heading: "", body: "" };
+  if (typeof window === "undefined" || typeof window.DOMParser === "undefined") {
+    return { heading: "", body: input };
+  }
+  const parsed = new window.DOMParser().parseFromString(`<body>${input}</body>`, "text/html");
+  const body = parsed.body;
+  const first = body.firstElementChild;
+  if (first && /^H[1-6]$/i.test(first.tagName) && (first.textContent || "").trim()) {
+    const heading = (first.textContent || "").replace(/\u200b/g, "").trim();
+    const next = first.nextElementSibling;
+    if (next && next.tagName.toLowerCase() === "hr") next.remove();
+    first.remove();
+    return { heading, body: body.innerHTML.trim() };
+  }
+  return { heading: "", body: input };
 };
 
 /** Plain text → HTML, preserving line breaks and runs of spaces. */
