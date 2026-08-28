@@ -75,9 +75,14 @@ test("the overlay renders the mind map panel for its tab and degrades without on
 // Sheet sizing — the mind map claims half the screen
 // ---------------------------------------------------------------------------
 
-test("in landscape the mind map sheet claims 50% and always splits", () => {
+test("in landscape the mind map sheet claims 50% and splits while the sheet is open", () => {
   assert.match(overlay, /const DEFAULT_MINDMAP_SPLIT = 50;/);
-  assert.match(overlay, /const mindMapSplit = landscape && mindMapActive;/);
+  // The split follows `open` ON PURPOSE: tapping the same Mind map dock button
+  // closes the sheet but keeps the tab selected, and an un-gated split would
+  // leave the lesson shrunk to 50% with a blank half of the screen behind a
+  // sheet that is no longer there. On the next open the split is already true,
+  // so the sheet lands straight back in the swipe-and-adjust layout.
+  assert.match(overlay, /const mindMapSplit = landscape && mindMapActive && open;/);
   assert.match(overlay, /mindMapSplit \? mindMapSplitWidth : splitMode \? splitEditorWidth : sheetHeight/);
 });
 
@@ -261,8 +266,14 @@ test("nodes are hand-positionable — drag and drop anywhere, persisted per node
   assert.match(panel, /applyNodeChanges\(changes, current\)/);
   assert.match(panel, /onNodeDragStart=/);
   assert.match(panel, /collectSubtreeIds\(mind, node\.id\)/);
-  assert.match(panel, /position: \{ x: node\.position\.x, y: node\.position\.y \}/);
-  assert.match(panel, /setNodePosition\(current, node\.id, node\.position\.x, node\.position\.y\)/);
+  // The drop is committed as ONE RIGID GROUP through the model: the picked
+  // node is pinned at the drop point AND every already-pinned descendant of it
+  // travels by the same delta, so re-placing a branch head can never tear the
+  // hand-arranged shape beneath it apart.
+  assert.match(
+    panel,
+    /moveNodeSubtree\(current, node\.id, node\.position\.x, node\.position\.y, session\.origin\.x, session\.origin\.y\)/,
+  );
   // Buttons inside a node must never start a drag.
   assert.match(panel, /nodrag absolute top-1\/2/);
   assert.doesNotMatch(panel, /data-mind-node-collapse=/);
@@ -270,34 +281,37 @@ test("nodes are hand-positionable — drag and drop anywhere, persisted per node
 
 test("the dragged node tracks the pointer LIVE — the primary node included", () => {
   // Regression contract for the learner-reported bug: dragging the PRIMARY
-  // (root) node updated its location only on drop, while every other node
-  // was seen moving live. The drag loop must therefore write the dragged
-  // node's OWN live position on EVERY frame — never rely on React Flow's
-  // onNodesChange alone for the box under the finger (a parent drag's
-  // setNodes can win a stale frame and leave the centre behind).
-  // 1. The live-drag handler exists and runs against the drag session.
+  // (root) node updated its location only on drop, while every other node was
+  // seen moving live. The drag loop therefore writes ONE state update per
+  // frame — the picked node's live position plus its whole branch at the same
+  // offset — because two competing setNodes calls can win a stale frame and
+  // leave the centre behind.
+  // 1. The session is read on every change, and React Flow's own position
+  //    change for the picked node is the source of truth for that frame.
   assert.match(panel, /onNodeDrag=\{\(_event, node\) => \{/);
   assert.match(panel, /const session = dragSessionRef\.current;/);
-  // 2. The dragged node itself is written from `node.position` (live), not
-  //    left on its last committed layout spot until pointer-up.
-  assert.match(
-    panel,
-    /if \(item\.id === node\.id\) \{\s*return \{ \.\.\.item, position: \{ x: node\.position\.x, y: node\.position\.y \} \};\s*\}/,
-  );
-  // 3. Its branch rides along at the same rigid offset every frame.
-  assert.match(
-    panel,
-    /const start = session\.starts\.get\(item\.id\);\s*if \(!start\) return item;\s*return \{ \.\.\.item, position: \{ x: start\.x \+ dx, y: start\.y \+ dy \} \};/,
-  );
+  assert.match(panel, /changes\.find\(\(change\) => change\.type === "position" && change\.id === session\.id\)/);
+  assert.match(panel, /const next = applyNodeChanges\(changes, current\);/);
+  // 2. The frame's delta is measured against where the box stood at
+  //    pointer-down — not against its last committed layout spot.
+  assert.match(panel, /const dx = moved\.position\.x - session\.origin\.x;/);
+  assert.match(panel, /const dy = moved\.position\.y - session\.origin\.y;/);
+  // 3. Its branch rides along at the same rigid offset every frame, in the SAME
+  //    update, so head and descendants can never fall out of lock-step.
+  assert.match(panel, /if \(item\.id === session\.id \|\| !session\.moving\.has\(item\.id\)\) return item;/);
+  assert.match(panel, /return start \? \{ \.\.\.item, position: \{ x: start\.x \+ dx, y: start\.y \+ dy \} \} : item;/);
   // 4. Mid-drag, a layout pass must not snap nodes back to the tidy tree:
   //    live positions win while `draggingRef` is armed, and the flag is
   //    armed from drag START (before the first move can land).
   assert.match(panel, /onNodeDragStart=\{\(_event, node\) => \{\s*draggingRef\.current = true;/);
   assert.match(panel, /if \(!draggingRef\.current\) return layoutNodes;/);
   assert.match(panel, /const live = new Map\(prev\.map\(\(node\) => \[node\.id, node\.position\]\)\);/);
-  // 5. The root's drop is committed through the map-level rootX/rootY pin
-  //    (utils/mindMapTree.js), so the live position survives save + reload.
-  assert.match(panel, /setNodePosition\(current, node\.id, node\.position\.x, node\.position\.y\)/);
+  // 5. The drop (the centre's map-level rootX/rootY pin included) is committed
+  //    through the model, so the live position survives save + reload.
+  assert.match(
+    panel,
+    /moveNodeSubtree\(current, node\.id, node\.position\.x, node\.position\.y, session\.origin\.x, session\.origin\.y\)/,
+  );
 });
 
 test("zoom is available on touch as well as by button", () => {

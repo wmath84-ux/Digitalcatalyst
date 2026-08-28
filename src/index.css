@@ -1059,18 +1059,21 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 
 /* Course Player — the MIND MAP LIBRARY (every map of the module at once) is
    the map panel's twin of the notes grid, so it re-uses the notes grid's
-   tiling function: `grid-cols-2 sm:grid-cols-3` counts the VIEWPORT, while
-   the split sheet is only a slice of it — three columns inside a 25% sheet
-   left ~144 px cards, and inside a 10% sheet ~48 px grey slivers, which is
-   the "chhote aur grey boxes" bug the learner reported. auto-fill instead
-   counts the SPACE THE GRID ACTUALLY GOT, so a squeezed sheet drops to 2
-   columns, then 1, and every card keeps its title, its tint and its two
-   action buttons. Same scoping as the notes rule (the landscape split); the
-   portrait sheet is full-bleed, where the phone columns already fit.
-   The `min(…, 100%)` guard is the one addition: a sheet dragged to its 10%
+   tiling function: `grid-cols-2 sm:grid-cols-3` counts the VIEWPORT, while a
+   split sheet is only a slice of it — three columns inside a 25% sheet left
+   ~144 px cards, and inside a 10% sheet ~48 px grey slivers, which is the
+   "chhote aur grey boxes" bug the learner reported. auto-fill instead counts
+   the SPACE THE GRID ACTUALLY GOT, so a squeezed sheet drops to 2 columns,
+   then 1, and every card keeps its title, its tint and its two action
+   buttons.
+   Deliberately NOT gated on `data-split-kind` (the notes rule is): the map
+   library is the panel's HOME screen and it owns the whole sheet, so the same
+   measurement should also hold for the portrait sheet on small phones instead
+   of leaving a second, viewport-based rule in charge there.
+   The `min(…, 100%)` guard is the other addition: a sheet dragged to its 10%
    minimum is narrower than one 160 px card, and the grid must then shrink to
    the container instead of overflowing it. */
-[data-course-overlay][data-split-kind="mindmap"] [data-course-mindmap-map-grid] {
+[data-course-mindmap-map-grid] {
   grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
 }
 
