@@ -143,7 +143,16 @@ export default function NotesPanel({
 
   // The overlay expands the notes sheet while the editor is open so the
   // writing surface gets the full notes area.
-  useEffect(() => { onEditorOpenChange?.(editorOpen); }, [editorOpen, onEditorOpenChange]);
+  //
+  // Reported on EVERY render (not only when `editorOpen` changes): the
+  // sheet closes and reopens WITHOUT unmounting this panel (the hidden
+  // sheet stays in the tree), and a deps-gated effect would not re-fire
+  // after a reopen when the editor state never changed in between — which
+  // is exactly how the overlay's mirror went stale and the sheet came back
+  // as a plain overlay instead of the landscape split. Reporting the same
+  // boolean again is a cheap no-op for React (it bails out), so this costs
+  // nothing.
+  useEffect(() => { onEditorOpenChange?.(editorOpen); });
   useEffect(() => () => { onEditorOpenChange?.(false); }, [onEditorOpenChange]);
 
   // ── Auto-save helpers (stable refs so they work inside cleanup effects) ─
