@@ -18,6 +18,12 @@
 //                    ANYWHERE by hand. The drop is remembered per node, so
 //                    the hand-arranged map survives save / reload. Nodes the
 //                    learner never dragged keep riding the tidy-tree layout.
+//                    Whichever side of its PARENT a node ends up on is also
+//                    which way it FACES: the anchor dot swivels to the edge
+//                    pointing at the parent, the `+` to the opposite edge, and
+//                    the branch grows away from the parent — re-derived live
+//                    while the finger is down, so a node can never keep its
+//                    wire hooked to the face pointing into empty space.
 //   Enter / blur   → save the new topic and close the editor. Long text
 //                    wraps inside the editor (the box grows while typing),
 //                    so nothing overflows the node sideways.
@@ -104,6 +110,7 @@ import {
   autoArrangeMindMap,
   collectSubtreeIds,
   countNodes,
+  facingBetweenBoxes,
   hasManualPositions,
   layoutMindMap,
   maxDepth,
@@ -150,7 +157,14 @@ const loadDblTapDelete = (): boolean => {
 interface MindNodeData extends Record<string, unknown> {
   topic: string;
   depth: number;
+  /** The wing the tidy tree built this branch on (structural, from the map). */
   side: "left" | "right" | null;
+  /**
+   * Which side of its PARENT the box actually sits on — recomputed from the
+   * live geometry, so a node dragged across the centre flips its anchor dot,
+   * its `+` and its rope together instead of wiring backwards.
+   */
+  facing: "left" | "right" | null;
   collapsed: boolean;
   childCount: number;
   isRoot: boolean;
@@ -175,12 +189,24 @@ const DOUBLE_TAP_MS = 350;
 const EDITOR_MIN_HEIGHT_PX = 17;
 /** The editor stops growing here (~7 lines) and scrolls internally instead. */
 const EDITOR_MAX_HEIGHT_PX = 119;
+/**
+ * Shared empty "live facing" map. One frozen instance means "no override", so
+ * clearing overrides at the end of a drag hands back the SAME object identity
+ * React already had and the state update bails out instead of re-rendering.
+ */
+const EMPTY_FACING: Record<string, "left" | "right"> = Object.freeze({});
 
 /**
  * One mind map box. The `+` sits just outside the measured box on the side
- * facing away from the root, so it never changes the node's own width — the
- * layout measured this box in `utils/mindMapTree.js` and the two must agree
- * pixel for pixel or siblings would overlap.
+ * facing AWAY from the parent, and the anchor dot sits on the opposite face
+ * (facing the parent), so neither changes the node's own width — the layout
+ * measured this box in `utils/mindMapTree.js` and the two must agree pixel for
+ * pixel or siblings would overlap.
+ *
+ * Which side that is comes from the node's FACING — the box's real position
+ * relative to its parent — and not from the wing the branch was created on.
+ * Drag a node from the left of the centre to the right and the dot, the rope
+ * and the `+` all swing to the opposite edge, live while the finger is down.
  *
  * Single-tap on a node opens the inline editor right where the topic was
  * rendered, so the soft keyboard lands in the same place. The editor is a
@@ -200,6 +226,7 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
     topic,
     depth,
     side,
+    facing,
     isRoot,
     selected,
     editing,
@@ -304,7 +331,15 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
           ? "border-indigo-400/25 bg-indigo-500/10 text-indigo-50"
           : "border-white/12 bg-white/6 text-slate-100";
 
-  const facesLeft = side === "left";
+  // ── Which way the box faces ────────────────────────────────────────────
+  // `facing` is the GEOMETRY — which side of its parent the box actually ended
+  // up on — not the wing the branch was created on. A node sitting WEST of its
+  // parent takes the rope on its EAST edge (the face pointing at the parent)
+  // and grows its own children to the WEST, so the dot goes right and the `+`
+  // left. Drag that same node to the EAST of its parent and the two swap: dot
+  // left, `+` right. One rule, applied in both directions, so a node can never
+  // keep an anchor (or a wire) hooked to the face pointing into empty space.
+  const facesLeft = facing === "left";
 
   // ── Tap + double-tap detection (pointer events, see header) ────────────
   const handlePointerDown = (event: React.PointerEvent) => {
@@ -350,7 +385,9 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
   // on each side — so the smoothstep router always picks the cleanest path
   // regardless of which direction the parent sits. All four are visually
   // invisible (opacity-0, pointer-events-none) so they never interfere with
-  // the node's own tap-to-edit / drag-to-move interaction.
+  // the node's own tap-to-edit / drag-to-move interaction. The one dot the
+  // learner DOES see (below) is a copy of whichever handle the rope is
+  // currently attached to, so the socket and the wire can never disagree.
   const handleStyle: React.CSSProperties = {
     opacity: 0,
     pointerEvents: "none",
@@ -366,6 +403,7 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
       data-mind-node={id}
       data-mind-node-depth={depth}
       data-mind-node-side={side ?? "center"}
+      data-mind-node-facing={facing ?? "center"}
       data-mind-node-selected={selected ? "true" : "false"}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
@@ -437,6 +475,24 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
           <span className="line-clamp-4 min-h-0 flex-1 break-words">{topic}</span>
         )}
       </div>
+
+      {/* ── The anchor dot: which face this box is wired to ───────────────
+          A small mark on the edge that faces the parent, i.e. exactly where
+          the rope plugs in. It is the mirror of the `+` below — one face in,
+          the opposite face out — so a node dropped on the other side of its
+          parent visibly turns around instead of keeping its socket (and its
+          wire) hooked to the wrong edge. The centre has no parent to face, so
+          it carries no dot at all. */}
+      {isRoot ? null : (
+        <span
+          aria-hidden="true"
+          data-mind-node-anchor={id}
+          data-anchor-side={facesLeft ? "right" : "left"}
+          className={`pointer-events-none absolute top-1/2 h-[7px] w-[7px] -translate-y-1/2 rounded-full ${
+            facesLeft ? "-right-[3.5px]" : "-left-[3.5px]"
+          }`}
+        />
+      )}
 
       {/* ── The `+`: one tap appends a child to THIS node ──────────────── */}
       <button
@@ -714,6 +770,60 @@ function MindMapCanvas(props: MindMapPanelProps) {
 
   const layout = useMemo(() => layoutMindMap(mind), [mind]);
 
+  // ── Facing, live ───────────────────────────────────────────────────────
+  // `layoutMindMap` resolves a `facing` for every box (which side of its
+  // parent it really ends up on), so a map full of hand-placed nodes wires up
+  // correctly on the very first paint. While a drag is RUNNING the layout is
+  // deliberately frozen — React Flow is moving the boxes in its own state — so
+  // the dragged node's facing is recomputed here from the live pointer spot.
+  //
+  // Only the node UNDER THE FINGER can change facing mid-drag: a branch
+  // travels rigidly, so nothing inside the group moves relative to anything
+  // else, and the parent above the group never moves at all.
+  const facingOverrideRef = useRef<Record<string, "left" | "right">>(EMPTY_FACING);
+  const [facingOverride, setFacingOverride] = useState<Record<string, "left" | "right">>(EMPTY_FACING);
+
+  // Size / position lookup the drag handler needs, keyed by node id.
+  const boxById = useMemo(() => new Map(layout.nodes.map((node) => [node.id, node])), [layout.nodes]);
+  const parentById = useMemo(
+    () => new Map(mind.nodes.map((node) => [String(node.id), String(node.parentId)])),
+    [mind.nodes],
+  );
+
+  /**
+   * Flip the picked node's anchor to the face that now points at its parent.
+   * Runs on every pointer move of a drag; it only ever writes state when the
+   * answer actually changes, so a long drag costs zero extra renders.
+   */
+  const syncDragFacing = useCallback(
+    (nodeId: string, x: number) => {
+      const parentId = parentById.get(nodeId);
+      const parent = parentId ? boxById.get(parentId) : undefined;
+      const self = boxById.get(nodeId);
+      if (!parent || !self) return;
+      const facing = facingBetweenBoxes(
+        { x: parent.x, width: parent.width },
+        { x, width: self.width },
+        // A near-tie keeps the answer the map already settled on (its resolved
+        // facing, or the wing it was created on) instead of flicking between
+        // two faces on a one-pixel horizontal wobble.
+        self.facing ?? self.side ?? undefined,
+      );
+      const current = facingOverrideRef.current;
+      if (current[nodeId] === facing) return;
+      const next = { ...current, [nodeId]: facing };
+      facingOverrideRef.current = next;
+      setFacingOverride(next);
+    },
+    [boxById, parentById],
+  );
+
+  const clearDragFacing = useCallback(() => {
+    if (facingOverrideRef.current === EMPTY_FACING) return;
+    facingOverrideRef.current = EMPTY_FACING;
+    setFacingOverride(EMPTY_FACING);
+  }, []);
+
   // Keep the node being typed into in view. A branch added at the edge of a
   // wide map would otherwise appear off-screen, and the learner would have no
   // idea their `+` tap did anything.
@@ -847,6 +957,10 @@ function MindMapCanvas(props: MindMapPanelProps) {
         topic: topicById.get(placed.id) || "Idea",
         depth: placed.depth,
         side: placed.side,
+        // Live drag overrides win while the finger is down (see syncDragFacing);
+        // otherwise the layout's resolved geometry decides. The centre has no
+        // parent to face, so it keeps `null` and renders no anchor dot.
+        facing: placed.isRoot ? null : (facingOverride[placed.id] ?? placed.facing),
         collapsed: placed.collapsed,
         childCount: placed.childCount,
         isRoot: placed.isRoot,
@@ -863,6 +977,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
     }));
   }, [
     layout,
+    facingOverride,
     mind.nodes,
     mind.rootTopic,
     selectedId,
@@ -922,13 +1037,16 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const edges: Edge[] = useMemo(
     () =>
       layout.edges.map((edge) => {
-        // For left-side branches: parent exports from its left handle,
-        // child receives on its right handle.
-        // For right-side (and root) branches: parent exports from its right
-        // handle, child receives on its left handle.
+        // A rope plugs into the two faces that point at each other: the child
+        // receives it on the edge facing its parent, the parent exports from
+        // the edge facing the child. Both come from `facing` — the RESOLVED
+        // geometry of the two boxes — and never from the wing the branch was
+        // created on. Keying these on the stored side is what made a node
+        // dragged across its parent keep wiring backwards, which turned the
+        // whole map into a knot of crossing ropes.
         // The stroke reads per-theme CSS variables off the shell so a theme
         // flip recolours every wire without re-deriving the edges.
-        const goesLeft = edge.side === "left";
+        const goesLeft = (facingOverride[edge.target] ?? edge.facing ?? "right") === "left";
         return {
           id: edge.id,
           source: edge.source,
@@ -943,7 +1061,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           },
         };
       }),
-    [layout.edges],
+    [layout.edges, facingOverride],
   );
 
   const save = SAVE_COPY[status] || SAVE_COPY.idle;
@@ -1015,19 +1133,33 @@ function MindMapCanvas(props: MindMapPanelProps) {
               starts,
               moving,
             };
+            // Arm the live facing with where the node stands right now, so the
+            // first move can only ever CHANGE it (an untouched node keeps the
+            // face the layout resolved for it).
+            syncDragFacing(node.id, node.position.x);
           }}
-          onNodeDrag={() => {
+          onNodeDrag={(_event, node) => {
             // The actual live movement of the node AND its whole connected
             // branch is applied in `onNodesChange` above — one position
             // change per frame, one state update. This handler only marks
             // that a real move happened, so the click that trails the drop
             // is never mistaken for a tap that should open the editor.
             dragMovedRef.current = true;
+            // …and re-derives which face of the box points at the parent, so
+            // the anchor dot, the rope and the `+` swing round the moment the
+            // node crosses over — the learner sees the wire re-attach while
+            // dragging, not only after the drop.
+            syncDragFacing(node.id, node.position.x);
           }}
           onNodeDragStop={(_event, node) => {
             const session = dragSessionRef.current;
             dragSessionRef.current = null;
             draggingRef.current = false;
+            // The drop below commits the new position into the map, so the
+            // layout re-derives every facing from it. Hand the drag's temporary
+            // answer back here: no override ever outlives the finger (and a
+            // clear back to the shared empty object costs no re-render).
+            clearDragFacing();
             // React Flow fires drag start/stop even for a PLAIN TAP (its
             // nodeDragThreshold is 0), so guard on real travel: a tap must
             // never pin the node — every tapped node would silently freeze
@@ -1156,7 +1288,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
                   fake single card — the grid is this panel's first screen, so
                   it should never look emptier than it really is. */}
               {mapsLoading ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-loading>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-loading data-course-mindmap-map-grid="true">
                   {[0, 1, 2].map((index) => (
                     <div
                       key={index}
@@ -1165,17 +1297,15 @@ function MindMapCanvas(props: MindMapPanelProps) {
                   ))}
                 </div>
               ) : (
-              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-list>
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-course-mindmap-map-list data-course-mindmap-map-grid="true">
                 {maps.map((entry) => {
                   const active = entry.mapKey === activeMapKey;
                   const renaming = renamingKey === entry.mapKey;
                   return (
                     <li
                       key={entry.mapKey}
-                      className={`relative flex aspect-square flex-col overflow-hidden rounded-2xl p-2.5 ring-1 transition ${
-                        active
-                          ? "bg-violet-500/15 ring-violet-400/60"
-                          : "bg-[var(--mm-soft)] ring-[var(--mm-border)] hover:bg-[var(--mm-soft-hover)]"
+                      className={`relative flex aspect-square min-h-[104px] flex-col overflow-hidden rounded-2xl border p-2.5 transition ${
+                        active ? "border-violet-400/70" : "border-[var(--mm-border)]"
                       }`}
                       data-course-mindmap-map-card
                       data-map-key={entry.mapKey}

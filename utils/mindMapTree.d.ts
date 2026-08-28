@@ -60,6 +60,28 @@ export interface LayoutOptions extends MeasureOptions {
   measure?: MeasureOptions;
 }
 
+/** A box the layout can measure — a laid-out node, or a live drag position. */
+export interface FacingBox {
+  x: number;
+  width?: number;
+  /** Structural wing, consulted only when the geometry is a tie. */
+  side?: MindMapSide;
+}
+
+/** Which way a box faces its parent: the side its anchor dot sits on. */
+export type MindMapFacing = "left" | "right" | null;
+
+/** Inside this many px of the parent's centre the facing falls back to `side`. */
+export const FACING_TIE_PX: number;
+
+/**
+ * `"left"` when `child` sits west of `parent`, `"right"` when east — measured
+ * from RESOLVED positions, so a hand-dragged drop re-anchors the rope on the
+ * face that actually points at the parent. Near-ties fall back to the branch's
+ * structural side (or the explicit `fallback`) instead of flickering.
+ */
+export function facingBetweenBoxes(parent: FacingBox | null, child: FacingBox | null, fallback?: "left" | "right"): "left" | "right";
+
 /** One positioned box from `layoutMindMap`, in React Flow's top-left space. */
 export interface LaidOutNode {
   id: string;
@@ -68,7 +90,14 @@ export interface LaidOutNode {
   width: number;
   height: number;
   depth: number;
+  /** The wing the tidy tree was told to build this branch on. */
   side: MindMapSide;
+  /**
+   * Which side of its PARENT the box actually ends up on — `null` for the
+   * centre. The wire anchor and the `+` follow this, never `side`, so a node
+   * dragged across the centre re-anchors itself instead of wiring backwards.
+   */
+  facing: MindMapFacing;
   collapsed: boolean;
   childCount: number;
   isRoot: boolean;
@@ -81,6 +110,8 @@ export interface LaidOutEdge {
   source: string;
   target: string;
   side: MindMapSide;
+  /** The child's resolved facing — which handles the rope attaches to. */
+  facing: Exclude<MindMapFacing, null>;
 }
 
 export interface MindMapBounds {

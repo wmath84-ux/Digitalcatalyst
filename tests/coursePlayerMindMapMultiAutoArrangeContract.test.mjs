@@ -42,6 +42,9 @@ const repoRoot = path.join(__dirname, "..");
 const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const panel = readSource("src/course/MindMapPanel.tsx");
+const notesPanel = readSource("src/course/NotesPanel.tsx");
+const overlay = readSource("src/course/CourseOverlay.tsx");
+const styles = readSource("src/index.css");
 const hook = readSource("src/course/useCourseMindMap.ts");
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
 const rules = readSource("firestore.rules");
@@ -276,7 +279,14 @@ test("the panel ships a notes-style card list of the module's maps", () => {
   assert.match(panel, /data-course-mindmap-delete-map/);
   // The library slides over the canvas so the diagram surface stays clean
   // when it is closed — the mind map tab has no header of its own.
-  assert.match(panel, /const \[libraryOpen, setLibraryOpen\] = useState\(false\);/);
+  //
+  // It is also the panel's HOME screen: it is open on mount, and it comes
+  // straight back (with any half-finished node edit cleared) every time the
+  // sheet is re-opened, so the learner always PICKS a map — or taps "New map"
+  // — instead of landing on whatever canvas was left behind last time.
+  assert.match(panel, /const \[libraryOpen, setLibraryOpen\] = useState\(true\);/);
+  assert.match(panel, /if \(open && !prevOpenRef\.current\) \{/);
+  assert.match(panel, /setLibraryOpen\(true\);/);
 });
 
 test("the map library's delete acts on a MAP, the toolbar trash on a BRANCH", () => {
@@ -315,4 +325,66 @@ test("the rules tie every map document id to its own map key", () => {
   assert.match(block, /request\.resource\.data\.mapKey\.matches\('\^\[a-z0-9-\]\+\$'\)/);
   assert.match(block, /request\.resource\.data\.mapKey\.size\(\) <= 40/);
   assert.match(block, /allow delete: if isOwner\(uid\) \|\| isAdmin\(\);/, "the learner must be able to delete a map");
+});
+
+// ---------------------------------------------------------------------------
+// 2e. The library grid sizes itself by the space it GOT (notes parity)
+//
+// Reported by the learner: in the landscape split the map cards collapsed
+// into tiny grey slivers while the notes list, in the very same narrow sheet,
+// stayed comfortable. Cause: the grid's `grid-cols-2 sm:grid-cols-3` classes
+// count the VIEWPORT, and the sheet is only a slice of it. The notes panel
+// escaped this because `src/index.css` re-tiles ITS grid on the container
+// width (`repeat(auto-fill, minmax(…))`); the library had no such rule.
+// ---------------------------------------------------------------------------
+
+test("the map library re-uses the notes grid's own tiling function", () => {
+  // The library opts into the shared rule with the same kind of hook the notes
+  // list uses (`data-course-notes-grid`), on BOTH its states — cards and
+  // skeleton — so a loading grid never tiles differently than the real one.
+  assert.match(notesPanel, /data-course-notes-grid="true"/);
+  const grids = [...panel.matchAll(/data-course-mindmap-map-grid="true"/g)];
+  assert.equal(grids.length, 2, "the card list AND its skeleton placeholder must both tile by width");
+
+  // Same function, same floor: auto-fill over 160 px, i.e. the grid is measured
+  // by the space it got and never by a fixed column count.
+  const notesRule = styles.match(/\[data-course-notes-grid\][^{]*\{[^}]*\}/);
+  const libraryRule = styles.match(/^\[data-course-mindmap-map-grid\] \{[^}]*\}/m);
+  assert.ok(notesRule && libraryRule, "both grids need a tiling rule in the stylesheet");
+  for (const rule of [notesRule[0], libraryRule[0]]) {
+    assert.match(rule, /grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(/, "tile by the width the grid got");
+    assert.match(rule, /160px/, "a card never shrinks below a readable 160 px");
+    assert.doesNotMatch(rule, /grid-template-columns:\s*repeat\((2|3)/, "no fixed column count");
+  }
+  // The library rule starts its own line with a BARE selector on purpose: the
+  // notes grid only needs rescuing inside the landscape split, while the map
+  // library is the panel's home screen and owns the whole sheet — so the same
+  // measurement has to hold for the portrait sheet too instead of a second,
+  // viewport-based rule taking over there.
+  assert.doesNotMatch(libraryRule[0], /data-split-kind/, "no orientation/split mode may be excluded");
+  // …and a sheet dragged to its 10% minimum is narrower than one 160 px card,
+  // so the grid must shrink to the container rather than overflow it.
+  assert.match(libraryRule[0], /minmax\(min\(160px, 100%\), 1fr\)/);
+});
+
+test("the library is still mounted inside the sheet the split rule targets", () => {
+  // Parity depends on the panel living under the element that reports which
+  // sheet is open — the same ancestor the notes grid hangs its rule off.
+  assert.match(overlay, /data-course-overlay\b/);
+  assert.match(overlay, /data-split-kind=\{mindMapSplit \? "mindmap" : splitMode \? "notes" : "none"\}/);
+  assert.match(panel, /data-course-mindmap-library/);
+});
+
+test("a map card keeps a floor of height and a real surface, never a flat grey tile", () => {
+  // A square card in a squeezed column used to collapse into a grey blob: no
+  // minimum height, and the background was a 6% white wash. The height floor
+  // keeps the two action buttons inside the card, and the surface — including
+  // the "this map is open right now" violet state — is painted in CSS so both
+  // themes get a lifted card.
+  assert.match(panel, /data-course-mindmap-map-card/);
+  assert.match(panel, /aspect-square min-h-\[104px\]/);
+  assert.match(styles, /\[data-course-mindmap-map-card\]\s*\{[^}]*background:/);
+  assert.match(styles, /\[data-course-mindmap-map-card\]\s*\{[^}]*box-shadow:/);
+  assert.match(styles, /\[data-course-mindmap-map-card\]\[data-active="true"\]/);
+  assert.match(styles, /\[data-mindmap-theme="light"\] \[data-course-mindmap-map-card\]/);
 });
