@@ -446,12 +446,54 @@ export const DEFAULT_LAYOUT = Object.freeze({
 });
 
 /**
+ * Inside this many px of its parent's centre a box is "straight above/below"
+ * it — there is no honest left or right there, so the facing falls back to the
+ * branch's structural side instead of flipping on a single pixel of jitter.
+ */
+export const FACING_TIE_PX = 8;
+
+/**
+ * Which side of `parent` the box `child` actually hangs off, measured from
+ * RESOLVED positions — the tidy tree's spots and a hand-dragged drop alike.
+ * `"left"` when the child sits west of the parent, `"right"` when east.
+ *
+ * This is the one place left/right is decided, so the editor (wire anchor +
+ * `+`), the layout and the drag preview can never disagree. When the geometry
+ * is a tie there is no honest answer, and the caller's `fallback` is used —
+ * normally the child box's own structural `side`, or the facing it had a
+ * moment ago while it is being dragged.
+ */
+export const facingBetweenBoxes = (parent, child, fallback) => {
+  const tied =
+    child?.side === "left" || child?.side === "right"
+      ? child.side
+      : fallback === "left" || fallback === "right"
+        ? fallback
+        : "right";
+  if (!parent || !child) return tied;
+  const parentCentre = Number(parent.x) + (Number(parent.width) || 0) / 2;
+  const childCentre = Number(child.x) + (Number(child.width) || 0) / 2;
+  if (!Number.isFinite(parentCentre) || !Number.isFinite(childCentre)) return tied;
+  const dx = childCentre - parentCentre;
+  if (Math.abs(dx) <= FACING_TIE_PX) return tied;
+  return dx < 0 ? "left" : "right";
+};
+
+/**
  * Arrange a mind map as a classic two-sided tidy tree.
  *
  * Returns React Flow-ready records: `x`/`y` are the box's TOP-LEFT corner
  * (React Flow's own convention), `width`/`height` are the measured box, and
  * `edges` carries the parent→child links. The root sits at x-centre 0 with
  * its right branches to the east and left branches to the west.
+ *
+ * Every box also carries a `facing`: which side of ITS parent it really ends
+ * up on (`side` is only the wing the tree was told to build). The editor wires
+ * its rope to the facing side and puts the `+` on the opposite one, so a node
+ * dragged around the centre never keeps an anchor pointing into empty space.
+ * A hand-placed node also GROWS its own children on the side it faces —
+ * otherwise a branch parked east of the centre would keep hanging westward,
+ * straight back across every other rope.
  *
  * Collapsed branches are treated as leaves: their hidden descendants are
  * omitted from both the node list and the vertical extent, which is what makes
@@ -512,7 +554,12 @@ export const layoutMindMap = (mind, options = {}) => {
   // `shiftX/shiftY` is the accumulated manual offset inherited from ancestors;
   // children of a hand-placed node are placed relative to its PURE auto spot
   // plus that shift, so the branch moves as one rigid group.
-  const place = (node, side, top, depth, parentX, parentWidth, shiftX, shiftY) => {
+  //
+  // `parentActualX` is the parent's RESOLVED centre-box origin — its hand-dragged
+  // spot when it has one. It is only used to work out which way this box faces
+  // its parent, never to place it (placement stays on the tidy tree + inherited
+  // shift, so the group never tears).
+  const place = (node, side, top, depth, parentX, parentWidth, shiftX, shiftY, parentActualX = null) => {
     const span = spanOf(node);
     const { width, height } = sizeOf(node);
     const centerY = top + span / 2;
@@ -535,6 +582,16 @@ export const layoutMindMap = (mind, options = {}) => {
     const nextShiftX = x - autoX;
     const nextShiftY = y - autoY;
 
+    // Which side of the parent this box ENDS UP on. On an untouched map that is
+    // simply the structural `side` (the maths agree pixel for pixel), and it
+    // only ever differs once a learner parks a node on the far side of its
+    // parent — which is exactly when the old wing-based anchor started drawing
+    // ropes across the whole diagram.
+    const facing =
+      depth === 0
+        ? null
+        : facingBetweenBoxes({ x: parentActualX, width: parentWidth }, { x, width }, side);
+
     nodes.push({
       id: String(node.id),
       x: Math.round(x * 100) / 100,
@@ -543,6 +600,7 @@ export const layoutMindMap = (mind, options = {}) => {
       height,
       depth,
       side: branchSide,
+      facing,
       collapsed: isCollapsed(node.id),
       childCount: visibleChildren(node.id).length,
       isRoot: depth === 0,
@@ -556,8 +614,12 @@ export const layoutMindMap = (mind, options = {}) => {
     let cursor = centerY - totalKids / 2;
     for (const kid of kids) {
       edges.push({ id: `e-${node.id}-${kid.id}`, source: String(node.id), target: String(kid.id), side });
-      const kidSide = depth === 0 ? (kid.side === "left" ? "left" : "right") : side;
-      place(kid, kidSide, cursor, depth + 1, autoX, width, nextShiftX, nextShiftY);
+      // Root-level branches pick their wing from the record (that is what
+      // `side` means). Deeper nodes inherit their parent's FACING rather than
+      // its wing, so a branch always grows away from the centre it hangs off —
+      // even after the learner dragged its head across to the other side.
+      const kidSide = depth === 0 ? (kid.side === "left" ? "left" : "right") : facing ?? side;
+      place(kid, kidSide, cursor, depth + 1, autoX, width, nextShiftX, nextShiftY, x);
       cursor += spanOf(kid) + layout.vGap;
     }
   };
@@ -565,6 +627,14 @@ export const layoutMindMap = (mind, options = {}) => {
   const rootNode = { id: ROOT_ID, topic: mind.rootTopic || "" };
   const rootSpan = spanOf(rootNode);
   place(rootNode, "right", -rootSpan / 2, 0, 0, 0, 0, 0);
+
+  // A rope's endpoints live on the faces that point at each other, so every
+  // edge takes the facing its CHILD resolved to. The editor reads this instead
+  // of the structural side, which is what keeps wires honest after a drag.
+  const facingById = new Map(nodes.map((item) => [item.id, item.facing]));
+  for (const edge of edges) {
+    edge.facing = facingById.get(edge.target) ?? edge.side ?? "right";
+  }
 
   const bounds = nodes.reduce(
     (box, node) => ({

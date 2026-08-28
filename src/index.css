@@ -1057,6 +1057,73 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 
+/* Course Player — the MIND MAP LIBRARY (every map of the module at once) is
+   the map panel's twin of the notes grid, so it re-uses the notes grid's
+   tiling function: `grid-cols-2 sm:grid-cols-3` counts the VIEWPORT, while
+   the split sheet is only a slice of it — three columns inside a 25% sheet
+   left ~144 px cards, and inside a 10% sheet ~48 px grey slivers, which is
+   the "chhote aur grey boxes" bug the learner reported. auto-fill instead
+   counts the SPACE THE GRID ACTUALLY GOT, so a squeezed sheet drops to 2
+   columns, then 1, and every card keeps its title, its tint and its two
+   action buttons. Same scoping as the notes rule (the landscape split); the
+   portrait sheet is full-bleed, where the phone columns already fit.
+   The `min(…, 100%)` guard is the one addition: a sheet dragged to its 10%
+   minimum is narrower than one 160 px card, and the grid must then shrink to
+   the container instead of overflowing it. */
+[data-course-overlay][data-split-kind="mindmap"] [data-course-mindmap-map-grid] {
+  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
+}
+
+/* Mind map library cards: the same raised-surface treatment the note squares
+   get, so a card reads as a card (tinted, lifted, edged) at any grid width
+   instead of a flat grey tile — and the map that is open right now stays
+   clearly violet. Unlayered, so these win over the Tailwind state classes on
+   the same element; the border colour still comes from JSX. */
+[data-course-mindmap-map-card] {
+  background:
+    linear-gradient(165deg, rgb(167 139 250 / 0.18), rgb(99 102 241 / 0.07) 46%, rgb(2 6 23 / 0.28)),
+    var(--mm-surface);
+  box-shadow:
+    0 16px 28px -14px rgb(76 29 149 / 0.6),
+    0 8px 16px -10px rgb(2 6 23 / 0.55);
+}
+
+[data-course-mindmap-map-card]:hover {
+  background:
+    linear-gradient(165deg, rgb(167 139 250 / 0.26), rgb(99 102 241 / 0.1) 46%, rgb(2 6 23 / 0.24)),
+    var(--mm-surface);
+}
+
+[data-course-mindmap-map-card][data-active="true"] {
+  background:
+    linear-gradient(165deg, rgb(139 92 246 / 0.42), rgb(99 102 241 / 0.24) 52%, rgb(139 92 246 / 0.16)),
+    var(--mm-surface);
+  box-shadow:
+    0 16px 30px -12px rgb(124 58 237 / 0.65),
+    0 0 0 1px rgb(167 139 250 / 0.5);
+}
+
+.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-map-card] {
+  background:
+    linear-gradient(165deg, rgb(237 233 254 / 0.95), rgb(224 231 255 / 0.6) 48%, #ffffff);
+  box-shadow:
+    0 14px 26px -14px rgb(76 29 149 / 0.3),
+    0 6px 14px -10px rgb(15 23 42 / 0.18);
+}
+
+.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-map-card]:hover {
+  background:
+    linear-gradient(165deg, rgb(221 214 254 / 1), rgb(212 222 255 / 0.75) 48%, #ffffff);
+}
+
+.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-map-card][data-active="true"] {
+  background:
+    linear-gradient(165deg, rgb(196 181 253 / 0.9), rgb(199 210 254 / 0.6) 52%, #ffffff);
+  box-shadow:
+    0 14px 26px -12px rgb(109 40 217 / 0.35),
+    0 0 0 1px rgb(139 92 246 / 0.45);
+}
+
 /* Course Player — square note cards lift off the panel with a mixed
    blue gradient glow so the boxes stay readable against both themes. */
 [data-course-notes-grid] [data-course-note] {
@@ -1954,6 +2021,28 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   min-height: unset !important;
   border: none !important;
   background: transparent !important;
+}
+
+/* ── The anchor dot — the socket the rope plugs into ─────────────────────
+   React Flow's own handles are deliberately invisible (above), so the map
+   needs its OWN mark for "which face of this box is wired to my parent":
+   a solid violet bead straddling that edge, haloed in the canvas colour so
+   it separates from the box border. Which edge it straddles is decided by
+   the node's resolved facing in `MindNode`, never by a stylesheet guess. */
+[data-course-mindmap] [data-mind-node-anchor] {
+  background: #8b5cf6;
+  /* The first spread is the halo that separates the bead from the box border
+     it straddles (a ring would do this too, but this rule owns box-shadow). */
+  box-shadow:
+    0 0 0 2px var(--mm-bg),
+    0 0 8px rgb(139 92 246 / 0.55);
+}
+
+.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-anchor] {
+  background: #7c3aed;
+  box-shadow:
+    0 0 0 2px var(--mm-bg),
+    0 0 8px rgb(124 58 237 / 0.3);
 }
 /* ==================== End Mind Map Styles ==================== */
 

@@ -374,3 +374,71 @@ test("the toolbar slot is replaced by a slim status strip in both orientations",
   assert.match(coursePlayer, /landscape=\{useLandscapeRails\}/);
 });
 
+
+// ---------------------------------------------------------------------------
+// Facing — the dot, the `+` and the rope all follow the REAL geometry
+//
+// Reported by the learner: a branch created on the LEFT of the centre faces
+// its parent on its right edge (dot right, `+` left). Drag that same node to
+// the RIGHT of the centre and the anchors stayed put, so every wire looked
+// like it had been tied to the wrong face and the whole map read as one knot.
+// The editor must therefore key the anchors off the resolved `facing`, never
+// off the wing the branch was created on.
+// ---------------------------------------------------------------------------
+
+test("the node box derives its anchors from `facing`, not from the stored wing", () => {
+  assert.match(panel, /facing: "left" \| "right" \| null;/, "the node data carries a facing");
+  assert.match(panel, /const facesLeft = facing === "left";/);
+  assert.doesNotMatch(panel, /const facesLeft = side === "left";/, "the structural wing must not drive the anchors");
+  // Both faces are exposed for debugging / test hooks.
+  assert.match(panel, /data-mind-node-side=\{side \?\? "center"\}/);
+  assert.match(panel, /data-mind-node-facing=\{facing \?\? "center"\}/);
+});
+
+test("the anchor dot sits on the face that points at the parent, opposite the `+`", () => {
+  assert.match(panel, /data-mind-node-anchor=\{id\}/);
+  // The dot is on the parent-facing edge…
+  assert.match(panel, /data-anchor-side=\{facesLeft \? "right" : "left"\}/);
+  assert.match(panel, /facesLeft \? "-right-\[3\.5px\]" : "-left-\[3\.5px\]"/);
+  // …and the `+` on the opposite (child-growing) edge.
+  assert.match(panel, /facesLeft \? "-left-3\.5" : "-right-3\.5"/);
+  // The centre has no parent to face, so it renders no dot.
+  assert.match(panel, /\{isRoot \? null : \(/);
+  // It must never eat a tap meant for the node, nor start a drag.
+  const dot = panel.slice(panel.indexOf("data-mind-node-anchor"), panel.indexOf("data-mind-node-add"));
+  assert.match(dot, /pointer-events-none/);
+  // Its paint is themed in the stylesheet (the bead straddles the box border,
+  // so it carries a halo in the canvas colour) — never an inline one-off.
+  assert.match(styles, /\[data-course-mindmap\] \[data-mind-node-anchor\]\s*\{[^}]*background: #8b5cf6/);
+  // The light-theme override has to hang off the SHELL (the themed element is
+  // the same node that carries `data-course-mindmap`, not an ancestor).
+  assert.match(styles, /\.course-mindmap-shell\[data-mindmap-theme="light"\] \[data-mind-node-anchor\]/);
+  assert.doesNotMatch(dot, /style=\{\{/, "the bead is themed by CSS, not inline");
+});
+
+test("ropes attach to the facing handles, and the tint follows them", () => {
+  const edgeBlock = panel.slice(panel.indexOf("const edges: Edge[] = useMemo"), panel.indexOf("const save = SAVE_COPY"));
+  assert.match(edgeBlock, /const goesLeft = \(facingOverride\[edge\.target\] \?\? edge\.facing \?\? "right"\) === "left";/);
+  assert.match(edgeBlock, /sourceHandle: goesLeft \? "src-left" : "src-right"/);
+  assert.match(edgeBlock, /targetHandle: goesLeft \? "right" : "left"/);
+  assert.doesNotMatch(edgeBlock, /edge\.side === "left"/, "the wing must not pick the handles any more");
+});
+
+test("a dragged node re-faces itself LIVE, and hands back on drop", () => {
+  // The layout is frozen mid-drag (React Flow owns the positions), so the
+  // facing of the box under the finger is recomputed from the pointer spot.
+  assert.match(panel, /const syncDragFacing = useCallback/);
+  assert.match(panel, /facingBetweenBoxes\(/);
+  const drag = panel.slice(panel.indexOf("onNodeDrag={(_event, node)"), panel.indexOf("onNodeDragStop="));
+  assert.match(drag, /dragMovedRef\.current = true;/);
+  assert.match(drag, /syncDragFacing\(node\.id, node\.position\.x\);/, "re-derived on every pointer move");
+  // Only the picked box can change facing mid-drag: the branch below it
+  // travels as one rigid group, so nothing inside it moves relative to
+  // anything else.
+  assert.match(panel, /const clearDragFacing = useCallback/);
+  const stop = panel.slice(panel.indexOf("onNodeDragStop="), panel.indexOf("<Background"));
+  assert.match(stop, /clearDragFacing\(\);/, "the committed layout takes over the moment the finger lifts");
+  // The override is fed into both the nodes and the edges.
+  assert.match(panel, /facing: placed\.isRoot \? null : \(facingOverride\[placed\.id\] \?\? placed\.facing\)/);
+  assert.match(panel, /const next = \{ \.\.\.current, \[nodeId\]: facing \};/);
+});

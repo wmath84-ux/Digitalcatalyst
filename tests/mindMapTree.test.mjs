@@ -23,9 +23,12 @@ import {
   childrenOf,
   collectSubtreeIds,
   countNodes,
+  FACING_TIE_PX,
   createMindMap,
+  facingBetweenBoxes,
   findNode,
   hasChildren,
+  hasManualPositions,
   isMindMap,
   layoutMindMap,
   maxDepth,
@@ -709,4 +712,124 @@ test("allNodes surfaces the root alongside the stored children", () => {
   assert.equal(nodes[0].parentId, null);
   assert.equal(hasChildren(mind, rootId()), true);
   assert.equal(hasChildren(mind, nodes[1].id), false);
+});
+
+// ---------------------------------------------------------------------------
+// 8. Facing — which side of its parent a box ACTUALLY hangs off
+//
+// `side` is what the tidy tree was told to build; `facing` is where the box
+// really ended up. The editor anchors every rope, dot and `+` to the FACING,
+// which is what keeps a hand-dragged map from wiring itself backwards.
+// ---------------------------------------------------------------------------
+
+/** The box of one node, from a fresh layout of `mind`. */
+const boxOf = (mind, id) => layoutMindMap(mind).nodes.find((node) => node.id === String(id));
+/** The rope that connects `id` to its parent. */
+const edgeTo = (mind, id) => layoutMindMap(mind).edges.find((edge) => edge.target === String(id));
+
+test("an untouched map faces every box exactly the way the tidy tree built it", () => {
+  const { nodes } = layoutMindMap(withBranches(4));
+  assert.equal(nodes.find((node) => node.isRoot).facing, null, "the centre has no parent to face");
+  for (const node of nodes.filter((item) => !item.isRoot)) {
+    assert.equal(node.facing, node.side === "left" ? "left" : "right", `${node.id} rides its wing`);
+  }
+});
+
+test("a node dragged across its parent flips its facing — and the rope with it", () => {
+  const first = addChildNode(createMindMap("Root"), rootId(), "Left branch", { side: "left" });
+  const mind = first.mind;
+  const id = first.nodeId;
+  assert.equal(boxOf(mind, id).facing, "left");
+  assert.equal(edgeTo(mind, id).facing, "left");
+
+  // Park the same box far EAST of the centre it hangs off.
+  const before = boxOf(mind, id);
+  const moved = moveNodeSubtree(mind, id, 900, before.y, before.x, before.y);
+  assert.equal(boxOf(moved, id).facing, "right", "the box turned around to face its parent again");
+  assert.equal(edgeTo(moved, id).facing, "right", "the rope re-attaches to the opposite pair of handles");
+});
+
+test("a hand-placed node grows its children on the side it faces, not the wing it was born on", () => {
+  const head = addChildNode(createMindMap("Root"), rootId(), "Head", { side: "left" });
+  const withHead = head.mind;
+  const kid = addChildNode(withHead, head.nodeId, "Kid");
+  const mind = kid.mind;
+
+  const beforeHead = boxOf(mind, head.nodeId);
+  // West of the centre its branch was built on, so its child hangs further west.
+  assert.equal(boxOf(mind, kid.nodeId).x < beforeHead.x, true, "untouched: the child sits west of its parent");
+
+  // Now throw the head across to the east side and lay the map out again.
+  const moved = moveNodeSubtree(mind, head.nodeId, 900, beforeHead.y, beforeHead.x, beforeHead.y);
+  const laid = layoutMindMap(moved);
+  const movedHead = laid.nodes.find((node) => node.id === head.nodeId);
+  const movedKid = laid.nodes.find((node) => node.id === kid.nodeId);
+
+  assert.equal(movedHead.facing, "right");
+  assert.equal(movedKid.facing, "right");
+  assert.ok(
+    movedKid.x >= movedHead.x + movedHead.width,
+    "the child follows the branch east instead of hanging back across the centre",
+  );
+});
+
+test("dragging the centre around re-faces nothing — the whole map turns together", () => {
+  const mind = withBranches(4);
+  const before = layoutMindMap(mind);
+  const root = before.nodes.find((node) => node.isRoot);
+  const moved = moveNodeSubtree(mind, rootId(), root.x + 1200, root.y - 800, root.x, root.y);
+  const after = layoutMindMap(moved);
+  assert.deepEqual(
+    after.nodes.map((node) => [node.id, node.facing]),
+    before.nodes.map((node) => [node.id, node.facing]),
+    "rigid group motion can never change a relative side",
+  );
+  assert.deepEqual(
+    after.edges.map((edge) => [edge.id, edge.facing]),
+    before.edges.map((edge) => [edge.id, edge.facing]),
+  );
+});
+
+test("a pinned branch faces its DROP point, not the wing it was stored on", () => {
+  const first = addChildNode(createMindMap("Root"), rootId(), "Flip me", { side: "right" });
+  const id = first.nodeId;
+  const before = boxOf(first.mind, id);
+  // Pinned west of the centre: facing flips now, and the pin is what carries it.
+  const moved = moveNodeSubtree(first.mind, id, -900, before.y, before.x, before.y);
+  assert.equal(boxOf(moved, id).facing, "left");
+  assert.ok(hasManualPositions(moved));
+});
+
+test("facingBetweenBoxes measures centres and refuses to flicker on a near-tie", () => {
+  const parent = { x: 0, width: 100 };
+  // Child centre at 260 → east.
+  assert.equal(facingBetweenBoxes(parent, { x: 240, width: 40 }), "right");
+  // Child centre at -240 → west.
+  assert.equal(facingBetweenBoxes(parent, { x: -260, width: 40 }), "left");
+  // Dead centre: inside the tie band there is no honest answer…
+  assert.equal(facingBetweenBoxes(parent, { x: 45, width: 10 }, "left"), "left", "…so the caller's fallback wins");
+  assert.equal(facingBetweenBoxes(parent, { x: 45, width: 10 }, "right"), "right");
+  // …and a box that carries its own wing falls back to that.
+  assert.equal(facingBetweenBoxes(parent, { x: 45, width: 10, side: "left" }), "left");
+  // Just OUTSIDE the band the geometry decides again, wing be damned.
+  assert.equal(
+    facingBetweenBoxes(parent, { x: -(100 / 2) - FACING_TIE_PX - 40 - 1, width: 40, side: "right" }),
+    "left",
+  );
+  // Nothing to measure is not a crash — it is simply "no movement yet".
+  assert.equal(facingBetweenBoxes(null, { x: 10, width: 10 }, "left"), "left");
+  assert.equal(facingBetweenBoxes(parent, null), "right");
+});
+
+test("a parsed legacy map re-faces itself from its pins without storing anything new", () => {
+  // `facing` is derived, never persisted: an old document (no facing field
+  // anywhere) lays out identically to the new one.
+  const first = addChildNode(createMindMap("Root"), rootId(), "Old pin", { side: "left" });
+  const id = first.nodeId;
+  const before = boxOf(first.mind, id);
+  const moved = moveNodeSubtree(first.mind, id, 900, before.y, before.x, before.y);
+  const stored = JSON.parse(JSON.stringify(toFirestoreMindMap(moved, { uid: 1, productId: 1, moduleId: 1 })));
+  assert.equal(Object.prototype.hasOwnProperty.call(stored.nodes[0], "facing"), false);
+  const reloaded = parseMindMap(stored);
+  assert.equal(boxOf(reloaded, id).facing, "right", "the flip survives a Firestore round-trip");
 });
