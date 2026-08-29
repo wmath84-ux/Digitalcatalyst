@@ -23,6 +23,17 @@
 // The hook `useResponsiveCategory()` re-evaluates the viewport on
 // resize + orientation change, so flipping a tablet into landscape
 // flips the chrome live to desktop.
+//
+// SCROLL OWNERSHIP (why a tablet page used to be frozen): the shell is
+// pinned to the viewport and `[data-desktop-content]` is the single
+// scroll container — see the "TABLET / DESKTOP SCROLL MODEL" block at the
+// bottom of `src/index.css`, which also releases each page's phone framing
+// (`sm:overflow-hidden` on `[data-app-frame]` + a `flex-1 overflow-y-auto`
+// <main>) so the content flows into that one scroller. A mouse wheel chains
+// out of a clipped box, a touch gesture does not, which is why the pages
+// scrolled on a desktop but not on a tablet. Keep exactly one scroller per
+// band: the shell's row here, and `[data-app-frame]` from 640 px up when the
+// shell is not rendered (tablet portrait).
 
 import { type ReactNode, useEffect, useState } from "react";
 import DesktopShell, { type DesktopRailKey, resolveActiveFromHash } from "./DesktopShell";

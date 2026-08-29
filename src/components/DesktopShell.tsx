@@ -24,9 +24,12 @@
 //      the bar grows a second row of text tabs for as long as that
 //      page is mounted — no other page ever sees the row.
 //
-// The shell is RENDERED ON DESKTOP ONLY. Mobile + tablet fall back to
-// the existing per-page chrome and the bottom nav. The desktop CSS
-// lives in `src/index.css` under `@media (min-width: 1024px)`.
+// The shell is RENDERED ON DESKTOP + TABLET (see `src/components/AppShell.tsx`).
+// Mobile keeps the existing per-page chrome and the bottom nav. The desktop CSS
+// lives in `src/index.css`, and the shell owns the scroll: it is pinned to the
+// viewport, `[data-desktop-content]` is the one scroll container, and pages
+// inside it are released from their phone clipping (search for
+// "TABLET / DESKTOP SCROLL MODEL" in `src/index.css`).
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import useScreenSize from "@/hooks/useScreenSize";
