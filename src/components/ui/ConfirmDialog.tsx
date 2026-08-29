@@ -1,4 +1,12 @@
+import { useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
+import { cn } from "../../utils/cn";
+import {
+  lockBodyScroll,
+  unlockBodyScroll,
+  useOverlayBox,
+  useOverlayBounds,
+} from "./overlayBounds";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -9,6 +17,13 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
+/**
+ * Confirmation overlay with the same screen-size behaviour as `Modal`:
+ * bottom-sheet-style centred card on phones, and on tablet / desktop a
+ * dialog constrained to the My Day content column (the side navigation
+ * stays visible and untouched). The panel is capped to the visible height,
+ * so short landscape screens scroll internally instead of overflowing.
+ */
 export default function ConfirmDialog({
   open,
   title,
@@ -17,12 +32,54 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const boundsRef = useOverlayBounds();
+  const { scoped, box } = useOverlayBox(open, boundsRef);
+
+  useEffect(() => {
+    if (!open) return;
+    lockBodyScroll();
+    return () => unlockBodyScroll();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onCancel]);
+
   if (!open) return null;
 
+  const isScoped = scoped && box !== null;
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl animate-scaleIn">
+    <div
+      className={cn(
+        "animate-fadeIn flex",
+        isScoped && box
+          ? "fixed z-[60] items-center justify-center p-4 sm:p-6"
+          : "fixed inset-0 z-[60] items-center justify-center p-4",
+      )}
+      style={
+        isScoped && box
+          ? { top: box.top, left: box.left, width: box.width, height: box.height }
+          : undefined
+      }
+    >
+      <div
+        className={cn(
+          "absolute inset-0 bg-slate-900/40 backdrop-blur-sm",
+          isScoped && "rounded-[1.75rem]",
+        )}
+        onClick={onCancel}
+      />
+      <div
+        className="relative max-h-full w-full max-w-sm animate-scaleIn overflow-y-auto overscroll-contain rounded-2xl bg-white p-6 shadow-2xl custom-scrollbar"
+        role="alertdialog"
+        aria-modal="true"
+      >
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 text-rose-600">
           <AlertTriangle className="h-6 w-6" />
         </div>
