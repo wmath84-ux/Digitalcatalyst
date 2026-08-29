@@ -24,6 +24,7 @@ import BottomNav from "./components/myday/BottomNav";
 import ConfirmDialog from "./components/ui/ConfirmDialog";
 import Toast from "./components/ui/Toast";
 import type { ToastMessage } from "./components/ui/Toast";
+import { OverlayBoundsProvider } from "./components/ui/overlayBounds";
 import { initialNotes, initialReminders, initialSchedule, initialTasks } from "./data/sampleData";
 import type { NoteColor, QuickNote, Reminder, ScheduleEvent, Task, TaskStatus } from "./types";
 import { useCommerce } from "./context/CommerceContext";
@@ -78,6 +79,11 @@ export default function App() {
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
+  // The My Day working column (right of the sticky side navigation). Every
+  // create/edit overlay (Modal / ConfirmDialog) clamps itself to this column's
+  // on-screen rectangle on tablet + desktop widths via OverlayBoundsProvider,
+  // so dialogs never cover the side panel or spill outside the app frame.
+  const contentColumnRef = useRef<HTMLElement>(null);
   const [savingMyDay, setSavingMyDay] = useState(false);
 
   const userName = user?.name?.split(" ")[0] || "Learner";
@@ -476,6 +482,7 @@ export default function App() {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   return (
+    <OverlayBoundsProvider value={contentColumnRef}>
     <div className="dc-app-shell min-h-screen">
       <div data-app-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0 lg:max-w-7xl lg:rounded-[2rem] lg:bg-white lg:shadow-xl lg:border lg:border-slate-200">
         <StoreHeader
@@ -523,7 +530,7 @@ export default function App() {
         <div data-myday-content className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 pt-6 sm:px-6 md:gap-8 md:px-8 lg:px-10">
           <SideNav active={activeSection} onNavigate={handleNavigate} />
 
-          <main className="min-w-0 flex-1 pb-6">
+          <main ref={contentColumnRef} className="min-w-0 flex-1 pb-6">
             {/* The free-creation allowance summary is deliberately NOT rendered
                 here. It is account/usage information, so it lives on the
                 Profile page inside MyDayAllowanceCard. My Day itself stays a
@@ -687,5 +694,6 @@ export default function App() {
 
       <Toast toasts={toasts} onRemove={removeToast} />
     </div>
+    </OverlayBoundsProvider>
   );
 }
