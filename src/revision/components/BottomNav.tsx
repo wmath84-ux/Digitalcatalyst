@@ -41,6 +41,7 @@ export default function BottomNav({ route }: { route: string }) {
     // reached from the text-only tab row under the header instead
     // (src/components/ui/PageTabs.tsx). Below 768 px nothing changes.
     <nav
+      data-site-footer-nav
       className="pointer-events-none sticky bottom-0 z-30 w-full px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-1 md:hidden"
       aria-label="Bottom navigation"
     >
