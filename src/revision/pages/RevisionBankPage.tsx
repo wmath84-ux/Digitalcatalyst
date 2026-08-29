@@ -389,7 +389,11 @@ function SavedTestsView({
               onDelete={() => onDelete(test)}
             />
           ))}
-          <div className="grid grid-cols-2 gap-2 pt-1 sm:col-span-2 lg:col-span-3">
+          {/* Trailing create actions. `data-saved-tests-actions` lets the
+              compact-band CSS pin this tile to a full row: its `sm:col-span-2
+              lg:col-span-3` spans would otherwise invent an implicit second
+              column inside the one-card-per-row grid and squeeze the buttons. */}
+          <div className="grid grid-cols-2 gap-2 pt-1 sm:col-span-2 lg:col-span-3" data-saved-tests-actions>
             <SecondaryButton onClick={onCreateAi}><SparklesIcon className="h-4 w-4" /> Generate</SecondaryButton>
             <SecondaryButton onClick={onImport}><BookOpenCheck className="h-4 w-4" /> Import</SecondaryButton>
           </div>
@@ -427,6 +431,11 @@ function SavedTestCard({
   const progress = test.status === "in_progress" ? Math.min(100, ((test.currentIndex + 1) / progressTotal) * 100) : 0;
 
   return (
+    /* `aspect-square` is the wide-screen look only. Whenever the Test Bank
+       content column is narrow (small tablet with the side panel visible,
+       split-screen tablet, phone) the compact-band CSS in `src/index.css`
+       switches it to `aspect-ratio: auto` so the card grows with its content
+       instead of clipping the action buttons behind `overflow-hidden`. */
     <Card className="relative aspect-square overflow-hidden p-0" data-saved-test-card>
       <div className="flex h-full flex-col p-3.5">
         <div className="flex items-start gap-2.5">
