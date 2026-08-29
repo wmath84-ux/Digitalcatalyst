@@ -2542,6 +2542,18 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   }
 }
 
+/* The desktop shell's body carries `px-6 py-6` (and `padding: clamp(12px,
+   1.5vw, 24px) !important` in the tablet-landscape band), so its top padding
+   pushed the whole revision frame — feature header included — away from the
+   top bar. On AI Configuration / Bulk Import that left the header floating in
+   a band of wallpaper instead of sitting flush under the main header, and the
+   frame (pinned to the full height just below) overflowed by the same amount
+   at the bottom. Zero the block padding whenever the shell hosts Revision;
+   `!important` matches the tablet-landscape rule it has to beat. */
+.dc-desktop-shell [data-desktop-content]:has(> main > [data-revision-app]) {
+  padding-block: 0 !important;
+}
+
 /* Revision Studio desktop experience - OPTIMIZED compact, no empty space */
 @media (min-width: 960px) {
   .dc-desktop-shell:has([data-revision-app]) {
@@ -4183,14 +4195,10 @@ html[data-course-player-active="true"] {
    (640-1023 px) keep the intended behaviour and 768 px+ layouts are
    untouched:
 
-     1. Revision feature header (back-button AppHeader) sticky offset.
-        The site header height differs per band: 68 px on a phone, ~80 px
-        on tablet portrait (md:py-4 + 3rem brand tile), 64 px desktop top
-        bar (which replaces the site header from 960 px up / tablet
-        landscape). The header hard-coded top-[68px] for every band, so on
-        tablet portrait it stuck 12 px BELOW the site header (a visible gap)
-        and on desktop 4-8 px below the top bar. The offset now lives in
-        CSS, exactly like `.dc-page-tabs`.
+     1. Revision feature header (back-button AppHeader) seat. The header
+        sits flush at the top of the revision content column on every band —
+        see the `[data-revision-app-header]` rule below for why the per-band
+        offsets that used to live here had to go.
      2. Revision dashboard test cards: compact on small screens (< 768 px).
         The plan carousel card + first-plan hero were built as desktop
         heroes (min-height 270 px, text-2xl headings, 50 px buttons). On a
@@ -4202,22 +4210,39 @@ html[data-course-player-active="true"] {
         buttons / icon chips, and the quick-stats row becomes square tiles.
    ══════════════════════════════════════════════════════════════════════ */
 
-/* ── 1. Revision feature header sticky offset per band ─────────────────── */
+/* ── 1. Revision feature header: flush at the top of the content column ──
+   `AppHeader` (src/revision/components/AppHeader.tsx) is a flex sibling
+   ABOVE the page scroller — PageShell renders
+   `<AppHeader> + <main data-revision-page-main> + <BottomNav>` inside
+   `[data-revision-content]`, and THAT container is `overflow: hidden`, so it
+   is the sticky scrollport the header is measured against. Its scrollport
+   starts immediately below the website header (phone + tablet portrait) or
+   below the desktop top bar (≥ 960 px / tablet landscape), which is exactly
+   where the header's own static position already is.
+
+   The per-band offsets that used to live here (68 / 80 / 64 px, copied from
+   `.dc-page-tabs`) were written for the old layout in which the header
+   scrolled with the page body and had to clear the site header. Against this
+   scrollport they did the opposite: a sticky inset also pushes a box DOWN
+   when its static position lies above the inset, so the header dropped out
+   of its seat by 68 px on a phone, 80 px on tablet portrait and 64 px on
+   desktop and floated over the page content — the "header slid down into the
+   middle of the page" report on AI Configuration and Bulk Import (both
+   reached from the revision profile page, both rendered through this
+   header).
+
+   `.dc-page-tabs` KEEPS its per-band offsets: that row is a sibling of
+   `[data-revision-content]` inside the frame scrollport, sitting directly
+   under the site header, so its static position already equals 68 / 80 px
+   and the inset never moves it.
+
+   `top: 0` is declared unlayered on purpose. Tailwind's `.top-0` utility
+   lives in `@layer utilities`, and unlayered rules always win the cascade
+   against layered ones — which is why adding the `top-0` class to the
+   element could not override the old `[data-revision-app-header]` offsets.
+   Keep this rule unlayered so the two never disagree. */
 [data-revision-app-header] {
-  top: 68px;
-}
-@media (min-width: 768px) {
-  [data-revision-app-header] {
-    top: 80px;
-  }
-}
-@media (min-width: 960px) {
-  [data-revision-app-header] {
-    top: 64px;
-  }
-}
-html[data-tablet-landscape-desktop="true"] [data-revision-app-header] {
-  top: 64px;
+  top: 0;
 }
 
 /* ── 2. Revision dashboard test cards: compact on small screens ─────────── */
