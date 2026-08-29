@@ -10,10 +10,17 @@ type AppHeaderProps = {
 };
 
 /**
- * The feature's own header, ported from the reference design. It stays
- * independently sticky directly below the 68px website header (same
- * two-header pattern the My Day feature uses) so both headers are always
- * visible and neither covers the other.
+ * The feature's own header, ported from the reference design.
+ *
+ * PageShell renders it as a flex sibling ABOVE the page scroller
+ * (`[data-revision-page-main]`), so it is permanently parked at the top of
+ * `[data-revision-content]` — directly under the website header on a phone /
+ * tablet portrait, and under the desktop top bar from 960 px up. `sticky
+ * top-0` only matters if that container ever becomes the scroller itself: the
+ * inset MUST stay 0, because a sticky inset also pushes a box down when its
+ * static position is above it, which is what dropped this header into the
+ * middle of the page when `index.css` carried per-band 68/80/64 px offsets
+ * for `[data-revision-app-header]`.
  */
 export default function AppHeader({ title, subtitle, backHref, rightSlot }: AppHeaderProps) {
   const { navigate } = useExitGuard();
