@@ -3299,3 +3299,213 @@ html[data-course-player-active="true"] {
     touch-action: auto;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   TABLET / DESKTOP SCROLL MODEL — one real scroller, always reachable
+   ══════════════════════════════════════════════════════════════════════
+   Reported on a tablet: tapping through the side rail swapped pages fine, but
+   no page could be scrolled at all (Home, Store, My Day, PDP, Search, Cart,
+   Profile, Subscription …).
+
+   Why it happened
+   ───────────────
+   Every page is still built like a phone: `[data-app-frame]` is
+   `flex flex-col` with an inner `<main class="flex-1 overflow-y-auto">`, and
+   Tailwind's `sm:overflow-hidden` clips the frame from 640 px up. Below
+   640 px the frame is pinned to `height: 100dvh`, so that inner `<main>` has a
+   bounded height, a real scroll range, and the finger scrolls it.
+
+   From 640 px up the tablet/desktop bands switched the frame to
+   `height: auto; min-height: 100dvh`. An auto-height flex column grows with
+   its content, so the inner `<main>` ends up exactly as tall as the content
+   inside it: `overflow-y: auto` with a zero scroll range. A mouse wheel is
+   handled on the main thread and chains out to the viewport — which is why a
+   desktop kept scrolling — while a touch gesture is handled by the compositor
+   and never leaves the clipped box. On a tablet that is a frozen page.
+   Revision showed the identical symptom until PR #486 re-bound it to the
+   viewport; the blocks below apply that same pattern to the rest of the app.
+
+   The rule the layout now follows
+   ───────────────────────────────
+   • Desktop shell (desktop, tablet landscape, and any viewport ≥ 960 px):
+     the shell owns the viewport, and `[data-desktop-content]` is THE scroll
+     container. Pages inside it stop clipping so their content flows into that
+     single scroller — no dead `<main>`, and nothing stranded under the top bar.
+   • 640–959 px with no shell (tablet portrait): the phone model stays honest —
+     the frame is bound to the viewport, so whichever of the frame / its `<main>`
+     holds the content is the one that scrolls.
+   • Below 640 px: unchanged, it already worked.
+
+   Touch affordances live on the scroller itself: `overscroll-behavior: contain`
+   so a pull at the edge cannot turn into a pull-to-refresh that eats the
+   gesture, `-webkit-overflow-scrolling: touch` for momentum, and a visible
+   scrollbar — the global `::-webkit-scrollbar { display: none }` hides every
+   scrollbar in the app, which is what made a perfectly scrollable tablet page
+   look dead. `touch-action` is deliberately NOT narrowed: the pages carry
+   horizontal carousels (hero, category chips, PDP gallery) and an ancestor that
+   only advertises `pan-y` would kill those.
+
+   Revision is left alone on purpose — it already pins itself to the viewport
+   and scrolls inside `[data-revision-page-main]`; a second bound scroller above
+   it would only add a competing gesture surface. */
+
+/* ── 1. The desktop shell is a fixed frame; its content row scrolls ────── */
+.dc-desktop-shell {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The rail is a column of the pinned shell, so it fills it instead of
+   adding a second viewport-height box (its own nav list already scrolls). */
+.dc-desktop-shell [data-desktop-rail] {
+  height: 100%;
+}
+
+.dc-desktop-shell [data-desktop-content] {
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(100 116 139 / 0.45) transparent;
+}
+
+/* Scroll affordance inside the shell only — the rest of the app keeps the
+   chrome-less phone look from the global `::-webkit-scrollbar` reset. */
+.dc-desktop-shell [data-desktop-content]::-webkit-scrollbar {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+.dc-desktop-shell [data-desktop-content]::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dc-desktop-shell [data-desktop-content]::-webkit-scrollbar-thumb {
+  background: rgb(100 116 139 / 0.38);
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: padding-box;
+}
+.dc-desktop-shell [data-desktop-content]::-webkit-scrollbar-thumb:hover {
+  background: rgb(79 70 229 / 0.5);
+  background-clip: padding-box;
+}
+
+/* Keep the page column filled so a short page still paints its background
+   to the bottom of the viewport, then let it grow past it freely. */
+.dc-desktop-shell [data-desktop-content] > main {
+  min-height: 100%;
+}
+
+/* The phone padding + `min-h-screen` of a page body would add ~112 px of
+   phantom scroll (top bar + gutters) under the shell and leave a dead band
+   of background under the card. The shell supplies the padding, so the page
+   stops reserving it. */
+.dc-desktop-shell .dc-app-shell {
+  min-height: 0;
+  padding: 0;
+}
+
+/* Profile renders its own page wrapper instead of `.dc-app-shell`, so the
+   same release is spelled out for it. */
+.dc-desktop-shell [data-profile-page] {
+  min-height: 0;
+  padding: 0;
+}
+
+/* Release the per-page clipping inside the shell. `sm:overflow-hidden` and the
+   `min-h-screen` / `sm:h-[calc(100vh-3rem)]` phone framing are what turned the
+   page's `<main>` into a scroller with nothing to scroll; here the content is
+   allowed to flow so the shell's row does the scrolling. Revision opt-outs are
+   handled by the `:not(:has(…))` on the column above it. */
+.dc-desktop-shell [data-desktop-content] > main:not(:has([data-revision-app])) [data-app-frame] {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+.dc-desktop-shell [data-desktop-content] > main:not(:has([data-revision-app])) [data-app-frame] :is(main, [data-profile-content], [data-pdp-scroll]) {
+  overflow: visible !important;
+  max-height: none !important;
+  min-height: 0 !important;
+}
+
+/* Revision keeps its own bounded scroller, but the tablet-landscape band pins
+   the feature to `100dvh` while the shell row is shorter than that by the top
+   bar + gutters. Filling the row instead keeps exactly one surface — the page's
+   `[data-revision-page-main]` — scrolling, with nothing cut off at the bottom. */
+.dc-desktop-shell [data-desktop-content] > main > [data-revision-app] {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+
+/* Sticky rows inside a page now stick to the shell's scrollport, whose top edge
+   already sits under the global top bar. The phone's `top: 68/72/80px` offsets
+   would strand the search row mid-air, so it releases exactly like it does on
+   the tablet-portrait band — the shell's own top-bar search is the input. */
+.dc-desktop-shell [data-search-bar] {
+  position: static !important;
+}
+
+/* …and My Day's side rail keeps its offset-free pin, so it parks at the top of
+   the shell's scrollport instead of floating 65 px below it. */
+.dc-desktop-shell [data-myday-content] > aside {
+  top: 0;
+}
+
+/* ── 2. 640–959 px without the shell (tablet portrait): bind the frame ────
+   Same model the phone band uses: the frame is exactly the viewport, so
+   whichever box holds the overflow — the frame (My Day) or its own `<main>`
+   (Home, Store, PDP, Search, Profile, …) — has a real scroll range and the
+   finger lands on it. Guarded so it can never fight the shell: the shell owns
+   the scroll the moment it renders. */
+@media (min-width: 640px) and (max-width: 959px) {
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]) {
+    height: 100dvh;
+    min-height: 0;
+    max-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(100 116 139 / 0.45) transparent;
+  }
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame])::-webkit-scrollbar {
+    display: block;
+    width: 8px;
+  }
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame])::-webkit-scrollbar-thumb {
+    background: rgb(100 116 139 / 0.38);
+    border-radius: 9999px;
+  }
+  /* The page's own scroller stays the primary surface — it just now has a
+     bounded parent, which is all it was missing. It also gets the same visible
+     scrollbar, because on these pages it (not the frame) is what moves. */
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]) > main {
+    min-height: 0;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(100 116 139 / 0.45) transparent;
+  }
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]) > main::-webkit-scrollbar {
+    display: block;
+    width: 8px;
+  }
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]) > main::-webkit-scrollbar-thumb {
+    background: rgb(100 116 139 / 0.38);
+    border-radius: 9999px;
+  }
+  /* `min-h-screen` on the page wrapper is up to a browser-UI's worth taller than
+     the bound frame, which reads as a short dead tug at the end of every swipe.
+     The frame is the scroller here, so the wrapper stops reserving the height. */
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) .dc-app-shell {
+    min-height: 0;
+  }
+}
