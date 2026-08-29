@@ -3867,3 +3867,311 @@ html[data-course-player-active="true"] {
     grid-column: 1 / -1;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   RESPONSIVE LAYOUT OVERHAUL
+   ══════════════════════════════════════════════════════════════════════
+   This is the container-aware foundation for small tablets, split-screen
+   windows and narrow desktop browser windows.
+
+   The trick is NOT to shrink the UI. The pages that live inside a
+   sidebar + content shell must respond to their ACTUAL content width, not
+   only to the global viewport width. These rules declare the real layout
+   containers and reflow grids / panels / stats / controls based on that
+   width. Phone, tablet portrait and wide desktop behaviour are unchanged;
+   this pass only relaxes the over-eager desktop splits when the available
+   container is no longer wide enough for them.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* 1. Real layout containers ---------------------------------------------
+   PageShell's scroller is the revision layout container. The profile and
+   settings pages make their own page wrapper a container so a narrow
+   desktop-window column reflows without touching the phone layout. The
+   desktop shell content row is also a container so an optional side panel
+   can stack below the main column instead of stealing width. */
+[data-revision-page-main] {
+  container-type: inline-size;
+  container-name: dc-rev;
+}
+[data-profile-layout] {
+  container-type: inline-size;
+  container-name: dc-profile;
+}
+[data-settings-layout] {
+  container-type: inline-size;
+  container-name: dc-settings;
+}
+.dc-desktop-shell [data-desktop-content] {
+  container-type: inline-size;
+  container-name: dc-shell;
+}
+
+/* 2. Text can never force a flex child wider than its container -------------
+   Long AI-generated titles, topic names, profile bios and button labels wrap
+   instead of pushing the surrounding card off-screen. */
+[data-revision-page-main] h1,
+[data-revision-page-main] h2,
+[data-revision-page-main] h3,
+[data-revision-page-main] p,
+[data-revision-page-main] button,
+[data-revision-page-main] a,
+[data-revision-page-main] span,
+[data-revision-page-main] label,
+[data-profile-layout] h1,
+[data-profile-layout] h2,
+[data-profile-layout] h3,
+[data-profile-layout] p,
+[data-profile-layout] button,
+[data-profile-layout] a,
+[data-profile-layout] span,
+[data-profile-layout] label,
+[data-settings-layout] h1,
+[data-settings-layout] h2,
+[data-settings-layout] h3,
+[data-settings-layout] p,
+[data-settings-layout] button,
+[data-settings-layout] a,
+[data-settings-layout] span,
+[data-settings-layout] label {
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+/* Flex rows must be allowed to let their text children wrap normally. */
+[data-revision-page-main] .flex > *,
+[data-profile-layout] .flex > *,
+[data-settings-layout] .flex > *,
+[data-revision-page-main] .flex-wrap > *,
+[data-profile-layout] .flex-wrap > * {
+  min-width: 0;
+}
+
+/* Badges / pills must never escape their card. */
+[data-revision-page-main] .inline-flex,
+[data-revision-page-main] .rounded-full,
+[data-profile-layout] .inline-flex,
+[data-profile-layout] .rounded-full {
+  max-width: 100%;
+}
+
+/* 3. Narrow content inside the desktop shell --------------------------------
+   The desktop shell previously forced the 12-column split based on the
+   VIEWPORT width, so a 960–1024 px browser window with a 220 px rail had only
+   ~740 px left and the dashboard/profile cards were crushed into narrow strips.
+   When the ACTUAL revision container is below 860 px, those pages re-flow to a
+   single readable column (the shell still owns the scroll). */
+@container dc-rev (max-width: 859px) {
+  .dc-desktop-shell [data-rev-layout="dashboard"],
+  .dc-desktop-shell [data-rev-layout="progress"],
+  .dc-desktop-shell [data-rev-layout="weak"],
+  .dc-desktop-shell [data-revision-profile-layout] {
+    display: block !important;
+    max-width: 100%;
+    margin-inline: 0;
+    gap: 0;
+  }
+
+  /* Re-introduce the vertical rhythm that `lg:space-y-0` removes on desktop. */
+  .dc-desktop-shell [data-rev-layout="dashboard"] > * + *,
+  .dc-desktop-shell [data-rev-layout="progress"] > * + *,
+  .dc-desktop-shell [data-rev-layout="weak"] > * + *,
+  .dc-desktop-shell [data-revision-profile-layout] > * + * {
+    margin-top: 16px !important;
+  }
+
+  /* The 12-col zones become normal blocks and their sections keep breathing. */
+  .dc-desktop-shell [data-rev-panel="primary"],
+  .dc-desktop-shell [data-rev-panel="secondary"],
+  .dc-desktop-shell [data-rev-col="left"],
+  .dc-desktop-shell [data-rev-col="middle"],
+  .dc-desktop-shell [data-rev-col="right"],
+  .dc-desktop-shell [data-rev-col="weak-primary"],
+  .dc-desktop-shell [data-rev-col="weak-secondary"] {
+    display: block !important;
+    grid-column: auto !important;
+  }
+  .dc-desktop-shell [data-rev-panel="primary"] > * + *,
+  .dc-desktop-shell [data-rev-col="weak-primary"] > * + *,
+  .dc-desktop-shell [data-rev-col="weak-secondary"] > * + *,
+  .dc-desktop-shell [data-rev-col="left"] > * + *,
+  .dc-desktop-shell [data-rev-col="middle"] > * + *,
+  .dc-desktop-shell [data-rev-col="right"] > * + * {
+    margin-top: 12px !important;
+  }
+  .dc-desktop-shell [data-rev-col="right"] {
+    margin-top: 16px !important;
+  }
+
+  /* The Weak Topics "Recommended for you" grid must never force 2 columns into
+     a narrow primary panel. */
+  .dc-desktop-shell [data-rev-col="weak-primary"] .grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* 4. Stats and metric chips: no narrow vertical strips -----------------------
+   A 3-up stat row inside a ~280 px column becomes three ~90 px strips. At
+   compact content widths it falls back to 2 + a full-width final tile; at the
+   first width where 3-up is comfortable it returns to 3. The same rule applies
+   to revision dashboard / profile / result and the main Profile stats. */
+@container dc-rev (max-width: 479px) {
+  [data-rev-stat-grid],
+  [data-rev-bank-grid],
+  [data-rev-widget-grid],
+  [data-rev-result-grid] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  [data-rev-stat-grid] > *:last-child,
+  [data-rev-bank-grid] > *:last-child,
+  [data-rev-widget-grid] > *:last-child,
+  [data-rev-result-grid] > *:last-child {
+    grid-column: span 2;
+  }
+}
+@container dc-rev (min-width: 480px) and (max-width: 859px) {
+  [data-rev-stat-grid],
+  [data-rev-bank-grid],
+  [data-rev-widget-grid],
+  [data-rev-result-grid] {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  [data-rev-stat-grid] > *:last-child,
+  [data-rev-bank-grid] > *:last-child,
+  [data-rev-widget-grid] > *:last-child,
+  [data-rev-result-grid] > *:last-child {
+    grid-column: auto !important;
+  }
+}
+
+/* 5. Saved-test / result metric grids ---------------------------------------
+   Saved-test cards were locked to a viewport-based 4-col grid. An auto-fit
+   grid with a sensible minimum keeps cards readable wherever the card actually
+   lives (full phone width, split-screen, a narrow desktop column). */
+[data-saved-tests-grid] {
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)) !important;
+}
+[data-rev-result-metrics] {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+@container dc-rev (min-width: 360px) {
+  [data-rev-result-metrics] {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+/* 6. AI generator: form controls reflow, never squeeze ------------------------
+   The four dropdown tiles and four difficulty tiles become 2-up when the
+   container is compact so each control keeps a usable width. */
+@container dc-rev (max-width: 479px) {
+  [data-rev-choice-grid] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  [data-rev-question-mode-grid] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+@container dc-rev (min-width: 480px) and (max-width: 659px) {
+  [data-rev-choice-grid] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  [data-rev-question-mode-grid] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+@container dc-rev (min-width: 660px) {
+  [data-rev-choice-grid] {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+  [data-rev-question-mode-grid] {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+/* 7. Main Profile ------------------------------------------------------------
+   Same container approach for the main app Profile. The profile's own
+   side/main columns stay side-by-side on a real tablet portrait and only
+   stack when the actual content width is too narrow for them. */
+@container dc-profile (max-width: 479px) {
+  [data-profile-stats] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  [data-profile-stats] > *:last-child {
+    grid-column: span 2;
+  }
+}
+@container dc-profile (min-width: 480px) {
+  [data-profile-stats] {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  [data-profile-stats] > *:last-child {
+    grid-column: auto !important;
+  }
+}
+@container dc-profile (max-width: 719px) {
+  [data-profile-layout] {
+    display: block !important;
+  }
+  [data-profile-layout] > * + * {
+    margin-top: 18px !important;
+  }
+  [data-profile-col="main"],
+  [data-profile-col="side"] {
+    display: block !important;
+  }
+}
+
+/* 8. Settings ---------------------------------------------------------------
+   Settings is naturally single-column, but the page must never let a header /
+   save indicator collide or an input lose its minimum usable width. */
+@container dc-settings (max-width: 560px) {
+  [data-settings-layout] > header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  [data-settings-layout] > header > :last-child {
+    align-self: flex-start;
+  }
+}
+
+/* 9. Desktop shell: optional side panel must not eat the main column ---------
+   In a narrow desktop / split-screen window the side panel (My Day, etc.)
+   stacks below the main page instead of shrinking it. */
+@container dc-shell (max-width: 1040px) {
+  [data-desktop-content] {
+    flex-wrap: wrap;
+  }
+  [data-desktop-content] > main {
+    flex-basis: 100%;
+  }
+  [data-desktop-side-panel] {
+    flex-basis: 100%;
+    width: auto !important;
+    max-width: none !important;
+    margin-top: 18px;
+  }
+}
+
+/* 10. Top bar on narrow desktop / split-screen -----------------------------
+   The top bar was a single non-wrapping row with a fixed 64px height. On a
+   narrow desktop the search box + actions + page title are allowed to wrap
+   and the search shrinks instead of pushing the title off-screen. */
+@media (max-width: 1199px) {
+  .dc-desktop-shell [data-desktop-topbar-row] {
+    flex-wrap: wrap;
+    height: auto !important;
+    min-height: var(--desktop-topbar-height);
+    row-gap: 6px;
+  }
+  .dc-desktop-shell [data-desktop-search] {
+    width: min(220px, 30vw) !important;
+  }
+}
+@media (max-width: 899px) {
+  .dc-desktop-shell [data-desktop-search] {
+    width: 100% !important;
+  }
+  .dc-desktop-shell [data-desktop-topbar-row] > * {
+    flex: 1 1 auto;
+  }
+}

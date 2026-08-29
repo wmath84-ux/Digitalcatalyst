@@ -89,7 +89,7 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
   return (
     <PageShell route={route} title="Progress" subtitle="Your learning journey" mergeIntoMainHeader>
       <div data-rev-layout="progress" className="animate-fade-in space-y-4 px-4 py-4 pb-8 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0 lg:py-0 lg:pb-0 lg:max-w-[1200px] lg:mx-auto">
-        <div className="lg:col-span-4 lg:space-y-3"><div className="grid grid-cols-2 gap-2.5 lg:gap-2">
+        <div data-rev-panel="primary" className="lg:col-span-4 lg:space-y-3"><div data-rev-total-grid className="grid grid-cols-2 gap-2.5 lg:gap-2">
           <TotalCard icon={<CheckIcon className="h-5 w-5 text-indigo-600" />} label="Tests Completed" value={data.totals.testsCompleted} />
           <TotalCard icon={<ChartIcon className="h-5 w-5 text-emerald-600" />} label="Overall Accuracy" value={`${data.totals.overallAccuracy}%`} />
           <TotalCard icon={<SparklesIcon className="h-5 w-5 text-sky-600" />} label="Questions Attempted" value={data.totals.questionsAttempted} />
@@ -98,7 +98,7 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
           <TotalCard icon={<FlameIcon className="h-5 w-5 text-orange-600" />} label="Current Streak" value={`${data.totals.currentStreak}d`} />
         </div></div>
 
-        <div className="space-y-4 lg:col-span-8 lg:space-y-3">
+        <div data-rev-panel="secondary" className="space-y-4 lg:col-span-8 lg:space-y-3">
         <Card>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-[15px] font-bold text-slate-900 lg:text-[14px]">Activity</h2>

@@ -617,7 +617,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   {curriculumMeta.board} · {curriculumMeta.yearLabel} included syllabus
                 </p>
               )}
-              <div className="mt-3 grid grid-cols-4 gap-1.5">
+              <div data-rev-choice-grid className="mt-3 grid grid-cols-4 gap-1.5">
                 {pickers.map((p) => (
                   <PickerButton
                     key={p.key}
@@ -673,7 +673,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
               <p className="mt-0.5 text-[11px] text-slate-500">
                 Difficulty controls level only. Question type is selected separately below.
               </p>
-              <div className="mt-3 grid grid-cols-4 gap-1.5">
+              <div data-rev-choice-grid className="mt-3 grid grid-cols-4 gap-1.5">
                 {DIFFICULTY_OPTIONS.map((d) => (
                   <button
                     key={d.value}
@@ -709,7 +709,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                     {modeOption.label}
                   </span>
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-1.5">
+                <div data-rev-question-mode-grid className="mt-3 grid grid-cols-3 gap-1.5">
                   {QUESTION_MODE_OPTIONS.map((m) => (
                     <button
                       key={m.value}

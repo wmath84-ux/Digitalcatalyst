@@ -180,7 +180,7 @@ export default function AiConfigForm({
       <div>
         {title && <p className="text-[13px] font-bold text-slate-900">{title}</p>}
         {description && <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{description}</p>}
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div data-ai-provider-grid className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {AI_PROVIDERS.map((p) => (
             <ProviderTile
               key={p.id}
