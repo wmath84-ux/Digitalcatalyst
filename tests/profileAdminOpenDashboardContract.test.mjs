@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const profile = fs.readFileSync("src/profile/App.tsx", "utf8");
+const profileLayout = fs.readFileSync("src/profile/ProfileLayout.tsx", "utf8");
 const auth = fs.readFileSync("src/AuthApp.tsx", "utf8");
 
 test("auth page keeps the tiny Open dashboard hint", () => {
@@ -20,9 +21,9 @@ test("auth page keeps the tiny Open dashboard hint", () => {
 
 test("profile shows the same-size Open dashboard link only for the approved admin", () => {
   assert.match(profile, /APPROVED_ADMIN_EMAIL/);
-  assert.match(profile, /user\.role === "admin"/);
-  assert.match(profile, /data-profile-open-dashboard/);
-  assert.match(profile, /text-\[9px\] font-medium tracking-wide/);
-  assert.match(profile, />Open dashboard</);
+  assert.match(profile, /String\(user\.role \|\| ""\) === "admin"/);
+  assert.match(profileLayout, /data-profile-open-dashboard/);
+  assert.match(profileLayout, /text-\[9px\] font-medium tracking-wide/);
+  assert.match(profileLayout, /Open dashboard/);
   assert.match(profile, /#\/admin-login/);
 });

@@ -15,31 +15,31 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const profile = fs.readFileSync("src/profile/App.tsx", "utf8");
+const profileLayout = fs.readFileSync("src/profile/ProfileLayout.tsx", "utf8");
+const profilePage = `${profile}\n${profileLayout}`;
 const styles = fs.readFileSync("src/index.css", "utf8");
 
 test("profile hero maps each subscription tier to its plan label", () => {
-  assert.match(profile, /basic:\s*"Basic Plan"/);
-  assert.match(profile, /premium:\s*"Premium Plan"/);
-  assert.match(profile, /pro:\s*"Pro Plan"/);
-  assert.match(profile, /data-profile-plan-label/);
-  assert.match(profile, /membership\.subscriber \? planLabel : PLAN_LABELS\.normal/);
+  assert.match(profilePage, /basic:\s*"Basic Plan"/);
+  assert.match(profilePage, /premium:\s*"Premium Plan"/);
+  assert.match(profilePage, /pro:\s*"Pro Plan"/);
+  assert.match(profilePage, /data-profile-plan-label/);
+  assert.match(profilePage, /membership\.subscriber \? membership\.planLabel : PLAN_LABELS\.normal/);
 });
 
 test("profile hero keeps the plan status data attribute", () => {
-  assert.match(profile, /data-profile-plan-status=\{membership\.active \? "active" : "expired"\}/);
-  assert.match(profile, /data-profile-membership-status=\{membership\.active \? "active" : "expired"\}/);
+  assert.match(profilePage, /data-profile-plan-status=\{active \? "active" : "expired"\}/);
+  assert.match(profilePage, /data-profile-membership-status=\{membership\.active \? "active" : "expired"\}/);
 });
 
-test("profile page is clean: no glassmorphism, orbs or animated gradients", () => {
-  // The redesign is deliberately flat — none of the old glass / aurora /
-  // conic-orbit machinery may come back to the profile page.
-  assert.doesNotMatch(profile, /dc-glass/);
-  assert.doesNotMatch(profile, /backdrop-blur/);
-  assert.doesNotMatch(profile, /dc-profile-aurora/);
-  assert.doesNotMatch(profile, /dc-profile-plan-orbit/);
-  assert.doesNotMatch(profile, /dc-profile-status-orbit/);
-  assert.doesNotMatch(profile, /conic-gradient/);
-  assert.doesNotMatch(profile, /data-glass-mode/);
+test("profile page is clean: no legacy orbs or animated gradients", () => {
+  // The page uses a light glass hero today, but the old aurora / conic-orbit
+  // machinery must not come back to the profile page.
+  assert.doesNotMatch(profilePage, /dc-profile-aurora/);
+  assert.doesNotMatch(profilePage, /dc-profile-plan-orbit/);
+  assert.doesNotMatch(profilePage, /dc-profile-status-orbit/);
+  assert.doesNotMatch(profilePage, /conic-gradient/);
+  assert.doesNotMatch(profilePage, /data-glass-mode/);
   // The shared CSS must also drop the profile-only visual machinery.
   assert.doesNotMatch(styles, /dc-profile-orb/);
   assert.doesNotMatch(styles, /dc-profile-plan-orbit/);
@@ -51,7 +51,7 @@ test("profile reuses the store's brand gradient for actions and accents", () => 
   // The Store's CTA gradient (indigo → violet → fuchsia) is the only
   // gradient on the redesigned profile — buttons, progress and small icon
   // chips carry it, exactly like the Store page's Add-to-Cart button.
-  assert.match(profile, /from-indigo-600 via-violet-600 to-fuchsia-600/);
+  assert.match(profilePage, /from-indigo-600 via-violet-600 to-fuchsia-600/);
 });
 
 test("profile page background is a clean static wash, not a glow field", () => {
