@@ -13,6 +13,7 @@ import LeaderboardApp from "./LeaderboardApp";
 import RevisionApp from "./revision/RevisionApp";
 import ProfileApp from "./profile/App";
 import SubscriberExperiencePage from "./profile/SubscriberExperiencePage";
+import ProfilePreview from "./profile/ProfilePreview";
 import CourseRouteGuard from "./components/CourseRouteGuard";
 import CartWishlistApp from "./CartWishlistApp";
 import SubscriptionApp from "./subscription/App";
@@ -114,6 +115,10 @@ const SEARCH_HASH = "#/search";
 // Developer sandbox for the expiry / renewal messaging. Pure preview:
 // it synthesises a subscription document and never touches Firestore.
 const RENEWAL_PREVIEW_HASH = "#/dev/subscription-preview";
+// Developer visual sandbox for the redesigned Profile layout. Renders the
+// layout with mock data so its responsive behaviour can be reviewed on any
+// screen without auth. Never touches Firestore.
+const PROFILE_PREVIEW_HASH = "#/dev/profile-preview";
 const FLOWPATH_HASH = "#/flowpath";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
@@ -336,6 +341,7 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith("#/admin-login")
     || hash.startsWith("#/course/")
     || hash.startsWith("#/flowpath")
+    || hash.startsWith(PROFILE_PREVIEW_HASH)
   ) {
     return <>{children}</>;
   }
@@ -1049,6 +1055,7 @@ function RootPage(): ReactNode {
     );
   }
   if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return <SubscriberExperiencePage />;
+  if (hash.startsWith(PROFILE_PREVIEW_HASH)) return <ProfilePreview />;
   if (hash.startsWith(COURSE_HASH)) {
     if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;
     return (
