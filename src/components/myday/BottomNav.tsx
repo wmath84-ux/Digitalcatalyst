@@ -34,6 +34,7 @@ export default function BottomNav({ active, onNavigate }: BottomNavProps) {
 
   return (
     <nav
+      data-site-footer-nav
       className="pointer-events-none sticky bottom-0 z-30 w-full px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-1 md:hidden"
       aria-label="My day"
     >

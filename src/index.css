@@ -519,9 +519,15 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
     --desktop-topbar-height: clamp(56px, 7vh, 64px);
   }
 
-  /* Hide mobile chrome, show desktop chrome */
+  /* Hide mobile chrome, show desktop chrome.
+     data-site-footer lives on the inner pill, not on .dc-footer-shell —
+     hide the wrapping nav so leftover padding cannot occupy space. */
   [data-site-header],
-  [data-site-footer].dc-footer-shell {
+  [data-site-footer].dc-footer-shell,
+  [data-site-footer-nav],
+  [data-site-footer],
+  .dc-footer-shell:has([data-site-footer]),
+  nav:has([data-site-footer]) {
     display: none !important;
   }
 
@@ -700,7 +706,11 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
     --desktop-topbar-height: 60px;
   }
   [data-site-header],
-  [data-site-footer].dc-footer-shell {
+  [data-site-footer].dc-footer-shell,
+  [data-site-footer-nav],
+  [data-site-footer],
+  .dc-footer-shell:has([data-site-footer]),
+  nav:has([data-site-footer]) {
     display: none !important;
   }
   [data-app-frame] {
@@ -807,9 +817,15 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   }
 
   /* The mobile + tablet per-page chrome is hidden on desktop. The
-     rail + top bar is the only chrome. */
+     rail + top bar is the only chrome. Footer nav must never appear
+     on desktop — the pill is [data-site-footer], the wrapper is
+     [data-site-footer-nav]. */
   [data-site-header],
-  [data-site-footer].dc-footer-shell {
+  [data-site-footer].dc-footer-shell,
+  [data-site-footer-nav],
+  [data-site-footer],
+  .dc-footer-shell:has([data-site-footer]),
+  nav:has([data-site-footer]) {
     display: none !important;
   }
 
@@ -2716,7 +2732,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   }
 
   /* Hide bottom nav on desktop revision */
-  .dc-desktop-shell [data-revision-app] [data-site-footer] {
+  .dc-desktop-shell [data-revision-app] [data-site-footer],
+  .dc-desktop-shell [data-revision-app] [data-site-footer-nav] {
     display: none !important;
   }
 }
@@ -2984,7 +3001,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     font-size: clamp(10px, 0.7vw, 11px) !important;
   }
   /* Hide bottom nav on desktop (desktop shell has rail) */
-  [data-profile-page] [data-site-footer] {
+  [data-profile-page] [data-site-footer],
+  [data-profile-page] [data-site-footer-nav] {
     display: none !important;
   }
   [data-profile-page] [data-site-header] {
@@ -3087,7 +3105,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     font-size: 0.8rem !important;
   }
   [data-profile-page] [data-site-header],
-  [data-profile-page] [data-site-footer] {
+  [data-profile-page] [data-site-footer],
+  [data-profile-page] [data-site-footer-nav] {
     display: none !important;
   }
   .dc-desktop-shell {
@@ -3144,7 +3163,11 @@ html[data-tablet-landscape-desktop="true"] .dc-desktop-shell {
   display: flex !important;
 }
 html[data-tablet-landscape-desktop="true"] [data-site-header],
-html[data-tablet-landscape-desktop="true"] [data-site-footer].dc-footer-shell {
+html[data-tablet-landscape-desktop="true"] [data-site-footer].dc-footer-shell,
+html[data-tablet-landscape-desktop="true"] [data-site-footer-nav],
+html[data-tablet-landscape-desktop="true"] [data-site-footer],
+html[data-tablet-landscape-desktop="true"] .dc-footer-shell:has([data-site-footer]),
+html[data-tablet-landscape-desktop="true"] nav:has([data-site-footer]) {
   display: none !important;
 }
 
@@ -3260,6 +3283,37 @@ html[data-tablet-landscape-desktop="true"] [data-site-footer].dc-footer-shell {
   }
 }
 
+
+/* ── HARD RULE: Footer navigation never appears on desktop ─────────────────
+   The left rail is the primary nav. The mobile footer pill
+   (`[data-site-footer]` on the inner capsule, `[data-site-footer-nav]`
+   on the wrapping <nav>) must be gone on:
+     • width >= 960 px
+     • tablet landscape treated as desktop
+     • any page inside `.dc-desktop-shell`
+     • body.is-desktop
+   Course-player dock is excluded because it does not carry
+   data-site-footer. */
+@media (min-width: 960px) {
+  [data-site-footer-nav],
+  [data-site-footer],
+  [data-site-footer].dc-footer-shell,
+  .dc-footer-shell:has([data-site-footer]),
+  nav:has([data-site-footer]) {
+    display: none !important;
+  }
+}
+
+.dc-desktop-shell [data-site-footer-nav],
+.dc-desktop-shell [data-site-footer],
+.dc-desktop-shell [data-site-footer].dc-footer-shell,
+.dc-desktop-shell .dc-footer-shell:has([data-site-footer]),
+.dc-desktop-shell nav:has([data-site-footer]),
+body.is-desktop [data-site-footer-nav],
+body.is-desktop [data-site-footer],
+body.is-desktop nav:has([data-site-footer]) {
+  display: none !important;
+}
 
 /* ── HARD RULE: Mobile Portrait Lock ───────────────────────────────────────
    Mobile phones (<768px) are locked to portrait everywhere except course player.
