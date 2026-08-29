@@ -689,10 +689,17 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
     }
   }
 
-  /* Boxes padding fluid */
+  /* Boxes padding fluid.
+     `.rev-card` must NOT reach the Test Bank cards: `SavedTestCard` renders
+     `Card className="… p-0"` and carries its own `p-3.5` inside, so this fluid
+     padding stacked 12–18 px on every side of a card that was already padded —
+     on a 640–1023 px tablet that is up to 36 px of dead box around the content
+     and the reason the test cards read as bloated / vertically stretched.
+     `:not([data-saved-test-card])` keeps the fluid treatment for every other
+     revision card (dashboard, progress, results), which do rely on it. */
   .dc-glass,
   .dc-glass-soft,
-  .rev-card {
+  .rev-card:not([data-saved-test-card]) {
     padding: clamp(12px, 1.8vw, 20px) !important;
   }
 
@@ -2597,22 +2604,31 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     gap: clamp(10px, 1vw, 14px);
   }
 
-  /* Dashboard: 12-col compact grid - left 7 (carousel), right 5 (stats+cards) */
+  /* Dashboard: 12-col compact grid — left 7 (plan hero + quick stats), right 5
+     (weak topics + revision bank).
+     `align-items: stretch`, NOT `start`: with `start` every column ended at its
+     own height, so the shorter one trailed off into a band of empty wallpaper
+     next to the taller one and the dashboard read as collapsing vertically. The
+     hero card now has a flex chain that fills the row (see `DashboardPage.tsx`)
+     and the plan-details box inside it absorbs the slack, so the columns stay
+     balanced instead of one of them being cut short. */
   .dc-desktop-shell [data-revision-page-main] > [data-revision-page="dashboard"] {
     display: grid !important;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: clamp(10px, 1vw, 14px);
-    align-items: start;
+    align-items: stretch;
     max-width: 1200px;
   }
   .dc-desktop-shell [data-rev-layout="dashboard"] {
     display: grid !important;
     grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: clamp(10px, 1vw, 14px);
-    align-items: start;
+    align-items: stretch;
   }
   .dc-desktop-shell [data-rev-layout="dashboard"] > .lg\:col-span-7 {
     grid-column: span 7;
+    display: flex;
+    flex-direction: column;
   }
   .dc-desktop-shell [data-rev-layout="dashboard"] > .lg\:col-span-5 {
     grid-column: span 5;
@@ -2679,15 +2695,21 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     gap: 10px;
   }
 
-  /* Cards compact on desktop */
-  .dc-desktop-shell [data-revision-page-main] .rev-card,
+  /* Cards compact on desktop — but never SMALLER than the phone box.
+     `clamp(10px, 0.9vw, 14px)` meant a 1024–1555 px window gave every revision
+     card 10 px of padding where the design says 16 px, which is what made the
+     dashboard read as "shrink ho gaya" on a laptop / a tablet in landscape. The
+     floor is now the phone value, and the ceiling is the design's own 20 px.
+     Test Bank cards are excluded: they are `p-0` by design and carry their own
+     inner padding, so this rule only ever inflated them by 14 px on all sides. */
+  .dc-desktop-shell [data-revision-page-main] .rev-card:not([data-saved-test-card]),
   .dc-desktop-shell [data-revision-page-main] .rounded-3xl,
   .dc-desktop-shell [data-revision-page-main] .rounded-2xl {
-    border-radius: clamp(12px, 1vw, 16px) !important;
+    border-radius: clamp(14px, 1.1vw, 18px) !important;
     box-shadow: 0 2px 12px -8px rgba(15,23,42,0.08), 0 1px 4px -2px rgba(15,23,42,0.06) !important;
   }
-  .dc-desktop-shell [data-revision-page-main] .rev-card {
-    padding: clamp(10px, 0.9vw, 14px) !important;
+  .dc-desktop-shell [data-revision-page-main] .rev-card:not([data-saved-test-card]) {
+    padding: clamp(16px, 1.3vw, 20px) !important;
   }
 
   /* Test Bank grid: 4 cols on desktop, compact */
@@ -2746,14 +2768,13 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     gap: 12px;
   }
 
-  /* Keep hero actions calm */
-  .dc-desktop-shell [data-revision-page-main] .min-h-\[270px\] {
-    min-height: 200px !important;
-  }
-  .dc-desktop-shell [data-revision-page-main] .min-h-\[270px\] > div {
-    min-height: 200px !important;
-    padding: 16px !important;
-  }
+  /* The plan / first-plan hero card carries NO height cap here.
+     `min-height: 200px !important` + `padding: 16px !important` on the card and
+     its content box flattened the 270 px hero into a short band in every
+     desktop-sized window — the "dashboard vertically shrink ho gaya" report.
+     The card now sizes from its own content (the < 768 px band keeps its own
+     compact 205 px version) and grows to fill its column through the flex chain
+     in `DashboardPage.tsx`, where the plan-details box absorbs the slack. */
 
   /* Hide bottom nav on desktop revision */
   .dc-desktop-shell [data-revision-app] [data-site-footer],
@@ -2829,7 +2850,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 10px !important;
   }
-  [data-revision-page-main] .rev-card {
+  [data-revision-page-main] .rev-card:not([data-saved-test-card]) {
     padding: 14px !important;
     border-radius: 16px !important;
   }
@@ -2911,20 +2932,21 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
     gap: 10px !important;
   }
-  [data-revision-page-main] .rev-card {
-    padding: 10px !important;
-    border-radius: 12px !important;
+  /* Card box metrics: the phone values, not the 10 px / 12 px shave this band
+     used to force. Ten px of card padding on an 800 x 1180 landscape tablet is
+     exactly the "sab kuch shrink ho gaya" look the tablet-portrait pass below
+     already fixed for portrait — the landscape band simply never got it.
+     Test Bank cards stay excluded: they are `p-0` by design with their own
+     inner padding, so any `.rev-card` padding here only inflated them. */
+  [data-revision-page-main] .rev-card:not([data-saved-test-card]) {
+    padding: 1rem !important;
+    border-radius: 1.5rem !important;
   }
-  [data-revision-page-main] .rounded-3xl {
+  [data-revision-page-main] .rounded-3xl:not([data-saved-test-card]) {
     border-radius: 14px !important;
   }
-  [data-revision-page-main] .min-h-\[270px\] {
-    min-height: 180px !important;
-  }
-  [data-revision-page-main] .min-h-\[270px\] > div {
-    min-height: 180px !important;
-    padding: 12px !important;
-  }
+  /* …and the plan hero card is not height-capped on this band either (see the
+     matching note in the >= 960 px desktop-shell block). */
   .dc-desktop-shell {
     display: flex !important;
   }
@@ -3801,8 +3823,15 @@ html[data-course-player-active="true"] {
    1rem and `.p-6` returns 1rem instead of 1.5rem. That — not the layout
    grids — is the "sab layout shrink ho gaye hain". The global clamp() stays
    (a contract test requires clamp() to exist and other features rely on it);
-   these two features simply get their phone sizes back. */
-@media (min-width: 640px) and (max-width: 1023px) {
+   these two features simply get their phone sizes back.
+
+   The range has to MATCH the block it undoes (640–1366 px). It used to stop at
+   1023 px, so every window from 1024 px to 1366 px — an iPad Pro in landscape,
+   a split-screen tablet, a small laptop, and the whole desktop-shell tablet
+   landscape band — kept the shrunken paddings, gaps, radii and heading sizes
+   for Revision and Profile. That leftover band is the "dashboard ekadam shrink
+   ho gaya hai vertically" report on tablet + desktop. */
+@media (min-width: 640px) and (max-width: 1366px) {
   [data-revision-app] h1,
   [data-profile-page] h1 { font-size: 1.5rem !important; }
   [data-revision-app] h2,
@@ -3846,7 +3875,7 @@ html[data-course-player-active="true"] {
   [data-revision-app] [data-revision-profile-layout] {
     max-width: 100%;
   }
-  [data-revision-app] [data-revision-page-main] .rev-card {
+  [data-revision-app] [data-revision-page-main] .rev-card:not([data-saved-test-card]) {
     padding: 1rem !important;
     border-radius: 1.5rem !important;
   }
@@ -4366,8 +4395,11 @@ html[data-course-player-active="true"] {
     font-size: 0.5625rem !important;
   }
 
-  /* CTA button */
-  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] button.mt-auto {
+  /* CTA button. `[data-rev-plan-cta]` is the plan card's own button: it no
+     longer uses `mt-auto` (the growing `data-rev-plan-details` box absorbs the
+     slack instead), so it needs its own hook to keep the compact phone box. */
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] button.mt-auto,
+  [data-revision-app] [data-revision-page-main] [data-rev-plan-cta] {
     min-height: 38px !important;
     border-radius: 0.75rem !important;
     font-size: 0.75rem !important;
@@ -4590,4 +4622,45 @@ html[data-course-player-active="true"] {
     height: 2.25rem !important;
     width: 2.25rem !important;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   TEST BANK — the sticky header keeps its seat, flush under the main header
+   ══════════════════════════════════════════════════════════════════════
+   Reported: on Revision → Test Bank the sticky header looked like it had
+   slipped a few px down — a strip of wallpaper between the website header and
+   the Test Bank bar row, and the sticky search row below it refusing to close
+   that gap while scrolling.
+
+   Nothing in the bar moved; what moved is the seat it is measured from.
+   A sticky `top: 0` is resolved against the CONTENT box of the scroll
+   container, and a sticky box may never be shifted above its own containing
+   block — so every padding sitting between the top edge of
+   `[data-revision-page-main]` and the header row shows up again, px for px, as
+   an offset:
+
+     • `.dc-desktop-shell [data-revision-page-main]` — `padding: clamp(12 px,
+       1.2 vw, 20 px) …` (desktop, and every tablet that gets desktop chrome);
+     • `[data-revision-page-main]` in the tablet-landscape band — 12 px;
+     • `[data-revision-page-main] > .animate-fade-in` in both tablet-portrait
+       bands — 16 px, and that wrapper IS the containing block of the sticky
+       search / filter row;
+     • the header row's own `lg:mt-2` — 8 px, removed in the page markup.
+
+   Below: only the TOP padding goes, and only while the page scroller hosts the
+   Test Bank (`:has(> [data-rev-bank-header])`), so the other four revision
+   tabs keep the gutter their cards are designed against. No air is lost — the
+   Test Bank header row carries `py-3` and the search rows their own `py-3`, so
+   the breathing room now lives INSIDE the glass bars instead of above them.
+   That is also what makes the pinned row paint over the content it eats
+   instead of leaving a live strip for it to peek through.
+
+   Both rules are `[data-revision-app]`-prefixed and `!important`: the band
+   paddings they beat are `!important` too, so the override needs at least the
+   same specificity AND a later position in the file. */
+[data-revision-app] [data-revision-page-main]:has(> [data-rev-bank-header]) {
+  padding-top: 0 !important;
+}
+[data-revision-app] [data-revision-page-main]:has(> [data-rev-bank-header]) > .animate-fade-in {
+  padding-top: 0 !important;
 }

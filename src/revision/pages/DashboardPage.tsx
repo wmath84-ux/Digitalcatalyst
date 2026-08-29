@@ -94,20 +94,31 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
       mergeIntoMainHeader
     >
       <div data-revision-page="dashboard" data-rev-layout="dashboard" className="animate-fade-in space-y-4 px-4 py-4 pb-8 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0 lg:py-0 lg:pb-0 lg:max-w-[1200px] lg:mx-auto">
-        <div data-rev-panel="primary" className="lg:col-span-7 lg:space-y-3">
+        {/* The dashboard's plan column.
+            • `flex flex-col` + the hero card's `flex-1`: on tablet / desktop the
+              dashboard grid stretches its rows, and this panel is what the plan
+              card fills. Without that chain the card stopped at its own height
+              and the left half of the dashboard ended in a band of empty
+              wallpaper — the "dashboard vertically shrink ho gaya" look.
+            • The three quick stats live here on purpose (they used to be the top
+              of the right column): the hero + the stat row make this column about
+              as tall as the weak-topics + revision-bank stack next to it, so both
+              columns read complete on every band instead of one trailing short.
+            • `gap-*` rather than `space-y-*`, because the panel is a flex column. */}
+        <div data-rev-panel="primary" className="flex flex-col gap-4 lg:col-span-7 lg:gap-3">
         {revisionPlans.length === 0 ? (
           <FirstRevisionCard onGenerate={openGenerator} />
         ) : (
           <RevisionPlanCarousel plans={revisionPlans} onOpen={openPlan} />
         )}
-        </div>
-
-        <div data-rev-panel="secondary" className="space-y-4 lg:col-span-5 lg:space-y-3">
-        <div data-rev-stat-grid className="grid grid-cols-3 gap-3 lg:gap-2">
+        <div data-rev-stat-grid className="grid shrink-0 grid-cols-3 gap-3 lg:gap-2">
           <StatChip icon={<ChartIcon className="h-5 w-5 text-indigo-600" />} label="Revisions" value={String(data.quickStats.testsCompleted)} />
           <StatChip icon={<TargetIcon className="h-5 w-5 text-emerald-600" />} label="Accuracy" value={`${data.quickStats.overallAccuracy}%`} />
           <StatChip icon={<FlameIcon className="h-5 w-5 text-orange-600" />} label="Streak" value={`${data.quickStats.streak}d`} />
         </div>
+        </div>
+
+        <div data-rev-panel="secondary" className="space-y-4 lg:col-span-5 lg:space-y-3">
         <div className="space-y-4 lg:space-y-3">
         <Card>
           <div className="mb-3 flex items-center justify-between">
@@ -169,10 +180,14 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
 
 function FirstRevisionCard({ onGenerate }: { onGenerate: () => void }) {
   return (
-    <div className="relative min-h-[270px] overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-0 text-white shadow-[0_20px_46px_-28px_rgba(79,70,229,0.42)] lg:rounded-2xl lg:min-h-[220px]">
+    /* `flex-auto` (1 1 auto), never `flex-1` (1 1 0%): a zero flex basis lets a
+       card shrink to less than its own content, which `overflow-hidden` would
+       then clip. `auto` keeps the content height as the floor and still grows
+       into whatever the row gives the column. */
+    <div className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-0 text-white shadow-[0_20px_46px_-28px_rgba(79,70,229,0.42)] lg:rounded-2xl lg:min-h-[220px]">
       <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/10" />
       <div className="absolute -bottom-16 -left-12 h-44 w-44 rounded-full bg-indigo-300/10" />
-      <div className="relative flex min-h-[270px] flex-col p-5 lg:min-h-[220px] lg:p-4">
+      <div className="relative flex min-h-0 flex-1 flex-col p-5 lg:p-4">
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 shadow-sm backdrop-blur lg:h-10 lg:w-10 lg:rounded-xl">
           <SparklesIcon className="h-6 w-6" />
         </span>
@@ -214,7 +229,7 @@ function RevisionPlanCarousel({ plans, onOpen }: { plans: CustomTestListItem[]; 
 
   const plan = plans[activeIndex];
   return (
-    <section aria-label="Your revision plans">
+    <section aria-label="Your revision plans" className="flex min-h-0 flex-auto flex-col">
       <AnimatePresence mode="wait" initial={false} custom={direction}>
         <motion.div
           key={plan.id}
@@ -227,14 +242,14 @@ function RevisionPlanCarousel({ plans, onOpen }: { plans: CustomTestListItem[]; 
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.35}
           onDragEnd={onDragEnd}
-          className="cursor-grab touch-pan-y active:cursor-grabbing"
+          className="flex min-h-0 flex-auto cursor-grab flex-col touch-pan-y active:cursor-grabbing"
         >
           <RevisionPlanCard plan={plan} onOpen={() => onOpen(plan)} position={`${activeIndex + 1} of ${plans.length}`} />
         </motion.div>
       </AnimatePresence>
 
       {plans.length > 1 && (
-        <div className="mt-3 flex items-center justify-center gap-4">
+        <div className="mt-3 flex shrink-0 items-center justify-center gap-4">
           <button type="button" onClick={() => move(-1)} aria-label="Previous revision plan" className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 shadow-md ring-1 ring-slate-100 transition active:scale-90">
             <ChevronLeftIcon className="h-5 w-5" />
           </button>
@@ -263,10 +278,12 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
   const action = plan.status === "completed" ? "View Revision Results" : plan.status === "in_progress" ? "Continue Revision" : "Start Revision";
 
   return (
-    <div className="relative min-h-[270px] overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-900 p-0 text-white shadow-lg shadow-indigo-200">
+    /* Same fill chain as `FirstRevisionCard` — `flex-auto`, not `flex-1`, so the
+       card can never be squeezed below its content. */
+    <div className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-900 p-0 text-white shadow-lg shadow-indigo-200">
       <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-violet-400/15" />
-      <div className="relative flex min-h-[270px] flex-col p-5">
-        <div className="flex items-start justify-between gap-3">
+      <div className="relative flex min-h-0 flex-1 flex-col p-5">
+        <div className="flex shrink-0 items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-200">Start Revision</p>
             <h2 className="mt-1 line-clamp-2 text-xl font-extrabold leading-tight">{subjects}</h2>
@@ -274,20 +291,25 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
           <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-indigo-100">{position}</span>
         </div>
 
-        <div className="mt-3 space-y-1.5 rounded-2xl bg-white/10 p-3 text-xs backdrop-blur-sm">
+        {/* The slack lands HERE, not under the copy: when the row is taller than the
+            card's own content, the Class / Chapter / Topics box grows and centres its
+            rows. That keeps the card filled instead of opening an empty band between
+            the text and the button — which is what an `mt-auto` button would do (auto
+            margins take free space before `flex-grow` can). */}
+        <div data-rev-plan-details className="mt-3 flex min-h-0 flex-auto flex-col justify-center space-y-1.5 rounded-2xl bg-white/10 p-3 text-xs backdrop-blur-sm">
           {details.classNames.length > 0 && <PlanRow label="Class" value={displayList(details.classNames, "")} />}
           <PlanRow label="Chapter" value={chapters} />
           <PlanRow label="Topics" value={topics} />
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-indigo-100">
+        <div className="mt-3 flex shrink-0 flex-wrap items-center gap-2 text-xs font-semibold text-indigo-100">
           <span className="flex items-center gap-1"><BankIcon className="h-4 w-4" /> {plan.totalQuestions} questions</span>
           <span className="flex items-center gap-1"><ClockIcon className="h-4 w-4" /> {plan.estimatedMinutes} min</span>
           <span className="rounded-full bg-white/10 px-2 py-1 capitalize">{details.difficulty} difficulty</span>
           <span className="rounded-full bg-white/10 px-2 py-1">{questionModeLabel(details.questionMode)}</span>
         </div>
 
-        <button type="button" onClick={onOpen} className="mt-auto flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl bg-white text-sm font-extrabold text-indigo-800 shadow-sm transition active:scale-[0.98]">
+        <button type="button" data-rev-plan-cta onClick={onOpen} className="mt-3 flex min-h-[48px] w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-white text-sm font-extrabold text-indigo-800 shadow-sm transition active:scale-[0.98]">
           {plan.status === "completed" && <CheckIcon className="h-4 w-4" />}
           {action}
           {plan.status !== "completed" && <ChevronRightIcon className="h-4 w-4" />}
