@@ -391,7 +391,13 @@ function SavedTestsView({
           ) : <SecondaryButton className="mt-2 w-auto px-6" onClick={() => onSearch("")}>Clear search</SecondaryButton>}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-3 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 lg:px-0 lg:gap-3 lg:max-w-[1200px] lg:mx-auto" data-saved-tests-grid>
+        /* `items-start` matters as much as the column count: with the grid's
+           default `align-items: stretch` every card in a row is forced to the
+           height of the tallest one (a completed test shows a 4-up result-metrics
+           row, a "ready to start" one does not), and the leftover opened up in the
+           MIDDLE of the shorter cards — the "cards bahut vertically stretched /
+           bich mein white space" report on every tablet width. */
+        <div className="grid grid-cols-1 items-start gap-3 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 lg:px-0 lg:gap-3 lg:max-w-[1200px] lg:mx-auto" data-saved-tests-grid>
           {tests.map((test) => (
             <SavedTestCard
               key={test.id}
@@ -449,12 +455,14 @@ function SavedTestCard({
   const progress = test.status === "in_progress" ? Math.min(100, ((test.currentIndex + 1) / progressTotal) * 100) : 0;
 
   return (
-    /* `aspect-square` is the wide-screen look only. Whenever the Test Bank
-       content column is narrow (small tablet with the side panel visible,
-       split-screen tablet, phone) the compact-band CSS in `src/index.css`
-       switches it to `aspect-ratio: auto` so the card grows with its content
-       instead of clipping the action buttons behind `overflow-hidden`. */
-    <Card className="relative aspect-square overflow-hidden p-0" data-saved-test-card>
+    /* No `aspect-square`: a card is as tall as its content, on every band. The
+       square was only ever safe in a narrow single-column layout (and the
+       compact-band CSS in `src/index.css` had to switch it back to `auto` for
+       exactly that reason) — as soon as the column was wide enough for a square
+       of 260-330 px, the content was shorter than the box and the leftover
+       space opened a white gap in the middle of every card. `overflow-hidden`
+       stays: it is what contains the expanded attempt-history overlay. */
+    <Card className="relative overflow-hidden p-0" data-saved-test-card>
       <div className="flex h-full flex-col p-3.5">
         <div className="flex items-start gap-2.5">
           <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${test.source === "bulk" ? "bg-amber-50 text-amber-600" : "bg-violet-50 text-violet-600"}`}>
@@ -488,9 +496,11 @@ function SavedTestCard({
           </div>
         )}
 
-        <div className="min-h-0 flex-1" />
-
-        <div className="flex items-center justify-between text-[10px] text-slate-500">
+        {/* Used to be a `min-h-0 flex-1` spacer that pushed the actions to the
+            bottom of a square card. With content-driven heights it had nothing
+            to absorb EXCEPT the slack from a stretched grid row — i.e. it WAS
+            the white band in the middle of the card. Gone. */}
+        <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
           <span className="flex items-center gap-1"><History className="h-3 w-3" /> {test.attemptCount} completed attempt{test.attemptCount === 1 ? "" : "s"}</span>
           <span>{relativeDate(test.completedAt)}</span>
         </div>

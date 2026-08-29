@@ -10,8 +10,8 @@
 // cards side by side. `AppShell` routes those viewports to `DesktopShell` from
 // 960 px wide, or from 640 px when a tablet (min screen side >= 600 px) is in
 // landscape, and the 200-260 px rail leaves a much narrower content column
-// than the viewport suggests. Cards are `aspect-square overflow-hidden`, so
-// each one shrank with its column and clipped its own action buttons.
+// than the viewport suggests. Cards used to be `aspect-square overflow-hidden`,
+// so each one shrank with its column and clipped its own action buttons.
 //
 // The rule is now container-driven: under 900 px of REAL content width the
 // grid is exactly one card per row, cards grow with their content, and the
@@ -74,9 +74,12 @@ test("the rule also beats the desktop-shell grid rule inside the side panel", ()
 test("cards stop being squares so every button stays on screen", () => {
   assert.match(compactBlock, /aspect-ratio: auto !important/);
   assert.match(compactBlock, /min-height: 0 !important/);
-  // The phone/tablet-portrait markup is untouched: still a square with the
-  // clip that contains the expanded attempt-history overlay.
-  assert.match(page, /className="relative aspect-square overflow-hidden p-0" data-saved-test-card/);
+  // And no band forces a square any more: the card is content-sized everywhere,
+  // which is also what stops a stretched grid row from opening a white band in
+  // the middle of a shorter card. `overflow-hidden` stays — it is what contains
+  // the expanded attempt-history overlay.
+  assert.doesNotMatch(page, /className="relative[^"]*aspect-square[^"]*data-saved-test-card/);
+  assert.match(page, /className="relative overflow-hidden p-0" data-saved-test-card/);
 });
 
 test("the trailing create tile spans the full row in the one-column band", () => {
