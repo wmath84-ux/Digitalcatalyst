@@ -127,13 +127,28 @@ body,
   -ms-touch-action: pan-x pan-y;
 }
 
-html,
 body {
   /* Mobile webviews can otherwise pan into tiny off-canvas areas created by
      glows/shadows (notably the floating footer), making the app look like a
      white page floating inside the screen. */
+
+  /* The horizontal guard lives on body ONLY, never on html. On an engine
+     without `overflow-x: clip` support the first declaration falls back to
+     `overflow-x: hidden`, which forces that element's overflow-y to compute to
+     auto. Applied to the ROOT element that would turn the document itself into
+     a viewport-height scroll container that steals / short-circuits the tablet
+     shell's `[data-desktop-content]` scroll. On `html` the browser additionally
+     propagates overflow to the viewport, so an `overflow-x: hidden` root makes
+     the viewport a competing scroller. Left at its default, the root stays
+     `overflow-y: visible` and never becomes a scroller. */
   overflow-x: hidden;
   overflow-x: clip;
+}
+
+html {
+  /* Belt-and-braces companion so the root is never a competing scroll
+     container, even if some other rule ever sets `overflow-x` on it. */
+  overflow-y: visible;
 }
 
 *,
@@ -3274,8 +3289,11 @@ body.is-desktop nav:has([data-site-footer]) {
     overflow: hidden;
   }
   
-  /* Ensure overlay is always on top in landscape */
-  html[data-orientation-locked="portrait"]:not([data-course-player-active="true"]) [data-app-portrait-overlay] {
+  /* Ensure overlay is always on top in landscape. Belt-and-braces: also gated
+     on `data-phone-device` (from isPhoneDevice() in appOrientation.ts), so a
+     tablet window can never be shown the "rotate your phone" overlay even if
+     the lock attribute ever landed on it. */
+  html[data-phone-device="true"][data-orientation-locked="portrait"]:not([data-course-player-active="true"]) [data-app-portrait-overlay] {
     display: grid !important;
     visibility: visible !important;
     opacity: 1 !important;
@@ -3288,14 +3306,23 @@ html[data-course-player-active="true"] {
   overflow: auto;
 }
 
-/* Extra safety: Hide any landscape-specific UI outside course player on mobile */
+/* Extra safety: Hide any landscape-specific UI outside course player on mobile.
+   The freeze is gated on `data-phone-device`, NOT on the orientation-lock
+   attribute: `touch-action` intersects down the ancestor chain, so an ungated
+   `touch-action: none` here would freeze EVERY scroller the tablet scroll model
+   creates (the shell's `[data-desktop-content]` and the tablet-portrait
+   `<main>`s) on a tablet window. `data-phone-device` comes from isPhoneDevice()
+   in appOrientation.ts, which reads the device's smaller physical CSS
+   dimension — still true in Android split-screen, false on any real tablet. */
 @media screen and (orientation: landscape) and (max-width: 767px) {
-  html:not([data-course-player-active="true"]) body {
+  html[data-phone-device="true"]:not([data-course-player-active="true"]) body {
     /* Prevent content from being interactive in landscape - overlay handles it */
     touch-action: none;
   }
-  
-  html[data-course-player-active="true"] body {
+
+  /* A tablet window sized into this narrow landscape band is a real tablet,
+     just a narrow one — it keeps normal panning instead of being frozen. */
+  html:not([data-phone-device="true"]) body {
     touch-action: auto;
   }
 }
@@ -3507,5 +3534,143 @@ html[data-course-player-active="true"] {
      The frame is the scroller here, so the wrapper stops reserving the height. */
   html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) .dc-app-shell {
     min-height: 0;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   TABLET SCROLL — follow-up to the TABLET / DESKTOP SCROLL MODEL above (#501)
+   ──────────────────────────────────────────────────────────────────────────
+   #501 was verified statically only. The three cases below are the parts where
+   that static model was wrong or incomplete on a real device.
+
+   • Split-screen / narrow tablet landscape (640–959 px wide, no shell): the
+     width-gated phone freeze used to live on an ungated `body { touch-action:
+     none }` and is now on `html[data-phone-device="true"]`, so a tablet window
+     keeps normal panning. (Edited in place above.)
+   • Tablet portrait (640–959 px, no shell): #501 made `[data-app-frame]` the
+     scroller, which dragged the phone header AND the bottom nav pill (both
+     children of the frame) out of view — not the phone model. Prefer the page's
+     own `<main>` as the scroller and only fall back to the frame. Every 100dvh
+     also gets a 100vh fallback so the pin survives engines without dvh.
+   • Wide tablet / desktop shell: the horizontal overflow guard now lives on
+     `body` only (edited above) and the shell's non-passive touchmove is gone
+     (src/utils/disablePageZoom.ts). Fallbacks for the shell pin added below. */
+
+/* ── 3. Tablet portrait (640–959 px, no shell): the page's own <main> is the
+        scroller, not the frame — the phone model ─────────────────────────
+   Home, Store, PDP, Search, Profile, … all put `<main>` DIRECTLY inside
+   `[data-app-frame]` (which is a `flex flex-col`), with the phone header above
+   it and the bottom nav pill below it. On a phone, the header and pill are
+   pinned and `<main>` scrolls. The #501 binding scrolled the FRAME, which made
+   the header AND the pill scroll out of view. So for a frame that has a direct
+   `<main>`, the frame is clipped (`overflow: hidden`, so header + pill stay
+   pinned) and that `<main>` becomes the scroller.
+
+   My Day nests its `<main>` inside `[data-myday-content]`, so it has NO direct
+   `<main>`; for it the frame itself scrolls (the existing #501 behaviour), just
+   now with a 100vh fallback.
+
+   Every pin that uses 100dvh is written as `100vh` here and upgraded to 100dvh
+   only inside `@supports (height: 100dvh)`. A bare `height: 100dvh` drops on
+   engines without dynamic-viewport units, leaving the frame `height: auto` and
+   bringing the zero-range dead scroller back exactly as before. lightningcss
+   (the build minifier) collapses two sequential same-property declarations
+   (`height: 100vh; height: 100dvh;` → `height: 100dvh`), which would silently
+   delete the fallback from the compiled CSS — `@supports` is the only form that
+   survives the real pipeline. */
+
+@media (min-width: 640px) and (max-width: 959px) {
+  /* Frame WITH a direct <main>: keep header + pill pinned, let <main> scroll. */
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]):has(> main) {
+    height: 100vh;
+    min-height: 0;
+    max-height: 100vh;
+    overflow: hidden;
+  }
+  /* The page's own scroller — it only ever lacked a bounded parent. It gets the
+     same visible scrollbar the phone's inner <main> already gets, because on
+     these pages it (not the frame) is what moves. */
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]):has(> main) > main {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(100 116 139 / 0.45) transparent;
+  }
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]):has(> main) > main::-webkit-scrollbar {
+    display: block;
+    width: 8px;
+  }
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]):has(> main) > main::-webkit-scrollbar-thumb {
+    background: rgb(100 116 139 / 0.38);
+    border-radius: 9999px;
+  }
+
+  /* Frame WITHOUT a direct <main> (e.g. My Day, whose main sits inside
+     `[data-myday-content]`): the frame itself is the scroller. */
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]):not(:has(> main)) {
+    height: 100vh;
+    min-height: 0;
+    max-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(100 116 139 / 0.45) transparent;
+  }
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]):not(:has(> main))::-webkit-scrollbar {
+    display: block;
+    width: 8px;
+  }
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]):not(:has(> main))::-webkit-scrollbar-thumb {
+    background: rgb(100 116 139 / 0.38);
+    border-radius: 9999px;
+  }
+
+  /* `min-h-screen` on the page wrapper is up to a browser-UI's worth taller
+     than the bound frame, which reads as a short dead tug at the end of every
+     swipe. The frame is bound here, so the wrapper stops reserving the height. */
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) .dc-app-shell {
+    min-height: 0;
+  }
+}
+
+/* Upgrade the tablet-portrait pins to dynamic-viewport units where supported,
+   so the visible viewport (minus collapsed mobile browser chrome) is used. */
+@supports (height: 100dvh) {
+  @media (min-width: 640px) and (max-width: 959px) {
+    html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]):has(> main) {
+      height: 100dvh;
+      max-height: 100dvh;
+    }
+    html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:not([data-revision-frame]):not(:has(> main)) {
+      height: 100dvh;
+      max-height: 100dvh;
+    }
+  }
+}
+
+/* ── 4. Desktop shell pin: 100vh fallback before 100dvh ────────────────────
+   #501 pinned `.dc-desktop-shell` to `height: 100dvh`. Where dvh is
+   unsupported the declaration drops and the shell falls back to `height: auto`
+   (its intrinsic height), shrinking the viewport-height scroll container. The
+   same rule is re-pinned at 100vh and upgraded to 100dvh via `@supports` so the
+   shell stays exactly the viewport on every engine. Same specificity + later
+   source order ⇒ these override the #501 pin. */
+.dc-desktop-shell {
+  height: 100vh;
+}
+.dc-desktop-shell:has([data-revision-app]) {
+  height: 100vh;
+}
+@supports (height: 100dvh) {
+  .dc-desktop-shell {
+    height: 100dvh;
+  }
+  .dc-desktop-shell:has([data-revision-app]) {
+    height: 100dvh;
   }
 }

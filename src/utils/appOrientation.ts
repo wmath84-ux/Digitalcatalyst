@@ -79,6 +79,19 @@ const setHtmlOrientationAttributes = (): void => {
   if (typeof document === "undefined") return;
   try {
     const html = document.documentElement;
+    // Publish the device decision as an explicit, always-correct signal that is
+    // independent of any lock state. CSS re-gates the landscape phone freeze
+    // (`touch-action: none`) and the "rotate your phone" overlay on this, so a
+    // TABLET window in a narrow landscape band is never touch-frozen and never
+    // shown the rotate overlay. `isPhoneDevice()` reads the device's smaller
+    // physical CSS dimension, so it stays true in Android split-screen — where
+    // `screen.*` still reports the whole device display — and false on a real
+    // tablet regardless of how the window is sized.
+    if (isPhoneDevice()) {
+      html.setAttribute("data-phone-device", "true");
+    } else {
+      html.removeAttribute("data-phone-device");
+    }
     if (coursePlayerActive) {
       html.setAttribute("data-course-player-active", "true");
       html.removeAttribute("data-orientation-locked");

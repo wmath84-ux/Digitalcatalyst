@@ -17,12 +17,6 @@ export const disablePageZoom = () => {
     event.preventDefault();
   };
 
-  const onTouchMove = (event: TouchEvent) => {
-    if (event.touches.length < 2) return;
-    if (isInteractiveZoomSurface(event.target)) return;
-    event.preventDefault();
-  };
-
   const onWheel = (event: WheelEvent) => {
     if (!event.ctrlKey && !event.metaKey) return;
     if (isInteractiveZoomSurface(event.target)) return;
@@ -35,10 +29,17 @@ export const disablePageZoom = () => {
     event.preventDefault();
   };
 
+  // NOTE: there is deliberately NO document-level `touchmove` listener here.
+  // A non-passive document touchmove makes every scroll wait on the main
+  // thread and, with `touches.length >= 2`, swallows the whole gesture — that
+  // competes with the compositor-driven touch scrolling of the tablet shell's
+  // `[data-desktop-content]` (and the tablet-portrait `<main>` scrollers).
+  // Pinch-zoom is already blocked app-wide by `#root { touch-action:
+  // pan-x pan-y }`, and the iOS gesturestart/gesturechange/gestureend + wheel
+  // + keydown handlers below still block zoom everywhere else.
   document.addEventListener("gesturestart", onGesture, { passive: false });
   document.addEventListener("gesturechange", onGesture, { passive: false });
   document.addEventListener("gestureend", onGesture, { passive: false });
-  document.addEventListener("touchmove", onTouchMove, { passive: false });
   document.addEventListener("wheel", onWheel, { passive: false });
   document.addEventListener("keydown", onKeyDown);
 
@@ -46,7 +47,6 @@ export const disablePageZoom = () => {
     document.removeEventListener("gesturestart", onGesture);
     document.removeEventListener("gesturechange", onGesture);
     document.removeEventListener("gestureend", onGesture);
-    document.removeEventListener("touchmove", onTouchMove);
     document.removeEventListener("wheel", onWheel);
     document.removeEventListener("keydown", onKeyDown);
   };
