@@ -4591,3 +4591,44 @@ html[data-course-player-active="true"] {
     width: 2.25rem !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   TEST BANK — the sticky header keeps its seat, flush under the main header
+   ══════════════════════════════════════════════════════════════════════
+   Reported: on Revision → Test Bank the sticky header looked like it had
+   slipped a few px down — a strip of wallpaper between the website header and
+   the Test Bank bar row, and the sticky search row below it refusing to close
+   that gap while scrolling.
+
+   Nothing in the bar moved; what moved is the seat it is measured from.
+   A sticky `top: 0` is resolved against the CONTENT box of the scroll
+   container, and a sticky box may never be shifted above its own containing
+   block — so every padding sitting between the top edge of
+   `[data-revision-page-main]` and the header row shows up again, px for px, as
+   an offset:
+
+     • `.dc-desktop-shell [data-revision-page-main]` — `padding: clamp(12 px,
+       1.2 vw, 20 px) …` (desktop, and every tablet that gets desktop chrome);
+     • `[data-revision-page-main]` in the tablet-landscape band — 12 px;
+     • `[data-revision-page-main] > .animate-fade-in` in both tablet-portrait
+       bands — 16 px, and that wrapper IS the containing block of the sticky
+       search / filter row;
+     • the header row's own `lg:mt-2` — 8 px, removed in the page markup.
+
+   Below: only the TOP padding goes, and only while the page scroller hosts the
+   Test Bank (`:has(> [data-rev-bank-header])`), so the other four revision
+   tabs keep the gutter their cards are designed against. No air is lost — the
+   Test Bank header row carries `py-3` and the search rows their own `py-3`, so
+   the breathing room now lives INSIDE the glass bars instead of above them.
+   That is also what makes the pinned row paint over the content it eats
+   instead of leaving a live strip for it to peek through.
+
+   Both rules are `[data-revision-app]`-prefixed and `!important`: the band
+   paddings they beat are `!important` too, so the override needs at least the
+   same specificity AND a later position in the file. */
+[data-revision-app] [data-revision-page-main]:has(> [data-rev-bank-header]) {
+  padding-top: 0 !important;
+}
+[data-revision-app] [data-revision-page-main]:has(> [data-rev-bank-header]) > .animate-fade-in {
+  padding-top: 0 !important;
+}

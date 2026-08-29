@@ -202,7 +202,20 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
 
   return (
     <PageShell route={route} title="Test Bank" subtitle={view === "tests" ? capacityLabel : `${summary.due} questions ready for Smart Revision`} mergeIntoMainHeader>
-      <div className="dc-glass-toolbar border-b border-white/60 px-4 pb-3 pt-3 lg:px-0 lg:max-w-[1200px] lg:mx-auto lg:rounded-2xl lg:mt-2">
+      {/* The Test Bank header row.
+          `data-rev-bank-header` is the hook the flush-seat rules in
+          `src/index.css` key off. This row is the FIRST child of the page
+          scroller (`main[data-revision-page-main]`), and a sticky inset is
+          resolved against that scroller's CONTENT box — so the band paddings
+          it used to carry (12 px tablet landscape, clamp(12–20 px) inside the
+          desktop shell) plus the old `lg:mt-2` here parked the whole Test Bank
+          header a few px BELOW the website header instead of flush against it,
+          and the search row below could never rise to the true top while
+          sticking. Both offsets are gone: the header now starts glued to the
+          main header, and `sticky top-0` inside the scroller means "the very
+          top", not "the top plus padding". The row keeps its own `py-3`, so
+          the breathing room lives inside the glass bar instead of above it. */}
+      <div data-rev-bank-header className="dc-glass-toolbar border-b border-white/60 px-4 py-3 lg:px-0 lg:max-w-[1200px] lg:mx-auto lg:rounded-2xl">
         <div data-rev-bank-view-switch className="dc-glass-soft grid grid-cols-2 rounded-2xl p-1">
           <button
             type="button"
@@ -338,6 +351,11 @@ function SavedTestsView({
   const percentage = limit == null || limit < 0 ? 0 : Math.min(100, limit === 0 ? 100 : (used / limit) * 100);
 
   return (
+    /* The root wrapper must not grow a top padding of its own on any band:
+       the sticky search row below is constrained by this element's content
+       box, so any padding here would leave that row hanging the same number of
+       px under the main header instead of flush (`index.css` zeroes it for the
+       Test Bank). */
     <div className="animate-fade-in pb-24">
       <div className="dc-glass-toolbar sticky top-0 z-10 space-y-3 border-b border-white/60 px-4 py-3">
         <div className="dc-glass-input flex min-h-[44px] items-center gap-2 rounded-2xl px-3">
@@ -554,6 +572,8 @@ function SmartRevisionView({ bankData, summary, search, statusTab, activeFilterC
   onClear: () => void;
 }) {
   return (
+    /* Same seat as the Saved Tests view: a sticky row directly under a wrapper
+       with no top padding, so `top-0` really is the top of the page. */
     <div className="animate-fade-in pb-28">
       <div className="dc-glass-toolbar sticky top-0 z-10 space-y-3 border-b border-white/60 px-4 py-3">
         <div className="flex gap-2">
