@@ -4175,3 +4175,343 @@ html[data-course-player-active="true"] {
     flex: 1 1 auto;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   SMALL-SCREEN PASS (appended)
+   ══════════════════════════════════════════════════════════════════════
+   Three fixes, all gated so the phone band (< 640 px) and tablet portrait
+   (640-1023 px) keep the intended behaviour and 768 px+ layouts are
+   untouched:
+
+     1. Revision feature header (back-button AppHeader) sticky offset.
+        The site header height differs per band: 68 px on a phone, ~80 px
+        on tablet portrait (md:py-4 + 3rem brand tile), 64 px desktop top
+        bar (which replaces the site header from 960 px up / tablet
+        landscape). The header hard-coded top-[68px] for every band, so on
+        tablet portrait it stuck 12 px BELOW the site header (a visible gap)
+        and on desktop 4-8 px below the top bar. The offset now lives in
+        CSS, exactly like `.dc-page-tabs`.
+     2. Revision dashboard test cards: compact on small screens (< 768 px).
+        The plan carousel card + first-plan hero were built as desktop
+        heroes (min-height 270 px, text-2xl headings, 50 px buttons). On a
+        phone or small tablet that card consumed the whole screen. Below
+        768 px the cards shrink a lot — phones (< 640 px) get the tightest
+        version, small tablets (640-767 px) a slightly roomier one.
+     3. Main Profile page: compact single-column redesign for small screens
+        (< 768 px). One card below the other, smaller card padding / type /
+        buttons / icon chips, and the quick-stats row becomes square tiles.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Revision feature header sticky offset per band ─────────────────── */
+[data-revision-app-header] {
+  top: 68px;
+}
+@media (min-width: 768px) {
+  [data-revision-app-header] {
+    top: 80px;
+  }
+}
+@media (min-width: 960px) {
+  [data-revision-app-header] {
+    top: 64px;
+  }
+}
+html[data-tablet-landscape-desktop="true"] [data-revision-app-header] {
+  top: 64px;
+}
+
+/* ── 2. Revision dashboard test cards: compact on small screens ─────────── */
+@media (max-width: 767px) {
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] {
+    min-height: 205px !important;
+  }
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] > div.relative {
+    min-height: 205px !important;
+    padding: 14px !important;
+  }
+
+  /* Card headings: text-2xl / text-xl → compact 17 px */
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] h2 {
+    font-size: 1.0625rem !important;
+    line-height: 1.2 !important;
+  }
+
+  /* First-plan hero: kicker + body copy tighter */
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] p.text-xs.mt-5 {
+    font-size: 0.625rem !important;
+    margin-top: 10px !important;
+  }
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] p.text-sm {
+    font-size: 0.75rem !important;
+    margin-top: 6px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Icon tiles: h-12 w-12 → 36 px, icon h-6 w-6 → 18 px */
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] .h-12.w-12 {
+    height: 2.25rem !important;
+    width: 2.25rem !important;
+    border-radius: 0.75rem !important;
+  }
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] .h-6.w-6 {
+    height: 1.125rem !important;
+    width: 1.125rem !important;
+  }
+
+  /* Plan details box (Class / Chapter / Topics) */
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] .rounded-2xl.bg-white\/10 {
+    margin-top: 10px !important;
+    padding: 10px !important;
+    border-radius: 0.75rem !important;
+  }
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] .rounded-2xl.bg-white\/10 p {
+    font-size: 0.6875rem !important;
+  }
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] .rounded-2xl.bg-white\/10 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 3px !important;
+  }
+
+  /* Meta row (questions · min · difficulty · mode) */
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] .flex.flex-wrap.items-center.gap-2 {
+    gap: 6px !important;
+    margin-top: 10px !important;
+    font-size: 0.6875rem !important;
+  }
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] .h-4.w-4 {
+    height: 0.875rem !important;
+    width: 0.875rem !important;
+  }
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] .rounded-full.bg-white\/10 {
+    padding: 1px 7px !important;
+    font-size: 0.625rem !important;
+  }
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] .rounded-full.bg-white\/10.px-2\.5 {
+    padding: 1px 8px !important;
+    font-size: 0.5625rem !important;
+  }
+
+  /* CTA button */
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] button.mt-auto {
+    min-height: 38px !important;
+    border-radius: 0.75rem !important;
+    font-size: 0.75rem !important;
+  }
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] button.mt-auto svg {
+    height: 0.875rem !important;
+    width: 0.875rem !important;
+  }
+
+  /* Carousel swipe controls + dots */
+  [data-revision-app] [data-revision-page-main] .h-11.w-11 {
+    height: 2.25rem !important;
+    width: 2.25rem !important;
+  }
+  [data-revision-app] [data-revision-page-main] .h-11.w-11 .h-5.w-5 {
+    height: 1rem !important;
+    width: 1rem !important;
+  }
+  [data-revision-app] [data-revision-page-main] .min-w-\[132px\] {
+    min-width: 96px !important;
+  }
+  [data-revision-app] [data-revision-page-main] .min-w-\[132px\] p {
+    font-size: 0.625rem !important;
+  }
+  [data-revision-app] [data-revision-page-main] .mt-3.flex.items-center.justify-center.gap-4 {
+    gap: 0.5rem !important;
+    margin-top: 10px !important;
+  }
+}
+
+/* ── 3. Main Profile: compact single-column redesign (< 768 px) ────────────
+   On phones and small tablets the profile becomes a tight vertical stack —
+   every card one below the other — with smaller card padding, smaller type,
+   smaller buttons/icon chips and square quick-stat tiles. 768 px+ keeps the
+   existing two-column / desktop layout untouched. */
+@media (max-width: 767px) {
+  /* Tighter page gutter */
+  [data-profile-page] [data-profile-content] {
+    padding: 12px 14px 22px;
+  }
+
+  /* One card under another: override the tablet-portrait two-column split
+     (640-959 px) and the container-query stack so the rhythm stays even. */
+  [data-profile-layout] {
+    display: block !important;
+  }
+  [data-profile-layout] > * + * {
+    margin-top: 12px !important;
+  }
+  [data-profile-col="main"],
+  [data-profile-col="side"] {
+    display: block !important;
+  }
+  [data-profile-col="main"] > * + *,
+  [data-profile-col="side"] > * + * {
+    margin-top: 12px !important;
+  }
+
+  /* Page header: smaller headline + tagline */
+  [data-profile-layout] > header h1 {
+    font-size: 1.4rem !important;
+  }
+  [data-profile-layout] > header p {
+    font-size: 0.75rem !important;
+  }
+
+  /* Quick stats → row of square tiles (3-across even in the narrow
+     container-query band, where the last tile would otherwise span two
+     columns and turn into a giant square). */
+  [data-profile-page] [data-profile-stats] {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+  [data-profile-page] [data-profile-stats] > *:last-child {
+    grid-column: auto !important;
+  }
+  [data-profile-stats] > button {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 2px !important;
+    border-radius: 14px !important;
+  }
+  [data-profile-stats] > button > span:first-child {
+    height: 2rem !important;
+    width: 2rem !important;
+    border-radius: 0.625rem !important;
+  }
+  [data-profile-stats] > button > span:first-child svg {
+    height: 1rem !important;
+    width: 1rem !important;
+  }
+  [data-profile-stats] > button > span:nth-child(2) {
+    font-size: 1.125rem !important;
+    margin-top: 2px !important;
+  }
+  [data-profile-stats] > button > span:last-child {
+    font-size: 0.5625rem !important;
+  }
+
+  /* Cards: smaller padding + radius (the branded hero is excluded — it is a
+     <section> too, but keeps its own full-bleed treatment + inner padding). */
+  [data-profile-layout] section:not([data-profile-hero]) {
+    padding: 14px !important;
+    border-radius: 18px !important;
+  }
+  [data-profile-layout] section h3 {
+    font-size: 0.9375rem !important;
+  }
+  /* Body copy only — the tiny 10-12 px helper labels stay as they are. */
+  [data-profile-layout] section p.text-sm,
+  [data-profile-layout] section p.text-base {
+    font-size: 0.8125rem !important;
+  }
+
+  /* Icon chips inside cards: h-11 w-11 → 36 px, h-12 w-12 → 40 px */
+  [data-profile-layout] .h-11.w-11 {
+    height: 2.25rem !important;
+    width: 2.25rem !important;
+    border-radius: 0.75rem !important;
+  }
+  [data-profile-layout] .h-12.w-12 {
+    height: 2.5rem !important;
+    width: 2.5rem !important;
+    border-radius: 0.75rem !important;
+  }
+
+  /* CTA buttons: shorter, smaller type */
+  [data-profile-layout] section button.py-3\.5,
+  [data-profile-layout] section button.py-3 {
+    padding-top: 0.625rem !important;
+    padding-bottom: 0.625rem !important;
+    border-radius: 0.875rem !important;
+    font-size: 0.8125rem !important;
+  }
+  [data-profile-layout] section button.py-3\.5 svg,
+  [data-profile-layout] section button.py-3 svg {
+    height: 0.9375rem !important;
+    width: 0.9375rem !important;
+  }
+
+  /* Stat chips inside membership / renewal cards: value a touch smaller,
+     the tiny 9 px label untouched. */
+  [data-profile-layout] section .rounded-2xl.bg-slate-50 {
+    padding: 8px 6px !important;
+    border-radius: 0.75rem !important;
+  }
+  [data-profile-layout] section .rounded-2xl.bg-slate-50 p.mt-1 {
+    font-size: 0.6875rem !important;
+  }
+
+  /* Hero: smaller avatar, tighter padding + type */
+  [data-profile-hero] > div {
+    padding: 16px !important;
+  }
+  [data-profile-hero] .h-16.w-16 {
+    height: 3rem !important;
+    width: 3rem !important;
+  }
+  [data-profile-hero] .h-16.w-16 img,
+  [data-profile-hero] .h-16.w-16 div {
+    height: 3rem !important;
+    width: 3rem !important;
+    font-size: 0.9375rem !important;
+  }
+  [data-profile-hero] h2 {
+    font-size: 1.0625rem !important;
+  }
+  [data-profile-hero] p {
+    font-size: 0.8125rem !important;
+  }
+  [data-profile-hero] .flex.items-center.gap-1\.5 {
+    font-size: 0.6875rem !important;
+  }
+  [data-profile-hero] .flex.items-center.gap-1\.5 svg {
+    height: 0.875rem !important;
+    width: 0.875rem !important;
+  }
+  [data-profile-hero] p.rounded-2xl {
+    padding: 10px 12px !important;
+    font-size: 0.75rem !important;
+    line-height: 1.45 !important;
+  }
+  /* Only the labelled "Edit profile" text button — not the circular
+     pencil icon button. */
+  [data-profile-hero] button.inline-flex {
+    margin-top: 12px !important;
+    padding: 8px 12px !important;
+    border-radius: 0.75rem !important;
+    font-size: 0.75rem !important;
+  }
+  [data-profile-hero] button.inline-flex svg {
+    height: 0.875rem !important;
+    width: 0.875rem !important;
+  }
+
+  /* Library rows: smaller thumbnails + type */
+  [data-profile-layout] section .h-12.w-16 {
+    height: 2.5rem !important;
+    width: 3.25rem !important;
+    border-radius: 0.625rem !important;
+  }
+  [data-profile-layout] section button .text-sm {
+    font-size: 0.8125rem !important;
+  }
+
+  /* Logout button: shorter (the tiny admin link keeps its text-only look) */
+  [data-profile-layout] > [data-profile-col="side"] > button:not([data-profile-open-dashboard]) {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+    border-radius: 0.875rem !important;
+    font-size: 0.8125rem !important;
+  }
+
+  /* Preferences bell button */
+  [data-profile-layout] section .h-10.w-10 {
+    height: 2.25rem !important;
+    width: 2.25rem !important;
+  }
+}
