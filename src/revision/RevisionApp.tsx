@@ -106,6 +106,25 @@ export function resolveRevisionTabId(path: string): string | null {
 }
 
 /**
+ * True on sub-pages that render their own feature header (the back-button
+ * `AppHeader` from PageShell): AI settings / generator, bulk import, the test
+ * player / test result / test review and the Smart Revision session. On
+ * tablet the tab strip is only meant to switch the five top-level tab pages,
+ * so stacking it above the feature header pushed that header down and left a
+ * redundant row between the site header and the page. Sub-pages skip the
+ * in-body strip; the desktop shell's top-bar tab row is unaffected (it is
+ * published separately via `useRegisterTopBarTabs`).
+ */
+export function isRevisionSubPage(path: string): boolean {
+  if (path === "#/revision" || path === "#/revision/") return false;
+  if (path.startsWith("#/revision/bank")) return false;
+  if (path.startsWith("#/revision/weak-topics")) return false;
+  if (path.startsWith("#/revision/progress")) return false;
+  if (path.startsWith("#/revision/profile")) return false;
+  return true;
+}
+
+/**
  * True on the focused test-taking surfaces, where the feature also hides its
  * own bottom nav (`PageShell hideNav`): a running test and an in-progress
  * Smart Revision session. The tab row steps out of the way there too, so the
@@ -122,6 +141,7 @@ export function RevisionPageTabs({ path }: { path: string }) {
   // `null` unless the desktop shell is mounted and owns the header.
   const topBarHost = useTopBarTabsHost();
   const focusRoute = isRevisionFocusRoute(path);
+  const subPage = isRevisionSubPage(path);
 
   // Publish the row into the desktop header. Registering `null` on the focused
   // test-taking surfaces — and clearing on unmount, which `useRegisterTopBarTabs`
@@ -142,8 +162,11 @@ export function RevisionPageTabs({ path }: { path: string }) {
       : null,
   );
 
-  // The desktop header already shows them; the focused routes show neither.
+  // The desktop header already shows them; the focused routes show neither;
+  // and sub-pages (AI settings, bulk import, …) render their own feature
+  // header, so the strip would only push that header down below the tabs.
   if (topBarHost || focusRoute) return null;
+  if (subPage) return null;
 
   return (
     <PageTabs

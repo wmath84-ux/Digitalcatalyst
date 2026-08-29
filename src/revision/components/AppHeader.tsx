@@ -18,7 +18,10 @@ type AppHeaderProps = {
 export default function AppHeader({ title, subtitle, backHref, rightSlot }: AppHeaderProps) {
   const { navigate } = useExitGuard();
   return (
-    <header className="dc-glass-toolbar sticky top-[68px] z-20 border-b border-white/60 transition-all shadow-[0_10px_30px_-18px_rgba(79,70,229,0.32)]">
+    <header
+      data-revision-app-header
+      className="dc-glass-toolbar sticky z-20 border-b border-white/60 transition-all shadow-[0_10px_30px_-18px_rgba(79,70,229,0.32)]"
+    >
       <div className="flex min-h-[56px] w-full min-w-0 flex-wrap items-center gap-2 px-3 py-2">
         {backHref ? (
           <button
