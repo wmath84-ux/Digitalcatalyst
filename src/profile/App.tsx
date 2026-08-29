@@ -25,7 +25,11 @@ import ProfileLayout, {
 } from "./ProfileLayout";
 
 type Modal = "edit" | "settings" | null;
-type Preferences = {
+
+/** Notification + privacy switches stored on `users/{uid}.preferences`.
+ *  Exported so the dedicated Settings page (`#/settings`) reads and writes
+ *  exactly the same shape instead of keeping a second copy of it. */
+export type Preferences = {
   push: boolean;
   email: boolean;
   promotions: boolean;
@@ -41,7 +45,7 @@ type MembershipState = {
   subscriber: boolean;
 };
 
-const DEFAULT_PREFERENCES: Preferences = {
+export const DEFAULT_PREFERENCES: Preferences = {
   push: true,
   email: true,
   promotions: false,

@@ -12,6 +12,7 @@ import MyDayApp from "./MyDayApp";
 import LeaderboardApp from "./LeaderboardApp";
 import RevisionApp from "./revision/RevisionApp";
 import ProfileApp from "./profile/App";
+import SettingsPage from "./settings/SettingsPage";
 import SubscriberExperiencePage from "./profile/SubscriberExperiencePage";
 import ProfilePreview from "./profile/ProfilePreview";
 import CourseRouteGuard from "./components/CourseRouteGuard";
@@ -105,6 +106,8 @@ const MY_DAY_HASH = "#/my-day";
 const LEADERBOARD_HASH = "#/leaderboard";
 const REVISION_HASH = "#/revision";
 const PROFILE_HASH = "#/profile";
+// Dedicated Settings / Preferences page (the desktop rail's Settings entry).
+const SETTINGS_HASH = "#/settings";
 const PROFILE_SUBSCRIBER_EXPERIENCE_HASH = "#/profile/subscriber-experience";
 const COURSE_HASH = "#/course/";
 const CART_HASH = "#/cart";
@@ -1068,6 +1071,8 @@ function RootPage(): ReactNode {
       />
     );
   }
+  // Settings renders inside the desktop shell like the Profile page does.
+  if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
   if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
   if (hash.startsWith(LEADERBOARD_HASH)) return <LeaderboardApp />;

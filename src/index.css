@@ -3674,3 +3674,196 @@ html[data-course-player-active="true"] {
     height: 100dvh;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   TABLET SMALL-SCREEN PASS — Revision scroll + the "everything shrank" fix
+   ══════════════════════════════════════════════════════════════════════
+   Reported on a tablet:
+     1. every Revision page refused to scroll;
+     2. Revision AND the Profile looked shrunken next to a phone
+        ("sab layout shrink ho gaye hain");
+     3. the Profile's bottom cards were squeezed into a narrow tall stack.
+
+   Everything below is APPENDED at the very end of the file (splicing it in
+   earlier would move the first `[data-app-frame] { max-width: 100% !important }`
+   block and break the fluid-width contract) and every rule is gated on
+   `min-width: 640px`, so the phone band (< 640 px) keeps its exact behaviour:
+   pinned header, pinned bottom pill, content scrolls, portrait lock intact.
+   No rule here narrows `touch-action` — Revision carries horizontal carousels
+   (hero, category chips, test cards) that an ancestor must never veto. */
+
+/* ── 1. Revision: re-pin the tablet-portrait scroll chain ────────────────
+   Intended chain: `[data-revision-app]` (viewport, clipped) →
+   `[data-revision-frame]` (100%) → `[data-revision-content]`
+   (`flex-1 min-h-0 overflow-hidden`) → PageShell's
+   `<main data-revision-page-main>` (`flex-1 min-h-0 overflow-y-auto`).
+   That inner `<main>` is the ONLY scroller.
+
+   The existing 640–1023 pin wrote a bare `height: 100dvh`. On an engine
+   without dynamic-viewport units the declaration is dropped, the app falls
+   back to `height: auto`, the whole chain above the `<main>` loses its
+   definite height — and because both the app and `[data-revision-content]`
+   are `overflow: hidden`, the page cannot be scrolled at all. So every pin
+   here is written at `100vh` and upgraded to `100dvh` inside `@supports`,
+   the same form the rest of the tablet scroll model uses. (lightningcss
+   collapses two sequential same-property declarations, so `@supports` is the
+   only spelling of the fallback that survives the real build.) */
+@media (min-width: 640px) and (max-width: 959px) {
+  [data-revision-app] {
+    height: 100vh;
+    min-height: 0;
+    max-height: 100vh;
+    overflow: hidden;
+    padding: 0;
+  }
+  [data-revision-app] [data-revision-frame] {
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+  }
+  [data-revision-app] [data-revision-content] {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+  /* The scroller itself, with the same visible affordance the rest of the
+     tablet model gives its scrollers — `.no-scrollbar` hides it otherwise,
+     which is what made a perfectly scrollable page read as dead. */
+  [data-revision-app] [data-revision-page-main] {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(100 116 139 / 0.45) transparent;
+  }
+  [data-revision-app] [data-revision-page-main]::-webkit-scrollbar {
+    display: block;
+    width: 8px;
+  }
+  [data-revision-app] [data-revision-page-main]::-webkit-scrollbar-thumb {
+    background: rgb(100 116 139 / 0.38);
+    border-radius: 9999px;
+  }
+}
+@supports (height: 100dvh) {
+  @media (min-width: 640px) and (max-width: 959px) {
+    [data-revision-app] {
+      height: 100dvh;
+      max-height: 100dvh;
+    }
+  }
+}
+
+/* ── 2. Revision inside the desktop shell: one scroller, not two ─────────
+   `.dc-desktop-shell [data-desktop-content] > main > [data-revision-app]`
+   asks for `height: 100%`, but the shell's `<main>` only ever declared
+   `min-height: 100%` — an auto height, so the percentage resolved to `auto`,
+   the revision app grew with its content and the shell's row scrolled
+   instead of the page's own `<main>`. Giving that `<main>` a real height
+   (only when it hosts Revision) makes the percentage chain resolve, so
+   `[data-revision-page-main]` is the single scroller and the header + tab row
+   stay pinned. Other pages keep the flowing `min-height: 100%` behaviour. */
+.dc-desktop-shell [data-desktop-content] > main:has([data-revision-app]) {
+  height: 100%;
+  min-height: 0;
+}
+/* …and the shell's revision scroller gets the same visible scrollbar. */
+.dc-desktop-shell [data-revision-page-main]::-webkit-scrollbar {
+  display: block;
+  width: 10px;
+}
+.dc-desktop-shell [data-revision-page-main]::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dc-desktop-shell [data-revision-page-main]::-webkit-scrollbar-thumb {
+  background: rgb(100 116 139 / 0.38);
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: padding-box;
+}
+
+/* ── 3. Undo the global tablet shrink for Revision + Profile ─────────────
+   The "Tablet Size-Based Scaling" block (640–1366 px) clamps `.p-*`, `.gap-*`
+   and `.rounded-*` to values whose LOWER bound is smaller than the phone
+   default: at 640 px `1vw` is 6.4 px, so `.p-4` returns 0.75rem instead of
+   1rem and `.p-6` returns 1rem instead of 1.5rem. That — not the layout
+   grids — is the "sab layout shrink ho gaye hain". The global clamp() stays
+   (a contract test requires clamp() to exist and other features rely on it);
+   these two features simply get their phone sizes back. */
+@media (min-width: 640px) and (max-width: 1023px) {
+  [data-revision-app] h1,
+  [data-profile-page] h1 { font-size: 1.5rem !important; }
+  [data-revision-app] h2,
+  [data-profile-page] h2 { font-size: 1.25rem !important; }
+  [data-revision-app] h3,
+  [data-profile-page] h3 { font-size: 1.125rem !important; }
+  [data-revision-app] button,
+  [data-profile-page] button { font-size: 0.875rem; }
+  [data-revision-app] .p-3,
+  [data-profile-page] .p-3 { padding: 0.75rem !important; }
+  [data-revision-app] .p-4,
+  [data-profile-page] .p-4 { padding: 1rem !important; }
+  [data-revision-app] .p-5,
+  [data-profile-page] .p-5 { padding: 1.25rem !important; }
+  [data-revision-app] .p-6,
+  [data-profile-page] .p-6 { padding: 1.5rem !important; }
+  [data-revision-app] .gap-3,
+  [data-profile-page] .gap-3 { gap: 0.75rem !important; }
+  [data-revision-app] .gap-4,
+  [data-profile-page] .gap-4 { gap: 1rem !important; }
+  [data-revision-app] .gap-6,
+  [data-profile-page] .gap-6 { gap: 1.5rem !important; }
+  [data-revision-app] .rounded-2xl,
+  [data-profile-page] .rounded-2xl { border-radius: 1rem !important; }
+  [data-revision-app] .rounded-3xl,
+  [data-profile-page] .rounded-3xl { border-radius: 1.5rem !important; }
+}
+
+/* ── 4. Revision tablet portrait: use the whole window ───────────────────
+   The compact band capped every page at a 720 px column and shaved the card
+   padding/radius to 14 px / 16 px, which is what made the pages read as
+   cramped on a 768–959 px tablet. The two-column rhythm stays; the column
+   just stops floating in the middle of the screen and the cards go back to
+   their phone box metrics. */
+@media (min-width: 640px) and (max-width: 959px) and (orientation: portrait) {
+  [data-revision-app] [data-revision-page-main] > .animate-fade-in {
+    max-width: 100%;
+    padding: 16px clamp(14px, 3vw, 24px) 24px;
+    gap: 14px;
+  }
+  [data-revision-app] [data-revision-profile-layout] {
+    max-width: 100%;
+  }
+  [data-revision-app] [data-revision-page-main] .rev-card {
+    padding: 1rem !important;
+    border-radius: 1.5rem !important;
+  }
+  [data-revision-app] [data-saved-tests-grid] {
+    gap: 14px !important;
+  }
+}
+
+/* ── 5. Profile bottom cards: a simple grid of rectangular cards ─────────
+   Both columns were single-column stacks, so the last cards (My Day
+   allowance, AI quota, Referral, Library, Preferences, Log out) ended up as
+   a narrow tall run of squeezed boxes. On tablet+ each column becomes a plain
+   auto-fill grid: cards tile side by side where the width allows, keep their
+   natural height (`align-items: start`) and never shrink into a slot.
+   Banner-shaped cards keep spanning the whole column. Below 640 px nothing
+   changes — the phone stack is exactly as it was. */
+@media (min-width: 640px) {
+  [data-profile-col="main"],
+  [data-profile-col="side"] {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+    gap: clamp(14px, 2vw, 20px);
+    align-items: start;
+  }
+  [data-profile-col="main"] > section[data-profile-membership-card],
+  [data-profile-col="main"] > section[data-profile-upgrade-card],
+  [data-profile-col="main"] > section[data-renewal-card],
+  [data-profile-col="side"] > section[data-profile-referral],
+  [data-profile-col="side"] > nav {
+    grid-column: 1 / -1;
+  }
+}

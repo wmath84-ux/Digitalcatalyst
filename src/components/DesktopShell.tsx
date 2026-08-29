@@ -45,6 +45,7 @@ import {
   ShoppingBag,
   Sparkles,
   Store,
+  Trophy,
   UserRound,
   X,
 } from "lucide-react";
@@ -138,7 +139,9 @@ const PRIMARY_RAIL: RailEntry[] = [
 const WORKSPACE_RAIL: RailEntry[] = [
   { key: "favorites", label: "Favorites", description: "Saved for later", Icon: Heart, hash: "#/favorites", group: "workspace" },
   { key: "profile", label: "Profile", description: "Account & plan", Icon: UserRound, hash: "#/profile", group: "workspace" },
-  { key: "settings", label: "Settings", description: "Preferences & privacy", Icon: Settings, hash: "#/profile", group: "workspace" },
+  // Settings is its own page (`#/settings`) — it used to deep-link into the
+  // Profile page, which made the rail's "Settings" entry open the wrong screen.
+  { key: "settings", label: "Settings", description: "Preferences & privacy", Icon: Settings, hash: "#/settings", group: "workspace" },
 ];
 
 const ALL_RAIL: RailEntry[] = [...PRIMARY_RAIL, ...WORKSPACE_RAIL];
@@ -152,6 +155,9 @@ function resolveActiveFromHash(hash: string): DesktopRailKey {
   if (hash.startsWith("#/cart")) return "purchases";
   if (hash.startsWith("#/my-day")) return "myday";
   if (hash.startsWith("#/revision")) return "revision";
+  // The Settings page is its own route; without this the rail falls back to
+  // "home" and no entry lights up while the learner is on it.
+  if (hash.startsWith("#/settings")) return "settings";
   if (hash.startsWith("#/profile")) return "profile";
   if (hash.startsWith("#/checkout") || hash.startsWith("#/subscription")) return "store";
   return "home";
@@ -372,10 +378,17 @@ export default function DesktopShell({
             </dl>
             <button
               type="button"
-              onClick={() => handleNavigate("#/my-day")}
+              onClick={() => handleNavigate("#/flowpath")}
               className="mt-3 w-full rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-3 py-2 text-[11px] font-black text-white shadow-sm transition hover:brightness-110 active:scale-95"
             >
-              Plan today in My Day
+              plan today in Flowpath
+            </button>
+            <button
+              type="button"
+              onClick={() => handleNavigate("#/leaderboard")}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 active:scale-95"
+            >
+              <Trophy size={12} /> Leaderboard
             </button>
           </div>
         </nav>
