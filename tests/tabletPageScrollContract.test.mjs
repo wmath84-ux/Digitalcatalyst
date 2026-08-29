@@ -18,13 +18,21 @@
 //      is pinned to the viewport and `[data-desktop-content]` is THE scroller.
 //      Pages inside it release the phone clipping so their content flows into
 //      that single scroller — never a second competing one.
-//   2. 640–959 px without the shell (tablet portrait): the frame is bound to
-//      the viewport, so whichever box holds the overflow has a real range.
+//   2. 640–959 px without the shell (tablet portrait): the phone model is kept
+//      honest — a frame with a direct `<main>` is clipped so the header + pill
+//      stay pinned and that `<main>` scrolls; a frame with no direct `<main>`
+//      (My Day) scrolls itself. The pin has a `100vh` fallback (written via
+//      `@supports (height: 100dvh)` so lightningcss does not delete it).
 //   3. Below 640 px: the original phone model, untouched.
 //   4. The scrollers show a scrollbar (the app-wide `::-webkit-scrollbar {
 //      display: none }` hides every affordance, which is what made a
 //      scrollable page look dead) and never narrow `touch-action`, because the
 //      pages carry horizontal carousels an ancestor must not veto.
+//   Additionally: the landscape phone freeze and the "rotate your phone"
+//   overlay are gated on `data-phone-device` (see appOrientation.ts), so a
+//   tablet window in the narrow landscape band keeps normal panning; and there
+//   is no non-passive document-level `touchmove` listener (disablePageZoom.ts)
+//   that would make touch scrolling wait on the main thread.
 //
 // Pure code-shape — no React, no DOM, no browser.
 
@@ -106,7 +114,7 @@ test("Revision keeps one scroller instead of getting a second one", () => {
   declares(revision, "height:\\s*100%\\s*!important", "max-height:\\s*100%\\s*!important");
 });
 
-test("tablet portrait (640–959 px, no shell) binds the frame to the viewport", () => {
+test("tablet portrait (640–959 px, no shell) keeps the phone model: <main> scrolls, header + pill stay pinned", () => {
   const start = css.indexOf("@media (min-width: 640px) and (max-width: 959px)");
   assert.ok(start > 0, "expected a 640–959 px band for the frame binding");
   const band = css.slice(start);
@@ -115,17 +123,53 @@ test("tablet portrait (640–959 px, no shell) binds the frame to the viewport",
     /html:not\(\[data-tablet-landscape-desktop="true"\]\)\s+body:not\(:has\(\.dc-desktop-shell\)\)/,
     "the binding must step aside the moment the shell renders",
   );
-  const block = new RegExp(`${escape(TABLET_FRAME)}\\s*\\{([^}]*)\\}`).exec(band)?.[1];
-  assert.ok(block, "expected the tablet-portrait frame block");
-  for (const source of [/height:\s*100dvh/, /max-height:\s*100dvh/, /min-height:\s*0/, /overflow-y:\s*auto/, /overscroll-behavior:\s*contain/, /-webkit-overflow-scrolling:\s*touch/]) {
-    assert.match(block, source, `the tablet frame must declare ${source}`);
+
+  // Frame WITH a direct <main> (Home, Store, PDP, Search, Profile, …): the
+  // frame is clipped so the phone header and the bottom nav pill (both
+  // children of the frame) stay pinned, and that <main> becomes the scroller.
+  const hasMain = TABLET_FRAME + ":has(> main)";
+  const frameBlock = new RegExp(`${escape(hasMain)}\\s*\\{([^}]*)\\}`).exec(band)?.[1];
+  assert.ok(frameBlock, "expected the :has(> main) frame block");
+  assert.match(frameBlock, /overflow:\s*hidden/, "the :has(> main) frame must clip so header + pill stay pinned");
+  assert.match(frameBlock, /min-height:\s*0/);
+
+  // …and the page's own scroller is what moves (it only lacked a bounded parent).
+  const mainScroller = new RegExp(`${escape(hasMain)} > main\\s*\\{([^}]*)\\}`).exec(band)?.[1];
+  assert.ok(mainScroller, "expected the :has(> main) > main scroller block");
+  for (const source of [/overflow-y:\s*auto/, /min-height:\s*0/, /overscroll-behavior:\s*contain/, /-webkit-overflow-scrolling:\s*touch/]) {
+    assert.match(mainScroller, source, `the inner <main> scroller must declare ${source}`);
   }
-  // The page's own scroller keeps working — it only ever lacked a bounded parent.
+
+  // Frame WITHOUT a direct <main> (e.g. My Day, whose main is nested inside
+  // `[data-myday-content]`): the frame itself scrolls.
+  const noMain = TABLET_FRAME + ":not(:has(> main))";
+  const noMainBlock = new RegExp(`${escape(noMain)}\\s*\\{([^}]*)\\}`).exec(band)?.[1];
+  assert.ok(noMainBlock, "expected the :not(:has(> main)) frame block");
+  assert.match(noMainBlock, /overflow-y:\s*auto/, "the no-<main> frame must be the scroller");
+  assert.match(noMainBlock, /min-height:\s*0/);
+});
+
+test("the tablet portrait pin has a 100vh fallback for engines without dvh", () => {
+  // Every pin is written at 100vh and upgraded to 100dvh only inside
+  // `@supports (height: 100dvh)` — a bare `height: 100dvh` would drop on
+  // engines without dynamic-viewport units, leaving the frame `height: auto`
+  // and resurrecting the zero-range dead scroller.
+  assert.match(css, /@supports \(height:\s*100dvh\)/);
+  // The base (no-dvh) frame pin keeps a plain 100vh height/max-height.
+  const hasMain = TABLET_FRAME + ":has(> main)";
+  const frameBlock = new RegExp(`${escape(hasMain)}\\s*\\{([^}]*)\\}`).exec(css)?.[1];
+  assert.ok(frameBlock, "expected the :has(> main) frame block");
+  assert.match(frameBlock, /height:\s*100vh/, "the frame must declare a 100vh height fallback");
+  assert.match(frameBlock, /max-height:\s*100vh/, "the frame must declare a 100vh max-height fallback");
+  // The dvh upgrade inside @supports re-pins the same frame selectors.
   assert.match(
-    band,
-    new RegExp(`${escape(TABLET_FRAME)} > main\\s*\\{[^}]*min-height:\\s*0`),
-    "the inner main must be allowed to shrink so it scrolls",
+    css,
+    /@supports \(height:\s*100dvh\)[^{]*\{[^}]*@media[^}]*:has\(> main\)[^}]*height:\s*100dvh/,
+    "the @supports block must upgrade the frame pin to 100dvh",
   );
+  // The desktop shell pin gets the same fallback.
+  assert.match(css, /\.dc-desktop-shell\s*\{\s*height:\s*100vh/);
+  assert.match(css, /@supports \(height:\s*100dvh\)[^{]*\{[^}]*\.dc-desktop-shell[^}]*height:\s*100dvh/);
 });
 
 test("the scroll model below the tablet band is untouched", () => {
@@ -137,10 +181,11 @@ test("the scroll model below the tablet band is untouched", () => {
 
 test("the scrollers are visible — a tablet page must look scrollable", () => {
   assert.match(css, /\.dc-desktop-shell \[data-desktop-content\]::-webkit-scrollbar\s*\{[^}]*display:\s*block/);
-  assert.match(css, /\[data-app-frame\]:not\(\[data-revision-frame\]\)::-webkit-scrollbar\s*\{[^}]*display:\s*block/);
-  // On these pages the frame's own <main> may be the surface that moves, so it
-  // opts out of the reset too.
-  assert.match(css, /\[data-app-frame\]:not\(\[data-revision-frame\]\) > main::-webkit-scrollbar\s*\{[^}]*display:\s*block/);
+  // On the tablet-portrait pages the frame's own <main> is the surface that
+  // moves, so it opts out of the reset — both the direct-<main> scroller and
+  // the frame-as-scroller (My Day) variant.
+  assert.match(css, /\[data-app-frame\]:not\(\[data-revision-frame\]\):has\(> main\) > main::-webkit-scrollbar\s*\{[^}]*display:\s*block/);
+  assert.match(css, /\[data-app-frame\]:not\(\[data-revision-frame\]\):not\(:has\(> main\)\)::-webkit-scrollbar\s*\{[^}]*display:\s*block/);
   // The app-wide reset stays: the overrides above are how the wide layouts
   // escape it, while phone pages keep the chrome-less look.
   assert.match(css, /::-webkit-scrollbar\s*\{\s*display:\s*none/);
@@ -164,4 +209,40 @@ test("the new blocks win over the bands they replace (source order)", () => {
   assert.ok(profilePin < fix, "the shell release must come after the profile pin");
   const revisionPin = css.indexOf(".dc-desktop-shell:has([data-revision-app]) {");
   assert.ok(revisionPin > 0 && revisionPin < fix, "and after the revision shell pin it must not fight");
+});
+
+test("the landscape touch freeze is gated on data-phone-device, so a tablet window never freezes", () => {
+  // The width-gated phone lock must NOT freeze a tablet window: `touch-action`
+  // intersects down the ancestor chain, so an ungated `body { touch-action:
+  // none }` would kill every scroller the tablet model creates.
+  assert.match(css, /html\[data-phone-device="true"\]:not\(\[data-course-player-active="true"\]\) body\s*\{\s*touch-action:\s*none/);
+  // …and a tablet window in the same narrow landscape band keeps normal panning.
+  assert.match(css, /html:not\(\[data-phone-device="true"\]\) body\s*\{\s*touch-action:\s*auto/);
+  // The signal comes from appOrientation.ts (publishes data-phone-device).
+  const orientation = fs.readFileSync("src/utils/appOrientation.ts", "utf8");
+  assert.match(orientation, /setAttribute\("data-phone-device", "true"\)/);
+  assert.match(orientation, /removeAttribute\("data-phone-device"\)/);
+});
+
+test("no non-passive document-level touchmove competes with the scrollers", () => {
+  // A non-passive document touchmove makes every scroll wait on the main thread
+  // and, with `touches.length >= 2`, swallows the gesture — competing with the
+  // compositor-driven touch scroll of `[data-desktop-content]` and the tablet
+  // <main> scrollers.
+  const zoom = fs.readFileSync("src/utils/disablePageZoom.ts", "utf8");
+  assert.doesNotMatch(zoom, /addEventListener\("touchmove"/);
+  assert.doesNotMatch(zoom, /removeEventListener\("touchmove"/);
+  // The opt-out surface for image viewers survives.
+  assert.match(zoom, /data-pinch-zoom=\\"enabled\\"/);
+  // Pinch-zoom is still blocked app-wide by the root touch-action.
+  assert.match(css, /#root\s*\{\s*[^}]*touch-action:\s*pan-x pan-y/);
+});
+
+test("the horizontal overflow guard lives on body only, never on the root", () => {
+  // `overflow-x: hidden` on html forces the root's overflow-y to auto (no `clip`
+  // fallback), turning the document into a competing scroll container. The guard
+  // is therefore on body, and html is left `overflow-y: visible`.
+  assert.match(css, /body\s*\{\s*overflow-x:\s*hidden;\s*overflow-x:\s*clip/);
+  assert.match(css, /html\s*\{\s*overflow-y:\s*visible/);
+  assert.doesNotMatch(css, /html,\s*body\s*\{\s*overflow-x:\s*hidden/);
 });
