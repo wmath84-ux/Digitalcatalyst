@@ -4071,6 +4071,57 @@ html[data-course-player-active="true"] {
   }
 }
 
+/* 5b. Test Bank on the SMALLEST tablet screens: one card per row -------------
+   HARD RULE — whenever the Test Bank content column is under 900 px, every
+   saved-test card owns its own row: cards stack one after another, full
+   width, tall enough that all of their buttons are on screen.
+
+   Why the column count has to come from the container and not the viewport:
+   the smallest screens that still show the desktop shell's side panel are
+   exactly the ones this rule targets — a mini tablet in landscape, a tablet
+   in split screen, a small portrait tablet, and the 960-1199 px narrow
+   desktop band. `AppShell` hands those viewports to `DesktopShell` (side
+   panel visible) as soon as the window is 960 px wide, or as soon as a
+   tablet (min screen side >= 600 px) is in landscape at 640 px+. The rail
+   then eats 200-260 px, so a "wide" viewport leaves a much narrower column:
+   a 1133 px iPad landscape keeps only ~802 px, a 960 px split-screen tablet
+   only ~671 px, a 640 px mini tablet in landscape only ~372 px. The
+   viewport-based rules above happily packed 2-3 cards
+   into that space, and because a card is `aspect-square overflow-hidden`
+   each one shrank with its column and clipped its own actions (Revise
+   Again / Revise Skipped / Result / Attempt history) away.
+
+   Both selectors are listed because the desktop-shell rule
+   (`.dc-desktop-shell [data-saved-tests-grid]`, min-width: 960 px) carries
+   the same `!important` at a higher specificity; repeating it here keeps
+   this block the winner inside the shell too. */
+@container dc-rev (max-width: 899px) {
+  [data-saved-tests-grid],
+  .dc-desktop-shell [data-saved-tests-grid] {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+    /* At the top of the band the column can be ~890 px wide; cap the stack
+       so a card reads as a card instead of a full-bleed banner. */
+    width: min(100%, 640px);
+    margin-inline: auto;
+  }
+  /* Height follows content — nothing is clipped any more. `overflow-hidden`
+     stays on the card so the expanded attempt-history overlay is contained. */
+  [data-saved-test-card],
+  .dc-desktop-shell [data-saved-test-card] {
+    aspect-ratio: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  /* The trailing Generate / Import tile spans 2 (sm) / 3 (lg) columns; in a
+     one-column grid those spans would create an implicit second column and
+     squeeze the buttons into a strip. It always takes the whole row. */
+  [data-saved-tests-grid] > [data-saved-tests-actions],
+  .dc-desktop-shell [data-saved-tests-grid] > [data-saved-tests-actions] {
+    grid-column: 1 / -1 !important;
+  }
+}
+
 /* 6. AI generator: form controls reflow, never squeeze ------------------------
    The four dropdown tiles and four difficulty tiles become 2-up when the
    container is compact so each control keeps a usable width. */
