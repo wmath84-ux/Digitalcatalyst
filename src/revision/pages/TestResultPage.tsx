@@ -64,7 +64,7 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
             </div>
           </Card>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div data-rev-result-grid className="grid grid-cols-3 gap-3">
             <ResultChip icon={<CheckIcon className="h-5 w-5 text-emerald-600" />} label="Correct" value={data.correctCount} tone="bg-emerald-100" />
             <ResultChip icon={<XIcon className="h-5 w-5 text-rose-600" />} label="Wrong" value={data.wrongCount} tone="bg-rose-100" />
             <ResultChip icon={<SparklesIcon className="h-5 w-5 text-slate-500" />} label="Skipped" value={data.skippedCount} tone="bg-slate-100" />

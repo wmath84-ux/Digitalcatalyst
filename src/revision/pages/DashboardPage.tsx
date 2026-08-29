@@ -94,7 +94,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
       mergeIntoMainHeader
     >
       <div data-revision-page="dashboard" data-rev-layout="dashboard" className="animate-fade-in space-y-4 px-4 py-4 pb-8 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0 lg:py-0 lg:pb-0 lg:max-w-[1200px] lg:mx-auto">
-        <div className="lg:col-span-7 lg:space-y-3">
+        <div data-rev-panel="primary" className="lg:col-span-7 lg:space-y-3">
         {revisionPlans.length === 0 ? (
           <FirstRevisionCard onGenerate={openGenerator} />
         ) : (
@@ -102,8 +102,8 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
         )}
         </div>
 
-        <div className="space-y-4 lg:col-span-5 lg:space-y-3">
-        <div className="grid grid-cols-3 gap-3 lg:gap-2">
+        <div data-rev-panel="secondary" className="space-y-4 lg:col-span-5 lg:space-y-3">
+        <div data-rev-stat-grid className="grid grid-cols-3 gap-3 lg:gap-2">
           <StatChip icon={<ChartIcon className="h-5 w-5 text-indigo-600" />} label="Revisions" value={String(data.quickStats.testsCompleted)} />
           <StatChip icon={<TargetIcon className="h-5 w-5 text-emerald-600" />} label="Accuracy" value={`${data.quickStats.overallAccuracy}%`} />
           <StatChip icon={<FlameIcon className="h-5 w-5 text-orange-600" />} label="Streak" value={`${data.quickStats.streak}d`} />
@@ -145,7 +145,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
               Open
             </button>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div data-rev-bank-grid className="grid grid-cols-3 gap-2 text-center">
             <BankCount tone="amber" value={data.revisionBankSummary.learning} label="Learning" />
             <BankCount tone="sky" value={data.revisionBankSummary.improving} label="Improving" />
             <BankCount tone="emerald" value={data.revisionBankSummary.mastered} label="Mastered" />

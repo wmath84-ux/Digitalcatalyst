@@ -33,6 +33,84 @@ export const DESKTOP_ON_TABLET_THRESHOLD = Math.round(MOBILE_BASE_WIDTH * 1.5); 
 /** Minimum width where tablet landscape should show desktop. */
 export const TABLET_LANDSCAPE_MIN_WIDTH = 640;
 
+/**
+ * Intermediate layout bands used by the responsive layout overhaul.
+ *
+ * The app still uses the broad mobile / tablet / desktop category, but the
+ * pages that sit inside a sidebar+content shell need finer, content-aware
+ * behaviour. These constants document the practical band boundaries for
+ * split-screen, mini-tablet, narrow-desktop and phone-split cases.
+ *
+ * CSS container queries carry the real layout decisions (see
+ * src/index.css "Responsive Layout Overhaul"); these values are kept here so
+ * JS-driven structural changes (drawers, toolbar toggles, etc.) can use the
+ * same vocabulary without duplicating magic numbers.
+ */
+export const VIEWPORT_BANDS = {
+  /** 320–479 px — compact phone / split-screen phone. */
+  compactMobileMin: 320,
+  compactMobileMax: 479,
+  /** 480–639 px — large phone / mini-tablet split. */
+  largeMobileMin: 480,
+  largeMobileMax: 639,
+  /** 640–767 px — small tablet / tablet split-screen. */
+  smallTabletMin: 640,
+  smallTabletMax: 767,
+  /** 768–959 px — tablet portrait. */
+  tabletPortraitMin: 768,
+  tabletPortraitMax: 959,
+  /** 960–1199 px — wide tablet / narrow desktop inside the app shell. */
+  narrowDesktopMin: 960,
+  narrowDesktopMax: 1199,
+  /** 1200+ px — normal desktop. */
+  desktopMin: 1200,
+} as const;
+
+export type ViewportBand =
+  | "compact-mobile"
+  | "large-mobile"
+  | "small-tablet"
+  | "tablet-portrait"
+  | "narrow-desktop"
+  | "desktop";
+
+/** Resolve a numeric viewport width into a practical layout band. */
+export const getViewportBand = (width: number): ViewportBand => {
+  if (width <= VIEWPORT_BANDS.compactMobileMax) return "compact-mobile";
+  if (width <= VIEWPORT_BANDS.largeMobileMax) return "large-mobile";
+  if (width <= VIEWPORT_BANDS.smallTabletMax) return "small-tablet";
+  if (width <= VIEWPORT_BANDS.tabletPortraitMax) return "tablet-portrait";
+  if (width <= VIEWPORT_BANDS.narrowDesktopMax) return "narrow-desktop";
+  return "desktop";
+};
+
+/**
+ * Reactive viewport-band hook. This complements `useResponsiveCategory`:
+ * components that need a finer distinction than mobile/tablet/desktop (for
+ * example a filter toolbar that switches between an inline row and a sheet)
+ * can ask for the practical band without re-implementing the math.
+ */
+export const useViewportBand = (): ViewportBand => {
+  const getBand = (): ViewportBand => {
+    if (typeof window === "undefined") return "desktop";
+    return getViewportBand(window.innerWidth);
+  };
+  const [band, setBand] = useState<ViewportBand>(getBand);
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const update = () => setBand(getBand());
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    window.visualViewport?.addEventListener?.("resize", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+      window.visualViewport?.removeEventListener?.("resize", update);
+    };
+  }, []);
+  return band;
+};
+
 /** Check if viewport is in landscape orientation. */
 export const isLandscapeOrientation = (): boolean => {
   if (typeof window === "undefined") return false;

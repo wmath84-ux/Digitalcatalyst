@@ -48,7 +48,7 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
         <div className="space-y-4 lg:col-span-4 lg:space-y-3" data-rev-col="left">
           <section>
             <h3 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-500 lg:text-[11px] lg:mb-1.5">Snapshot</h3>
-            <div className="grid grid-cols-3 gap-2.5 lg:gap-2">
+            <div data-rev-widget-grid className="grid grid-cols-3 gap-2.5 lg:gap-2">
               <WidgetCard
                 icon={<ChartIcon className="h-5 w-5 text-emerald-600 lg:h-4 lg:w-4" />}
                 label="Accuracy"
@@ -117,8 +117,10 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
           <PrimaryButton onClick={() => navigate("#/revision")} className="lg:min-h-[40px] lg:text-[13px] lg:rounded-xl">Go to Revision Dashboard</PrimaryButton>
         </div>
 
-        {/* RIGHT COL: Quick actions / info - can be empty or extra */}
-        <div className="hidden lg:flex lg:col-span-3 lg:flex-col lg:gap-3" data-rev-col="right">
+        {/* RIGHT COL: Quick actions / info - secondary info flows below primary
+            on compact / split viewports and joins the desktop 12-col grid on wide
+            content. */}
+        <div className="flex lg:col-span-3 lg:flex-col lg:gap-3" data-rev-col="right">
           <section className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
             <h3 className="text-[12px] font-black uppercase tracking-wider text-slate-500">Quick Tips</h3>
             <ul className="mt-2 space-y-2 text-[11px] leading-relaxed text-slate-600">

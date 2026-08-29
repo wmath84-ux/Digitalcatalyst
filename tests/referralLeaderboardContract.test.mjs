@@ -140,11 +140,12 @@ test("historic referral usage is repaired automatically, with zero manual steps"
 
 test("the owner's profile crosses out a used referral ID with a clear Used badge", () => {
   const profile = fs.readFileSync("src/profile/App.tsx", "utf8");
+  const profileLayout = fs.readFileSync("src/profile/ProfileLayout.tsx", "utf8");
   assert.match(profile, /referralUsedCount/);
-  assert.match(profile, /data-profile-referral-used/);
-  assert.match(profile, /line-through/);
-  assert.match(profile, />Used</);
-  assert.match(profile, /no longer active/);
+  assert.match(profileLayout, /data-profile-referral-used/);
+  assert.match(profileLayout, /line-through/);
+  assert.match(profileLayout, />Used</);
+  assert.match(profileLayout, /no longer active/);
 });
 
 test("leaderboard hides used IDs from Unused and crosses them out elsewhere", () => {

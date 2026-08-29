@@ -203,7 +203,7 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
   return (
     <PageShell route={route} title="Test Bank" subtitle={view === "tests" ? capacityLabel : `${summary.due} questions ready for Smart Revision`} mergeIntoMainHeader>
       <div className="dc-glass-toolbar border-b border-white/60 px-4 pb-3 pt-3 lg:px-0 lg:max-w-[1200px] lg:mx-auto lg:rounded-2xl lg:mt-2">
-        <div className="dc-glass-soft grid grid-cols-2 rounded-2xl p-1">
+        <div data-rev-bank-view-switch className="dc-glass-soft grid grid-cols-2 rounded-2xl p-1">
           <button
             type="button"
             onClick={() => setView("tests")}
@@ -453,7 +453,7 @@ function SavedTestCard({
         )}
 
         {test.status === "completed" && (
-          <div className="mt-2 grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-2 text-center">
+          <div data-rev-result-metrics className="mt-2 grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-2 text-center">
             <ResultMetric value={`${test.score ?? 0}%`} label="Score" />
             <ResultMetric value={String(test.correctCount)} label="Correct" tone="text-emerald-600" />
             <ResultMetric value={String(test.wrongCount)} label="Wrong" tone="text-rose-600" />
