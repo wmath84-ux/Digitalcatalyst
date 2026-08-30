@@ -5,14 +5,13 @@ import {
   CalendarClock,
   ClipboardList,
   NotebookPen,
-  Plus,
   Search,
   X,
 } from "lucide-react";
-import { cn } from "./utils/cn";
 import StoreHeader from "./components/Header";
 import { useBranding } from "./context/BrandingContext";
 import GreetingHeader from "./components/myday/GreetingHeader";
+import CreateMenu from "./components/myday/CreateMenu";
 import TaskList from "./components/myday/TaskList";
 import TaskModal from "./components/myday/TaskModal";
 import Timeline from "./components/myday/Timeline";
@@ -76,9 +75,7 @@ export default function App() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
   const [activeSection, setActiveSection] = useState<DaySection>("overview");
-  const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [highlightId, setHighlightId] = useState<string | null>(null);
-  const createMenuRef = useRef<HTMLDivElement>(null);
   // The My Day working column (right of the sticky side navigation). Every
   // create/edit overlay (Modal / ConfirmDialog) clamps itself to this column's
   // on-screen rectangle on tablet + desktop widths via OverlayBoundsProvider,
@@ -177,41 +174,22 @@ export default function App() {
     return () => { cancelled = true; };
   }, [applyCloudData, refreshMyDay, uid]);
 
-  useEffect(() => {
-    if (!createMenuOpen) return;
-    const closeOnOutsidePointer = (event: Event) => {
-      const target = event.target as Node | null;
-      if (target && createMenuRef.current && !createMenuRef.current.contains(target)) setCreateMenuOpen(false);
-    };
-    const closeOnOutsideScroll = (event: Event) => {
-      const target = event.target as Node | null;
-      if (target && createMenuRef.current && !createMenuRef.current.contains(target)) setCreateMenuOpen(false);
-    };
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
-    document.addEventListener("mousedown", closeOnOutsidePointer);
-    document.addEventListener("touchstart", closeOnOutsidePointer, { passive: true });
-    document.addEventListener("scroll", closeOnOutsideScroll, { capture: true, passive: true });
-    window.addEventListener("touchmove", closeOnOutsideScroll, { passive: true });
-    window.addEventListener("wheel", closeOnOutsideScroll, { passive: true });
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePointer);
-      document.removeEventListener("mousedown", closeOnOutsidePointer);
-      document.removeEventListener("touchstart", closeOnOutsidePointer);
-      document.removeEventListener("scroll", closeOnOutsideScroll, { capture: true } as EventListenerOptions);
-      window.removeEventListener("touchmove", closeOnOutsideScroll);
-      window.removeEventListener("wheel", closeOnOutsideScroll);
-    };
-  }, [createMenuOpen]);
-
   const handleNavigate = useCallback((id: string) => {
     if (id === "home") {
       window.location.hash = "#/home";
       return;
     }
-    setCreateMenuOpen(false);
     setActiveSection(id as DaySection);
     setHighlightId(null);
   }, []);
+
+  // The big "+" hub on the overview: the CreateMenu component owns the
+  // open/close lifecycle; the page only decides what a selection does —
+  // the same access-gated section swap it has always done.
+  const handleCreateSelect = useCallback((id: string) => {
+    if (!requireMyDayAccess()) return;
+    handleNavigate(id);
+  }, [handleNavigate, requireMyDayAccess]);
 
   useEffect(() => {
     const applyDeepLink = () => {
@@ -548,61 +526,12 @@ export default function App() {
                   streak={12}
                 />
 
-                <div ref={createMenuRef} data-myday-create-row className="relative flex flex-col items-center pb-8">
-                  {/* Wrap the cross button in its own relative container so the
-                      create-dropdown can anchor against the BUTTON (not the
-                      whole flex column). The dropdown is now always placed
-                      above the button with explicit spacing, which keeps the
-                      button itself clickable and prevents the dropdown from
-                      falling through to the section below on short screens. */}
-                  <div className="relative flex flex-col items-center">
-                    <button
-                      type="button"
-                      aria-label="Create item"
-                      aria-expanded={createMenuOpen}
-                      onClick={() => setCreateMenuOpen((open) => !open)}
-                      className={cn(
-                        "relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-300/60 transition active:scale-95 md:h-24 md:w-24",
-                        createMenuOpen && "rotate-45",
-                      )}
-                    >
-                      <Plus className="h-10 w-10 md:h-12 md:w-12" strokeWidth={2.5} />
-                    </button>
-                    <p className="mt-3 text-sm font-semibold text-slate-500 md:text-base">Add to your day</p>
-
-                    {createMenuOpen && (
-                      <div
-                        className="dc-glass absolute left-1/2 z-20 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-3xl p-2 shadow-[0_24px_60px_-26px_rgba(79,70,229,0.48)]"
-                        style={{ bottom: "calc(100% + 0.75rem)" }}
-                        role="menu"
-                      >
-                        {CREATE_OPTIONS.map((option) => {
-                          const Icon = option.icon;
-                          return (
-                            <button
-                              key={option.id}
-                              type="button"
-                              onClick={() => {
-                                // When user selects what to create, check access immediately
-                                if (!requireMyDayAccess()) { setCreateMenuOpen(false); return; }
-                                handleNavigate(option.id);
-                              }}
-                              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-white/55"
-                            >
-                              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
-                                <Icon className="h-5 w-5" />
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block text-sm font-bold text-slate-900">{option.label}</span>
-                                <span className="block text-xs text-slate-400">{option.hint}</span>
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                {/* The big "+" creation hub — button + compact drop-up menu
+                    live in `CreateMenu`; the page only handles selection
+                    (access check → section swap). The drop-up always opens
+                    ABOVE the button and holds the same narrow menu width on
+                    phone / tablet / desktop, so it reads well everywhere. */}
+                <CreateMenu options={CREATE_OPTIONS} onSelect={handleCreateSelect} />
               </section>
             )}
 

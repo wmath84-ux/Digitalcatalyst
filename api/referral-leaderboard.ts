@@ -107,7 +107,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action.startsWith("flowpath.")) {
       return handleFlowPathControl(req, res);
     }
-    return handleRevisionGenerate(req, res);
+    // AI generation can run tens of seconds; if anything ever rejects above
+    // the handler's own try/catch (e.g. an unexpected Firestore fault), still
+    // answer JSON so the client can show a real message instead of parsing a
+    // platform error page.
+    try {
+      return await handleRevisionGenerate(req, res);
+    } catch (error) {
+      return errorResponse(res, error, "Could not generate questions with AI.");
+    }
   }
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {

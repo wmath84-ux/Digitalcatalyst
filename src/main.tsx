@@ -337,8 +337,19 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
   // immersive layout, the admin has its own shell). On those routes
   // the mobile + tablet chrome is hidden too — keeping the desktop
   // shell out of the way preserves the full-bleed experience.
+  //
+  // The landing page is a standalone marketing page: wrapping it in the
+  // app shell squeezed the hero into a small box beside the rail, hid the
+  // sections below from the page scroll and stretched the fixed header
+  // edge-to-edge. It renders full-bleed at every size instead — desktop
+  // browsers are locked to it anyway (Open App shows the install-PWA
+  // notice), so any hash that ends up rendering the landing also passes
+  // through unchanged.
   if (
-    hash.startsWith("#/checkout")
+    !hash
+    || hash.startsWith(LANDING_HASH)
+    || isDesktopBrowserLocked()
+    || hash.startsWith("#/checkout")
     || hash.startsWith("#/auth")
     || hash.startsWith("#/admin")
     || hash.startsWith("#/admin-login")

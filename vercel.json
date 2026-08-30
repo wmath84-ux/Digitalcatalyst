@@ -5,6 +5,11 @@
       "schedule": "30 0 * * *"
     }
   ],
+  "functions": {
+    "api/referral-leaderboard.ts": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     {
       "source": "/api/manifest",

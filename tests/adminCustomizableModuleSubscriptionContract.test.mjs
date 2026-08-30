@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const builder = fs.readFileSync("src/components/pdp/PdpPurchaseBuilder.tsx", "utf8");
+const moduleModal = fs.readFileSync("src/components/pdp/ModuleSelectModal.tsx", "utf8");
 const editor = fs.readFileSync("src/components/admin/products/ProductEditor.tsx", "utf8");
 const modulesEditor = fs.readFileSync("src/components/admin/products/ModulesResourcesEditor.tsx", "utf8");
 const adminClient = fs.readFileSync("src/lib/admin/client.ts", "utf8");
@@ -10,10 +11,17 @@ const adminSubs = fs.readFileSync("src/admin/pages/SubscriptionsPage.tsx", "utf8
 const serverQuotes = fs.readFileSync("utils/serverQuotes.js", "utf8");
 
 test("PDP module selector has checkboxes, individual prices and dynamic selected total", () => {
-  assert.match(builder, /role="checkbox"/);
+  // The "Select course modules" dropdown modal is the single module picker
+  // (the duplicate inline list + tabs were removed); it keeps the checkbox
+  // semantics, per-module prices and the dynamic selected total, while the
+  // builder still pipes the same selection into the order summary.
+  assert.match(moduleModal, /role="checkbox"/);
+  assert.match(moduleModal, /aria-checked/);
+  assert.match(moduleModal, /getModuleEffectivePrice/);
+  assert.match(moduleModal, /selectedTotal/);
+  assert.match(moduleModal, /selectedIds\.length} of \{modules\.length\} selected/);
   assert.match(builder, /getModuleEffectivePrice/);
   assert.match(builder, /selectedTotal/);
-  assert.match(builder, /selectedIds\.size} selected/);
   assert.match(builder, /Total due today/);
 });
 
