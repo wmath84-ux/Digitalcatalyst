@@ -54,6 +54,16 @@ test("server model normalises every section of the document", () => {
   assert.match(gateServer, /function\s+getSubscriptionGateSettings\(/);
 });
 
+test("subscriptionGate reader uses the shared Admin Firestore accessor", () => {
+  // `getFirestore` is NOT exported by firebaseAdmin (only `adminDb` is).
+  // Importing it was a build/runtime break in the `api/referral-leaderboard`
+  // bundle — which also serves `/api/myday` — so every My Day create failed.
+  // The reader must import `adminDb` and call it.
+  assert.match(gateServer, /import\s*\{\s*adminDb\s*\}\s*from\s*"\.\/firebaseAdmin\.js"/);
+  assert.doesNotMatch(gateServer, /import\s*\{\s*getFirestore\s*\}\s*from\s*"\.\/firebaseAdmin\.js"/);
+  assert.match(gateServer, /const\s+db\s*=\s*adminDb\(\);/);
+});
+
 test("server model honours the subscriber-only price rule", () => {
   // The resolver returns the public price when the caller is NOT a
   // subscriber, even if an override exists. The override only takes

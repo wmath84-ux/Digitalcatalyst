@@ -14,7 +14,7 @@
 // instead of reading the Firestore doc directly so the cache + the
 // shape normalisation stay in one place.
 
-import { getFirestore } from "./firebaseAdmin.js";
+import { adminDb } from "./firebaseAdmin.js";
 
 export type SubscriptionGateDurationFlags = {
   monthly: boolean;
@@ -140,9 +140,11 @@ function normaliseUsageLimits(input: any) {
 }
 
 export async function getSubscriptionGateSettings(): Promise<SubscriptionGateSettings> {
-  // Lazy import so the helper stays unit-testable without booting
-  // the full firebaseAdmin module.
-  const db = getFirestore();
+  // Use the shared Admin Firestore instance. This helper is only called
+  // inside authenticated serverless handlers, where the Admin app has
+  // already been booted by `requireFirebaseUser`/`adminDb`; the indirection
+  // through `adminDb()` also gives the test suite an overridable seam.
+  const db = adminDb();
   const { doc, getDoc } = await import("firebase-admin/firestore");
   const snap = await getDoc(doc(db, "settings", "subscriptionGate"));
   if (!snap.exists()) {
