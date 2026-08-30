@@ -7,6 +7,7 @@
 // those are gone.
 
 import { BadgeCheck, Check, Crown, Lock, X as XIcon, ChevronDown, ChevronUp } from "lucide-react";
+import SubscriberOnlyPriceBadge from "../../components/subscription/SubscriberOnlyPriceBadge";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type {
@@ -34,6 +35,16 @@ interface Props {
   ownedPlanId?: string | null;
   /** Billing cycle of that owned membership. */
   ownedCycle?: BillingCycle | null;
+  /**
+   * Subscriber-only override price, in RUPEES, for the currently
+   * selected plan + cycle. When the buyer IS a subscriber and the
+   * admin has set an override, the card swaps the public price for
+   * the override and adds a "Your subscriber price" badge above the
+   * main price line.
+   */
+  subscriberPriceRupees?: number | null;
+  /** True when the visitor has an active subscription. */
+  isSubscriber?: boolean;
 }
 
 export default function PlanOverview({
@@ -47,6 +58,8 @@ export default function PlanOverview({
   totalPaise,
   ownedPlanId = null,
   ownedCycle = null,
+  subscriberPriceRupees = null,
+  isSubscriber = false,
 }: Props) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const activePlan = plans.find((p) => p.id === selectedPlanId) || null;
@@ -102,6 +115,15 @@ export default function PlanOverview({
             <p className="text-[10px] font-bold uppercase tracking-wider text-violet-200/80">
               {activePlan ? activePlan.name : "Choose a plan"}
             </p>
+            {isSubscriber && subscriberPriceRupees != null && activePlan ? (
+              <div className="mt-1.5">
+                <SubscriberOnlyPriceBadge
+                  price={subscriberPriceRupees}
+                  basePrice={totalRupees === "FREE" ? 0 : Math.round(Number(totalRupees) || 0)}
+                  cycleLabel={cycle === "monthly" ? "month" : "year"}
+                />
+              </div>
+            ) : null}
             <p className="mt-0.5 truncate text-2xl font-black tracking-tight text-white sm:text-3xl" data-subscription-plan-price data-subscription-plan-free={activePlan && totalPaise <= 0 ? "true" : undefined}>
               {activePlan
                 ? totalPaise <= 0

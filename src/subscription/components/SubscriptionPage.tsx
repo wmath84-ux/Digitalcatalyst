@@ -27,10 +27,14 @@ import FeatureSelectModal from "./FeatureSelectModal";
 import PriceSummary from "./PriceSummary";
 import SubscribeBar from "./SubscribeBar";
 import HelpModal from "./HelpModal";
+import SubscriberActiveBadge from "../../components/subscription/SubscriberActiveBadge";
+import SubscriberOnlyPriceBadge from "../../components/subscription/SubscriberOnlyPriceBadge";
 import { SHOWCASE_CARDS } from "../data/showcase";
 import { FALLBACK_SUBSCRIPTION_CATALOG } from "../data/fallbackCatalog";
 import { useAuth } from "../../context/AuthContext";
 import { useCatalog } from "../../context/CatalogContext";
+import { useSubscriptionGateLogic } from "../../hooks/useSubscriptionGateLogic";
+import { resolveSubscriberOnlyPrice } from "../../utils/subscriptionPricing";
 import { playSfxError, playSfxSuccess } from "../../utils/sfx";
 import { shouldShowCouponInput } from "../../../utils/couponVisibility";
 import {
@@ -591,6 +595,28 @@ export default function SubscriptionPage({
   // downgrade is never purchasable, so it is never advertised either.
   const purchasablePlanNames = useMemo(() => upgradePlans.map((p) => p.name), [upgradePlans]);
 
+  // Phase-2: subscriber-only override price for the currently selected
+  // plan + cycle. Resolved via the admin's `settings/subscriptionGate`
+  // document — non-subscribers always see the public price.
+  const { settings: gateSettings } = useSubscriptionGateLogic();
+  const subscriberPriceRupees = useMemo(() => {
+    if (!isActiveMember) return null;
+    const activePlan = plans.find((p) => p.id === selectedPlanId);
+    if (!activePlan) return null;
+    const baseRupees = cycle === "yearly"
+      ? (activePlan.yearlyPricePaise / 100)
+      : (activePlan.monthlyPricePaise / 100);
+    if (!Number.isFinite(baseRupees) || baseRupees <= 0) return null;
+    const resolved = resolveSubscriberOnlyPrice(
+      activePlan.id,
+      cycle,
+      baseRupees,
+      true,
+      gateSettings.subscriberPricing,
+    );
+    return Math.round(resolved);
+  }, [isActiveMember, plans, selectedPlanId, cycle, gateSettings.subscriberPricing]);
+
   // Never leave a stale coupon / referral attached to a selection the buyer
   // cannot purchase. Add-on upgrades ARE purchasable, so their coupon state
   // is kept.
@@ -805,6 +831,12 @@ export default function SubscriptionPage({
       {/* An active member gets the membership dashboard, not the buy flow. */}
       {showMemberView ? (
         <div className="flex-1">
+          <div className="mx-5 mt-4">
+            <SubscriberActiveBadge
+              planLabel={plans.find((p) => p.id === String(activeSubscription?.planId || ""))?.name || null}
+              expiresAtLabel={formatExpiryDate(subscriptionExpiresAtMs)}
+            />
+          </div>
           <ActiveMemberView
             planName={plans.find((p) => p.id === String(activeSubscription?.planId || ""))?.name || String(activeSubscription?.planId || "Your plan")}
             plan={plans.find((p) => p.id === String(activeSubscription?.planId || "")) || null}
@@ -835,6 +867,31 @@ export default function SubscriptionPage({
             }}
           />
           <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
+          {/* BOTTOM-most action: a clear "Upgrade" button for existing
+              subscribers who want a HIGHER plan. Lives at the very end
+              of the member dashboard so the user always sees the path
+              to upgrade. Tapping it opens the buy flow on the next
+              higher plan. */}
+          {upgradePlans.length > 0 ? (
+            <div className="mx-5 mt-5 mb-4 flex flex-col items-stretch gap-2">
+              <button
+                type="button"
+                data-subscription-upgrade-button
+                onClick={() => {
+                  const next = upgradePlans[0];
+                  if (!next) return;
+                  setSelectedPlanId(next.id);
+                  setManageMode(true);
+                }}
+                className="w-full rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              >
+                Upgrade — view higher plans
+              </button>
+              <span className="text-center text-[11px] font-medium text-slate-500">
+                Move to a higher plan anytime. Your current membership stays active until the cycle ends.
+              </span>
+            </div>
+          ) : null}
         </div>
       ) : (
       <>
@@ -911,6 +968,8 @@ export default function SubscriptionPage({
           totalPaise={totalPaise}
           ownedPlanId={isActiveMember ? ownedPlanId || null : null}
           ownedCycle={isActiveMember ? ownedCycle : null}
+          isSubscriber={isActiveMember}
+          subscriberPriceRupees={subscriberPriceRupees}
         />
 
         {/* Already-owned selection: the entire buy flow below is replaced by

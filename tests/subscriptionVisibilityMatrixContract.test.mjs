@@ -245,10 +245,18 @@ test("useMyDayAccess exposes a `hidden` flag driven by the server's response", (
 });
 
 test("api myday endpoint returns the `hidden` flag computed from the feature's visibilityMode", () => {
+  // Phase-1 derives the per-doc mode from `feature.visibilityMode`; the
+  // global kill switch + per-feature override can flip the effective
+  // mode to "hide" independently.
   assert.match(
     myDayServer,
-    /visibilityMode\s*=\s*\(feature as any\)\?\.visibilityMode\s*===\s*"hide"\s*\?\s*"hide"\s*:\s*"gate"/,
-    "api/_lib/myDay.ts derives the visibilityMode from the feature doc",
+    /perDocMode\s*=\s*\(feature as any\)\?\.visibilityMode\s*===\s*"hide"\s*\?\s*"hide"\s*:\s*"gate"/,
+    "api/_lib/myDay.ts derives the per-doc visibilityMode from the feature doc",
+  );
+  assert.match(
+    myDayServer,
+    /visibilityMode\s*=\s*perDocMode\s*===\s*"hide"\s*\|\|\s*globalHideOn\s*\?\s*"hide"\s*:\s*"gate"/,
+    "api/_lib/myDay.ts stacks the per-doc + global kill switch into the effective mode",
   );
   assert.match(
     myDayServer,
@@ -259,6 +267,11 @@ test("api myday endpoint returns the `hidden` flag computed from the feature's v
     myDayServer,
     /hidden,/,
     "api/_lib/myDay.ts includes `hidden` on the access snapshot",
+  );
+  assert.match(
+    myDayServer,
+    /getSubscriptionGateSettings\(\)/,
+    "api/_lib/myDay.ts reads the gate settings document",
   );
 });
 

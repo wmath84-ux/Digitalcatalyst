@@ -42,6 +42,10 @@
     {
       "source": "/api/flowpath/control",
       "destination": "/api/referral-leaderboard"
+    },
+    {
+      "source": "/api/subscription-gate",
+      "destination": "/api/referral-leaderboard"
     }
   ]
 }

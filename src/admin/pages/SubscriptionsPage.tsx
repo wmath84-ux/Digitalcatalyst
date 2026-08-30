@@ -114,6 +114,18 @@ export default function SubscriptionsPage() {
   const [catalogSearch, setCatalogSearch] = useState("");
   const [quickAddingId, setQuickAddingId] = useState<string | null>(null);
   const [referralSettings, setReferralSettings] = useState({ enabled: true, discountPaise: 25000, maxUsesPerReferrer: null as number | null });
+  // Phase-2: subscription gate kill switch + per-feature/per-duration matrix.
+  // Defaults are SAFE (legacy gate still on, hide-until-purchased off) so
+  // a fresh DB continues to behave like the existing page until the admin
+  // explicitly changes a value.
+  const [gateSettings, setGateSettings] = useState({
+    oldGateEnabled: true,
+    hideUntilPurchasedEnabled: false,
+    features: {} as Record<string, { gated: boolean; hideFromNonSubscribers: boolean; durations: { monthly: boolean; yearly: boolean; lifetime: boolean }; tiers: Record<string, boolean> }>,
+    planVisibility: {} as Record<string, { visible: boolean; durations: { monthly: boolean; yearly: boolean; lifetime: boolean } }>,
+    subscriberPricing: {} as Record<string, { monthly: number | null; yearly: number | null; lifetime: number | null }>,
+    usageLimits: { aiQuestionsPerDay: {} as Record<string, number> },
+  });
   const [error, setError] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<Partial<Plan> | null>(null);
   const [editingFeature, setEditingFeature] = useState<Partial<FeatureRow> | null>(null);
@@ -139,6 +151,23 @@ export default function SubscriptionsPage() {
       setSubscriptionProducts(sp.products || []);
       setReferralSettings({ enabled: r.settings.enabled !== false, discountPaise: Number(r.settings.discountPaise ?? 25000), maxUsesPerReferrer: r.settings.maxUsesPerReferrer ?? null });
       setAvailableProducts(allProducts.products || []);
+      // Load the subscription gate kill switch + matrix. The endpoint
+      // always returns safe defaults so this never throws.
+      try {
+        const gate = await adminFetch<{ settings: any }>("/api/admin/subscriptions/gate");
+        if (gate?.settings) {
+          setGateSettings({
+            oldGateEnabled: gate.settings.oldGateEnabled !== false,
+            hideUntilPurchasedEnabled: Boolean(gate.settings.hideUntilPurchasedEnabled),
+            features: gate.settings.features || {},
+            planVisibility: gate.settings.planVisibility || {},
+            subscriberPricing: gate.settings.subscriberPricing || {},
+            usageLimits: gate.settings.usageLimits || { aiQuestionsPerDay: {} },
+          });
+        }
+      } catch {
+        // ignore — defaults stay.
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load subscriptions.");
     }
@@ -205,6 +234,17 @@ export default function SubscriptionsPage() {
       notify("success", "Referral settings saved.");
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "Could not save referral settings.");
+    } finally { setSaving(false); }
+  }
+
+  async function saveGateSettings() {
+    setSaving(true);
+    try {
+      await adminFetch("/api/admin/subscriptions/gate", { method: "PATCH", body: JSON.stringify(gateSettings) });
+      notify("success", "Subscription logic saved.");
+      load();
+    } catch (err) {
+      notify("error", err instanceof Error ? err.message : "Could not save subscription logic.");
     } finally { setSaving(false); }
   }
 
@@ -325,7 +365,7 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="space-y-3 pb-6 lg:space-y-4">
-      <Tabs tabs={[{ key: "plans", label: "Plans" }, { key: "features", label: "Features" }, { key: "products", label: "Products" }, { key: "referrals", label: "Referrals" }]} active={tab} onChange={setTab} />
+      <Tabs tabs={[{ key: "plans", label: "Plans" }, { key: "features", label: "Features" }, { key: "products", label: "Products" }, { key: "logic", label: "Subscription Logic" }, { key: "referrals", label: "Referrals" }]} active={tab} onChange={setTab} />
 
       {tab === "plans" && (
         <div className="space-y-3 lg:space-y-4">
@@ -455,6 +495,280 @@ export default function SubscriptionsPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {tab === "logic" && (
+        <div className="space-y-4">
+          <RecordCard>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Subscription logic — kill switch</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Flip the global behaviour between <strong>old gate</strong> (show paywall on access) and{" "}
+                  <strong>new hide-until-purchased</strong> (feature removed from catalog + rail + nav until the user subscribes). The old gate is the SAFE default for a fresh database.
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-5 w-5"
+                  data-admin-gate-old-gate
+                  checked={gateSettings.oldGateEnabled}
+                  onChange={(event) => setGateSettings({ ...gateSettings, oldGateEnabled: event.target.checked })}
+                />
+                Old gate enabled (paywall on access)
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-5 w-5"
+                  data-admin-gate-hide-mode
+                  checked={gateSettings.hideUntilPurchasedEnabled}
+                  onChange={(event) => setGateSettings({ ...gateSettings, hideUntilPurchasedEnabled: event.target.checked })}
+                />
+                Hide until purchased (global kill switch — removes all features from the rail + catalog for non-subscribers)
+              </label>
+              <PrimaryButton className="w-full" loading={saving} onClick={saveGateSettings}>
+                Save subscription logic
+              </PrimaryButton>
+            </div>
+          </RecordCard>
+
+          <RecordCard>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Per-feature matrix</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Toggle the new hide-until-purchased model for one feature at a time, choose which billing cycles non-subscribers see, and set the AI-questions/day cap. Override the public price for existing members.
+                </p>
+              </div>
+              {(["myday", "revision"] as const).map((key) => {
+                const feature = features.find((f) => f.id === key || f.id === (key === "myday" ? "my-day" : key));
+                const current = gateSettings.features[key] || { gated: false, hideFromNonSubscribers: false, durations: { monthly: true, yearly: true, lifetime: true }, tiers: {} };
+                const update = (patch: Partial<typeof current>) => setGateSettings({
+                  ...gateSettings,
+                  features: { ...gateSettings.features, [key]: { ...current, ...patch } },
+                });
+                return (
+                  <div key={key} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                    <p className="text-xs font-semibold text-slate-900">{feature?.name || key}</p>
+                    <label className="mt-2 flex items-center gap-2 text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        data-admin-gate-feature-gated={key}
+                        checked={current.gated}
+                        onChange={(event) => update({ gated: event.target.checked })}
+                      />
+                      Hide until purchased
+                    </label>
+                    <label className="mt-1 flex items-center gap-2 text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        data-admin-gate-feature-hide={key}
+                        checked={current.hideFromNonSubscribers}
+                        onChange={(event) => update({ hideFromNonSubscribers: event.target.checked })}
+                      />
+                      Mirror as hidden in nav + rail
+                    </label>
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={current.durations.monthly}
+                          onChange={(event) => update({ durations: { ...current.durations, monthly: event.target.checked } })}
+                        />
+                        Monthly
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={current.durations.yearly}
+                          onChange={(event) => update({ durations: { ...current.durations, yearly: event.target.checked } })}
+                        />
+                        Yearly
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={current.durations.lifetime}
+                          onChange={(event) => update({ durations: { ...current.durations, lifetime: event.target.checked } })}
+                        />
+                        Lifetime
+                      </label>
+                    </div>
+                    <Field label="AI questions / day (cap; leave blank for unlimited)">
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min="0"
+                        data-admin-gate-feature-ai-cap={key}
+                        value={gateSettings.usageLimits.aiQuestionsPerDay[key] ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          const next = raw === "" ? null : Math.max(0, Math.round(Number(raw) || 0));
+                          const map = { ...gateSettings.usageLimits.aiQuestionsPerDay };
+                          if (next == null) delete map[key]; else map[key] = next;
+                          setGateSettings({ ...gateSettings, usageLimits: { ...gateSettings.usageLimits, aiQuestionsPerDay: map } });
+                        }}
+                      />
+                    </Field>
+                  </div>
+                );
+              })}
+            </div>
+          </RecordCard>
+
+          <RecordCard>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Plan visibility + subscriber-only price</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Choose which plans show on the subscription page, which cycles are visible for each, and the per-plan override price that only EXISTING subscribers see.
+                </p>
+              </div>
+              {plans.map((plan) => {
+                const visibility = gateSettings.planVisibility[plan.id] || { visible: true, durations: { monthly: true, yearly: true, lifetime: true } };
+                const override = gateSettings.subscriberPricing[plan.id] || { monthly: null, yearly: null, lifetime: null };
+                return (
+                  <div key={plan.id} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                    <p className="text-xs font-semibold text-slate-900">{plan.name}</p>
+                    <label className="mt-2 flex items-center gap-2 text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        data-admin-gate-plan-visible={plan.id}
+                        checked={visibility.visible}
+                        onChange={(event) => setGateSettings({
+                          ...gateSettings,
+                          planVisibility: {
+                            ...gateSettings.planVisibility,
+                            [plan.id]: { ...visibility, visible: event.target.checked },
+                          },
+                        })}
+                      />
+                      Visible on subscription page
+                    </label>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-slate-600">
+                      <label className="flex flex-col gap-1">
+                        <span>Monthly</span>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={visibility.durations.monthly}
+                          onChange={(event) => setGateSettings({
+                            ...gateSettings,
+                            planVisibility: {
+                              ...gateSettings.planVisibility,
+                              [plan.id]: { ...visibility, durations: { ...visibility.durations, monthly: event.target.checked } },
+                            },
+                          })}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span>Yearly</span>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={visibility.durations.yearly}
+                          onChange={(event) => setGateSettings({
+                            ...gateSettings,
+                            planVisibility: {
+                              ...gateSettings.planVisibility,
+                              [plan.id]: { ...visibility, durations: { ...visibility.durations, yearly: event.target.checked } },
+                            },
+                          })}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span>Lifetime</span>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={visibility.durations.lifetime}
+                          onChange={(event) => setGateSettings({
+                            ...gateSettings,
+                            planVisibility: {
+                              ...gateSettings.planVisibility,
+                              [plan.id]: { ...visibility, durations: { ...visibility.durations, lifetime: event.target.checked } },
+                            },
+                          })}
+                        />
+                      </label>
+                    </div>
+                    <p className="mt-3 text-[11px] font-semibold text-emerald-700">Subscriber-only override (₹/cycle, blank = use public price)</p>
+                    <div className="mt-1 grid grid-cols-3 gap-2">
+                      <Field label="Monthly">
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min="0"
+                          data-admin-gate-plan-override-monthly={plan.id}
+                          value={override.monthly ?? ""}
+                          onChange={(event) => {
+                            const raw = event.target.value;
+                            const next = raw === "" ? null : Math.max(0, Math.round(Number(raw) || 0));
+                            setGateSettings({
+                              ...gateSettings,
+                              subscriberPricing: {
+                                ...gateSettings.subscriberPricing,
+                                [plan.id]: { ...override, monthly: next },
+                              },
+                            });
+                          }}
+                        />
+                      </Field>
+                      <Field label="Yearly">
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min="0"
+                          data-admin-gate-plan-override-yearly={plan.id}
+                          value={override.yearly ?? ""}
+                          onChange={(event) => {
+                            const raw = event.target.value;
+                            const next = raw === "" ? null : Math.max(0, Math.round(Number(raw) || 0));
+                            setGateSettings({
+                              ...gateSettings,
+                              subscriberPricing: {
+                                ...gateSettings.subscriberPricing,
+                                [plan.id]: { ...override, yearly: next },
+                              },
+                            });
+                          }}
+                        />
+                      </Field>
+                      <Field label="Lifetime">
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min="0"
+                          data-admin-gate-plan-override-lifetime={plan.id}
+                          value={override.lifetime ?? ""}
+                          onChange={(event) => {
+                            const raw = event.target.value;
+                            const next = raw === "" ? null : Math.max(0, Math.round(Number(raw) || 0));
+                            setGateSettings({
+                              ...gateSettings,
+                              subscriberPricing: {
+                                ...gateSettings.subscriberPricing,
+                                [plan.id]: { ...override, lifetime: next },
+                              },
+                            });
+                          }}
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </RecordCard>
         </div>
       )}
 

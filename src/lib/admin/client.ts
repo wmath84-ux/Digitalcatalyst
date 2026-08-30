@@ -570,6 +570,63 @@ async function homeBannersRequest(init?:RequestInit){
  * An absent (or empty) list means "derive the chips from the products",
  * which the Store page falls back to, so the filter row is never empty.
  */
+/**
+ * Subscription logic kill switch + per-feature / per-duration / per-tier
+ * matrix. Stored as a single `settings/subscriptionGate` document —
+ * admin write, app read. The defaults here are intentionally SAFE:
+ *
+ *   - `oldGateEnabled: true` — the existing "paywall on access" behaviour
+ *     still works for any feature that does not opt in to the new model.
+ *   - `hideUntilPurchasedEnabled: false` — the new "hide everywhere"
+ *     model is OFF by default. Admin can flip it on per feature via the
+ *     `features[key].gated` flag.
+ *   - `features` is empty — no per-feature override until admin adds one.
+ *   - `subscriberPricing` is empty — no per-cycle override until admin
+ *     adds one. When admin adds a per-cycle value, the resolver uses it
+ *     ONLY for users with an active subscription.
+ *
+ * The shape is fully typed so future per-tier toggles (e.g. enterprise
+ * SSO, family sharing) join the same object without breaking the
+ * contract.
+ */
+async function subscriptionGateRequest(init?:RequestInit){
+  const ref=doc(db,"settings","subscriptionGate");
+  const defaults={
+    oldGateEnabled: true,
+    hideUntilPurchasedEnabled: false,
+    features: {} as Record<string,{gated:boolean;durations:{monthly:boolean;yearly:boolean;lifetime:boolean};tiers:Record<string,boolean>;hideFromNonSubscribers:boolean}>,
+    planVisibility: {} as Record<string,{visible:boolean;durations:{monthly:boolean;yearly:boolean;lifetime:boolean}}>,
+    subscriberPricing: {} as Record<string,{monthly:number|null;yearly:number|null;lifetime:number|null}>,
+    usageLimits: { aiQuestionsPerDay: {} as Record<string,number> },
+    updatedAt: null as any,
+  };
+  if((init?.method||"GET")==="GET"){
+    const snap=await getDoc(ref);
+    const data=snap.exists()?snap.data()||{}:{} as any;
+    // Normalise: ensure every section exists with the same shape.
+    return {
+      settings: {
+        ...defaults,
+        ...data,
+        features: { ...(defaults.features), ...((data as any).features || {}) },
+        planVisibility: { ...(defaults.planVisibility), ...((data as any).planVisibility || {}) },
+        subscriberPricing: { ...(defaults.subscriberPricing), ...((data as any).subscriberPricing || {}) },
+        usageLimits: {
+          aiQuestionsPerDay: {
+            ...(((defaults.usageLimits as any).aiQuestionsPerDay) || {}),
+            ...(((data as any).usageLimits || {}).aiQuestionsPerDay || {}),
+          },
+        },
+      },
+    };
+  }
+  const b=bodyOf(init);
+  // Accept partial updates — merge on top of the existing document so
+  // the admin UI can update one section without resending the whole shape.
+  await setDoc(ref,stripUndefinedDeep({...b,updatedAt:serverTimestamp()}),{merge:true});
+  return { settings: { ...defaults, ...b } };
+}
+
 async function storeFiltersRequest(init?: RequestInit) {
   const ref = doc(db, "settings", STORE_FILTERS_DOC_ID);
   if ((init?.method || "GET") === "GET") {
@@ -626,6 +683,7 @@ export async function adminFetch<T=unknown>(input:string,init?:RequestInit):Prom
   else if(p==="/api/admin/subscriptions/features")result=await subscriptionFeaturesRequest(init);
   else if(p==="/api/admin/subscriptions/products")result=await subscriptionPlanProductsRequest(init);
   else if(p==="/api/admin/subscriptions/referrals")result=await settingsRequest("referralProgram","settings",init);
+  else if(p==="/api/admin/subscriptions/gate")result=await subscriptionGateRequest(init);
   else if(p==="/api/admin/coupons")result=await genericCollection("siteCoupons","coupons",init);
   else if(p==="/api/admin/reviews")result=await genericCollection("siteReviews","reviews",init);
   else if(p==="/api/admin/content")result=await settingsRequest("adminContent","settings",init);

@@ -1301,6 +1301,24 @@ export async function handleRevisionGenerate(req: VercelRequest, res: VercelResp
     } else {
       allowance = { unmetered: true, source: "own", message: "Your API key does not use the school/plan AI allowance." };
     }
+    // Phase-2: write the per-month usage document so the profile widget
+    // can show "X of Y AI questions this month" with the admin-set cap.
+    // The write is best-effort — a failed profile tally never blocks a
+    // successful AI delivery.
+    try {
+      const month = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+      const usageRef = adminDb().collection("users").doc(user.uid).collection("usage").doc(month);
+      await adminDb().runTransaction(async (tx) => {
+        const snap = await tx.get(usageRef);
+        const prev = snap.exists ? (snap.data() as any) : null;
+        const generated = Array.isArray(generated.questions) ? generated.questions.length : 0;
+        const total = (Number(prev?.aiQuestionsGenerated) || 0) + generated;
+        const byFeature = { ...((prev?.aiQuestionsByFeature) || {}), revision: (Number((prev?.aiQuestionsByFeature || {}).revision) || 0) + generated };
+        tx.set(usageRef, { uid: user.uid, month, aiQuestionsGenerated: total, aiQuestionsByFeature: byFeature, updatedAt: Date.now() }, { merge: true });
+      });
+    } catch {
+      // ignore — usage doc write failed but the response is already valid.
+    }
     res.status(200).json({
       ok: true,
       provider: config.provider,

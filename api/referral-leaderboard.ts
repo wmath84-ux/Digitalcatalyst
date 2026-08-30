@@ -7,6 +7,7 @@ import { handleMyDay } from "./_lib/myDay.js";
 import { handleFlowPathControl } from "./_lib/flowpathControl.js";
 import { handleManifest } from "./_lib/manifest.js";
 import { handleBrandIcon } from "./_lib/brandIcon.js";
+import { handleSubscriptionGate } from "./_lib/subscriptionGateServer.js";
 
 type SubscriberRow = {
   uid: string;
@@ -84,6 +85,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (path === "/api/brand-icon") {
     return handleBrandIcon(req, res);
+  }
+  // Phase-2: public read endpoint for the admin's subscription gate
+  // (kill switch + per-feature / per-duration matrix). Same dispatch
+  // pattern as the manifest / brand-icon endpoints so the
+  // serverless-function count stays within the Hobby cap.
+  if (path === "/api/subscription-gate") {
+    return handleSubscriptionGate(req, res);
   }
   // Course-player GitHub embed proxy. `/api/embed-proxy` rewrites here
   // (see vercel.json) because the Hobby plan caps serverless functions at
