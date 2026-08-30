@@ -304,6 +304,29 @@ test("wires between nodes are n8n-style cubic-bezier ropes, not rigid smoothstep
   assert.match(panel, /defaultEdgeOptions=\{\{ type: "rope" \}\}/);
 });
 
+test("ropes are drawn from node boxes so they load even when handle bounds are 0", () => {
+  // Reported: the violet ANCHOR DOTS on nodes always painted, but the WIRES
+  // between them sometimes did not — especially on a slow radio. Cause:
+  // React Flow routes edges from handle DOM bounds, which are 0×0 while the
+  // overlay is still animating / the map is still arriving. Wires must
+  // therefore be drawn from the node's own width/height (already known)
+  // instead of those handle bounds. The visible 7px anchor dots stay as they
+  // were; the invisible 1px connection handles stay 1px.
+  assert.match(panel, /export const boxFaceAnchor/);
+  assert.match(panel, /useStore\(\(state\) => state\.nodeLookup\?\.get\(source\)\)/);
+  assert.match(panel, /useStore\(\(state\) => state\.nodeLookup\?\.get\(target\)\)/);
+  assert.match(panel, /const fromBox = boxFaceAnchor\(sourceNode, sourcePosition\)/);
+  assert.match(panel, /width: placed\.width/);
+  assert.match(panel, /height: placed\.height/);
+  assert.match(panel, /width: 1,/);
+  assert.match(styles, /width: 1px !important/);
+  assert.match(styles, /fill: none !important/);
+  assert.match(styles, /\[data-course-mindmap\] svg/);
+  assert.match(styles, /max-width: none !important/);
+  const main = readSource("src/main.tsx");
+  assert.match(main, /import "@xyflow\/react\/dist\/style\.css"/);
+});
+
 test("nodes are hand-positionable — drag and drop anywhere, persisted per node", () => {
   // The learner can drag any node (root included) and the drop is committed
   // as that node's manual position; the tidy tree still owns every node that

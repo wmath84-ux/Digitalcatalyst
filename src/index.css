@@ -2499,12 +2499,30 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    The @xyflow/react dist stylesheet is imported in MindMapPanel.tsx, but
    some global resets can zero-out SVG stroke values or set `overflow:hidden`
    on the edge container, hiding the connecting wires between nodes.
-   These rules ensure the edge paths are always visible inside the canvas. */
+   The tablet `* { max-width: 100% }` pass is the other culprit: it shrinks
+   the edge SVG to a sliver so ropes look like they "didn't load". These
+   rules keep every path painted, unclipped, and independent of net speed. */
+[data-course-mindmap] .react-flow,
+[data-course-mindmap] .react-flow__renderer,
+[data-course-mindmap] .react-flow__viewport,
+[data-course-mindmap] .react-flow__container,
+[data-course-mindmap] .react-flow__edges,
+[data-course-mindmap] .react-flow__edgelayer,
+[data-course-mindmap] .react-flow__edge,
+[data-course-mindmap] svg,
+[data-course-mindmap] path {
+  max-width: none !important;
+  overflow: visible !important;
+}
+
 [data-course-mindmap] .react-flow__edge path,
-[data-course-mindmap] .react-flow__edge-path {
+[data-course-mindmap] .react-flow__edge-path,
+[data-course-mindmap] .react-flow__connection-path {
+  fill: none !important;
   stroke-opacity: 1 !important;
   visibility: visible !important;
   display: block !important;
+  stroke-linecap: round;
 }
 
 [data-course-mindmap] .react-flow__edges {

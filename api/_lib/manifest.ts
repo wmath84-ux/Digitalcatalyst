@@ -49,6 +49,7 @@ export async function handleManifest(_req: VercelRequest, res: VercelResponse) {
       ];
 
   const manifest = {
+    id: "/",
     name: tagline ? `${appName} | ${tagline}` : appName,
     short_name: appName,
     description,

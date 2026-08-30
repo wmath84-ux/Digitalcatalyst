@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from
 import { createRoot } from "react-dom/client";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
+import "@xyflow/react/dist/style.css";
 import "./index.css";
 import "./landing.css";
 import StoreApp from "./App";

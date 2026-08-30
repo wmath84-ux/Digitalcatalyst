@@ -136,16 +136,60 @@ export const writeCachedLogoUrl = (url: string | null | undefined): void => {
   });
 };
 
+const STATIC_MANIFEST_HREF = "/manifest.webmanifest";
+
+function isInstallableManifest(data: unknown): boolean {
+  if (!data || typeof data !== "object") return false;
+  const manifest = data as {
+    name?: unknown;
+    short_name?: unknown;
+    icons?: unknown;
+    display?: unknown;
+  };
+  const name = typeof manifest.name === "string"
+    ? manifest.name
+    : typeof manifest.short_name === "string"
+      ? manifest.short_name
+      : "";
+  const icons = Array.isArray(manifest.icons) ? manifest.icons : [];
+  const display = typeof manifest.display === "string" ? manifest.display : "";
+  return Boolean(name)
+    && icons.length > 0
+    && ["standalone", "fullscreen", "minimal-ui"].includes(display);
+}
+
 /**
  * Force the browser to re-fetch the dynamic PWA manifest after branding
- * changes. The manifest is served from /api/manifest with a `?v=` cache-buster
- * so Chrome/Android re-read the name + icons.
+ * changes. The live document is `/api/manifest?v=` — but only after a probe
+ * confirms it is a real web-app manifest. A rewrite miss used to serve the
+ * referral leaderboard JSON here, which made Chrome refuse "Install app".
+ * Fall back to the static /manifest.webmanifest in that case so install
+ * still works.
  */
 function refreshManifestLink(version: string) {
   if (typeof document === "undefined") return;
   const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
   if (!manifest) return;
-  manifest.href = `/api/manifest?v=${encodeURIComponent(version)}`;
+  const dynamicUrl = `/api/manifest?v=${encodeURIComponent(version)}`;
+  void (async () => {
+    try {
+      const res = await fetch(dynamicUrl, {
+        headers: { Accept: "application/manifest+json, application/json" },
+      });
+      if (!res.ok) {
+        manifest.href = STATIC_MANIFEST_HREF;
+        return;
+      }
+      const data = await res.json();
+      if (!isInstallableManifest(data)) {
+        manifest.href = STATIC_MANIFEST_HREF;
+        return;
+      }
+      manifest.href = dynamicUrl;
+    } catch {
+      manifest.href = STATIC_MANIFEST_HREF;
+    }
+  })();
 }
 
 function applyBootSplash(branding: Branding) {

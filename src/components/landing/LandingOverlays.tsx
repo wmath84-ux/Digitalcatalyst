@@ -32,8 +32,12 @@ export default function LandingOverlays() {
       maintenanceTimer.current = setTimeout(() => setMaintenanceOpen(false), 5200);
     };
     const showInstall = () => {
-      setInstalled(isPwaInstalled());
-      setManualHelp(false);
+      const alreadyInstalled = isPwaInstalled();
+      setInstalled(alreadyInstalled);
+      // iOS and browsers that never fire beforeinstallprompt must see the
+      // manual Add-to-Home-Screen steps immediately — waiting for a failed
+      // Install tap made it look like the web app could not be installed.
+      setManualHelp(!alreadyInstalled && !isInstallPromptReady());
       setInstallOpen(true);
     };
     const handleInstalled = () => {

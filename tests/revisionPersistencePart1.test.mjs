@@ -4,7 +4,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import ts from "typescript";
 import {
   DEFAULT_REVISION_TEST_BANK_LIMITS,
   normalizeRevisionTestBankLimits,
@@ -30,7 +29,21 @@ class MemoryStorage {
   clear() { this.#values.clear(); }
 }
 
-async function revisionEngine() {
+async function loadTypescript() {
+  try {
+    const mod = await import("typescript");
+    return mod.default ?? mod;
+  } catch {
+    return null;
+  }
+}
+
+async function revisionEngine(t) {
+  const ts = await loadTypescript();
+  if (!ts) {
+    t?.skip("dependencies not installed — run pnpm install");
+    return null;
+  }
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "revision-part1-"));
   const files = [
     ["src/revision/data/seedData.ts", "data/seedData.mjs"],
@@ -75,7 +88,9 @@ const question = (prompt, correctIndex = 0) => ({
 });
 
 test("AI-generated and imported tests persist in the same local Test Bank", async (t) => {
-  const { root, custom } = await revisionEngine();
+  const engine = await revisionEngine(t);
+  if (!engine) return;
+  const { root, custom } = engine;
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const uid = "learner-bank";
   const ai = custom.createCustomTest(uid, {
@@ -101,7 +116,9 @@ test("AI-generated and imported tests persist in the same local Test Bank", asyn
 });
 
 test("saved tests recover from storage and keep immutable full/skipped attempt history", async (t) => {
-  const { root, custom, service } = await revisionEngine();
+  const engine = await revisionEngine(t);
+  if (!engine) return;
+  const { root, custom, service } = engine;
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const uid = "learner-history";
   const created = custom.createCustomTest(uid, {

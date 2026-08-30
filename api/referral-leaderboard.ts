@@ -74,23 +74,58 @@ const toUserRow = (uid: string, data: Record<string, unknown>): UserRow => ({
 const isSubscriber = (data: Record<string, unknown>) =>
   Boolean(data.subscriptionPlanId || (data.subscriptionTier && data.subscriptionTier !== "basic"));
 
+const headerValue = (req: VercelRequest, name: string) => {
+  const raw = req.headers?.[name];
+  if (Array.isArray(raw)) return String(raw[0] || "");
+  return typeof raw === "string" ? raw : "";
+};
+
+const incomingUrl = (req: VercelRequest & { url?: string }) =>
+  headerValue(req, "x-matched-path")
+  || headerValue(req, "x-invoke-path")
+  || headerValue(req, "x-vercel-original-path")
+  || headerValue(req, "x-forwarded-uri")
+  || String(req.url || "");
+
+const incomingPath = (req: VercelRequest & { url?: string }) =>
+  incomingUrl(req).split("?")[0].replace(/\/+$/, "") || "/";
+
+const routeQuery = (req: VercelRequest) =>
+  String((req.query as { route?: string } | undefined)?.route || "");
+
+const matchesApiRoute = (req: VercelRequest & { url?: string }, route: "manifest" | "brand-icon") => {
+  const path = incomingPath(req);
+  const url = `${incomingUrl(req)} ${String(req.url || "")}`;
+  const needle = `/api/${route}`;
+  return (
+    routeQuery(req) === route
+    || path === needle
+    || path.endsWith(needle)
+    || url.includes(`${needle}?`)
+    || url.includes(`${needle} `)
+    || url.endsWith(needle)
+  );
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // PWA manifest + brand icon share this deployed function to stay within the
-  // 12-function Hobby cap (see vercel.json rewrites). Dispatch on path first
-  // so these never fall through to the leaderboard/embed logic below.
+  // 12-function Hobby cap (see vercel.json rewrites). Dispatch on path AND
+  // `?route=` first — after a rewrite `req.url` is often the destination
+  // `/api/referral-leaderboard`, which used to miss this branch and return
+  // leaderboard JSON. Chrome then refused to install the web app.
   const reqWithUrl = req as VercelRequest & { url?: string };
-  const path = String(reqWithUrl.url || "").split("?")[0].replace(/\/+$/, "");
-  if (path === "/api/manifest") {
+  const path = incomingPath(reqWithUrl);
+  if (matchesApiRoute(reqWithUrl, "manifest")) {
     return handleManifest(req, res);
   }
-  if (path === "/api/brand-icon") {
+  if (matchesApiRoute(reqWithUrl, "brand-icon")) {
     return handleBrandIcon(req, res);
   }
   // Phase-2: public read endpoint for the admin's subscription gate
   // (kill switch + per-feature / per-duration matrix). Same dispatch
   // pattern as the manifest / brand-icon endpoints so the
   // serverless-function count stays within the Hobby cap.
-  if (path === "/api/subscription-gate") {
+  if (path === "/api/subscription-gate" || path.endsWith("/api/subscription-gate") || routeQuery(req) === "subscription-gate") {
     return handleSubscriptionGate(req, res);
   }
   // Course-player GitHub embed proxy. `/api/embed-proxy` rewrites here
