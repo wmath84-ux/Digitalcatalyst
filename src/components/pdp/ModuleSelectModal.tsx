@@ -104,6 +104,8 @@ export default function ModuleSelectModal({
 
         {modules.length > 0 ? <button
           type="button"
+          role="checkbox"
+          aria-checked={allFilteredSelected}
           onClick={toggleSelectAll}
           className="mx-5 mb-2 flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
         >
@@ -135,11 +137,14 @@ export default function ModuleSelectModal({
                 const owned = ownedIds.has(module.id);
                 const price = getModuleEffectivePrice(module, fallbackPrice);
                 return (
-                  <li key={module.id}>
-                    <button
-                      type="button"
-                      disabled={owned}
-                      onClick={() => toggleModule(module.id)}
+        <li key={module.id}>
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={owned ? true : checked}
+              aria-label={`${module.title} — ${owned ? "already owned" : `${formatPrice(price)}`}`}
+              disabled={owned}
+              onClick={() => toggleModule(module.id)}
                       data-pdp-module-pick={module.id}
                       className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors ${
                         owned ? "border-emerald-100 bg-emerald-50/70 opacity-80" : checked ? "border-violet-200 bg-violet-50" : "border-slate-100 bg-white"

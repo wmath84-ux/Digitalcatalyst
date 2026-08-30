@@ -14,16 +14,12 @@
 // at viewport widths down to 320px (verified in
 // `tests/pdpPurchaseBuilderMobileWidths.test.mjs`).
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
-  AlertTriangle,
   BadgePercent,
   Check,
-  ChevronDown,
-  ChevronUp,
   CircleAlert,
   CircleCheck,
-  Eye,
   Info,
   Package,
   PackageOpen,
@@ -45,6 +41,7 @@ import ModuleSelectModal from "./ModuleSelectModal";
 import {
   buildCheckoutSelection,
   computeSummary,
+  flattenModules,
   getAvailableModes,
   getAvailablePaidUpdates,
   getBundleModules,
@@ -169,32 +166,45 @@ export default function PdpPurchaseBuilder({
     [isProductOwned, purchasableModules, purchasableResources, availableUpdates],
   );
 
-  // Default mode: prefer module picker so the PDP matches the subscription
-  // feature-select flow. Fall back to full course when no modules exist.
-  const [mode, setMode] = useState<PdpPurchaseMode>(() => {
-    if (isProductOwned && availableModes.includes("paid_update")) return "paid_update";
-    if (availableModes.includes("selected_modules")) return "selected_modules";
-    if (availableModes.includes("full_product")) return "full_product";
-    if (availableModes.includes("selected_resources")) return "selected_resources";
-    if (availableModes.includes("paid_update")) return "paid_update";
-    return "free_entitlement";
-  });
-
-  // If the current mode becomes unavailable (e.g. user switches from full to modules and
-  // the product has no purchasable modules), fall back to the next best mode.
-  useEffect(() => {
-    if (!availableModes.includes(mode)) {
-      setMode(isProductOwned && availableModes.includes("paid_update") ? "paid_update" : availableModes[0] || "free_entitlement");
-    }
-  }, [availableModes, isProductOwned, mode]);
-
+  // The purchase mode is DERIVED, not a separate tab state. The "Select
+  // course modules" dropdown is the single place for module picking, so the
+  // mode follows the selection: picking ≥1 module switches to
+  // "selected_modules", an empty selection means the default "full_product"
+  // (whose CTA stays enabled). Deriving — instead of a useState that only
+  // initialised once — also fixes the bug where the dropdown became a no-op
+  // whenever the one-time mode init had landed on "full_product" (e.g. when
+  // modules finished loading after the builder had already mounted).
+  //
+  // Resources / paid updates keep their explicit opt-in because they are not
+  // part of the module dropdown; a tiny chip row appears only for products
+  // that actually offer them.
   const [selectedModuleIds, setSelectedModuleIds] = useState<Set<string>>(() => new Set());
   const [selectedResourceIds, setSelectedResourceIds] = useState<Set<string>>(() => new Set());
   const [selectedUpdateId, setSelectedUpdateId] = useState<string | null>(null);
-  const [expandedModules, setExpandedModules] = useState<Set<string>>(() => new Set());
+  const [extraMode, setExtraMode] = useState<Extract<PdpPurchaseMode, "selected_resources" | "paid_update"> | null>(null);
   const [previewNotice, setPreviewNotice] = useState<string | null>(null);
   const [moduleModalOpen, setModuleModalOpen] = useState(false);
   const fallbackModulePrice = useMemo(() => getModuleFallbackPrice(product, modules), [product, modules]);
+
+  const extraModes = useMemo(
+    () =>
+      availableModes.filter(
+        (m): m is Extract<PdpPurchaseMode, "selected_resources" | "paid_update"> =>
+          m === "selected_resources" || m === "paid_update",
+      ),
+    [availableModes],
+  );
+  // Priority order mirrors the old default-mode logic: an explicit module
+  // selection always wins; otherwise paid updates lead for owners, then the
+  // full course for everyone else.
+  const baseMode: PdpPurchaseMode = selectedModuleIds.size > 0
+    ? "selected_modules"
+    : isProductOwned && availableModes.includes("paid_update")
+      ? "paid_update"
+      : availableModes.includes("full_product")
+        ? "full_product"
+        : availableModes[0] || "free_entitlement";
+  const mode: PdpPurchaseMode = extraMode && extraModes.includes(extraMode) ? extraMode : baseMode;
 
   const ownershipState = useMemo(
     () => ({
@@ -248,56 +258,30 @@ export default function PdpPurchaseBuilder({
 
   // ---- Handlers ----
 
-  const toggleModule = (id: string) => {
-    setSelectedModuleIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        // Re-validate after toggle to give the user immediate feedback on
-        // dependencies. The summary panel re-derives everything anyway.
-        next.add(id);
-        const check = validateSelection({
-          mode: "selected_modules",
-          selectedIds: next,
-          modules,
-          isProductOwned,
-          ownedUpdateIds,
-          ownedModuleIds,
-        });
-        if (!check.ok) {
-          setPreviewNotice(check.reason);
-          return current; // ignore
-        }
-        // Auto-add dependencies.
-        const module = modules.flatMap((m) => [m, ...(m.modules || [])]).find((m) => m.id === id);
-        if (module) {
-          for (const depId of module.requiredPreviousModuleIds || []) {
-            if (!next.has(depId)) {
-              const depModule = (modules.flatMap((m) => [m, ...(m.modules || [])])).find((m) => m.id === depId);
-              if (depModule && !getIsModuleOwned(depModule, ownershipState) && depModule.individuallyPurchasable) {
-                next.add(depId);
-              }
-            }
-          }
-        }
-      }
-      setPreviewNotice(null);
-      return next;
-    });
+  // Normalize a raw id list coming from the module dropdown: keep only
+  // purchasable, not-yet-owned modules and AUTO-ADD any required previous
+  // modules — exactly what the old inline selector did per toggle. Without
+  // this, picking one dependent module from the dropdown would fail
+  // validation and leave the CTA silently disabled.
+  const normalizeModuleSelection = (ids: readonly string[]): Set<string> => {
+    const flat = flattenModules(modules);
+    const byId = new Map(flat.map((m) => [m.id, m]));
+    const purchasableIds = new Set(purchasableModules.map((m) => m.id));
+    const next = new Set<string>();
+    const addWithDeps = (id: string, seen: Set<string>) => {
+      if (next.has(id) || seen.has(id) || !purchasableIds.has(id)) return;
+      seen.add(id);
+      const module = byId.get(id);
+      if (!module || getIsModuleOwned(module, ownershipState)) return;
+      next.add(id);
+      for (const depId of module.requiredPreviousModuleIds || []) addWithDeps(depId, seen);
+    };
+    ids.forEach((id) => addWithDeps(String(id), new Set()));
+    return next;
   };
 
   const toggleResource = (id: string) => {
     setSelectedResourceIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const expandModule = (id: string) => {
-    setExpandedModules((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -354,7 +338,11 @@ export default function PdpPurchaseBuilder({
         fallbackPrice={fallbackModulePrice}
         onClose={() => setModuleModalOpen(false)}
         onChangeSelected={(ids) => {
-          setSelectedModuleIds(new Set(ids));
+          // Normalize (dependency auto-add) so the dropdown drives summary,
+          // price, CTA and checkout exactly like the selector it replaced.
+          // The derived mode then flips to "selected_modules" by itself.
+          setSelectedModuleIds(normalizeModuleSelection(ids));
+          setExtraMode(null);
           setPreviewNotice(null);
         }}
       />
@@ -372,26 +360,32 @@ export default function PdpPurchaseBuilder({
   return (
     <div className="space-y-4" data-pdp-purchase-builder>
       {modulePicker}
-      <ModeSwitcher modes={availableModes} mode={mode} onChange={setMode} />
+
+      {/* The Full course / Modules tabs were removed: the dropdown above is
+          the module picker, and the CTA defaults to the full course. Only
+          non-module extras (standalone resources, paid updates) still get an
+          explicit opt-in chip row — and only when the product offers them. */}
+      {extraModes.length > 0 ? (
+        <div data-pdp-extra-modes className="flex flex-wrap gap-2" role="group" aria-label="Extra purchase options">
+          <ExtraModeChip
+            active={mode !== "selected_resources" && mode !== "paid_update"}
+            onClick={() => setExtraMode(null)}
+          >
+            Course · modules
+          </ExtraModeChip>
+          {extraModes.map((extra) => (
+            <ExtraModeChip key={extra} active={mode === extra} onClick={() => setExtraMode(extra)}>
+              {extra === "selected_resources" ? "Resources" : "Paid update"}
+            </ExtraModeChip>
+          ))}
+        </div>
+      ) : null}
 
       {mode === "full_product" && (
         <FullCoursePanel
           modules={bundleModules}
           isProductOwned={isProductOwned}
           fullCourse={summary.fullCourse}
-        />
-      )}
-
-      {mode === "selected_modules" && purchasableModules.length > 0 && (
-        <ModuleSelector
-          modules={purchasableModules}
-          allModules={modules}
-          selectedIds={selectedModuleIds}
-          expandedIds={expandedModules}
-          ownershipState={ownershipState}
-          fallbackPrice={fallbackModulePrice}
-          onToggle={toggleModule}
-          onExpand={expandModule}
         />
       )}
 
@@ -428,44 +422,27 @@ export default function PdpPurchaseBuilder({
   );
 }
 
+/** Compact opt-in chip for the non-module extras (resources / paid updates). */
+function ExtraModeChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`inline-flex items-center justify-center rounded-2xl border px-3 py-2 text-xs font-black transition sm:text-sm ${
+        active
+          ? "border-violet-600 bg-violet-600 text-white shadow-md shadow-violet-200"
+          : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:text-violet-700"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 // ===========================================================================
 // Sub-components
 // ===========================================================================
-
-function ModeSwitcher({ modes, mode, onChange }: { modes: PdpPurchaseMode[]; mode: PdpPurchaseMode; onChange: (m: PdpPurchaseMode) => void }) {
-  const labels: Record<PdpPurchaseMode, { short: string; long: string; icon: typeof Package }> = {
-    full_product: { short: "Full course", long: "Full course", icon: Package },
-    selected_modules: { short: "Modules", long: "Choose modules", icon: PackageOpen },
-    selected_resources: { short: "Resources", long: "Resources", icon: Unlock },
-    paid_update: { short: "Update", long: "Paid update", icon: BadgePercent },
-    free_entitlement: { short: "Free", long: "Free", icon: Sparkles },
-  };
-  return (
-    <div className="flex flex-wrap gap-2" role="tablist" aria-label="Purchase mode">
-      {modes.map((m) => {
-        const isActive = mode === m;
-        const Icon = labels[m].icon;
-        return (
-          <button
-            key={m}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => onChange(m)}
-            className={`inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-2xl border px-3 py-2.5 text-xs font-black transition sm:text-sm ${
-              isActive
-                ? "border-violet-600 bg-violet-600 text-white shadow-md shadow-violet-200"
-                : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:text-violet-700"
-            }`}
-          >
-            <Icon size={14} className="shrink-0" />
-            <span className="truncate">{labels[m].short}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 function FullCoursePanel({
   modules,
@@ -523,176 +500,6 @@ function FullCoursePanel({
           ) : null}
         </ul>
       </div>
-    </div>
-  );
-}
-
-type ModuleSelectorOwnership = {
-  isProductOwned: boolean;
-  ownedUpdateIds: ReadonlySet<string> | readonly string[];
-  ownedModuleIds?: ReadonlySet<string> | readonly string[];
-  ownedResourceIds?: ReadonlySet<string> | readonly string[];
-};
-
-function ModuleSelector({
-  modules,
-  allModules,
-  selectedIds,
-  expandedIds,
-  ownershipState,
-  fallbackPrice = 0,
-  onToggle,
-  onExpand,
-}: {
-  modules: CanonicalCourseModule[];
-  allModules: CanonicalCourseModule[];
-  selectedIds: Set<string>;
-  expandedIds: Set<string>;
-  ownershipState: ModuleSelectorOwnership;
-  fallbackPrice?: number;
-  onToggle: (id: string) => void;
-  onExpand: (id: string) => void;
-}) {
-  if (modules.length === 0) {
-    return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
-        No modules have been published for this course yet.
-      </div>
-    );
-  }
-  const allFlat = allModules.flatMap((m) => [m, ...(m.modules || [])]);
-  const selectedTotal = modules.filter((module) => selectedIds.has(module.id)).reduce((sum, module) => sum + (getModuleEffectivePrice(module, fallbackPrice) || 0), 0);
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between rounded-2xl bg-violet-50 px-3 py-2.5 ring-1 ring-violet-100">
-        <div><p className="text-xs font-black uppercase tracking-wider text-violet-700">Select individual modules</p><p className="text-[10px] text-violet-500">{modules.length} available · {selectedIds.size} selected</p></div>
-        <span className="text-sm font-black text-violet-900">{formatPrice(selectedTotal)}</span>
-      </div>
-      {modules.map((m) => {
-        const isSelected = selectedIds.has(m.id);
-        const isExpanded = expandedIds.has(m.id);
-        const isOwned = getIsModuleOwned(m, ownershipState);
-        const price = getModuleEffectivePrice(m, fallbackPrice);
-        const regular = m.cashPrice;
-        const sale = m.salePrice;
-        const depIds = m.requiredPreviousModuleIds || [];
-        const deps = depIds.map((id) => allFlat.find((x) => x.id === id)).filter(Boolean) as CanonicalCourseModule[];
-        const depsMissing = deps.filter((d) => !selectedIds.has(d.id) && !getIsModuleOwned(d, ownershipState));
-        return (
-          <article
-            key={m.id}
-            data-pdp-module
-            data-module-id={m.id}
-            className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition ${
-              isSelected ? "border-violet-500 ring-2 ring-violet-200" : "border-slate-200"
-            }`}
-          >
-            <div className="flex items-start gap-3 p-3 sm:p-4">
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={isOwned ? "true" : isSelected}
-                disabled={isOwned}
-                onClick={() => onToggle(m.id)}
-                className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 transition ${
-                  isOwned
-                    ? "cursor-not-allowed border-emerald-500 bg-emerald-500 text-white"
-                    : isSelected
-                      ? "border-violet-600 bg-violet-600 text-white"
-                      : "border-slate-300 bg-white"
-                }`}
-              >
-                {isOwned ? <Unlock size={12} /> : isSelected ? <Check size={14} /> : null}
-              </button>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="min-w-0 truncate text-sm font-black text-slate-900">{m.title}</h3>
-                  {m.badge ? (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase text-amber-700">
-                      {m.badge}
-                    </span>
-                  ) : null}
-                  {m.previewAvailable ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">
-                      <Eye size={10} /> Preview
-                    </span>
-                  ) : null}
-                  {isOwned ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                      <CircleCheck size={10} /> Owned
-                    </span>
-                  ) : null}
-                </div>
-                <p className="mt-1 line-clamp-2 text-xs text-slate-500 sm:text-sm">
-                  {m.description || `${m.resources.length} resource${m.resources.length === 1 ? "" : "s"} included.`}
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs">
-                  <span className="font-bold text-slate-500">
-                    {m.resources.length} resource{m.resources.length === 1 ? "" : "s"}
-                  </span>
-                  {price !== null ? (
-                    <>
-                      <span className="font-black text-slate-900">{formatPrice(price)}</span>
-                      {sale !== null && sale < (regular ?? Number.POSITIVE_INFINITY) ? (
-                        <span className="text-slate-400 line-through">{formatPriceValue(regular)}</span>
-                      ) : null}
-                    </>
-                  ) : (
-                    <span className="text-slate-400">Bundle only</span>
-                  )}
-
-                </div>
-                {deps.length > 0 ? (
-                  <p className="mt-2 text-[11px] text-slate-500">
-                    Requires: {deps.map((d) => d.title).join(" · ")}
-                    {depsMissing.length > 0 ? (
-                      <span className="ml-1 inline-flex items-center gap-1 text-amber-700">
-                        <AlertTriangle size={10} /> Auto-added on select
-                      </span>
-                    ) : null}
-                  </p>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={() => onExpand(m.id)}
-                aria-expanded={isExpanded}
-                aria-label={isExpanded ? "Collapse details" : "Expand details"}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-50 text-slate-500 hover:bg-slate-100"
-              >
-                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </button>
-            </div>
-            {isExpanded ? (
-              <div className="border-t border-slate-100 bg-slate-50/50 p-3 text-xs text-slate-600 sm:p-4 sm:text-sm">
-                {m.description ? (
-                  <p className="leading-5">{m.description}</p>
-                ) : (
-                  <p className="italic text-slate-400">No description provided.</p>
-                )}
-                {m.resources.length > 0 ? (
-                  <ul className="mt-3 space-y-1.5">
-                    {m.resources.slice(0, 8).map((r) => (
-                      <li key={r.id} className="flex items-center gap-2">
-                        <span className="grid h-5 w-5 place-items-center rounded bg-white text-slate-400 ring-1 ring-slate-200">
-                          <Package size={10} />
-                        </span>
-                        <span className="truncate">{r.name}</span>
-                        <span className="ml-auto text-[10px] uppercase tracking-wider text-slate-400">
-                          {RESOURCE_TYPE_LABEL[r.type] || r.type}
-                        </span>
-                      </li>
-                    ))}
-                    {m.resources.length > 8 ? (
-                      <li className="text-[11px] text-slate-500">+ {m.resources.length - 8} more</li>
-                    ) : null}
-                  </ul>
-                ) : null}
-              </div>
-            ) : null}
-          </article>
-        );
-      })}
     </div>
   );
 }

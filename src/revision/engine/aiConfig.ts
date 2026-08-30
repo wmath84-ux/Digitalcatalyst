@@ -722,6 +722,23 @@ function isSpaFallback(res: Response, text: string): boolean {
   return /^\s*<!doctype html/i.test(text) || /^\s*<html/i.test(text);
 }
 
+/**
+ * Turn a non-JSON API body into an actionable error. The revision AI runs on
+ * a shared serverless function with a 60s budget; when a generation outlives
+ * it, the platform answers with an empty/plain-text error page — surfacing
+ * the real status (502/503/504 or empty) beats the old blanket
+ * "invalid response", and tells the learner a retry is safe (failed
+ * reservations are released).
+ */
+function describeNonJsonAiResponse(res: Response, raw: string): string {
+  const detail = raw.trim().slice(0, 140);
+  const status = res.status || 0;
+  if (status === 502 || status === 503 || status === 504 || !detail) {
+    return `The AI server stopped before answering (status ${status}). It was a timeout, not your setup — please try again.`;
+  }
+  return detail ? `AI server returned ${status}. ${detail}` : "AI server returned an invalid response.";
+}
+
 async function generateViaServer(args: RevisionGenerateArgs): Promise<ParsedQuestion[]> {
   const firebaseUser = auth.currentUser;
   if (!firebaseUser) throw Object.assign(new Error("Please log in to generate with AI."), { code: "auth" });
@@ -752,7 +769,7 @@ async function generateViaServer(args: RevisionGenerateArgs): Promise<ParsedQues
   try {
     payload = JSON.parse(raw) as { ok?: boolean; error?: string; questions?: unknown };
   } catch {
-    throw new Error("AI server returned an invalid response.");
+    throw new Error(describeNonJsonAiResponse(res, raw));
   }
   if (!res.ok || !payload.ok) {
     throw Object.assign(new Error(payload.error || `AI server returned ${res.status}.`), { code: "provider", status: res.status });
@@ -898,7 +915,7 @@ async function completeJsonViaServer(config: AiConfig, system: string, user: str
   try {
     payload = JSON.parse(raw) as typeof payload;
   } catch {
-    throw new Error("AI server returned an invalid response.");
+    throw new Error(describeNonJsonAiResponse(res, raw));
   }
   if (!res.ok || !payload.ok) {
     throw Object.assign(new Error(payload.error || `AI server returned ${res.status}.`), { code: "provider", status: res.status });

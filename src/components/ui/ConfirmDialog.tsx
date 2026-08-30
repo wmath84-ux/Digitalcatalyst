@@ -20,7 +20,8 @@ interface ConfirmDialogProps {
 /**
  * Confirmation overlay with the same screen-size behaviour as `Modal`:
  * bottom-sheet-style centred card on phones, and on tablet / desktop a
- * dialog constrained to the My Day content column (the side navigation
+ * dialog constrained to the My Day content column (the side navigation —
+ * or the desktop shell's left rail on a small tablet in landscape —
  * stays visible and untouched). The panel is capped to the visible height,
  * so short landscape screens scroll internally instead of overflowing.
  */

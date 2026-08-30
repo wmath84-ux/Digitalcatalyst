@@ -27,11 +27,14 @@ interface ModalProps {
 /**
  * Responsive My Day overlay.
  *
- * - Phones (<768px): bottom sheet pinned to the viewport bottom, full width,
- *   respecting the safe-area inset, never taller than the visible viewport.
- * - Tablets / laptops / desktops (>=768px): centred dialog constrained to the
- *   My Day content column — the sticky side navigation stays visible and
- *   clickable, and nothing spills over the app frame or off-screen.
+ * - Phones (<768px, no desktop shell): bottom sheet pinned to the viewport
+ *   bottom, full width, respecting the safe-area inset, never taller than
+ *   the visible viewport.
+ * - Tablets / laptops / desktops (>=768px) — AND small tablets in landscape
+ *   (>=640px) where the desktop shell's left rail is rendered: centred
+ *   dialog constrained to the My Day content column — the sticky side
+ *   navigation / shell rail stays visible and clickable, and nothing spills
+ *   over the app frame or off-screen.
  *
  * In both cases the panel is a flex column capped at the available height
  * (dvh-aware, with a vh fallback for older browsers): the header stays put and
