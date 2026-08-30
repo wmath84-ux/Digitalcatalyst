@@ -1,4 +1,5 @@
 import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./firebaseAdmin.js";
+import { getSubscriptionGateSettings } from "./subscriptionGate.js";
 
 const MAX_ITEMS_PER_SECTION = 300;
 const MAX_PAYLOAD_BYTES = 700_000;
@@ -157,6 +158,12 @@ type Access = {
   dayKey: string;
   resetAt: number;
   timeZone: string;
+  // Phase-1: when the feature is in "hide" mode AND the user is not paid,
+  // the client should remove the My Day entry from the rail/nav. The
+  // paywall still appears on a direct deep-link, so the "no free access"
+  // contract is preserved. Subscribers always see the feature regardless
+  // of the visibility mode.
+  hidden: boolean;
 };
 
 function accessSnapshot(
@@ -165,6 +172,7 @@ function accessSnapshot(
   usage: Record<string, unknown>,
   requestedTimeZone: string,
   now = Date.now(),
+  gateSettings: import("./subscriptionGate.js").SubscriptionGateSettings | null = null,
 ): Access {
   const featureConfigured = Boolean(feature) && feature?.active !== false;
   const active = subscription.status === "active" && millis(subscription.expiresAt) > now;
@@ -177,6 +185,15 @@ function accessSnapshot(
   const timeZone = validTimeZone(usage.timeZone || requestedTimeZone);
   const today = dayKeyInZone(now, timeZone);
   const freeUsed = String(usage.dayKey || "") === today ? Math.max(0, Math.round(Number(usage.dayCount) || 0)) : 0;
+  // Phase-1: hide mode only hides for non-subscribers. Subscribers
+  // (paid === true) always see the feature regardless of mode. The
+  // global kill switch + per-feature gate override stack on top of
+  // the per-doc visibilityMode so the admin can flip the model on
+  // without rewriting any feature doc.
+  const perDocMode = (feature as any)?.visibilityMode === "hide" ? "hide" : "gate";
+  const globalHideOn = gateSettings ? gateSettings.hideUntilPurchasedEnabled || Boolean(gateSettings.features?.["myday"]?.gated) : false;
+  const visibilityMode = perDocMode === "hide" || globalHideOn ? "hide" : "gate";
+  const hidden = visibilityMode === "hide" && !paid;
   return {
     paid,
     paidExpiresAt: paid ? millis(subscription.expiresAt) : 0,
@@ -189,6 +206,7 @@ function accessSnapshot(
     dayKey: today,
     resetAt: nextDayReset(now, timeZone),
     timeZone,
+    hidden,
   };
 }
 
@@ -204,7 +222,8 @@ async function loadStatus(uid: string, requestedTimeZone: string) {
   ]);
   const feature = featureSnap.exists ? asRecord(featureSnap.data()) : null;
   const usage = asRecord(usageSnap.data());
-  const access = accessSnapshot(feature, asRecord(subscriptionSnap.data()), usage, requestedTimeZone);
+  const gateSettings = await getSubscriptionGateSettings();
+  const access = accessSnapshot(feature, asRecord(subscriptionSnap.data()), usage, requestedTimeZone, Date.now(), gateSettings);
   await usageRef.set({
     uid,
     dayKey: access.dayKey,
@@ -235,11 +254,14 @@ async function save(uid: string, requested: unknown, requestedTimeZone: string, 
       throw Object.assign(new Error("My Day has too much data to save. Remove older items and try again."), { statusCode: 413, code: "MYDAY_TOO_LARGE" });
     }
     const usage = asRecord(usageSnap.data());
+    const gateSettings = await getSubscriptionGateSettings();
     const access = accessSnapshot(
       featureSnap.exists ? asRecord(featureSnap.data()) : null,
       asRecord(subscriptionSnap.data()),
       usage,
       requestedTimeZone,
+      Date.now(),
+      gateSettings,
     );
     const creations = addedCount(previous, next);
     if (!access.unlimited && creations > access.freeRemaining) {

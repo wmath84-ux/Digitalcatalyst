@@ -21,6 +21,7 @@ import { useAuth } from "../context/AuthContext";
 import { useBranding } from "../context/BrandingContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useRevisionAccess } from "../hooks/useRevisionAccess";
+import { usePublishFeatureVisibility } from "../context/FeatureVisibilityContext";
 import { syncRevisionCatalog } from "./engine/catalogService";
 import { hydrateRevisionFromCloud, queueRevisionCloudPersistence } from "./engine/cloudRevisionService";
 import PremiumGate from "../components/subscription/PremiumGate";
@@ -186,7 +187,7 @@ export function RevisionPageTabs({ path }: { path: string }) {
 export default function RevisionApp() {
   const { user } = useAuth();
   const { cartIds } = useCommerce();
-  const { hasAccess: hasRevisionAccess, loading: revisionAccessLoading } = useRevisionAccess();
+  const { hasAccess: hasRevisionAccess, loading: revisionAccessLoading, hidden: revisionHidden } = useRevisionAccess();
   const [route, setRoute] = useState(() => window.location.hash);
   const [syncKey, setSyncKey] = useState(0);
   const [revisionDataLoading, setRevisionDataLoading] = useState(Boolean(user));
@@ -197,6 +198,11 @@ export default function RevisionApp() {
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+
+  // Phase-1: publish Revision's visibility into the shared context so the
+  // desktop rail can remove the entry when admin has set the feature to
+  // "hide" mode AND the user is not a subscriber.
+  usePublishFeatureVisibility("revision", { hidden: Boolean(revisionHidden) });
 
   const uid = user?.id ?? "guest";
   const userName = user?.name?.split(" ")[0] || "Learner";

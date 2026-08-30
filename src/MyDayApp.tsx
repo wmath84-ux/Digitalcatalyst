@@ -29,6 +29,7 @@ import type { NoteColor, QuickNote, Reminder, ScheduleEvent, Task, TaskStatus } 
 import { useCommerce } from "./context/CommerceContext";
 import { useAuth } from "./context/AuthContext";
 import { useMyDayAccess } from "./hooks/useMyDayAccess";
+import { usePublishFeatureVisibility } from "./context/FeatureVisibilityContext";
 import PremiumGate from "./components/subscription/PremiumGate";
 import { playSfxAdd, playSfxComplete, playSfxRemove, playSfxSuccess, playSfxToggle } from "./utils/sfx";
 
@@ -62,6 +63,7 @@ export default function App() {
     uid,
     setAccess: setMyDayAccess,
     refresh: refreshMyDay,
+    hidden: myDayHidden,
   } = useMyDayAccess();
   const [cloudLoaded, setCloudLoaded] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -173,6 +175,12 @@ export default function App() {
     });
     return () => { cancelled = true; };
   }, [applyCloudData, refreshMyDay, uid]);
+
+  // Phase-1: publish My Day's visibility into the shared context so the
+  // desktop rail + bottom nav can remove the entry when admin has set the
+  // feature to "hide" mode AND the user is not a subscriber. The hook
+  // already short-circuits to { hidden: false } when not signed in.
+  usePublishFeatureVisibility("myday", { hidden: Boolean(myDayHidden) });
 
   const handleNavigate = useCallback((id: string) => {
     if (id === "home") {

@@ -21,6 +21,10 @@ type Plan = {
     monthly: { dailyGenerationLimit: number; costBudgetMicros: number };
     yearly: { dailyGenerationLimit: number; costBudgetMicros: number };
   };
+  /** Phase-1: which billing cycles are SHOWN to non-subscribers. */
+  visibleCycles?: string[];
+  /** Phase-1: price ONLY existing subscribers see (per-cycle). null = use public price. */
+  subscriberPricingOverride?: { monthly: number | null; yearly: number | null; lifetime: number | null };
 };
 
 /** Per-plan price override stored on a feature doc. */
@@ -44,6 +48,18 @@ type FeatureRow = {
   active: boolean;
   /** Non-subscriber item creations allowed each calendar day (My Day only). */
   freeItemsPerDay?: number;
+  // ---- Phase-1 fields ----
+  /** "gate" = show paywall when accessed (legacy). "hide" = completely
+   *  removed from catalog & nav until the user has an active subscription. */
+  visibilityMode?: "gate" | "hide";
+  /** Billing cycles non-subscribers can pick this feature on. */
+  visibleCycles?: string[];
+  /** Plan ids the feature is completely removed from. */
+  hiddenPlanIds?: string[];
+  /** Subscriber-only override price. */
+  subscriberPricingOverride?: { monthly: number | null; yearly: number | null; lifetime: number | null };
+  /** Admin-set per-feature user cap. */
+  userLimit?: { aiQuestionsPerDay: number | null };
 };
 
 /** Subscription add-on product (like features but unlocks real products). */
@@ -75,6 +91,11 @@ type SubscriptionProductRow = {
   active: boolean;
   /** True when an explicit pricing doc exists in subscriptionPlanProducts (vs virtual auto row) */
   hasOverride?: boolean;
+  // ---- Phase-1 fields (mirrored from FeatureRow) ----
+  visibilityMode?: "gate" | "hide";
+  visibleCycles?: string[];
+  hiddenPlanIds?: string[];
+  subscriberPricingOverride?: { monthly: number | null; yearly: number | null; lifetime: number | null };
 };
 
 const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }, { cycle: "yearly", label: "Yearly", price: 0 }], revisionTestBankLimits: { monthly: 20, yearly: 20 }, aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } }, accessTier: "basic", cta: "Subscribe", featured: false, active: true };
@@ -93,6 +114,18 @@ export default function SubscriptionsPage() {
   const [catalogSearch, setCatalogSearch] = useState("");
   const [quickAddingId, setQuickAddingId] = useState<string | null>(null);
   const [referralSettings, setReferralSettings] = useState({ enabled: true, discountPaise: 25000, maxUsesPerReferrer: null as number | null });
+  // Phase-2: subscription gate kill switch + per-feature/per-duration matrix.
+  // Defaults are SAFE (legacy gate still on, hide-until-purchased off) so
+  // a fresh DB continues to behave like the existing page until the admin
+  // explicitly changes a value.
+  const [gateSettings, setGateSettings] = useState({
+    oldGateEnabled: true,
+    hideUntilPurchasedEnabled: false,
+    features: {} as Record<string, { gated: boolean; hideFromNonSubscribers: boolean; durations: { monthly: boolean; yearly: boolean; lifetime: boolean }; tiers: Record<string, boolean> }>,
+    planVisibility: {} as Record<string, { visible: boolean; durations: { monthly: boolean; yearly: boolean; lifetime: boolean } }>,
+    subscriberPricing: {} as Record<string, { monthly: number | null; yearly: number | null; lifetime: number | null }>,
+    usageLimits: { aiQuestionsPerDay: {} as Record<string, number> },
+  });
   const [error, setError] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<Partial<Plan> | null>(null);
   const [editingFeature, setEditingFeature] = useState<Partial<FeatureRow> | null>(null);
@@ -118,6 +151,23 @@ export default function SubscriptionsPage() {
       setSubscriptionProducts(sp.products || []);
       setReferralSettings({ enabled: r.settings.enabled !== false, discountPaise: Number(r.settings.discountPaise ?? 25000), maxUsesPerReferrer: r.settings.maxUsesPerReferrer ?? null });
       setAvailableProducts(allProducts.products || []);
+      // Load the subscription gate kill switch + matrix. The endpoint
+      // always returns safe defaults so this never throws.
+      try {
+        const gate = await adminFetch<{ settings: any }>("/api/admin/subscriptions/gate");
+        if (gate?.settings) {
+          setGateSettings({
+            oldGateEnabled: gate.settings.oldGateEnabled !== false,
+            hideUntilPurchasedEnabled: Boolean(gate.settings.hideUntilPurchasedEnabled),
+            features: gate.settings.features || {},
+            planVisibility: gate.settings.planVisibility || {},
+            subscriberPricing: gate.settings.subscriberPricing || {},
+            usageLimits: gate.settings.usageLimits || { aiQuestionsPerDay: {} },
+          });
+        }
+      } catch {
+        // ignore — defaults stay.
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load subscriptions.");
     }
@@ -184,6 +234,17 @@ export default function SubscriptionsPage() {
       notify("success", "Referral settings saved.");
     } catch (err) {
       notify("error", err instanceof Error ? err.message : "Could not save referral settings.");
+    } finally { setSaving(false); }
+  }
+
+  async function saveGateSettings() {
+    setSaving(true);
+    try {
+      await adminFetch("/api/admin/subscriptions/gate", { method: "PATCH", body: JSON.stringify(gateSettings) });
+      notify("success", "Subscription logic saved.");
+      load();
+    } catch (err) {
+      notify("error", err instanceof Error ? err.message : "Could not save subscription logic.");
     } finally { setSaving(false); }
   }
 
@@ -304,7 +365,7 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="space-y-3 pb-6 lg:space-y-4">
-      <Tabs tabs={[{ key: "plans", label: "Plans" }, { key: "features", label: "Features" }, { key: "products", label: "Products" }, { key: "referrals", label: "Referrals" }]} active={tab} onChange={setTab} />
+      <Tabs tabs={[{ key: "plans", label: "Plans" }, { key: "features", label: "Features" }, { key: "products", label: "Products" }, { key: "logic", label: "Subscription Logic" }, { key: "referrals", label: "Referrals" }]} active={tab} onChange={setTab} />
 
       {tab === "plans" && (
         <div className="space-y-3 lg:space-y-4">
@@ -434,6 +495,280 @@ export default function SubscriptionsPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {tab === "logic" && (
+        <div className="space-y-4">
+          <RecordCard>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Subscription logic — kill switch</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Flip the global behaviour between <strong>old gate</strong> (show paywall on access) and{" "}
+                  <strong>new hide-until-purchased</strong> (feature removed from catalog + rail + nav until the user subscribes). The old gate is the SAFE default for a fresh database.
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-5 w-5"
+                  data-admin-gate-old-gate
+                  checked={gateSettings.oldGateEnabled}
+                  onChange={(event) => setGateSettings({ ...gateSettings, oldGateEnabled: event.target.checked })}
+                />
+                Old gate enabled (paywall on access)
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-5 w-5"
+                  data-admin-gate-hide-mode
+                  checked={gateSettings.hideUntilPurchasedEnabled}
+                  onChange={(event) => setGateSettings({ ...gateSettings, hideUntilPurchasedEnabled: event.target.checked })}
+                />
+                Hide until purchased (global kill switch — removes all features from the rail + catalog for non-subscribers)
+              </label>
+              <PrimaryButton className="w-full" loading={saving} onClick={saveGateSettings}>
+                Save subscription logic
+              </PrimaryButton>
+            </div>
+          </RecordCard>
+
+          <RecordCard>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Per-feature matrix</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Toggle the new hide-until-purchased model for one feature at a time, choose which billing cycles non-subscribers see, and set the AI-questions/day cap. Override the public price for existing members.
+                </p>
+              </div>
+              {(["myday", "revision"] as const).map((key) => {
+                const feature = features.find((f) => f.id === key || f.id === (key === "myday" ? "my-day" : key));
+                const current = gateSettings.features[key] || { gated: false, hideFromNonSubscribers: false, durations: { monthly: true, yearly: true, lifetime: true }, tiers: {} };
+                const update = (patch: Partial<typeof current>) => setGateSettings({
+                  ...gateSettings,
+                  features: { ...gateSettings.features, [key]: { ...current, ...patch } },
+                });
+                return (
+                  <div key={key} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                    <p className="text-xs font-semibold text-slate-900">{feature?.name || key}</p>
+                    <label className="mt-2 flex items-center gap-2 text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        data-admin-gate-feature-gated={key}
+                        checked={current.gated}
+                        onChange={(event) => update({ gated: event.target.checked })}
+                      />
+                      Hide until purchased
+                    </label>
+                    <label className="mt-1 flex items-center gap-2 text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        data-admin-gate-feature-hide={key}
+                        checked={current.hideFromNonSubscribers}
+                        onChange={(event) => update({ hideFromNonSubscribers: event.target.checked })}
+                      />
+                      Mirror as hidden in nav + rail
+                    </label>
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={current.durations.monthly}
+                          onChange={(event) => update({ durations: { ...current.durations, monthly: event.target.checked } })}
+                        />
+                        Monthly
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={current.durations.yearly}
+                          onChange={(event) => update({ durations: { ...current.durations, yearly: event.target.checked } })}
+                        />
+                        Yearly
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={current.durations.lifetime}
+                          onChange={(event) => update({ durations: { ...current.durations, lifetime: event.target.checked } })}
+                        />
+                        Lifetime
+                      </label>
+                    </div>
+                    <Field label="AI questions / day (cap; leave blank for unlimited)">
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min="0"
+                        data-admin-gate-feature-ai-cap={key}
+                        value={gateSettings.usageLimits.aiQuestionsPerDay[key] ?? ""}
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          const next = raw === "" ? null : Math.max(0, Math.round(Number(raw) || 0));
+                          const map = { ...gateSettings.usageLimits.aiQuestionsPerDay };
+                          if (next == null) delete map[key]; else map[key] = next;
+                          setGateSettings({ ...gateSettings, usageLimits: { ...gateSettings.usageLimits, aiQuestionsPerDay: map } });
+                        }}
+                      />
+                    </Field>
+                  </div>
+                );
+              })}
+            </div>
+          </RecordCard>
+
+          <RecordCard>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Plan visibility + subscriber-only price</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Choose which plans show on the subscription page, which cycles are visible for each, and the per-plan override price that only EXISTING subscribers see.
+                </p>
+              </div>
+              {plans.map((plan) => {
+                const visibility = gateSettings.planVisibility[plan.id] || { visible: true, durations: { monthly: true, yearly: true, lifetime: true } };
+                const override = gateSettings.subscriberPricing[plan.id] || { monthly: null, yearly: null, lifetime: null };
+                return (
+                  <div key={plan.id} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                    <p className="text-xs font-semibold text-slate-900">{plan.name}</p>
+                    <label className="mt-2 flex items-center gap-2 text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        data-admin-gate-plan-visible={plan.id}
+                        checked={visibility.visible}
+                        onChange={(event) => setGateSettings({
+                          ...gateSettings,
+                          planVisibility: {
+                            ...gateSettings.planVisibility,
+                            [plan.id]: { ...visibility, visible: event.target.checked },
+                          },
+                        })}
+                      />
+                      Visible on subscription page
+                    </label>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-slate-600">
+                      <label className="flex flex-col gap-1">
+                        <span>Monthly</span>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={visibility.durations.monthly}
+                          onChange={(event) => setGateSettings({
+                            ...gateSettings,
+                            planVisibility: {
+                              ...gateSettings.planVisibility,
+                              [plan.id]: { ...visibility, durations: { ...visibility.durations, monthly: event.target.checked } },
+                            },
+                          })}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span>Yearly</span>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={visibility.durations.yearly}
+                          onChange={(event) => setGateSettings({
+                            ...gateSettings,
+                            planVisibility: {
+                              ...gateSettings.planVisibility,
+                              [plan.id]: { ...visibility, durations: { ...visibility.durations, yearly: event.target.checked } },
+                            },
+                          })}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span>Lifetime</span>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={visibility.durations.lifetime}
+                          onChange={(event) => setGateSettings({
+                            ...gateSettings,
+                            planVisibility: {
+                              ...gateSettings.planVisibility,
+                              [plan.id]: { ...visibility, durations: { ...visibility.durations, lifetime: event.target.checked } },
+                            },
+                          })}
+                        />
+                      </label>
+                    </div>
+                    <p className="mt-3 text-[11px] font-semibold text-emerald-700">Subscriber-only override (₹/cycle, blank = use public price)</p>
+                    <div className="mt-1 grid grid-cols-3 gap-2">
+                      <Field label="Monthly">
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min="0"
+                          data-admin-gate-plan-override-monthly={plan.id}
+                          value={override.monthly ?? ""}
+                          onChange={(event) => {
+                            const raw = event.target.value;
+                            const next = raw === "" ? null : Math.max(0, Math.round(Number(raw) || 0));
+                            setGateSettings({
+                              ...gateSettings,
+                              subscriberPricing: {
+                                ...gateSettings.subscriberPricing,
+                                [plan.id]: { ...override, monthly: next },
+                              },
+                            });
+                          }}
+                        />
+                      </Field>
+                      <Field label="Yearly">
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min="0"
+                          data-admin-gate-plan-override-yearly={plan.id}
+                          value={override.yearly ?? ""}
+                          onChange={(event) => {
+                            const raw = event.target.value;
+                            const next = raw === "" ? null : Math.max(0, Math.round(Number(raw) || 0));
+                            setGateSettings({
+                              ...gateSettings,
+                              subscriberPricing: {
+                                ...gateSettings.subscriberPricing,
+                                [plan.id]: { ...override, yearly: next },
+                              },
+                            });
+                          }}
+                        />
+                      </Field>
+                      <Field label="Lifetime">
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min="0"
+                          data-admin-gate-plan-override-lifetime={plan.id}
+                          value={override.lifetime ?? ""}
+                          onChange={(event) => {
+                            const raw = event.target.value;
+                            const next = raw === "" ? null : Math.max(0, Math.round(Number(raw) || 0));
+                            setGateSettings({
+                              ...gateSettings,
+                              subscriberPricing: {
+                                ...gateSettings.subscriberPricing,
+                                [plan.id]: { ...override, lifetime: next },
+                              },
+                            });
+                          }}
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </RecordCard>
         </div>
       )}
 
@@ -569,6 +904,89 @@ export default function SubscriptionsPage() {
               </Field>
               <Field label="CTA label"><input className={inputClass} value={editingPlan.cta ?? ""} onChange={(e) => setEditingPlan({ ...editingPlan, cta: e.target.value })} /></Field>
             </div>
+
+            {/* ---- Phase-1: per-plan per-duration matrix + subscriber pricing ---- */}
+            <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/60 p-3">
+              <p className="text-sm font-semibold text-slate-900">Visibility & subscriber pricing</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                Konse billing duration ke buttons non-subscribers ko dikhane hain aur existing subscribers ke liye custom price kya rahega. <strong>Subscriber pricing</strong> sirf active members ko dikhta hai — useful jab renewal/upgrade ko specific subscriber ke liye discounted rate pe dena ho.
+              </p>
+
+              <div className="mt-3 space-y-2">
+                <p className="text-[11px] font-semibold text-slate-700">Billing durations to show</p>
+                <div className="flex flex-wrap gap-2">
+                  {["monthly", "yearly"].map((cycle) => {
+                    const visible = (editingPlan.visibleCycles ?? ["monthly", "yearly"]).includes(cycle);
+                    return (
+                      <label
+                        key={cycle}
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold transition ${
+                          visible ? "border-fuchsia-300 bg-white text-fuchsia-700" : "border-slate-200 bg-slate-50 text-slate-500"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={visible}
+                          onChange={(e) => {
+                            const current = new Set(editingPlan.visibleCycles ?? ["monthly", "yearly"]);
+                            if (e.target.checked) current.add(cycle);
+                            else current.delete(cycle);
+                            // Never let the list go empty — keep at least one cycle
+                            if (current.size === 0) current.add("monthly");
+                            setEditingPlan({ ...editingPlan, visibleCycles: Array.from(current) });
+                          }}
+                        />
+                        Show <span className="capitalize">{cycle}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-slate-500">At least one duration must be visible. Default: both monthly &amp; yearly.</p>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <p className="text-[11px] font-semibold text-slate-700">Subscriber-only price (₹)</p>
+                <p className="text-[10px] text-slate-500">Blank = use the public price above. Set ₹0 to make the renewal/upgrade free for active members.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Subscriber monthly (₹)">
+                    <input
+                      className={inputClass}
+                      type="number"
+                      min="0"
+                      placeholder="public price"
+                      value={editingPlan.subscriberPricingOverride?.monthly ?? ""}
+                      onChange={(e) => setEditingPlan({
+                        ...editingPlan,
+                        subscriberPricingOverride: {
+                          monthly: e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value) || 0)),
+                          yearly: editingPlan.subscriberPricingOverride?.yearly ?? null,
+                          lifetime: editingPlan.subscriberPricingOverride?.lifetime ?? null,
+                        },
+                      })}
+                    />
+                  </Field>
+                  <Field label="Subscriber yearly (₹)">
+                    <input
+                      className={inputClass}
+                      type="number"
+                      min="0"
+                      placeholder="public price"
+                      value={editingPlan.subscriberPricingOverride?.yearly ?? ""}
+                      onChange={(e) => setEditingPlan({
+                        ...editingPlan,
+                        subscriberPricingOverride: {
+                          monthly: editingPlan.subscriberPricingOverride?.monthly ?? null,
+                          yearly: e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value) || 0)),
+                          lifetime: editingPlan.subscriberPricingOverride?.lifetime ?? null,
+                        },
+                      })}
+                    />
+                  </Field>
+                </div>
+              </div>
+            </div>
+
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" className="h-5 w-5" checked={!!editingPlan.featured} onChange={(e) => setEditingPlan({ ...editingPlan, featured: e.target.checked })} />
               Featured plan
@@ -695,6 +1113,173 @@ export default function SubscriptionsPage() {
               <Field label="Badge"><input className={inputClass} placeholder="POPULAR" value={editingFeature.badge ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, badge: e.target.value })} /></Field>
               <Field label="Display order"><input className={inputClass} type="number" value={editingFeature.sortOrder ?? 0} onChange={(e) => setEditingFeature({ ...editingFeature, sortOrder: Number(e.target.value || 0) })} /></Field>
             </div>
+
+            {/* ---- Phase-1: visibility mode + per-cycle/per-plan matrix + user limit ---- */}
+            <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/60 p-3">
+              <p className="text-sm font-semibold text-slate-900">Visibility &amp; user limits</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                Choose how this feature shows up for non-subscribers. <strong>Show paywall on access</strong> = feature dikhta hai but access pe gate aata hai (legacy). <strong>Hide until purchased</strong> = catalog, nav aur home me completely gayab — only the subscriber sees it. Use this for premium features you never want teased to non-subscribers.
+              </p>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <label className={`flex items-start gap-2 rounded-xl border p-2.5 transition ${(editingFeature.visibilityMode ?? "gate") === "gate" ? "border-fuchsia-300 bg-white" : "border-slate-200 bg-slate-50"}`}>
+                  <input
+                    type="radio"
+                    name={`visibility-${editingFeature.id ?? "new"}`}
+                    className="mt-0.5 h-4 w-4"
+                    checked={(editingFeature.visibilityMode ?? "gate") === "gate"}
+                    onChange={() => setEditingFeature({ ...editingFeature, visibilityMode: "gate" })}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-900">Show paywall on access</p>
+                    <p className="mt-0.5 text-[10px] leading-snug text-slate-500">Catalog &amp; nav me dikhata hai. Click karne par subscription gate aata hai.</p>
+                  </div>
+                </label>
+                <label className={`flex items-start gap-2 rounded-xl border p-2.5 transition ${editingFeature.visibilityMode === "hide" ? "border-fuchsia-300 bg-white" : "border-slate-200 bg-slate-50"}`}>
+                  <input
+                    type="radio"
+                    name={`visibility-${editingFeature.id ?? "new"}`}
+                    className="mt-0.5 h-4 w-4"
+                    checked={editingFeature.visibilityMode === "hide"}
+                    onChange={() => setEditingFeature({ ...editingFeature, visibilityMode: "hide" })}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-900">Hide until purchased</p>
+                    <p className="mt-0.5 text-[10px] leading-snug text-slate-500">Feature chhupa rahega jab tak user subscriber nahi ban jata. Direct deep-link bhi block.</p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <p className="text-[11px] font-semibold text-slate-700">Billing durations non-subscribers can pick</p>
+                <div className="flex flex-wrap gap-2">
+                  {["monthly", "yearly"].map((cycle) => {
+                    const visible = (editingFeature.visibleCycles ?? ["monthly", "yearly"]).includes(cycle);
+                    return (
+                      <label
+                        key={cycle}
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold transition ${
+                          visible ? "border-fuchsia-300 bg-white text-fuchsia-700" : "border-slate-200 bg-slate-50 text-slate-500"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={visible}
+                          onChange={(e) => {
+                            const current = new Set(editingFeature.visibleCycles ?? ["monthly", "yearly"]);
+                            if (e.target.checked) current.add(cycle);
+                            else current.delete(cycle);
+                            if (current.size === 0) current.add("monthly");
+                            setEditingFeature({ ...editingFeature, visibleCycles: Array.from(current) });
+                          }}
+                        />
+                        Show <span className="capitalize">{cycle}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {plans.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-[11px] font-semibold text-slate-700">Hide from specific plans (no free toggle, no add-on)</p>
+                  <p className="text-[10px] text-slate-500">Tick karne par wo plan se feature completely remove ho jayega — sirf remaining plans me dikhega.</p>
+                  <div className="space-y-1.5">
+                    {plans.map((plan) => {
+                      const hidden = (editingFeature.hiddenPlanIds ?? []).includes(plan.id);
+                      return (
+                        <label
+                          key={plan.id}
+                          className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-[11px] transition ${
+                            hidden ? "border-rose-200 bg-rose-50" : "border-slate-200 bg-white"
+                          }`}
+                        >
+                          <span className="font-semibold text-slate-800">{plan.name}</span>
+                          <span className="flex items-center gap-2 text-[10px] font-semibold text-slate-600">
+                            {hidden ? <span className="text-rose-600">hidden</span> : <span className="text-emerald-600">visible</span>}
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={hidden}
+                              onChange={(e) => {
+                                const current = new Set(editingFeature.hiddenPlanIds ?? []);
+                                if (e.target.checked) current.add(plan.id);
+                                else current.delete(plan.id);
+                                setEditingFeature({ ...editingFeature, hiddenPlanIds: Array.from(current) });
+                              }}
+                            />
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3 space-y-2">
+                <p className="text-[11px] font-semibold text-slate-700">Subscriber-only price (₹)</p>
+                <p className="text-[10px] text-slate-500">Sirf active subscribers ko upgrade / renewal overlay par dikhta hai. Blank = public price.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Subscriber monthly (₹)">
+                    <input
+                      className={inputClass}
+                      type="number"
+                      min="0"
+                      placeholder="public price"
+                      value={editingFeature.subscriberPricingOverride?.monthly ?? ""}
+                      onChange={(e) => setEditingFeature({
+                        ...editingFeature,
+                        subscriberPricingOverride: {
+                          monthly: e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value) || 0)),
+                          yearly: editingFeature.subscriberPricingOverride?.yearly ?? null,
+                          lifetime: editingFeature.subscriberPricingOverride?.lifetime ?? null,
+                        },
+                      })}
+                    />
+                  </Field>
+                  <Field label="Subscriber yearly (₹)">
+                    <input
+                      className={inputClass}
+                      type="number"
+                      min="0"
+                      placeholder="public price"
+                      value={editingFeature.subscriberPricingOverride?.yearly ?? ""}
+                      onChange={(e) => setEditingFeature({
+                        ...editingFeature,
+                        subscriberPricingOverride: {
+                          monthly: editingFeature.subscriberPricingOverride?.monthly ?? null,
+                          yearly: e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value) || 0)),
+                          lifetime: editingFeature.subscriberPricingOverride?.lifetime ?? null,
+                        },
+                      })}
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <p className="text-[11px] font-semibold text-slate-700">User limit (per billing cycle)</p>
+                <p className="text-[10px] text-slate-500">Subscriber ke liye is feature ka cap. -1 = unlimited. Profile page par dikhega.</p>
+                <Field label="AI questions per day" hint="Revision feature ke liye">
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min={-1}
+                    max={10000}
+                    placeholder="50"
+                    value={editingFeature.userLimit?.aiQuestionsPerDay ?? ""}
+                    onChange={(e) => setEditingFeature({
+                      ...editingFeature,
+                      userLimit: {
+                        aiQuestionsPerDay: e.target.value === "" ? null : Math.max(-1, Math.min(10000, Math.round(Number(e.target.value) || 0))),
+                      },
+                    })}
+                  />
+                </Field>
+              </div>
+            </div>
+
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" className="h-5 w-5" checked={!!editingFeature.included} onChange={(e) => setEditingFeature({ ...editingFeature, included: e.target.checked, individualPrice: e.target.checked ? "0" : (editingFeature.individualPrice || "0") })} />
               Included / free feature (no add-on charge)

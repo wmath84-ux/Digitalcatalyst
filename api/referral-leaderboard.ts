@@ -7,6 +7,7 @@ import { handleMyDay } from "./_lib/myDay.js";
 import { handleFlowPathControl } from "./_lib/flowpathControl.js";
 import { handleManifest } from "./_lib/manifest.js";
 import { handleBrandIcon } from "./_lib/brandIcon.js";
+import { handleSubscriptionGate } from "./_lib/subscriptionGateServer.js";
 
 type SubscriberRow = {
   uid: string;
@@ -85,6 +86,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (path === "/api/brand-icon") {
     return handleBrandIcon(req, res);
   }
+  // Phase-2: public read endpoint for the admin's subscription gate
+  // (kill switch + per-feature / per-duration matrix). Same dispatch
+  // pattern as the manifest / brand-icon endpoints so the
+  // serverless-function count stays within the Hobby cap.
+  if (path === "/api/subscription-gate") {
+    return handleSubscriptionGate(req, res);
+  }
   // Course-player GitHub embed proxy. `/api/embed-proxy` rewrites here
   // (see vercel.json) because the Hobby plan caps serverless functions at
   // 12 and the project is already at the limit — the proxy logic lives in
@@ -110,11 +118,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // AI generation can run tens of seconds; if anything ever rejects above
     // the handler's own try/catch (e.g. an unexpected Firestore fault), still
     // answer JSON so the client can show a real message instead of parsing a
-    // platform error page.
+    // platform error page. Two layers of catch ensure even a misbehaving
+    // `res` object cannot turn a 502 into Vercel's opaque HTML 500.
     try {
-      return await handleRevisionGenerate(req, res);
-    } catch (error) {
-      return errorResponse(res, error, "Could not generate questions with AI.");
+      try {
+        return await handleRevisionGenerate(req, res);
+      } catch (innerError) {
+        return errorResponse(res, innerError, "Could not generate questions with AI.");
+      }
+    } catch (outerError) {
+      console.error("[leaderboard] failed to write JSON error response", outerError);
+      try {
+        if (!res.headersSent) {
+          res.setHeader("Content-Type", "application/json");
+          res.status(500).json({
+            ok: false,
+            code: "INTERNAL_FAILURE",
+            error: "The server hit an unexpected problem. Please try again.",
+          });
+        }
+      } catch {
+        // The connection is already gone; nothing more we can write.
+      }
     }
   }
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });

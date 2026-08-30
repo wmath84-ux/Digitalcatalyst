@@ -30,12 +30,40 @@ const DEFAULT_BASE: Record<ProviderId, string> = {
 };
 
 const FETCH_MS = 45000;
+/**
+ * Per-call HTTP timeout for the upstream AI provider. Vercel's Hobby plan
+ * caps a single serverless invocation at 60s (vercel.json → maxDuration:60)
+ * and a request can use up to two repair rounds, so the first call must
+ * leave headroom for the second. 25s lets us finish a first + one repair
+ * well inside the 60s window, and the time-budget guard below aborts the
+ * repair loop before the platform kills the function with the opaque
+ * `FUNCTION_INVOCATION_FAILED` 500.
+ */
+const FETCH_MS_REPAIR = 25000;
 const MAX_COUNT = 20;
 const MAX_STAMPS = 200;
 const REVISION_CATALOG_DOC = "revisionCatalog";
 
 /** Live fallback when a stored/published Gemini model has been retired. */
 const GEMINI_FALLBACK_MODEL = "gemini-3.7-flash";
+
+/**
+ * Wall-clock budget for the whole `handleRevisionGenerate` body, in ms.
+ * Vercel's 60s Hobby cap leaves ~55s of usable runtime (cold start +
+ * platform overhead). Anything past that gets killed with
+ * `FUNCTION_INVOCATION_FAILED` (an opaque 500 the user cannot act on).
+ * We stop issuing new upstream calls at 50s and let in-flight ones finish,
+ * so the response is always a structured JSON error the UI can render.
+ *
+ * The budget is per-handler invocation, not per-module: the cold-start
+ * clock is reset by `enterHandler()` at the top of every request.
+ */
+const HANDLER_BUDGET_MS = 50_000;
+let handlerStartedAt = Date.now();
+const enterHandler = () => {
+  handlerStartedAt = Date.now();
+};
+const budgetRemaining = () => Math.max(0, HANDLER_BUDGET_MS - (Date.now() - handlerStartedAt));
 
 /** True when the model id is one Google has retired and would 404 today. */
 const isRetiredGeminiModel = (model: unknown): boolean => {
@@ -442,6 +470,24 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = FETCH_MS): 
   }
 }
 
+/**
+ * Raised when the per-handler wall-clock budget is nearly spent, so the
+ * repair loop stops issuing new upstream calls and the request returns a
+ * structured 502 instead of being killed by the platform with the opaque
+ * `FUNCTION_INVOCATION_FAILED` 500.
+ */
+class TimeBudgetExhausted extends Error {
+  statusCode = 502;
+  code = "AI_TIME_BUDGET_EXHAUSTED";
+  constructor(message: string) {
+    super(message);
+    this.name = "TimeBudgetExhausted";
+  }
+}
+
+/** True when the per-handler budget is nearly spent and we should stop. */
+const isBudgetLow = (headroomMs = 8000) => budgetRemaining() <= headroomMs;
+
 function parseSyllabus(raw: unknown): RevisionSyllabus {
   const r = asRecord(raw);
   const difficultyRaw = String(r.difficulty || "medium");
@@ -834,7 +880,7 @@ function providerUsage(raw: unknown, fallbackInputText: string, fallbackOutputTe
   };
 }
 
-async function callGemini(config: AiConfig, userPrompt: string, difficulty: RevisionSyllabus["difficulty"]): Promise<ProviderGeneration> {
+async function callGemini(config: AiConfig, userPrompt: string, difficulty: RevisionSyllabus["difficulty"], timeoutMs: number = FETCH_MS): Promise<ProviderGeneration> {
   const base = config.baseUrl || DEFAULT_BASE.gemini;
   const call = (model: string) =>
     fetchWithTimeout(geminiGenerateUrl(base, model), {
@@ -850,7 +896,7 @@ async function callGemini(config: AiConfig, userPrompt: string, difficulty: Revi
         // rules (theory vs application) instead of drifting to generic exam items.
         generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
       }),
-    });
+    }, timeoutMs);
 
   let model = config.model;
   let res = await call(model);
@@ -883,7 +929,7 @@ async function callGemini(config: AiConfig, userPrompt: string, difficulty: Revi
   };
 }
 
-async function callAnthropic(config: AiConfig, userPrompt: string, difficulty: RevisionSyllabus["difficulty"]): Promise<ProviderGeneration> {
+async function callAnthropic(config: AiConfig, userPrompt: string, difficulty: RevisionSyllabus["difficulty"], timeoutMs: number = FETCH_MS): Promise<ProviderGeneration> {
   const base = (config.baseUrl || DEFAULT_BASE.anthropic).replace(/\/+$/, "");
   const res = await fetchWithTimeout(`${base}/messages`, {
     method: "POST",
@@ -901,7 +947,7 @@ async function callAnthropic(config: AiConfig, userPrompt: string, difficulty: R
       system: systemPrompt(),
       messages: [{ role: "user", content: userPrompt }],
     }),
-  });
+  }, timeoutMs);
   if (!res.ok) {
     const detail = (await res.text().catch(() => "")).slice(0, 240);
     throw Object.assign(new Error(`Anthropic returned ${res.status}. Check the API key and model (${config.model}). ${detail}`), { statusCode: 502 });
@@ -915,7 +961,7 @@ async function callAnthropic(config: AiConfig, userPrompt: string, difficulty: R
   };
 }
 
-async function callOpenAiCompatible(config: AiConfig, userPrompt: string, origin: string, difficulty: RevisionSyllabus["difficulty"]): Promise<ProviderGeneration> {
+async function callOpenAiCompatible(config: AiConfig, userPrompt: string, origin: string, difficulty: RevisionSyllabus["difficulty"], timeoutMs: number = FETCH_MS): Promise<ProviderGeneration> {
   const base = assertSafeBaseUrl(config.baseUrl || DEFAULT_BASE[config.provider], config.provider);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -939,7 +985,7 @@ async function callOpenAiCompatible(config: AiConfig, userPrompt: string, origin
         temperature: 0.4,
         ...(withJson ? { response_format: { type: "json_object" } } : {}),
       }),
-    });
+    }, timeoutMs);
   let res = await call(true);
   if (res.status === 400) {
     const detail = await res.text().catch(() => "");
@@ -965,10 +1011,11 @@ async function requestProviderQuestions(
   userPrompt: string,
   origin: string,
   difficulty: RevisionSyllabus["difficulty"],
+  timeoutMs: number = FETCH_MS,
 ): Promise<ProviderGeneration> {
-  if (config.provider === "gemini") return callGemini(config, userPrompt, difficulty);
-  if (config.provider === "anthropic") return callAnthropic(config, userPrompt, difficulty);
-  return callOpenAiCompatible(config, userPrompt, origin, difficulty);
+  if (config.provider === "gemini") return callGemini(config, userPrompt, difficulty, timeoutMs);
+  if (config.provider === "anthropic") return callAnthropic(config, userPrompt, difficulty, timeoutMs);
+  return callOpenAiCompatible(config, userPrompt, origin, difficulty, timeoutMs);
 }
 
 function mergeProviderUsage(parts: ProviderUsage[]): ProviderUsage {
@@ -1043,11 +1090,20 @@ async function generateWithProvider(config: AiConfig, syllabus: RevisionSyllabus
   usageParts.push(first.usage);
   let plan = planModeEnforcement<GeneratedQuestion>(first.questions, mode, syllabus.count);
   for (let round = 1; !plan.ok && round <= MAX_TYPE_REPAIR_ROUNDS; round += 1) {
+    // Bail before the Vercel 60s cap kicks in. If we are too close to the
+    // platform timeout, another upstream call would be killed mid-flight and
+    // surface to the user as a generic 500 / FUNCTION_INVOCATION_FAILED.
+    if (isBudgetLow()) {
+      throw new TimeBudgetExhausted(
+        `The repair loop is taking too long; stop and ask the user to try again.`,
+      );
+    }
     const repaired = await requestProviderQuestions(
       config,
       buildTypeRepairPrompt(syllabus, plan.needs, plan.rejects, round),
       origin,
       syllabus.difficulty,
+      FETCH_MS_REPAIR,
     );
     usageParts.push(repaired.usage);
     plan = planModeEnforcement<GeneratedQuestion>([...plan.keep, ...repaired.questions], mode, syllabus.count);
@@ -1129,6 +1185,9 @@ export async function handleRevisionGenerate(req: VercelRequest, res: VercelResp
     res.status(405).json({ ok: false, error: "Method not allowed" });
     return;
   }
+  // Reset the per-request time budget so cold starts / keep-warm reuse
+  // never trip the time-budget guard.
+  enterHandler();
   try {
     const user = await requireFirebaseUser(req);
     const body = readBody(req);
@@ -1196,6 +1255,15 @@ export async function handleRevisionGenerate(req: VercelRequest, res: VercelResp
     const promptText = `${systemPrompt()}\n${buildSyllabusPrompt(syllabus)}`;
     const price = findAiModelPrice(policy.pricing, config.provider, config.model);
     let reservation: UsageReservation | null = null;
+    // Refuse to start a reservation if we are already close to the platform
+    // 60s cap; otherwise the first upstream call could be killed mid-flight
+    // and the user would see a generic 500 (FUNCTION_INVOCATION_FAILED).
+    if (isBudgetLow(15_000) && source !== "own") {
+      throw Object.assign(
+        new Error("The server is busy. Please try generating your test again in a minute."),
+        { statusCode: 503, code: "AI_SERVER_BUSY" },
+      );
+    }
     if (source !== "own") {
       reservation = await reserveUsage(
         user.uid,
@@ -1232,6 +1300,24 @@ export async function handleRevisionGenerate(req: VercelRequest, res: VercelResp
       }
     } else {
       allowance = { unmetered: true, source: "own", message: "Your API key does not use the school/plan AI allowance." };
+    }
+    // Phase-2: write the per-month usage document so the profile widget
+    // can show "X of Y AI questions this month" with the admin-set cap.
+    // The write is best-effort — a failed profile tally never blocks a
+    // successful AI delivery.
+    try {
+      const month = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+      const usageRef = adminDb().collection("users").doc(user.uid).collection("usage").doc(month);
+      await adminDb().runTransaction(async (tx) => {
+        const snap = await tx.get(usageRef);
+        const prev = snap.exists ? (snap.data() as any) : null;
+        const generated = Array.isArray(generated.questions) ? generated.questions.length : 0;
+        const total = (Number(prev?.aiQuestionsGenerated) || 0) + generated;
+        const byFeature = { ...((prev?.aiQuestionsByFeature) || {}), revision: (Number((prev?.aiQuestionsByFeature || {}).revision) || 0) + generated };
+        tx.set(usageRef, { uid: user.uid, month, aiQuestionsGenerated: total, aiQuestionsByFeature: byFeature, updatedAt: Date.now() }, { merge: true });
+      });
+    } catch {
+      // ignore — usage doc write failed but the response is already valid.
     }
     res.status(200).json({
       ok: true,

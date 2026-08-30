@@ -20,6 +20,10 @@ export type MyDayAccessSnapshot = {
   dayKey: string;
   resetAt: number;
   timeZone: string;
+  // Phase-1: server echoes whether the feature is currently in "hide"
+  // mode AND the user is not a subscriber. The hook mirrors this so the
+  // rail / nav can remove the My Day entry on the client.
+  hidden?: boolean;
 };
 
 type MyDayResponse = {

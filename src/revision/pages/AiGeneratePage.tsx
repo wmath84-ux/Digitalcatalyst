@@ -26,6 +26,7 @@ import { fetchRemoteCatalog } from "../engine/catalogService";
 import {
   generateRevisionQuestions,
   getProvider,
+  hasStoredUserAiConfig,
   loadUserAiConfig,
   resolveEffectiveAi,
   type CatalogAiSettings,
@@ -374,6 +375,20 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
     classSel.size > 0 && effSubjects.size > 0 && effChapters.size > 0 && effTopics.size > 0 &&
     totalQuestions >= 1 && totalMinutes >= 1 && phase !== "generating";
 
+  /**
+   * When the learner has not configured ANY AI (no school-provided key, no
+   * own key) we must never silently fall back to the offline engine — that
+   * generated study-skill prompts that looked like real topic questions and
+   * confused learners who picked a chapter/topic. Surface a clear "configure
+   * AI or use bulk import" gate instead of letting the offline fallback run.
+   * If the learner explicitly chose "No AI (offline)" in AI Configuration
+   * (i.e. they saved a choice of `source: "offline"`), we honour that.
+   */
+  const userHasStoredChoice = useMemo(() => hasStoredUserAiConfig(uid), [uid]);
+  const userChoseOffline = userCfg.source === "offline" && userHasStoredChoice;
+  const aiNotConfigured = !activeConfig;
+  const generateBlockedByNoAi = aiNotConfigured && !userChoseOffline;
+
   /* ----------------------------- generate ------------------------------ */
 
   const runGenerate = async () => {
@@ -486,9 +501,26 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
       return;
     }
 
-    // Offline engine only when the student explicitly chose No AI.
+    /**
+     * Offline engine ONLY runs when the learner explicitly turned AI off in
+     * AI Configuration (saved a "No AI (offline)" choice, not just defaulted).
+     * If no AI is configured AND the user did not pick "No AI (offline)", we
+     * never silently fabricate study-skill questions — we release the slot,
+     * show a clear instruction, and let them choose to configure AI or use
+     * Bulk Import. This is the rule the user explicitly asked us to enforce.
+     */
+    const liveHasStoredChoice = hasStoredUserAiConfig(uid);
+    const liveUserChoseOffline = liveEffective.mode === "offline" && liveHasStoredChoice;
     try {
       if (collected.length === 0) {
+        if (!liveUserChoseOffline) {
+          await releaseRevisionTestSlot(uid, reservationId);
+          setNotice(
+            "No AI is configured. Connect an AI provider in AI Configuration, or use Bulk Import to paste a complete revision plan.",
+          );
+          setPhase("idle");
+          return;
+        }
         const qs = generateOfflineQuestions({
           subjectName: subjectNames[0] || "General",
           topicName: topicNames.join(", ") || chapterNames[0] || "General",
@@ -606,6 +638,62 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
 
         {phase !== "ready" && (
           <>
+            {/**
+             * Hard block: if no AI is configured AND the learner did not pick
+             * the explicit "No AI (offline)" path, surface clear instructions
+             * before they can hit Generate. Two CTAs:
+             *   1) Configure AI — opens AI Configuration.
+             *   2) Use Bulk Import — pastes a complete revision plan.
+             * These CTAs are the explicit "either / or" instruction the
+             * learner asked us to enforce so they never get stuck.
+             */}
+            {aiNotConfigured && (
+              <Card
+                data-rev-no-ai-gate
+                className="overflow-hidden border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md shadow-amber-200">
+                    <SparklesIcon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-[14px] font-bold text-slate-900">No AI is configured</h3>
+                    <p className="mt-1 text-[12px] leading-relaxed text-slate-700">
+                      Connect an AI provider to generate fresh, syllabus-aligned questions for the
+                      topic you picked. Without an AI, the test can&apos;t be generated here — pick one
+                      of the two options below.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate("#/revision/ai-settings")}
+                    className="flex min-h-[56px] flex-col items-start justify-center gap-0.5 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 px-4 py-2 text-left text-white shadow-md shadow-indigo-200 active:scale-[0.98]"
+                  >
+                    <span className="text-[13px] font-bold">Configure AI →</span>
+                    <span className="text-[10px] font-medium opacity-90">
+                      School-provided key or paste your own
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("#/revision/bulk-import")}
+                    className="flex min-h-[56px] flex-col items-start justify-center gap-0.5 rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-left text-emerald-700 active:scale-[0.98]"
+                  >
+                    <span className="text-[13px] font-bold">Use Bulk Import →</span>
+                    <span className="text-[10px] font-medium text-emerald-600">
+                      Paste a full revision plan with answers
+                    </span>
+                  </button>
+                </div>
+                <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+                  After configuration, come back here and your saved selections (class, subject,
+                  chapter, topic, question type) will be used to generate the test automatically.
+                </p>
+              </Card>
+            )}
+
             {/* Step 1 — the 4-dropdown selection row */}
             <Card>
               <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">1 · What to test</h3>
@@ -835,12 +923,20 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
               </Card>
             ) : (
               <>
-                <PrimaryButton disabled={!canGenerate} onClick={() => void runGenerate()}>
+                <PrimaryButton
+                  disabled={!canGenerate || generateBlockedByNoAi}
+                  onClick={() => void runGenerate()}
+                >
                   <SparklesIcon className="h-5 w-5" /> Generate revision plan
                 </PrimaryButton>
                 {!canGenerate && (
                   <p className="text-center text-[11px] text-slate-500">
                     Select at least one class, subject, chapter and topic to generate.
+                  </p>
+                )}
+                {canGenerate && generateBlockedByNoAi && (
+                  <p className="text-center text-[11px] font-semibold text-amber-700">
+                    Configure AI or use Bulk Import above to continue.
                   </p>
                 )}
               </>

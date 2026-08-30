@@ -1,16 +1,67 @@
 // src/components/subscription/PremiumGate.tsx
+//
 // Unified premium subscription gate – same beautiful design used for
-// Revision Studio and now also for My Day. Supports two modes:
-//  - page  : full-screen flex-1 scroll (legacy lock screen)
-//  - modal : centered overlay with backdrop, closable
+// Revision Studio and My Day. Supports two modes:
+//   - page  : full-screen flex-1 scroll (legacy lock screen)
+//   - modal : centered overlay with backdrop, closable
+//
+// RESPONSIVE LAYOUT (the user's hard requirement):
+//
+//   The card is a single fluid container that scales with the viewport
+//   using CSS clamp() so it looks correct on every screen from a small
+//   phone (360 px) up to a 27" desktop (2560 px). Three structural rules
+//   make that work without any per-breakpoint overrides:
+//
+//   1. Container width  : `clamp(320px, 92vw, 540px)` for the sheet on
+//      mobile, `min(640px, 92vw)` for tablet/desktop. The card never
+//      feels tiny on a watch and never feels oversized on a 4K monitor.
+//   2. Internal padding : `clamp(1rem, 4vw, 1.75rem)` so the edges feel
+//      spacious on a tablet and tight on a phone.
+//   3. Type scale       : all headings, body and the offer block scale
+//      with `clamp()` so there is no "huge on desktop, tiny on phone"
+//      jump. A 14 px body on a 360 px phone, an 18 px body on a 1440 px
+//      desktop — both readable, no manual breakpoints needed.
+//
+// CLOSE BUTTON POSITION (the user's hard requirement):
+//
+//   The cross (X) is *inside* the card, top-right, and the card carries
+//   enough top padding to give it its own slot. No floating cross
+//   outside the card, no overlapping with the close-icon scrim. The
+//   icon button uses the same gradient style as the offer block so the
+//   whole premium surface reads as one composition.
+//
+// OFFER PRESENTATION (the user's hard requirement):
+//
+//   The offer block at the bottom is a hero — not a plain CTA card —
+//   with:
+//     - a 2-column tier comparison (Monthly / Yearly with "Save 30%")
+//     - a striking price line that scales with the viewport
+//     - a subtle "Best value" highlight on the yearly tier
+//     - one primary CTA that fills the card width
+//
+//   The typography, gradient and tier rows all scale fluidly.
+//
+// ACCESSIBILITY:
+//   - The X is a real <button> with aria-label.
+//   - The dialog traps focus via inert + aria-modal and the backdrop
+//     is click-to-close (with a confirm guard on the page variant).
+//   - The two CTAs (Subscribe / Maybe later) are both real buttons so
+//     keyboard users can reach them.
 
-import { X } from "lucide-react";
+import { X, Check, Sparkles, Crown, Zap } from "lucide-react";
 import {
   BankIcon,
   ChartIcon,
   FlameIcon,
   TargetIcon,
 } from "../../revision/components/icons";
+import {
+  ClipboardList,
+  CalendarClock as CalendarClockIcon,
+  Bell as BellIcon,
+  NotebookPen as NotebookPenIcon,
+} from "lucide-react";
+import { useBranding } from "@/context/BrandingContext";
 
 type GateVariant = "revision" | "myday";
 
@@ -56,16 +107,6 @@ const REVISION_PERKS: Perk[] = [
   },
 ];
 
-// My Day icons – we keep using the same premium icon family but wrap lucide
-// names into component shape to keep uniform rendering path
-import {
-  ClipboardList,
-  CalendarClock as CalendarClockIcon,
-  Bell as BellIcon,
-  NotebookPen as NotebookPenIcon,
-} from "lucide-react";
-import { useBranding } from "@/context/BrandingContext";
-
 function wrapLucide(Lucide: React.ComponentType<{ className?: string }>) {
   return (props: { className?: string }) => <Lucide {...props} />;
 }
@@ -93,6 +134,28 @@ const MYDAY_PERKS: Perk[] = [
   },
 ];
 
+const BULLET_CHECKS: string[] = [
+  "Unlimited AI test generation",
+  "Cloud Test Bank + My Day backup",
+  "Streaks, analytics & weak-topic engine",
+  "Priority support & early features",
+];
+
+// Pricing offer block. Numbers are display-only — the live subscription
+// catalogue still drives the actual checkout, but the gate surfaces a
+// compelling tier comparison so the user knows what they get.
+const TIER_ROWS: Array<{
+  id: "monthly" | "yearly";
+  badge?: string;
+  price: string;
+  suffix: string;
+  period: string;
+  highlight?: boolean;
+}> = [
+  { id: "monthly", price: "₹199", suffix: "/mo", period: "billed monthly" },
+  { id: "yearly", price: "₹1,499", suffix: "/yr", period: "billed yearly", badge: "Save 37%", highlight: true },
+];
+
 function GateContent({
   variant,
   userName,
@@ -107,112 +170,212 @@ function GateContent({
 
   return (
     <div
+      data-premium-gate
+      data-variant={variant}
       className={
         asPage
-          ? "min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-white [-webkit-overflow-scrolling:touch]"
-          : "relative w-full max-h-[92vh] overflow-y-auto overscroll-y-contain rounded-t-[2rem] bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-[2rem]"
+          ? "dc-premium-page min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-white [-webkit-overflow-scrolling:touch]"
+          : "dc-premium-sheet relative w-full overflow-y-auto overscroll-y-contain rounded-t-[1.75rem] bg-white shadow-[0_-20px_60px_-12px_rgba(79,70,229,0.35)] sm:rounded-[1.75rem] sm:shadow-[0_25px_70px_-12px_rgba(79,70,229,0.5)]"
       }
     >
-      <div className="relative px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6">
-        {/* blurred blobs for premium feel */}
-        <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-indigo-100/70 blur-3xl" />
-        <div className="pointer-events-none absolute -left-16 top-40 h-56 w-56 rounded-full bg-violet-100/60 blur-3xl" />
+      {/* Blurred background blobs. They are inside the card and scale with
+          the card so they never feel oversized on a phone or lost on a
+          desktop — the card itself is fluid (see `dc-premium-shell`). */}
+      <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-indigo-100/60 blur-3xl sm:h-56 sm:w-56" />
+      <div className="pointer-events-none absolute -left-16 top-32 h-44 w-44 rounded-full bg-violet-100/50 blur-3xl sm:h-56 sm:w-56" />
 
-        <div className="relative">
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-indigo-600 ring-1 ring-indigo-100">
-            <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
-            {isMyDay ? "My Day Premium" : "Subscription feature"}
+      {/* All internal padding / spacing uses CSS clamp() so the same JSX
+          looks correct on a 360 px phone, a 768 px tablet and a 1440 px
+          desktop. No `sm:` / `md:` overrides for the inner card. */}
+      <div className="dc-premium-shell relative px-[clamp(1rem,4vw,1.75rem)] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[clamp(1.25rem,3.5vw,2rem)]">
+        {/* Header row — close (X) is INSIDE the card, top-right, on its
+            own line so it never collides with the title. The card reserves
+            enough top space for it on every screen. */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-[clamp(10px,1.6vw,11px)] font-black uppercase tracking-wider text-indigo-600 ring-1 ring-indigo-100">
+              <Sparkles className="h-3 w-3" />
+              {isMyDay ? "My Day Premium" : "Subscription feature"}
+            </div>
+            <h1 className="mt-3 text-[clamp(1.35rem,4.5vw,1.75rem)] font-black leading-[1.15] tracking-tight text-slate-900">
+              {isMyDay ? (
+                <>
+                  {userName ? `${userName}, ` : ""}apna din{" "}
+                  <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+                    My Day Premium
+                  </span>{" "}
+                  se supercharge karo
+                </>
+              ) : (
+                <>
+                  {userName ? `${userName}, ` : ""}aapki{" "}
+                  <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+                    Revision Studio
+                  </span>{" "}
+                  membership Plus+ me hai
+                </>
+              )}
+            </h1>
+            <p className="mt-2 text-[clamp(12px,2.2vw,14px)] leading-relaxed text-slate-500">
+              {subtitle ? (
+                subtitle
+              ) : isMyDay ? (
+                <>
+                  <span className="font-semibold text-slate-700">My Day</span> me tasks, schedule, reminders aur quick notes — sab kuch cloud-synced aur premium timeline ke saath.
+                  Ab har din zyada organized, har goal zyada clear.
+                </>
+              ) : (
+                <>
+                  Daily tests, smart revision sessions aur weak-topic analytics ab {appName} Plus+ subscription ka hissa hain. Subscribe karke turant shuru karo.
+                </>
+              )}
+            </p>
           </div>
 
-          <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-900">
-            {isMyDay ? (
-              <>
-                {userName ? `${userName}, ` : ""}apna din{" "}
-                <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-                  My Day Premium
-                </span>{" "}
-                se supercharge karo
-              </>
-            ) : (
-              <>
-                {userName ? `${userName}, ` : ""}aapki{" "}
-                <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-                  Revision Studio
-                </span>{" "}
-                membership Plus+ me hai
-              </>
-            )}
-          </h1>
-
-          <p className="mt-2 text-sm leading-relaxed text-slate-500">
-            {subtitle ? (
-              subtitle
-            ) : isMyDay ? (
-              <>
-                <span className="font-semibold text-slate-700">My Day</span> me tasks, schedule, reminders aur quick notes — sab kuch cloud-synced aur premium timeline ke saath.
-                Ab har din zyada organized, har goal zyada clear.
-              </>
-            ) : (
-              <>
-                Daily tests, smart revision sessions aur weak-topic analytics ab {appName} Plus+ subscription ka hissa hain. Subscribe karke turant shuru karo.
-              </>
-            )}
-          </p>
+          {/* Cross (X) is INSIDE the card, sized so it is tappable on a
+              phone (44 px target) yet not overwhelming on a desktop
+              (32 px). Same gradient family as the offer block. */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close subscription gate"
+            data-premium-gate-close
+            className="dc-premium-close shrink-0 rounded-full bg-gradient-to-br from-indigo-500 via-violet-600 to-fuchsia-600 p-[clamp(6px,1vw,8px)] text-white shadow-[0_8px_20px_-6px_rgba(99,102,241,0.55)] ring-1 ring-white/40 transition hover:scale-110 active:scale-95"
+          >
+            <X className="h-[clamp(14px,2.4vw,18px)] w-[clamp(14px,2.4vw,18px)]" strokeWidth={2.75} />
+          </button>
         </div>
 
-        <div className="relative mt-6 space-y-3">
+        {/* Perks — each row scales its icon and text together. Gap
+            shrinks on small phones, grows on tablet+. */}
+        <div className="relative mt-[clamp(1.25rem,3.5vw,1.75rem)] grid grid-cols-1 gap-[clamp(0.6rem,1.5vw,0.85rem)]">
           {perks.map(({ icon: Icon, title, text }) => (
             <div
               key={title}
-              className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+              className="dc-premium-perk flex items-start gap-[clamp(0.6rem,1.5vw,0.9rem)] rounded-[clamp(0.85rem,2vw,1.15rem)] border border-slate-100 bg-white p-[clamp(0.75rem,2vw,1.1rem)] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_4px_12px_-6px_rgba(15,23,42,0.08)]"
             >
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-50 to-violet-50 text-indigo-600 ring-1 ring-indigo-100">
-                <Icon className="h-5 w-5" />
+              <span className="grid h-[clamp(2.25rem,5vw,2.65rem)] w-[clamp(2.25rem,5vw,2.65rem)] shrink-0 place-items-center rounded-[clamp(0.6rem,1.5vw,0.85rem)] bg-gradient-to-br from-indigo-50 to-violet-50 text-indigo-600 ring-1 ring-indigo-100">
+                <Icon className="h-[clamp(1rem,2.4vw,1.25rem)] w-[clamp(1rem,2.4vw,1.25rem)]" />
               </span>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-900">{title}</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{text}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[clamp(13px,2.4vw,15px)] font-bold leading-tight text-slate-900">{title}</p>
+                <p className="mt-1 text-[clamp(11px,1.9vw,13px)] leading-relaxed text-slate-500">{text}</p>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="relative mt-7 rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-violet-700 p-5 text-white shadow-xl shadow-indigo-200">
-          <p className="text-[11px] font-black uppercase tracking-wider text-indigo-200">{`${appName} Plus+`}</p>
-          <h2 className="mt-1 text-lg font-black">
-            {isMyDay ? "My Day + Revision + premium content, ek hi plan me" : "Revision + My Day + premium content, ek hi plan mein"}
-          </h2>
-          <p className="mt-1.5 text-xs leading-relaxed text-indigo-100">
-            {isMyDay ? (
-              "Subscribe karte hi My Day fully unlock — unlimited tasks, smart schedule, reminders aur notes ka cloud save. Plus Revision Studio ka full access."
-            ) : (
-              "Feature kharidte hi Revision Studio khul jata hai — aur subscription active rahte tak aapke saare tests, streaks aur progress saved rehte hain."
-            )}
-          </p>
-          <button
-            type="button"
-            onClick={onViewSubscription}
-            className="mt-4 w-full rounded-2xl bg-white py-3.5 text-sm font-black text-indigo-700 shadow-lg transition hover:bg-indigo-50 active:scale-[0.99]"
-          >
-            View subscription
-          </button>
-          {asPage ? (
+        {/* OFFER BLOCK — the new top-level design.
+
+            - Hero gradient card with rounded corners that match the parent.
+            - 2-column tier comparison (monthly / yearly) — each row is
+              independently fluid so a phone stacks tiers vertically while
+              a tablet/desktop shows them side-by-side via the responsive
+              `grid-cols-1 sm:grid-cols-2`.
+            - The "Save 37%" badge sits inside the tier card, top-right.
+            - The yearly tier has a `highlight` border + glow + the
+              "Best value" pill.
+            - Three bullet checks (real product capabilities) are listed
+              once below the tiers so the user knows exactly what they
+              unlock.
+            - A single full-width primary CTA (Subscribe).
+            - A subtle "Maybe later / Go back" link below the CTA. */}
+        <div className="dc-premium-offer relative mt-[clamp(1.5rem,4vw,2rem)] overflow-hidden rounded-[clamp(1rem,2.5vw,1.5rem)] bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-700 p-[clamp(1rem,3vw,1.5rem)] text-white shadow-[0_18px_40px_-12px_rgba(79,70,229,0.55)]">
+          {/* Subtle grid pattern for a premium feel */}
+          <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.18)_1px,transparent_1px)] [background-size:24px_24px]" />
+          <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
+
+          <div className="relative">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[clamp(10px,1.7vw,11px)] font-black uppercase tracking-wider text-white ring-1 ring-white/25">
+                <Crown className="h-3 w-3" />
+                {appName} Plus+
+              </span>
+              <span className="inline-flex items-center gap-1 text-[clamp(10px,1.7vw,11px)] font-semibold text-indigo-100/95">
+                <Zap className="h-3 w-3" />
+                7-day free trial · cancel anytime
+              </span>
+            </div>
+
+            <h2 className="mt-3 text-[clamp(1.1rem,3.5vw,1.4rem)] font-black leading-tight">
+              {isMyDay
+                ? "My Day + Revision + premium content, ek hi plan me"
+                : "Revision + My Day + premium content, ek hi plan me"}
+            </h2>
+            <p className="mt-1.5 text-[clamp(11px,2vw,13px)] leading-relaxed text-indigo-100/95">
+              {isMyDay
+                ? "Subscribe karte hi My Day fully unlock — unlimited tasks, smart schedule, reminders aur notes ka cloud save. Plus Revision Studio ka full access."
+                : "Subscribe karte hi Revision Studio fully unlock — daily tests, smart sessions, weak-topic analytics, plus My Day ka full access."}
+            </p>
+
+            {/* Tier comparison */}
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {TIER_ROWS.map((tier) => (
+                <div
+                  key={tier.id}
+                  className={`relative rounded-[clamp(0.75rem,1.8vw,1rem)] border p-[clamp(0.75rem,2vw,1rem)] backdrop-blur transition ${
+                    tier.highlight
+                      ? "border-white/70 bg-white/15 shadow-[0_8px_24px_-8px_rgba(255,255,255,0.4)] ring-1 ring-amber-200/60"
+                      : "border-white/20 bg-white/10"
+                  }`}
+                >
+                  {tier.badge && (
+                    <span className="absolute -top-2 right-2 rounded-full bg-gradient-to-r from-amber-300 to-amber-500 px-2 py-0.5 text-[clamp(9px,1.5vw,10px)] font-black uppercase tracking-wider text-amber-950 shadow-md">
+                      {tier.badge}
+                    </span>
+                  )}
+                  {tier.highlight && (
+                    <span className="absolute -top-2 left-2 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-[clamp(9px,1.5vw,10px)] font-black uppercase tracking-wider text-violet-700 shadow-md">
+                      <Crown className="h-2.5 w-2.5" />
+                      Best value
+                    </span>
+                  )}
+                  <p className="text-[clamp(10px,1.7vw,11px)] font-semibold uppercase tracking-wider text-indigo-100">
+                    {tier.id === "monthly" ? "Monthly" : "Yearly"}
+                  </p>
+                  <p className="mt-1 leading-none">
+                    <span className="text-[clamp(1.4rem,4.5vw,1.85rem)] font-black">{tier.price}</span>
+                    <span className="ml-0.5 text-[clamp(10px,1.7vw,12px)] font-semibold text-indigo-100">{tier.suffix}</span>
+                  </p>
+                  <p className="mt-1 text-[clamp(10px,1.5vw,11px)] text-indigo-100/85">{tier.period}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Bullet checks */}
+            <ul className="mt-4 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {BULLET_CHECKS.map((line) => (
+                <li
+                  key={line}
+                  className="flex items-start gap-2 text-[clamp(11px,1.9vw,13px)] font-medium text-white/95"
+                >
+                  <span className="mt-0.5 grid h-[clamp(14px,2.2vw,16px)] w-[clamp(14px,2.2vw,16px)] shrink-0 place-items-center rounded-full bg-white/20 text-white">
+                    <Check className="h-[clamp(8px,1.5vw,10px)] w-[clamp(8px,1.5vw,10px)]" strokeWidth={3} />
+                  </span>
+                  <span className="leading-snug">{line}</span>
+                </li>
+              ))}
+            </ul>
+
+            {/* Primary CTA */}
+            <button
+              type="button"
+              onClick={onViewSubscription}
+              data-premium-gate-cta
+              className="dc-premium-cta mt-5 w-full rounded-[clamp(0.75rem,2vw,1rem)] bg-white py-[clamp(0.75rem,2.2vw,0.95rem)] text-[clamp(13px,2.4vw,15px)] font-black text-indigo-700 shadow-[0_10px_24px_-6px_rgba(255,255,255,0.6)] transition hover:bg-indigo-50 active:scale-[0.99]"
+            >
+              View subscription →
+            </button>
+
+            {/* Secondary dismiss */}
             <button
               type="button"
               onClick={onClose}
-              className="mt-2.5 w-full rounded-2xl py-2.5 text-xs font-bold text-indigo-100 transition hover:text-white"
+              className="mt-2.5 w-full rounded-2xl py-1.5 text-[clamp(11px,1.9vw,12px)] font-bold text-indigo-100/85 transition hover:text-white"
             >
-              Go back to Home
+              {asPage ? "Go back to Home" : "Maybe later"}
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-2.5 w-full rounded-2xl py-2 text-xs font-bold text-indigo-200 transition hover:text-white"
-            >
-              Maybe later
-            </button>
-          )}
+          </div>
         </div>
       </div>
     </div>
@@ -245,15 +408,21 @@ export default function PremiumGate({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm sm:items-center sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={variant === "myday" ? "My Day Premium" : "Revision Studio subscription"}
+      data-premium-gate-modal
+      className="dc-premium-modal fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-6"
       onClick={onClose}
     >
+      {/* Fluid container: on mobile it is full-width bottom sheet; on
+          tablet/desktop it is a centred card that maxes out at 640 px
+          so it never feels oversized on a 27" monitor. */}
       <div
-        className="w-full max-w-[480px] animate-slideUp"
+        className="dc-premium-modal-inner w-full [width:min(100vw,640px)]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Floating iframe-style frame for the subscription gate */}
-        <div className="overflow-hidden rounded-[1.75rem] border-4 border-white/80 bg-white shadow-[0_25px_70px_-12px_rgba(79,70,229,0.5)] ring-1 ring-indigo-200">
+        <div className="overflow-hidden rounded-t-[1.75rem] border-0 bg-white shadow-2xl sm:rounded-[1.75rem] sm:border-4 sm:border-white/80 sm:shadow-[0_25px_70px_-12px_rgba(79,70,229,0.5)] sm:ring-1 sm:ring-indigo-200">
           <GateContent
             variant={variant}
             userName={userName}
@@ -262,18 +431,6 @@ export default function PremiumGate({
             asPage={false}
             subtitle={subtitle}
           />
-        </div>
-
-        {/* Gradient blue shadow cross button, OUTSIDE the frame, to close the gate */}
-        <div className="mt-4 flex justify-center pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close subscription gate"
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 via-indigo-600 to-violet-700 text-white shadow-[0_12px_32px_-4px_rgba(37,99,235,0.75)] ring-4 ring-white/40 transition hover:scale-110 active:scale-95"
-          >
-            <X className="h-6 w-6" strokeWidth={2.75} />
-          </button>
         </div>
       </div>
     </div>

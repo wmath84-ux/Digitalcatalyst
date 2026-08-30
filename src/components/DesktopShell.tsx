@@ -54,6 +54,7 @@ import { useBranding } from "../context/BrandingContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
+import { useFeatureVisibilityMap } from "../context/FeatureVisibilityContext";
 import BrandMark from "./BrandMark";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { cn } from "../utils/cn";
@@ -295,10 +296,22 @@ export default function DesktopShell({
   const favoritesCount = favoriteIds.size;
   const ownedCount = purchasedIds.size;
   const notifications = liveNotificationCount ?? 0;
+  // Phase-1: the feature pages publish "hidden" into this map when the
+  // admin has set the feature to "hide" mode AND the user is not a
+  // subscriber. Filter those entries out of the rail so the feature
+  // is no longer advertised in the chrome.
+  const featureVisibility = useFeatureVisibilityMap();
   const railEntries: RailEntry[] = [
-    ...PRIMARY_RAIL.map((entry) =>
-      entry.key === "purchases" ? { ...entry, badge: ownedCount } : entry
-    ),
+    ...PRIMARY_RAIL
+      .map((entry) => {
+        if (entry.key === "purchases") return { ...entry, badge: ownedCount };
+        // Phase-1: the rail key ("myday" / "revision") maps directly
+        // to the feature document id, so the lookup is direct. A hidden
+        // feature is removed from the rail until the user subscribes.
+        if (featureVisibility[entry.key]?.hidden) return null;
+        return entry;
+      })
+      .filter((entry): entry is RailEntry => entry !== null),
     ...WORKSPACE_RAIL.map((entry) => {
       if (entry.key === "favorites") return { ...entry, badge: favoritesCount };
       return entry;
