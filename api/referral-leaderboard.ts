@@ -110,11 +110,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // AI generation can run tens of seconds; if anything ever rejects above
     // the handler's own try/catch (e.g. an unexpected Firestore fault), still
     // answer JSON so the client can show a real message instead of parsing a
-    // platform error page.
+    // platform error page. Two layers of catch ensure even a misbehaving
+    // `res` object cannot turn a 502 into Vercel's opaque HTML 500.
     try {
-      return await handleRevisionGenerate(req, res);
-    } catch (error) {
-      return errorResponse(res, error, "Could not generate questions with AI.");
+      try {
+        return await handleRevisionGenerate(req, res);
+      } catch (innerError) {
+        return errorResponse(res, innerError, "Could not generate questions with AI.");
+      }
+    } catch (outerError) {
+      console.error("[leaderboard] failed to write JSON error response", outerError);
+      try {
+        if (!res.headersSent) {
+          res.setHeader("Content-Type", "application/json");
+          res.status(500).json({
+            ok: false,
+            code: "INTERNAL_FAILURE",
+            error: "The server hit an unexpected problem. Please try again.",
+          });
+        }
+      } catch {
+        // The connection is already gone; nothing more we can write.
+      }
     }
   }
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });

@@ -41,10 +41,14 @@ test("the shared AI function has a platform budget larger than its provider time
 });
 
 test("a handler rejection above try/catch still answers JSON, not an unhandled platform error", () => {
+  // Two layers of try/catch are required: the inner one calls
+  // errorResponse (which itself could throw on a misbehaving `res`); the
+  // outer one is a last-resort JSON writer so Vercel never answers an
+  // opaque HTML 500 / FUNCTION_INVOCATION_FAILED.
   const dispatch = leaderboard.match(
-    /handleRevisionGenerate\(req, res\)[\s\S]{0,200}?errorResponse\(res, error/,
+    /handleRevisionGenerate\(req, res\)[\s\S]{0,400}?errorResponse\(res, innerError[\s\S]{0,400}?try \{[\s\S]{0,400}?res\.status\(500\)\.json/,
   );
-  assert.ok(dispatch, "revision dispatch is wrapped so any rejection becomes a JSON errorResponse");
+  assert.ok(dispatch, "revision dispatch is wrapped twice so any rejection becomes JSON, never a platform HTML 500");
 });
 
 test("the client names gateway timeouts / empty bodies instead of the blanket invalid-response error", () => {
