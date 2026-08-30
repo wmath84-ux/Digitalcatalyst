@@ -21,7 +21,14 @@ self.addEventListener('message', event => {
 });
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
+  // Never abort SW install if `/` or `/index.html` fail to cache (GitHub
+  // Pages, a redirect, or a preview host). A failed install event means
+  // Chrome/Android will not treat the site as an installable PWA.
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(APP_SHELL).catch(() => undefined))
+      .then(() => self.skipWaiting()),
+  );
 });
 self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))).then(() => self.clients.claim()));

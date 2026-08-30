@@ -13,11 +13,11 @@
   "rewrites": [
     {
       "source": "/api/manifest",
-      "destination": "/api/referral-leaderboard"
+      "destination": "/api/referral-leaderboard?route=manifest"
     },
     {
       "source": "/api/brand-icon",
-      "destination": "/api/referral-leaderboard"
+      "destination": "/api/referral-leaderboard?route=brand-icon"
     },
     {
       "source": "/api/embed-proxy",

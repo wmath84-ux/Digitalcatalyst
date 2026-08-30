@@ -259,7 +259,7 @@ async function subscriptionFeaturesRequest(init?: RequestInit) {
   const method = init?.method || "GET";
   if (method === "GET") {
     const snap = await getDocs(collection(db, "subscriptionFeatures"));
-    return { features: snap.docs.map((item) => { const data = item.data() || {}; return { id: item.id, key: data.key || item.id, name: data.name || "Feature", description: data.description || "", individualPrice: String(money(data.price ?? data.individualPrice ?? 0)), monthlyPrice: data.monthlyPrice === undefined || data.monthlyPrice === null ? "" : String(money(data.monthlyPrice)), yearlyPrice: data.yearlyPrice === undefined || data.yearlyPrice === null ? "" : String(money(data.yearlyPrice)), planPricing: data.planPricing && typeof data.planPricing === "object" ? data.planPricing : {}, icon: data.icon || "sparkles", included: data.included === true, badge: data.badge || "", sortOrder: Number(data.sortOrder || 0), freeItemsPerDay: Math.max(0, Math.min(100, Math.round(Number(data.freeItemsPerDay ?? 1) || 0))), active: data.active !== false, visibilityMode: data.visibilityMode === "hide" ? "hide" : "gate", visibleCycles: normaliseVisibleCycles(data.visibleCycles), hiddenPlanIds: normaliseStringList(data.hiddenPlanIds), subscriberPricingOverride: normaliseSubscriberPricing(data.subscriberPricingOverride), userLimit: normaliseUserLimit(data.userLimit, recordId(item.id)) }; }) };
+    return { features: snap.docs.map((item) => { const data = item.data() || {}; return { id: item.id, key: data.key || item.id, name: data.name || "Feature", description: data.description || "", individualPrice: String(money(data.price ?? data.individualPrice ?? 0)), monthlyPrice: data.monthlyPrice === undefined || data.monthlyPrice === null ? "" : String(money(data.monthlyPrice)), yearlyPrice: data.yearlyPrice === undefined || data.yearlyPrice === null ? "" : String(money(data.yearlyPrice)), planPricing: data.planPricing && typeof data.planPricing === "object" ? data.planPricing : {}, icon: data.icon || "sparkles", included: data.included === true, badge: data.badge || "", sortOrder: Number(data.sortOrder || 0), freeItemsPerDay: Math.max(0, Math.min(100, Math.round(Number(data.freeItemsPerDay ?? 1) || 0))), active: data.active !== false, visibilityMode: data.visibilityMode === "hide" ? "hide" : "gate", visibleCycles: normaliseVisibleCycles(data.visibleCycles), hiddenPlanIds: normaliseStringList(data.hiddenPlanIds), subscriberPricingOverride: normaliseSubscriberPricing(data.subscriberPricingOverride), userLimit: normaliseUserLimit(data.userLimit, String(item.id)) }; }) };
   }
   const body = bodyOf(init); const recordId = String(body.id || body.key || id()); const ref = doc(db, "subscriptionFeatures", recordId);
   if (body.delete) { await deleteDoc(ref); return { ok: true }; }
@@ -406,12 +406,11 @@ function defaultUserLimitForFeature(recordId: string): number | null {
   return null;
 }
 
-// `recordId(item.id)` is used as a default for `userLimit` so the hook
-// always gets a typed shape; the helper is duplicated locally because
-// the closure inside the map function can't see the top-level helpers.
-function recordId(value: string) {
-  return String(value || "");
-}
+// Do NOT name a local `const recordId` in the same function as a GET
+// mapper that calls `recordId(...)`. That binding is in the temporal
+// dead zone for the whole function and throws
+// "Cannot access 'recordId' before initialization" the moment the
+// admin Subscriptions customisation page loads features.
 
 async function subscriptionPlanProductsRequest(init?: RequestInit) {
   const method = init?.method || "GET";

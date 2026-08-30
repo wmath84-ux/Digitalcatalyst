@@ -127,9 +127,18 @@ test("admin client supports userLimit (per-feature cap, currently AI questions/d
   );
   assert.match(
     admin,
-    /userLimit:\s*normaliseUserLimit\(data\.userLimit,\s*recordId\(item\.id\)\)/,
+    /userLimit:\s*normaliseUserLimit\(data\.userLimit,\s*String\(item\.id\)\)/,
     "feature reads userLimit on GET with the document id as the seed",
   );
+
+  // GET used to call recordId(item.id) in the same function that later
+  // declared `const recordId = ...`, which crashed the admin Subscriptions
+  // customisation page with "Cannot access 'recordId' before initialization".
+  const featuresFn = admin.slice(
+    admin.indexOf("async function subscriptionFeaturesRequest"),
+    admin.indexOf("async function subscriptionPlanProductsRequest"),
+  );
+  assert.doesNotMatch(featuresFn, /recordId\(item\.id\)/);
   // Built-in defaults: 50/day for Revision.
   assert.match(
     admin,

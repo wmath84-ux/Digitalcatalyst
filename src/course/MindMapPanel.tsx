@@ -83,6 +83,8 @@ import {
   ReactFlowProvider,
   applyNodeChanges,
   useReactFlow,
+  useStore,
+  useUpdateNodeInternals,
   type Edge,
   type EdgeProps,
   type Node,
@@ -413,10 +415,10 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
       }}
     >
       {/* Invisible connection handles — required by React Flow to route edges */}
-      <Handle type="target" position={Position.Left} id="left" style={handleStyle} />
-      <Handle type="target" position={Position.Right} id="right" style={handleStyle} />
-      <Handle type="source" position={Position.Left} id="src-left" style={handleStyle} />
-      <Handle type="source" position={Position.Right} id="src-right" style={handleStyle} />
+      <Handle type="target" position={Position.Left} id="left" isConnectable={false} style={handleStyle} />
+      <Handle type="target" position={Position.Right} id="right" isConnectable={false} style={handleStyle} />
+      <Handle type="source" position={Position.Left} id="src-left" isConnectable={false} style={handleStyle} />
+      <Handle type="source" position={Position.Right} id="src-right" isConnectable={false} style={handleStyle} />
 
       <div
         className={`flex h-full w-full flex-col overflow-hidden rounded-xl border px-2.5 pt-1.5 text-[13px] font-semibold leading-[17px] transition ${tone} ${
@@ -552,6 +554,48 @@ const handleOut = (x: number, y: number, position: Position, offset: number, sag
   }
 };
 
+/**
+ * Mid-point of one face of a node box, in flow coordinates.
+ * Wires are drawn from THESE points — the node's known width/height —
+ * never from React Flow's handle DOM measurement, which collapses to a
+ * 0×0 "dot" while the overlay is still animating or the map is still
+ * arriving from the network.
+ */
+export const boxFaceAnchor = (
+  node:
+    | {
+        position?: { x?: number; y?: number };
+        width?: number;
+        height?: number;
+        measured?: { width?: number; height?: number };
+        internals?: { positionAbsolute?: { x?: number; y?: number } };
+      }
+    | undefined,
+  face: Position,
+): { x: number; y: number } | null => {
+  if (!node) return null;
+  const width = Number(node.measured?.width ?? node.width ?? 0);
+  const height = Number(node.measured?.height ?? node.height ?? 0);
+  if (!(width > 0) || !(height > 0)) return null;
+  const origin = node.internals?.positionAbsolute ?? node.position;
+  const x = Number(origin?.x);
+  const y = Number(origin?.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const midY = y + height / 2;
+  const midX = x + width / 2;
+  switch (face) {
+    case Position.Left:
+      return { x, y: midY };
+    case Position.Right:
+      return { x: x + width, y: midY };
+    case Position.Top:
+      return { x: midX, y };
+    case Position.Bottom:
+    default:
+      return { x: midX, y: y + height };
+  }
+};
+
 /** Cubic Bézier path that leaves each handle along its facing, then sags. */
 export const buildRopePath = (
   sourceX: number,
@@ -573,6 +617,8 @@ export const buildRopePath = (
 
 function RopeEdge({
   id,
+  source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -581,7 +627,20 @@ function RopeEdge({
   targetPosition,
   style,
 }: EdgeProps) {
-  const path = buildRopePath(sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition);
+  // Prefer the node's own box (width/height we already know) over handle
+  // bounds. Handle bounds are what made wires vanish while the violet
+  // anchor dots on the nodes still painted.
+  const sourceNode = useStore((state) => state.nodeLookup?.get(source));
+  const targetNode = useStore((state) => state.nodeLookup?.get(target));
+  const fromBox = boxFaceAnchor(sourceNode, sourcePosition);
+  const toBox = boxFaceAnchor(targetNode, targetPosition);
+  const sx = fromBox?.x ?? sourceX;
+  const sy = fromBox?.y ?? sourceY;
+  const tx = toBox?.x ?? targetX;
+  const ty = toBox?.y ?? targetY;
+  if (![sx, sy, tx, ty].every((value) => Number.isFinite(value))) return null;
+  if (Math.hypot(tx - sx, ty - sy) < 1) return null;
+  const path = buildRopePath(sx, sy, tx, ty, sourcePosition, targetPosition);
   const stroke = (style && typeof style.stroke === "string" ? style.stroke : undefined) || "var(--mm-edge-right)";
   const width = typeof style?.strokeWidth === "number" ? style.strokeWidth : 2.4;
   return (
@@ -711,6 +770,8 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const [themeOverride, setThemeOverride] = useState<MindMapTheme | null>(loadMindMapThemeOverride);
   const [doubleTapDelete, setDoubleTapDelete] = useState<boolean>(loadDblTapDelete);
   const { zoomIn, zoomOut, fitView, setCenter } = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   // Set while a real node drag is in progress, so the click that follows a
   // drop can be told apart from a genuine tap on the node.
@@ -940,6 +1001,13 @@ function MindMapCanvas(props: MindMapPanelProps) {
       id: placed.id,
       type: "mindNode",
       position: { x: placed.x, y: placed.y },
+      // Explicit box size lets React Flow route ropes from known geometry
+      // instead of waiting on a ResizeObserver that often misses inside a
+      // just-opened (or still-animating) overlay sheet.
+      width: placed.width,
+      height: placed.height,
+      initialWidth: placed.width,
+      initialHeight: placed.height,
       // Hand placement: the learner can drag any node anywhere on the
       // canvas and the drop is committed on release (see onNodeDragStop).
       draggable: true,
@@ -1053,6 +1121,8 @@ function MindMapCanvas(props: MindMapPanelProps) {
           target: edge.target,
           sourceHandle: goesLeft ? "src-left" : "src-right",
           targetHandle: goesLeft ? "right" : "left",
+          sourcePosition: goesLeft ? Position.Left : Position.Right,
+          targetPosition: goesLeft ? Position.Right : Position.Left,
           type: "rope",
           animated: false,
           style: {
@@ -1063,6 +1133,46 @@ function MindMapCanvas(props: MindMapPanelProps) {
       }),
     [layout.edges, facingOverride],
   );
+
+  // ── Wires must remeasure whenever the canvas becomes a real box ────────
+  // React Flow caches handle bounds. Those bounds are 0×0 while:
+  //   • the overlay sheet is `invisible` / translated off-screen
+  //   • the map library is covering the canvas on first open
+  //   • Firestore has just replaced the empty seed with the real node list
+  //     (slow net = this race is easy to lose; fast net often wins it)
+  // Calling `updateNodeInternals` after those moments is what makes every
+  // rope appear without the learner having to pan or tap anything.
+  const nodeIdsKey = layout.nodes.map((node) => node.id).join(",");
+  const refreshWires = useCallback(() => {
+    for (const node of layout.nodes) updateNodeInternals(node.id);
+  }, [layout.nodes, updateNodeInternals]);
+
+  useLayoutEffect(() => {
+    if (!open || libraryOpen) return undefined;
+    refreshWires();
+    const raf = requestAnimationFrame(() => {
+      refreshWires();
+      requestAnimationFrame(refreshWires);
+    });
+    // 240ms covers `animate-course-overlay-in` (0.22s); 480ms covers a
+    // late Firestore paint on a slow radio.
+    const timers = [50, 240, 480].map((ms) => window.setTimeout(refreshWires, ms));
+    return () => {
+      cancelAnimationFrame(raf);
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [open, libraryOpen, nodeIdsKey, refreshWires]);
+
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(() => {
+      if (!open || libraryOpen) return;
+      refreshWires();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [open, libraryOpen, refreshWires]);
 
   const save = SAVE_COPY[status] || SAVE_COPY.idle;
   const levels = maxDepth(mind);
@@ -1081,7 +1191,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
       {/* ── Canvas ────────────────────────────────────────────────────────
           `touch-action: none` is required, not cosmetic: without it the
           browser claims the pinch for page zoom and React Flow never sees it. */}
-      <div className="relative min-h-0 flex-1" style={{ touchAction: "none" }} data-course-mindmap-canvas>
+      <div ref={canvasRef} className="relative min-h-0 flex-1" style={{ touchAction: "none" }} data-course-mindmap-canvas>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -1089,6 +1199,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           edgeTypes={EDGE_TYPES}
           defaultEdgeOptions={{ type: "rope" }}
           onNodesChange={onNodesChange}
+          onInit={() => { requestAnimationFrame(refreshWires); }}
           fitView
           fitViewOptions={{ padding: 0.18 }}
           minZoom={0.15}

@@ -162,7 +162,9 @@ export default function SubscriptionsPage() {
             features: gate.settings.features || {},
             planVisibility: gate.settings.planVisibility || {},
             subscriberPricing: gate.settings.subscriberPricing || {},
-            usageLimits: gate.settings.usageLimits || { aiQuestionsPerDay: {} },
+            usageLimits: {
+              aiQuestionsPerDay: { ...(gate.settings.usageLimits?.aiQuestionsPerDay || {}) },
+            },
           });
         }
       } catch {
@@ -545,7 +547,17 @@ export default function SubscriptionsPage() {
               </div>
               {(["myday", "revision"] as const).map((key) => {
                 const feature = features.find((f) => f.id === key || f.id === (key === "myday" ? "my-day" : key));
-                const current = gateSettings.features[key] || { gated: false, hideFromNonSubscribers: false, durations: { monthly: true, yearly: true, lifetime: true }, tiers: {} };
+                const stored = gateSettings.features[key] || {};
+                const current = {
+                  gated: Boolean(stored.gated),
+                  hideFromNonSubscribers: Boolean(stored.hideFromNonSubscribers),
+                  durations: {
+                    monthly: stored.durations?.monthly !== false,
+                    yearly: stored.durations?.yearly !== false,
+                    lifetime: stored.durations?.lifetime !== false,
+                  },
+                  tiers: stored.tiers || {},
+                };
                 const update = (patch: Partial<typeof current>) => setGateSettings({
                   ...gateSettings,
                   features: { ...gateSettings.features, [key]: { ...current, ...patch } },
@@ -608,11 +620,11 @@ export default function SubscriptionsPage() {
                         type="number"
                         min="0"
                         data-admin-gate-feature-ai-cap={key}
-                        value={gateSettings.usageLimits.aiQuestionsPerDay[key] ?? ""}
+                        value={gateSettings.usageLimits?.aiQuestionsPerDay?.[key] ?? ""}
                         onChange={(event) => {
                           const raw = event.target.value;
                           const next = raw === "" ? null : Math.max(0, Math.round(Number(raw) || 0));
-                          const map = { ...gateSettings.usageLimits.aiQuestionsPerDay };
+                          const map = { ...(gateSettings.usageLimits?.aiQuestionsPerDay || {}) };
                           if (next == null) delete map[key]; else map[key] = next;
                           setGateSettings({ ...gateSettings, usageLimits: { ...gateSettings.usageLimits, aiQuestionsPerDay: map } });
                         }}
@@ -1097,6 +1109,8 @@ export default function SubscriptionsPage() {
                       planPricing: editingFeature.planPricing ?? {},
                     };
                     const monthly = resolveFeaturePrice(previewDoc, plan.id, "monthly");
+                    const yearly = resolveFeaturePrice(previewDoc, plan.id, "yearly");
+                    const fmt = (r: { pricePaise: number; included: boolean }) => (r.included || r.pricePaise === 0 ? "Free" : `₹${Math.round(r.pricePaise / 100const monthly = resolveFeaturePrice(previewDoc, plan.id, "monthly");
                     const yearly = resolveFeaturePrice(previewDoc, plan.id, "yearly");
                     const fmt = (r: { pricePaise: number; included: boolean }) => (r.included || r.pricePaise === 0 ? "Free" : `₹${Math.round(r.pricePaise / 100).toLocaleString("en-IN")}`);
                     return (

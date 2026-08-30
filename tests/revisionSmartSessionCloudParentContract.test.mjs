@@ -14,7 +14,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import ts from "typescript";
 
 const read = (file) => fs.readFileSync(file, "utf8");
 const cloudSource = read("src/revision/engine/cloudRevisionService.ts");
@@ -29,7 +28,21 @@ class MemoryStorage {
   clear() { this.#values.clear(); }
 }
 
-async function revisionEngine() {
+async function loadTypescript() {
+  try {
+    const mod = await import("typescript");
+    return mod.default ?? mod;
+  } catch {
+    return null;
+  }
+}
+
+async function revisionEngine(t) {
+  const ts = await loadTypescript();
+  if (!ts) {
+    t?.skip("dependencies not installed — run pnpm install");
+    return null;
+  }
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "revision-smart-session-"));
   const files = [
     ["src/revision/data/seedData.ts", "data/seedData.mjs"],
@@ -62,7 +75,9 @@ async function revisionEngine() {
 }
 
 test("the Revision Bank skips orphan revision rows without crashing", async (t) => {
-  const { root, store, revision } = await revisionEngine();
+  const engine = await revisionEngine(t);
+  if (!engine) return;
+  const { root, store, revision } = engine;
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const uid = "orphan-bank";
   const db = store.loadDb(uid);

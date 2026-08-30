@@ -10,10 +10,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="google-site-verification" content="6eLv1FI47zrzjUwJu35mWI1sMzzTeyn0Mwgn_dMBUJw" />
-    <!-- Dynamic manifest: the branding admin page can swap the logo and this
-         endpoint reflects it live (installed PWA icon + Add to Home screen).
-         The static /manifest.webmanifest is kept as an offline fallback. -->
-    <link rel="manifest" href="/api/manifest" />
+    <!-- Static manifest so Chrome/Android can install the PWA even when the
+         serverless /api/manifest route is down, rewritten, or returning
+         leaderboard JSON. Branding still upgrades this link to /api/manifest
+         after a successful installability probe. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
     <title>Eduvora | Digital Catalyst</title>
     <style>
