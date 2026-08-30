@@ -159,3 +159,14 @@ test("curriculum import / paste / JSON still works on the new page", () => {
   assert.match(curriculumPage, /data-sheet-mode="bulk"/);
   assert.match(curriculumPage, /data-sheet-mode="single"/);
 });
+
+test("Save & publish blocks an incomplete class → subject → chapter → concept tree", () => {
+  // The old save only checked that each class had a subject, so a tree missing
+  // chapters/concepts was silently normalised to `null` server-side and the
+  // admin's publish looked like it "did nothing" on the student AI page. The
+  // save now validates the full depth and cleans nameless nodes first.
+  assert.match(curriculumPage, /cleanTree/);
+  assert.match(curriculumPage, /has no subjects/);
+  assert.match(curriculumPage, /has no chapters/);
+  assert.match(curriculumPage, /has no concepts/);
+});

@@ -70,3 +70,13 @@ test("academic year starts in April", () => {
   assert.match(engine, /month >= 3/);
   assert.match(engine, /export function currentAcademicYear/);
 });
+
+test("a partially-filled tree is preserved instead of silently wiped", () => {
+  // The old normalizer dropped chapters with zero topics and subjects with
+  // zero chapters, so a half-built publish normalised the ENTIRE
+  // `planningCurriculum` to null and students kept seeing the built-in
+  // fallback. Named nodes must now survive (lossless round-trip).
+  assert.doesNotMatch(engine, /if \(!topics\.length\) continue;/);
+  assert.doesNotMatch(engine, /if \(!chapters\.length\) continue;/);
+  assert.match(engine, /lossless/);
+});

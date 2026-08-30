@@ -778,20 +778,45 @@ export default function ManualCurriculumEditor({ catalog, onCatalog }: Props) {
   };
 
   const saveLive = async () => {
-    const validClasses = classes.filter((c) => c.name.trim());
+    const validClasses = classes
+      .filter((c) => c.name.trim())
+      .map((c) => ({
+        ...c,
+        subjects: c.subjects
+          .filter((s) => s.name.trim())
+          .map((s) => ({
+            ...s,
+            chapters: s.chapters
+              .filter((ch) => ch.name.trim())
+              .map((ch) => ({
+                ...ch,
+                topics: ch.topics.filter((t) => t.name.trim()),
+              })),
+          })),
+      }));
     if (!validClasses.length) {
       notify("error", "Add at least one class with a name.");
       return;
     }
-    // Validate each class has subjects
+    // Block an incomplete tree with a precise message instead of letting the
+    // server normalizer silently drop the branch (which made the published
+    // curriculum "disappear" on the student AI test page).
     for (const cls of validClasses) {
-      const validSubjects = cls.subjects.filter((s) => s.name.trim());
-      if (!validSubjects.length) {
-        notify(
-          "error",
-          `${cls.name} has no subjects. Add at least one subject.`
-        );
+      if (!cls.subjects.length) {
+        notify("error", `${cls.name} has no subjects. Add at least one subject.`);
         return;
+      }
+      for (const subject of cls.subjects) {
+        if (!subject.chapters.length) {
+          notify("error", `${cls.name} → ${subject.name} has no chapters. Add at least one chapter.`);
+          return;
+        }
+        for (const chapter of subject.chapters) {
+          if (!chapter.topics.length) {
+            notify("error", `${cls.name} → ${subject.name} → ${chapter.name} has no concepts. Add at least one concept.`);
+            return;
+          }
+        }
       }
     }
 

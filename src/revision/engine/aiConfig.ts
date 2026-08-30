@@ -215,8 +215,8 @@ export function getProvider(id: AIProviderId | string): AIProviderMeta {
 
 export const KNOWN_MODELS: Record<AIProviderId, ProviderModel[]> = {
   gemini: [
-    { id: "gemini-3.7-flash", name: "Gemini 3.7 Flash — newest, best reasoning" },
-    { id: "gemini-3.6-flash", name: "Gemini 3.6 Flash — recommended default" },
+    { id: "gemini-3.7-flash", name: "Gemini 3.7 Flash — recommended default (best reasoning)" },
+    { id: "gemini-3.6-flash", name: "Gemini 3.6 Flash" },
     { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash" },
     { id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash-Lite — fastest / cheapest" },
     { id: "gemini-flash-latest", name: "Gemini Flash (latest alias)" },
