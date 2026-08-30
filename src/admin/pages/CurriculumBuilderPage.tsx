@@ -568,8 +568,11 @@ export default function CurriculumBuilderPage() {
     if (newClasses.length && !activeClassKey) setActiveClassKey(newClasses[0].key);
   };
 
-  const updateClass = (next: CurriculumClass) => {
-    setClasses((prev) => prev.map((c) => (c.key === next.key ? next : c)));
+  const updateClass = (originalKey: string, next: CurriculumClass) => {
+    // Match on the ORIGINAL key, not `next.key`: renaming a class recomputes
+    // its key from the new name, so the old `c.key === next.key` check never
+    // matched and the rename was silently dropped.
+    setClasses((prev) => prev.map((c) => (c.key === originalKey ? next : c)));
   };
 
   const deleteClass = (key: string) => {
@@ -583,16 +586,15 @@ export default function CurriculumBuilderPage() {
   };
 
   const addSubject = (classKey: string, name: string) => {
+    const cls = classes.find((c) => c.key === classKey);
+    if (!cls) return;
+    const used = new Set(cls.subjects.map((s) => s.key));
+    const key = uniqueKey(name, used);
+    const next: CurriculumSubject = { key, name, icon: guessIcon(name), chapters: [] };
     setClasses((prev) =>
-      prev.map((c) => {
-        if (c.key !== classKey) return c;
-        const used = new Set(c.subjects.map((s) => s.key));
-        const key = uniqueKey(name, used);
-        const next: CurriculumSubject = { key, name, icon: guessIcon(name), chapters: [] };
-        return { ...c, subjects: [...c.subjects, next] };
-      }),
+      prev.map((c) => (c.key !== classKey ? c : { ...c, subjects: [...c.subjects, next] })),
     );
-    setActiveSubjectKey(uniqueKey(name, new Set()));
+    setActiveSubjectKey(key);
   };
 
   const addBulkSubjects = (classKey: string, lines: string[]) => {
@@ -611,12 +613,12 @@ export default function CurriculumBuilderPage() {
     );
   };
 
-  const updateSubject = (classKey: string, next: CurriculumSubject) => {
+  const updateSubject = (classKey: string, originalKey: string, next: CurriculumSubject) => {
     setClasses((prev) =>
       prev.map((c) =>
         c.key !== classKey
           ? c
-          : { ...c, subjects: c.subjects.map((s) => (s.key === next.key ? next : s)) },
+          : { ...c, subjects: c.subjects.map((s) => (s.key === originalKey ? next : s)) },
       ),
     );
   };
@@ -634,6 +636,12 @@ export default function CurriculumBuilderPage() {
   };
 
   const addChapter = (classKey: string, subjectKey: string, name: string) => {
+    const cls = classes.find((c) => c.key === classKey);
+    const subject = cls?.subjects.find((s) => s.key === subjectKey);
+    if (!subject) return;
+    const used = new Set(subject.chapters.map((ch) => ch.key));
+    const key = uniqueKey(name, used);
+    const next: CurriculumChapter = { key, name, topics: [] };
     setClasses((prev) =>
       prev.map((c) => {
         if (c.key !== classKey) return c;
@@ -641,17 +649,12 @@ export default function CurriculumBuilderPage() {
           ...c,
           subjects: c.subjects.map((s) => {
             if (s.key !== subjectKey) return s;
-            const used = new Set(s.chapters.map((ch) => ch.key));
-            const key = uniqueKey(name, used);
-            return {
-              ...s,
-              chapters: [...s.chapters, { key, name, topics: [] }],
-            };
+            return { ...s, chapters: [...s.chapters, next] };
           }),
         };
       }),
     );
-    setActiveChapterKey(uniqueKey(name, new Set()));
+    setActiveChapterKey(key);
   };
 
   const addBulkChapters = (classKey: string, subjectKey: string, lines: string[]) => {
@@ -675,7 +678,7 @@ export default function CurriculumBuilderPage() {
     );
   };
 
-  const updateChapter = (classKey: string, subjectKey: string, next: CurriculumChapter) => {
+  const updateChapter = (classKey: string, subjectKey: string, originalKey: string, next: CurriculumChapter) => {
     setClasses((prev) =>
       prev.map((c) => {
         if (c.key !== classKey) return c;
@@ -685,7 +688,7 @@ export default function CurriculumBuilderPage() {
             if (s.key !== subjectKey) return s;
             return {
               ...s,
-              chapters: s.chapters.map((ch) => (ch.key === next.key ? next : ch)),
+              chapters: s.chapters.map((ch) => (ch.key === originalKey ? next : ch)),
             };
           }),
         };
@@ -894,19 +897,60 @@ export default function CurriculumBuilderPage() {
   /* Save & publish                                                   */
   /* ---------------------------------------------------------------- */
 
+  /**
+   * Deep-clean the working tree for publishing: drop every nameless node so
+   * an in-progress blank row the admin left behind never reaches students
+   * (the server normalizer would otherwise silently discard the branch).
+   */
+  const cleanTree = (input: CurriculumClass[]): CurriculumClass[] =>
+    input
+      .filter((c) => c.name.trim())
+      .map((c) => ({
+        ...c,
+        subjects: c.subjects
+          .filter((s) => s.name.trim())
+          .map((s) => ({
+            ...s,
+            chapters: s.chapters
+              .filter((ch) => ch.name.trim())
+              .map((ch) => ({
+                ...ch,
+                topics: ch.topics.filter((t) => t.name.trim()),
+              })),
+          })),
+      }));
+
   const saveLive = async () => {
-    const validClasses = classes.filter((c) => c.name.trim());
-    if (!validClasses.length) {
-      notify("error", "Add at least one class with a name.");
+    const cleaned = cleanTree(classes);
+    if (!cleaned.length) {
+      notify("error", "Add at least one class with a name before publishing.");
       return;
     }
-    for (const cls of validClasses) {
-      const validSubjects = cls.subjects.filter((s) => s.name.trim());
-      if (!validSubjects.length) {
-        notify("error", `${cls.name} has no subjects. Add at least one subject.`);
+    // Block an incomplete tree with a precise message instead of letting the
+    // server normalizer silently drop the branch (which made the admin's
+    // published curriculum "disappear" on the student AI test page).
+    for (const cls of cleaned) {
+      if (!cls.subjects.length) {
+        notify("error", `${cls.name} has no subjects. Add at least one subject to this class.`);
         return;
       }
+      for (const subject of cls.subjects) {
+        if (!subject.chapters.length) {
+          notify("error", `${cls.name} → ${subject.name} has no chapters. Add at least one chapter.`);
+          return;
+        }
+        for (const chapter of subject.chapters) {
+          if (!chapter.topics.length) {
+            notify(
+              "error",
+              `${cls.name} → ${subject.name} → ${chapter.name} has no concepts. Add at least one concept so students can select a topic.`,
+            );
+            return;
+          }
+        }
+      }
     }
+
     const ok = window.confirm(
       "Replace the Class → Subject → Chapter → Concept lists students see on the revision planning page? Existing student tests are not deleted.",
     );
@@ -917,7 +961,7 @@ export default function CurriculumBuilderPage() {
       board: board.trim() || "CBSE",
       prompt: published?.prompt || "",
       updatedAt: new Date().toISOString(),
-      classes: validClasses,
+      classes: cleaned,
     };
     setSaving(true);
     try {
@@ -1126,7 +1170,7 @@ export default function CurriculumBuilderPage() {
             <div className="w-14">
               <InlineEdit
                 value={activeClass.icon}
-                onChange={(icon) => updateClass({ ...activeClass, icon: icon.slice(0, 4) })}
+                onChange={(icon) => updateClass(activeClass.key, { ...activeClass, icon: icon.slice(0, 4) })}
                 placeholder="🎒"
                 className="text-center"
               />
@@ -1134,7 +1178,11 @@ export default function CurriculumBuilderPage() {
             <div className="min-w-[140px] flex-1">
               <InlineEdit
                 value={activeClass.name}
-                onChange={(name) => updateClass({ ...activeClass, name, key: slug(name) })}
+                onChange={(name) => {
+                  const nextKey = name.trim() ? slug(name) : activeClass.key;
+                  updateClass(activeClass.key, { ...activeClass, name, key: nextKey });
+                  if (nextKey !== activeClass.key) setActiveClassKey(nextKey);
+                }}
                 placeholder="Class name (e.g. Class 10)"
               />
             </div>
@@ -1171,7 +1219,7 @@ export default function CurriculumBuilderPage() {
                   <InlineEdit
                     value={activeSubject.icon}
                     onChange={(icon) =>
-                      updateSubject(activeClass.key, { ...activeSubject, icon: icon.slice(0, 4) })
+                      updateSubject(activeClass.key, activeSubject.key, { ...activeSubject, icon: icon.slice(0, 4) })
                     }
                     placeholder="📘"
                     className="text-center"
@@ -1180,14 +1228,16 @@ export default function CurriculumBuilderPage() {
                 <div className="min-w-[140px] flex-1">
                   <InlineEdit
                     value={activeSubject.name}
-                    onChange={(name) =>
-                      updateSubject(activeClass.key, {
+                    onChange={(name) => {
+                      const nextKey = name.trim() ? slug(name) : activeSubject.key;
+                      updateSubject(activeClass.key, activeSubject.key, {
                         ...activeSubject,
                         name,
-                        key: slug(name),
+                        key: nextKey,
                         icon: activeSubject.icon || guessIcon(name),
-                      })
-                    }
+                      });
+                      if (nextKey !== activeSubject.key) setActiveSubjectKey(nextKey);
+                    }}
                     placeholder="Subject name"
                   />
                 </div>
@@ -1234,9 +1284,11 @@ export default function CurriculumBuilderPage() {
                       <div className="min-w-[140px] flex-1">
                         <InlineEdit
                           value={chapter.name}
-                          onChange={(name) =>
-                            updateChapter(activeClass.key, activeSubject.key, { ...chapter, name, key: slug(name) })
-                          }
+                          onChange={(name) => {
+                            const nextKey = name.trim() ? slug(name) : chapter.key;
+                            updateChapter(activeClass.key, activeSubject.key, chapter.key, { ...chapter, name, key: nextKey });
+                            if (nextKey !== chapter.key) setActiveChapterKey(nextKey);
+                          }}
                           placeholder="Chapter name"
                         />
                       </div>

@@ -143,10 +143,16 @@ export function normalizeCurriculumClass(raw: unknown, fallbackName = "Class"): 
         if (!tName) continue;
         topics.push({ key: uniqueKey(tName, topicKeys), name: tName });
       }
-      if (!topics.length) continue;
+      // Keep a named chapter even while it has no concepts yet. The previous
+      // behaviour silently dropped chapters with zero topics and subjects with
+      // zero chapters, so an admin who saved a partially-filled tree lost the
+      // ENTIRE `planningCurriculum` (normalizePlanningCurriculum returned null)
+      // and students kept seeing the built-in fallback syllabus. Preserving
+      // named nodes makes the round-trip lossless: what the admin saves is what
+      // students see, and the cascading picker simply shows an empty list under
+      // an incomplete branch.
       chapters.push({ key: uniqueKey(chName, chapterKeys), name: chName, topics });
     }
-    if (!chapters.length) continue;
     const icon = cleanName(item.icon, SUBJECT_ICONS[sName.toLowerCase()] || "📘");
     subjects.push({ key: uniqueKey(sName, subjectKeys), name: sName, icon: icon.slice(0, 4), chapters });
   }

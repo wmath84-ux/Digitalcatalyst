@@ -118,18 +118,15 @@ export async function getLectureCourses(uid: string, q: string): Promise<Lecture
 export async function getLectureModules(productId: string): Promise<LectureModuleOption[]> {
   const db = adminDb();
   const idKeys = [productId, Number(productId)].filter((v) => Number.isFinite(v));
-  let snap = null as Awaited<ReturnType<typeof db.collection("siteProducts").doc(String).get>> | null;
   for (const key of idKeys) {
     const candidate = await db.collection("siteProducts").doc(String(key)).get();
     if (candidate.exists) {
-      snap = candidate;
-      break;
+      const data = candidate.data() || {};
+      const modules = flattenModules(data.courseContent);
+      return modules.map((m) => ({ id: m.id, title: m.title, description: m.description || null, order: m.order }));
     }
   }
-  if (!snap || !snap.exists) return [];
-  const data = snap.data() || {};
-  const modules = flattenModules(data.courseContent);
-  return modules.map((m) => ({ id: m.id, title: m.title, description: m.description || null, order: m.order }));
+  return [];
 }
 
 export async function getPurchasedProductIds(uid: string): Promise<Set<string>> {

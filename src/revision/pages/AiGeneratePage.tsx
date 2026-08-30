@@ -22,7 +22,7 @@ import { Card, PrimaryButton } from "../components/ui";
 import { CheckIcon, ChevronRightIcon, ClockIcon, SparklesIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { CURRICULUM, type CurriculumClass } from "../data/curriculum";
-import { fetchRemoteCatalog } from "../engine/catalogService";
+import { fetchRemoteCatalog, type RevisionCatalog } from "../engine/catalogService";
 import {
   generateRevisionQuestions,
   getProvider,
@@ -256,16 +256,32 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
   const [aiSettings, setAiSettings] = useState<CatalogAiSettings | null>(null);
   const [curriculum, setCurriculum] = useState<CurriculumClass[]>(CURRICULUM);
   const [curriculumMeta, setCurriculumMeta] = useState<{ board: string; yearLabel: string } | null>(null);
+  const [syllabusSource, setSyllabusSource] = useState<"loading" | "published" | "builtin">("loading");
   useEffect(() => {
     let cancelled = false;
-    void fetchRemoteCatalog().then((c) => {
+    const apply = (c: RevisionCatalog | null) => {
       if (cancelled) return;
       if (c?.aiSettings) setAiSettings(c.aiSettings);
       if (c?.planningCurriculum?.classes?.length) {
         setCurriculum(c.planningCurriculum.classes);
         setCurriculumMeta({ board: c.planningCurriculum.board, yearLabel: c.planningCurriculum.yearLabel });
+        setSyllabusSource("published");
+      } else {
+        setSyllabusSource("builtin");
       }
-    });
+    };
+    void (async () => {
+      // Read the admin-published catalog. One retry guards against a transient
+      // network/timing failure so a single blip never leaves the generator
+      // stuck on the built-in fallback syllabus for the whole session.
+      const first = await fetchRemoteCatalog();
+      if (first) {
+        apply(first);
+        return;
+      }
+      const second = await fetchRemoteCatalog();
+      apply(second);
+    })();
     return () => {
       cancelled = true;
     };
@@ -703,6 +719,11 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
               {curriculumMeta && (
                 <p className="mt-1 text-[11px] font-semibold text-indigo-600">
                   {curriculumMeta.board} · {curriculumMeta.yearLabel} included syllabus
+                </p>
+              )}
+              {!curriculumMeta && syllabusSource === "builtin" && (
+                <p className="mt-1 text-[11px] font-medium text-amber-600">
+                  Using the built-in syllabus — the school has not published a custom syllabus yet.
                 </p>
               )}
               <div data-rev-choice-grid className="mt-3 grid grid-cols-4 gap-1.5">

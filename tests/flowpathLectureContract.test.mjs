@@ -68,6 +68,16 @@ test("lecture planner puts owned courses first, then preview-only", () => {
   assert.match(lecturePlanner, /a\.title\.localeCompare/);
 });
 
+test("lecture module lookup avoids the esbuild-unparseable typeof db.collection type query", () => {
+  // `typeof db.collection("siteProducts").doc(String).get` is a
+  // type query Vercel's esbuild bundler cannot parse, which broke the
+  // build of the shared `api/referral-leaderboard` function (the one
+  // that serves `/api/myday`). The lookup must stay a plain early-return
+  // loop so the whole function bundles cleanly.
+  assert.doesNotMatch(lecturePlanner, /typeof\s+db\.collection\(/);
+  assert.match(lecturePlanner, /return\s+modules\.map\(\(m\) =>/);
+});
+
 /* ------------------------------------------------------------------ */
 /*  Server: multiplexer wiring                                       */
 /* ------------------------------------------------------------------ */

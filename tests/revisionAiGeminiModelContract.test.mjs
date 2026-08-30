@@ -44,7 +44,7 @@ const RETIRED_MODEL_IDS = [
 // ---------------------------------------------------------------------------
 
 test("the default Gemini model is the current Flash model, not a retired one", () => {
-  assert.match(aiGenerate, /export const DEFAULT_MODEL = "gemini-3\.6-flash"/);
+  assert.match(aiGenerate, /export const DEFAULT_MODEL = "gemini-3\.7-flash"/);
 });
 
 test("no retired Gemini model id is used as a default or in the known-model lists", () => {
@@ -145,7 +145,8 @@ test("every known Gemini model offered in dropdowns is a live (non-retired) mode
       `${value} is not a current Gemini model`,
     );
   }
-  assert.ok(values.includes("gemini-3.6-flash"), "the default model must be selectable");
+  assert.ok(values.includes("gemini-3.6-flash"), "the previous default must remain selectable");
+  assert.ok(values.includes("gemini-3.7-flash"), "the current default (best reasoning) model must be selectable");
 });
 
 test("the admin-published default is part of the shared catalog", () => {

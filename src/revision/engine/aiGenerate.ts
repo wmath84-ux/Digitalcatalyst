@@ -20,13 +20,19 @@ const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models
  * them now returns 404 "This model is no longer available", which used to push
  * the admin panel silently onto the offline generator. Keep this pointed at a
  * live model.
+ *
+ * `gemini-3.7-flash` is the best current Flash model for this task: it is the
+ * newest Flash release (best instruction-following for the strict JSON
+ * question/syllabus schema) while staying fast and cheap enough for the
+ * per-test generation flow. The server proxy already uses it as its
+ * retired-model fallback, so the client default now matches.
  */
-export const DEFAULT_MODEL = "gemini-3.6-flash";
+export const DEFAULT_MODEL = "gemini-3.7-flash";
 
 /** Models offered in the admin dropdown (newest first). */
 export const MODEL_OPTIONS: { value: string; label: string }[] = [
-  { value: "gemini-3.7-flash", label: "Gemini 3.7 Flash — newest, best reasoning" },
-  { value: "gemini-3.6-flash", label: "Gemini 3.6 Flash — recommended default" },
+  { value: "gemini-3.7-flash", label: "Gemini 3.7 Flash — recommended default (best reasoning)" },
+  { value: "gemini-3.6-flash", label: "Gemini 3.6 Flash" },
   { value: "gemini-3.5-flash", label: "Gemini 3.5 Flash" },
   { value: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite — fastest / cheapest" },
   { value: "gemini-flash-latest", label: "Gemini Flash (latest alias)" },
