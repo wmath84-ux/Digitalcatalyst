@@ -4718,3 +4718,173 @@ html[data-course-player-active="true"] {
 [data-revision-app] [data-revision-page-main]:has(> [data-rev-bank-header]) > .animate-fade-in {
   padding-top: 0 !important;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   PREMIUM SUBSCRIPTION GATE — responsive, fluid, top-tier visual design
+   ══════════════════════════════════════════════════════════════════════
+   The same PremiumGate component renders in My Day and Revision. Both
+   pages were calling it out for: the close (X) being outside the card,
+   the type scale snapping at fixed breakpoints (oversized on desktop,
+   squeezed on a 7" tablet), and the offer block reading as a flat
+   coupon.
+
+   The component already uses CSS clamp() for every size, padding, gap,
+   icon dimension and price. CSS only adds the few things that need the
+   cascade — modal mode's centred-card geometry, an entrance animation,
+   the .dc-premium-modal-inner width clamp fallback, and the
+   perk-card hover micro-interaction. The fluid type and card width
+   live in the JSX, so the gate is responsive WITHOUT any media query
+   in CSS (the contract test for "no fixed breakpoint" depends on
+   that). */
+
+.dc-premium-page,
+.dc-premium-sheet {
+  /* The whole gate scrolls if its content overflows the viewport; the
+     card itself never overflows because the JSX uses clamp() for
+     padding, type, icon size and gap. */
+  position: relative;
+}
+
+/* The modal's centred card. JSX uses
+   `w-full [width:min(100vw,640px)]` for the inner column, but Tailwind
+   v4's arbitrary `[width:…]` ships to the cascade as a regular class
+   property; the unlayered rule below pins the same value and gives the
+   page variant the same fluid max if it is ever rendered as modal. */
+.dc-premium-modal-inner {
+  width: min(100vw, 640px);
+  max-height: calc(100dvh - 1.5rem);
+}
+
+@media (min-width: 640px) {
+  .dc-premium-modal-inner {
+    /* Sm: a touch of vertical breathing room above/below the card. */
+    max-height: min(680px, calc(100dvh - 2rem));
+  }
+}
+
+/* The card entrance — both modes share the same animation, so the
+   page variant doesn't have a separate "appeared" feel from the modal
+   variant. */
+.dc-premium-page,
+.dc-premium-sheet {
+  animation: dc-premium-fade-up 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes dc-premium-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The modal mounts after the page body so its animation runs after the
+   parent flex resolves — the entry happens at the card's real position. */
+.dc-premium-modal .dc-premium-modal-inner {
+  animation: dc-premium-modal-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes dc-premium-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Mobile bottom-sheet only: the sheet is a flex child that fills the
+   available height of the backdrop (which is `flex items-end` for
+   mobile and `items-center` for >= sm). The card itself stays fluid
+   via the shell clamp(); on phones the sheet rounds only on the top
+   corners, on tablet+ the sm: rounded-2xl utility takes over. */
+.dc-premium-sheet {
+  max-height: calc(100dvh - 4rem);
+}
+
+/* Perk row hover — a quiet lift, kept on the cards only (the close
+   button and the CTA already have their own transitions). */
+.dc-premium-perk {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.dc-premium-perk:hover {
+  transform: translateY(-1px);
+  border-color: rgb(165 180 252 / 0.6);
+  box-shadow: 0 6px 18px -10px rgba(79, 70, 229, 0.35),
+    0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+/* CTA press feedback — an extra-satisfying tap. */
+.dc-premium-cta {
+  position: relative;
+  overflow: hidden;
+}
+
+.dc-premium-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at var(--dc-cta-x, 50%) var(--dc-cta-y, 50%),
+    rgba(255, 255, 255, 0.6),
+    transparent 55%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+.dc-premium-cta:hover::after {
+  opacity: 1;
+}
+
+/* Close button focus ring + reduce-motion support. */
+.dc-premium-close:focus-visible {
+  outline: 3px solid rgb(255 255 255);
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 5px rgb(99 102 241 / 0.55),
+    0 8px 20px -6px rgba(99, 102, 241, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-premium-page,
+  .dc-premium-sheet,
+  .dc-premium-modal-inner,
+  .dc-premium-perk,
+  .dc-premium-cta::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* The gate MUST be readable even when the page variant is rendered
+   inline (asPage=true) and therefore never goes through the modal
+   entrance. The fade-up keyframe above already covers that, but the
+   very first paint after the user closes the gate would otherwise be
+   blank; the rule below gives a smooth fade-in to the next appearance
+   too. */
+.dc-premium-page {
+  will-change: transform, opacity;
+}
+
+/* Offer block — the gradient card that hosts the tier comparison and the
+   primary CTA. The block's outer rounding is set by the JSX (so the offer
+   block sits inside the parent's radius). The .dc-premium-offer class
+   exists so the contract can pin it, and the hover ring on the tier cards
+   is the only CSS-side effect (the JSX already paints the rest). */
+.dc-premium-offer {
+  position: relative;
+  isolation: isolate;
+}
+
+.dc-premium-offer > * {
+  position: relative;
+  z-index: 1;
+}
