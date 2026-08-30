@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { saveMyDayData } from "./lib/myDayClient";
+import { saveMyDayData, type MyDayCloudData } from "./lib/myDayClient";
 import {
   Bell,
   CalendarClock,
@@ -45,6 +45,30 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   }
 }
 
+const MYDAY_STORAGE_KEYS: Record<keyof MyDayCloudData, string> = {
+  tasks: "myday_tasks",
+  schedule: "myday_schedule",
+  notes: "myday_notes",
+  reminders: "myday_reminders",
+};
+
+/**
+ * My Day is intentionally local-first: the learner taps a task/note/etc. and
+ * sees it immediately, then we try to mirror it to Firestore through the
+ * secure server endpoint. If the cloud save is unavailable (offline, dev
+ * server without an API stub, old deploy, etc.) we still keep the change on
+ * this device instead of showing an unreadable error and losing the work.
+ */
+function writeLocalMyDay(data: MyDayCloudData): void {
+  try {
+    Object.entries(MYDAY_STORAGE_KEYS).forEach(([key, storageKey]) => {
+      localStorage.setItem(storageKey, JSON.stringify(data[key as keyof MyDayCloudData]));
+    });
+  } catch {
+    // The in-memory state is still authoritative for this visit.
+  }
+}
+
 const CREATE_OPTIONS: { id: DaySection; label: string; hint: string; icon: typeof ClipboardList }[] = [
   { id: "tasks", label: "Today Task", hint: "Plan what you need to finish today", icon: ClipboardList },
   { id: "schedule", label: "Daily Schedule", hint: "Block time for classes and study", icon: CalendarClock },
@@ -84,6 +108,15 @@ export default function App() {
   // so dialogs never cover the side panel or spill outside the app frame.
   const contentColumnRef = useRef<HTMLElement>(null);
   const [savingMyDay, setSavingMyDay] = useState(false);
+  const [cloudSyncFailed, setCloudSyncFailed] = useState(false);
+
+  // Latest full local snapshot. Used by the local-first save path so a cloud
+  // failure never discards a change the learner already made on this device.
+  const latestMyDayRef = useRef<MyDayCloudData | null>(null);
+  // Guard against overlapping cloud writes. The React state is still used to
+  // drive the "Saving My Day…" label, but the async guard must be a ref so the
+  // saved-local-first path can queue the newest snapshot right after a write.
+  const myDaySaveRunningRef = useRef(false);
 
   const userName = user?.name?.split(" ")[0] || "Learner";
 
@@ -126,44 +159,115 @@ export default function App() {
     return true;
   }, []);
 
-  const applyCloudData = useCallback((data: { tasks: Task[]; schedule: ScheduleEvent[]; notes: QuickNote[]; reminders: Reminder[] }) => {
+  const applyCloudData = useCallback((data: MyDayCloudData) => {
+    latestMyDayRef.current = data;
     setTasks(data.tasks);
     setSchedule(data.schedule);
     setNotes(data.notes);
     setReminders(data.reminders);
-    try {
-      localStorage.setItem("myday_tasks", JSON.stringify(data.tasks));
-      localStorage.setItem("myday_schedule", JSON.stringify(data.schedule));
-      localStorage.setItem("myday_notes", JSON.stringify(data.notes));
-      localStorage.setItem("myday_reminders", JSON.stringify(data.reminders));
-    } catch {
-      // Cloud remains authoritative when local storage is unavailable.
-    }
+    writeLocalMyDay(data);
   }, []);
 
-  // The API transaction is the only writer to the users/{uid}/myDay collection.
+  /**
+   * Apply a change to the device-first My Day state. This always succeeds and
+   * is called before the cloud request so the learner never loses work when
+   * the server is unreachable. Returns both the merged local snapshot and the
+   * snapshot that existed before the change (used for a clean rollback when
+   * the server rejects a daily-free-limit breach).
+   */
+  const applyLocalMyDay = useCallback((next: Partial<MyDayCloudData>) => {
+    const previous = latestMyDayRef.current ?? { tasks, schedule, notes, reminders };
+    const merged: MyDayCloudData = {
+      tasks: next.tasks ?? previous.tasks,
+      schedule: next.schedule ?? previous.schedule,
+      notes: next.notes ?? previous.notes,
+      reminders: next.reminders ?? previous.reminders,
+    };
+    latestMyDayRef.current = merged;
+    setTasks(merged.tasks);
+    setSchedule(merged.schedule);
+    setNotes(merged.notes);
+    setReminders(merged.reminders);
+    writeLocalMyDay(merged);
+    return { previous, merged };
+  }, [notes, reminders, schedule, tasks]);
+
+  // My Day saves are local-first. The device state is updated immediately;
+  // the secure users/{uid}/myDay collection API is then asked to mirror it
+  // to cloud.
+  // If the server is unavailable the change still remains on this device and
+  // we show a readable non-blocking notice instead of a solid red error box.
   const persistMyDay = useCallback(async (
-    next: Partial<{ tasks: Task[]; schedule: ScheduleEvent[]; notes: QuickNote[]; reminders: Reminder[] }>,
+    next: Partial<MyDayCloudData>,
   ): Promise<boolean> => {
-    if (!uid || savingMyDay) return false;
+    const { previous, merged } = applyLocalMyDay(next);
+    setCloudLoaded(true);
+
+    // Without a signed-in user we still let learners create items locally
+    // (they persist on this device). This is the helpful fallback for a page
+    // where auth has not finished restoring, and it is clearly communicated
+    // to the user instead of silently failing.
+    if (!uid) {
+      setCloudSyncFailed(true);
+      return true;
+    }
+
+    // A cloud save is already in flight. The change is already on this device;
+    // the in-flight request won't overwrite it, and the finally block below
+    // sends the newest snapshot once that request completes.
+    if (myDaySaveRunningRef.current) {
+      setCloudSyncFailed(false);
+      return true;
+    }
+
+    myDaySaveRunningRef.current = true;
     setSavingMyDay(true);
     try {
-      const result = await saveMyDayData(next, {
+      const result = await saveMyDayData(merged, {
         tzOffsetMinutes: new Date().getTimezoneOffset(),
       });
-      applyCloudData(result.data);
+      // Keep the local-first snapshot as-is: a newer local change could have
+      // been made while this request was in flight. Overwriting it here would
+      // silently lose that device-only change.
       setMyDayAccess(result.access);
-      setCloudLoaded(true);
+      setCloudSyncFailed(false);
       return true;
     } catch (err) {
       const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code || "") : "";
-      if (code === "MYDAY_DAILY_FREE_USED") setPaywallOpen(true);
-      addToast(err instanceof Error ? err.message : "My Day cloud save failed", "error");
-      return false;
+      if (code === "MYDAY_DAILY_FREE_USED") {
+        // The server rejected the creation because today's free allowance is
+        // exhausted. Keep the paywall contract real by restoring the state
+        // that existed before this change.
+        applyLocalMyDay(previous);
+        setPaywallOpen(true);
+        addToast(
+          `Today's free My Day creation limit is reached. Subscribe for unlimited creation or try again after the daily reset.`,
+          "info",
+        );
+        return false;
+      }
+      // Every other failure (offline, wrong deploy, missing env var) becomes a
+      // device-only save instead of a lost task + unreadable red message.
+      setCloudSyncFailed(true);
+      addToast("Saved on this device. Cloud sync will be attempted again on your next save.", "info");
+      return true;
     } finally {
+      myDaySaveRunningRef.current = false;
       setSavingMyDay(false);
+      // If the user made another change while this request was running, push
+      // that newest snapshot now (the in-flight one stayed read-only for it).
+      if (latestMyDayRef.current && latestMyDayRef.current !== merged) {
+        void persistMyDay(latestMyDayRef.current);
+      }
     }
-  }, [addToast, applyCloudData, savingMyDay, setMyDayAccess, uid]);
+  }, [addToast, applyLocalMyDay, setMyDayAccess, uid]);
+
+  // Keep the local snapshot ref aligned with the rendered state so subsequent
+  // local-first saves can compute "before" correctly and queue the newest
+  // snapshot after a cloud write.
+  useEffect(() => {
+    latestMyDayRef.current = { tasks, schedule, notes, reminders };
+  }, [notes, reminders, schedule, tasks]);
 
   useEffect(() => {
     if (!uid) { setCloudLoaded(false); return; }
@@ -172,6 +276,7 @@ export default function App() {
       if (cancelled || !result) return;
       applyCloudData(result.data);
       setCloudLoaded(true);
+      setCloudSyncFailed(false);
     });
     return () => { cancelled = true; };
   }, [applyCloudData, refreshMyDay, uid]);
@@ -522,8 +627,18 @@ export default function App() {
                 Profile page inside MyDayAllowanceCard. My Day itself stays a
                 clean planning surface; the PremiumGate below still explains
                 the allowance at the exact moment a creation is blocked. */}
-            {(!cloudLoaded || savingMyDay) && (
-              <p className="mb-3 text-center text-[11px] font-semibold text-slate-400">{savingMyDay ? "Saving My Day securely…" : "Syncing My Day…"}</p>
+            {(!cloudLoaded || savingMyDay || cloudSyncFailed) && (
+              <div className="mb-3 text-center">
+                <p className={cloudSyncFailed ? "text-[11px] font-bold text-amber-700" : "text-[11px] font-semibold text-slate-400"}>
+                  {savingMyDay
+                    ? "Saving My Day…"
+                    : cloudSyncFailed
+                      ? uid
+                        ? "Saved on this device — cloud sync will retry on your next save"
+                        : "Saved on this device — sign in to sync to cloud"
+                      : "Syncing My Day…"}
+                </p>
+              </div>
             )}
             {activeSection === "overview" && (
               <section className="space-y-8">

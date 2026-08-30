@@ -22,9 +22,13 @@ const icons: Record<ToastType, LucideIcon> = {
 };
 
 const styles: Record<ToastType, string> = {
-  success: "bg-emerald-600 text-white",
-  error: "bg-rose-600 text-white",
-  info: "bg-slate-800 text-white",
+  // Use a light, high-contrast surface for errors. A solid red pill can hide
+  // the message on some devices / dark-theme CSS, which is what users see as
+  // "ek pura red box jisme kuch bhi nahi dikhta". The dark red text on white
+  // is readable while still being unmistakably an error.
+  success: "bg-emerald-600 text-white shadow-emerald-900/20",
+  error: "bg-white text-rose-700 border border-rose-300 shadow-rose-200/70",
+  info: "bg-slate-800 text-white shadow-slate-900/30",
 };
 
 function ToastItem({ toast, onRemove }: { toast: ToastMessage; onRemove: (id: string) => void }) {
@@ -35,7 +39,7 @@ function ToastItem({ toast, onRemove }: { toast: ToastMessage; onRemove: (id: st
     const timer = setTimeout(() => {
       setVisible(false);
       setTimeout(() => onRemove(toast.id), 300);
-    }, 2800);
+    }, 4000);
     return () => clearTimeout(timer);
   }, [toast.id, onRemove]);
 
@@ -43,15 +47,32 @@ function ToastItem({ toast, onRemove }: { toast: ToastMessage; onRemove: (id: st
 
   return (
     <div
+      role={toast.type === "error" ? "alert" : "status"}
+      aria-live={toast.type === "error" ? "assertive" : "polite"}
       className={cn(
-        "flex items-center gap-2.5 rounded-xl px-4 py-3 shadow-xl transition-all duration-300",
+        "flex items-start gap-2.5 rounded-xl px-4 py-3 shadow-xl transition-all duration-300",
         styles[toast.type],
         visible ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0",
       )}
     >
-      <Icon className="h-4.5 w-4.5 shrink-0" />
-      <span className="flex-1 text-sm font-medium">{toast.text}</span>
-      <button onClick={() => onRemove(toast.id)} className="shrink-0 opacity-70 hover:opacity-100">
+      <Icon
+        className={cn("h-4.5 w-4.5 mt-0.5 shrink-0", toast.type === "error" ? "text-rose-600" : "text-white")}
+        aria-hidden="true"
+      />
+      <span
+        className="min-w-0 flex-1 break-words text-left text-sm font-semibold leading-snug"
+        style={toast.type === "error" ? { color: "#9f1239" } : { color: "#fff" }}
+      >
+        {toast.text}
+      </span>
+      <button
+        onClick={() => onRemove(toast.id)}
+        aria-label="Dismiss notification"
+        className={cn(
+          "mt-0.5 shrink-0 rounded-md p-0.5 transition hover:opacity-100",
+          toast.type === "error" ? "text-rose-400 opacity-70 hover:bg-rose-100" : "text-white/80 opacity-70 hover:bg-white/10",
+        )}
+      >
         <X className="h-4 w-4" />
       </button>
     </div>
