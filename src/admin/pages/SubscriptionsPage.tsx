@@ -1110,8 +1110,6 @@ export default function SubscriptionsPage() {
                     };
                     const monthly = resolveFeaturePrice(previewDoc, plan.id, "monthly");
                     const yearly = resolveFeaturePrice(previewDoc, plan.id, "yearly");
-                    const fmt = (r: { pricePaise: number; included: boolean }) => (r.included || r.pricePaise === 0 ? "Free" : `₹${Math.round(r.pricePaise / 100const monthly = resolveFeaturePrice(previewDoc, plan.id, "monthly");
-                    const yearly = resolveFeaturePrice(previewDoc, plan.id, "yearly");
                     const fmt = (r: { pricePaise: number; included: boolean }) => (r.included || r.pricePaise === 0 ? "Free" : `₹${Math.round(r.pricePaise / 100).toLocaleString("en-IN")}`);
                     return (
                       <div key={plan.id} className="flex items-center justify-between rounded-lg bg-white px-2.5 py-1.5 text-[11px]">
