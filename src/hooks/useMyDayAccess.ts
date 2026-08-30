@@ -21,22 +21,35 @@ const initialAccess = (): MyDayAccessSnapshot => ({
 /**
  * My Day remains browseable for everyone. The server resolves whether the
  * learner has paid/unlimited access or today's Admin-configured free creation
- * allowance. Server access still requires subscription status === "active",
- * a future expiresAt and features.includes("my-day"); the browser never grants
+ * allowance. Server access still requires subscription status === "active", a
+ * future expiresAt and features.includes("my-day"); the browser never grants
  * that entitlement itself. The hook listens to feature, subscription and usage
  * documents so an Admin change, purchase, creation or daily reset is reflected live.
+ *
+ * Phase-1: the feature doc now also carries `visibilityMode`. When the admin
+ * sets it to "hide", the rail/nav removes the My Day entry for
+ * non-subscribers. Direct deep-links still land on the paywall, so the
+ * "you can never access it without paying" contract is preserved.
  */
 export function useMyDayAccess() {
   const { user } = useAuth();
   const [access, setAccess] = useState<MyDayAccessSnapshot>(initialAccess);
   const [loading, setLoading] = useState(Boolean(user));
   const [error, setError] = useState<string | null>(null);
+  // Phase-1: hide mode = feature is removed from the catalog for
+  // non-subscribers. The rail reads this and the page is replaced by
+  // the paywall on a direct deep-link.
+  const [hidden, setHidden] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!user) return null;
     try {
       const result = await fetchMyDayStatus();
       setAccess(result.access);
+      // The server echoes `hidden` on the access snapshot (Phase-1).
+      // We mirror it into the hook so the rail / nav can read it
+      // synchronously.
+      setHidden(Boolean((result.access as any)?.hidden));
       setError(null);
       return result;
     } catch (err) {
@@ -52,6 +65,7 @@ export function useMyDayAccess() {
       setAccess(initialAccess());
       setLoading(false);
       setError(null);
+      setHidden(false);
       return undefined;
     }
     setLoading(true);
@@ -111,5 +125,6 @@ export function useMyDayAccess() {
     access,
     setAccess,
     refresh,
+    hidden, // Phase-1
   };
 }

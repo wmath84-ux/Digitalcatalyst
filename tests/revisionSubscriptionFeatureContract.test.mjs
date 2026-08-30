@@ -37,7 +37,9 @@ test("revision access mirrors the My Day gate against the revision feature doc",
   assert.match(useRevisionAccess, /status === "active"/);
   assert.match(useRevisionAccess, /expiresAt/);
   // Missing/inactive feature doc removes the gate (feature becomes free).
-  assert.match(useRevisionAccess, /featureConfigured = snapshot\.exists\(\) && \(snapshot\.data\(\)\?\.active !== false\)/);
+  // Phase-1 reads the snapshot into a typed `data` variable and computes
+  // `featureConfigured` + `visibilityMode` together.
+  assert.match(useRevisionAccess, /featureConfigured\s*=\s*snapshot\.exists\(\)\s*&&\s*data\.active\s*!==\s*false/);
 });
 
 test("RevisionApp gates paywalled actions with the floating premium gate", () => {

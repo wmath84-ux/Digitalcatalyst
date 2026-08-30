@@ -157,6 +157,12 @@ type Access = {
   dayKey: string;
   resetAt: number;
   timeZone: string;
+  // Phase-1: when the feature is in "hide" mode AND the user is not paid,
+  // the client should remove the My Day entry from the rail/nav. The
+  // paywall still appears on a direct deep-link, so the "no free access"
+  // contract is preserved. Subscribers always see the feature regardless
+  // of the visibility mode.
+  hidden: boolean;
 };
 
 function accessSnapshot(
@@ -177,6 +183,10 @@ function accessSnapshot(
   const timeZone = validTimeZone(usage.timeZone || requestedTimeZone);
   const today = dayKeyInZone(now, timeZone);
   const freeUsed = String(usage.dayKey || "") === today ? Math.max(0, Math.round(Number(usage.dayCount) || 0)) : 0;
+  // Phase-1: hide mode only hides for non-subscribers. Subscribers
+  // (paid === true) always see the feature regardless of mode.
+  const visibilityMode = (feature as any)?.visibilityMode === "hide" ? "hide" : "gate";
+  const hidden = visibilityMode === "hide" && !paid;
   return {
     paid,
     paidExpiresAt: paid ? millis(subscription.expiresAt) : 0,
@@ -189,6 +199,7 @@ function accessSnapshot(
     dayKey: today,
     resetAt: nextDayReset(now, timeZone),
     timeZone,
+    hidden,
   };
 }
 

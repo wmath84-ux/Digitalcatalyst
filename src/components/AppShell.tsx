@@ -38,6 +38,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import DesktopShell, { type DesktopRailKey, resolveActiveFromHash } from "./DesktopShell";
 import { useResponsiveCategory } from "../utils/responsive";
+import { FeatureVisibilityProvider } from "../context/FeatureVisibilityContext";
 
 interface AppShellProps {
   children: ReactNode;
@@ -134,25 +135,35 @@ export default function AppShell({
   // - wide tablet >=960 (1.5x mobile)
   const showDesktopShell = category === "desktop" || isTabletLandscapeDesktop;
 
+  // The FeatureVisibilityProvider is mounted in BOTH branches so a feature
+  // page (My Day / Revision) can publish its visibility regardless of
+  // whether the desktop shell owns the chrome. The desktop rail and the
+  // mobile bottom nav both consume it via `useFeatureVisibilityMap`.
   if (showDesktopShell) {
     return (
-      <DesktopShell
-        active={resolvedActive}
-        pageTitle={pageTitle}
-        pageSubtitle={pageSubtitle}
-        topBarRight={topBarRight}
-        onSearch={onSearch}
-        initialSearchQuery={initialSearchQuery}
-        sidePanel={sidePanel}
-      >
-        {children}
-      </DesktopShell>
+      <FeatureVisibilityProvider>
+        <DesktopShell
+          active={resolvedActive}
+          pageTitle={pageTitle}
+          pageSubtitle={pageSubtitle}
+          topBarRight={topBarRight}
+          onSearch={onSearch}
+          initialSearchQuery={initialSearchQuery}
+          sidePanel={sidePanel}
+        >
+          {children}
+        </DesktopShell>
+      </FeatureVisibilityProvider>
     );
   }
   // Mobile + tablet portrait: the per-page chrome is in charge. The wrapper
   // is render-free for the page body, so the existing JSX structure
   // stays exactly as it was.
-  return <>{children}</>;
+  return (
+    <FeatureVisibilityProvider>
+      {children}
+    </FeatureVisibilityProvider>
+  );
 }
 
 export type { DesktopRailKey };

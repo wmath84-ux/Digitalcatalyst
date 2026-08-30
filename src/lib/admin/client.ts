@@ -217,7 +217,7 @@ async function subscriptionPlansRequest(init?: RequestInit) {
       return { id: item.id, name: data.name || "Plan", description: data.description || "", billingCycles: [
         { cycle: "monthly", label: "Monthly", price: money(data.monthlyPrice ?? data.priceMonthly ?? 0) },
         { cycle: "yearly", label: "Yearly", price: money(data.yearlyPrice ?? data.priceYearly ?? 0) },
-      ], revisionTestBankLimits: normalizeRevisionTestBankLimits(data.revisionTestBankLimits, item.id), aiAllowances: normalizePlanAiAllowances(data.aiAllowances), accessTier: data.accessTier || item.id, badge: data.badge || null, cta: data.cta || "Subscribe", featured: Boolean(data.featured), active: data.active !== false };
+      ], revisionTestBankLimits: normalizeRevisionTestBankLimits(data.revisionTestBankLimits, item.id), aiAllowances: normalizePlanAiAllowances(data.aiAllowances), accessTier: data.accessTier || item.id, badge: data.badge || null, cta: data.cta || "Subscribe", featured: Boolean(data.featured), active: data.active !== false, visibleCycles: normaliseVisibleCycles(data.visibleCycles), subscriberPricingOverride: normaliseSubscriberPricing(data.subscriberPricingOverride) };
     }) };
   }
   const body = bodyOf(init); const recordId = String(body.id || id()); const ref = doc(db, "subscriptionPlans", recordId);
@@ -225,7 +225,33 @@ async function subscriptionPlansRequest(init?: RequestInit) {
   const cycles = Array.isArray(body.billingCycles) ? body.billingCycles : [];
   const monthly = cycles.find((cycle: any) => cycle.cycle === "monthly")?.price ?? 0;
   const yearly = cycles.find((cycle: any) => cycle.cycle === "yearly")?.price ?? 0;
-  await setDoc(ref, stripUndefinedDeep({ id: recordId, name: str(body.name, "Plan"), description: str(body.description), monthlyPrice: Number(monthly), yearlyPrice: Number(yearly), allowedCycles: ["monthly", "yearly"], revisionTestBankLimits: normalizeRevisionTestBankLimits(body.revisionTestBankLimits, recordId), aiAllowances: normalizePlanAiAllowances(body.aiAllowances), accessTier: body.accessTier || "basic", badge: body.badge || null, cta: body.cta || "Subscribe", featured: Boolean(body.featured), active: body.active !== false, includedFeatureIds: [], updatedAt: serverTimestamp() }), { merge: true });
+  await setDoc(ref, stripUndefinedDeep({
+    id: recordId,
+    name: str(body.name, "Plan"),
+    description: str(body.description),
+    monthlyPrice: Number(monthly),
+    yearlyPrice: Number(yearly),
+    allowedCycles: ["monthly", "yearly"],
+    revisionTestBankLimits: normalizeRevisionTestBankLimits(body.revisionTestBankLimits, recordId),
+    aiAllowances: normalizePlanAiAllowances(body.aiAllowances),
+    accessTier: body.accessTier || "basic",
+    badge: body.badge || null,
+    cta: body.cta || "Subscribe",
+    featured: Boolean(body.featured),
+    active: body.active !== false,
+    includedFeatureIds: [],
+    // ---- Phase-1 fields (per-plan per-duration matrix + subscriber pricing) ----
+    // visibleCycles = which billing durations are SHOWN to non-subscribers.
+    // Hiding yearly on a "free trial" plan forces a subscriber to a monthly
+    // conversion first, etc. Defaults to both.
+    visibleCycles: normaliseVisibleCycles(body.visibleCycles),
+    // subscriberPricingOverride = the price ONLY existing subscribers see
+    // for this plan (e.g. a renewal-only discount, a free upgrade for
+    // active members, a custom annual lock-in). Independent of the
+    // public plan price.
+    subscriberPricingOverride: normaliseSubscriberPricing(body.subscriberPricingOverride),
+    updatedAt: serverTimestamp(),
+  }), { merge: true });
   return { plan: { ...body, id: recordId } };
 }
 
@@ -233,14 +259,158 @@ async function subscriptionFeaturesRequest(init?: RequestInit) {
   const method = init?.method || "GET";
   if (method === "GET") {
     const snap = await getDocs(collection(db, "subscriptionFeatures"));
-    return { features: snap.docs.map((item) => { const data = item.data() || {}; return { id: item.id, key: data.key || item.id, name: data.name || "Feature", description: data.description || "", individualPrice: String(money(data.price ?? data.individualPrice ?? 0)), monthlyPrice: data.monthlyPrice === undefined || data.monthlyPrice === null ? "" : String(money(data.monthlyPrice)), yearlyPrice: data.yearlyPrice === undefined || data.yearlyPrice === null ? "" : String(money(data.yearlyPrice)), planPricing: data.planPricing && typeof data.planPricing === "object" ? data.planPricing : {}, icon: data.icon || "sparkles", included: data.included === true, badge: data.badge || "", sortOrder: Number(data.sortOrder || 0), freeItemsPerDay: Math.max(0, Math.min(100, Math.round(Number(data.freeItemsPerDay ?? 1) || 0))), active: data.active !== false }; }) };
+    return { features: snap.docs.map((item) => { const data = item.data() || {}; return { id: item.id, key: data.key || item.id, name: data.name || "Feature", description: data.description || "", individualPrice: String(money(data.price ?? data.individualPrice ?? 0)), monthlyPrice: data.monthlyPrice === undefined || data.monthlyPrice === null ? "" : String(money(data.monthlyPrice)), yearlyPrice: data.yearlyPrice === undefined || data.yearlyPrice === null ? "" : String(money(data.yearlyPrice)), planPricing: data.planPricing && typeof data.planPricing === "object" ? data.planPricing : {}, icon: data.icon || "sparkles", included: data.included === true, badge: data.badge || "", sortOrder: Number(data.sortOrder || 0), freeItemsPerDay: Math.max(0, Math.min(100, Math.round(Number(data.freeItemsPerDay ?? 1) || 0))), active: data.active !== false, visibilityMode: data.visibilityMode === "hide" ? "hide" : "gate", visibleCycles: normaliseVisibleCycles(data.visibleCycles), hiddenPlanIds: normaliseStringList(data.hiddenPlanIds), subscriberPricingOverride: normaliseSubscriberPricing(data.subscriberPricingOverride), userLimit: normaliseUserLimit(data.userLimit, recordId(item.id)) }; }) };
   }
   const body = bodyOf(init); const recordId = String(body.id || body.key || id()); const ref = doc(db, "subscriptionFeatures", recordId);
   if (body.delete) { await deleteDoc(ref); return { ok: true }; }
   const optionalRupees = (value: unknown) => (value === "" || value === null || value === undefined ? null : Number(value));
   const defaultIcon = recordId === "my-day" ? "calendar" : recordId === "revision" ? "brain" : "sparkles";
-  await setDoc(ref, stripUndefinedDeep({ id: recordId, key: str(body.key, recordId), name: str(body.name, "Feature"), description: str(body.description), price: Number(body.individualPrice || 0), monthlyPrice: optionalRupees(body.monthlyPrice), yearlyPrice: optionalRupees(body.yearlyPrice), planPricing: body.planPricing && typeof body.planPricing === "object" ? body.planPricing : {}, icon: str(body.icon, defaultIcon), included: body.included === true, badge: str(body.badge), sortOrder: Math.floor(Number(body.sortOrder || 0)), freeItemsPerDay: recordId === "my-day" ? Math.max(0, Math.min(100, Math.round(Number(body.freeItemsPerDay ?? 1) || 0))) : null, active: body.active !== false, updatedAt: serverTimestamp() }), { merge: true });
+  await setDoc(ref, stripUndefinedDeep({
+    id: recordId,
+    key: str(body.key, recordId),
+    name: str(body.name, "Feature"),
+    description: str(body.description),
+    price: Number(body.individualPrice || 0),
+    monthlyPrice: optionalRupees(body.monthlyPrice),
+    yearlyPrice: optionalRupees(body.yearlyPrice),
+    planPricing: body.planPricing && typeof body.planPricing === "object" ? body.planPricing : {},
+    icon: str(body.icon, defaultIcon),
+    included: body.included === true,
+    badge: str(body.badge),
+    sortOrder: Math.floor(Number(body.sortOrder || 0)),
+    freeItemsPerDay: recordId === "my-day" ? Math.max(0, Math.min(100, Math.round(Number(body.freeItemsPerDay ?? 1) || 0))) : null,
+    active: body.active !== false,
+    // ---- New Phase-1 fields (per-feature/per-duration/per-tier matrix) ----
+    // visibilityMode = "gate"  → paywall shown when accessed, feature is
+    //                            visible in the catalog and nav. Legacy.
+    // visibilityMode = "hide"  → feature is fully removed from the catalog
+    //                            and the nav until the user has it unlocked
+    //                            by an active subscription. No paywall
+    //                            overlay, no teaser — just gone.
+    visibilityMode: body.visibilityMode === "hide" ? "hide" : "gate",
+    // visibleCycles = the subset of billing cycles a non-subscriber is
+    // allowed to choose. Hiding every cycle forces admin to add the
+    // feature via a plan override (i.e. a feature only available on
+    // a specific plan, never as a public add-on).
+    visibleCycles: normaliseVisibleCycles(body.visibleCycles),
+    // hiddenPlanIds = plans from which this feature is completely removed
+    // (no "Free on this plan" toggle either). Empty = available on every
+    // active plan.
+    hiddenPlanIds: normaliseStringList(body.hiddenPlanIds),
+    // subscriberPricingOverride = the price ONLY existing subscribers see
+    // (e.g. a ₹0 free year for active members). It is independent of the
+    // per-plan `planPricing` map and is applied as an absolute override
+    // on the subscription / upgrade overlay.
+    subscriberPricingOverride: normaliseSubscriberPricing(body.subscriberPricingOverride),
+    // userLimit = the cap a subscriber can consume this billing cycle.
+    // Currently just the AI questions/day counter; future fields join
+    // the same shape (storage, active sessions, etc.).
+    userLimit: normaliseUserLimit(body.userLimit, recordId),
+    updatedAt: serverTimestamp(),
+  }), { merge: true });
   return { feature: { ...body, id: recordId } };
+}
+
+// ---- helpers for the new Phase-1 fields ---------------------------------
+// Every helper is null/empty-safe so a partially-filled admin form never
+// crashes the Firestore write and the existing "feature pricing"
+// tests (which call the same payload shape) keep working unchanged.
+
+/** Allowed billing cycles a non-subscriber can pick. Defaults to both. */
+function normaliseVisibleCycles(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return ["monthly", "yearly"];
+  const cleaned = raw
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter((value) => value === "monthly" || value === "yearly" || value === "lifetime");
+  // Deduplicate while preserving the input order.
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of cleaned) {
+    if (seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
+  }
+  return out.length ? out : ["monthly", "yearly"];
+}
+
+function normaliseStringList(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of raw) {
+    const trimmed = String(value || "").trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+/**
+ * Subscriber-only override map. Each value is a number (rupees, may be 0
+ * for a free renewal/upgrade). The same per-cycle shape as the public
+ * `monthlyPrice` / `yearlyPrice` fields.
+ *
+ *   {
+ *     monthly: 0,   // free monthly upgrade for existing subscribers
+ *     yearly: 999,  // discounted yearly rate
+ *     lifetime: 0
+ *   }
+ *
+ * Empty / invalid input collapses to an empty override, which means
+ * "use the regular price for everyone".
+ */
+function normaliseSubscriberPricing(raw: unknown): { monthly: number | null; yearly: number | null; lifetime: number | null } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { monthly: null, yearly: null, lifetime: null };
+  }
+  const pick = (value: unknown) => {
+    if (value === "" || value === null || value === undefined) return null;
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < 0) return null;
+    return Math.round(number);
+  };
+  return {
+    monthly: pick((raw as any).monthly),
+    yearly: pick((raw as any).yearly),
+    lifetime: pick((raw as any).lifetime),
+  };
+}
+
+/**
+ * Per-feature user limit. Only `aiQuestionsPerDay` is in scope today;
+ * future fields (storage MB, bulk imports per day, etc.) join the same
+ * shape. Use -1 for unlimited, 0 for no allowance.
+ *
+ * The hook on the client maps this back into a per-cycle counter the
+ * `useMyDayAccess` / `useRevisionAccess` snapshots already carry
+ * (see `freeLimit` / `freeUsed`), so nothing else on the client has to
+ * change to read the value.
+ */
+function normaliseUserLimit(raw: unknown, recordId: string): { aiQuestionsPerDay: number | null } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { aiQuestionsPerDay: defaultUserLimitForFeature(recordId) };
+  }
+  const rawAi = (raw as any).aiQuestionsPerDay;
+  if (rawAi === null || rawAi === undefined || rawAi === "") {
+    return { aiQuestionsPerDay: defaultUserLimitForFeature(recordId) };
+  }
+  const number = Number(rawAi);
+  if (!Number.isFinite(number)) return { aiQuestionsPerDay: defaultUserLimitForFeature(recordId) };
+  return { aiQuestionsPerDay: Math.max(-1, Math.min(10000, Math.round(number))) };
+}
+
+/** Built-in sensible defaults for the few features that exist today. */
+function defaultUserLimitForFeature(recordId: string): number | null {
+  if (recordId === "revision") return 50;
+  return null;
+}
+
+// `recordId(item.id)` is used as a default for `userLimit` so the hook
+// always gets a typed shape; the helper is duplicated locally because
+// the closure inside the map function can't see the top-level helpers.
+function recordId(value: string) {
+  return String(value || "");
 }
 
 async function subscriptionPlanProductsRequest(init?: RequestInit) {
@@ -264,6 +434,7 @@ async function subscriptionPlanProductsRequest(init?: RequestInit) {
       const hasOverride = Boolean(data && data.id);
       pricing.delete(productId);
       pricing.delete(item.id);
+      const productIdKey = String(productId);
       return {
         id: data.id || productId,
         productId,
@@ -277,6 +448,13 @@ async function subscriptionPlanProductsRequest(init?: RequestInit) {
         active: data.active !== false && product.isVisible !== false && product.inStock !== false,
         sortOrder: Number(data.sortOrder || 0),
         hasOverride,
+        // Phase-1 fields, mirrored from subscriptionFeatures so a single
+        // admin form can manage courses exactly the same way it manages
+        // My Day / Revision.
+        visibilityMode: data.visibilityMode === "hide" ? "hide" : "gate",
+        visibleCycles: normaliseVisibleCycles(data.visibleCycles),
+        hiddenPlanIds: normaliseStringList(data.hiddenPlanIds),
+        subscriberPricingOverride: normaliseSubscriberPricing(data.subscriberPricingOverride),
       };
     });
     // Keep legacy overrides whose product document is temporarily unavailable,
@@ -295,6 +473,10 @@ async function subscriptionPlanProductsRequest(init?: RequestInit) {
         active: data.active !== false,
         sortOrder: Number(data.sortOrder || 0),
         hasOverride: true,
+        visibilityMode: data.visibilityMode === "hide" ? "hide" : "gate",
+        visibleCycles: normaliseVisibleCycles(data.visibleCycles),
+        hiddenPlanIds: normaliseStringList(data.hiddenPlanIds),
+        subscriberPricingOverride: normaliseSubscriberPricing(data.subscriberPricingOverride),
       });
     }
     return { products: rows };
@@ -316,6 +498,11 @@ async function subscriptionPlanProductsRequest(init?: RequestInit) {
     included: body.included === true,
     active: body.active !== false,
     sortOrder: Math.floor(Number(body.sortOrder || 0)),
+    // ---- Phase-1 fields (per-product per-duration/per-tier matrix) ----
+    visibilityMode: body.visibilityMode === "hide" ? "hide" : "gate",
+    visibleCycles: normaliseVisibleCycles(body.visibleCycles),
+    hiddenPlanIds: normaliseStringList(body.hiddenPlanIds),
+    subscriberPricingOverride: normaliseSubscriberPricing(body.subscriberPricingOverride),
     updatedAt: serverTimestamp(),
   }), { merge: true });
   return { product: { ...body, id: recordId } };
