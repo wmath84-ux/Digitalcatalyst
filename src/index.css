@@ -2562,6 +2562,340 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     0 0 0 2px var(--mm-bg),
     0 0 8px rgb(124 58 237 / 0.3);
 }
+
+/* ── Mind map toolbar — one icon per control, sized per screen ───────────
+   Every control in the status strip is a single icon tile (no words), so the
+   whole bar reads the same on a 320px phone and on a desktop split view.
+   The tile size is a custom property that steps up with the viewport
+   (phone → tablet → desktop) and drops to the compact tile when the sheet
+   itself is narrow — a landscape split panel can be narrower than the
+   screen it sits on, so the strip measures ITSELF rather than guessing
+   from media queries alone.
+
+   The strip deliberately does NOT scroll sideways any more. It used to be
+   `overflow-x-auto`, and a scrollable bar is what made the toolbar look
+   "khisak gaya" (shifted left): any focused tile is scrolled into view by
+   the browser when the layout changes — the soft keyboard opening for a
+   node rename, an orientation flip, the sheet reopening — and the browser
+   never hands that scroll position back. With the strip clipped instead of
+   scrolled there is no scroll offset to lose, and the map-name pill shrinks
+   (then collapses to its icon) so the tiles always fit. */
+[data-course-mindmap-status] {
+  --mm-tool-size: 30px;
+  --mm-tool-gap: 4px;
+  --mm-tool-radius: 10px;
+  scroll-behavior: auto;
+}
+
+@media (min-width: 640px) {
+  [data-course-mindmap-status] {
+    --mm-tool-size: 34px;
+    --mm-tool-gap: 6px;
+    --mm-tool-radius: 12px;
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-course-mindmap-status] {
+    --mm-tool-size: 38px;
+    --mm-tool-gap: 8px;
+    --mm-tool-radius: 14px;
+  }
+}
+
+/* Measured-narrow (split panel / small phone): tighter tiles, no map name. */
+[data-course-mindmap-status][data-compact="true"] {
+  --mm-tool-size: 28px;
+  --mm-tool-gap: 3px;
+}
+[data-course-mindmap-status][data-compact="true"] [data-mm-map-name] {
+  display: none;
+}
+/* …and the pill tightens up so even a 320px phone keeps the count badge. */
+[data-course-mindmap-status][data-compact="true"] .mm-pill {
+  gap: 0.2rem;
+  padding-left: 0.3rem;
+  padding-right: 0.3rem;
+}
+
+/* One icon tile. `svg { width: 58% }` keeps the glyph proportional to
+   the tile, so the same markup looks right at 28px and at 38px. */
+.mm-tool {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--mm-tool-size);
+  height: var(--mm-tool-size);
+  border-radius: var(--mm-tool-radius);
+  background: var(--mm-soft);
+  color: var(--mm-text);
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 120ms ease;
+}
+.mm-tool:hover {
+  background: var(--mm-soft-hover);
+}
+.mm-tool:active {
+  transform: scale(0.92);
+}
+.mm-tool:disabled {
+  cursor: not-allowed;
+  opacity: 0.32;
+}
+.mm-tool > svg {
+  width: 58%;
+  height: 58%;
+  stroke-width: 2.6;
+}
+.mm-tool-violet,
+.mm-tool[data-mm-active="true"] {
+  background: rgb(139 92 246 / 0.28);
+  color: #ede9fe;
+  box-shadow: inset 0 0 0 1px rgb(167 139 250 / 0.55);
+}
+.mm-tool-emerald {
+  background: rgb(16 185 129 / 0.24);
+  color: #d1fae5;
+  box-shadow: inset 0 0 0 1px rgb(52 211 153 / 0.5);
+}
+.mm-tool-danger:hover:not(:disabled) {
+  color: #fb7185;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool-violet,
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-mm-active="true"] {
+  color: #5b21b6;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool-emerald {
+  color: #065f46;
+}
+
+/* The cloud-save tile is tinted by the save state — the text label it
+   replaced is now a tooltip + menu, so the colour is the status. A quiet
+   state (nothing to report) stays in the muted tone; the ones the learner
+   should notice get their own colour AND the blinking beacon. */
+.mm-tool[data-save-status="idle"],
+.mm-tool[data-save-status="loading"],
+.mm-tool[data-save-status="ready"] {
+  color: var(--mm-muted);
+}
+.mm-tool[data-save-status="saving"] {
+  color: #fcd34d;
+}
+.mm-tool[data-save-status="saved"] {
+  color: #6ee7b7;
+}
+.mm-tool[data-save-status="error"] {
+  color: #fda4af;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="saving"] {
+  color: #b45309;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="saved"] {
+  color: #047857;
+}
+.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="error"] {
+  color: #be123c;
+}
+
+/* ── The blinking save beacon ───────────────────────────────────────────
+   Sits on the TOP-RIGHT corner of the cloud tile and inherits that tile's
+   status colour through `currentColor`, so an amber "saving…" beacon and a
+   red "retry" beacon need no extra classes. It only exists while there is a
+   message to read (see `data-blink` in the panel). */
+.mm-blink {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 2px var(--mm-bg);
+  pointer-events: none;
+  animation: mm-blink 1.05s ease-in-out infinite;
+}
+.mm-blink::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: mm-halo 1.05s ease-out infinite;
+}
+@keyframes mm-blink {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.68);
+  }
+}
+@keyframes mm-halo {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.6);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mm-blink,
+  .mm-blink::after {
+    animation-duration: 2s;
+  }
+}
+
+/* ── The map-name pill (the only non-square control) ────────────────────
+   It is the one element allowed to shrink: it carries `min-width: 0`
+   and truncates, so a long map name can never push a tool off the bar. */
+.mm-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  max-width: 100%;
+  height: var(--mm-tool-size);
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
+  border-radius: var(--mm-tool-radius);
+  background: var(--mm-soft);
+  color: var(--mm-text);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+.mm-pill:hover {
+  background: var(--mm-soft-hover);
+}
+.mm-pill > svg {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.6;
+}
+.mm-pill-count {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--mm-soft-hover);
+  padding: 0 0.3rem;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+/* ── Toolbar drop-downs (portalled to the body) ─────────────────────────
+   Rendered with `position: fixed` because the strip clips its own overflow:
+   a menu anchored inside it would be cut in half. The panel measures the
+   trigger and hands the rect down, and the menu carries its own theme
+   attribute because it lives outside `.course-mindmap-shell` and so cannot
+   inherit the `--mm-*` variables. */
+.mm-menu {
+  z-index: 70;
+  min-width: 12.5rem;
+  max-width: min(17rem, calc(100vw - 16px));
+  max-height: min(60vh, 26rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.4rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 18px;
+  background: #14141f;
+  color: #e2e8f0;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.55);
+  /* Opens upward out of its trigger, so the growth starts at the bar. */
+  transform-origin: bottom right;
+  animation: mm-menu-in 0.16s ease both;
+}
+.mm-menu[data-menu-theme="light"] {
+  border-color: rgb(15 23 42 / 0.14);
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 24px 60px rgb(15 23 42 / 0.22);
+}
+@keyframes mm-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.mm-menu-head {
+  padding: 0.3rem 0.45rem 0.2rem;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+.mm-menu-note {
+  padding: 0 0.45rem 0.35rem;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.5;
+  opacity: 0.75;
+}
+.mm-menu-sep {
+  height: 1px;
+  margin: 0.3rem 0.2rem;
+  background: currentColor;
+  opacity: 0.12;
+}
+.mm-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: left;
+  color: inherit;
+  transition: background-color 120ms ease;
+}
+.mm-menu-item:hover {
+  background: rgb(255 255 255 / 0.08);
+}
+.mm-menu[data-menu-theme="light"] .mm-menu-item:hover {
+  background: rgb(15 23 42 / 0.07);
+}
+.mm-menu-item[aria-checked="true"] {
+  background: rgb(139 92 246 / 0.3);
+}
+.mm-menu-item > svg {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.6;
+}
+.mm-menu-item > svg.mm-menu-check {
+  width: 14px;
+  height: 14px;
+  stroke-width: 3.2;
+}
+.mm-menu-item > span {
+  min-width: 0;
+  flex: 1 1 auto;
+}
 /* ==================== End Mind Map Styles ==================== */
 
 /* Stability + tablet pass: keep revision's nested content scrollable. */
