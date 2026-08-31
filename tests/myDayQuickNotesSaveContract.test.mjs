@@ -34,15 +34,17 @@ test("the note card itself never opens the editor — only the pencil does", () 
 });
 
 test("the tick (Save) renders only in the expanded edit state", () => {
-  // Exactly one Save button and one Check icon in the whole component —
-  // both live inside the `isEditing` branch.
-  const saveButtons = quickNotes.match(/aria-label="Save note"/g) ?? [];
-  assert.equal(saveButtons.length, 1, "the Save button must exist exactly once (edit state only)");
+  // The checkbox-style Save lives in the shared BigNoteEditor; its label is
+  // passed down as `saveAriaLabel` and ONLY the edit view passes
+  // "Save note". Exactly one Save label and one Check icon must exist.
+  const saveLabels = quickNotes.match(/saveAriaLabel="Save note"/g) ?? [];
+  assert.equal(saveLabels.length, 1, "the Save label must be passed exactly once (edit state only)");
+  assert.match(quickNotes, /aria-label=\{saveAriaLabel\}/);
   const checkIcons = quickNotes.match(/<Check /g) ?? [];
   assert.equal(checkIcons.length, 1, "the check icon must exist exactly once (edit state only)");
   // The collapsed view only shows pencil + delete actions.
   const collapsed = quickNotes.slice(quickNotes.indexOf("aria-label=\"Edit note\""));
-  assert.doesNotMatch(collapsed, /aria-label="Save note"/);
+  assert.doesNotMatch(collapsed, /saveAriaLabel="Save note"/);
 });
 
 test("Save persists through onEdit and minimizes the note back to its compact state", () => {
@@ -66,9 +68,11 @@ test("My Day persists edited notes to the backend", () => {
 });
 
 test("the edit box gives ample room and scrolls internally", () => {
-  // The expanded textarea keeps a generous height budget and scrolls its
+  // The expanded textarea keeps a generous, CONSISTENT height budget — a
+  // 200px floor that grows with the content up to 55dvh — and scrolls its
   // own content when the pasted text exceeds it.
-  assert.match(quickNotes, /rows=\{4\}/);
-  assert.match(quickNotes, /max-h-\[45vh\]/);
+  assert.match(quickNotes, /rows=\{6\}/);
+  assert.match(quickNotes, /min-h-\[200px\]/);
+  assert.match(quickNotes, /max-h-\[55dvh\]/);
   assert.match(quickNotes, /overflow-y-auto/);
 });

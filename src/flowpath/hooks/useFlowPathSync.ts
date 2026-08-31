@@ -14,6 +14,13 @@
 // state is written to Firestore with a small debounce so a flurry
 // of edits becomes one network call.
 //
+// The sync is DIFF-based: a fingerprint snapshot of the last
+// synced state decides which items are new (create), changed
+// (update) or removed (delete). Sending the whole list on every
+// change used to re-fire immediate push notifications and re-write
+// every doc on each keystroke — and every call forced an id-token
+// refresh. Only real changes leave the client now.
+//
 // If the network is down, the mutations queue in localStorage
 // (`flowpath:pending-sync.v1`) and are replayed on the next
 // successful edit. The dashboard never blocks on the network.
@@ -84,8 +91,13 @@ const toFlowPathActivity = (activity: Activity, uid: string): Partial<FlowPathAc
   } else if (activity.type === "reminder") {
     if ((activity as { time?: string }).time) base.reminderTime = (activity as { time?: string }).time;
   } else if (activity.type === "schedule") {
-    if ((activity as { startTime?: string }).startTime) base.scheduleStartTime = (activity as { startTime?: string }).startTime;
-    if ((activity as { endTime?: string }).endTime) base.scheduleEndTime = (activity as { endTime?: string }).endTime;
+    // Local schedules store human labels (startLabel/endLabel) from the
+    // CreateModal; merged Firestore ones carry startTime/endTime.
+    // Mirror whichever flavour is present.
+    const start = (activity as { startTime?: string }).startTime ?? (activity as { startLabel?: string }).startLabel;
+    const end = (activity as { endTime?: string }).endTime ?? (activity as { endLabel?: string }).endLabel;
+    if (start) base.scheduleStartTime = start;
+    if (end) base.scheduleEndTime = end;
     base.scheduleType = ((activity as unknown as { type?: "class" | "study" | "break" | "personal" | "exam" }).type) || "personal";
   } else if (activity.type === "note") {
     base.noteColor = (activity as { color?: "amber" | "sky" | "rose" | "emerald" | "violet" }).color || "amber";
@@ -101,6 +113,16 @@ const toFlowPathActivity = (activity: Activity, uid: string): Partial<FlowPathAc
   return base;
 };
 
+/**
+ * Stable fingerprint of everything that matters for the server mirror.
+ * `order` is excluded on purpose: re-indexing after a delete is a
+ * layout-only change and must not produce a server update.
+ */
+const fingerprintOf = (activity: Activity): string => {
+  const { order: _order, timeLabel: _timeLabel, ...rest } = activity;
+  return JSON.stringify(rest);
+};
+
 /** Hook that watches the local FlowPath state and mirrors every
  *  mutation to the server multiplexer. Called once from the
  *  FlowPath page (or from the existing useFlowPath if you prefer
@@ -109,6 +131,8 @@ export function useFlowPathSync(items: Array<{ activity: Activity }>) {
   const { user } = useAuth();
   const debounceRef = useRef<number | null>(null);
   const replayedRef = useRef<boolean>(false);
+  // id -> fingerprint of the last state mirrored to the server.
+  const lastSyncRef = useRef<Map<string, string> | null>(null);
 
   // Replay any queued mutations from a previous offline session on
   // first mount. We don't await — each one is a single network call
@@ -122,27 +146,44 @@ export function useFlowPathSync(items: Array<{ activity: Activity }>) {
     void replayQueue(pending, user.id);
   }, [user?.id]);
 
-  // Watch the items array for changes. On any change, build a diff
-  // (new + changed + missing) and queue mutations. The debounce
+  // Watch the items array for changes. On any change, diff against
+  // the last synced snapshot and queue only what actually moved:
+  // new -> create, changed -> update, missing -> delete. The debounce
   // collapses a flurry of edits into one batch.
   useEffect(() => {
     if (!user?.id) return;
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(() => {
       const uid = user.id;
+      const prior = lastSyncRef.current;
       const seen = new Set<string>();
       const pending: Pending[] = [];
       for (const { activity } of items) {
         if (!activity) continue;
         seen.add(activity.id);
-        pending.push({
-          type: "create",
-          activityId: activity.id,
-          payload: toFlowPathActivity(activity, uid),
-          snapshot: activity,
-          attempts: 0,
-          ts: Date.now(),
-        });
+        const fingerprint = fingerprintOf(activity);
+        const known = prior?.get(activity.id);
+        if (known === undefined) {
+          // Brand new locally (or the first sync of pre-existing
+          // local data — the initial seed upload).
+          pending.push({
+            type: "create",
+            activityId: activity.id,
+            payload: toFlowPathActivity(activity, uid),
+            snapshot: activity,
+            attempts: 0,
+            ts: Date.now(),
+          });
+        } else if (known !== fingerprint) {
+          pending.push({
+            type: "update",
+            activityId: activity.id,
+            payload: toFlowPathActivity(activity, uid),
+            snapshot: activity,
+            attempts: 0,
+            ts: Date.now(),
+          });
+        }
       }
       // Queue deletes for any prior local activity not in the current
       // list. We track prior ids in localStorage so a single browser
@@ -154,6 +195,12 @@ export function useFlowPathSync(items: Array<{ activity: Activity }>) {
         }
       }
       writePriorIds(Array.from(seen));
+      // Remember this state as the new baseline. Items whose calls
+      // fail are retried via the persistent pending queue on the next
+      // session; the next local edit will re-diff them anyway.
+      lastSyncRef.current = new Map(
+        items.filter((i) => i && i.activity).map((i) => [i.activity.id, fingerprintOf(i.activity)]),
+      );
       if (pending.length > 0) void replayQueue(pending, uid);
     }, 350);
     return () => {
@@ -215,13 +262,25 @@ async function runOne(item: Pending, uid: string): Promise<boolean> {
       return res.ok;
     }
     if (item.type === "update") {
-      const res = await flowpathControl<unknown>({
+      const res = await flowpathControl<{ activity: FlowPathActivity; status?: number }>({
         action: "flowpath.update",
         uid,
         id: item.activityId,
         ...(item.payload || {}),
       });
-      return res.ok;
+      if (res.ok) return true;
+      // The server doc may not exist yet (e.g. the original create
+      // never landed). Fall back to a create so the edit still
+      // reaches the server instead of failing forever.
+      if ((res as { status?: number }).status === 404 && item.payload) {
+        const created = await flowpathControl<unknown>({
+          action: "flowpath.create",
+          uid,
+          activity: item.payload,
+        });
+        return created.ok;
+      }
+      return false;
     }
     if (item.type === "complete") {
       const res = await flowpathControl<unknown>({

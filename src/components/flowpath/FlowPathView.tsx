@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Trash2, BookOpen } from "lucide-react";
-import type { Activity, ActivityType } from "../../flowpath/types/flowpath";
+import type {
+  Activity,
+  ActivityType,
+  ActivityWithStatus,
+  FlowPathActivity,
+} from "../../flowpath/types/flowpath";
 import { ACTIVITY_TYPE_META } from "../../flowpath/types/flowpath";
+import { buildTimeLabel, deriveStatus } from "../../flowpath/lib/activityService";
 import { useFlowPath } from "../../flowpath/hooks/useFlowPath";
 import { useFlowPathFirestore } from "../../flowpath/hooks/useFlowPathFirestore";
 import { useFlowPathSync } from "../../flowpath/hooks/useFlowPathSync";
@@ -17,6 +23,78 @@ import { auth } from "../../../firebase";
 const lecturePickerUid = (): string => {
   try { return auth?.currentUser?.uid || ""; } catch { return ""; }
 };
+
+/**
+ * The kinds the LOCAL ActivityType union models. Anything else the
+ * server can store (e.g. "lecture") is normalised to "other" for the
+ * local type system while the original kind rides along in
+ * `activity.flowKind` so cards/nodes still show the right label,
+ * colour and icon. This is what prevents a merged server doc of an
+ * unmodelled kind from crashing the whole FlowPath page.
+ */
+const LOCAL_ACTIVITY_TYPES: ReadonlySet<string> = new Set(Object.keys(ACTIVITY_TYPE_META));
+
+/** Convert a server millis value (or a stray Timestamp-like object) to
+ *  a valid ISO string. Never throws — invalid input falls back to now. */
+function safeIsoFromMillis(value: unknown): string {
+  let ms = NaN;
+  if (typeof value === "number") ms = value;
+  else if (value && typeof value === "object" && "toMillis" in value && typeof (value as { toMillis?: unknown }).toMillis === "function") {
+    ms = (value as { toMillis: () => number }).toMillis();
+  } else {
+    ms = Number(value);
+  }
+  const date = new Date(Number.isFinite(ms) ? ms : NaN);
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+}
+
+/** Map a server FlowPathActivity onto the local Activity shape used by
+ *  the 3D flow. Every field is defaulted defensively so a corrupt or
+ *  partial doc can never produce an undefined lookup in the cards /
+ *  nodes (the former white-screen crash). */
+function toLocalActivity(fp: FlowPathActivity, order: number, currentId: string | null): ActivityWithStatus {
+  const datetime = fp.scheduledFor != null
+    ? safeIsoFromMillis(fp.scheduledFor)
+    : safeIsoFromMillis(fp.createdAt);
+  const localType: ActivityType = LOCAL_ACTIVITY_TYPES.has(fp.kind)
+    ? (fp.kind as ActivityType)
+    : "other";
+  const activity = {
+    id: fp.id,
+    type: localType,
+    flowKind: fp.kind,
+    title: fp.title,
+    description: fp.description,
+    datetime,
+    timeLabel: buildTimeLabel(new Date(datetime)),
+    createdAt: typeof fp.createdAt === "number" && Number.isFinite(fp.createdAt) ? fp.createdAt : Date.now(),
+    order,
+    ...(fp.completedAt ? { completedAt: fp.completedAt } : {}),
+    ...(fp.taskPriority ? { priority: fp.taskPriority } : {}),
+    ...(fp.taskStatus ? { status: fp.taskStatus } : {}),
+    ...(fp.taskSubject ? { subject: fp.taskSubject } : {}),
+    ...(fp.reminderTime ? { time: fp.reminderTime } : {}),
+    ...(fp.scheduleStartTime ? { startTime: fp.scheduleStartTime, startLabel: fp.scheduleStartTime } : {}),
+    ...(fp.scheduleEndTime ? { endTime: fp.scheduleEndTime, endLabel: fp.scheduleEndTime } : {}),
+    ...(fp.noteColor ? { color: fp.noteColor } : {}),
+    ...(fp.testConfig ? {
+      totalQuestions: typeof fp.testConfig.totalQuestions === "number" ? fp.testConfig.totalQuestions : 0,
+      difficulty: fp.testConfig.difficulty,
+      questionMode: fp.testConfig.questionMode,
+      estimatedMinutes: fp.testConfig.estimatedMinutes,
+    } : {}),
+    ...(fp.testId !== undefined ? { testId: fp.testId } : {}),
+    ...(fp.progress !== undefined ? { progress: fp.progress } : {}),
+    ...(fp.lectureModuleTitle !== undefined && fp.lectureModuleTitle !== null ? { lectureModuleTitle: fp.lectureModuleTitle } : {}),
+    ...(fp.lectureProductTitle ? { lectureProductTitle: fp.lectureProductTitle } : {}),
+    ...(fp.lectureEstimatedMinutes ? { lectureEstimatedMinutes: fp.lectureEstimatedMinutes } : {}),
+    ...(fp.lecturePreviewOnly ? { lecturePreviewOnly: fp.lecturePreviewOnly } : {}),
+  } as Activity;
+  // Re-derive the display status from the merged datetime so overdue /
+  // upcoming / completed all render correctly (the server's status enum
+  // is wider than the local one).
+  return { activity, status: deriveStatus(activity, currentId) };
+}
 import {
   buildRows,
   buildSmoothPath,
@@ -161,48 +239,19 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
   useFlowPathSync(items);
   // Merge Firestore activities (admin-created, server-created, or
   // cross-device edits) into the local items so the 3D flow shows
-  // the full picture. Map the FlowPathActivity shape to the
-  // local Activity shape so the rest of the component is unchanged.
+  // the full picture. The mapping goes through toLocalActivity(),
+  // which normalises unmodelled kinds (e.g. "lecture") instead of
+  // letting them crash the card/node meta lookups — the old
+  // white-screen bug.
   const mergedItems = useMemo(() => {
     const seen = new Set(items.map((i) => i.activity.id));
     const merged = [...items];
     for (const fp of firestoreItems) {
-      if (seen.has(fp.id)) continue;
-      // Convert FlowPathActivity to local Activity. The minimum
-      // required fields are id, type, title, datetime, createdAt,
-      // order. Extra fields are stored on the union type.
-      const datetime = fp.scheduledFor ? new Date(fp.scheduledFor).toISOString() : new Date(fp.createdAt || Date.now()).toISOString();
-      const localActivity: Activity = {
-        id: fp.id,
-        type: fp.kind,
-        title: fp.title,
-        description: fp.description,
-        datetime,
-        timeLabel: "",
-        createdAt: fp.createdAt || Date.now(),
-        order: merged.length + 1,
-        ...(fp.taskPriority ? { priority: fp.taskPriority } : {}),
-        ...(fp.taskStatus ? { status: fp.taskStatus } : {}),
-        ...(fp.taskSubject ? { subject: fp.taskSubject } : {}),
-        ...(fp.reminderTime ? { time: fp.reminderTime } : {}),
-        ...(fp.scheduleStartTime ? { startTime: fp.scheduleStartTime } : {}),
-        ...(fp.scheduleEndTime ? { endTime: fp.scheduleEndTime } : {}),
-        ...(fp.scheduleType ? { type: fp.scheduleType } : {}),
-        ...(fp.noteColor ? { color: fp.noteColor } : {}),
-        ...(fp.testConfig ? {
-          totalQuestions: fp.testConfig.totalQuestions,
-          difficulty: fp.testConfig.difficulty,
-          questionMode: fp.testConfig.questionMode,
-          estimatedMinutes: fp.testConfig.estimatedMinutes,
-        } : {}),
-        ...(fp.testId ? { testId: fp.testId } : {}),
-        ...(fp.completedAt ? { completedAt: fp.completedAt } : {}),
-        ...(fp.progress !== undefined ? { progress: fp.progress } : {}),
-      } as unknown as Activity;
-      merged.push({ activity: localActivity, status: fp.status === "completed" ? "completed" : "current" });
+      if (!fp || seen.has(fp.id)) continue;
+      merged.push(toLocalActivity(fp, merged.length + 1, currentId));
     }
     return merged;
-  }, [items, firestoreItems]);
+  }, [items, firestoreItems, currentId]);
   const { mode: themeMode, resolved: resolvedTheme, toggle: toggleTheme } = useTheme();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -712,7 +761,12 @@ function ActivityRowItem({
         style={{ position: "absolute", left: row.x, top: "50%", transform: "translate(-50%, -50%)", zIndex: 2 }}
       >
         <div className={`relative ${highlighted ? "fp-pulse rounded-full" : ""}`}>
-          <ActivityNode type={activity.type} status={status} onClick={onNodeClick} />
+          <ActivityNode
+            type={activity.type}
+            flowKind={activity.flowKind}
+            status={status}
+            onClick={onNodeClick}
+          />
           {armed && (
             <motion.button
               type="button"

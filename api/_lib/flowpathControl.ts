@@ -791,6 +791,20 @@ export async function handleFlowPathControl(req: VercelRequest, res: VercelRespo
         status: (text(body.status, 30) as FlowPathActivityStatus) || existing.status,
         scheduledFor: body.scheduledFor === null ? null : (body.scheduledFor === undefined ? existing.scheduledFor : millis(body.scheduledFor)),
         completedAt: body.completedAt ? millis(body.completedAt) : existing.completedAt,
+        // Per-kind fields: the client's diff-sync sends the full
+        // activity shape on update, so merge the kind-specific values
+        // (priority, times, progress, test config) instead of dropping
+        // them — a priority change must survive the round trip.
+        taskPriority: body.taskPriority !== undefined ? (text(body.taskPriority, 10) as "low" | "medium" | "high") : existing.taskPriority,
+        taskSubject: body.taskSubject !== undefined ? text(body.taskSubject, 120) : existing.taskSubject,
+        taskStatus: body.taskStatus !== undefined ? (text(body.taskStatus, 20) as "pending" | "in-progress" | "completed") : existing.taskStatus,
+        scheduleStartTime: body.scheduleStartTime !== undefined ? text(body.scheduleStartTime, 5) : existing.scheduleStartTime,
+        scheduleEndTime: body.scheduleEndTime !== undefined ? text(body.scheduleEndTime, 5) : existing.scheduleEndTime,
+        scheduleType: body.scheduleType !== undefined ? (text(body.scheduleType, 20) as "class" | "study" | "break" | "personal" | "exam") : existing.scheduleType,
+        noteColor: body.noteColor !== undefined ? (text(body.noteColor, 20) as FlowPathActivity["noteColor"]) : existing.noteColor,
+        reminderTime: body.reminderTime !== undefined ? text(body.reminderTime, 5) : existing.reminderTime,
+        progress: body.progress !== undefined ? number(body.progress) : existing.progress,
+        testConfig: body.testConfig !== undefined ? asRecord(body.testConfig) as FlowPathActivity["testConfig"] : existing.testConfig,
         updatedAt: Date.now(),
       };
       await ref.set(updated, { merge: true });

@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
 import { Check, Circle, Clock3 } from "lucide-react";
 import type { Activity, ActivityStatus } from "../../flowpath/types/flowpath";
-import { ACTIVITY_TYPE_META } from "../../flowpath/types/flowpath";
-import { ACTIVITY_ICONS } from "./icons";
+import { flowPathKindMeta } from "../../flowpath/types/flowpath";
+import { getFlowKindIcon } from "./icons";
 
 interface ActivityCardProps {
   activity: Activity;
@@ -37,34 +37,44 @@ function CardBody({ activity }: { activity: Activity }) {
                   : "bg-emerald-500/20 fp-text-emerald"
             }`}
           >
-            {activity.priority} priority
+            {activity.priority ?? "medium"} priority
           </span>
         </div>
       );
-    case "schedule":
-      return (
+    case "schedule": {
+      // Local schedules carry startLabel/endLabel; Firestore-merged ones
+      // carry scheduleStartTime/scheduleEndTime. Show whichever exists so
+      // the row never renders "undefined — undefined".
+      const start = activity.startLabel ?? (activity as { startTime?: string }).startTime;
+      const end = activity.endLabel ?? (activity as { endTime?: string }).endTime;
+      return start || end ? (
         <p className="mt-1 text-[12px] text-fp-text-55">
-          {activity.startLabel} — {activity.endLabel}
+          {start ?? "—"} — {end ?? "—"}
+        </p>
+      ) : null;
+    }
+    case "note":
+      return (
+        <p className="mt-1 line-clamp-2 text-[12px] text-fp-text-50">
+          {activity.preview || activity.description}
         </p>
       );
-    case "note":
-      return <p className="mt-1 line-clamp-2 text-[12px] text-fp-text-50">{activity.preview}</p>;
     case "revision":
       return (
         <div className="mt-2">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-fp-text-10">
             <div
               className="h-full rounded-full bg-gradient-to-r from-blue-400 to-cyan-300"
-              style={{ width: `${activity.progress}%` }}
+              style={{ width: `${activity.progress ?? 0}%` }}
             />
           </div>
-          <p className="mt-1 text-[11px] text-fp-text-45">Progress {activity.progress}%</p>
+          <p className="mt-1 text-[11px] text-fp-text-45">Progress {activity.progress ?? 0}%</p>
         </div>
       );
     case "mcq":
       return (
         <p className="mt-1 text-[12px] text-fp-text-50">
-          {activity.totalQuestions} Questions · {activity.completedQuestions} Completed
+          {activity.totalQuestions ?? 0} Questions · {activity.completedQuestions ?? 0} Completed
         </p>
       );
     case "reminder":
@@ -74,15 +84,37 @@ function CardBody({ activity }: { activity: Activity }) {
         </p>
       );
     default:
+      // Firestore-merged "lecture" items are normalised to type "other"
+      // (see FlowPathView merge) but keep their flowKind; show the real
+      // lecture summary instead of a bare description.
+      if (activity.flowKind === "lecture") {
+        const moduleTitle = activity.lectureModuleTitle;
+        const minutes = activity.lectureEstimatedMinutes;
+        const previewOnly = activity.lecturePreviewOnly;
+        return (
+          <div className="mt-1 space-y-0.5">
+            {moduleTitle ? (
+              <p className="truncate text-[12px] text-fp-text-50">Module · {moduleTitle}</p>
+            ) : null}
+            <p className="text-[11px] text-fp-text-45">
+              {minutes ? `${minutes} min` : "Lecture"}
+              {previewOnly ? " · Preview (not purchased)" : ""}
+            </p>
+          </div>
+        );
+      }
       return activity.description ? (
         <p className="mt-1 line-clamp-2 text-[12px] text-fp-text-50">{activity.description}</p>
       ) : null;
   }
 }
 
-export function ActivityCard({ activity, status, side, onComplete, completing, onEdit, onUncomplete }: ActivityCardProps) {
-  const meta = ACTIVITY_TYPE_META[activity.type];
-  const Icon = ACTIVITY_ICONS[activity.type];
+export function ActivityCard({ activity, status, onComplete, completing, onEdit, onUncomplete }: ActivityCardProps) {
+  // Display metadata comes from the original server kind when present
+  // (so merged lecture docs show "Lecture" + their cyan styling) and
+  // always falls back safely — never undefined — for unknown kinds.
+  const meta = flowPathKindMeta(activity.flowKind ?? activity.type);
+  const Icon = getFlowKindIcon(activity.flowKind ?? activity.type);
   const isCurrent = status === "current";
   const isCompleted = status === "completed";
   const isOverdue = status === "overdue";

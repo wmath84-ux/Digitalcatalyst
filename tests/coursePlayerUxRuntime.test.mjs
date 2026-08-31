@@ -28,6 +28,7 @@ const sidebar = readSource("src/course/CourseSidebar.tsx");
 const overlay = readSource("src/course/CourseOverlay.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
+const notesStore = readSource("src/course/notesStore.ts");
 const resourceViewer = readSource("src/course/ResourceViewer.tsx");
 const imageViewer = readSource("src/course/ImageViewer.tsx");
 const courseTypes = readSource("src/types/course.ts");
@@ -138,9 +139,10 @@ test("CoursePlayer keeps the Part 10 hook + resolver as the source of truth", ()
 // ---------------------------------------------------------------------------
 
 test("All note operations (add / edit / delete) write to localStorage", () => {
-  assert.match(coursePlayer, /notesStorageKey/, "expected 'notesStorageKey' in source");
-  assert.match(coursePlayer, /localStorage\.getItem\(notesStorageKey\(uid, productId\)\)/);
-  assert.match(coursePlayer, /localStorage\.setItem\(notesStorageKey\(uid, productId\), JSON\.stringify\(notes\)\)/);
+  // The storage plumbing lives in the shared notesStore (player + NotesPanel).
+  assert.match(notesStore, /notesStorageKey/, "expected 'notesStorageKey' in source");
+  assert.match(notesStore, /localStorage\.getItem\(notesStorageKey\(uid, productId\)\)/);
+  assert.match(notesStore, /localStorage\.setItem\(notesStorageKey\(uid, productId\), JSON\.stringify\(notes\)\)/);
   assert.match(coursePlayer, /persistLocalNotes\(user\.id, product\.id, next\)/);
 });
 

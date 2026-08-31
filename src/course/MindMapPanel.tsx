@@ -4,11 +4,12 @@
 // to the Note tab.
 //
 // The panel's HOME screen is the map library — the grid of every map this
-// module holds — so opening the tab always lands on a choice ("konsi map
-// kholni hai / nayi banani hai") instead of dropping straight onto whatever
-// canvas was open last. Tapping a card opens that diagram for editing; "New
-// map" starts a fresh one. The library also returns every time the sheet is
-// reopened after being closed, never leaving a lone stale canvas behind.
+// module holds — so a FRESH visit lands on a choice ("konsi map kholni hai /
+// nayi banani hai") instead of dropping straight onto whatever canvas was
+// open last. Tapping a card opens that diagram for editing; "New map" starts
+// a fresh one. Within one player visit the last view (library or canvas) is
+// remembered in the panel session, so switching tabs and coming back keeps
+// the learner's place; leaving the player resets it to the library.
 //
 // ── Interaction contract ─────────────────────────────────────────────────
 //   `+`            → add a child to this node (then focus its editor)
@@ -57,12 +58,14 @@
 // The double-tap delete is measured the same way (two taps on the same node
 // within 350ms), which makes it work identically for mouse, touch and pen.
 //
-// ── Theme: follows the Course Player, overridable for this window only ──
+// ── Theme: follows the Course Player, overridable for this visit ────────
 // The panel starts in whatever theme the Course Player is in (dark or
-// light/white). The sun/moon button next to Fit flips ONLY the mind map
-// window — the lesson keeps its own theme — and the choice is remembered per
-// device. While no manual choice exists the map keeps tracking the player's
-// own toggle.
+// light/white) — EVERY visit, because the override lives in the player's
+// panel session and is reset when the player unmounts. The sun/moon button
+// next to Fit flips ONLY the mind map window for the rest of this visit;
+// the lesson keeps its own theme. Switch tabs and back and the map still
+// keeps the picked theme; leave the player and it follows the player's
+// theme again on the next entry.
 //
 // ── The toolbar (the bottom strip) ───────────────────────────────────────
 // ONE ICON PER CONTROL — the bar carries no words at all. From the left:
@@ -169,6 +172,11 @@ import {
   type MindMapArrangement,
 } from "../../utils/mindMapTree";
 import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
+import {
+  getCoursePanelSession,
+  setMindMapSessionTheme,
+  setMindMapSessionView,
+} from "./coursePanelSession";
 
 // ── Theme ─────────────────────────────────────────────────────────────────
 
@@ -176,19 +184,11 @@ export type MindMapTheme = "dark" | "light";
 
 /**
  * The mind map renders in the Course Player's current theme until the
- * learner flips the map's own sun/moon button. The manual choice is kept per
- * device so reopening the tab (or the app) doesn't lose it, while clearing it
- * makes the map follow the player again.
+ * learner flips the map's own sun/moon button. The manual choice is kept in
+ * the player's PANEL SESSION (src/course/coursePanelSession.ts), so it
+ * survives tab switches but resets when the player is left — the next entry
+ * always starts by following the player's theme again.
  */
-const mindMapThemeStorageKey = "dc.mindMapThemeOverride";
-const loadMindMapThemeOverride = (): MindMapTheme | null => {
-  try {
-    const stored = localStorage.getItem(mindMapThemeStorageKey);
-    return stored === "dark" || stored === "light" ? stored : null;
-  } catch {
-    return null;
-  }
-};
 
 /** Double-tap delete is a knife the learner chooses to pick up. Off by default. */
 const dblTapDeleteStorageKey = "dc.mindMapDblTapDelete";
@@ -997,16 +997,23 @@ function MindMapCanvas(props: MindMapPanelProps) {
     atMapLimit = false,
   } = props;
   /** The map library sheet (grid of this module's maps) is the HOME screen:
-   *  it is open by default so the learner picks a map to edit — or creates a
-   *  new one — before ever landing on a canvas. */
-  const [libraryOpen, setLibraryOpen] = useState(true);
+   *  it is open by default (fresh player entry) so the learner picks a map to
+   *  edit — or creates a new one — before ever landing on a canvas. Within a
+   *  single player visit the last view (library vs canvas) is restored from
+   *  the panel session instead, so switching tabs never yanks the learner
+   *  back to the library. */
+  const [libraryOpen, setLibraryOpen] = useState(
+    () => getCoursePanelSession().mindMapView !== "canvas",
+  );
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Theme: null → track the Course Player; a value → the learner's own pick
-  // for THIS window (persisted per device).
-  const [themeOverride, setThemeOverride] = useState<MindMapTheme | null>(loadMindMapThemeOverride);
+  // for THIS window, kept in the player's panel session for this visit.
+  const [themeOverride, setThemeOverride] = useState<MindMapTheme | null>(
+    () => getCoursePanelSession().mindMapThemeOverride,
+  );
   const [doubleTapDelete, setDoubleTapDelete] = useState<boolean>(loadDblTapDelete);
   // ── Align-menu choices (box arrangement + how a long label fits) ───────
   // Views, not data: they are remembered per device like the theme and the
@@ -1045,15 +1052,16 @@ function MindMapCanvas(props: MindMapPanelProps) {
 
   const mindTheme: MindMapTheme = themeOverride ?? (playerTheme === "light" ? "light" : "dark");
 
-  // Remember the manual choices per device (private mode just loses them).
+  // Keep the panel session in lock-step with this window's live choices:
+  // the theme pick and the library/canvas view. Both survive tab switches
+  // (this panel unmounts) and reset only when the player itself is left.
   useEffect(() => {
-    try {
-      if (themeOverride) localStorage.setItem(mindMapThemeStorageKey, themeOverride);
-      else localStorage.removeItem(mindMapThemeStorageKey);
-    } catch {
-      /* ignore */
-    }
+    setMindMapSessionTheme(themeOverride);
   }, [themeOverride]);
+
+  useEffect(() => {
+    setMindMapSessionView(libraryOpen ? "library" : "canvas");
+  }, [libraryOpen]);
 
   useEffect(() => {
     try {
@@ -1079,18 +1087,23 @@ function MindMapCanvas(props: MindMapPanelProps) {
     }
   }, [textFit]);
 
-  // The library is the panel's home screen. It opens on mount, and if the
-  // learner closes the sheet with the same-tab dock toggle and opens it again,
-  // the library comes straight back — with any in-progress node edit cleared —
-  // so they can pick another map or start a new one.
+  // The library is the panel's home screen on a FRESH visit. When the learner
+  // closes the sheet with the same-tab dock toggle and opens it again (the
+  // panel stays mounted), the last view is restored from the panel session:
+  // library stays library, canvas stays canvas. Landing back on the library
+  // also clears any half-finished node edit / rename, so the picker starts
+  // clean; returning to the canvas keeps the diagram exactly as it was.
   const prevOpenRef = useRef(open);
   useEffect(() => {
     if (open && !prevOpenRef.current) {
-      setLibraryOpen(true);
+      const resumeCanvas = getCoursePanelSession().mindMapView === "canvas";
+      setLibraryOpen(!resumeCanvas);
       setRenamingKey(null);
       setRenameDraft("");
-      setSelectedId(null);
-      setEditingId(null);
+      if (!resumeCanvas) {
+        setSelectedId(null);
+        setEditingId(null);
+      }
       // Opening the sheet must never inherit a stale tool drop-down…
       setAlignMenuOpen(false);
       setSaveMenuOpen(false);
