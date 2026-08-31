@@ -25,6 +25,7 @@ import AuthApp from "./AuthApp";
 import AdminLoginApp from "./AdminLoginApp";
 import AdminApp from "./admin/AdminApp";
 import FlowPathApp from "./FlowPathApp";
+import { FlowPathErrorBoundary } from "./components/flowpath/FlowPathErrorBoundary";
 import NotificationsPage from "./components/NotificationsPage";
 import SearchPage from "./components/SearchPage";
 import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
@@ -1092,7 +1093,17 @@ function RootPage(): ReactNode {
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
   if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
   if (hash.startsWith(LEADERBOARD_HASH)) return <LeaderboardApp />;
-  if (hash.startsWith(FLOWPATH_HASH)) return <FlowPathApp onNavigateToHome={() => { window.location.hash = HOME_HASH; }} />;
+  if (hash.startsWith(FLOWPATH_HASH)) {
+    // The boundary keeps a FlowPath render crash contained to this
+    // route: instead of the whole app unmounting to a white screen
+    // (with dead navigation), the user gets a recoverable screen with
+    // working Retry / Back / Home actions.
+    return (
+      <FlowPathErrorBoundary>
+        <FlowPathApp onNavigateToHome={() => { window.location.hash = HOME_HASH; }} />
+      </FlowPathErrorBoundary>
+    );
+  }
   if (hash.startsWith(REVISION_HASH)) return <RevisionApp />;
   if (hash.startsWith(PRODUCT_HASH)) {
     return (

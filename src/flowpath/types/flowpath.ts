@@ -23,6 +23,21 @@ export interface BaseActivity {
   createdAt: number;
   completedAt?: number;
   order: number;
+  /**
+   * Original server kind when this activity was merged from a
+   * Firestore FlowPathActivity. The local ActivityType union does not
+   * include "lecture", so the merged activity keeps the display type
+   * normalized (lecture -> other) while this field preserves the real
+   * kind for label / colour / icon resolution. Components must resolve
+   * display metadata through `flowPathKindMeta()` + `getFlowKindIcon()`
+   * so an unknown kind can never crash the page.
+   */
+  flowKind?: FlowPathActivityKind;
+  // Lecture display fields (kind === "lecture", merged from Firestore).
+  lectureModuleTitle?: string | null;
+  lectureProductTitle?: string;
+  lectureEstimatedMinutes?: number;
+  lecturePreviewOnly?: boolean;
 }
 
 export interface TaskActivity extends BaseActivity {
@@ -172,3 +187,30 @@ export const FLOW_PATH_KIND_META: Record<
   ...ACTIVITY_TYPE_META,
   lecture: { label: "Lecture", color: "#22d3ee", glow: "rgba(34,211,238,0.55)" },
 };
+
+/** Meta used when a kind is unknown/corrupt so rendering can never throw. */
+export const FLOW_PATH_FALLBACK_META = {
+  label: "Activity",
+  color: "#8b7bff",
+  glow: "rgba(139,123,255,0.5)",
+} as const;
+
+export type FlowPathKindMeta = {
+  label: string;
+  color: string;
+  glow: string;
+};
+
+/**
+ * Resolve display metadata (label / colour / glow) for any server
+ * `kind` value. Unknown or corrupt kinds fall back to a neutral meta
+ * instead of returning undefined — this is what keeps the FlowPath
+ * page from white-screening when Firestore returns a kind the local
+ * ActivityType union does not model (e.g. "lecture").
+ */
+export function flowPathKindMeta(kind: string | undefined | null): FlowPathKindMeta {
+  if (kind && (kind as FlowPathActivityKind) in FLOW_PATH_KIND_META) {
+    return FLOW_PATH_KIND_META[kind as FlowPathActivityKind];
+  }
+  return FLOW_PATH_FALLBACK_META;
+}

@@ -1,18 +1,22 @@
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 import type { ActivityStatus, ActivityType } from "../../flowpath/types/flowpath";
-import { ACTIVITY_TYPE_META } from "../../flowpath/types/flowpath";
-import { ACTIVITY_ICONS } from "./icons";
+import { flowPathKindMeta } from "../../flowpath/types/flowpath";
+import { getFlowKindIcon } from "./icons";
 
 interface ActivityNodeProps {
   type: ActivityType;
   status: ActivityStatus;
+  /** Original server kind for Firestore-merged items (e.g. "lecture"). */
+  flowKind?: string;
   onClick?: () => void;
 }
 
-export function ActivityNode({ type, status, onClick }: ActivityNodeProps) {
-  const meta = ACTIVITY_TYPE_META[type];
-  const Icon = ACTIVITY_ICONS[type];
+export function ActivityNode({ type, status, flowKind, onClick }: ActivityNodeProps) {
+  // Never undefined: unknown kinds fall back to a neutral meta/icon so a
+  // bad server doc can't crash the whole page.
+  const meta = flowPathKindMeta(flowKind ?? type);
+  const Icon = getFlowKindIcon(flowKind ?? type);
   const isCurrent = status === "current";
   const isCompleted = status === "completed";
   const isOverdue = status === "overdue";

@@ -159,7 +159,17 @@ export function useFlowPathFirestore(targetUidOverride?: string) {
           setLoading(false);
           return;
         }
-        const list = (res.items || []).filter(Boolean);
+        // Defensive: the server can only ever return an array here,
+        // but a malformed response must degrade to "no server items"
+        // instead of throwing inside the poll (which would crash the
+        // FlowPath render on the next tick).
+        const list = (Array.isArray(res.items) ? res.items : []).filter(
+          (item): item is FlowPathActivity =>
+            Boolean(item) &&
+            typeof item === "object" &&
+            typeof (item as { id?: unknown }).id === "string" &&
+            typeof (item as { title?: unknown }).title === "string",
+        );
         if (list.length === 0 && !didSeed) {
           // First-load empty state. Seed demo activities so the
           // dashboard is never blank; the user can edit / delete
