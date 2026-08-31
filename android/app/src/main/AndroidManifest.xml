@@ -11,9 +11,13 @@
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">
 
+        <!-- fullSensor: allows the Course Player to rotate (even when
+             system auto-rotate is OFF). The JS layer (appOrientation.ts)
+             locks the rest of the app to portrait at runtime via the
+             @capacitor/screen-orientation plugin. -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
-            android:screenOrientation="portrait"
+            android:screenOrientation="fullSensor"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"

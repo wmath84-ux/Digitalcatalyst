@@ -5,16 +5,18 @@
 // - Course Player is the ONLY screen where rotation is allowed.
 // - This is a HARD rule that applies whether the user has system auto-rotate
 //   ON or OFF, and whether the phone is currently held in landscape or portrait:
-//   outside the course player the app NEVER rotates (native hard lock +
-//   Screen Orientation API + full-screen overlay fallback on web). Inside the
+//   outside the course player the app NEVER rotates (Screen Orientation API +
+//   Capacitor plugin lock + full-screen overlay fallback on web). Inside the
 //   course player, rotation is allowed and uses FULL_SENSOR on native so it can
 //   rotate even if auto-rotate OFF (like YouTube).
 // - Tablet/desktop are NEVER locked - their layouts work in any orientation.
 //
-// Three layers for enforcement:
-//   1. AndroidManifest.xml: android:screenOrientation="portrait" (native hard lock)
-//   2. Web Manifest: orientation="portrait" (PWA hard lock)
-//   3. JS: Screen Orientation API + Capacitor plugins (runtime lock/unlock)
+// Four layers for enforcement:
+//   1. AndroidManifest.xml: android:screenOrientation="fullSensor" (native allows
+//      rotation; the JS layer locks to portrait at runtime for non-course screens)
+//   2. Web Manifest: orientation="any" (PWA allows rotation; JS locks at runtime)
+//   3. JS: Screen Orientation API + @capacitor/screen-orientation plugin (runtime
+//      lock/unlock — portrait outside course player, unlocked inside it)
 //   4. PortraitOnlyGuard overlay: Visual fallback when API lock fails (browser tabs, iOS)
 
 import { isMobileDevice } from "./courseStatusBar";
@@ -109,10 +111,10 @@ const setHtmlOrientationAttributes = (): void => {
 /** Try Capacitor Screen Orientation plugin lock */
 const tryCapacitorLockPortrait = async (): Promise<void> => {
   try {
-    // Try official plugin first
+    // Use official @capacitor/screen-orientation plugin (installed as ^7.0.4)
     const mod = await import("@capacitor/screen-orientation").catch(() => null);
     if (mod?.ScreenOrientation?.lock) {
-      await mod.ScreenOrientation.lock({ orientation: "portrait" }).catch(() => {});
+      await mod.ScreenOrientation.lock({ orientation: "portrait-primary" }).catch(() => {});
       return;
     }
   } catch {}
@@ -144,9 +146,11 @@ const tryCapacitorLockPortrait = async (): Promise<void> => {
 /** Try Capacitor unlock for course player */
 const tryCapacitorUnlock = async (): Promise<void> => {
   try {
+    // Use official @capacitor/screen-orientation plugin (installed as ^7.0.4)
     const mod = await import("@capacitor/screen-orientation").catch(() => null);
     if (mod?.ScreenOrientation?.unlock) {
       await mod.ScreenOrientation.unlock().catch(() => {});
+      return;
     }
   } catch {}
   try {
@@ -232,10 +236,15 @@ export const enterCoursePlayerRotation = (): void => {
   coursePlayerActive = true;
   unlockAppRotation();
   notifyRotationChange();
-  // Extra safety: try again after short delay for native
+  // Extra safety: retry unlock after delays for native platforms.
+  // The Capacitor Screen Orientation plugin may need time to bind after
+  // the native activity switches from portrait-locked to fullSensor.
   setTimeout(() => {
     if (coursePlayerActive) unlockAppRotation();
   }, 300);
+  setTimeout(() => {
+    if (coursePlayerActive) unlockAppRotation();
+  }, 800);
 };
 
 /**
