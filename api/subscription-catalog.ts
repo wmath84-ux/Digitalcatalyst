@@ -16,8 +16,14 @@ import {
   type VercelResponse,
 } from "./_lib/firebaseAdmin.js";
 import {
+  getSubscriptionGateSettings,
+  isPlanVisibleForAudience,
+} from "./_lib/subscriptionGate.js";
+import { isOwnedSubscriptionActive } from "../../utils/subscriptionOwnership.js";
+import {
   loadActiveFeatures,
   loadActivePlans,
+  loadCurrentSubscription,
   loadPlanModuleUnlocks,
   loadPlanProductUnlocks,
   loadSubscriptionProducts,
@@ -27,20 +33,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     // Auth is optional — we still verify the token if it's
-    // present so a logged-in buyer gets the same plan list.
+    // present so a logged-in buyer gets a catalog filtered for
+    // their subscriber vs guest audience.
+    let uid = "";
     try {
-      await requireFirebaseUser(req);
+      const user = await requireFirebaseUser(req);
+      uid = String(user?.uid || "");
     } catch {
       // ignore — public read is allowed.
     }
-    const [plans, features, subProducts] = await Promise.all([
+    const [plans, features, subProducts, gateSettings, currentSub] = await Promise.all([
       loadActivePlans(),
       loadActiveFeatures(),
       loadSubscriptionProducts(),
+      getSubscriptionGateSettings(),
+      uid ? loadCurrentSubscription(uid) : Promise.resolve(null),
     ]);
+    const isSubscriber = Boolean(currentSub && isOwnedSubscriptionActive(currentSub, Date.now()));
+    const ownedPlanId = isSubscriber ? String(currentSub?.planId || "") : "";
+    const visiblePlans = plans.filter((plan) =>
+      isPlanVisibleForAudience(plan.id, isSubscriber, gateSettings, { ownedPlanId }),
+    );
     const productUnlocks: Array<{ planId: string; productId: string; active: boolean }> = [];
     const moduleUnlocks: Array<{ planId: string; productId: string; moduleId: string; active: boolean }> = [];
-    for (const plan of plans) {
+    for (const plan of visiblePlans) {
       const [pl, ml] = await Promise.all([
         loadPlanProductUnlocks(plan.id),
         loadPlanModuleUnlocks(plan.id),
@@ -51,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       ok: true,
       catalog: {
-        plans,
+        plans: visiblePlans,
         features,
         subscriptionProducts: subProducts || [],
         productUnlocks,

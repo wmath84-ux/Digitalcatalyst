@@ -21,6 +21,13 @@ export function resolveSubscriberOnlyPrice(
   subscriberPricing: Record<string, SubscriberPricingOverride | undefined> | null | undefined,
 ): number;
 
+export function isPlanVisibleForAudience(
+  planId: string,
+  isSubscriber: boolean,
+  planVisibility: Record<string, { visible?: boolean; visibleToSubscribers?: boolean } | undefined> | null | undefined,
+  options?: { ownedPlanId?: string | null } | null,
+): boolean;
+
 export function resolveAiQuestionsPerDay(
   planId: string | null | undefined,
   featureCap: number | null | undefined,

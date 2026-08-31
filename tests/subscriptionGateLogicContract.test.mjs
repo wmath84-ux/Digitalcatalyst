@@ -153,6 +153,20 @@ test("admin client routes the new endpoint and normalises the shape on save", ()
   );
 });
 
+test("plan visibility matrix includes visibleToSubscribers for existing members", () => {
+  assert.match(gateServer, /visibleToSubscribers/);
+  assert.match(gateServer, /export function isPlanVisibleForAudience/);
+  assert.match(gateHook, /visibleToSubscribers/);
+  assert.match(adminPage, /data-admin-gate-plan-visible-subscribers/);
+  assert.match(adminPage, /Visible to existing subscribers/);
+  const pricing = fs.readFileSync("utils/subscriptionPricing.js", "utf8");
+  assert.match(pricing, /export function isPlanVisibleForAudience/);
+  const catalog = fs.readFileSync("api/subscription-catalog.ts", "utf8");
+  assert.match(catalog, /isPlanVisibleForAudience/);
+  const page = fs.readFileSync("src/subscription/components/SubscriptionPage.tsx", "utf8");
+  assert.match(page, /isPlanVisibleForAudience/);
+});
+
 test("admin form exposes the 'Subscription Logic' tab", () => {
   assert.match(
     adminPage,

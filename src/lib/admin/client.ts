@@ -594,7 +594,7 @@ async function subscriptionGateRequest(init?:RequestInit){
     oldGateEnabled: true,
     hideUntilPurchasedEnabled: false,
     features: {} as Record<string,{gated:boolean;durations:{monthly:boolean;yearly:boolean;lifetime:boolean};tiers:Record<string,boolean>;hideFromNonSubscribers:boolean}>,
-    planVisibility: {} as Record<string,{visible:boolean;durations:{monthly:boolean;yearly:boolean;lifetime:boolean}}>,
+    planVisibility: {} as Record<string,{visible:boolean;visibleToSubscribers:boolean;durations:{monthly:boolean;yearly:boolean;lifetime:boolean}}>,
     subscriberPricing: {} as Record<string,{monthly:number|null;yearly:number|null;lifetime:number|null}>,
     usageLimits: { aiQuestionsPerDay: {} as Record<string,number> },
     updatedAt: null as any,

@@ -35,6 +35,30 @@ export function resolveSubscriberOnlyPrice(planId, cycle, basePrice, isSubscribe
  * @param {{ usageLimits?: { aiQuestionsPerDay?: Record<string, number> } } | null | undefined} settings
  * @returns {number | null}
  */
+/**
+ * Whether a plan card should appear on the public subscription page for
+ * this audience. Missing rows default to visible for everyone so a fresh
+ * database behaves like the legacy catalog.
+ *
+ * Existing subscribers keep seeing the plan they already own even when
+ * the admin hides it from the subscriber picker — otherwise they could
+ * not renew.
+ *
+ * @param {string} planId
+ * @param {boolean} isSubscriber
+ * @param {Record<string, { visible?: boolean, visibleToSubscribers?: boolean } | undefined> | null | undefined} planVisibility
+ * @param {{ ownedPlanId?: string | null } | null | undefined} [options]
+ * @returns {boolean}
+ */
+export function isPlanVisibleForAudience(planId, isSubscriber, planVisibility, options) {
+  const ownedPlanId = options && options.ownedPlanId ? String(options.ownedPlanId) : "";
+  if (ownedPlanId && String(planId) === ownedPlanId) return true;
+  const row = planVisibility && planVisibility[planId];
+  if (!row) return true;
+  if (isSubscriber) return row.visibleToSubscribers !== false;
+  return row.visible !== false;
+}
+
 export function resolveAiQuestionsPerDay(planId, featureCap, settings) {
   if (planId) {
     const planCap = settings?.usageLimits?.aiQuestionsPerDay?.[planId];

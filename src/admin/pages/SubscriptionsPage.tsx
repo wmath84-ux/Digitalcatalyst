@@ -122,7 +122,7 @@ export default function SubscriptionsPage() {
     oldGateEnabled: true,
     hideUntilPurchasedEnabled: false,
     features: {} as Record<string, { gated: boolean; hideFromNonSubscribers: boolean; durations: { monthly: boolean; yearly: boolean; lifetime: boolean }; tiers: Record<string, boolean> }>,
-    planVisibility: {} as Record<string, { visible: boolean; durations: { monthly: boolean; yearly: boolean; lifetime: boolean } }>,
+    planVisibility: {} as Record<string, { visible: boolean; visibleToSubscribers: boolean; durations: { monthly: boolean; yearly: boolean; lifetime: boolean } }>,
     subscriberPricing: {} as Record<string, { monthly: number | null; yearly: number | null; lifetime: number | null }>,
     usageLimits: { aiQuestionsPerDay: {} as Record<string, number> },
   });
@@ -641,11 +641,11 @@ export default function SubscriptionsPage() {
               <div>
                 <h3 className="text-sm font-semibold text-slate-900">Plan visibility + subscriber-only price</h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Choose which plans show on the subscription page, which cycles are visible for each, and the per-plan override price that only EXISTING subscribers see.
+                  Choose which plans show on the subscription page for guests vs existing subscribers, which cycles are visible for each, and the per-plan override price that only EXISTING subscribers see.
                 </p>
               </div>
               {plans.map((plan) => {
-                const visibility = gateSettings.planVisibility[plan.id] || { visible: true, durations: { monthly: true, yearly: true, lifetime: true } };
+                const visibility = gateSettings.planVisibility[plan.id] || { visible: true, visibleToSubscribers: true, durations: { monthly: true, yearly: true, lifetime: true } };
                 const override = gateSettings.subscriberPricing[plan.id] || { monthly: null, yearly: null, lifetime: null };
                 return (
                   <div key={plan.id} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
@@ -664,7 +664,23 @@ export default function SubscriptionsPage() {
                           },
                         })}
                       />
-                      Visible on subscription page
+                      Visible to new / non-subscribers
+                    </label>
+                    <label className="mt-1 flex items-center gap-2 text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        data-admin-gate-plan-visible-subscribers={plan.id}
+                        checked={visibility.visibleToSubscribers !== false}
+                        onChange={(event) => setGateSettings({
+                          ...gateSettings,
+                          planVisibility: {
+                            ...gateSettings.planVisibility,
+                            [plan.id]: { ...visibility, visibleToSubscribers: event.target.checked },
+                          },
+                        })}
+                      />
+                      Visible to existing subscribers
                     </label>
                     <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-slate-600">
                       <label className="flex flex-col gap-1">

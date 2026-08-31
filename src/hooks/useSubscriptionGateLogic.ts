@@ -28,6 +28,7 @@ export type SubscriptionGateFeatureRow = {
 
 export type SubscriptionGatePlanRow = {
   visible: boolean;
+  visibleToSubscribers: boolean;
   durations: SubscriptionGateDurationFlags;
 };
 
@@ -84,6 +85,7 @@ function normalisePlanRow(input: any): SubscriptionGatePlanRow {
   const durations = normaliseDurationFlags(input?.durations, { monthly: true, yearly: true, lifetime: true });
   return {
     visible: input?.visible === false ? false : true,
+    visibleToSubscribers: input?.visibleToSubscribers === false ? false : true,
     durations,
   };
 }

@@ -34,7 +34,7 @@ import { FALLBACK_SUBSCRIPTION_CATALOG } from "../data/fallbackCatalog";
 import { useAuth } from "../../context/AuthContext";
 import { useCatalog } from "../../context/CatalogContext";
 import { useSubscriptionGateLogic } from "../../hooks/useSubscriptionGateLogic";
-import { resolveSubscriberOnlyPrice } from "../../utils/subscriptionPricing";
+import { isPlanVisibleForAudience, resolveSubscriberOnlyPrice } from "../../utils/subscriptionPricing";
 import { playSfxError, playSfxSuccess } from "../../utils/sfx";
 import { shouldShowCouponInput } from "../../../utils/couponVisibility";
 import {
@@ -102,6 +102,7 @@ export default function SubscriptionPage({
 }: SubscriptionPageProps) {
   const { user } = useAuth();
   const { products: availableProducts, purchasedIds } = useCatalog();
+  const { settings: gateSettings } = useSubscriptionGateLogic();
   const renewalLoadedRef = useRef(false);
   const repairedOrderIdsRef = useRef<Set<string>>(new Set());
 
@@ -506,13 +507,18 @@ export default function SubscriptionPage({
   // hidden — the server re-checks the same rule at checkout anyway.
   // ---------------------------------------------------------------------------
   const pickerPlans = useMemo(() => {
-    if (!isActiveMember || ownedPlanOrder === null) return plans;
-    return plans.filter((candidate) => {
+    const audienceVisible = plans.filter((candidate) =>
+      isPlanVisibleForAudience(candidate.id, isActiveMember, gateSettings.planVisibility, {
+        ownedPlanId: isActiveMember ? ownedPlanId : null,
+      }),
+    );
+    if (!isActiveMember || ownedPlanOrder === null) return audienceVisible;
+    return audienceVisible.filter((candidate) => {
       const order = Number(candidate.sortOrder);
       if (!Number.isFinite(order)) return true; // never hide unranked custom plans
       return order >= ownedPlanOrder;
     });
-  }, [plans, isActiveMember, ownedPlanOrder]);
+  }, [plans, isActiveMember, ownedPlanOrder, ownedPlanId, gateSettings.planVisibility]);
 
   // Higher plans only — the plans a member can actually switch TO.
   const upgradePlans = useMemo(
@@ -598,7 +604,6 @@ export default function SubscriptionPage({
   // Phase-2: subscriber-only override price for the currently selected
   // plan + cycle. Resolved via the admin's `settings/subscriptionGate`
   // document — non-subscribers always see the public price.
-  const { settings: gateSettings } = useSubscriptionGateLogic();
   const subscriberPriceRupees = useMemo(() => {
     if (!isActiveMember) return null;
     const activePlan = plans.find((p) => p.id === selectedPlanId);
