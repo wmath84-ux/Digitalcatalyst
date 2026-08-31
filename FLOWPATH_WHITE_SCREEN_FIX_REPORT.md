@@ -124,3 +124,41 @@ Full suite after these two changes: **1827 passed, 0 failed**.
   list par reset hota hai (9/9 pass).
 - Full suite: **1833/1833 pass, 0 fail**.
 - `vite build` successful; touched files mein 0 TypeScript errors.
+
+## My Day Quick Notes: bada editor + checkbox save + "half box" fix
+
+Reported: "short note likhte waqt editor chhota khulta hai, likhna mushkil hai;
+delete/edit ke bagal checkbox chahiye jo click par save kare aur editor band
+kare; aur editor ka box kabhi pura dikhta hai kabhi nahi."
+
+### Root cause of the intermittent half-box
+
+1. Editor apni height note ki length se leta tha (`rows={4}` + `max-h-[45vh]`),
+   isliye chhoti note par chhota box, lambi par bada — "kabhi full, kabhi nahi".
+2. Editor notes list ke apne `max-h-80` scroll container ke ANDAR tha — list
+   ke edge ke paas editor container se clip ho jaata tha.
+3. `autoFocus` kabhi silently fail ho jaata tha → keyboard/focus nahi aata →
+   box adhura lagta tha.
+
+### Fix (src/components/myday/QuickNotes.tsx)
+
+- **Shared `BigNoteEditor`** (compose + edit dono use karte hain): fixed
+  **200px floor**, content ke saath auto-grow **55dvh cap** tak, phir internal
+  scroll — box hamesha bada aur consistent, note ki length par depend nahi.
+- **Edit karte waqt editor list ki jagah le leta hai** — poora card area,
+  kabhi clip nahi ho sakta. Save/cancel/delete par list wapas.
+- **Editor khulne par khud ko view mein scroll karta hai + explicit focus**
+  (rAF), taaki full box hamesha dikhe.
+- **Checkbox-style Save** Delete/Cancel ke bagal: ek click = save + editor
+  close (edit: "Save note", composer: "Add note").
+- **Composer focus par expand** hota hai usi bade editor mein; Cancel
+  bina draft khoye collapse karta hai. Enter = nayi line, Ctrl/Cmd+Enter =
+  save, Escape = cancel. Editor ke andar Delete bhi hai.
+
+### Verification
+
+- Naya contract test `tests/myDayQuickNotesBigEditorContract.test.mjs` (9
+  tests) + purana `myDayQuickNotesSaveContract` naye design par update.
+- Runtime render checks: list default render, editor replacements, checkbox
+  wiring — 9/9 pass.
+- Full suite: **1842/1842 pass, 0 fail**; `vite build` clean.
