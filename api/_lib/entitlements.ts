@@ -52,11 +52,14 @@ import type { CouponDoc } from "../../utils/coupons.js";
 import { ensureReferralCoupon } from "./referrals.js";
 import {
   collectSubscriptionEntitlementIds,
+  loadActiveFeatures,
   loadPlanById,
   writeSubscriptionAfterPayment,
   type BillingCycle,
+  type SubscriptionFeatureDoc,
   type SubscriptionPlanDoc,
 } from "./subscriptions.js";
+import { resolveFeaturePrice } from "../../utils/featurePricing.js";
 
 /** Firestore collection / subcollection names. Kept here for testability. */
 const ENTITLEMENTS_COLLECTION = "entitlements";
@@ -553,6 +556,36 @@ export interface GrantSubscriptionResult {
   orderId: string;
 }
 
+/**
+ * Complete list of feature ids this membership must unlock: the buyer's
+ * explicit selection PLUS every feature that is free on THIS plan/cycle
+ * (globally included, or included via a plan override). Free-included
+ * features produce no priced quote line, so the client may not have carried
+ * them in `featureIds` — yet the membership obviously owns them (this is
+ * what makes "My Day unlimited for Basic subscribers" land in the stored
+ * `features` list and show up consistently on Profile / My Day / Revision).
+ */
+async function resolveGrantedFeatureIds(
+  planId: string,
+  cycle: BillingCycle,
+  selectedFeatureIds: string[],
+): Promise<string[]> {
+  const granted = new Set<string>(selectedFeatureIds.map(String).filter(Boolean));
+  try {
+    const features = await loadActiveFeatures();
+    for (const feature of features as SubscriptionFeatureDoc[]) {
+      if (!feature?.id || !feature.active) continue;
+      const resolved = resolveFeaturePrice(feature as never, planId, cycle);
+      if (feature.included || resolved.included) granted.add(String(feature.id));
+    }
+  } catch (error) {
+    // Catalog read failure must never block activation; the selected ids
+    // are already in the quote and the per-gate resolution keeps working.
+    console.error("[entitlements] plan-included feature resolution skipped", error);
+  }
+  return Array.from(granted);
+}
+
 export const grantSubscriptionFromQuote = async (
   input: { quote: ServerPriceQuote; orderId: string; paymentId: string | null; source: "razorpay" | "free" | "admin" },
   options: { now?: number } = {},
@@ -575,8 +608,12 @@ export const grantSubscriptionFromQuote = async (
   const selectedFeatureIds = featureIdsFromQuote ?? (quote.verifiedLineItems || [])
     .filter((line) => line.kind === "subscription_features" && typeof line.featureId === "string")
     .map((line) => String(line.featureId));
+  // Merge the buyer's selection with every feature this plan includes for
+  // free (global inclusion or a plan/cycle override) so the stored
+  // membership carries the complete set of features it actually owns.
+  const grantedFeatureIds = await resolveGrantedFeatureIds(plan.id, cycle, selectedFeatureIds);
   // Dedupe.
-  const uniqueFeatures = Array.from(new Set(selectedFeatureIds));
+  const uniqueFeatures = Array.from(new Set(grantedFeatureIds));
   // Products have their own authoritative quote field. Rebuilding the grant
   // only from receipt line items is lossy (and was the reason features worked
   // while a paid bonus product remained locked). Line inference remains for

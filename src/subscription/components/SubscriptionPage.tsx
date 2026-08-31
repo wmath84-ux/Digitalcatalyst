@@ -564,6 +564,21 @@ export default function SubscriptionPage({
     () => (Array.isArray(activeSubscription?.features) ? activeSubscription.features.map(String) : []),
     [activeSubscription],
   );
+  // Features the buyer already owns as far as the subscription page is
+  // concerned: the ids stored on their active membership PLUS every feature
+  // that is free on the plan + cycle they are currently looking at (globally
+  // included or a plan override). Such features carry no price, so they must
+  // show as "Purchased"/Included and never be treated as chargeable add-ons —
+  // this keeps the pickers, tiers and totals in sync with what the grant
+  // actually writes after payment.
+  const ownedFeatureIds = useMemo(() => {
+    const owned = new Set<string>(memberFeatureIds);
+    for (const feature of features) {
+      const resolved = resolveFeaturePrice(feature as never, selectedPlanId || "", cycle);
+      if (feature.included || resolved.included) owned.add(feature.id);
+    }
+    return Array.from(owned);
+  }, [features, memberFeatureIds, selectedPlanId, cycle]);
   const memberFeatures = useMemo(
     () => rawFeatures.filter((feature) => memberFeatureIds.includes(feature.id)),
     [rawFeatures, memberFeatureIds],
@@ -1010,7 +1025,7 @@ export default function SubscriptionPage({
           features={features}
           selectedIds={selectedFeatureIds}
           onOpen={() => setFeatureModalOpen(true)}
-          purchasedIds={isActiveMember ? memberFeatureIds : []}
+          purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
         />
 
         {/* Price-tier strip — features grouped by their resolved price
@@ -1019,7 +1034,7 @@ export default function SubscriptionPage({
           tiers={featureTiers}
           cycle={cycle}
           selectedIds={selectedFeatureIds}
-          purchasedIds={isActiveMember ? memberFeatureIds : []}
+          purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
           onToggleTier={(ids, allSelected) => {
             setSelectedFeatureIds((current) => {
               const next = new Set(current);
@@ -1149,7 +1164,7 @@ export default function SubscriptionPage({
         onClose={() => setFeatureModalOpen(false)}
         onChangeSelected={setSelectedFeatureIds}
         includedIds={Array.from(includedFeatureIds)}
-        purchasedIds={isActiveMember ? memberFeatureIds : []}
+        purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
       />
 
       <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />

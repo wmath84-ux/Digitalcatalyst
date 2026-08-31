@@ -33,9 +33,10 @@ const main = fs.readFileSync("src/main.tsx", "utf8");
 test("revision access mirrors the My Day gate against the revision feature doc", () => {
   assert.match(useRevisionAccess, /doc\(db, "subscriptionFeatures", "revision"\)/);
   assert.match(useRevisionAccess, /doc\(db, "users", user\.id, "subscription", "current"\)/);
-  assert.match(useRevisionAccess, /features\.includes\("revision"\)/);
-  assert.match(useRevisionAccess, /status === "active"/);
-  assert.match(useRevisionAccess, /expiresAt/);
+  // Entitlement is resolved through the shared single-source rule (explicit
+  // feature list wins; any active membership unlocks the core Revision
+  // feature), keeping Profile, My Day and Revision in sync.
+  assert.match(useRevisionAccess, /subscriptionUnlocksFeature\(subscription, "revision"\)/);
   // Missing/inactive feature doc removes the gate (feature becomes free).
   // Phase-1 reads the snapshot into a typed `data` variable and computes
   // `featureConfigured` + `visibilityMode` together.
@@ -114,7 +115,11 @@ test("server seeds the Revision feature once and respects admin deletions", () =
 });
 
 test("quote + grant flow carries any catalog feature id through generically", () => {
-  assert.match(entitlements, /const uniqueFeatures = Array\.from\(new Set\(selectedFeatureIds\)\)/);
+  // The grant writes a deduplicated feature list and merges every feature
+  // free on the purchased plan/cycle (global inclusion or plan override) so
+  // plan-included features land on the membership even when the buyer never
+  // selected them explicitly.
+  assert.match(entitlements, /resolveGrantedFeatureIds/);
   assert.match(entitlements, /features: uniqueFeatures/);
   // Unknown feature ids are refused against the live catalog, not a whitelist.
   assert.match(serverSubscriptions, /SUBSCRIPTION_FEATURE_NOT_FOUND/);

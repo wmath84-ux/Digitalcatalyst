@@ -1,5 +1,7 @@
 import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./firebaseAdmin.js";
 import { getSubscriptionGateSettings } from "./subscriptionGate.js";
+import { subscriptionUnlocksFeature } from "../../utils/subscriptions.js";
+import { repairSubscriptionFeatures } from "./subscriptions.js";
 
 const MAX_ITEMS_PER_SECTION = 300;
 const MAX_PAYLOAD_BYTES = 700_000;
@@ -175,9 +177,13 @@ function accessSnapshot(
   gateSettings: import("./subscriptionGate.js").SubscriptionGateSettings | null = null,
 ): Access {
   const featureConfigured = Boolean(feature) && feature?.active !== false;
-  const active = subscription.status === "active" && millis(subscription.expiresAt) > now;
-  const features = Array.isArray(subscription.features) ? subscription.features.map(String) : [];
-  const paid = active && features.includes("my-day");
+  // Entitlement: the explicit stored feature list wins, but the two core
+  // subscription features (My Day cloud saving, Revision Studio) are what an
+  // active membership itself grants — every admin plan pricing tier is
+  // expressed as a price override, not an availability toggle. This keeps the
+  // profile allowance, My Day and Revision in sync for older memberships whose
+  // stored `features` list predates the id or is incomplete.
+  const paid = subscriptionUnlocksFeature(subscription, "my-day");
   const unlimited = !featureConfigured || paid;
   const freeLimit = Math.max(0, Math.min(100, Math.round(Number(feature?.freeItemsPerDay ?? 1) || 0)));
   // Persist the first validated timezone. A crafted client cannot repeatedly
@@ -214,16 +220,26 @@ async function loadStatus(uid: string, requestedTimeZone: string) {
   const db = adminDb();
   const dataRef = db.collection("users").doc(uid).collection("myDay").doc("current");
   const usageRef = db.collection("users").doc(uid).collection("myDayUsage").doc("current");
-  const [featureSnap, subscriptionSnap, dataSnap, usageSnap] = await Promise.all([
+  const [featureSnap, dataSnap, usageSnap] = await Promise.all([
     db.collection("subscriptionFeatures").doc("my-day").get(),
-    db.collection("users").doc(uid).collection("subscription").doc("current").get(),
     dataRef.get(),
     usageRef.get(),
   ]);
   const feature = featureSnap.exists ? asRecord(featureSnap.data()) : null;
   const usage = asRecord(usageSnap.data());
   const gateSettings = await getSubscriptionGateSettings();
-  const access = accessSnapshot(feature, asRecord(subscriptionSnap.data()), usage, requestedTimeZone, Date.now(), gateSettings);
+  // Self-heal: if this member's stored feature list is missing features
+  // their plan includes for free (e.g. an older Basic membership granted
+  // before plan-included features were written to the record), backfill the
+  // list before computing access. Fire-and-forget safety: a repair failure
+  // never blocks the status response.
+  try {
+    await repairSubscriptionFeatures(uid);
+  } catch (repairError) {
+    console.warn("[myday] subscription feature repair skipped", repairError);
+  }
+  const freshSubscriptionSnap = await db.collection("users").doc(uid).collection("subscription").doc("current").get();
+  const access = accessSnapshot(feature, asRecord(freshSubscriptionSnap.data()), usage, requestedTimeZone, Date.now(), gateSettings);
   await usageRef.set({
     uid,
     dayKey: access.dayKey,
