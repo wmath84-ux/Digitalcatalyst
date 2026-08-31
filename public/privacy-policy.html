@@ -79,13 +79,19 @@
       border-bottom: 1px solid var(--line-soft);
     }
     .site-header-inner {
-      max-width: 880px;
+      max-width: 1200px;
       margin: 0 auto;
       padding: 12px 18px;
       display: flex;
       align-items: center;
       gap: 12px;
       justify-content: space-between;
+    }
+    @media (max-width: 420px) {
+      .site-header-inner { padding: 10px 12px; gap: 8px; }
+      .header-link { padding: 6px 10px; font-size: 11.5px; }
+      .brand-name { font-size: 14px; }
+      .brand-sub { display: none; }
     }
     .brand {
       display: flex;
@@ -153,7 +159,7 @@
     .hero-inner {
       position: relative;
       z-index: 1;
-      max-width: 880px;
+      max-width: 1200px;
       margin: 0 auto;
     }
     .kicker {
@@ -205,15 +211,24 @@
 
     /* ── Layout ────────────────────────────────────────────────────── */
     .page {
-      max-width: 880px;
+      width: 100%;
+      max-width: 1200px;
       margin: 0 auto;
-      padding: 28px 18px 60px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 22px;
+      padding: 24px 16px 60px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+    /* Content column holds all cards — full width, never shrinks */
+    .content {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 18px;
     }
 
+    /* "This page" chips — on top of the content on mobile & tablet */
     .toc {
       display: flex;
       flex-wrap: wrap;
@@ -236,13 +251,58 @@
       box-shadow: var(--ring);
     }
 
+    /* Two-column layout for tablet-landscape and desktop: sticky TOC sidebar */
+    @media (min-width: 860px) {
+      .page {
+        grid-template-columns: 200px minmax(0, 1fr);
+        gap: 26px;
+        align-items: start;
+        padding: 36px 28px 72px;
+      }
+      .toc {
+        position: sticky;
+        top: 96px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        margin-top: 6px;
+        padding: 10px;
+        border: 1px solid var(--line-soft);
+        border-radius: 16px;
+        background: #fff;
+        box-shadow: var(--ring);
+        max-height: calc(100vh - 128px);
+        overflow-y: auto;
+      }
+      .toc a {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 9px 12px;
+        border: 0;
+        background: transparent;
+        color: var(--body);
+        border-radius: 10px;
+        font-size: 13px;
+      }
+      .toc a:hover {
+        transform: none;
+        box-shadow: none;
+        background: #f3f0ff;
+        border: 0;
+        color: var(--violet-ink);
+      }
+    }
+
     .card {
       background: var(--card);
       border: 1px solid var(--line-soft);
       border-radius: 20px;
       padding: 24px 22px;
       box-shadow: var(--ring);
-      scroll-margin-top: 92px;
+      scroll-margin-top: 96px;
+      min-width: 0;
+      overflow-wrap: break-word;
     }
     @media (min-width: 640px) {
       .card { padding: 30px 32px; border-radius: 24px; }
@@ -407,7 +467,7 @@
       color: #94a3b8;
     }
     .site-footer-inner {
-      max-width: 880px;
+      max-width: 1200px;
       margin: 0 auto;
       padding: 36px 18px 44px;
       text-align: center;
@@ -486,6 +546,7 @@
       <a href="#contact">Contact</a>
     </nav>
 
+    <div class="content">
     <section class="card" id="intro">
       <div class="section-head">
         <span class="section-icon">01</span>
@@ -633,6 +694,7 @@
     </section>
 
     <p><a class="back-link" data-policy-back href="/#/home">← Back to Eduvora</a></p>
+    </div>
   </main>
 
   <footer class="site-footer">
