@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, ChevronUp, NotebookPen, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, CheckSquare, ChevronDown, ChevronUp, NotebookPen, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import type { NoteColor, QuickNote } from "../../types";
 import { cn } from "../../utils/cn";
 
@@ -21,6 +21,141 @@ const colorStyles: Record<NoteColor, { card: string; editBg: string; highlight: 
 };
 
 const MAX_COLLAPSED_LENGTH = 80; // Characters before truncating
+
+// ── Big note editor ────────────────────────────────────────────────────────
+// Both the new-note composer and the edit view share this one surface. It is
+// deliberately LARGE and always the same size — a generous 200px floor that
+// grows with the content up to 55% of the viewport height — so writing is
+// comfortable and the box never shrinks or grows unpredictably. The old
+// editor lived inside the notes list's own scroll box and sized itself off
+// the note's length (rows + 45vh), which is exactly why it "kabhi pura
+// dikhta tha, kabhi nahi": a short note opened a small box, a long note a
+// tall one, and near the list edge the container clipped it.
+//
+// The editor replaces the list area while open (maximum area, no clipping)
+// and scrolls itself into view + focuses on mount. The action row carries
+// [Delete?] [Cancel] and a CHECKBOX-style Save: one click saves and closes
+// the editor.
+const EDITOR_MIN_HEIGHT_PX = 200;
+const EDITOR_MAX_HEIGHT_DVH = 55;
+
+interface BigNoteEditorProps {
+  kind: "compose" | "edit";
+  value: string;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onDelete?: () => void;
+  placeholder: string;
+  /** aria-label of the checkbox-save button ("Save note" for edit). */
+  saveAriaLabel: string;
+  surfaceClassName?: string;
+}
+
+function BigNoteEditor({
+  kind,
+  value,
+  onChange,
+  onSave,
+  onCancel,
+  onDelete,
+  placeholder,
+  saveAriaLabel,
+  surfaceClassName,
+}: BigNoteEditorProps) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Auto-grow: the box follows the content line by line between the 200px
+  // floor and the 55dvh cap, then scrolls internally.
+  const resize = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const cap = Math.max(EDITOR_MIN_HEIGHT_PX, Math.round(window.innerHeight * (EDITOR_MAX_HEIGHT_DVH / 100)));
+    el.style.height = `${Math.min(el.scrollHeight, cap)}px`;
+  }, []);
+
+  useEffect(() => { resize(); }, [value, resize]);
+
+  // Opening the editor: bring the FULL box into view and land the caret at
+  // the end. The explicit focus (in a frame) is more reliable than the
+  // autoFocus attribute, which can silently fail when the editor mounts
+  // inside a freshly-swapped area — another cause of the half-visible box.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const raf = requestAnimationFrame(() => {
+      el.focus();
+      const end = el.value.length;
+      try { el.setSelectionRange(end, end); } catch { /* ignore */ }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return (
+    <div className="space-y-2.5" data-myday-note-editor data-myday-note-editor-kind={kind}>
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onInput={resize}
+        rows={6}
+        placeholder={placeholder}
+        onKeyDown={(event) => {
+          // In the big editor Enter makes a new line; Ctrl/Cmd+Enter saves.
+          if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+            event.preventDefault();
+            onSave();
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            onCancel();
+          }
+        }}
+        className={cn(
+          "w-full resize-none rounded-xl border-0 px-3 py-2.5 text-sm text-slate-700 outline-none min-h-[200px] max-h-[55dvh] overflow-y-auto custom-scrollbar placeholder:text-slate-400 focus:ring-2 focus:ring-rose-200/70",
+          surfaceClassName ?? "bg-white/80",
+        )}
+      />
+      <div className="flex items-center justify-end gap-1.5">
+        {onDelete ? (
+          <button
+            onClick={onDelete}
+            aria-label="Delete note"
+            title="Delete note"
+            data-myday-note-editor-delete
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/60 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        ) : null}
+        <button
+          onClick={onCancel}
+          aria-label="Cancel editing"
+          title="Cancel (editor band karein, bina save kiye)"
+          data-myday-note-editor-cancel
+          className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/60 text-slate-500 transition hover:bg-white"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        {/* Checkbox-style Save: one click saves the note AND closes the
+            editor. It sits next to Delete / Cancel, styled like a check
+            box so the action is unmistakable. */}
+        <button
+          onClick={onSave}
+          disabled={!value.trim()}
+          aria-label={saveAriaLabel}
+          title={kind === "edit" ? "Save note & close editor" : "Save note & close"}
+          data-myday-note-save
+          className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-emerald-500 bg-emerald-500/15 text-emerald-600 transition hover:bg-emerald-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {kind === "edit" ? <Check className="h-4 w-4" strokeWidth={3} /> : <CheckSquare className="h-4 w-4" strokeWidth={2.5} />}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
@@ -50,6 +185,7 @@ function highlightText(text: string, query: string, highlightClass: string) {
 
 export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearch = "", onRequireAccess }: QuickNotesProps) {
   const [draft, setDraft] = useState("");
+  const [composerExpanded, setComposerExpanded] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -73,6 +209,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
     if (!draft.trim()) return;
     onAdd(draft.trim());
     setDraft("");
+    setComposerExpanded(false);
   };
 
   const startEdit = (note: QuickNote) => {
@@ -103,6 +240,20 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
     setEditText("");
   };
 
+  // Deleting from inside the editor: remove the note and fall straight back
+  // to the list (the expanded flag goes too, so nothing stale remains).
+  const deleteEditingNote = (note: QuickNote) => {
+    onDelete(note.id);
+    setEditingId(null);
+    setEditText("");
+    setExpandedIds((prev) => {
+      if (!prev.has(note.id)) return prev;
+      const next = new Set(prev);
+      next.delete(note.id);
+      return next;
+    });
+  };
+
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -126,6 +277,10 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
   }, [notes, searchQuery]);
 
   const isSearchActive = searchQuery.length > 0;
+
+  // The note currently open in the big editor (null → list view).
+  const editingNote = editingId ? notes.find((n) => n.id === editingId) ?? null : null;
+  const editingColor = editingNote ? colorStyles[editingNote.color] : null;
 
   return (
     <div className="dc-glass rounded-3xl shadow-[0_22px_48px_-28px_rgba(79,70,229,0.46)]">
@@ -178,103 +333,103 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
           )}
         </div>
 
-        {/* Input */}
-        <div className="dc-glass-input mb-4 flex items-start gap-2 rounded-2xl p-2 transition-all focus-within:ring-2 focus-within:ring-rose-100/80">
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submit();
-              }
-            }}
-            placeholder="Type a quick thought or reminder..."
-            rows={2}
-            className="min-h-[40px] flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-slate-700 outline-none placeholder:text-slate-400"
-          />
-          <button
-            onClick={submit}
-            disabled={!draft.trim()}
-            aria-label="Add note"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md shadow-rose-200 transition hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+        {/* Composer — a compact strip that EXPANDS into the big editor the
+            moment the learner starts writing, so short notes get the same
+            comfortable surface as edits. Cancel collapses it back without
+            losing the draft. */}
+        {composerExpanded ? (
+          <div className="dc-glass-input mb-4 rounded-2xl p-2.5 transition-all focus-within:ring-2 focus-within:ring-rose-100/80">
+            <BigNoteEditor
+              kind="compose"
+              value={draft}
+              onChange={setDraft}
+              onSave={submit}
+              onCancel={() => setComposerExpanded(false)}
+              placeholder="Type a quick thought or reminder..."
+              saveAriaLabel="Add note"
+              surfaceClassName="bg-transparent"
+            />
+          </div>
+        ) : (
+          <div className="dc-glass-input mb-4 flex items-start gap-2 rounded-2xl p-2 transition-all focus-within:ring-2 focus-within:ring-rose-100/80">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onFocus={() => setComposerExpanded(true)}
+              placeholder="Type a quick thought or reminder..."
+              rows={1}
+              className="min-h-[40px] flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+            />
+            <button
+              onClick={submit}
+              disabled={!draft.trim()}
+              aria-label="Add note"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md shadow-rose-200 transition hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Notes area — the big editor REPLACES the list while a note is open,
+            so it always gets the full card area and can never be clipped by
+            the list's own scroll box. Saving / cancelling / deleting brings
+            the list straight back. */}
+        {editingNote && editingColor ? (
+          <div
+            className={cn("rounded-xl border p-3.5 transition-all duration-200", editingColor.card)}
+            data-myday-note-edit-card
           >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
+            <BigNoteEditor
+              kind="edit"
+              value={editText}
+              onChange={setEditText}
+              onSave={saveEdit}
+              onCancel={cancelEdit}
+              onDelete={() => deleteEditingNote(editingNote)}
+              placeholder="Write your note..."
+              saveAriaLabel="Save note"
+              surfaceClassName={editingColor.editBg}
+            />
+          </div>
+        ) : (
+          <div className="max-h-80 space-y-2.5 overflow-y-auto pr-0.5 custom-scrollbar">
+            {filtered.length === 0 ? (
+              <div className="dc-glass flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-rose-200/70 bg-white/45 py-10 text-center">
+                {isSearchActive ? (
+                  <>
+                    <Search className="h-8 w-8 text-slate-300" />
+                    <p className="text-sm font-bold text-slate-500">
+                      No notes match "{searchQuery}"
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <NotebookPen className="h-8 w-8 text-slate-300" />
+                    <p className="text-sm font-bold text-slate-500">No notes yet. Start jotting!</p>
+                  </>
+                )}
+              </div>
+            ) : (
+              filtered.map((note, idx) => {
+                const isExpanded = expandedIds.has(note.id);
+                const isLong = note.text.length > MAX_COLLAPSED_LENGTH;
+                const cs = colorStyles[note.color];
 
-        {/* Notes list */}
-        <div className="max-h-80 space-y-2.5 overflow-y-auto pr-0.5 custom-scrollbar">
-          {filtered.length === 0 ? (
-            <div className="dc-glass flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-rose-200/70 bg-white/45 py-10 text-center">
-              {isSearchActive ? (
-                <>
-                  <Search className="h-8 w-8 text-slate-300" />
-                  <p className="text-sm font-bold text-slate-500">
-                    No notes match "{searchQuery}"
-                  </p>
-                </>
-              ) : (
-                <>
-                  <NotebookPen className="h-8 w-8 text-slate-300" />
-                  <p className="text-sm font-bold text-slate-500">No notes yet. Start jotting!</p>
-                </>
-              )}
-            </div>
-          ) : (
-            filtered.map((note, idx) => {
-              const isEditing = editingId === note.id;
-              const isExpanded = expandedIds.has(note.id);
-              const isLong = note.text.length > MAX_COLLAPSED_LENGTH;
-              const cs = colorStyles[note.color];
+                const displayText = isLong && !isExpanded
+                  ? note.text.slice(0, MAX_COLLAPSED_LENGTH) + "..."
+                  : note.text;
 
-              const displayText = isLong && !isExpanded
-                ? note.text.slice(0, MAX_COLLAPSED_LENGTH) + "..."
-                : note.text;
-
-              return (
-                <div
-                  key={note.id}
-                  className={cn(
-                    "group rounded-xl border transition-all duration-200",
-                    cs.card,
-                    isSearchActive && "ring-2 ring-amber-200/50",
-                  )}
-                  style={{ animationDelay: `${idx * 30}ms` }}
-                >
-                  {isEditing ? (
-                    <div className="p-3.5 space-y-2">
-                      <textarea
-                        autoFocus
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        rows={4}
-                        placeholder="Write your note..."
-                        className={cn(
-                          "w-full resize-none rounded-lg border-0 px-2.5 py-2 text-sm outline-none max-h-[45vh] overflow-y-auto custom-scrollbar",
-                          cs.editBg,
-                        )}
-                      />
-                      <div className="flex gap-1.5 justify-end">
-                        <button
-                          onClick={cancelEdit}
-                          aria-label="Cancel editing"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/60 text-slate-500 hover:bg-white transition"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={saveEdit}
-                          disabled={!editText.trim()}
-                          aria-label="Save note"
-                          title="Save note"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <Check className="h-4 w-4" strokeWidth={3} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
+                return (
+                  <div
+                    key={note.id}
+                    className={cn(
+                      "group rounded-xl border transition-all duration-200",
+                      cs.card,
+                      isSearchActive && "ring-2 ring-amber-200/50",
+                    )}
+                    style={{ animationDelay: `${idx * 30}ms` }}
+                  >
                     <div className="px-3.5 py-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
@@ -334,12 +489,12 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
