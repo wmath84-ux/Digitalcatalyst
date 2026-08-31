@@ -369,20 +369,47 @@ function SubmitConfirmModal({
   onConfirm: () => void;
 }) {
   const boundsRef = useRef<HTMLElement | null>(null);
-  const [boundsReady, setBoundsReady] = useState(0);
+  const [boundsReady, setBoundsReady] = useState(false);
+
+  // Resolve the column the overlay must stay inside (the page's own
+  // scroller, falling back to the revision content column). Re-queried on
+  // every mount — and retried one frame later when the page shell has not
+  // committed its <main> yet — so a missing element can never silently
+  // downgrade the overlay to the full-window fallback on tablet/desktop.
   useLayoutEffect(() => {
-    boundsRef.current =
-      document.querySelector<HTMLElement>("[data-revision-page-main]") ??
-      document.querySelector<HTMLElement>("[data-revision-content]");
-    setBoundsReady((n) => n + 1);
+    const resolve = () => {
+      boundsRef.current =
+        document.querySelector<HTMLElement>("[data-revision-page-main]") ??
+        document.querySelector<HTMLElement>("[data-revision-content]") ??
+        null;
+      return boundsRef.current !== null;
+    };
+    if (!resolve()) {
+      const raf = requestAnimationFrame(() => {
+        resolve();
+        setBoundsReady(true);
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+    setBoundsReady(true);
   }, []);
-  const { scoped, box } = useOverlayBox(boundsReady > 0, boundsRef as OverlayBoundsRef);
+
+  const { scoped, box } = useOverlayBox(boundsReady, boundsRef as OverlayBoundsRef);
   const isScoped = scoped && box !== null;
 
   useEffect(() => {
     lockBodyScroll();
     return () => unlockBodyScroll();
   }, []);
+
+  // Defensive clamp: even if a measurement is stale or degenerate, the
+  // overlay must never extend below the visible viewport — the dialog
+  // stays fully on screen without any scrolling on every tablet and
+  // desktop size.
+  const overlayHeight =
+    isScoped && box
+      ? Math.max(0, Math.min(box.height, window.innerHeight - box.top))
+      : undefined;
 
   return (
     <div
@@ -394,7 +421,7 @@ function SubmitConfirmModal({
       }
       style={
         isScoped && box
-          ? { top: box.top, left: box.left, width: box.width, height: box.height }
+          ? { top: box.top, left: box.left, width: box.width, height: overlayHeight }
           : undefined
       }
     >
@@ -407,9 +434,10 @@ function SubmitConfirmModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="rev-submit-title"
-        className="relative flex w-full max-w-[min(100%,26rem)] flex-col overflow-hidden rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6"
+        data-rev-submit-dialog
+        className="custom-scrollbar relative flex w-full max-w-[min(100%,26rem)] flex-col overflow-hidden rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6"
         style={{
-          maxHeight: isScoped && box ? "100%" : "min(100dvh - 2rem, 28rem)",
+          maxHeight: isScoped && box ? "100%" : undefined,
           paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",
         }}
       >

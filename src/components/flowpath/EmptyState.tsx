@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 export function EmptyState() {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4, duration: 0.8 }}
       className="pointer-events-none absolute left-1/2 top-[30%] w-[85%] max-w-sm -translate-x-1/2 text-center sm:top-[26%]"

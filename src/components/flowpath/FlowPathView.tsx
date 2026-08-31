@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Trash2, BookOpen } from "lucide-react";
 import type { Activity, ActivityType } from "../../flowpath/types/flowpath";
@@ -234,8 +234,10 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
   const hasAutoScrolled = useRef(false);
   const isEmpty = mergedItems.length === 0;
 
-  // measure container width responsively
-  useEffect(() => {
+  // measure container width responsively — useLayoutEffect so the width is
+  // known BEFORE the first paint: the Ribbon and the row layout are correct
+  // on frame one instead of popping in after a ResizeObserver tick.
+  useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {

@@ -7,6 +7,17 @@ function resolve(mode: ThemeMode): "dark" | "light" {
   return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
+/** Write the theme onto <html> so the palette is correct BEFORE the browser
+ *  paints the first frame. Called from the state initializer (synchronous,
+ *  pre-paint) and again from effects on every change. Without this the
+ *  attribute only landed in `useEffect`, i.e. AFTER the first paint — which
+ *  made the very first frame of FlowPath flash the wrong theme (white for
+ *  light-mode users) while the whole UI was still invisible. */
+const applyThemeAttribute = (resolved: "dark" | "light") => {
+  if (typeof document === "undefined") return;
+  document.documentElement.setAttribute("data-theme", resolved);
+};
+
 export function useTheme() {
   // FlowPath is a dark-first 3D dashboard — default to dark, not system
   const [mode, setMode] = useState<ThemeMode>(() => {
@@ -19,14 +30,19 @@ export function useTheme() {
 
   const [resolved, setResolved] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "dark";
-    return resolve(mode);
+    const resolvedNow = resolve(mode);
+    // Synchronous, before React commits: the first painted frame already
+    // carries the stored theme — no white/dark flash on navigation.
+    applyThemeAttribute(resolvedNow);
+    return resolvedNow;
   });
 
-  // Set data-theme on mount, REMOVE it on unmount so the rest of the app is unaffected
+  // Keep data-theme in sync on every change, REMOVE it on unmount so the
+  // rest of the app is unaffected.
   useEffect(() => {
     const resolvedNow = resolve(mode);
     setResolved(resolvedNow);
-    document.documentElement.setAttribute("data-theme", resolvedNow);
+    applyThemeAttribute(resolvedNow);
     try {
       localStorage.setItem("flowpath.theme", mode);
     } catch {
@@ -44,7 +60,7 @@ export function useTheme() {
       if (mode === "system") {
         const r = resolve(mode);
         setResolved(r);
-        document.documentElement.setAttribute("data-theme", r);
+        applyThemeAttribute(r);
       }
     };
     mq.addEventListener("change", handler);

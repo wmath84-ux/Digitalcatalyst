@@ -362,9 +362,12 @@ test("the map library re-uses the notes grid's own tiling function", () => {
   // measurement has to hold for the portrait sheet too instead of a second,
   // viewport-based rule taking over there.
   assert.doesNotMatch(libraryRule[0], /data-split-kind/, "no orientation/split mode may be excluded");
-  // …and a sheet dragged to its 10% minimum is narrower than one 160 px card,
-  // so the grid must shrink to the container rather than overflow it.
-  assert.match(libraryRule[0], /minmax\(min\(160px, 100%\), 1fr\)/);
+  // …and a sheet dragged to its 10% minimum is narrower than one 160 px card.
+  // The grid must NOT shrink to the container there: cards keep their 160 px
+  // floor and clip at the sheet edge — the exact dismissal behaviour of the
+  // Note Library — instead of shrinking to a sliver as the drag closes.
+  assert.match(libraryRule[0], /minmax\(160px, 1fr\)/);
+  assert.doesNotMatch(libraryRule[0], /minmax\(min\(160px/, "cards never shrink below 160 px during a drag-close");
 });
 
 test("the library is still mounted inside the sheet the split rule targets", () => {
