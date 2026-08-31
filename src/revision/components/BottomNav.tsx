@@ -77,7 +77,7 @@ export default function BottomNav({ route }: { route: string }) {
                     active ? "bg-indigo-100" : ""
                   } ${isHome && homeHold.holding ? "scale-110" : ""}`}
                 >
-                  {isHome && homeHold.holding && <HoldRing holding={homeHold.holding} />}
+                  {isHome && homeHold.holding && <HoldRing holding={homeHold.holding} durationMs={homeHold.durationMs} />}
                   <Icon className="h-5 w-5 [stroke-width:2px] text-black" />
                 </span>
                 <span className="w-full truncate leading-tight">{tab.label}</span>

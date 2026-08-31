@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 
 /** Default long-press duration for the Home button (ms). */
-export const DEFAULT_HOME_HOLD_DURATION = 3000;
+export const DEFAULT_HOME_HOLD_DURATION = 1000;
 
 /**
  * Manages a long-press on a footer Home button.

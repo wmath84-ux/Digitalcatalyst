@@ -2,15 +2,10 @@
 //
 // Custom audio player for the Course Player. Replaces the bare
 // native <audio> element with a themed transport that matches the
-// rest of the player (#090912 / violet-cyan accent):
+// rest of the player (#090912 / violet-cyan accent).
 //
-//   - Play / pause with an animated equalizer while playing.
-//   - Seek bar (click / drag) with elapsed + total time.
-//   - Mute toggle + loop toggle.
-//   - Restart from the beginning.
-//
-// The underlying element stays a native <audio> so all codecs and
-// streaming behaviour are handled by the browser.
+// The card scales with the viewer stage (phone, every tablet width,
+// landscape rails, desktop) so controls never clip or hide.
 
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw, Volume2, VolumeX, Repeat } from "lucide-react";
@@ -40,25 +35,33 @@ const formatTime = (value: number) => {
 
 export default function AudioPlayer({ url, name, active = true, resumeAt = 0, onProgress }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [loop, setLoop] = useState(false);
-  const [landscape, setLandscape] = useState(false);
+  const [compact, setCompact] = useState(false);
 
-  // Landscape is a wide, short viewport — the tall stacked card would push the
-  // transport controls off-screen, so we switch to a compact horizontal layout
-  // where the seek bar and transport stay reachable edge-to-edge.
+  // Compact = short stage (landscape phone / tablet landscape rails) OR
+  // a narrow split sheet. Artwork shrinks and the transport goes inline.
   useEffect(() => {
-    const media = window.matchMedia("(orientation: landscape)");
-    const update = () => setLandscape(media.matches);
-    update();
-    media.addEventListener?.("change", update);
-    window.addEventListener("resize", update);
+    const node = surfaceRef.current;
+    if (!node) return;
+    const measure = () => {
+      const w = node.clientWidth;
+      const h = node.clientHeight;
+      setCompact(h < 420 || w < 420 || (w > h && h < 520));
+    };
+    measure();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    observer?.observe(node);
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
     return () => {
-      media.removeEventListener?.("change", update);
-      window.removeEventListener("resize", update);
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
     };
   }, []);
 
@@ -67,7 +70,6 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
   const progressRef = useRef(onProgress);
   progressRef.current = onProgress;
 
-  // Reset when the track changes.
   useEffect(() => {
     setPlaying(false);
     setCurrentTime(0);
@@ -75,8 +77,6 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
     resumeApplied.current = false;
   }, [url]);
 
-  // Switching module stops the audio where it is — it must never keep playing
-  // behind another lesson.
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || active) return;
@@ -107,13 +107,17 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
     if (!playing) void audio.play();
   };
 
+  const artSize = compact ? "h-12 w-12 sm:h-14 sm:w-14" : "h-[clamp(4.5rem,18vmin,7.5rem)] w-[clamp(4.5rem,18vmin,7.5rem)]";
+  const playSize = compact ? "h-11 w-11" : "h-[clamp(2.75rem,10vmin,3.5rem)] w-[clamp(2.75rem,10vmin,3.5rem)]";
+  const sideSize = compact ? "h-9 w-9" : "h-10 w-10";
+
   const equalizer = (
     <div className="flex items-end gap-1">
       {[0, 1, 2, 3, 4].map((bar) => (
         <span
           key={bar}
-          className={`w-1.5 rounded-full bg-white ${playing ? "animate-eq" : ""}`}
-          style={{ height: playing ? undefined : `${8 + (bar % 3) * 4}px`, animationDelay: `${bar * 0.12}s` }}
+          className={`w-1 rounded-full bg-white sm:w-1.5 ${playing ? "animate-eq" : ""}`}
+          style={{ height: playing ? undefined : `${6 + (bar % 3) * 3}px`, animationDelay: `${bar * 0.12}s` }}
         />
       ))}
     </div>
@@ -128,11 +132,11 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
         step={0.1}
         value={Math.min(currentTime, duration || 0)}
         onChange={(event) => seek(Number(event.target.value))}
-        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[var(--course-soft-hover)] accent-violet-400"
+        className="h-1.5 w-full min-w-0 cursor-pointer appearance-none rounded-full bg-[var(--course-soft-hover)] accent-violet-400"
         aria-label="Seek"
         data-course-audio-seek
       />
-      <div className="mt-2 flex items-center justify-between text-[10px] font-bold tabular-nums text-[var(--course-muted)]">
+      <div className="mt-1 flex items-center justify-between text-[10px] font-bold tabular-nums text-[var(--course-muted)] sm:mt-2">
         <span data-course-audio-current>{formatTime(currentTime)}</span>
         <span data-course-audio-duration>{formatTime(duration)}</span>
       </div>
@@ -140,35 +144,35 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
   );
 
   const transport = (
-    <div className="flex items-center justify-center gap-3 sm:gap-4" data-course-audio-transport>
+    <div className={`flex shrink-0 items-center justify-center ${compact ? "gap-1.5" : "gap-2 sm:gap-3"}`} data-course-audio-transport>
       <button
         type="button"
         onClick={() => setLoop((value) => !value)}
         aria-label="Toggle loop"
-        className={`grid h-10 w-10 place-items-center rounded-full transition ${loop ? "bg-violet-500 text-white" : "bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"}`}
+        className={`grid ${sideSize} place-items-center rounded-full transition ${loop ? "bg-violet-500 text-white" : "bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"}`}
         data-course-audio-loop
         data-active={loop ? "true" : "false"}
       >
-        <Repeat size={16} />
+        <Repeat size={compact ? 14 : 16} />
       </button>
       <button
         type="button"
         onClick={restart}
         aria-label="Restart"
-        className="grid h-10 w-10 place-items-center rounded-full bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+        className={`grid ${sideSize} place-items-center rounded-full bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]`}
         data-course-audio-restart
       >
-        <RotateCcw size={16} />
+        <RotateCcw size={compact ? 14 : 16} />
       </button>
       <button
         type="button"
         onClick={togglePlay}
         aria-label={playing ? "Pause" : "Play"}
-        className="grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-lg shadow-violet-500/40 transition active:scale-95"
+        className={`grid ${playSize} place-items-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-lg shadow-violet-500/40 transition active:scale-95`}
         data-course-audio-play
         data-playing={playing ? "true" : "false"}
       >
-        {playing ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
+        {playing ? <Pause size={compact ? 18 : 22} /> : <Play size={compact ? 18 : 22} className="ml-0.5" />}
       </button>
       <button
         type="button"
@@ -179,43 +183,51 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
           setMuted(audio.muted);
         }}
         aria-label="Toggle mute"
-        className="grid h-10 w-10 place-items-center rounded-full bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+        className={`grid ${sideSize} place-items-center rounded-full bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]`}
         data-course-audio-mute
         data-muted={muted ? "true" : "false"}
       >
-        {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+        {muted ? <VolumeX size={compact ? 14 : 16} /> : <Volume2 size={compact ? 14 : 16} />}
       </button>
     </div>
   );
 
   return (
-    <div className="grid h-full place-items-center course-audio-surface bg-[var(--course-bg)] p-3 sm:p-6" data-course-viewer-audio data-orientation={landscape ? "landscape" : "portrait"}>
-      {landscape ? (
-        <div className="flex w-full max-w-3xl items-center gap-4 rounded-3xl border border-[var(--course-border)] bg-[var(--course-soft)] p-4 shadow-2xl backdrop-blur" data-course-audio-player>
-          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg shadow-violet-500/30">
+    <div
+      ref={surfaceRef}
+      className="grid h-full min-h-0 w-full min-w-0 place-items-center overflow-hidden course-audio-surface bg-[var(--course-bg)] p-2 sm:p-4 md:p-6"
+      data-course-viewer-audio
+      data-orientation={compact ? "landscape" : "portrait"}
+      data-compact={compact ? "true" : "false"}
+    >
+      {compact ? (
+        <div
+          className="flex w-full max-w-3xl min-w-0 items-center gap-2 rounded-2xl border border-[var(--course-border)] bg-[var(--course-soft)] p-2.5 shadow-2xl backdrop-blur sm:gap-3 sm:rounded-3xl sm:p-3.5"
+          data-course-audio-player
+        >
+          <div className={`grid ${artSize} shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg shadow-violet-500/30`}>
             {equalizer}
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
-            <p className="truncate text-sm font-black text-[var(--course-text)]" title={name}>{name}</p>
-            <div className="mt-1.5">{seekBar}</div>
+            <p className="truncate text-xs font-black text-[var(--course-text)] sm:text-sm" title={name}>{name}</p>
+            <div className="mt-1">{seekBar}</div>
           </div>
           {transport}
         </div>
       ) : (
-        <div className="w-full max-w-md rounded-3xl border border-[var(--course-border)] bg-[var(--course-soft)] p-6 shadow-2xl backdrop-blur" data-course-audio-player>
-          {/* Artwork / equalizer */}
-          <div className="mx-auto grid h-24 w-24 place-items-center rounded-3xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg shadow-violet-500/30">
+        <div
+          className="w-full max-w-[min(28rem,100%)] min-w-0 rounded-3xl border border-[var(--course-border)] bg-[var(--course-soft)] p-[clamp(1rem,3.5vmin,1.75rem)] shadow-2xl backdrop-blur"
+          data-course-audio-player
+        >
+          <div className={`mx-auto grid ${artSize} place-items-center rounded-3xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg shadow-violet-500/30`}>
             {equalizer}
           </div>
 
-          <p className="mt-5 truncate text-center text-sm font-black text-[var(--course-text)]" title={name}>{name}</p>
+          <p className="mt-4 truncate text-center text-sm font-black text-[var(--course-text)] sm:mt-5" title={name}>{name}</p>
           <p className="mt-1 text-center text-[10px] font-bold uppercase tracking-wider text-[var(--course-muted)]">Now playing</p>
 
-          {/* Seek bar */}
-          <div className="mt-5">{seekBar}</div>
-
-          {/* Transport controls */}
-          <div className="mt-4">{transport}</div>
+          <div className="mt-4 sm:mt-5">{seekBar}</div>
+          <div className="mt-3 sm:mt-4">{transport}</div>
         </div>
       )}
 
@@ -233,7 +245,6 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
         onLoadedMetadata={(event) => {
           const audio = event.currentTarget;
           setDuration(audio.duration || 0);
-          // Continue from where the learner left off.
           if (!resumeApplied.current && resumeRef.current > 0) {
             audio.currentTime = Math.min(resumeRef.current, Math.max(0, (audio.duration || 0) - 1));
             setCurrentTime(audio.currentTime);
