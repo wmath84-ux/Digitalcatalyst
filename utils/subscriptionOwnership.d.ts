@@ -29,6 +29,17 @@ export interface SubscriptionSelectionState {
   newFeatureIds: string[];
   /** Products the current membership does not already unlock (empty unless addOnPurchase). */
   newProductIds: string[];
+  /**
+   * Feature ids the ACTIVE membership already unlocks (paid with the current
+   * plan, or free on the current plan/cycle). These are never charged again —
+   * even when the buyer switches to a higher plan — but they stay granted.
+   */
+  ownedFeatureIds: string[];
+  /**
+   * Product ids the ACTIVE membership already unlocks. Same carry-over rule
+   * as `ownedFeatureIds`: never charged twice, always kept.
+   */
+  ownedProductIds: string[];
   code: string | null;
   reason: string | null;
 }

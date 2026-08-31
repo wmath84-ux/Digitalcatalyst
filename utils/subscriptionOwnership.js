@@ -142,14 +142,21 @@ export const evaluateSubscriptionSelection = ({
   // AND include something the current membership does not already unlock.
   const selectedFeatureIds = toStringArray(featureIds);
   const selectedProductIds = toStringArray(productIds);
-  const ownedFeatureIds = new Set(owned ? owned.featureIds : []);
-  const ownedProductIds = new Set(owned ? owned.productIds : []);
-  const newFeatureIds = selectedFeatureIds.filter((id) => !ownedFeatureIds.has(id));
-  const newProductIds = selectedProductIds.filter((id) => !ownedProductIds.has(id));
+  const ownedFeatureIdSet = new Set(owned ? owned.featureIds : []);
+  const ownedProductIdSet = new Set(owned ? owned.productIds : []);
+  const newFeatureIds = selectedFeatureIds.filter((id) => !ownedFeatureIdSet.has(id));
+  const newProductIds = selectedProductIds.filter((id) => !ownedProductIdSet.has(id));
   const addOnPurchase = Boolean(isOwned && (newFeatureIds.length > 0 || newProductIds.length > 0));
 
   const blocked = isOwned && !renewalEligible && !addOnPurchase;
   const daysRemaining = daysUntilExpiry(record, now);
+
+  // Whatever the selection is (renewal, add-on, or a switch to a higher
+  // plan), the active membership's unlocked features / products are
+  // ALREADY PAID — they are carried over and never charged again. The
+  // subscription page and the server quote both read these arrays.
+  const ownedFeatureIds = Array.from(ownedFeatureIdSet);
+  const ownedProductIds = Array.from(ownedProductIdSet);
 
   return {
     active,
@@ -164,6 +171,8 @@ export const evaluateSubscriptionSelection = ({
     renewalOpensAt: opensAt,
     newFeatureIds,
     newProductIds,
+    ownedFeatureIds,
+    ownedProductIds,
     code: blocked ? ALREADY_ACTIVE_CODE : null,
     reason: blocked
       ? `You already have an active ${normaliseCycle(cycle) === "yearly" ? "yearly" : "monthly"} membership on this plan. You can renew it in the last ${renewalWindowDays} days before it ends.`

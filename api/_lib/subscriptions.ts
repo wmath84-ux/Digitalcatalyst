@@ -672,6 +672,38 @@ export const loadSubscriptionSelectionContext = async (
     ? Number(ownershipVerdict.expiresAt)
     : 0;
 
+  // -------------------------------------------------------------------------
+  // ALREADY-OWNED CARRY-OVER. The active membership already unlocks features
+  // / products (paid for with the current subscription, or free on the owned
+  // plan/cycle). Those items are NEVER charged again — not on a renewal, not
+  // on an in-plan add-on, and not when the buyer switches to a higher plan.
+  // They stay granted (the quote keeps them in `subscriptionFeatureIds` /
+  // `subscriptionProductIds`), so the buyer simply keeps what they already
+  // paid for and is never billed twice for the same item.
+  // -------------------------------------------------------------------------
+  const hasActiveMembership = Boolean(ownershipVerdict && ownershipVerdict.active);
+  const ownedFeatureIdSet = new Set<string>(
+    hasActiveMembership && ownershipVerdict
+      ? ownershipVerdict.ownedFeatureIds.map(String)
+      : [],
+  );
+  const ownedProductIdSet = new Set<string>(
+    hasActiveMembership && ownershipVerdict
+      ? ownershipVerdict.ownedProductIds.map(String)
+      : [],
+  );
+  if (hasActiveMembership && ownershipVerdict && ownershipVerdict.planId) {
+    const ownedPlanId = String(ownershipVerdict.planId);
+    const ownedCycle: BillingCycle = ownershipVerdict.cycle === "yearly" ? "yearly" : "monthly";
+    // Free features on the OWNED plan/cycle are already unlocked even when an
+    // older record did not yet list them — they carry over too.
+    for (const feature of allFeatures) {
+      if (!feature?.id || !feature.active) continue;
+      const resolved = resolveFeaturePrice(feature as never, ownedPlanId, ownedCycle);
+      if (feature.included || resolved.included) ownedFeatureIdSet.add(String(feature.id));
+    }
+  }
+
   // Load subscription product pricing rules so we can apply per-plan / per-cycle / free overrides
   const subProducts = await loadSubscriptionProducts(options);
 
@@ -756,7 +788,21 @@ export const loadSubscriptionSelectionContext = async (
         if (item.productId && !addOnNewResolvedProductIds.has(String(item.productId))) return false;
         return true;
       })
-    : lineItems;
+    : lineItems.map((item) => {
+        // Renewal / plan change (any other active-membership selection): the
+        // plan itself is charged for the new cycle, but every item the
+        // membership ALREADY unlocks is carried over at ₹0 — marked
+        // `alreadyOwned` so the review page shows it was bought before and no
+        // money is taken for it a second time.
+        if (!hasActiveMembership) return item;
+        if (item.featureId && ownedFeatureIdSet.has(String(item.featureId))) {
+          return { ...item, regularPrice: 0, salePrice: null, effectivePrice: 0, alreadyOwned: true };
+        }
+        if (item.productId && ownedProductIdSet.has(String(item.productId))) {
+          return { ...item, regularPrice: 0, salePrice: null, effectivePrice: 0, alreadyOwned: true };
+        }
+        return item;
+      });
 
   // An add-on purchase must never move the membership window: the buyer keeps
   // their current expiry. Only brand-new activations / plan changes compute a
@@ -937,13 +983,18 @@ export const writeSubscriptionAfterPayment = async (
   const expiresAt = computeCycleExpiresAt(renewalPlan, args.cycle, subscriptionBase);
   const renewalCount = Math.max(0, Number(previousData.renewalCount || 0)) + (previous.exists && !isPlanChange ? 1 : 0);
   const upgradeCount = Math.max(0, Number(previousData.upgradeCount || 0)) + (isPlanChange ? 1 : 0);
+  // Renewals and plan changes carry the previously purchased access forward:
+  // features / products the member already paid for are never lost (and were
+  // never charged again in the quote), the new plan's entitlements are merged
+  // on top, and the new plan/cycle starts as configured.
+  const access = mergeSubscriptionAccess(previousData, args.plan, args.selectedFeatureIds);
   const record: SubscriptionRecord = {
     uid: args.uid,
     planId: args.plan.id,
     cycle: args.cycle,
-    features: args.selectedFeatureIds.slice(),
-    includedProductIds: args.plan.includedProductIds.slice(),
-    includedModuleKeys: args.plan.includedModuleKeys.slice(),
+    features: access.features,
+    includedProductIds: access.includedProductIds,
+    includedModuleKeys: access.includedModuleKeys,
     status: "active",
     activatedAt: args.now,
     expiresAt,
@@ -979,7 +1030,7 @@ export const writeSubscriptionAfterPayment = async (
       subscriptionPlanId: args.plan.id,
       subscriptionCycle: args.cycle,
       subscriptionTier: args.plan.id,
-      subscriptionFeatures: args.selectedFeatureIds.slice(),
+      subscriptionFeatures: access.features,
       subscriptionExpiresAt: Timestamp.fromMillis(expiresAt),
       subscriptionAutoRenew: false,
       subscriptionRenewalCount: renewalCount,

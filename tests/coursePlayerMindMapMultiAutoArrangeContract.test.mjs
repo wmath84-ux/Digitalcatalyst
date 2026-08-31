@@ -294,8 +294,12 @@ test("the panel ships a notes-style card list of the module's maps", () => {
 test("the map library's delete acts on a MAP, the toolbar trash on a BRANCH", () => {
   // Two different destructive actions must never share a control.
   assert.match(panel, /data-course-mindmap-delete\b/);
-  assert.match(panel, /onDeleteMap\?\.\(entry\.mapKey\)/);
-  assert.match(panel, /if \(selectedId\) handleDelete\(selectedId\);/);
+  // Both are now TWO-step: the first tap opens the confirmation overlay and
+  // the real destructive call only happens in the confirmation handler.
+  assert.match(panel, /requestMapDelete\(entry\.mapKey\)/);
+  assert.match(panel, /if \(selectedId\) requestDelete\(selectedId\);/);
+  assert.match(panel, /if \(key\) onDeleteMap\?\.\(key\);/);
+  assert.match(panel, /ConfirmDeleteDialog/);
 });
 
 test("the player hands the whole map list down to the panel", () => {

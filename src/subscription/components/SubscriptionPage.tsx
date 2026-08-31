@@ -391,21 +391,96 @@ export default function SubscriptionPage({
   // charged (the server enforces the same rule when it builds the quote).
   const isAddOnUpgrade = Boolean(ownershipState.addOnPurchase && !ownershipState.blocked);
 
+  // -------------------------------------------------------------------------
+  // ALREADY-PAID CARRY-OVER. While a membership is active, every feature /
+  // product the member already unlocked (bought with the current
+  // subscription, or free on the owned plan/cycle) is ALREADY PAID. Those
+  // items must never be added to another plan's order summary — on a renewal,
+  // an in-plan add-on, or a switch to a higher plan. They are carried over
+  // (still granted on the new plan) but contribute ₹0, exactly as the server
+  // quote filters them.
+  // -------------------------------------------------------------------------
+  const membershipOwnedFeatureIds = useMemo(() => {
+    if (!ownershipState.active) return [];
+    const owned = new Set<string>(
+      Array.isArray(activeSubscription?.features) ? activeSubscription.features.map(String) : [],
+    );
+    const recordPlanId = String(activeSubscription?.planId || "").trim();
+    const recordCycle: BillingCycle | null =
+      activeSubscription?.cycle === "yearly"
+        ? "yearly"
+        : activeSubscription?.cycle === "monthly"
+          ? "monthly"
+          : null;
+    if (recordPlanId && recordCycle) {
+      for (const feature of rawFeatures) {
+        const resolved = resolveFeaturePrice(feature as never, recordPlanId, recordCycle);
+        if (feature.included || resolved.included) owned.add(String(feature.id));
+      }
+    }
+    return Array.from(owned);
+  }, [ownershipState.active, activeSubscription, rawFeatures]);
+  const membershipOwnedFeatureIdSet = useMemo(
+    () => new Set(membershipOwnedFeatureIds),
+    [membershipOwnedFeatureIds],
+  );
+  const membershipOwnedProductIds = useMemo(() => {
+    if (!ownershipState.active) return [];
+    return Array.from(new Set(
+      Array.isArray(activeSubscription?.includedProductIds)
+        ? activeSubscription.includedProductIds.map(String)
+        : [],
+    ));
+  }, [ownershipState.active, activeSubscription]);
+  const membershipOwnedProductIdSet = useMemo(
+    () => new Set(membershipOwnedProductIds),
+    [membershipOwnedProductIds],
+  );
+
   // Server is the only authority on price math. We display the
   // plan's cycle price + feature prices + coupon discount (from
   // the verified quote) — never derive the total client-side.
   //
-  // Add-on upgrades charge ONLY the new items: the plan line (already paid)
-  // and every already-owned feature / product are excluded from the payable
-  // total shown here, exactly like the server filters the quote line items.
+  // Already-owned carry-over: whenever the buyer has an active membership,
+  // ONLY the items not already unlocked are payable. The plan line stays
+  // (a renewal / plan change buys the new cycle; only the same-plan add-on
+  // skips it), but every paid feature / product is excluded from the total
+  // shown here — exactly like the server filters the quote line items.
   const chargeableFeatureIds = useMemo(
-    () => (isAddOnUpgrade ? ownershipState.newFeatureIds : selectedFeatureIds),
-    [isAddOnUpgrade, ownershipState.newFeatureIds, selectedFeatureIds],
+    () =>
+      ownershipState.active
+        ? selectedFeatureIds.filter((id) => !membershipOwnedFeatureIdSet.has(id))
+        : (isAddOnUpgrade ? ownershipState.newFeatureIds : selectedFeatureIds),
+    [ownershipState.active, isAddOnUpgrade, ownershipState.newFeatureIds, selectedFeatureIds, membershipOwnedFeatureIdSet],
   );
   const chargeableCourseIds = useMemo(
-    () => (isAddOnUpgrade ? ownershipState.newProductIds : selectedCourseIds),
-    [isAddOnUpgrade, ownershipState.newProductIds, selectedCourseIds],
+    () =>
+      ownershipState.active
+        ? selectedCourseIds.filter((id) => !membershipOwnedProductIdSet.has(id))
+        : (isAddOnUpgrade ? ownershipState.newProductIds : selectedCourseIds),
+    [ownershipState.active, isAddOnUpgrade, ownershipState.newProductIds, selectedCourseIds, membershipOwnedProductIdSet],
   );
+  // Items the buyer already owns but still selected — shown in the summary as
+  // "Already purchased · ₹0" so it is impossible to miss that nothing is
+  // charged for them twice.
+  const carriedOverFeatureRecords = useMemo(
+    () =>
+      features.filter(
+        (feature) =>
+          selectedFeatureIds.includes(feature.id) &&
+          membershipOwnedFeatureIdSet.has(feature.id),
+      ),
+    [features, selectedFeatureIds, membershipOwnedFeatureIdSet],
+  );
+  const carriedOverProductRecords = useMemo(() => {
+    if (!ownershipState.active) return [];
+    const carried = new Set(
+      selectedCourseIds.filter((id) => membershipOwnedProductIdSet.has(id)),
+    );
+    return availableProducts.filter((product) => productHasId(product, carried));
+  }, [ownershipState.active, selectedCourseIds, membershipOwnedProductIdSet, availableProducts]);
+  const hasOwnedCarryOver =
+    carriedOverFeatureRecords.length > 0 || carriedOverProductRecords.length > 0;
   const featuresTotalPaise = useMemo(
     () => sumSelectedFeaturePaise(rawFeatures, chargeableFeatureIds, selectedPlanId, cycle),
     [rawFeatures, chargeableFeatureIds, selectedPlanId, cycle],
@@ -616,6 +691,14 @@ export default function SubscriptionPage({
   // different?" hint on the owned card. Only HIGHER plans are offered: a
   // downgrade is never purchasable, so it is never advertised either.
   const purchasablePlanNames = useMemo(() => upgradePlans.map((p) => p.name), [upgradePlans]);
+
+  // Course picker owned ids: store-purchased products (already in the
+  // catalog) UNION products unlocked by the active subscription — neither
+  // can ever be re-selected, so they are never charged a second time.
+  const subscriptionProductOwnedIds = useMemo(
+    () => new Set<string>([...purchasedIds, ...membershipOwnedProductIds]),
+    [purchasedIds, membershipOwnedProductIds],
+  );
 
   // Phase-2: subscriber-only override price for the currently selected
   // plan + cycle. Resolved via the admin's `settings/subscriptionGate`
@@ -949,6 +1032,25 @@ export default function SubscriptionPage({
                 </span>
               </div>
             ) : null}
+            {!isAddOnUpgrade && hasOwnedCarryOver ? (
+              <div
+                data-subscription-carryover-note
+                className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] leading-relaxed text-emerald-800"
+              >
+                <span aria-hidden="true">✅</span>
+                <span>
+                  <strong>Already purchased — carried over:</strong>{" "}
+                  {carriedOverFeatureRecords.length} feature
+                  {carriedOverFeatureRecords.length === 1 ? "" : "s"}
+                  {carriedOverProductRecords.length > 0
+                    ? ` and ${carriedOverProductRecords.length} course${carriedOverProductRecords.length === 1 ? "" : "s"}`
+                    : ""}{" "}
+                  you already paid for are included with the new plan. They
+                  are <strong>not charged again</strong> — you only pay for
+                  the new plan and any new items.
+                </span>
+              </div>
+            ) : null}
             {!isAddOnUpgrade && isSelectionOwned ? (
               <div className="flex items-start gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-[11px] leading-relaxed text-violet-800">
                 <span aria-hidden="true">💡</span>
@@ -1100,6 +1202,8 @@ export default function SubscriptionPage({
           productsTotalPaise={productsTotalPaise}
           featureTitles={chargeableFeatureRecords.map((feature) => feature.name)}
           includedFeatureTitles={includedFeatureRecords.map((feature) => feature.name)}
+          alreadyOwnedFeatureTitles={carriedOverFeatureRecords.map((feature) => feature.name)}
+          alreadyOwnedProductTitles={carriedOverProductRecords.map((product) => String(product.title || ""))}
           products={chargeableProductRecords.map((product) => ({
             id: String(product.documentId || product.id),
             title: String(product.title || ""),
@@ -1154,7 +1258,7 @@ export default function SubscriptionPage({
         onClose={() => setCourseModalOpen(false)}
         onChangeSelected={setSelectedCourseIds}
         products={subscriptionDisplayProducts}
-        purchasedIds={purchasedIds}
+        purchasedIds={subscriptionProductOwnedIds}
       />
 
       <FeatureSelectModal

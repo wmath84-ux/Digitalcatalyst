@@ -830,7 +830,7 @@ export const buildQuote = (input) => {
         effectivePaise: Math.max(0, Math.round(Number(item.effectivePrice || 0))),
         quantity: Math.max(1, Math.floor(Number(item.quantity || 1))),
         entitlementId: String(item.entitlementId || item.id || `subscription:${selection.subscriptionPlanId}`),
-        alreadyOwned: false,
+        alreadyOwned: item.alreadyOwned === true,
         minPayablePaise: 0,
         parentProductTitle: item.parentTitle || "",
       });
@@ -843,10 +843,27 @@ export const buildQuote = (input) => {
 
   // ===========================================================================
   // Drop already-owned line items (they would be free grants).
+  //
+  // Subscription carry-over is the one exception: a feature / product the
+  // active membership already unlocks is kept at ₹0 and marked
+  // `alreadyOwned` so the review page can show "already purchased — no
+  // charge" while the grant still writes it on the new plan. Every other
+  // already-owned line (products / modules / resources) is dropped as usual.
   // ===========================================================================
   const keptLines = [];
   for (const line of rawLines) {
-    if (line.alreadyOwned) continue;
+    if (line.alreadyOwned) {
+      if (isSubscriptionKind) {
+        keptLines.push({
+          ...line,
+          regularPaise: 0,
+          salePaise: null,
+          effectivePaise: 0,
+          minPayablePaise: 0,
+        });
+      }
+      continue;
+    }
     // Sale-window expiry: re-check that the sale is still valid now.
     if (!isSaleValidNow({ saleStart: null, saleEnd: null }, now)) {
       return { ok: false, status: 409, reason: `Sale expired for "${line.title}".` };
@@ -936,7 +953,10 @@ export const buildQuote = (input) => {
     salePrice: line.salePaise,
     effectivePrice: line.effectivePaise,
     quantity: line.quantity,
-    alreadyOwned: false, // kept lines are by definition not already owned
+    // Kept lines are by definition new — EXCEPT subscription carry-over
+    // lines, which stay visible at ₹0 and keep `alreadyOwned: true` so the
+    // checkout review can state they were bought before.
+    alreadyOwned: isSubscriptionKind && line.alreadyOwned === true,
     entitlementId: line.entitlementId,
     detailItems: Array.isArray(line.detailItems) ? line.detailItems.map(String) : [],
   }));
