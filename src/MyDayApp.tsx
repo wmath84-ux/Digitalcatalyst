@@ -272,12 +272,29 @@ export default function App() {
   useEffect(() => {
     if (!uid) { setCloudLoaded(false); return; }
     let cancelled = false;
-    void refreshMyDay().then((result) => {
-      if (cancelled || !result) return;
-      applyCloudData(result.data);
-      setCloudLoaded(true);
-      setCloudSyncFailed(false);
-    });
+    void refreshMyDay()
+      .then((result) => {
+        if (cancelled) return;
+        if (result) {
+          // Cloud data is authoritative for this account — apply it (the
+          // server normalises/validates every row) so the same tasks,
+          // schedule, notes and reminders appear on every device the
+          // learner signs in on.
+          applyCloudData(result.data);
+          setCloudSyncFailed(false);
+        } else {
+          // Status fetch failed (network). Keep showing this device's data
+          // but mark the cloud as unavailable so saves surface the
+          // "synced on this device" notice instead of pretending.
+          setCloudSyncFailed(true);
+        }
+        setCloudLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCloudSyncFailed(true);
+        setCloudLoaded(true);
+      });
     return () => { cancelled = true; };
   }, [applyCloudData, refreshMyDay, uid]);
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Check, Lock, Search, Sparkles, X } from "lucide-react";
+import { BadgeCheck, Check, Search, Sparkles, X } from "lucide-react";
 import type { CanonicalCourseModule } from "../../types/commerce";
 import { getModuleEffectivePrice } from "../../../utils/pdpSelection";
 
@@ -160,11 +160,11 @@ export default function ModuleSelectModal({
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <span className="text-sm font-extrabold text-slate-800">{owned ? "Owned" : `+${formatPrice(price)}`}</span>
-                        <span className={`flex h-5 w-5 items-center justify-center rounded-md border-2 ${
+                        <span className={`text-sm font-extrabold ${owned ? "text-emerald-700" : "text-slate-800"}`}>{owned ? "Purchased" : `+${formatPrice(price)}`}</span>
+                        <span aria-label={owned ? "Purchased" : undefined} className={`flex h-5 w-5 items-center justify-center rounded-md border-2 ${
                           owned ? "border-emerald-500 bg-emerald-500 text-white" : checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300 bg-white"
                         }`}>
-                          {owned ? <Lock className="h-3 w-3" /> : checked ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
+                          {owned ? <BadgeCheck className="h-3.5 w-3.5" strokeWidth={2.5} /> : checked ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
                         </span>
                       </div>
                     </button>

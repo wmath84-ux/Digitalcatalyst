@@ -1,4 +1,5 @@
 import { auth } from "../../firebase";
+import { apiFetch } from "../utils/apiBase";
 import type { QuickNote, Reminder, ScheduleEvent, Task } from "../types";
 
 export type MyDayCloudData = {
@@ -53,7 +54,7 @@ async function request(action: "myday.status" | "myday.save", data?: Partial<MyD
   const user = auth.currentUser;
   if (!user) throw new MyDayApiError("Please log in to use My Day.", "AUTH_REQUIRED", 401);
   const token = await user.getIdToken();
-  const response = await fetch("/api/myday", {
+  const response = await apiFetch("/api/myday", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ action, data, timeZone: browserTimeZone(), tzOffsetMinutes: metadata?.tzOffsetMinutes ?? new Date().getTimezoneOffset() }),

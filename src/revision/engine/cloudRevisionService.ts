@@ -17,6 +17,7 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { auth, db as firestore } from "../../../firebase";
+import { apiFetch } from "../../utils/apiBase";
 import {
   loadDb,
   saveDb,
@@ -158,7 +159,7 @@ async function callRevisionData<T>(uid: string, body: Record<string, unknown>): 
   const timer = setTimeout(() => controller.abort(), REVISION_API_TIMEOUT_MS);
   let response: Response;
   try {
-    response = await fetch("/api/revision/data", {
+    response = await apiFetch("/api/revision/data", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),

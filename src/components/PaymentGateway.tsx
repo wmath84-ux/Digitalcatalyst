@@ -19,6 +19,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, CreditCard, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import { auth } from "../../firebase";
+import { apiFetch } from "../utils/apiBase";
 import { revealCheckoutChromeOverRazorpay, type CheckoutChromeController } from "../utils/razorpayCheckoutChrome";
 import { playPaymentSuccessChime, preparePaymentSound } from "../utils/paymentSounds";
 import { formatPaise } from "../utils/money";
@@ -122,7 +123,7 @@ const apiRequest = async <T,>(path: string, body: Record<string, unknown>): Prom
   const firebaseUser = auth.currentUser;
   if (!firebaseUser) throw new Error("Your session expired. Please log in again.");
   const token = await firebaseUser.getIdToken(true);
-  const response = await fetch(path, {
+  const response = await apiFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),

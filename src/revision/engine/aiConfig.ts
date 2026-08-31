@@ -12,6 +12,7 @@
 // never baked into the public bundle.
 
 import { auth } from "../../../firebase";
+import { apiFetch } from "../../utils/apiBase";
 import type { ParsedQuestion } from "./bulkParser";
 import {
   buildUserPrompt,
@@ -743,7 +744,7 @@ async function generateViaServer(args: RevisionGenerateArgs): Promise<ParsedQues
   const firebaseUser = auth.currentUser;
   if (!firebaseUser) throw Object.assign(new Error("Please log in to generate with AI."), { code: "auth" });
   const token = await firebaseUser.getIdToken(true);
-  const res = await fetch("/api/revision/generate", {
+  const res = await apiFetch("/api/revision/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({
@@ -897,7 +898,7 @@ async function completeJsonViaServer(config: AiConfig, system: string, user: str
   const firebaseUser = auth.currentUser;
   if (!firebaseUser) throw Object.assign(new Error("Please log in as admin."), { code: "auth" });
   const token = await firebaseUser.getIdToken(true);
-  const res = await fetch("/api/revision/generate", {
+  const res = await apiFetch("/api/revision/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({

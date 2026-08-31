@@ -37,6 +37,7 @@ import { reviews as fallbackReviews } from "./home/data/mockData";
 import { useAuth } from "./context/AuthContext";
 import { useBranding } from "./context/BrandingContext";
 import { auth, db } from "../firebase";
+import { apiFetch } from "./utils/apiBase";
 import PromoCodeInput, { type PromoResult } from "./subscription/components/PromoCodeInput";
 import { isFreeProduct, shouldShowCouponInput } from "../utils/couponVisibility";
 import {
@@ -351,7 +352,7 @@ function PremiumProductContent({
         const firebaseUser = auth.currentUser;
         if (!firebaseUser) return { valid: false, message: "Please sign in to apply a coupon." };
         const token = await firebaseUser.getIdToken(true);
-        const response = await fetch("/api/quotes/create", {
+        const response = await apiFetch("/api/quotes/create", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
@@ -452,7 +453,7 @@ function PremiumProductContent({
       } catch {
         const token = await import("../firebase").then((module) => module.auth.currentUser?.getIdToken(true));
         if (!token) throw new Error("Login is required.");
-        const response = await fetch("/api/reviews/create", {
+        const response = await apiFetch("/api/reviews/create", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload),

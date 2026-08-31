@@ -16,16 +16,22 @@ interface Props {
   features: FeatureWithResolvedPrice[];
   selectedIds: string[];
   onOpen: () => void;
+  /** Feature ids the subscriber already owns — shown as "Purchased". */
+  purchasedIds?: string[];
 }
 
 const formatRupee = (paise: number): string =>
   `₹${Math.max(0, Math.round(paise / 100)).toLocaleString("en-IN")}`;
 
-export default function FeatureSelectTrigger({ features, selectedIds, onOpen }: Props) {
+export default function FeatureSelectTrigger({ features, selectedIds, onOpen, purchasedIds }: Props) {
+  const purchasedSet = new Set(purchasedIds || []);
   const selectedFeatures = features.filter((f) => selectedIds.includes(f.id));
+  const purchasedCount = selectedFeatures.filter((f) => purchasedSet.has(f.id)).length;
+  const addableFeatures = selectedFeatures.filter((f) => !purchasedSet.has(f.id));
   // Plan/cycle-resolved rate when available (the page resolves the list
-  // via `resolveFeaturesForPlan`); flat rate as a safety fallback.
-  const totalPaise = selectedFeatures.reduce(
+  // via `resolveFeaturesForPlan`); flat rate as a safety fallback. Already
+  // purchased features are never added to the payable total.
+  const totalPaise = addableFeatures.reduce(
     (sum, f) =>
       sum + (f.resolvedIncluded ? 0 : typeof f.resolvedPricePaise === "number" ? f.resolvedPricePaise : f.pricePaise || 0),
     0,
@@ -48,16 +54,26 @@ export default function FeatureSelectTrigger({ features, selectedIds, onOpen }: 
               <p className="text-xs text-slate-400">Add premium features to your plan</p>
             ) : (
               <p className="text-xs font-medium text-amber-600">
-                {selectedFeatures.length} feature
-                {selectedFeatures.length !== 1 ? "s" : ""} · +{formatRupee(totalPaise)}
+                {addableFeatures.length} feature
+                {addableFeatures.length !== 1 ? "s" : ""} · +{formatRupee(totalPaise)}
+                {purchasedCount > 0 ? (
+                  <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                    {purchasedCount} purchased
+                  </span>
+                ) : null}
               </p>
             )}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {selectedFeatures.length > 0 ? (
+          {purchasedCount > 0 ? (
+            <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-emerald-600 px-2 text-[11px] font-bold text-white">
+              {purchasedCount}
+            </span>
+          ) : null}
+          {addableFeatures.length > 0 ? (
             <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-amber-500 px-2 text-[11px] font-bold text-white">
-              {selectedFeatures.length}
+              {addableFeatures.length}
             </span>
           ) : null}
           <ChevronRight className="h-4.5 w-4.5 text-slate-300" />

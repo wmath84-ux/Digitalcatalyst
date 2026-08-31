@@ -22,12 +22,14 @@ import {
   loadUserHasPriorPurchases,
 } from "./_lib/coupons.js";
 import { loadSubscriptionSelectionContext } from "./_lib/subscriptions.js";
+import { applyCors } from "./_lib/cors.js";
 import { buildQuote } from "../utils/serverQuotes.js";
 
 const cleanId = (value: unknown, max = 100) =>
   String(value || "").trim().replace(/[^a-zA-Z0-9_:-]/g, "").slice(0, max);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (applyCors(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     const firebaseUser = await requireFirebaseUser(req);

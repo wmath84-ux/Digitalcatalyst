@@ -7,6 +7,7 @@ import { useCatalog } from "./context/CatalogContext";
 import { useCommerce } from "./context/CommerceContext";
 import { useBranding } from "./context/BrandingContext";
 import { db } from "../firebase";
+import { apiFetch } from "./utils/apiBase";
 
 type SubscriberRow = {
   uid: string;
@@ -74,7 +75,7 @@ export default function LeaderboardApp() {
       setLoading(true);
       setError("");
       try {
-        const response = await fetch("/api/referral-leaderboard");
+        const response = await apiFetch("/api/referral-leaderboard");
         const data = await response.json().catch(() => ({})) as {
           ok?: boolean;
           subscribers?: SubscriberRow[];

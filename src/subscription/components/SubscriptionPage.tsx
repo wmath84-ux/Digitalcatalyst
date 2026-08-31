@@ -34,6 +34,7 @@ import { FALLBACK_SUBSCRIPTION_CATALOG } from "../data/fallbackCatalog";
 import { useAuth } from "../../context/AuthContext";
 import { useCatalog } from "../../context/CatalogContext";
 import { useSubscriptionGateLogic } from "../../hooks/useSubscriptionGateLogic";
+import { apiFetch } from "../../utils/apiBase";
 import { isPlanVisibleForAudience, resolveSubscriberOnlyPrice } from "../../utils/subscriptionPricing";
 import { playSfxError, playSfxSuccess } from "../../utils/sfx";
 import { shouldShowCouponInput } from "../../../utils/couponVisibility";
@@ -217,7 +218,7 @@ export default function SubscriptionPage({
     const firebaseUser = auth.currentUser;
     if (!firebaseUser || firebaseUser.uid !== user.id) return;
     repairedOrderIdsRef.current.add(orderId);
-    void firebaseUser.getIdToken().then((token: string) => fetch("/api/razorpay/verify-payment", {
+    void firebaseUser.getIdToken().then((token: string) => apiFetch("/api/razorpay/verify-payment", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ orderId }),
@@ -720,7 +721,7 @@ export default function SubscriptionPage({
       const firebaseUser = await import("../../../firebase").then((module) => module.auth.currentUser);
       if (!firebaseUser) throw new Error("Please sign in to apply a referral code.");
       const token = await firebaseUser.getIdToken(true);
-      const response = await fetch("/api/subscription-referral", {
+      const response = await apiFetch("/api/subscription-referral", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ referralCode: code }),
@@ -1009,6 +1010,7 @@ export default function SubscriptionPage({
           features={features}
           selectedIds={selectedFeatureIds}
           onOpen={() => setFeatureModalOpen(true)}
+          purchasedIds={isActiveMember ? memberFeatureIds : []}
         />
 
         {/* Price-tier strip — features grouped by their resolved price
@@ -1017,6 +1019,7 @@ export default function SubscriptionPage({
           tiers={featureTiers}
           cycle={cycle}
           selectedIds={selectedFeatureIds}
+          purchasedIds={isActiveMember ? memberFeatureIds : []}
           onToggleTier={(ids, allSelected) => {
             setSelectedFeatureIds((current) => {
               const next = new Set(current);
@@ -1146,6 +1149,7 @@ export default function SubscriptionPage({
         onClose={() => setFeatureModalOpen(false)}
         onChangeSelected={setSelectedFeatureIds}
         includedIds={Array.from(includedFeatureIds)}
+        purchasedIds={isActiveMember ? memberFeatureIds : []}
       />
 
       <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
@@ -1177,7 +1181,7 @@ async function loadSubscriptionCatalog(): Promise<SubscriptionCatalog> {
     // signed out (the catalog itself is not user-specific).
   }
   const token = firebaseUser ? await firebaseUser.getIdToken(true) : "";
-  const response = await fetch("/api/subscription-catalog", {
+  const response = await apiFetch("/api/subscription-catalog", {
     method: "GET",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
@@ -1208,7 +1212,7 @@ async function preflightSubscriptionCoupon(selection: {
   const firebaseUser = await import("../../../firebase").then((m) => m.auth.currentUser);
   if (!firebaseUser) throw new Error("Please sign in to apply a coupon.");
   const token = await firebaseUser.getIdToken(true);
-  const response = await fetch("/api/subscription-coupon", {
+  const response = await apiFetch("/api/subscription-coupon", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(selection),

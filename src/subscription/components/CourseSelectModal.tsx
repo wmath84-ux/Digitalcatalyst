@@ -1,4 +1,4 @@
-import { BadgeCheck, Check, Lock, X } from "lucide-react";
+import { BadgeCheck, Check, X } from "lucide-react";
 import type { Product } from "../../data/products";
 
 interface Props {
@@ -38,14 +38,14 @@ export default function CourseSelectModal({ open, selected, onClose, onChangeSel
         const checked = keys.some((key) => selected.includes(key));
         const purchased = isPurchased(product);
         const toggle = () => {
-          // Already-purchased products are locked — the user owns them and
+          // Already-purchased products are marked "Purchased" — the user owns them and
           // they must never be re-added (or removed) through this picker.
           if (purchased) return;
           const withoutAliases = selected.filter((id) => !keys.includes(id));
           onChangeSelected(checked ? withoutAliases : [...withoutAliases, checkoutId]);
         };
         return <li key={checkoutId}><button type="button" onClick={toggle} disabled={purchased} data-subscription-product-pick={checkoutId} data-purchased={purchased ? "true" : "false"} className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${checked ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-white"} ${purchased ? "cursor-not-allowed border-emerald-200 bg-emerald-50/70" : ""}`}>
-          <img src={product.image} alt="" className="h-12 w-16 shrink-0 rounded-xl object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-800">{product.title}</span><span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">{purchased ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white"><BadgeCheck size={11} strokeWidth={3} /> Purchased</span> : null}<span className="text-xs text-slate-400">{product.category} · {product.instructor}</span></span></span><span className="shrink-0 text-right"><span className={`block text-sm font-black ${purchased ? "text-slate-400" : "text-slate-900"}`}>{price(product.price)}</span><span aria-label={purchased ? "Already purchased — locked" : checked ? "Selected" : "Not selected"} className={`ml-auto mt-1 grid h-5 w-5 place-items-center rounded-md border-2 ${purchased ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400" : checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{purchased ? <Lock size={11} /> : checked ? <Check size={13} strokeWidth={3} /> : null}</span></span>
+          <img src={product.image} alt="" className="h-12 w-16 shrink-0 rounded-xl object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-800">{product.title}</span><span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">{purchased ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white"><BadgeCheck size={11} strokeWidth={3} /> Purchased</span> : null}<span className="text-xs text-slate-400">{product.category} · {product.instructor}</span></span></span><span className="shrink-0 text-right"><span className={`block text-sm font-black ${purchased ? "text-emerald-700" : "text-slate-900"}`}>{purchased ? "Purchased" : price(product.price)}</span><span aria-label={purchased ? "Purchased" : checked ? "Selected" : "Not selected"} className={`ml-auto mt-1 grid h-5 w-5 place-items-center rounded-md border-2 ${purchased ? "cursor-not-allowed border-emerald-600 bg-emerald-600 text-white" : checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{purchased ? <BadgeCheck size={12} strokeWidth={3} /> : checked ? <Check size={13} strokeWidth={3} /> : null}</span></span>
         </button></li>;
       })}</ul>}</div>
       <div className="border-t border-slate-100 p-3"><button onClick={onClose} className="w-full rounded-2xl bg-slate-900 py-3 text-sm font-black text-white">Done · {selected.length} selected</button></div>

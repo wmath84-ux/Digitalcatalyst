@@ -1,8 +1,10 @@
 import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "../_lib/firebaseAdmin.js";
+import { applyCors } from "../_lib/cors.js";
 
 const clean = (value: unknown, max: number) => String(value || "").trim().slice(0, max);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (applyCors(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     const user = await requireFirebaseUser(req);
