@@ -1744,6 +1744,23 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   background-image: radial-gradient(circle at 50% 25%, rgb(124 58 237 / 0.2), transparent 44%);
 }
 
+/* Course audio card: never clip on tablet `* { max-width: 100% }` or short
+   landscape stages. The player measures its stage and switches layout; these
+   rules keep every control inside the visible box on phone / tablet / desktop. */
+[data-course-viewer-audio],
+[data-course-audio-player] {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+[data-course-audio-player] {
+  overflow: hidden;
+}
+[data-course-audio-transport] {
+  flex-wrap: nowrap;
+  max-width: 100%;
+}
+
 .course-player-shell[data-course-theme="light"] .course-viewer-empty-surface,
 .course-player-shell[data-course-theme="light"] .course-audio-surface {
   background-image: radial-gradient(circle at 50% 25%, rgb(124 58 237 / 0.13), transparent 48%);
@@ -2527,7 +2544,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   cursor: pointer;
 }
 
-/* ---------- FlowPath: Home button 3-second hold + liquid expand transition ---------- */
+/* ---------- FlowPath: Home button 1-second hold + liquid expand transition ---------- */
 @keyframes fp-home-hold-ring {
   from { stroke-dashoffset: 94.25; }
   to { stroke-dashoffset: 0; }

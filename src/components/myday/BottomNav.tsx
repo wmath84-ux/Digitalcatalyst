@@ -24,7 +24,7 @@ const items = [
  * scroll glow. Icons/labels are crisp black; the active tab keeps its
  * blue accent exactly as it was.
  *
- * The Home button shares the main footer's 3-second long-press shortcut:
+ * The Home button shares the main footer's 1-second long-press shortcut:
  * holding it opens the FlowPath / task-planning dashboard.
  */
 export default function BottomNav({ active, onNavigate }: BottomNavProps) {
@@ -70,7 +70,7 @@ export default function BottomNav({ active, onNavigate }: BottomNavProps) {
                     isHome && homeHold.holding ? "scale-110" : "",
                   )}
                 >
-                  {isHome && homeHold.holding && <HoldRing holding={homeHold.holding} />}
+                  {isHome && homeHold.holding && <HoldRing holding={homeHold.holding} durationMs={homeHold.durationMs} />}
                   <Icon className="h-5 w-5 text-black" />
                 </span>
                 {item.label}

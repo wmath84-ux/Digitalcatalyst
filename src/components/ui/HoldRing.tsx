@@ -10,12 +10,16 @@ const RING_C = 2 * Math.PI * RING_R;
  * dropping below it. The fill grows over the hold duration to show how much
  * of the long-press remains.
  *
- * The animation length is taken from DEFAULT_HOME_HOLD_DURATION so the
- * ring's stroke-dashoffset transition always matches whatever the active
- * caller's duration is (e.g. 1s for the main app footer, 3s for the MyDay
- * footer that still uses the default).
+ * The animation length follows `durationMs` (default: DEFAULT_HOME_HOLD_DURATION)
+ * so the ring always matches the active hold timer (1s for FlowPath).
  */
-export function HoldRing({ holding }: { holding: boolean }) {
+export function HoldRing({
+  holding,
+  durationMs = DEFAULT_HOME_HOLD_DURATION,
+}: {
+  holding: boolean;
+  durationMs?: number;
+}) {
   return (
     <svg
       className="pointer-events-none absolute"
@@ -51,7 +55,7 @@ export function HoldRing({ holding }: { holding: boolean }) {
         strokeDashoffset={holding ? 0 : RING_C}
         style={{
           transition: holding
-            ? `stroke-dashoffset ${DEFAULT_HOME_HOLD_DURATION}ms linear`
+            ? `stroke-dashoffset ${durationMs}ms linear`
             : "stroke-dashoffset 0.18s ease",
           filter: holding ? "drop-shadow(0 0 5px rgba(99, 102, 241, 0.9))" : "none",
         }}
