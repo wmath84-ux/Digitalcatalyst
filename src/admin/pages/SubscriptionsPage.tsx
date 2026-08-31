@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { DangerButton, EmptyState, ErrorState, Field, LoadingState, Pill, PrimaryButton, RecordCard, SecondaryButton, Sheet, Tabs, inputClass, selectClass, textareaClass } from "@/components/admin/ui";
+import { DangerButton, EmptyState, ErrorState, Field, LoadingState, Pill, PrimaryButton, RecordCard, SecondaryButton, SectionCard, Sheet, StatCard, Tabs, inputClass, selectClass, textareaClass } from "@/components/admin/ui";
 import { useConfirm, useToast } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
 import { resolveFeaturePrice, toPaise } from "../../../utils/featurePricing";
@@ -122,7 +122,7 @@ export default function SubscriptionsPage() {
     oldGateEnabled: true,
     hideUntilPurchasedEnabled: false,
     features: {} as Record<string, { gated: boolean; hideFromNonSubscribers: boolean; durations: { monthly: boolean; yearly: boolean; lifetime: boolean }; tiers: Record<string, boolean> }>,
-    planVisibility: {} as Record<string, { visible: boolean; durations: { monthly: boolean; yearly: boolean; lifetime: boolean } }>,
+    planVisibility: {} as Record<string, { visible: boolean; visibleToSubscribers: boolean; durations: { monthly: boolean; yearly: boolean; lifetime: boolean } }>,
     subscriberPricing: {} as Record<string, { monthly: number | null; yearly: number | null; lifetime: number | null }>,
     usageLimits: { aiQuestionsPerDay: {} as Record<string, number> },
   });
@@ -369,22 +369,41 @@ export default function SubscriptionsPage() {
     <div className="space-y-3 pb-6 lg:space-y-4">
       <Tabs tabs={[{ key: "plans", label: "Plans" }, { key: "features", label: "Features" }, { key: "products", label: "Products" }, { key: "logic", label: "Subscription Logic" }, { key: "referrals", label: "Referrals" }]} active={tab} onChange={setTab} />
 
+      <div className="flex flex-wrap gap-1.5">
+        {([
+          { key: "plans", n: "1", label: "Selling packages" },
+          { key: "features", n: "2", label: "App features" },
+          { key: "products", n: "3", label: "Courses" },
+          { key: "logic", n: "4", label: "Who sees what + subscriber prices" },
+          { key: "referrals", n: "5", label: "Referrals" },
+        ] as const).map((step) => (
+          <button
+            key={step.key}
+            type="button"
+            onClick={() => setTab(step.key)}
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${tab === step.key ? "border-violet-400 bg-violet-50 text-violet-800" : "border-slate-200 bg-white text-slate-600"}`}
+          >
+            {step.n} · {step.label}
+          </button>
+        ))}
+      </div>
+
       {tab === "plans" && (
         <div className="space-y-3 lg:space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">{plans.length} plan(s)</p>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">1 · Selling packages</p>
+              <p className="text-xs text-slate-500">{plans.length} plan(s) — public checkout price, plus a subscriber-only override in Edit.</p>
+            </div>
             <PrimaryButton onClick={() => setEditingPlan(EMPTY_PLAN)}>+ Add plan</PrimaryButton>
           </div>
           <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-3 text-xs leading-relaxed text-violet-900">
-            <p className="font-semibold">💡 Customise prices for subscribed users</p>
+            <p className="font-semibold">💡 Customise subscriptions — including subscriber-only prices</p>
             <p className="mt-1 text-[11px]">
-              Every price on this page is per subscriber: the <strong>plan price</strong> is
-              charged at checkout, and each <strong>feature / product</strong> can have its own
-              monthly, yearly and per-plan rate (or be free on a specific plan). Set an item
-              cheaper on a higher plan — or free on it — and upgrading becomes cheaper than
-              buying the item separately. Existing members can upgrade to any plan, and they
-              can also add features / courses to their current plan while paying only for the
-              new items.
+              Public <strong>plan price</strong> is charged at checkout. Each plan, feature and product can also have a
+              <strong> subscriber-only price</strong> (existing members see it on upgrade/renewal; blank = same as public).
+              Features/products can be monthly, yearly, per-plan, or free on a plan. Test Bank + School AI limits are per duration.
+              Guest vs member visibility lives on <strong>Subscription Logic</strong> (step 4).
             </p>
           </div>
           {plans.length === 0 ? <EmptyState title="No plans yet" /> : (
@@ -396,7 +415,18 @@ export default function SubscriptionsPage() {
                     <Pill tone={p.active ? "success" : "default"}>{p.active ? "active" : "inactive"}</Pill>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">{p.description}</p>
-                  <p className="mt-1 text-xs text-slate-600">{p.billingCycles?.map((c) => `${c.label}: ${Number(c.price) === 0 ? "FREE" : `₹${c.price}`}`).join(" · ")}</p>
+                  <p className="mt-1 text-xs text-slate-600">Public: {p.billingCycles?.map((c) => `${c.label}: ${Number(c.price) === 0 ? "FREE" : `₹${c.price}`}`).join(" · ")}</p>
+                  {(p.subscriberPricingOverride?.monthly != null || p.subscriberPricingOverride?.yearly != null || p.subscriberPricingOverride?.lifetime != null) ? (
+                    <p className="mt-0.5 text-[11px] font-semibold text-emerald-700">
+                      Subscriber-only: {[
+                        p.subscriberPricingOverride?.monthly != null ? `mo ₹${p.subscriberPricingOverride.monthly}` : null,
+                        p.subscriberPricingOverride?.yearly != null ? `yr ₹${p.subscriberPricingOverride.yearly}` : null,
+                        p.subscriberPricingOverride?.lifetime != null ? `life ₹${p.subscriberPricingOverride.lifetime}` : null,
+                      ].filter(Boolean).join(" · ")}
+                    </p>
+                  ) : (
+                    <p className="mt-0.5 text-[11px] text-slate-400">Subscriber-only price: same as public (set in Edit)</p>
+                  )}
                   <p className="mt-1 text-[11px] font-semibold text-indigo-600">
                     Test Bank: {p.revisionTestBankLimits?.monthly === -1 ? "Unlimited" : `${p.revisionTestBankLimits?.monthly ?? 20} monthly`} · {p.revisionTestBankLimits?.yearly === -1 ? "Unlimited yearly" : `${p.revisionTestBankLimits?.yearly ?? 20} yearly`}
                   </p>
@@ -416,8 +446,11 @@ export default function SubscriptionsPage() {
 
       {tab === "features" && (
         <div className="space-y-3 lg:space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">{features.length} feature(s) · Configure My Day or any feature · Delete/deactivate to remove its subscription gate</p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">2 · App features (add-ons)</p>
+              <p className="text-xs text-slate-500">{features.length} feature(s) — My Day / Revision / custom. Price, free-on-plan, aur hide-until-purchased yahan.</p>
+            </div>
             <PrimaryButton onClick={() => setEditingFeature({ ...EMPTY_FEATURE })}>+ Add feature</PrimaryButton>
           </div>
           {features.length === 0 ? <EmptyState title="No features yet" /> : (
@@ -454,16 +487,19 @@ export default function SubscriptionsPage() {
 
       {tab === "products" && (
         <div className="space-y-3 lg:space-y-4">
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] leading-relaxed text-emerald-900">
-            <p className="font-semibold">🔄 Auto-sync enabled</p>
-            <p className="mt-0.5">Jo bhi naya product aap Products section me add karenge, wo yahan <strong>directly dikhega</strong> — har 15 second me list refresh hoti hai. Naye product ko subscription feature me add karne ke liye <strong>+ Add product</strong> dabayein.</p>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-slate-500">{(subscriptionProducts || []).length} subscription product(s) · Add products that can be purchased individually or unlocked free per plan / duration</p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">3 · Courses & products</p>
+              <p className="text-xs text-slate-500">{(subscriptionProducts || []).length} item(s) — store product ko plan ke saath free ya extra-charge pe unlock karo.</p>
+            </div>
             <div className="flex items-center gap-2">
               <SecondaryButton className="h-9 px-3 text-xs" onClick={() => load()}>↻ Refresh</SecondaryButton>
               <PrimaryButton onClick={() => { setCatalogSearch(""); setCatalogPickerOpen(true); }}>+ Add product</PrimaryButton>
             </div>
+          </div>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] leading-relaxed text-emerald-900">
+            <p className="font-semibold">Store se auto-sync</p>
+            <p className="mt-0.5">Naya product Products section me add hote hi yahan list me aa jata hai (15s). Subscription me include karne ke liye <strong>+ Add product</strong>.</p>
           </div>
           {(subscriptionProducts || []).length === 0 ? <EmptyState title="No subscription products yet" description="Click + Add product to choose from your available products." /> : (
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3 lg:grid-cols-3 lg:gap-4">
@@ -502,9 +538,14 @@ export default function SubscriptionsPage() {
 
       {tab === "logic" && (
         <div className="space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">4 · Who sees what</p>
+            <p className="text-xs text-slate-500">Teen alag sawaal: poori site ka default, har feature, phir har plan (guest vs existing member).</p>
+          </div>
           <RecordCard>
             <div className="space-y-4">
               <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Step A · Site default</p>
                 <h3 className="text-sm font-semibold text-slate-900">Subscription logic — kill switch</h3>
                 <p className="mt-1 text-xs text-slate-500">
                   Flip the global behaviour between <strong>old gate</strong> (show paywall on access) and{" "}
@@ -540,6 +581,7 @@ export default function SubscriptionsPage() {
           <RecordCard>
             <div className="space-y-4">
               <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Step B · Features</p>
                 <h3 className="text-sm font-semibold text-slate-900">Per-feature matrix</h3>
                 <p className="mt-1 text-xs text-slate-500">
                   Toggle the new hide-until-purchased model for one feature at a time, choose which billing cycles non-subscribers see, and set the AI-questions/day cap. Override the public price for existing members.
@@ -639,13 +681,14 @@ export default function SubscriptionsPage() {
           <RecordCard>
             <div className="space-y-4">
               <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Step C · Plans & subscriber-only prices</p>
                 <h3 className="text-sm font-semibold text-slate-900">Plan visibility + subscriber-only price</h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Choose which plans show on the subscription page, which cycles are visible for each, and the per-plan override price that only EXISTING subscribers see.
+                  Choose which plans show on the subscription page for guests vs existing subscribers, which cycles are visible for each, and the per-plan override price that only EXISTING subscribers see.
                 </p>
               </div>
               {plans.map((plan) => {
-                const visibility = gateSettings.planVisibility[plan.id] || { visible: true, durations: { monthly: true, yearly: true, lifetime: true } };
+                const visibility = gateSettings.planVisibility[plan.id] || { visible: true, visibleToSubscribers: true, durations: { monthly: true, yearly: true, lifetime: true } };
                 const override = gateSettings.subscriberPricing[plan.id] || { monthly: null, yearly: null, lifetime: null };
                 return (
                   <div key={plan.id} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
@@ -664,7 +707,23 @@ export default function SubscriptionsPage() {
                           },
                         })}
                       />
-                      Visible on subscription page
+                      Visible to new / non-subscribers
+                    </label>
+                    <label className="mt-1 flex items-center gap-2 text-xs text-slate-700">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        data-admin-gate-plan-visible-subscribers={plan.id}
+                        checked={visibility.visibleToSubscribers !== false}
+                        onChange={(event) => setGateSettings({
+                          ...gateSettings,
+                          planVisibility: {
+                            ...gateSettings.planVisibility,
+                            [plan.id]: { ...visibility, visibleToSubscribers: event.target.checked },
+                          },
+                        })}
+                      />
+                      Visible to existing subscribers
                     </label>
                     <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-slate-600">
                       <label className="flex flex-col gap-1">
@@ -787,7 +846,11 @@ export default function SubscriptionsPage() {
       {tab === "referrals" && (
         <RecordCard>
           <div className="space-y-4">
-            <div><h3 className="text-sm font-semibold text-slate-900">Subscriber referral program</h3><p className="mt-1 text-xs text-slate-500">Codes are generated automatically after verified subscription payment.</p></div>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">5 · Growth</p>
+              <h3 className="text-sm font-semibold text-slate-900">Subscriber referral program</h3>
+              <p className="mt-1 text-xs text-slate-500">Codes are generated automatically after verified subscription payment.</p>
+            </div>
             <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={referralSettings.enabled} onChange={(event) => setReferralSettings({ ...referralSettings, enabled: event.target.checked })} /> Referral program enabled</label>
             <Field label="Referral discount (₹)"><input className={inputClass} type="number" min="0" value={referralSettings.discountPaise / 100} onChange={(event) => setReferralSettings({ ...referralSettings, discountPaise: Math.max(0, Math.round(Number(event.target.value || 0) * 100)) })} /></Field>
             <p className="text-xs text-slate-500">Each referral ID can be used only once. After that it shows as Used on the leaderboard.</p>

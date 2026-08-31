@@ -258,6 +258,22 @@ export const assertSubscriptionPurchasable = async (
   if (isOwnedSubscriptionActive(record, now)) {
     const ownedPlanId = String(record.planId || "").trim();
     const selectedPlanId = String(selection.subscriptionPlanId || "").trim();
+    if (selectedPlanId && selectedPlanId !== ownedPlanId) {
+      try {
+        const { getSubscriptionGateSettings, isPlanVisibleForAudience } = await import("./subscriptionGate.js");
+        const gateSettings = await getSubscriptionGateSettings();
+        if (!isPlanVisibleForAudience(selectedPlanId, true, gateSettings, { ownedPlanId })) {
+          return {
+            ok: false,
+            status: 403,
+            code: "SUBSCRIPTION_PLAN_HIDDEN_FOR_SUBSCRIBERS",
+            error: "This plan is not available on the subscription page for existing members.",
+          };
+        }
+      } catch {
+        // Gate read is best-effort — never block a purchase if settings fail.
+      }
+    }
     if (ownedPlanId && selectedPlanId) {
       let ownedPlanOrder: number | null = null;
       let selectedPlanOrder: number | null = null;

@@ -42,8 +42,11 @@ export type SubscriptionGateFeatureRow = {
 
 export type SubscriptionGatePlanRow = {
   // Per-plan visibility: `visible: false` removes the plan from the
-  // picker; `durations` overrides which cycles are shown.
+  // picker for guests / non-subscribers; `visibleToSubscribers: false`
+  // hides it from users who already have an active subscription.
+  // `durations` overrides which cycles are shown.
   visible: boolean;
+  visibleToSubscribers: boolean;
   durations: SubscriptionGateDurationFlags;
 };
 
@@ -115,6 +118,7 @@ function normalisePlanRow(input: any): SubscriptionGatePlanRow {
   const durations = normaliseDurationFlags(input?.durations, { monthly: true, yearly: true, lifetime: true });
   return {
     visible: input?.visible === false ? false : true,
+    visibleToSubscribers: input?.visibleToSubscribers === false ? false : true,
     durations,
   };
 }
@@ -216,4 +220,18 @@ export function resolveAiQuestionsPerDay(
   if (Number.isNaN(Number(featureCap))) return null;
   if (Number(featureCap) <= 0) return null;
   return Number(featureCap);
+}
+
+export function isPlanVisibleForAudience(
+  planId: string,
+  isSubscriber: boolean,
+  settings: SubscriptionGateSettings,
+  options?: { ownedPlanId?: string | null } | null,
+): boolean {
+  const ownedPlanId = options?.ownedPlanId ? String(options.ownedPlanId) : "";
+  if (ownedPlanId && String(planId) === ownedPlanId) return true;
+  const row = settings.planVisibility?.[planId];
+  if (!row) return true;
+  if (isSubscriber) return row.visibleToSubscribers !== false;
+  return row.visible !== false;
 }

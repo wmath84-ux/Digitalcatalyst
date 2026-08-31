@@ -40,6 +40,20 @@ export function resolveSubscriberOnlyPrice(
   return Number(candidate);
 }
 
+export function isPlanVisibleForAudience(
+  planId: string,
+  isSubscriber: boolean,
+  planVisibility: Record<string, { visible?: boolean; visibleToSubscribers?: boolean } | undefined> | null | undefined,
+  options?: { ownedPlanId?: string | null } | null,
+): boolean {
+  const ownedPlanId = options?.ownedPlanId ? String(options.ownedPlanId) : "";
+  if (ownedPlanId && String(planId) === ownedPlanId) return true;
+  const row = planVisibility?.[planId];
+  if (!row) return true;
+  if (isSubscriber) return row.visibleToSubscribers !== false;
+  return row.visible !== false;
+}
+
 export function resolveAiQuestionsPerDay(
   planId: string | null | undefined,
   featureCap: number | null | undefined,
