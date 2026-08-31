@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { DangerButton, EmptyState, ErrorState, Field, LoadingState, Pill, PrimaryButton, RecordCard, SecondaryButton, Sheet, Tabs, inputClass, selectClass, textareaClass } from "@/components/admin/ui";
+import { DangerButton, EmptyState, ErrorState, Field, LoadingState, Pill, PrimaryButton, RecordCard, SecondaryButton, SectionCard, Sheet, StatCard, Tabs, inputClass, selectClass, textareaClass } from "@/components/admin/ui";
 import { useConfirm, useToast } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
 import { resolveFeaturePrice, toPaise } from "../../../utils/featurePricing";
@@ -416,8 +416,11 @@ export default function SubscriptionsPage() {
 
       {tab === "features" && (
         <div className="space-y-3 lg:space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">{features.length} feature(s) · Configure My Day or any feature · Delete/deactivate to remove its subscription gate</p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">2 · App features (add-ons)</p>
+              <p className="text-xs text-slate-500">{features.length} feature(s) — My Day / Revision / custom. Price, free-on-plan, aur hide-until-purchased yahan.</p>
+            </div>
             <PrimaryButton onClick={() => setEditingFeature({ ...EMPTY_FEATURE })}>+ Add feature</PrimaryButton>
           </div>
           {features.length === 0 ? <EmptyState title="No features yet" /> : (
@@ -454,16 +457,19 @@ export default function SubscriptionsPage() {
 
       {tab === "products" && (
         <div className="space-y-3 lg:space-y-4">
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] leading-relaxed text-emerald-900">
-            <p className="font-semibold">🔄 Auto-sync enabled</p>
-            <p className="mt-0.5">Jo bhi naya product aap Products section me add karenge, wo yahan <strong>directly dikhega</strong> — har 15 second me list refresh hoti hai. Naye product ko subscription feature me add karne ke liye <strong>+ Add product</strong> dabayein.</p>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-slate-500">{(subscriptionProducts || []).length} subscription product(s) · Add products that can be purchased individually or unlocked free per plan / duration</p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">3 · Courses & products</p>
+              <p className="text-xs text-slate-500">{(subscriptionProducts || []).length} item(s) — store product ko plan ke saath free ya extra-charge pe unlock karo.</p>
+            </div>
             <div className="flex items-center gap-2">
               <SecondaryButton className="h-9 px-3 text-xs" onClick={() => load()}>↻ Refresh</SecondaryButton>
               <PrimaryButton onClick={() => { setCatalogSearch(""); setCatalogPickerOpen(true); }}>+ Add product</PrimaryButton>
             </div>
+          </div>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] leading-relaxed text-emerald-900">
+            <p className="font-semibold">Store se auto-sync</p>
+            <p className="mt-0.5">Naya product Products section me add hote hi yahan list me aa jata hai (15s). Subscription me include karne ke liye <strong>+ Add product</strong>.</p>
           </div>
           {(subscriptionProducts || []).length === 0 ? <EmptyState title="No subscription products yet" description="Click + Add product to choose from your available products." /> : (
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3 lg:grid-cols-3 lg:gap-4">
@@ -502,9 +508,14 @@ export default function SubscriptionsPage() {
 
       {tab === "logic" && (
         <div className="space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">4 · Who sees what</p>
+            <p className="text-xs text-slate-500">Teen alag sawaal: poori site ka default, har feature, phir har plan (guest vs existing member).</p>
+          </div>
           <RecordCard>
             <div className="space-y-4">
               <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Step A · Site default</p>
                 <h3 className="text-sm font-semibold text-slate-900">Subscription logic — kill switch</h3>
                 <p className="mt-1 text-xs text-slate-500">
                   Flip the global behaviour between <strong>old gate</strong> (show paywall on access) and{" "}
@@ -540,6 +551,7 @@ export default function SubscriptionsPage() {
           <RecordCard>
             <div className="space-y-4">
               <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Step B · Features</p>
                 <h3 className="text-sm font-semibold text-slate-900">Per-feature matrix</h3>
                 <p className="mt-1 text-xs text-slate-500">
                   Toggle the new hide-until-purchased model for one feature at a time, choose which billing cycles non-subscribers see, and set the AI-questions/day cap. Override the public price for existing members.
@@ -803,7 +815,11 @@ export default function SubscriptionsPage() {
       {tab === "referrals" && (
         <RecordCard>
           <div className="space-y-4">
-            <div><h3 className="text-sm font-semibold text-slate-900">Subscriber referral program</h3><p className="mt-1 text-xs text-slate-500">Codes are generated automatically after verified subscription payment.</p></div>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">5 · Growth</p>
+              <h3 className="text-sm font-semibold text-slate-900">Subscriber referral program</h3>
+              <p className="mt-1 text-xs text-slate-500">Codes are generated automatically after verified subscription payment.</p>
+            </div>
             <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={referralSettings.enabled} onChange={(event) => setReferralSettings({ ...referralSettings, enabled: event.target.checked })} /> Referral program enabled</label>
             <Field label="Referral discount (₹)"><input className={inputClass} type="number" min="0" value={referralSettings.discountPaise / 100} onChange={(event) => setReferralSettings({ ...referralSettings, discountPaise: Math.max(0, Math.round(Number(event.target.value || 0) * 100)) })} /></Field>
             <p className="text-xs text-slate-500">Each referral ID can be used only once. After that it shows as Used on the leaderboard.</p>
@@ -856,6 +872,37 @@ export default function SubscriptionsPage() {
                       revisionTestBankLimits: {
                         monthly: Math.max(-1, Math.min(1000, Math.round(Number(e.target.value) || 0))),
                         yearly: editingPlan.revisionTestBankLimits?.yearly ?? 20,
+                      },
+                    })}
+                  />
+                </Field>
+                <Field label="Yearly saved tests">
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min={-1}
+                    max={1000}
+                    value={editingPlan.revisionTestBankLimits?.yearly ?? 20}
+                    onChange={(e) => setEditingPlan({
+                      ...editingPlan,
+                      revisionTestBankLimits: {
+                        monthly: editingPlan.revisionTestBankLimits?.monthly ?? 20,
+                        yearly: Math.max(-1, Math.min(1000, Math.round(Number(e.target.value) || 0))),
+                      },
+                    })}
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+              <p className="text-sm font-semibold text-slate-900">School AI allowances</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                Configure each billing duration independently. Every successfully generated complete test uses one daily generation. Cost budget is the maximum school-model spend for that purchased term; leave it blank for unlimited. A learner&apos;s own API key never uses either allowance.
+              </p>
+              {(["monthly", "yearly"] as const).map((cycle) => {
+                const allowance = editingPlan.aiAllowances?.[cycle] ?? { dailyGenerationLimit: 20, costBudgetMicros: -1 };
+              yearly: editingPlan.revisionTestBankLimits?.yearly ?? 20,
                       },
                     })}
                   />
