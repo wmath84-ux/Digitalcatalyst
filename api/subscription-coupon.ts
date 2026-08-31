@@ -21,7 +21,7 @@ import {
   loadUserCouponUsageCount,
   loadUserHasPriorPurchases,
 } from "./_lib/coupons.js";
-import { loadSubscriptionSelectionContext } from "./_lib/subscriptions.js";
+import { loadCurrentSubscription, loadSubscriptionSelectionContext } from "./_lib/subscriptions.js";
 import { applyCors } from "./_lib/cors.js";
 import { buildQuote } from "../utils/serverQuotes.js";
 
@@ -59,7 +59,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       couponCode: null,
       returnRoute: null,
     };
-    const subContext = await loadSubscriptionSelectionContext(selection);
+    // The buyer's current membership, so the preflight quote applies the same
+    // already-owned carry-over as the real checkout quote: features/products
+    // already purchased with an active subscription are never included in the
+    // payable total, and the coupon discount is computed on the same amount.
+    const currentSubscription = await loadCurrentSubscription(firebaseUser.uid);
+    const subContext = await loadSubscriptionSelectionContext(selection, {
+      existingSubscription: currentSubscription,
+    });
     if (!subContext.ok) {
       return res.status(subContext.status).json({ ok: false, error: subContext.error });
     }

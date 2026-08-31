@@ -522,6 +522,9 @@ export function SubscriptionUnlocksCard({
       description: catalogFeature?.description || "",
       pricePaise: pricedLine ? pricedLine.effectivePrice : null,
       included: !pricedLine,
+      // Feature already unlocked by the current membership — carried over at
+      // ₹0, never billed again (renewal / plan change).
+      alreadyOwned: Boolean(pricedLine && pricedLine.alreadyOwned),
     };
   });
 
@@ -555,6 +558,7 @@ export function SubscriptionUnlocksCard({
     id: `product:${String(line.productId || line.id)}`,
     name: productNameFor(String(line.productId || ""), line.title || "Bonus product"),
     pricePaise: line.effectivePrice,
+    alreadyOwned: Boolean(line.alreadyOwned),
   }));
   const planUnlockRows = planUnlockLines.map((line) => ({
     id: `unlock:${String(line.productId || line.id)}`,
@@ -564,7 +568,8 @@ export function SubscriptionUnlocksCard({
     ),
   }));
 
-  const featureLabel = (row: { included: boolean; pricePaise: number | null }): string => {
+  const featureLabel = (row: { included: boolean; pricePaise: number | null; alreadyOwned?: boolean }): string => {
+    if (row.alreadyOwned) return "Already purchased — no charge";
     if (!row.included && typeof row.pricePaise === "number") return formatRupee(row.pricePaise);
     return quote.subscriptionAddOn ? "Already in your membership" : "Included with plan";
   };
@@ -643,7 +648,7 @@ export function SubscriptionUnlocksCard({
                 </div>
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
-                    row.included ? "bg-emerald-100 text-emerald-700" : "bg-violet-100 text-violet-700"
+                    row.included || row.alreadyOwned ? "bg-emerald-100 text-emerald-700" : "bg-violet-100 text-violet-700"
                   }`}
                 >
                   {featureLabel(row)}
@@ -673,7 +678,13 @@ export function SubscriptionUnlocksCard({
                 className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-2.5"
               >
                 <span className="min-w-0 flex-1 text-xs font-bold text-slate-800">{row.name}</span>
-                <span className="shrink-0 text-xs font-black text-violet-700">{formatRupee(row.pricePaise)}</span>
+                {row.alreadyOwned ? (
+                  <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                    Already purchased
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-xs font-black text-violet-700">{formatRupee(row.pricePaise)}</span>
+                )}
               </li>
             ))}
             {planUnlockRows.map((row) => (

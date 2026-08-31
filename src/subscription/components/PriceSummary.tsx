@@ -32,6 +32,17 @@ interface Props {
   featureTitles?: string[];
   /** Names of the plan-included features. */
   includedFeatureTitles?: string[];
+  /**
+   * Features the buyer ALREADY purchased with their active membership and
+   * kept selected. They carry over at ₹0 — never charged again, and shown
+   * here so it is impossible to miss there is no double charge.
+   */
+  alreadyOwnedFeatureTitles?: string[];
+  /**
+   * Products the buyer ALREADY purchased with their active membership and
+   * kept selected. Same carry-over rule: ₹0, never charged again.
+   */
+  alreadyOwnedProductTitles?: string[];
   /** Selected bonus products (title shown next to the count). */
   products?: SummaryProduct[];
   couponDiscountPaise: number;
@@ -56,6 +67,8 @@ export default function PriceSummary({
   productsTotalPaise,
   featureTitles = [],
   includedFeatureTitles = [],
+  alreadyOwnedFeatureTitles = [],
+  alreadyOwnedProductTitles = [],
   products = [],
   couponDiscountPaise,
   couponCode,
@@ -129,6 +142,42 @@ export default function PriceSummary({
                   ))}
                 </ul>
               ) : null}
+            </div>
+          ) : null}
+
+          {/* Already-purchased features — carried over from the active
+              membership at ₹0. The buyer paid for them once already, so this
+              row states "Already purchased" instead of showing a price. */}
+          {alreadyOwnedFeatureTitles.length > 0 ? (
+            <div data-subscription-row="owned">
+              <div className="flex justify-between text-emerald-700">
+                <span>Already purchased features ({alreadyOwnedFeatureTitles.length})</span>
+                <span className="font-medium">₹0 — no charge</span>
+              </div>
+              <ul className="mt-1.5 space-y-1 pl-4" data-subscription-owned-feature-names>
+                {alreadyOwnedFeatureTitles.map((title) => (
+                  <li key={title} className="list-disc text-xs font-medium text-emerald-700/80">
+                    {title}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {/* Already-purchased products — same carry-over rule. */}
+          {alreadyOwnedProductTitles.length > 0 ? (
+            <div data-subscription-row="owned-products">
+              <div className="flex justify-between text-emerald-700">
+                <span>Already purchased courses ({alreadyOwnedProductTitles.length})</span>
+                <span className="font-medium">₹0 — no charge</span>
+              </div>
+              <ul className="mt-1.5 space-y-1 pl-4" data-subscription-owned-product-names>
+                {alreadyOwnedProductTitles.map((title) => (
+                  <li key={title} className="list-disc text-xs font-medium text-emerald-700/80">
+                    {title}
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : null}
 
