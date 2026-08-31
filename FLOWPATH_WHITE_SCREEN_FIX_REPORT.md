@@ -54,7 +54,25 @@ moment" behaviour.
 - Runtime render checks (server-render of `ActivityCard`/`ActivityNode`) pass
   for lecture, schedule and corrupt/unknown-kind docs.
 - New `tests/flowpathWhiteScreenContract.test.mjs` (5 tests) pins the fix.
-- All 72 FlowPath contract tests pass; full suite 1824/1827 — the 3 failures
-  are pre-existing and unrelated (admin-subscription UI text, PWA manifest
-  orientation).
+- Full suite **1827/1827 pass** — the 3 pre-existing failures were fixed
+  afterwards (see below), so nothing is left red.
 - `vite build` succeeds; dev server serves the updated modules.
+
+## Pre-existing failures — fixed afterwards
+
+The 3 red tests at the time of the FlowPath fix were fixed by restoring the
+app's intended behaviour (keeping the latest updates intact):
+
+1. `adminCustomizableModuleSubscriptionContract` — the latest admin
+   Subscriptions page dropped the **"Configure My Day"** label from the
+   My Day feature editor. Restored it as the section eyebrow above
+   "Non-subscriber daily free creations".
+2. `appPortraitOrientationLockContract` — `public/manifest.webmanifest` had
+   `"orientation": "any"`; the app's hard rule is portrait-lock everywhere
+   except the course player (which unlocks at runtime via
+   `screen.orientation.unlock()`), so the static manifest is back to
+   `"orientation": "portrait"`.
+3. `pwaInstallabilityContract` — same static-manifest orientation
+   assertion; fixed by the same one-word change.
+
+Full suite after these two changes: **1827 passed, 0 failed**.

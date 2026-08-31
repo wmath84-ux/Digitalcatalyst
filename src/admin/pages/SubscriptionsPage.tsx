@@ -1082,6 +1082,9 @@ export default function SubscriptionsPage() {
             <Field label="Description"><textarea className={textareaClass} placeholder="Explain what this feature includes" value={editingFeature.description ?? ""} onChange={(e) => setEditingFeature({ ...editingFeature, description: e.target.value })} /></Field>
             {(editingFeature.id === "my-day" || editingFeature.key === "my-day") && (
               <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-600">
+                  Configure My Day
+                </p>
                 <p className="text-sm font-semibold text-slate-900">Non-subscriber daily free creations</p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
                   Learners without an active My Day subscription can browse normally and create this many new tasks, schedule items, notes or reminders per calendar day. After it is used, creation is gated until the next daily reset.
