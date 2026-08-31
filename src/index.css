@@ -4906,3 +4906,26 @@ html[data-course-player-active="true"] {
   position: relative;
   z-index: 1;
 }
+
+/* Unlayered .rev-card background beats Tailwind gradients — keep score cards readable. */
+.rev-card[data-rev-score-card] {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+.rev-card[data-rev-score-card="emerald"] {
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%) !important;
+}
+.rev-card[data-rev-score-card] p,
+.rev-card[data-rev-score-card] h1,
+.rev-card[data-rev-score-card] h2,
+.rev-card[data-rev-score-card] h3,
+.rev-card[data-rev-score-card] span {
+  color: inherit;
+}
+
+[data-rev-submit-overlay] {
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}

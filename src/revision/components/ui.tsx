@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { AlertIcon } from "./icons";
 
 export function Spinner({ className = "h-6 w-6" }: { className?: string }) {
@@ -127,9 +127,13 @@ export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?
   );
 }
 
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className = "",
+  ...rest
+}: { children: ReactNode; className?: string } & HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={`rev-card rounded-3xl p-4 ${className}`}>
+    <div className={`rev-card rounded-3xl p-4 ${className}`} {...rest}>
       {children}
     </div>
   );

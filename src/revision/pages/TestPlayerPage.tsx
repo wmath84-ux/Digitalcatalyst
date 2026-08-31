@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from "react";
 import PageShell from "../components/PageShell";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { ErrorState, FullScreenLoader, PrimaryButton, ProgressBar, SecondaryButton, Badge } from "../components/ui";
 import { CheckIcon, ChevronRightIcon, XIcon } from "../components/icons";
+import { lockBodyScroll, unlockBodyScroll, useOverlayBox, type OverlayBoundsRef } from "../../components/ui/overlayBounds";
 import {
   getAttemptForPlayer,
   getTodayTestState,
@@ -367,14 +368,56 @@ function SubmitConfirmModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const boundsRef = useRef<HTMLElement | null>(null);
+  const [boundsReady, setBoundsReady] = useState(0);
+  useLayoutEffect(() => {
+    boundsRef.current =
+      document.querySelector<HTMLElement>("[data-revision-page-main]") ??
+      document.querySelector<HTMLElement>("[data-revision-content]");
+    setBoundsReady((n) => n + 1);
+  }, []);
+  const { scoped, box } = useOverlayBox(boundsReady > 0, boundsRef as OverlayBoundsRef);
+  const isScoped = scoped && box !== null;
+
+  useEffect(() => {
+    lockBodyScroll();
+    return () => unlockBodyScroll();
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/50 backdrop-blur-sm sm:items-center">
-      <div className="mx-auto w-full max-w-[480px] rounded-t-3xl bg-white p-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] shadow-2xl sm:rounded-3xl">
+    <div
+      data-rev-submit-overlay
+      className={
+        isScoped && box
+          ? "fixed z-[90] flex items-center justify-center p-3 sm:p-4"
+          : "fixed inset-0 z-[90] flex items-end justify-center sm:items-center sm:p-4"
+      }
+      style={
+        isScoped && box
+          ? { top: box.top, left: box.left, width: box.width, height: box.height }
+          : undefined
+      }
+    >
+      <div
+        className={`absolute inset-0 bg-slate-950/50 backdrop-blur-sm ${isScoped ? "rounded-[1.5rem]" : ""}`}
+        onClick={submitting ? undefined : onCancel}
+        aria-hidden="true"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rev-submit-title"
+        className="relative flex w-full max-w-[min(100%,26rem)] flex-col overflow-hidden rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6"
+        style={{
+          maxHeight: isScoped && box ? "100%" : "min(100dvh - 2rem, 28rem)",
+          paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",
+        }}
+      >
         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200 sm:hidden" />
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
           <CheckIcon className="h-7 w-7" />
         </div>
-        <h3 className="text-center text-lg font-semibold text-slate-900">Submit your test?</h3>
+        <h3 id="rev-submit-title" className="text-center text-base font-semibold text-slate-900 sm:text-lg">Submit your test?</h3>
         {unansweredCount > 0 ? (
           <p className="mt-2 text-center text-sm leading-relaxed text-slate-600">
             You have <span className="font-semibold text-amber-600">{unansweredCount} unanswered question{unansweredCount === 1 ? "" : "s"}</span>{" "}
@@ -390,11 +433,11 @@ function SubmitConfirmModal({
             <XIcon className="h-3.5 w-3.5" /> {errorMessage}
           </p>
         )}
-        <div className="mt-5 flex gap-3">
-          <SecondaryButton onClick={onCancel} disabled={submitting} className="flex-1">
+        <div className="mt-5 flex min-w-0 gap-3">
+          <SecondaryButton onClick={onCancel} disabled={submitting} className="min-w-0 flex-1">
             Keep Reviewing
           </SecondaryButton>
-          <PrimaryButton onClick={onConfirm} disabled={submitting} className="flex-1">
+          <PrimaryButton onClick={onConfirm} disabled={submitting} className="min-w-0 flex-1">
             {submitting ? "Submitting…" : "Submit"}
           </PrimaryButton>
         </div>
