@@ -246,3 +246,38 @@ test("the horizontal overflow guard lives on body only, never on the root", () =
   assert.match(css, /html\s*\{\s*overflow-y:\s*visible/);
   assert.doesNotMatch(css, /html,\s*body\s*\{\s*overflow-x:\s*hidden/);
 });
+
+test("the phone band gives My Day's nested <main> a real scroller", () => {
+  // My Day's <main> sits inside `[data-myday-content]`, NOT directly under
+  // the frame, so the direct-child binding (`[data-app-frame] > main`) never
+  // reached it: on a phone the frame's `overflow: hidden` clip left the
+  // whole page with no scroll container — the reported "My Day cannot
+  // scroll on mobile". The phone band must bind the content row to the
+  // pinned frame and scroll its nested <main>, matching the phone model of
+  // every other page (site header + bottom pill pinned, body scrolls).
+  const phone = css.slice(css.indexOf("@media (max-width: 639px)"));
+
+  // The content row stops reserving its intrinsic (unbounded) height.
+  assert.match(
+    phone,
+    /\[data-app-frame\] \[data-myday-content\]\s*\{\s*min-height:\s*0/,
+    "the My Day content row must be height-bounded inside the pinned frame",
+  );
+
+  // The nested <main> becomes the touch scroller.
+  const scrollerBlock = new RegExp(
+    `${escape("[data-app-frame] [data-myday-content] > main")}\\s*\\{([^}]*)\\}`,
+  ).exec(phone)?.[1];
+  assert.ok(scrollerBlock, "expected a [data-app-frame] [data-myday-content] > main block in the phone band");
+  for (const source of [
+    /overflow-y:\s*auto/,
+    /min-height:\s*0/,
+    /overscroll-behavior:\s*contain/,
+    /-webkit-overflow-scrolling:\s*touch/,
+  ]) {
+    assert.match(scrollerBlock, source, `the My Day phone scroller must declare ${source}`);
+  }
+
+  // The phone model's original frame pin is untouched (this band extends it).
+  assert.match(phone, /\[data-app-frame\]\s*\{[^}]*height:\s*100dvh[^}]*overflow:\s*hidden/);
+});

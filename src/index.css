@@ -309,6 +309,26 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   [data-app-frame] > main {
     min-height: 0;
   }
+
+  /* My Day (and pages that, like it, nest their <main> inside a content
+     row instead of directly under the frame) never matched the direct-child
+     rule above, so the frame's `overflow: hidden` clip left the page with
+     NO scroll container on a phone: everything below the fold was
+     unreachable. Bound the content row to the pinned frame and make its
+     <main> the scroller — the same phone model the other pages use (site
+     header + bottom pill stay pinned, the body scrolls). */
+  [data-app-frame] [data-myday-content] {
+    min-height: 0;
+  }
+
+  [data-app-frame] [data-myday-content] > main {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(100 116 139 / 0.45) transparent;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -928,6 +948,46 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   [data-myday-create-row] button[aria-label="Create item"] {
     height: 6rem;
     width: 6rem;
+  }
+}
+
+/* ── Store view-mode dropdown (Grid / Cards / Mixed) ────────────────────
+   The popover is anchored to the 36 px layout-toggle button
+   (`absolute right-4 top-1/2` shrink-to-fit), so its containing block is
+   that tiny box. An absolutely-positioned child with `right: 0` and auto
+   width is capped by the containing block: on every screen the three
+   options used to be crushed into a thin, unusable sliver. Sizing the
+   popover from its own content (`width: max-content`) and pinning the
+   option buttons to their fixed tap-target size guarantees the three
+   options render side-by-side, fully tappable, on every tablet width and
+   every desktop viewport. Kept as a plain (unlayered) rule so it also
+   beats any future layered utility conflict. */
+[data-store-view-options] {
+  width: max-content;
+  min-width: max-content;
+}
+[data-store-view-options] > button {
+  flex: 0 0 auto;
+}
+
+/* ── Revision "test submit" confirm dialog ─────────────────────────────
+   The dialog must never grow past the visible viewport on any tablet or
+   desktop size: the cap is written at 100vh first (universal support) and
+   upgraded to 100dvh only inside @supports, so engines without
+   dynamic-viewport units still clamp (a bare `100dvh` declaration would
+   drop entirely there, leaving the dialog uncapped and overflowing below
+   the screen). Overflowing content scrolls inside the card instead of
+   pushing the actions off-screen. The scoped (content-column) mode
+   overrides the cap with an inline `max-height: 100%` of the measured
+   column box. */
+[data-rev-submit-dialog] {
+  max-height: min(100vh - 2rem, 28rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+@supports (height: 100dvh) {
+  [data-rev-submit-dialog] {
+    max-height: min(100dvh - 2rem, 28rem);
   }
 }
 

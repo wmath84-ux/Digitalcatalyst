@@ -271,14 +271,19 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
               </button>
 
               {viewDropdownOpen && (
-                <div className="absolute right-0 top-full z-30 mt-1.5 flex gap-1 rounded-2xl border border-white/70 bg-white/80 p-1.5 shadow-2xl shadow-indigo-900/20 backdrop-blur-2xl">
+                <div
+                  data-store-view-options
+                  className="absolute right-0 top-full z-30 mt-1.5 flex w-max gap-1 rounded-2xl border border-white/70 bg-white/80 p-1.5 shadow-2xl shadow-indigo-900/20 backdrop-blur-2xl"
+                >
                   {VIEW_OPTIONS.map(({ mode, label, Icon }) => (
                     <button
                       key={mode}
                       type="button"
                       onClick={() => { setViewMode(mode); setViewDropdownOpen(false); }}
                       title={label}
-                      className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${
+                      aria-label={`${label} view`}
+                      aria-pressed={viewMode === mode}
+                      className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl transition ${
                         viewMode === mode
                           ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-300/60"
                           : "text-slate-500 hover:bg-white/80 hover:text-slate-800"
