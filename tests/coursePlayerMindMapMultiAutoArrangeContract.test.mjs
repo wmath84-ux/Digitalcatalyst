@@ -280,13 +280,15 @@ test("the panel ships a notes-style card list of the module's maps", () => {
   // The library slides over the canvas so the diagram surface stays clean
   // when it is closed — the mind map tab has no header of its own.
   //
-  // It is also the panel's HOME screen: it is open on mount, and it comes
-  // straight back (with any half-finished node edit cleared) every time the
-  // sheet is re-opened, so the learner always PICKS a map — or taps "New map"
-  // — instead of landing on whatever canvas was left behind last time.
-  assert.match(panel, /const \[libraryOpen, setLibraryOpen\] = useState\(true\);/);
+  // It is also the panel's HOME screen on a FRESH player visit. Within one
+  // visit the learner's last view is restored from the panel session instead
+  // (library stays library, canvas stays canvas), so tab switches never yank
+  // them back to the picker — leaving the player is what resets it.
+  assert.match(panel, /useState\(\s*\(\) => getCoursePanelSession\(\)\.mindMapView !== "canvas",?\s*\)/);
+  assert.match(panel, /setMindMapSessionView\(libraryOpen \? "library" : "canvas"\)/);
   assert.match(panel, /if \(open && !prevOpenRef\.current\) \{/);
-  assert.match(panel, /setLibraryOpen\(true\);/);
+  assert.match(panel, /const resumeCanvas = getCoursePanelSession\(\)\.mindMapView === "canvas";/);
+  assert.match(panel, /setLibraryOpen\(!resumeCanvas\);/);
 });
 
 test("the map library's delete acts on a MAP, the toolbar trash on a BRANCH", () => {

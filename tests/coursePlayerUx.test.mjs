@@ -39,6 +39,7 @@ const sidebar = readSource("src/course/CourseSidebar.tsx");
 const overlay = readSource("src/course/CourseOverlay.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
+const notesStore = readSource("src/course/notesStore.ts");
 const resourceViewer = readSource("src/course/ResourceViewer.tsx");
 const imageViewer = readSource("src/course/ImageViewer.tsx");
 const courseTypes = readSource("src/types/course.ts");
@@ -220,8 +221,12 @@ test("CourseOverlay wires NotesPanel into the notes tab", () => {
 });
 
 test("CoursePlayer persists notes to localStorage (per user + product)", () => {
-  assert.match(coursePlayer, /localStorage\.getItem\(notesStorageKey\(uid, productId\)\)/);
-  assert.match(coursePlayer, /localStorage\.setItem\(notesStorageKey\(uid, productId\), JSON\.stringify\(notes\)\)/);
+  // The storage helpers live in the shared notesStore (used by both the
+  // player and the NotesPanel); the per-user + per-product key and the
+  // read/write plumbing must still be exactly this shape.
+  assert.match(notesStore, /localStorage\.getItem\(notesStorageKey\(uid, productId\)\)/);
+  assert.match(notesStore, /localStorage\.setItem\(notesStorageKey\(uid, productId\), JSON\.stringify\(notes\)\)/);
+  assert.match(notesStore, /notesStorageKey = \(uid: string, productId: string\) => `dc\.courseNotes\.\$\{uid\}\.\$\{productId\}`/);
   assert.match(coursePlayer, /persistLocalNotes\(user\.id, product\.id, next\)/);
   assert.match(coursePlayer, /loadLocalNotes\(user\.id, product\.id\)/);
 });

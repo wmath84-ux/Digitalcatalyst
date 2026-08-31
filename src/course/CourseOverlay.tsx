@@ -162,13 +162,6 @@ interface CourseOverlayProps {
    * centre handle resizes BOTH panes together.
    */
   onSplitRatioChange?: (percent: number | null) => void;
-  /**
-   * Monotonic counter the parent increments when the overlay is about to
-   * close (outside-click, tab switch, Escape). Each increment tells NotesPanel
-   * to flush any open draft to localStorage / state immediately, before the
-   * panel unmounts and the draft would otherwise be lost.
-   */
-  notesSaveSignal?: number;
 }
 
 const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; icon: (active: boolean) => ReactNode }> = [
@@ -729,7 +722,6 @@ export default function CourseOverlay(props: CourseOverlayProps) {
               onDelete={props.onDeleteNote}
               onEditorOpenChange={setNotesEditorOpen}
               composerOpenSignal={composerSignal}
-              saveSignal={props.notesSaveSignal}
             />
           ) : tab === "mindmap" ? (
             // The parent owns the map state + Firestore hook, so the panel is

@@ -7,6 +7,8 @@ import ResourceViewer from "./course/ResourceViewer";
 import CourseOverlay, { type DockTab } from "./course/CourseOverlay";
 import MindMapPanel from "./course/MindMapPanel";
 import useCourseMindMap from "./course/useCourseMindMap";
+import { combineHtml, loadLocalNotes, persistLocalNotes } from "./course/notesStore";
+import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
@@ -205,32 +207,8 @@ const collectModuleIdByFileId = (modules: CourseModule[]): Record<string, string
 };
 
 // Notes are kept in the user's localStorage (per user + product) so they stay
-// on the device and never collide with Firestore course progress.
-const notesStorageKey = (uid: string, productId: string) => `dc.courseNotes.${uid}.${productId}`;
-const loadLocalNotes = (uid: string, productId: string): CoursePlayerNote[] => {
-  try {
-    const raw = localStorage.getItem(notesStorageKey(uid, productId));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    // Migrate older notes that pre-date the `links` field. We materialise
-    // an empty array on read so the rest of the code can rely on
-    // `note.links` always being an array.
-    return parsed.map((note: any) => ({
-      ...note,
-      links: Array.isArray(note?.links) ? note.links.filter((id: unknown) => typeof id === "string") : [],
-    }));
-  } catch {
-    return [];
-  }
-};
-const persistLocalNotes = (uid: string, productId: string, notes: CoursePlayerNote[]) => {
-  try {
-    localStorage.setItem(notesStorageKey(uid, productId), JSON.stringify(notes));
-  } catch {
-    /* storage full / private mode — ignore */
-  }
-};
+// on the device and never collide with Firestore course progress. The store
+// helpers live in src/course/notesStore.ts, shared with the NotesPanel.
 
 type CoursePlayerTheme = "dark" | "light";
 const courseThemeStorageKey = "dc.coursePlayerTheme";
@@ -490,6 +468,48 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     setNotes(user?.id ? loadLocalNotes(user.id, product.id) : []);
   }, [user, product.id]);
 
+  // ── Panel session reset on exit ─────────────────────────────────────────
+  // While the player is open, the Notes and Mind Map panels keep their place
+  // across tab / module switches via the panel session (notes editor vs
+  // list, map library vs canvas, the map's own theme pick). Leaving the
+  // player resets ALL of it so the next entry starts at the defaults — the
+  // notes list and the mind map library, with the map following the player's
+  // theme again. One thing is never thrown away: an open notes draft is
+  // preserved as a saved note first.
+  useEffect(() => {
+    return () => {
+      if (user?.id) {
+        const sessionNotes = getCoursePanelSession().notes;
+        if (sessionNotes.view !== "list") {
+          const safeHtml = sanitizeRichText(combineHtml(sessionNotes.title, sessionNotes.draft));
+          if (!isEmptyRichText(safeHtml)) {
+            const plain = richTextToPlain(safeHtml);
+            if (sessionNotes.view === "compose") {
+              const next: CoursePlayerNote[] = [
+                {
+                  id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  text: plain,
+                  html: safeHtml,
+                  createdAt: Date.now(),
+                },
+                ...loadLocalNotes(user.id, product.id),
+              ];
+              persistLocalNotes(user.id, product.id, next);
+            } else {
+              const next = loadLocalNotes(user.id, product.id).map((note) =>
+                note.id === sessionNotes.noteId
+                  ? { ...note, text: plain, html: safeHtml, updatedAt: Date.now() }
+                  : note,
+              );
+              persistLocalNotes(user.id, product.id, next);
+            }
+          }
+        }
+      }
+      resetCoursePanelSession();
+    };
+  }, [user, product.id]);
+
   // Restore the saved "where did I leave off" snapshot for this course. It
   // covers every file type, so a YouTube lesson, an MP4, a podcast, a PDF and
   // a zoomed diagram all reopen exactly where the learner stopped.
@@ -670,9 +690,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // it stops being the active file (see its `active` prop).
     userSelectedRef.current = true;
     setSelectedFile(file);
-    // Close the overlay so the user sees the freshly opened content.
-    // Fire save signal first in case the notes editor is open mid-draft.
-    if (dockTab === "notes") fireSaveSignal();
+    // Close the overlay so the user sees the freshly opened content. The
+    // notes editor keeps its place in the panel session, so coming back
+    // later resumes the same editor + draft.
     setDockOpen(false);
     if (window.innerWidth < 768) document.getElementById("course-viewer")?.scrollIntoView({ behavior: "smooth" });
     if (user && progressRef) {
@@ -700,17 +720,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   };
 
   // Tapping the active toggle collapses the sheet; tapping a different
-  // toggle keeps the SAME sheet open and swaps its content in place.
-  // If the notes tab is currently open and has a draft, fire the save signal
-  // BEFORE closing / switching so the draft is committed first.
+  // toggle keeps the SAME sheet open and swaps its content in place. Both
+  // panels keep their place in the panel session, so a notes editor (or a
+  // mind map canvas) is still exactly where the learner left it on return.
   const handleDockTabChange = (next: DockTab) => {
     if (next === dockTab) {
-      // Toggling the same tab — if it's the notes tab, fire save first.
-      if (dockTab === "notes") fireSaveSignal();
       setDockOpen((open) => !open);
     } else {
-      // Switching tabs — if leaving notes, fire save first.
-      if (dockTab === "notes") fireSaveSignal();
       setDockTab(next);
       setDockOpen(true);
     }
@@ -748,16 +764,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // a video or an image renders identically either way.
   const selectedEmbedKind = selectedFile ? getCourseEmbed(selectedFile).kind : "none";
   const showViewportToggle = VIEWPORT_AWARE_KINDS.includes(selectedEmbedKind);
-
-  // ── Notes auto-save signal ────────────────────────────────────────────────
-  // Incremented every time the overlay is about to close while the notes tab
-  // is active. NotesPanel listens to this signal and immediately flushes any
-  // open draft to localStorage before the sheet animates away, so outside-
-  // click / Escape / tab-switch never discards work in progress.
-  const [notesSaveSignal, setNotesSaveSignal] = useState(0);
-  const fireSaveSignal = useCallback(() => {
-    setNotesSaveSignal((n) => n + 1);
-  }, []);
 
   // ── Notes split mode (landscape) ────────────────────────────────────────
   // CourseOverlay reports when the notes editor is open in landscape — that
@@ -1057,17 +1063,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onTabChange={handleDockTabChange}
       open={dockOpen}
       onToggle={() => {
-        // If we're about to CLOSE (open→false) while on notes tab, save first.
-        if (dockOpen && dockTab === "notes") fireSaveSignal();
-        // …and flush the mind map's pending debounced write the same way, so
-        // a dock-tap close never leaves a fresh branch waiting to save.
+        // Flush the mind map's pending debounced write when closing, so a
+        // dock-tap close never leaves a fresh branch waiting to save. The
+        // notes editor needs no flush — its draft lives in the panel session
+        // and is still right there when the sheet reopens.
         if (dockOpen && dockTab === "mindmap") mindMap.flush();
         setDockOpen((open) => !open);
       }}
       onClose={() => {
-        // Outside-click / Escape / header-X close: save any open notes draft
-        // and flush the mind map's pending write first.
-        if (dockTab === "notes") fireSaveSignal();
+        // Outside-click / Escape / header-X close: flush the mind map's
+        // pending write. The notes editor keeps its session state untouched.
         if (dockTab === "mindmap") mindMap.flush();
         setDockOpen(false);
       }}
@@ -1112,10 +1117,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           // until the learner flips the map's own sun/moon toolbar button.
           playerTheme={theme}
           landscape={useLandscapeRails}
-          // True only while the mind map sheet is actually open. The panel
-          // uses this to bring the map library (its first/home screen) back
-          // every time the tab is reopened, instead of resuming straight on
-          // a canvas.
+          // True only while the mind map sheet is actually open. Within one
+          // player visit the panel restores the learner's last view
+          // (library or canvas) from the panel session; leaving the player
+          // resets it back to the library home screen.
           open={dockOpen && dockTab === "mindmap"}
           onClose={() => {
             mindMap.flush();
@@ -1125,7 +1130,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       )}
       onMindMapSplitChange={handleMindMapSplitChange}
       onSplitRatioChange={handleSplitRatioChange}
-      notesSaveSignal={notesSaveSignal}
     />
   );
 

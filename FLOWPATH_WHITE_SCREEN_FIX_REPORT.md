@@ -76,3 +76,51 @@ app's intended behaviour (keeping the latest updates intact):
    assertion; fixed by the same one-word change.
 
 Full suite after these two changes: **1827 passed, 0 failed**.
+
+## Course Player: panel state session + mind map theme follow (same PR)
+
+### 1. Notes / Mind Map state stays put while switching inside the player
+
+- Naya shared session store: `src/course/coursePanelSession.ts` (notes view —
+  list / compose / edit with draft, mind map view — library / canvas, mind
+  map theme override). Module-scope isliye hai ki tab switch par panels
+  unmount ho jaate hain, lekin session zinda rehta hai.
+- **NotesPanel** ab mount par session se apni jagah restore karta hai:
+  agar learner ne editor khola tha (compose ya edit) aur Module/Mind map par
+  switch karke wapas aaya, toh **wahi editor wahi draft ke saath** khulta hai.
+  Draft ab tab-switch par auto-save (flush) nahi hota — editor mein hi rehta
+  hai.
+- **MindMapPanel** bhi session se restore karta hai: library par tha toh
+  library, canvas par tha toh canvas — "vahi state rahe".
+- **Player exit = full reset**: CoursePlayerApp ka unmount cleanup
+  `resetCoursePanelSession()` bulata hai, isliye dobara entry karne par
+  default state (notes list, mind map library) se khulta hai. Ek hi safety
+  net rakha hai — khula hua notes draft exit par saved note ban jaata hai,
+  learner ka kaam kabhi nahi khota.
+- Purana `saveSignal`/`fireSaveSignal` auto-save plumbing hata diya (ab
+  zaroori nahi), aur notes ke localStorage helpers `src/course/notesStore.ts`
+  mein share ho gaye (player + panel dono use karte hain).
+
+### 2. Mind map theme hamesha course player ko follow karta hai
+
+- Mind map ka apna light/dark button **per-visit choice** ban gaya: override
+  session mein rehta hai (tab switch par bhi wahi rahe), lekin player se bahar
+  nikalte hi reset — agli entry par map **hamesha course player ki theme
+  follow karta hai** (`themeOverride ?? playerTheme`). Purana
+  `dc.mindMapThemeOverride` localStorage (forever-persist) override hata diya.
+  Button se user ab bhi sirf mind map ke liye light/dark chun sakta hai.
+
+### 3. Purane 2 TypeScript errors bhi fix
+
+- `src/admin/pages/SubscriptionsPage.tsx` ke unused `SectionCard` / `StatCard`
+  imports hata diye (koi behavior change nahi, sirf warnings khatam).
+
+### Verification
+
+- Naya contract test `tests/coursePlayerPanelSessionContract.test.mjs` (6
+  tests) + 4 existing test files naye behavior ke hisaab se update.
+- Runtime checks: NotesPanel ko actually render karke verify kiya —
+  compose/edit state tab-switch ke baad restore hota hai aur exit ke baad
+  list par reset hota hai (9/9 pass).
+- Full suite: **1833/1833 pass, 0 fail**.
+- `vite build` successful; touched files mein 0 TypeScript errors.

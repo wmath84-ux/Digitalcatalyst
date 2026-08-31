@@ -441,11 +441,14 @@ test("the mind map follows the Course Player theme and can be flipped for the ma
   assert.match(panel, /const mindTheme: MindMapTheme = themeOverride \?\? \(playerTheme === "light" \? "light" : "dark"\);/);
   assert.match(panel, /data-mindmap-theme=\{mindTheme\}/);
   assert.match(panel, /course-mindmap-shell/);
-  // The toolbar button next to Fit flips ONLY this window and remembers the
-  // choice per device; the player keeps its own theme.
+  // The toolbar button next to Fit flips ONLY this window; the pick is kept
+  // in the player's PANEL SESSION, so it survives tab switches but resets
+  // when the player is left — the next entry follows the player's theme
+  // again instead of resurrecting an old per-device override.
   assert.match(panel, /data-course-mindmap-theme/);
   assert.match(panel, /setThemeOverride\(mindTheme === "dark" \? "light" : "dark"\)/);
-  assert.match(panel, /const mindMapThemeStorageKey = "dc.mindMapThemeOverride";/);
+  assert.match(panel, /getCoursePanelSession\(\)\.mindMapThemeOverride/);
+  assert.match(panel, /setMindMapSessionTheme\(themeOverride\)/);
   // The parent hands the player's live theme down.
   assert.match(coursePlayer, /playerTheme=\{theme\}/);
   // The palette itself lives in the stylesheet as scoped variables.
