@@ -37,6 +37,7 @@ import {
   fromPaise,
   getCycleDurationDays,
   getPlanCyclePricePaise,
+  isActiveSubscriptionRecord,
   isFeatureIdAllowed,
   isPlanActive,
   isPlanCycleAllowed,
@@ -222,6 +223,67 @@ export const loadCurrentSubscription = async (
     .get();
   return snap.exists ? ((snap.data() || {}) as Record<string, unknown>) : null;
 };
+
+/**
+ * Self-heal the feature list of an ACTIVE membership.
+ *
+ * The grant path writes the buyer's selected feature ids; older grants (and
+ * the quote-era free-included features) could leave the stored `features`
+ * list short of what the plan actually includes — e.g. My Day cloud saving
+ * configured as included on the Basic plan. This recomputes the complete
+ * set — stored ids ∪ features that are free on the member's plan/cycle —
+ * and patches the subscription doc + the user-doc mirror ONLY when ids are
+ * missing. Never removes anything, never touches dates/plan/cycle, so it is
+ * safe to call on every status/catalog load.
+ */
+export const repairSubscriptionFeatures = async (
+  uid: string,
+  options: { db?: Firestore; now?: number } = {},
+): Promise<{ repaired: boolean; features: string[] }> => {
+  const db = options.db ?? adminDb();
+  const now = options.now ?? Date.now();
+  const subRef = db
+    .collection(USER_SUBS_COLLECTION)
+    .doc(uid)
+    .collection(USER_SUBS_DOC)
+    .doc("current");
+  const snap = await subRef.get();
+  if (!snap.exists) return { repaired: false, features: [] };
+  const data = (snap.data() || {}) as Record<string, unknown>;
+  if (!isActiveSubscriptionRecord(data, now)) return { repaired: false, features: toStringList(data.features) };
+  const planId = String(data.planId || "").trim();
+  const cycle: BillingCycle = data.cycle === "yearly" ? "yearly" : "monthly";
+  const stored = toStringList(data.features);
+  const granted = new Set<string>(stored);
+  try {
+    const features = await loadActiveFeatures({ db });
+    for (const feature of features) {
+      if (!feature?.id || !feature.active) continue;
+      const resolved = resolveFeaturePrice(feature as never, planId, cycle);
+      if (feature.included || resolved.included) granted.add(String(feature.id));
+    }
+  } catch (error) {
+    console.warn("[subscriptions] feature repair resolution skipped", error);
+  }
+  const features = Array.from(granted);
+  const missing = features.some((id) => !stored.includes(id));
+  if (!missing) return { repaired: false, features };
+  await db.runTransaction(async (tx: Transaction) => {
+    const current = await tx.get(subRef);
+    if (!current.exists) return;
+    const currentData = (current.data() || {}) as Record<string, unknown>;
+    if (!isActiveSubscriptionRecord(currentData, now)) return;
+    tx.set(subRef, { features, updatedAt: Timestamp.fromMillis(now) }, { merge: true });
+    tx.set(db.collection(USER_SUBS_COLLECTION).doc(uid), {
+      subscriptionFeatures: features,
+      updatedAt: Timestamp.fromMillis(now),
+    }, { merge: true });
+  });
+  return { repaired: true, features };
+};
+
+const toStringList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map(String).filter(Boolean) : [];
 
 /**
  * Refuse a quote for a subscription type the buyer already holds.

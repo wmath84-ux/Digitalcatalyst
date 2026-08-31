@@ -210,6 +210,65 @@ export const isSubscriptionActive = (subscription, now = Date.now()) => {
 };
 
 // ---------------------------------------------------------------------------
+// Feature entitlement resolution (single source of truth)
+// ---------------------------------------------------------------------------
+
+/**
+ * Read an epoch-millis value from a Firestore Timestamp ({seconds,nanoseconds}),
+ * an admin Timestamp (toMillis()), a numeric string or a plain number.
+ */
+const timestampMillis = (value) => {
+  if (value === null || value === undefined || value === "") return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "object") {
+    if (typeof value.toMillis === "function") {
+      try { return value.toMillis(); } catch { /* fall through */ }
+    }
+    if (Number.isFinite(value.seconds)) return Number(value.seconds) * 1000;
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/**
+ * True when the stored `users/{uid}/subscription/current` record is an
+ * active, unexpired membership. Accepts both raw Firestore timestamps
+ * (web client) and admin Timestamp / epoch-millis values (server).
+ */
+export const isActiveSubscriptionRecord = (record, now = Date.now()) => {
+  if (!record || typeof record !== "object") return false;
+  const status = String(record.status || "active");
+  if (status !== "active") return false;
+  return timestampMillis(record.expiresAt) > now;
+};
+
+/**
+ * Whether an active subscription unlocks a given paid feature.
+ *
+ * The explicit list (record.features) wins. For the two core subscription
+ * features an active membership is the entitlement itself — they are what
+ * every plan sells (My Day cloud saving, Revision Studio) and the admin
+ * tunes their per-plan pricing, not their availability. This keeps the
+ * profile allowance, My Day, Revision and the server gates perfectly in
+ * sync even for memberships whose stored `features` list is older or was
+ * written before the id was stored in the record. Custom features still
+ * require their id in the list (or a free plan override, resolved by the
+ * caller via `freeFeatureIds`).
+ */
+export const CORE_SUBSCRIPTION_FEATURES = ["my-day", "revision"];
+
+export const subscriptionUnlocksFeature = (record, featureId, options = {}) => {
+  if (!isActiveSubscriptionRecord(record)) return false;
+  const id = String(featureId || "");
+  if (!id) return false;
+  const features = Array.isArray(record.features) ? record.features.map(String) : [];
+  if (features.includes(id)) return true;
+  const free = Array.isArray(options.freeFeatureIds) ? options.freeFeatureIds.map(String) : [];
+  if (free.includes(id)) return true;
+  return CORE_SUBSCRIPTION_FEATURES.includes(id);
+};
+
+// ---------------------------------------------------------------------------
 // Cycle price
 // ---------------------------------------------------------------------------
 

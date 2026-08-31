@@ -17,6 +17,7 @@
 
 import type { Firestore } from "firebase-admin/firestore";
 import type { FlowPathActivityKind } from "./flowpathControl.js";
+import { subscriptionUnlocksFeature } from "../../utils/subscriptions.js";
 
 export type FlowPathAccess = {
   /** If set, the request must be refused with this HTTP status. */
@@ -39,13 +40,6 @@ export type FlowPathAccess = {
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
-const millis = (value: unknown): number => {
-  if (value && typeof value === "object" && "toMillis" in value && typeof (value as { toMillis?: unknown }).toMillis === "function") {
-    return (value as { toMillis: () => number }).toMillis();
-  }
-  const n = Number(value || 0);
-  return Number.isFinite(n) ? n : 0;
-};
 
 const text = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
 
@@ -107,9 +101,10 @@ export async function resolveFlowPathAccess(
     }
     const subscription = await db.collection("users").doc(uid).collection("subscription").doc("current").get();
     const sub = asRecord(subscription.data());
-    const active = subscription.exists && sub.status === "active" && millis(sub.expiresAt) > now;
-    const features = Array.isArray(sub.features) ? sub.features.map(String) : [];
-    if (!active || !features.includes("revision")) {
+    // Same single-source entitlement rule as /api/myday and the Revision
+    // cloud APIs: any active membership unlocks the core Revision feature.
+    const active = subscriptionUnlocksFeature(sub, "revision");
+    if (!active) {
       return {
         status: 403,
         code: "PLAN_REQUIRED",
@@ -145,9 +140,9 @@ export async function resolveFlowPathAccess(
   }
   const subscription = await db.collection("users").doc(uid).collection("subscription").doc("current").get();
   const sub = asRecord(subscription.data());
-  const active = subscription.exists && sub.status === "active" && millis(sub.expiresAt) > now;
-  const features = Array.isArray(sub.features) ? sub.features.map(String) : [];
-  const paid = active && features.includes("my-day");
+  // Same single-source entitlement rule as /api/myday: any active membership
+  // unlocks My Day cloud creation; the stored feature list still wins.
+  const paid = subscriptionUnlocksFeature(sub, "my-day");
   if (paid) {
     return {
       canCreate: true,

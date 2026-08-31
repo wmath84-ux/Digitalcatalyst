@@ -38,6 +38,7 @@ import {
   type VercelResponse,
 } from "../_lib/firebaseAdmin.js";
 import { loadServerQuoteForUser } from "../_lib/quotes.js";
+import { applyCors } from "../_lib/cors.js";
 import { grantEntitlementsFromQuote, grantSubscriptionFromQuote } from "../_lib/entitlements.js";
 import { pushToUser } from "../_lib/pushNotify.js";
 
@@ -168,6 +169,7 @@ interface PaymentIntent {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (applyCors(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
 
   try {

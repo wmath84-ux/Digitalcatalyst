@@ -7,6 +7,7 @@
 
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../../../firebase";
+import { apiFetch } from "../../utils/apiBase";
 import type { CatalogAiSettings } from "./aiConfig";
 
 export type AiUsageRecord = {
@@ -275,7 +276,7 @@ export async function refreshAiUsageStatus(): Promise<AiUsageSnapshot> {
   const user = auth.currentUser;
   if (!user) throw new Error("Sign in to check the AI allowance.");
   const token = await user.getIdToken();
-  const response = await fetch("/api/revision/generate", {
+  const response = await apiFetch("/api/revision/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ action: "revision.usage.status", tzOffsetMinutes: new Date().getTimezoneOffset() }),

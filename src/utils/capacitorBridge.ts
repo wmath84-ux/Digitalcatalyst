@@ -40,6 +40,7 @@
 
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
+import { apiFetch } from "./apiBase";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import type { ActionPerformed, PushNotificationSchema, Token } from "@capacitor/push-notifications";
 import type { LocalNotificationSchema } from "@capacitor/local-notifications";
@@ -88,7 +89,7 @@ export async function registerForPush(getIdToken: () => Promise<string | null>):
         // Vercel rewrite (vercel.json). The action field picks the
         // fcm-register branch on the server so we don't need a
         // dedicated Vercel function (the Hobby plan caps at 12).
-        await fetch("/api/push/fcm-register", {
+        await apiFetch("/api/push/fcm-register", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
           body: JSON.stringify({

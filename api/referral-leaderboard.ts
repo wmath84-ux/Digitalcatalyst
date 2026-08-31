@@ -8,6 +8,7 @@ import { handleFlowPathControl } from "./_lib/flowpathControl.js";
 import { handleManifest } from "./_lib/manifest.js";
 import { handleBrandIcon } from "./_lib/brandIcon.js";
 import { handleSubscriptionGate } from "./_lib/subscriptionGateServer.js";
+import { applyCors } from "./_lib/cors.js";
 
 type SubscriberRow = {
   uid: string;
@@ -108,6 +109,11 @@ const matchesApiRoute = (req: VercelRequest & { url?: string }, route: "manifest
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS — required so the installed Android app (Capacitor runs the bundle
+  // from the internal https://localhost origin) can call these endpoints.
+  // Answers OPTIONS preflights immediately; same-origin web calls are
+  // unaffected.
+  if (applyCors(req, res)) return;
   // PWA manifest + brand icon share this deployed function to stay within the
   // 12-function Hobby cap (see vercel.json rewrites). Dispatch on path AND
   // `?route=` first — after a rewrite `req.url` is often the destination

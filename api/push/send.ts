@@ -45,6 +45,7 @@ import {
   type VercelRequest,
   type VercelResponse,
 } from "../_lib/firebaseAdmin.js";
+import { applyCors } from "../_lib/cors.js";
 import { pushToAllDevices, pushToUser, pushConfigured, type PushPayload } from "../_lib/pushNotify.js";
 import { fcmPushToAllDevices, fcmPushToUser, fcmConfigured, handleFcmRegister, type FcmPayload } from "../_lib/fcm.js";
 import { getNotificationBrandChrome } from "../_lib/branding.js";
@@ -229,6 +230,7 @@ async function handleProductAction(req: VercelRequest, res: VercelResponse, acti
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (applyCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
   try {
     // FCM token registration from the Capacitor / TWA Android shell.

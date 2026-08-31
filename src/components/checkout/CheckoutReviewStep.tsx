@@ -36,6 +36,7 @@ import {
 import { useCheckout } from "../../checkout/CheckoutContext";
 import { useAuth } from "../../context/AuthContext";
 import { useCatalog } from "../../context/CatalogContext";
+import { apiFetch } from "../../utils/apiBase";
 import type { CheckoutLineItem, ServerPriceQuote } from "../../types/commerce";
 import CheckoutLineItemCard from "./CheckoutLineItemCard";
 import { formatPaise } from "../../utils/money";
@@ -444,7 +445,7 @@ export function SubscriptionUnlocksCard({
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/subscription-catalog", { headers: { Accept: "application/json" } })
+    void apiFetch("/api/subscription-catalog", { headers: { Accept: "application/json" } })
       .then((response) => (response.ok ? response.json() : null))
       .then((data: { ok?: boolean; catalog?: { plans?: unknown; features?: unknown } } | null) => {
         if (cancelled || !data || !data.ok || !data.catalog) return;

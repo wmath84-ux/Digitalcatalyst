@@ -2,8 +2,10 @@ import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type V
 import { ensureReferralCoupon, loadReferralConfig, runReferralRepairOnce } from "./_lib/referrals.js";
 import { loadUserCouponUsageCount } from "./_lib/coupons.js";
 import { normaliseCouponCode } from "../utils/coupons.js";
+import { applyCors } from "./_lib/cors.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (applyCors(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     const user = await requireFirebaseUser(req);

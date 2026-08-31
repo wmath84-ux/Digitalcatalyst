@@ -34,6 +34,7 @@ import {
   writeToSessionStorage,
 } from "../../utils/checkoutSession";
 import { auth } from "../../firebase";
+import { apiFetch } from "../utils/apiBase";
 import type { ServerPriceQuote } from "../types/commerce";
 import {
   type CheckoutBuyer,
@@ -124,7 +125,12 @@ export function CheckoutProvider({
   getIdToken,
 }: CheckoutProviderProps) {
   const storageRef = useRef<Storage | null>(storage ?? (typeof window !== "undefined" ? window.sessionStorage : null));
-  const fetcherRef = useRef<typeof fetch>(fetcher ?? (typeof fetch !== "undefined" ? fetch.bind(globalThis) : undefined));
+  // Default fetch routes /api/* through apiFetch so the installed Android
+  // (Capacitor) app reaches the production API instead of the internal
+  // bundled-asset origin. Tests still inject their own `fetcher`.
+  const fetcherRef = useRef<typeof fetch>(
+    fetcher ?? (typeof fetch !== "undefined" ? ((input: RequestInfo | URL, init?: RequestInit) => apiFetch(input as string, init)) : undefined),
+  );
   const getIdTokenRef = useRef<() => Promise<string | null>>(
     getIdToken ?? (async () => {
       const user = auth.currentUser;

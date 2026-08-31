@@ -11,6 +11,7 @@ import {
   X,
   Search,
   Check,
+  BadgeCheck,
   Download,
   Award,
   Users,
@@ -79,6 +80,13 @@ interface Props {
   onChangeSelected: (ids: string[]) => void;
   /** Feature ids that are already included for free with the plan. */
   includedIds: string[];
+  /**
+   * Feature ids the subscriber already owns (bought with their active
+   * membership). These render with a "Purchased" badge and can never be
+   * toggled off (or re-purchased) — exactly like already-purchased products
+   * in the product picker.
+   */
+  purchasedIds?: string[];
 }
 
 export default function FeatureSelectModal({
@@ -88,10 +96,12 @@ export default function FeatureSelectModal({
   onClose,
   onChangeSelected,
   includedIds,
+  purchasedIds,
 }: Props) {
   const [query, setQuery] = useState("");
 
   const includedSet = useMemo(() => new Set(includedIds), [includedIds]);
+  const purchasedSet = useMemo(() => new Set(purchasedIds || []), [purchasedIds]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -103,10 +113,17 @@ export default function FeatureSelectModal({
     );
   }, [features, query]);
 
+  // Owned (purchased) features can never be toggled. Select-all only counts
+  // features the buyer can actually add or remove.
+  const selectableFeatures = useMemo(
+    () => filtered.filter((f) => !purchasedSet.has(f.id)),
+    [filtered, purchasedSet],
+  );
   const allFilteredSelected =
-    filtered.length > 0 && filtered.every((f) => selected.includes(f.id));
+    selectableFeatures.length > 0 && selectableFeatures.every((f) => selected.includes(f.id));
 
   const toggleFeature = (id: string) => {
+    if (purchasedSet.has(id)) return;
     if (selected.includes(id)) {
       onChangeSelected(selected.filter((s) => s !== id));
     } else {
@@ -116,16 +133,16 @@ export default function FeatureSelectModal({
 
   const toggleSelectAll = () => {
     if (allFilteredSelected) {
-      const filteredIds = new Set(filtered.map((f) => f.id));
-      onChangeSelected(selected.filter((id) => !filteredIds.has(id)));
+      const selectableIds = new Set(selectableFeatures.map((f) => f.id));
+      onChangeSelected(selected.filter((id) => !selectableIds.has(id)));
     } else {
-      const merged = new Set([...selected, ...filtered.map((f) => f.id)]);
+      const merged = new Set([...selected, ...selectableFeatures.map((f) => f.id)]);
       onChangeSelected(Array.from(merged));
     }
   };
 
   const selectedTotalPaise = features
-    .filter((f) => selected.includes(f.id) && !includedSet.has(f.id))
+    .filter((f) => selected.includes(f.id) && !includedSet.has(f.id) && !purchasedSet.has(f.id))
     .reduce((sum, f) => sum + featurePrice(f), 0);
 
   return (
@@ -237,44 +254,66 @@ export default function FeatureSelectModal({
                   {filtered.map((feat) => {
                     const isChecked = selected.includes(feat.id);
                     const isIncluded = includedSet.has(feat.id);
+                    // Already purchased with the subscriber's active
+                    // membership: never selectable again, shown as Purchased.
+                    const isPurchased = purchasedSet.has(feat.id);
                     return (
                       <li key={feat.id}>
                         <button
                           type="button"
                           onClick={() => toggleFeature(feat.id)}
+                          disabled={isPurchased}
                           data-subscription-feature-pick={feat.id}
                           data-included={isIncluded ? "true" : "false"}
+                          data-purchased={isPurchased ? "true" : "false"}
+                          aria-label={isPurchased ? `${feat.name} — Purchased` : feat.name}
                           className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors ${
-                            isChecked
-                              ? "border-violet-200 bg-violet-50"
-                              : "border-slate-100 bg-white"
-                          } ${isIncluded ? "opacity-80" : ""}`}
+                            isPurchased
+                              ? "cursor-not-allowed border-emerald-200 bg-emerald-50/70"
+                              : isChecked
+                                ? "border-violet-200 bg-violet-50"
+                                : "border-slate-100 bg-white"
+                          } ${isIncluded && !isPurchased ? "opacity-80" : ""}`}
                         >
                           <span
                             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                              ICON_BG[feat.icon] || "bg-slate-50 text-slate-500"
+                              isPurchased
+                                ? "bg-emerald-100 text-emerald-600"
+                                : ICON_BG[feat.icon] || "bg-slate-50 text-slate-500"
                             }`}
                           >
-                            {ICON_MAP[feat.icon] || <Sparkles className="h-4.5 w-4.5" />}
+                            {isPurchased
+                              ? <BadgeCheck className="h-5 w-5" strokeWidth={2.5} />
+                              : ICON_MAP[feat.icon] || <Sparkles className="h-4.5 w-4.5" />}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-bold text-slate-800">{feat.name}</p>
+                            <p className={`text-sm font-bold ${isPurchased ? "text-emerald-900" : "text-slate-800"}`}>{feat.name}</p>
                             <p className="mt-0.5 text-[11px] leading-snug text-slate-400">
                               {feat.description}
                             </p>
                           </div>
                           <div className="flex flex-col items-end gap-1">
-                            <span className="text-sm font-extrabold text-slate-800">
-                              {isIncluded || featurePrice(feat) <= 0 ? "Free" : `+${formatRupee(featurePrice(feat))}`}
-                            </span>
+                            {isPurchased ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white">
+                                <BadgeCheck size={11} strokeWidth={3} /> Purchased
+                              </span>
+                            ) : (
+                              <span className="text-sm font-extrabold text-slate-800">
+                                {isIncluded || featurePrice(feat) <= 0 ? "Free" : `+${formatRupee(featurePrice(feat))}`}
+                              </span>
+                            )}
                             <span
                               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
-                                isChecked
-                                  ? "border-violet-600 bg-violet-600"
-                                  : "border-slate-300 bg-white"
+                                isPurchased
+                                  ? "border-emerald-600 bg-emerald-600 text-white"
+                                  : isChecked
+                                    ? "border-violet-600 bg-violet-600"
+                                    : "border-slate-300 bg-white"
                               }`}
                             >
-                              {isChecked ? (
+                              {isPurchased ? (
+                                <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
+                              ) : isChecked ? (
                                 <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
                               ) : null}
                             </span>

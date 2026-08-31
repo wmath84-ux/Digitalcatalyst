@@ -12,6 +12,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { onSnapshot, doc, getFirestore } from "firebase/firestore";
+import { apiFetch } from "../utils/apiBase";
 
 export type SubscriptionGateDurationFlags = {
   monthly: boolean;
@@ -146,7 +147,7 @@ export function useSubscriptionGateLogic(): {
 
   const refetch = useCallback(async () => {
     try {
-      const res = await fetch("/api/subscription-gate", { method: "GET" });
+      const res = await apiFetch("/api/subscription-gate", { method: "GET" });
       if (!res.ok) {
         setSettings({ ...SUBSCRIPTION_GATE_DEFAULTS });
         return;

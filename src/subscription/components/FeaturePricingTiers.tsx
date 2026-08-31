@@ -9,7 +9,7 @@
 // plan and billing cycle, so switching plan or cycle re-prices the whole
 // strip. Tapping a tier selects every feature inside it.
 
-import { Check, Gift, Sparkles } from "lucide-react";
+import { BadgeCheck, Check, Gift, Sparkles } from "lucide-react";
 import type { FeaturePriceTier } from "../../../utils/featurePricing";
 
 const formatRupee = (paise: number): string =>
@@ -20,13 +20,16 @@ interface Props {
   cycle: "monthly" | "yearly";
   selectedIds: string[];
   onToggleTier: (featureIds: string[], allSelected: boolean) => void;
+  /** Feature ids the subscriber already owns — rendered as "Purchased". */
+  purchasedIds?: string[];
 }
 
-export default function FeaturePricingTiers({ tiers, cycle, selectedIds, onToggleTier }: Props) {
+export default function FeaturePricingTiers({ tiers, cycle, selectedIds, onToggleTier, purchasedIds }: Props) {
   const activeTiers = tiers.filter((tier) => tier.features.length > 0);
   if (activeTiers.length === 0) return null;
 
   const selected = new Set(selectedIds.map(String));
+  const purchased = new Set((purchasedIds || []).map(String));
   const cycleLabel = cycle === "yearly" ? "/yr" : "/mo";
 
   return (
@@ -42,27 +45,38 @@ export default function FeaturePricingTiers({ tiers, cycle, selectedIds, onToggl
       <div className="space-y-2">
         {activeTiers.map((tier) => {
           const ids = tier.features.map((feature) => String(feature.id));
-          const allSelected = ids.every((id) => selected.has(id));
-          const someSelected = !allSelected && ids.some((id) => selected.has(id));
+          // Already-purchased features stay locked into the membership: they
+          // read "Purchased" (emerald) and are excluded from the tap-to-toggle
+          // selection math.
+          const purchasableIds = ids.filter((id) => !purchased.has(id));
+          const allSelected = purchasableIds.length > 0 && purchasableIds.every((id) => selected.has(id));
+          const someSelected = !allSelected && purchasableIds.some((id) => selected.has(id));
+          const allPurchased = purchasableIds.length === 0;
 
           return (
             <button
               key={tier.pricePaise}
               type="button"
-              onClick={() => onToggleTier(ids, allSelected)}
+              onClick={() => onToggleTier(purchasableIds, allSelected)}
               data-tier-price={tier.pricePaise}
               data-tier-selected={allSelected ? "true" : someSelected ? "partial" : "false"}
               className={`w-full rounded-2xl border p-3 text-left transition active:scale-[0.99] ${
-                allSelected
-                  ? "border-violet-300 bg-violet-50"
-                  : someSelected
-                    ? "border-violet-200 bg-white"
-                    : "border-slate-200 bg-white"
+                allPurchased
+                  ? "border-emerald-200 bg-emerald-50/60"
+                  : allSelected
+                    ? "border-violet-300 bg-violet-50"
+                    : someSelected
+                      ? "border-violet-200 bg-white"
+                      : "border-slate-200 bg-white"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  {tier.free ? (
+                  {allPurchased ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                      <BadgeCheck className="h-3 w-3" /> Purchased
+                    </span>
+                  ) : tier.free ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-700">
                       <Gift className="h-3 w-3" /> Included
                     </span>
@@ -79,30 +93,39 @@ export default function FeaturePricingTiers({ tiers, cycle, selectedIds, onToggl
 
                 <span
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
-                    allSelected
-                      ? "border-violet-600 bg-violet-600 text-white"
+                    allPurchased || allSelected
+                      ? allPurchased
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-violet-600 bg-violet-600 text-white"
                       : someSelected
                         ? "border-violet-400 bg-white"
                         : "border-slate-300 bg-white"
                   }`}
                 >
-                  {allSelected ? <Check className="h-3 w-3" /> : someSelected ? <span className="h-2 w-2 rounded-full bg-violet-500" /> : null}
+                  {allPurchased ? <Check className="h-3 w-3" /> : allSelected ? <Check className="h-3 w-3" /> : someSelected ? <span className="h-2 w-2 rounded-full bg-violet-500" /> : null}
                 </span>
               </div>
 
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {tier.features.map((feature) => (
-                  <span
-                    key={feature.id}
-                    className={`rounded-lg px-2 py-1 text-[11px] font-semibold ${
-                      selected.has(String(feature.id))
-                        ? "bg-violet-100 text-violet-800"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {feature.name}
-                  </span>
-                ))}
+                {tier.features.map((feature) => {
+                  const isPurchased = purchased.has(String(feature.id));
+                  return (
+                    <span
+                      key={feature.id}
+                      data-feature-purchased={isPurchased ? "true" : undefined}
+                      className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${
+                        isPurchased
+                          ? "bg-emerald-100 font-bold text-emerald-700"
+                          : selected.has(String(feature.id))
+                            ? "bg-violet-100 text-violet-800"
+                            : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {isPurchased ? <BadgeCheck className="h-3 w-3" /> : null}
+                      {feature.name}
+                    </span>
+                  );
+                })}
               </div>
             </button>
           );

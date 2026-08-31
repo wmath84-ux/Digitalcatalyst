@@ -148,6 +148,20 @@ export const isFeatureIdAllowed: (plan: SubscriptionPlanDoc | null | undefined, 
 
 export const computeCycleExpiresAt: (plan: SubscriptionPlanDoc, cycle: BillingCycle, now?: number) => number;
 export const isSubscriptionActive: (subscription: SubscriptionRecord | null | undefined, now?: number) => boolean;
+/** Accepts raw Firestore/admin Timestamp or epoch-millis expiry. */
+export const isActiveSubscriptionRecord: (record: unknown, now?: number) => boolean;
+/** Feature ids an active membership always unlocks (the two core subscription features). */
+export const CORE_SUBSCRIPTION_FEATURES: string[];
+/**
+ * Whether an active subscription unlocks the given feature. The stored
+ * `features` list wins; core features ("my-day", "revision") are unlocked by
+ * ANY active membership; free plan-override feature ids may be supplied.
+ */
+export const subscriptionUnlocksFeature: (
+  record: unknown,
+  featureId: string,
+  options?: { freeFeatureIds?: string[] },
+) => boolean;
 
 export const getPlanCyclePricePaise: (plan: SubscriptionPlanDoc, cycle: BillingCycle) => number;
 export const formatBillingCycle: (cycle: BillingCycle) => string;

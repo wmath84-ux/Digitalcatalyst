@@ -20,8 +20,10 @@
 
 import { handleCreateQuote, handleFetchQuote } from "../_lib/quotes.js";
 import type { VercelRequest, VercelResponse } from "../_lib/firebaseAdmin.js";
+import { applyCors } from "../_lib/cors.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (applyCors(req, res)) return;
   // GET keeps quote lookup on this same function so the Hobby plan
   // stays within Vercel's 12-function limit (fetch used to be a
   // separate serverless entry).

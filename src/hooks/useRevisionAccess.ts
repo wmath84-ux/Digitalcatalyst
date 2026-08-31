@@ -25,12 +25,7 @@ import { useEffect, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../context/AuthContext";
-
-const millis = (value: unknown) => {
-  if (value && typeof value === "object" && "toMillis" in value && typeof (value as { toMillis?: unknown }).toMillis === "function") return (value as { toMillis: () => number }).toMillis();
-  const number = Number(value || 0);
-  return Number.isFinite(number) ? number : 0;
-};
+import { subscriptionUnlocksFeature } from "../../utils/subscriptions.js";
 
 export function useRevisionAccess() {
   const { user } = useAuth();
@@ -52,10 +47,11 @@ export function useRevisionAccess() {
       if (!featureLoaded) return;
       // Missing/inactive catalog entry means the feature no longer has a gate.
       if (!featureConfigured) { setHasAccess(true); setHidden(false); setLoading(false); return; }
-      const features = Array.isArray(subscription?.features) ? subscription.features.map(String) : [];
-      const paid = subscription?.status === "active" &&
-        millis(subscription?.expiresAt) > Date.now() &&
-        features.includes("revision");
+      // Single-source entitlement rule shared with the server gates: the
+      // stored feature list wins, but any active membership unlocks the core
+      // Revision Studio feature. This keeps Profile, My Day and Revision in
+      // sync with the admin plan configuration.
+      const paid = subscriptionUnlocksFeature(subscription, "revision");
       // Phase-1: hide mode only hides for non-subscribers. Subscribers
       // (paid === true) always see the feature regardless of mode.
       setHasAccess(paid || visibilityMode !== "hide");

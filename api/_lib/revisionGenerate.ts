@@ -11,7 +11,7 @@
 
 import { randomUUID } from "node:crypto";
 import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./firebaseAdmin.js";
-import { normalisePlanDoc } from "../../utils/subscriptions.js";
+import { normalisePlanDoc, subscriptionUnlocksFeature } from "../../utils/subscriptions.js";
 import { aiAllowanceForCycle } from "../../utils/aiAllowances.js";
 import { calculateAiCostMicros, estimateTokensFromText, findAiModelPrice, normalizeAiModelPricing, type AiModelPrice } from "../../utils/aiPolicy.js";
 import { normalizeCompleteAiQuestions } from "../../utils/aiGeneratedTest.js";
@@ -575,10 +575,9 @@ async function resolveEffectiveAiPolicy(uid: string, settingsInput?: Record<stri
   const settings = settingsInput ?? asRecord(asRecord(catalogSnap?.data()).aiSettings);
   const subscription = asRecord(subscriptionSnap.data());
   const now = Date.now();
-  const active = subscriptionSnap.exists && subscription.status === "active" && millis(subscription.expiresAt) > now;
-  const features = Array.isArray(subscription.features) ? subscription.features.map(String) : [];
+  const active = subscriptionUnlocksFeature(subscription, "revision");
   const featureConfigured = featureSnap.exists && featureSnap.data()?.active !== false;
-  const hasAccess = !featureConfigured || (active && features.includes("revision"));
+  const hasAccess = !featureConfigured || active;
   const storedPlanId = String(subscription.planId || "").trim();
   const planId = active ? (storedPlanId || "basic") : "free";
   const cycle = subscription.cycle === "yearly" ? "yearly" : "monthly";

@@ -27,10 +27,13 @@ import {
   loadPlanModuleUnlocks,
   loadPlanProductUnlocks,
   loadSubscriptionProducts,
+  repairSubscriptionFeatures,
 } from "./_lib/subscriptions.js";
+import { applyCors } from "./_lib/cors.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
+  if (applyCors(req, res)) return;
+  if (req.method !== "GET" && req.method !== "OPTIONS") return res.status(405).json({ ok: false, error: "Method not allowed" });
   try {
     // Auth is optional — we still verify the token if it's
     // present so a logged-in buyer gets a catalog filtered for
@@ -39,6 +42,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       const user = await requireFirebaseUser(req);
       uid = String(user?.uid || "");
+      // Self-heal a membership whose stored feature list is missing
+      // plan-included features before we answer (best-effort).
+      try { if (uid) await repairSubscriptionFeatures(uid); } catch { /* read-only endpoint */ }
     } catch {
       // ignore — public read is allowed.
     }

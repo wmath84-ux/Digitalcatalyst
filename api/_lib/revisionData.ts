@@ -11,8 +11,9 @@ import {
   type VercelRequest,
   type VercelResponse,
 } from "./firebaseAdmin.js";
-import { normalisePlanDoc } from "../../utils/subscriptions.js";
+import { normalisePlanDoc, subscriptionUnlocksFeature } from "../../utils/subscriptions.js";
 import { revisionBankLimitForCycle } from "../../utils/revisionLimits.js";
+import { repairSubscriptionFeatures } from "./subscriptions.js";
 
 const TESTS = "revisionTests";
 const DELETED_TESTS = "revisionDeletedTests";
@@ -31,13 +32,6 @@ const readBody = (req: VercelRequest): Record<string, any> => {
   return asRecord(req.body);
 };
 
-const millis = (value: unknown): number => {
-  if (value && typeof value === "object" && "toMillis" in value && typeof (value as { toMillis?: unknown }).toMillis === "function") {
-    return (value as { toMillis: () => number }).toMillis();
-  }
-  const number = Number(value || 0);
-  return Number.isFinite(number) ? number : 0;
-};
 
 const cleanText = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
 const cleanNumber = (value: unknown, fallback = 0) => {
@@ -147,15 +141,19 @@ function sanitizeTestBundle(raw: unknown, uid: string) {
 type Access = { limit: number; planId: string; planName: string; cycle: "monthly" | "yearly"; hasAccess: boolean };
 
 async function resolveAccess(db: Firestore, uid: string): Promise<Access> {
+  // Best-effort self-heal of an active membership's feature list before the
+  // entitlement is resolved (same repair the My Day status path runs).
+  try { await repairSubscriptionFeatures(uid, { db }); } catch { /* non-fatal */ }
   const [feature, subscription] = await Promise.all([
     db.collection("subscriptionFeatures").doc("revision").get(),
     db.collection("users").doc(uid).collection("subscription").doc("current").get(),
   ]);
   const featureConfigured = feature.exists && feature.data()?.active !== false;
   const sub = asRecord(subscription.data());
-  const active = subscription.exists && sub.status === "active" && millis(sub.expiresAt) > Date.now();
-  const features = Array.isArray(sub.features) ? sub.features.map(String) : [];
-  const hasAccess = !featureConfigured || (active && features.includes("revision"));
+  // Same single-source entitlement rule as My Day: the explicit feature list
+  // wins, but any active membership unlocks the core Revision Studio feature.
+  const paid = subscriptionUnlocksFeature(sub, "revision");
+  const hasAccess = !featureConfigured || paid;
   // Keep the last purchased plan/cycle visible after expiry so status and
   // capacity messaging remain truthful. Expiry blocks creation only; it must
   // never reinterpret, reduce, or delete the learner's existing Test Bank.
