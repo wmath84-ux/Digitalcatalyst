@@ -45,7 +45,21 @@ export interface MeasureOptions {
   lineHeight?: number;
   minWidth?: number;
   maxWidth?: number;
+  /**
+   * How many lines a box may show. `0` / `undefined` → as many as the text
+   * needs (wrap); `1` → the clip mode, where the renderer cuts the tail with
+   * an ellipsis and the box is only one line tall.
+   */
+  maxLines?: number;
 }
+
+/**
+ * How the boxes are ALIGNED on the canvas. A view of the map, never data:
+ *   tree  → the classic two-sided tidy tree (default)
+ *   line  → every box in one horizontal row, in reading order
+ *   stack → every box in one vertical column, in reading order
+ */
+export type MindMapArrangement = "tree" | "line" | "stack";
 
 export interface TopicBox {
   width: number;
@@ -58,6 +72,8 @@ export interface LayoutOptions extends MeasureOptions {
   vGap?: number;
   minNodeHeight?: number;
   measure?: MeasureOptions;
+  /** Alignment of the boxes on the canvas. Unknown values mean `"tree"`. */
+  arrange?: MindMapArrangement;
 }
 
 /** A box the layout can measure — a laid-out node, or a live drag position. */
@@ -218,6 +234,9 @@ export function moveNode(mind: MindMap, id: string | number, newParentId: string
 // ── Measurement + layout ──────────────────────────────────────────────────
 export const DEFAULT_MEASURE: Readonly<Required<MeasureOptions>>;
 export const DEFAULT_LAYOUT: Readonly<{ hGap: number; vGap: number; minNodeHeight: number }>;
+export const MIND_MAP_ARRANGEMENTS: Readonly<["tree", "line", "stack"]>;
+export const DEFAULT_ARRANGEMENT: MindMapArrangement;
+export function normalizeArrangement(value: unknown): MindMapArrangement;
 export function measureTopic(topic: string, measure?: MeasureOptions): TopicBox;
 export function layoutMindMap(mind: MindMap, options?: LayoutOptions): MindMapLayout;
 

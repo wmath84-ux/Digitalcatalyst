@@ -64,6 +64,40 @@
 // device. While no manual choice exists the map keeps tracking the player's
 // own toggle.
 //
+// ── The toolbar (the bottom strip) ───────────────────────────────────────
+// ONE ICON PER CONTROL — the bar carries no words at all. From the left:
+//   cloud-save  the save state, tinted by it, with a blinking beacon on top
+//               while there is a message to read. Tapping it opens the
+//               message itself plus "abhi save karein" (flush now).
+//   maps pill   this module's map list (icon + name + count).
+//   then, right-aligned: auto-arrange, the ALIGN menu (how the boxes are
+//   laid out — tree / one line / one column — and how a long label fits,
+//   wrap or clipped to one line), fit-to-screen, this window's light/dark
+//   flip, delete-branch, the double-tap-delete arm switch, and close.
+// There are no +/− zoom buttons any more: the canvas is pinched (and panned)
+// straight with the fingers, and Fit re-frames the whole map in one tap.
+//
+// ── Why the strip no longer scrolls sideways ─────────────────────────────
+// This is the "toolbar khisak gaya left" fix, and there were two ways the
+// old bar could slide over:
+//
+//   1. It was a SCROLL CONTAINER (`overflow-x-auto`). A scrollable box keeps
+//      the offset the browser handed it while scrolling a focused tile into
+//      view — the soft keyboard opening for a node rename, an orientation
+//      flip, the sheet reopening — and never gives it back, so the bar
+//      painted from somewhere in the middle with its left edge cut off.
+//   2. It used `justify-between` with percentage-width children. Once the
+//      content was wider than the bar (a long map name was enough) the free
+//      space went negative, and a negative-space `space-between` overflows
+//      out of BOTH ends — the start edge is then unreachable, i.e. the left
+//      half of the bar sat outside the visible area with no way to scroll to
+//      it. Same symptom, different cause, and just as intermittent.
+//
+// The strip is clipped now, its layout is `flex-1` (shrinkable) on the LEFT
+// cluster and `shrink-0` on the tools, the map-name pill is the only element
+// allowed to give up width (it collapses to its icon on a narrow sheet), and
+// any offset a browser still manages to set is reset on every open.
+//
 // ── Why React Flow and not jsMind ────────────────────────────────────────
 // jsMind ships a purpose-built tree, but its published core
 // (`jsmind/es6/jsmind.js`, v0.9.1) contains zero touch handling — no
@@ -73,6 +107,7 @@
 // so the `+` button is ordinary JSX rather than DOM surgery.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Background,
   BackgroundVariant,
@@ -93,18 +128,27 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
+  AlignHorizontalJustifyCenter,
   Check,
+  Cloud,
+  CloudAlert,
+  CloudCheck,
+  CloudUpload,
+  Columns3,
   Layers,
   Maximize,
-  Minus,
   MousePointerClick,
   Moon,
+  Network,
   Pencil,
   Plus,
+  Rows3,
   Sparkles,
   Sun,
   Trash2,
   TriangleAlert,
+  Type,
+  WrapText,
   X,
 } from "lucide-react";
 import {
@@ -117,10 +161,12 @@ import {
   layoutMindMap,
   maxDepth,
   moveNodeSubtree,
+  normalizeArrangement,
   removeNode,
   rootId,
   setNodeTopic,
   type MindMap,
+  type MindMapArrangement,
 } from "../../utils/mindMapTree";
 import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
 
@@ -154,6 +200,46 @@ const loadDblTapDelete = (): boolean => {
   }
 };
 
+// ── Box alignment + text fit ──────────────────────────────────────────────
+//
+// Two view-level choices the toolbar's ALIGN menu owns:
+//
+//   arrangement  how the boxes sit on the canvas — the classic two-sided
+//                tidy tree, every box in ONE horizontal line, or every box
+//                in ONE vertical column. The branches (parent → child) never
+//                change, so this is a way of LOOKING at the same map, which
+//                is exactly why it is a per-device preference and not map
+//                data: it must never cost a Firestore write or show up as an
+//                edit for anyone else.
+//   textFit      what a box does with a long label — wrap it onto further
+//                lines (`wrap`), or keep it to one clipped line with an
+//                ellipsis (`clip`) so every box stays the same height.
+//
+// Both live in localStorage next to the theme + double-tap choices.
+
+export type MindMapTextFit = "wrap" | "clip";
+
+const arrangementStorageKey = "dc.mindMapArrangement";
+const textFitStorageKey = "dc.mindMapTextFit";
+
+const loadArrangement = (): MindMapArrangement => normalizeArrangement(
+  (() => {
+    try {
+      return localStorage.getItem(arrangementStorageKey);
+    } catch {
+      return null;
+    }
+  })(),
+);
+
+const loadTextFit = (): MindMapTextFit => {
+  try {
+    return localStorage.getItem(textFitStorageKey) === "clip" ? "clip" : "wrap";
+  } catch {
+    return "wrap";
+  }
+};
+
 // ── Custom node ───────────────────────────────────────────────────────────
 
 interface MindNodeData extends Record<string, unknown> {
@@ -174,6 +260,13 @@ interface MindNodeData extends Record<string, unknown> {
   editing: boolean;
   /** Palette for this window — "light" is the white mode. */
   theme: MindMapTheme;
+  /**
+   * How a long label is fitted inside the box — `wrap` folds it onto further
+   * lines, `clip` keeps it to ONE line and cuts the tail with an ellipsis.
+   * Picked from the toolbar's align menu; the layout measures the box with
+   * the same rule, so the reserved space always matches what is painted.
+   */
+  textFit: MindMapTextFit;
   /** True while the toolbar's double-tap delete mode is armed. */
   deleteOnDoubleTap: boolean;
   onAddChild: (id: string) => void;
@@ -187,6 +280,19 @@ interface MindNodeData extends Record<string, unknown> {
 const TAP_SLOP_PX = 4;
 /** Two taps on the same node within this window count as a double-tap. */
 const DOUBLE_TAP_MS = 350;
+/**
+ * Below this strip width the toolbar drops to its compact tile and the map
+ * name collapses to the map icon, so every tool stays on the bar even in a
+ * narrow landscape split. Measured from the strip itself, not the viewport.
+ *
+ * 360px is the arithmetic, not a guess: seven tools at 30px + six 4px gaps
+ * (234) plus the save tile, the gap and a shortened map pill (94) plus the
+ * strip's own 16px padding comes to ~344, so a 390px phone keeps the map
+ * name while a 360px one hands the space back to the tools.
+ */
+const MIN_FULL_TOOLBAR_WIDTH_PX = 360;
+/** How long a finished save keeps blinking before it settles. */
+const SAVED_BLINK_MS = 2400;
 /** The editor's own minimum height — exactly one line of the 17px label leading. */
 const EDITOR_MIN_HEIGHT_PX = 17;
 /** The editor stops growing here (~7 lines) and scrolls internally instead. */
@@ -233,6 +339,7 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
     selected,
     editing,
     theme,
+    textFit,
     deleteOnDoubleTap,
     onAddChild,
     onDelete,
@@ -473,8 +580,14 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
             aria-label="Node ka text badlein"
             data-mind-node-input={id}
           />
+        ) : textFit === "clip" ? (
+          // One line, tail cut with an ellipsis — the box was measured for
+          // exactly one line, so the height here matches the layout.
+          <span className="min-h-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" data-mind-node-text-fit="clip">
+            {topic}
+          </span>
         ) : (
-          <span className="line-clamp-4 min-h-0 flex-1 break-words">{topic}</span>
+          <span className="line-clamp-4 min-h-0 flex-1 break-words" data-mind-node-text-fit="wrap">{topic}</span>
         )}
       </div>
 
@@ -684,6 +797,132 @@ const SAVE_COPY: Record<MindMapSaveStatus, { label: string; dark: string; light:
   error: { label: "Save retry ho raha hai", dark: "text-rose-300", light: "text-rose-600" },
 };
 
+// ── Toolbar drop-down ─────────────────────────────────────────────────────
+
+/**
+ * Width of a tool drop-down. Deliberately small — "chhota sa drop down" —
+ * so it never covers the diagram it is styling.
+ */
+const MENU_WIDTH_PX = 224;
+
+interface ToolbarMenuProps {
+  open: boolean;
+  /** The toolbar button the menu hangs off. */
+  anchorRef: React.RefObject<HTMLElement | null>;
+  onClose: () => void;
+  /** The menu lives outside the shell, so it carries the theme itself. */
+  theme: MindMapTheme;
+  label: string;
+  children: React.ReactNode;
+}
+
+/**
+ * The small drop-down a toolbar icon opens.
+ *
+ * It is PORTALLED to the body on purpose. The status strip is clipped (that
+ * clip is the "toolbar slid to the left" fix), so a menu rendered inside it
+ * would be sliced off at the strip's top edge. Fixed positioning against the
+ * trigger's own rect keeps it glued to its button while the sheet animates,
+ * it opens UPWARD because the bar sits at the bottom of the sheet, and it
+ * clamps itself into the viewport (sideways and vertically) so it can never
+ * hang off a phone screen.
+ */
+function ToolbarMenu({ open, anchorRef, onClose, theme, label, children }: ToolbarMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
+
+  // Re-measure on every resize / scroll: the sheet slides, the keyboard
+  // lifts it, and a menu that keeps the FIRST rect floats away from its
+  // button.
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const measure = () => {
+      const box = anchorRef.current?.getBoundingClientRect();
+      if (!box) return;
+      setAnchor({ top: box.top, right: box.right });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [open, anchorRef]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    // Capture phase, so a tap ANYWHERE else — canvas, node, dock, scrim —
+    // closes the menu before it can act on something behind it. The trigger
+    // itself is skipped: its own onClick toggles the menu, and closing here
+    // would make that toggle a no-op.
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (anchorRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      onClose();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, onClose, anchorRef]);
+
+  if (!open || !anchor) return null;
+
+  const viewportWidth = window.innerWidth;
+  const width = Math.min(MENU_WIDTH_PX, viewportWidth - 16);
+  const left = Math.max(8, Math.min(anchor.right - width, viewportWidth - width - 8));
+  // The menu grows upward from 8px above its trigger, and is never allowed
+  // to be taller than the space above it (so it can't run off the top).
+  const spaceAbove = Math.max(120, anchor.top - 16);
+  const maxHeight = Math.min(spaceAbove, Math.round(window.innerHeight * 0.6));
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      role="menu"
+      aria-label={label}
+      className="mm-menu fixed"
+      data-mm-menu
+      data-menu-theme={theme}
+      style={{ left, width, maxHeight, bottom: window.innerHeight - anchor.top + 8 }}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
+// ── The align menu's options ──────────────────────────────────────────────
+//
+// `arrangement` is how the boxes sit on the canvas (all three views carry the
+// SAME branches — only the geometry changes), `textFit` is what one box does
+// with a label longer than the box. Both are pure view choices, so they are
+// remembered per device and never written to the map.
+
+const ARRANGEMENT_OPTIONS: {
+  value: MindMapArrangement;
+  label: string;
+  hint: string;
+  Icon: typeof Network;
+}[] = [
+  { value: "tree", label: "Tree", hint: "Classic mind map — dono taraf branches", Icon: Network },
+  { value: "line", label: "Ek line", hint: "Saare boxes ek hi line mein", Icon: Rows3 },
+  { value: "stack", label: "Ek column", hint: "Saare boxes ek ke neeche ek", Icon: Columns3 },
+];
+
+const TEXT_FIT_OPTIONS: { value: MindMapTextFit; label: string; hint: string; Icon: typeof Type }[] = [
+  { value: "wrap", label: "Wrap", hint: "Lamba text agli line mein ghoom jayega", Icon: WrapText },
+  { value: "clip", label: "Ek line · clip", hint: "Har box ek line ka, aage “…”", Icon: Type },
+];
+
 // ── Panel ─────────────────────────────────────────────────────────────────
 
 export interface MindMapPanelProps {
@@ -769,9 +1008,25 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // for THIS window (persisted per device).
   const [themeOverride, setThemeOverride] = useState<MindMapTheme | null>(loadMindMapThemeOverride);
   const [doubleTapDelete, setDoubleTapDelete] = useState<boolean>(loadDblTapDelete);
-  const { zoomIn, zoomOut, fitView, setCenter } = useReactFlow();
+  // ── Align-menu choices (box arrangement + how a long label fits) ───────
+  // Views, not data: they are remembered per device like the theme and the
+  // double-tap switch, and never written to Firestore.
+  const [arrangement, setArrangement] = useState<MindMapArrangement>(loadArrangement);
+  const [textFit, setTextFit] = useState<MindMapTextFit>(loadTextFit);
+  // Which tool drop-down is open. Only one at a time, and both are portalled
+  // to the body so the clipped status strip cannot cut them in half.
+  const [alignMenuOpen, setAlignMenuOpen] = useState(false);
+  const [saveMenuOpen, setSaveMenuOpen] = useState(false);
+  // The status strip measures ITSELF: a landscape split panel can be far
+  // narrower than the screen, so media queries alone cannot know when to
+  // drop to the compact tile (and hide the map name).
+  const [toolbarCompact, setToolbarCompact] = useState(false);
+  const { fitView, setCenter } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
   const canvasRef = useRef<HTMLDivElement>(null);
+  const statusRef = useRef<HTMLDivElement>(null);
+  const saveAnchorRef = useRef<HTMLButtonElement>(null);
+  const alignAnchorRef = useRef<HTMLButtonElement>(null);
 
   // Set while a real node drag is in progress, so the click that follows a
   // drop can be told apart from a genuine tap on the node.
@@ -808,6 +1063,22 @@ function MindMapCanvas(props: MindMapPanelProps) {
     }
   }, [doubleTapDelete]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(arrangementStorageKey, arrangement);
+    } catch {
+      /* ignore */
+    }
+  }, [arrangement]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(textFitStorageKey, textFit);
+    } catch {
+      /* ignore */
+    }
+  }, [textFit]);
+
   // The library is the panel's home screen. It opens on mount, and if the
   // learner closes the sheet with the same-tab dock toggle and opens it again,
   // the library comes straight back — with any in-progress node edit cleared —
@@ -820,6 +1091,21 @@ function MindMapCanvas(props: MindMapPanelProps) {
       setRenameDraft("");
       setSelectedId(null);
       setEditingId(null);
+      // Opening the sheet must never inherit a stale tool drop-down…
+      setAlignMenuOpen(false);
+      setSaveMenuOpen(false);
+      // …nor a stale horizontal offset on the status strip. The strip no
+      // longer scrolls, but a keyboard / orientation change can still hand
+      // one to a `overflow: hidden` box (it scrolls programmatically), and a
+      // scrolled strip is exactly the "toolbar slid to the left" report:
+      // the bar paints from the middle with its left edge cut off.
+      const strip = statusRef.current;
+      if (strip && strip.scrollLeft !== 0) strip.scrollLeft = 0;
+    }
+    // A closed sheet must not leave a drop-down floating over the lesson.
+    if (!open) {
+      setAlignMenuOpen(false);
+      setSaveMenuOpen(false);
     }
     prevOpenRef.current = open;
   }, [open]);
@@ -829,7 +1115,65 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // parent's own "leaving the mind map tab" flush.
   useEffect(() => () => { onFlush?.(); }, [onFlush]);
 
-  const layout = useMemo(() => layoutMindMap(mind), [mind]);
+  // ── The status strip sizes itself to the space it actually has ─────────
+  // A landscape split panel is much narrower than the screen it sits on, so
+  // the strip watches its OWN width and drops to the compact tile (and hides
+  // the map name) when there is not enough room — that is what keeps every
+  // tool reachable on a phone, a tablet and a desktop split alike.
+  useEffect(() => {
+    const el = statusRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(() => {
+      const width = el.clientWidth;
+      if (!width) return;
+      setToolbarCompact(width < MIN_FULL_TOOLBAR_WIDTH_PX);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // ── The save beacon ───────────────────────────────────────────────────
+  // The cloud tile replaced a text label, so the message lives in a tooltip +
+  // a drop-down — and while there IS a message the tile wears a blinking dot
+  // on its top-right corner, so "saving…" / "saved" / "retrying" is visible
+  // without reading a word. A completed save blinks for a beat and settles;
+  // an in-flight or failed one blinks until the state moves on.
+  const [saveBlink, setSaveBlink] = useState(false);
+  useEffect(() => {
+    if (status === "saving" || status === "error") {
+      setSaveBlink(true);
+      return undefined;
+    }
+    if (status === "saved") {
+      setSaveBlink(true);
+      const timer = window.setTimeout(() => setSaveBlink(false), SAVED_BLINK_MS);
+      return () => window.clearTimeout(timer);
+    }
+    setSaveBlink(false);
+    return undefined;
+  }, [status]);
+
+  // A different alignment (or a different text rule) moves every box, so the
+  // canvas re-frames itself — otherwise the learner flips to "one line" and
+  // stares at empty canvas because the row now lives off-screen.
+  const firstAlignRef = useRef(true);
+  useEffect(() => {
+    if (firstAlignRef.current) {
+      firstAlignRef.current = false;
+      return undefined;
+    }
+    if (libraryOpen) return undefined;
+    const timer = window.setTimeout(() => void fitView({ duration: 320, padding: 0.2 }), 60);
+    return () => window.clearTimeout(timer);
+  }, [arrangement, textFit, fitView, libraryOpen]);
+
+  // The layout is the SAME map in the ALIGNMENT the toolbar picked, measured
+  // with the text rule the toolbar picked: `clip` measures every box for one
+  // line only, so the reserved height always matches what the node paints.
+  const layout = useMemo(
+    () => layoutMindMap(mind, { arrange: arrangement, measure: { maxLines: textFit === "clip" ? 1 : 0 } }),
+    [mind, arrangement, textFit],
+  );
 
   // ── Facing, live ───────────────────────────────────────────────────────
   // `layoutMindMap` resolves a `facing` for every box (which side of its
@@ -1035,6 +1379,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
         selected: selectedId === placed.id,
         editing: editingId === placed.id,
         theme: mindTheme,
+        textFit,
         deleteOnDoubleTap: doubleTapDelete,
         onAddChild: handleAddChild,
         onDelete: handleDelete,
@@ -1051,6 +1396,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
     selectedId,
     editingId,
     mindTheme,
+    textFit,
     doubleTapDelete,
     handleAddChild,
     handleDelete,
@@ -1498,168 +1844,295 @@ function MindMapCanvas(props: MindMapPanelProps) {
       </div>
 
       {/* ── Status strip — the mind map's toolbar ──────────────────────────
-          The only persistent chrome. The save indicator sits on the left,
-          a small node count + levels readout in the middle, and on the right
-          the working set of controls: zoom, fit-to-screen, the map's own
-          light/dark toggle, delete-selected and the double-tap-delete arm
-          switch. Every button is icon-sized so all six fit on a phone. */}
+          The only persistent chrome, and every control on it is a SINGLE
+          ICON: the cloud-save beacon (tinted by the save state, blinking
+          while there is a message to read), the map pill, then the tools —
+          auto-arrange, the align menu, fit-to-screen, this window's
+          light/dark flip, delete-branch, the double-tap-delete arm switch,
+          and close.
+
+          There are no +/− zoom buttons: the canvas is pinched (and panned)
+          straight with the fingers, and Fit re-frames the whole map in one
+          tap — the two buttons were the ones eating the bar's width.
+
+          The strip is CLIPPED, never scrolled. A scrollable bar keeps the
+          offset the browser handed it while scrolling a focused tile into
+          view (soft keyboard, orientation flip, the sheet reopening) and
+          never gives it back — that stale offset is exactly the "toolbar
+          khisak gaya left" report. The map-name pill is the only element
+          allowed to shrink, so every tool stays on the bar. */}
       <div
-        className="flex shrink-0 items-center justify-between gap-2 overflow-x-auto border-t border-[var(--mm-border)] px-3 py-1.5"
+        ref={statusRef}
+        className="flex shrink-0 items-center overflow-hidden border-t border-[var(--mm-border)] px-2 py-1.5"
+        style={{ gap: "var(--mm-tool-gap)" }}
         data-course-mindmap-status
+        data-compact={toolbarCompact ? "true" : "false"}
       >
-        <span
-          className={`flex min-w-0 max-w-[34%] shrink-0 items-center gap-1.5 truncate text-[10px] font-black uppercase tracking-wider ${
-            mindTheme === "light" ? save.light : save.dark
-          }`}
-          data-course-mindmap-save-label
-        >
-          {status === "error" ? <TriangleAlert size={11} /> : null}
-          {save.label}
-        </span>
-        {/* ── Map switcher ────────────────────────────────────────────────
-            Notes are a LIST, and so are mind maps now: this button opens the
-            module's map library (every diagram the learner made here), with
-            "New map", rename and delete inside. The active map's name rides
-            on the button so the learner always knows which one is open. */}
-        <button
-          type="button"
-          onClick={() => setLibraryOpen((open) => !open)}
-          aria-expanded={libraryOpen}
-          className={`flex min-w-0 max-w-[38%] shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-bold transition ${
-            libraryOpen
-              ? "bg-violet-500/25 text-violet-100 ring-1 ring-inset ring-violet-400/50"
-              : "bg-[var(--mm-soft)] text-[var(--mm-text)] hover:bg-[var(--mm-soft-hover)]"
-          }`}
-          aria-label="Is module ke saare mind maps"
-          title="Maps — is module ke sabhi mind maps"
-          data-course-mindmap-maps
-          data-map-count={maps.length}
-          data-active-map={activeMapKey}
-        >
-          <Layers size={12} />
-          <span className="min-w-0 truncate">{activeMapName}</span>
-          <span className="shrink-0 rounded-full bg-[var(--mm-soft-hover)] px-1.5 text-[9px] font-black">
-            {maps.length}
+        {/* ── Left cluster: cloud save + which map is open ─────────────── */}
+        <div className="flex min-w-0 flex-1 items-center" style={{ gap: "var(--mm-tool-gap)" }}>
+          {/* ── Cloud save ──────────────────────────────────────────────
+              The old "Cloud par saved" TEXT was the widest thing on the
+              bar, so it is an icon now: the cloud itself is tinted by the
+              state (amber saving / emerald saved / rose retrying) and a
+              blinking beacon rides its top-right corner while there is a
+              message. The words moved into the tooltip and this drop-down. */}
+          <button
+            type="button"
+            ref={saveAnchorRef}
+            onClick={() => {
+              setAlignMenuOpen(false);
+              setSaveMenuOpen((open) => !open);
+            }}
+            aria-expanded={saveMenuOpen}
+            aria-haspopup="menu"
+            aria-label={save.label}
+            title={save.label}
+            className={`mm-tool ${saveMenuOpen ? "mm-tool-violet" : ""}`}
+            data-course-mindmap-save
+            data-save-status={status}
+            data-blink={saveBlink ? "true" : "false"}
+          >
+            {status === "saving" ? <CloudUpload /> : status === "saved" ? <CloudCheck /> : status === "error" ? <CloudAlert /> : <Cloud />}
+            {saveBlink ? <span className="mm-blink" data-course-mindmap-save-blink aria-hidden="true" /> : null}
+          </button>
+          <ToolbarMenu
+            open={saveMenuOpen}
+            anchorRef={saveAnchorRef}
+            onClose={() => setSaveMenuOpen(false)}
+            theme={mindTheme}
+            label="Cloud save"
+          >
+            <p className="mm-menu-head">Cloud save</p>
+            <p
+              className={`mm-menu-note flex items-center gap-1.5 ${mindTheme === "light" ? save.light : save.dark}`}
+              data-course-mindmap-save-label
+            >
+              {status === "error" ? <TriangleAlert size={11} /> : null}
+              {save.label}
+            </p>
+            <button
+              type="button"
+              className="mm-menu-item"
+              onClick={() => {
+                onFlush?.();
+                setSaveMenuOpen(false);
+              }}
+              data-course-mindmap-save-now
+            >
+              <CloudUpload />
+              <span>Abhi cloud par save karein</span>
+            </button>
+          </ToolbarMenu>
+
+          {/* ── Map switcher ────────────────────────────────────────────
+              Notes are a LIST, and so are mind maps: this opens the
+              module's map library (every diagram the learner made here),
+              with "New map", rename and delete inside. The name rides on
+              the pill — and collapses to the bare icon on a narrow sheet
+              rather than pushing a tool off the bar. */}
+          <button
+            type="button"
+            onClick={() => {
+              setAlignMenuOpen(false);
+              setSaveMenuOpen(false);
+              setLibraryOpen((open) => !open);
+            }}
+            aria-expanded={libraryOpen}
+            className={`mm-pill ${libraryOpen ? "mm-tool-violet" : ""}`}
+            aria-label="Is module ke saare mind maps"
+            title="Maps — is module ke sabhi mind maps"
+            data-course-mindmap-maps
+            data-map-count={maps.length}
+            data-active-map={activeMapKey}
+          >
+            <Layers />
+            <span className="min-w-0 truncate normal-case" data-mm-map-name>
+              {activeMapName}
+            </span>
+            <span className="mm-pill-count">{maps.length}</span>
+          </button>
+
+          {/* The node / level readout is the one thing left as words, and
+              only where there is room for it (a wide desktop sheet). */}
+          <span
+            className="hidden min-w-0 truncate text-[10px] font-bold text-[var(--mm-muted)] xl:inline"
+            data-course-mindmap-stats
+          >
+            {totalNodes} {totalNodes === 1 ? "node" : "nodes"} · {levels} {levels === 1 ? "level" : "levels"}
           </span>
-        </button>
-        <span className="hidden min-w-0 truncate text-[10px] font-bold text-[var(--mm-muted)] sm:inline" data-course-mindmap-stats>
-          {totalNodes} {totalNodes === 1 ? "node" : "nodes"} · {levels} {levels === 1 ? "level" : "levels"}
-        </span>
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={() => void zoomOut({ duration: 180 })}
-            className={toolButton}
-            aria-label="Zoom out"
-            data-course-mindmap-zoom-out
-          >
-            <Minus size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => void zoomIn({ duration: 180 })}
-            className={toolButton}
-            aria-label="Zoom in"
-            data-course-mindmap-zoom-in
-          >
-            <Plus size={13} />
-          </button>
-          {/* ── Auto arrange: the one-tap clean-up ────────────────────────
+        </div>
+
+        {/* ── Right cluster: the tools ─────────────────────────────────── */}
+        <div className="flex shrink-0 items-center" style={{ gap: "var(--mm-tool-gap)" }}>
+          {/* ── Auto arrange: the one-tap clean-up ──────────────────────
               However badly the map was dragged around, this drops every
               hand-placed pin and hands the whole diagram back to the tidy
-              tree — nodes line up, branches re-balance, ropes stop crossing
-              — then the view re-fits. Stays lit only while there is actual
-              mess to clean, so it never looks like a no-op button. */}
+              tree — nodes line up, branches re-balance, ropes stop
+              crossing — then the view re-fits. Stays lit only while there
+              is actual mess to clean, so it never looks like a no-op. */}
           <button
             type="button"
             onClick={handleAutoArrange}
-            className={`flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-black uppercase tracking-wider transition ${
-              messy
-                ? "bg-emerald-500/25 text-emerald-100 ring-1 ring-inset ring-emerald-400/50 hover:bg-emerald-500/35"
-                : "bg-[var(--mm-soft)] text-[var(--mm-muted)] hover:bg-[var(--mm-soft-hover)] hover:text-[var(--mm-text)]"
-            }`}
+            className={`mm-tool ${messy ? "mm-tool-emerald" : ""}`}
             aria-label="Ek click me poora mind map organise karein"
             title="Auto arrange — sabhi nodes ek click me saaf-suthre organise"
             data-course-mindmap-auto-arrange
             data-messy={messy ? "true" : "false"}
           >
-            <Sparkles size={13} />
-            <span className="hidden sm:inline">Arrange</span>
+            <Sparkles />
           </button>
-          {/* Fit-to-screen: re-fits the whole diagram to the visible canvas.
-              Larger + violet-tinted than the zoom buttons so it stands out
-              as the "make everything visible" affordance (the maximise
-              icon matches the system "fullscreen" cue). A wider padding
-              keeps every node clear of the canvas edges after the fit. */}
+
+          {/* ── ALIGN: how the boxes sit, and how a long label fits ─────
+              One icon, one small drop-down. The learner picks the whole
+              map's alignment (classic tree / every box in one line / every
+              box in one column) and what a box does with a long label
+              (wrap it onto more lines, or clip it to one). Both are views
+              of the SAME map — no branch is ever added or removed. */}
+          <button
+            type="button"
+            ref={alignAnchorRef}
+            onClick={() => {
+              setSaveMenuOpen(false);
+              setAlignMenuOpen((open) => !open);
+            }}
+            aria-expanded={alignMenuOpen}
+            aria-haspopup="menu"
+            aria-label="Boxes ka alignment aur text fit"
+            title="Align — boxes ka layout aur text ka style"
+            className={`mm-tool ${alignMenuOpen ? "mm-tool-violet" : ""}`}
+            data-course-mindmap-align
+            data-arrangement={arrangement}
+            data-text-fit={textFit}
+          >
+            <AlignHorizontalJustifyCenter />
+          </button>
+          <ToolbarMenu
+            open={alignMenuOpen}
+            anchorRef={alignAnchorRef}
+            onClose={() => setAlignMenuOpen(false)}
+            theme={mindTheme}
+            label="Boxes ka alignment"
+          >
+            <p className="mm-menu-head">Boxes kahan dikhen</p>
+            {ARRANGEMENT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={arrangement === option.value}
+                className="mm-menu-item"
+                onClick={() => {
+                  setArrangement(option.value);
+                  setAlignMenuOpen(false);
+                }}
+                data-course-mindmap-arrangement={option.value}
+                data-active={arrangement === option.value ? "true" : "false"}
+              >
+                <option.Icon />
+                <span>
+                  <span className="block truncate">{option.label}</span>
+                  <span className="block text-[9px] font-bold opacity-60">{option.hint}</span>
+                </span>
+                {arrangement === option.value ? <Check className="mm-menu-check" /> : null}
+              </button>
+            ))}
+            <div className="mm-menu-sep" />
+            <p className="mm-menu-head">Box ke andar text</p>
+            {TEXT_FIT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={textFit === option.value}
+                className="mm-menu-item"
+                onClick={() => {
+                  setTextFit(option.value);
+                  setAlignMenuOpen(false);
+                }}
+                data-course-mindmap-text-fit-option={option.value}
+                data-active={textFit === option.value ? "true" : "false"}
+              >
+                <option.Icon />
+                <span>
+                  <span className="block truncate">{option.label}</span>
+                  <span className="block text-[9px] font-bold opacity-60">{option.hint}</span>
+                </span>
+                {textFit === option.value ? <Check className="mm-menu-check" /> : null}
+              </button>
+            ))}
+          </ToolbarMenu>
+
+          {/* Fit-to-screen: re-frames the whole diagram in one tap, and it
+              is the only zoom affordance left on the bar now that +/− are
+              gone (fingers pinch, a mouse wheel still zooms). Violet-tinted
+              so it reads as the "make everything visible" control — the
+              maximise glyph matches the system fullscreen cue. A wider
+              padding keeps every node clear of the canvas edges. */}
           <button
             type="button"
             onClick={() => void fitView({ duration: 260, padding: 0.2 })}
-            className="ml-1 flex h-7 items-center gap-1 rounded-lg bg-violet-500/20 px-2 text-[10px] font-black uppercase tracking-wider text-violet-100 ring-1 ring-inset ring-violet-400/40 transition hover:bg-violet-500/30 hover:text-white"
+            className="mm-tool mm-tool-violet"
             aria-label="Poora map fit karein"
             title="Fit to screen — sab nodes ek saath dikhao"
             data-course-mindmap-fit
           >
-            <Maximize size={13} />
-            <span className="hidden sm:inline">Fit</span>
+            <Maximize />
           </button>
-          {/* ── Light / dark for THIS window only ─────────────────────────
+
+          {/* ── Light / dark for THIS window only ───────────────────────
               The map follows the Course Player theme until this button is
-              used; from then on the map keeps its own choice (the lesson is
-              untouched). The icon previews what the next tap switches to. */}
+              used; from then on the map keeps its own choice (the lesson
+              is untouched). The icon previews what the next tap flips to. */}
           <button
             type="button"
             onClick={() => setThemeOverride(mindTheme === "dark" ? "light" : "dark")}
-            className={toolButton}
+            className="mm-tool"
             aria-label={mindTheme === "dark" ? "Mind map ko white mode mein le jayein" : "Mind map ko dark mode mein le jayein"}
             title={mindTheme === "dark" ? "White mode — sirf yeh mind map" : "Dark mode — sirf yeh mind map"}
             data-course-mindmap-theme
             data-theme={mindTheme}
             data-next-theme={mindTheme === "dark" ? "light" : "dark"}
           >
-            {mindTheme === "dark" ? <Sun size={13} /> : <Moon size={13} />}
+            {mindTheme === "dark" ? <Sun /> : <Moon />}
           </button>
-          {/* ── Delete the selected branch ─────────────────────────────────
-              The trash moved here from inside the node: tap (or drag) a
-              node to select it, then this button removes the branch. It
-              stays disabled for the root / no selection — the centre of a
-              mind map is never deletable. */}
+
+          {/* ── Delete the selected branch ──────────────────────────────
+              Tap (or drag) a node to select it, then this removes the
+              branch. Disabled for the root / no selection — the centre of
+              a mind map is never deletable. */}
           <button
             type="button"
             onClick={() => {
               if (selectedId) handleDelete(selectedId);
             }}
             disabled={!canDeleteSelected}
-            className={`${toolButton} ${canDeleteSelected ? "hover:text-rose-400" : "cursor-not-allowed opacity-35"}`}
+            className="mm-tool mm-tool-danger"
             aria-label={canDeleteSelected ? "Selected branch delete karein" : "Pehle koi node select karein"}
             title={canDeleteSelected ? "Delete — selected branch (root nahi hat sakta)" : "Node tap karke select karein, phir delete"}
             data-course-mindmap-delete
             data-delete-ready={canDeleteSelected ? "true" : "false"}
           >
-            <Trash2 size={13} />
+            <Trash2 />
           </button>
-          {/* ── Double-tap delete arm switch ──────────────────────────────
-              While ON, a quick double-tap on any node deletes it (never the
-              root). OFF by default so an accidental double-tap can never
-              cost a branch; the lit violet state doubles as the mode's
-              "this is armed" reminder. */}
+
+          {/* ── Double-tap delete arm switch ────────────────────────────
+              While ON, a quick double-tap on any node deletes it (never
+              the root). OFF by default so an accidental double-tap can
+              never cost a branch; the lit violet state doubles as the
+              mode's "this is armed" reminder. */}
           <button
             type="button"
             onClick={() => setDoubleTapDelete((armed) => !armed)}
             aria-pressed={doubleTapDelete}
-            className={`grid h-7 w-7 place-items-center rounded-lg transition ${
-              doubleTapDelete
-                ? mindTheme === "light"
-                  ? "bg-violet-500/20 text-violet-800 ring-1 ring-inset ring-violet-500/45"
-                  : "bg-violet-500/25 text-violet-100 ring-1 ring-inset ring-violet-400/50"
-                : "bg-[var(--mm-soft)] text-[var(--mm-muted)] hover:bg-[var(--mm-soft-hover)] hover:text-[var(--mm-text)]"
-            }`}
+            className={`mm-tool ${doubleTapDelete ? "mm-tool-violet" : ""}`}
             aria-label={doubleTapDelete ? "Double-tap delete band karein" : "Double-tap delete chaalu karein"}
             title={doubleTapDelete ? "Double-tap delete ON — band karne ke liye dabayein" : "Double-tap delete — node par double-tap karke delete karein"}
             data-course-mindmap-dbl-delete
             data-active={doubleTapDelete ? "true" : "false"}
           >
-            <MousePointerClick size={13} />
+            <MousePointerClick />
           </button>
+
           {onClose ? (
             <button
               type="button"
@@ -1667,12 +2140,12 @@ function MindMapCanvas(props: MindMapPanelProps) {
                 onFlush?.();
                 onClose();
               }}
-              className={`${toolButton} hover:text-rose-400`}
+              className="mm-tool mm-tool-danger"
               aria-label="Mind map band karein"
               title="Close mind map"
               data-course-mindmap-close
             >
-              <X size={13} />
+              <X />
             </button>
           ) : null}
         </div>

@@ -16,6 +16,7 @@ import ProfileApp from "./profile/App";
 import SettingsPage from "./settings/SettingsPage";
 import SubscriberExperiencePage from "./profile/SubscriberExperiencePage";
 import ProfilePreview from "./profile/ProfilePreview";
+import MindMapPreview from "./course/MindMapPreview";
 import CourseRouteGuard from "./components/CourseRouteGuard";
 import CartWishlistApp from "./CartWishlistApp";
 import SubscriptionApp from "./subscription/App";
@@ -123,6 +124,8 @@ const RENEWAL_PREVIEW_HASH = "#/dev/subscription-preview";
 // layout with mock data so its responsive behaviour can be reviewed on any
 // screen without auth. Never touches Firestore.
 const PROFILE_PREVIEW_HASH = "#/dev/profile-preview";
+// TEMPORARY dev sandbox for the mind map toolbar (removed before merge).
+const MINDMAP_PREVIEW_HASH = "#/dev/mindmap-preview";
 const FLOWPATH_HASH = "#/flowpath";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
@@ -1071,6 +1074,7 @@ function RootPage(): ReactNode {
   }
   if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return <SubscriberExperiencePage />;
   if (hash.startsWith(PROFILE_PREVIEW_HASH)) return <ProfilePreview />;
+  if (hash.startsWith(MINDMAP_PREVIEW_HASH)) return <MindMapPreview />;
   if (hash.startsWith(COURSE_HASH)) {
     if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;
     return (

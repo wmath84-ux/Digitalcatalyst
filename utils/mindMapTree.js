@@ -402,12 +402,22 @@ export const DEFAULT_MEASURE = Object.freeze({
   lineHeight: 17,
   minWidth: 56,
   maxWidth: 190,
+  /**
+   * How many lines a box is allowed to show. `0` / `undefined` means "as many
+   * as the text needs" (the wrap mode); `1` is the clip mode, where the label
+   * is a single line and the tail is cut with an ellipsis by the renderer.
+   */
+  maxLines: 0,
 });
 
 /**
  * Width/height/line count for one topic string. Wrapping is greedy by word,
  * which matches how the browser will lay the same text out closely enough for
  * layout purposes.
+ *
+ * `maxLines` clamps the result: the box is measured as if the renderer had cut
+ * the label off after that many lines, so a clipped map is laid out with
+ * one-line-tall boxes instead of reserving space for text that is never drawn.
  */
 export const measureTopic = (topic, measure = {}) => {
   const m = { ...DEFAULT_MEASURE, ...measure };
@@ -428,10 +438,12 @@ export const measureTopic = (topic, measure = {}) => {
   }
   if (line) lines.push(line);
 
-  const longest = lines.reduce((widest, value) => Math.max(widest, value.length), 0);
+  const cap = Number(m.maxLines);
+  const kept = Number.isFinite(cap) && cap > 0 ? lines.slice(0, Math.floor(cap)) : lines;
+  const longest = kept.reduce((widest, value) => Math.max(widest, value.length), 0);
   const width = Math.max(m.minWidth, Math.ceil(longest * charWidth) + m.paddingX * 2);
-  const height = m.paddingY * 2 + lines.length * m.lineHeight;
-  return { width, height, lines: lines.length };
+  const height = m.paddingY * 2 + kept.length * m.lineHeight;
+  return { width, height, lines: kept.length };
 };
 
 // ── Tidy-tree layout ──────────────────────────────────────────────────────
@@ -444,6 +456,29 @@ export const DEFAULT_LAYOUT = Object.freeze({
   /** Minimum height for every box, so short labels still look like nodes. */
   minNodeHeight: 38,
 });
+
+// ── Arrangements — how the boxes are aligned on the canvas ────────────────
+//
+// The tidy tree is the classic mind map, but a learner reviewing a chapter
+// often wants the SAME nodes laid out as a plain row or a plain column —
+// "sab boxes ek line mein dikhao". Arrangement is a VIEW of the map (the
+// parent/child links never change), so it is picked from the toolbar and
+// remembered per device.
+//
+//   tree  → the two-sided tidy tree (default)
+//   line  → every box in ONE horizontal row, in reading order
+//   stack → every box in ONE vertical column, in reading order
+//
+// In `line` every box shares the tallest box's height and in `stack` every box
+// shares the widest box's width, so the row/column reads as a straight line of
+// equal cards instead of a ragged stair.
+
+export const MIND_MAP_ARRANGEMENTS = Object.freeze(["tree", "line", "stack"]);
+export const DEFAULT_ARRANGEMENT = "tree";
+
+/** Any unknown / legacy value falls back to the tidy tree. */
+export const normalizeArrangement = (value) =>
+  value === "line" || value === "stack" ? value : DEFAULT_ARRANGEMENT;
 
 /**
  * Inside this many px of its parent's centre a box is "straight above/below"
@@ -499,6 +534,12 @@ export const facingBetweenBoxes = (parent, child, fallback) => {
  * omitted from both the node list and the vertical extent, which is what makes
  * collapsing actually reclaim screen space.
  *
+ * `options.arrange` picks the ALIGNMENT of the boxes — the classic two-sided
+ * `"tree"` (default), `"line"` (every box in one horizontal row) or `"stack"`
+ * (every box in one vertical column). Arrangement is a view, never data: the
+ * parent/child links, the topics and the manual pins are identical in all
+ * three, so a learner can flip between them without touching the map.
+ *
  * MANUAL positions override the tidy tree: a node the learner dragged by hand
  * renders exactly at its stored spot (marked `manual: true`), and every
  * descendant inherits the same offset so a branch never tears itself apart
@@ -550,6 +591,81 @@ export const layoutMindMap = (mind, options = {}) => {
 
   const nodes = [];
   const edges = [];
+
+  /**
+   * The NON-tree arrangements: every visible box in ONE row (`line`) or ONE
+   * column (`stack`), in reading order (depth-first from the centre).
+   *
+   * Boxes share the row's height / the column's width so the line reads as a
+   * straight run of equal cards instead of a ragged stair, and a hand-dragged
+   * pin still wins — dragging must never become a no-op just because the
+   * learner is looking at the map in another alignment.
+   */
+  const buildSequence = (mode) => {
+    const rootRecord = { id: ROOT_ID, topic: mind.rootTopic || "" };
+    const ordered = [];
+
+    const walk = (id, depth) => {
+      const record = String(id) === ROOT_ID ? rootRecord : findNode(mind, id);
+      if (!record) return;
+      const box = sizeOf(record);
+      ordered.push({ id: String(id), record, depth, width: box.width, height: box.height });
+      // A collapsed branch stays collapsed here too — its children are hidden
+      // from the row / column exactly as they are from the tidy tree.
+      if (isCollapsed(id)) return;
+      for (const kid of visibleChildren(id)) {
+        edges.push({ id: `e-${id}-${kid.id}`, source: String(id), target: String(kid.id), side: null });
+        walk(kid.id, depth + 1);
+      }
+    };
+    walk(ROOT_ID, 0);
+    if (!ordered.length) return;
+
+    const rowHeight = ordered.reduce((tallest, item) => Math.max(tallest, item.height), layout.minNodeHeight);
+    const columnWidth = ordered.reduce((widest, item) => Math.max(widest, item.width), 0);
+    const gap = mode === "line" ? layout.hGap : layout.vGap;
+
+    let cursor = 0;
+    for (const item of ordered) {
+      const width = mode === "line" ? item.width : columnWidth;
+      const height = mode === "line" ? rowHeight : item.height;
+      const autoX = mode === "line" ? cursor : -width / 2;
+      const autoY = mode === "line" ? -height / 2 : cursor;
+      const manual = manualOf(item.record, item.depth);
+      nodes.push({
+        id: item.id,
+        x: Math.round((manual ? manual.x : autoX) * 100) / 100,
+        y: Math.round((manual ? manual.y : autoY) * 100) / 100,
+        width,
+        height,
+        depth: item.depth,
+        side: null,
+        facing: null,
+        collapsed: isCollapsed(item.id),
+        childCount: visibleChildren(item.id).length,
+        isRoot: item.depth === 0,
+        manual: Boolean(manual),
+      });
+      cursor += (mode === "line" ? width : height) + gap;
+    }
+
+    // Faces come from the FINISHED geometry, exactly like the tidy tree: a box
+    // east of its parent takes the rope on its west edge. A pure column is a
+    // tie (nothing is east or west of anything), so the fallback parks every
+    // rope on the same edge instead of flipping it per pixel.
+    const boxById = new Map(nodes.map((node) => [node.id, node]));
+    for (const node of nodes) {
+      if (node.isRoot) continue;
+      const parentId = findNode(mind, node.id)?.parentId;
+      const parent = parentId == null ? null : boxById.get(String(parentId));
+      if (!parent) continue;
+      const facing = facingBetweenBoxes({ x: parent.x, width: parent.width }, { x: node.x, width: node.width }, "right");
+      node.facing = facing;
+      node.side = facing;
+    }
+    const facingById = new Map(nodes.map((node) => [node.id, node.facing]));
+    for (const edge of edges) edge.facing = facingById.get(edge.target) ?? "right";
+  };
 
   // `shiftX/shiftY` is the accumulated manual offset inherited from ancestors;
   // children of a hand-placed node are placed relative to its PURE auto spot
@@ -624,9 +740,15 @@ export const layoutMindMap = (mind, options = {}) => {
     }
   };
 
-  const rootNode = { id: ROOT_ID, topic: mind.rootTopic || "" };
-  const rootSpan = spanOf(rootNode);
-  place(rootNode, "right", -rootSpan / 2, 0, 0, 0, 0, 0);
+  const arrange = normalizeArrangement(options.arrange);
+
+  if (arrange === "tree") {
+    const rootNode = { id: ROOT_ID, topic: mind.rootTopic || "" };
+    const rootSpan = spanOf(rootNode);
+    place(rootNode, "right", -rootSpan / 2, 0, 0, 0, 0, 0);
+  } else {
+    buildSequence(arrange);
+  }
 
   // A rope's endpoints live on the faces that point at each other, so every
   // edge takes the facing its CHILD resolved to. The editor reads this instead

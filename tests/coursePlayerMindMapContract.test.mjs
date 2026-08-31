@@ -335,7 +335,12 @@ test("nodes are hand-positionable — drag and drop anywhere, persisted per node
   assert.doesNotMatch(panel, /nodesDraggable=\{false\}/);
   assert.match(panel, /draggable: true/);
   assert.match(panel, /nodesConnectable=\{false\}/);
-  assert.match(panel, /const layout = useMemo\(\(\) => layoutMindMap\(mind\), \[mind\]\)/);
+  // The layout runs in the arrangement + text rule the toolbar picked.
+  assert.match(
+    panel,
+    /const layout = useMemo\(\s*\(\) => layoutMindMap\(mind, \{ arrange: arrangement, measure: \{ maxLines: textFit === "clip" \? 1 : 0 \} \}\),/,
+  );
+  assert.match(panel, /\[mind, arrangement, textFit\],/);
   assert.match(panel, /onNodeDragStop=/);
   assert.match(panel, /onNodesChange=\{onNodesChange\}/);
   assert.match(panel, /applyNodeChanges\(changes, current\)/);
@@ -389,11 +394,17 @@ test("the dragged node tracks the pointer LIVE — the primary node included", (
   );
 });
 
-test("zoom is available on touch as well as by button", () => {
+test("zoom is done with the fingers — the toolbar no longer carries +/− buttons", () => {
+  // The +/− pair was the widest thing on the bar and the learner always had
+  // pinch-zoom under their fingers anyway, so it is gone: pinch to zoom,
+  // drag to pan, and one Fit tap to re-frame the whole map.
   assert.match(panel, /zoomOnPinch/);
-  assert.match(panel, /data-course-mindmap-zoom-in/);
-  assert.match(panel, /data-course-mindmap-zoom-out/);
+  assert.match(panel, /panOnDrag/);
   assert.match(panel, /data-course-mindmap-fit/);
+  assert.doesNotMatch(panel, /data-course-mindmap-zoom-in/, "the zoom-in button must be gone");
+  assert.doesNotMatch(panel, /data-course-mindmap-zoom-out/, "the zoom-out button must be gone");
+  assert.doesNotMatch(panel, /\bzoomIn\b/, "the bar must not even hold a zoomIn handle");
+  assert.doesNotMatch(panel, /\bzoomOut\b/, "the bar must not even hold a zoomOut handle");
   // Without this the browser claims the pinch for page zoom and React Flow
   // never receives it.
   assert.match(panel, /touchAction: "none"/);
@@ -454,8 +465,6 @@ test("the toolbar slot is replaced by a slim status strip in both orientations",
   // branch / stats / zoom controls are now a single status strip that is
   // always mounted, and the diagram fills the rest of the sheet.
   assert.match(panel, /data-course-mindmap-status/);
-  assert.match(panel, /data-course-mindmap-zoom-in/);
-  assert.match(panel, /data-course-mindmap-zoom-out/);
   assert.match(panel, /data-course-mindmap-fit/);
   // The parent still hands the same landscape flag it uses for the
   // overlay rails, so the status strip / canvas can adapt later if
@@ -530,4 +539,156 @@ test("a dragged node re-faces itself LIVE, and hands back on drop", () => {
   // The override is fed into both the nodes and the edges.
   assert.match(panel, /facing: placed\.isRoot \? null : \(facingOverride\[placed\.id\] \?\? placed\.facing\)/);
   assert.match(panel, /const next = \{ \.\.\.current, \[nodeId\]: facing \};/);
+});
+
+// ---------------------------------------------------------------------------
+// The toolbar: one icon per control, no +/− zoom, a small align drop-down
+//
+// Reported by the learner: the bottom bar kept "khisak" (sliding) to the left
+// when the sheet opened, the +/− zoom buttons ate most of its width, and the
+// long "Cloud par saved" text was the first thing to be squeezed out. The bar
+// is now icon-only, pinch does the zooming, the save state is a cloud icon
+// with a blinking beacon, and the node boxes get their own align menu.
+// ---------------------------------------------------------------------------
+
+const toolbar = panel.slice(
+  panel.indexOf("Status strip — the mind map's toolbar"),
+  panel.indexOf("{errorMessage ? ("),
+);
+// Everything on the bar lives between those two markers; the map library
+// screen above it still carries words.
+const toolCluster = panel.slice(panel.indexOf("Right cluster: the tools"), panel.indexOf("data-course-mindmap-close"));
+
+test("the toolbar is icon-only: every control is a single glyph tile, no captions", () => {
+  // One tile class per control, and not one of them renders a word.
+  assert.match(toolbar, /className="mm-tool/, "the bar's controls share the icon tile");
+  assert.match(toolbar, /data-course-mindmap-save/);
+  assert.match(toolbar, /data-course-mindmap-align/);
+  assert.match(toolbar, /data-course-mindmap-fit/);
+  assert.match(toolbar, /data-course-mindmap-theme/);
+  assert.match(toolbar, /data-course-mindmap-delete/);
+  assert.match(toolbar, /data-course-mindmap-dbl-delete/);
+  assert.match(toolbar, /data-course-mindmap-close/);
+  assert.match(toolbar, /data-course-mindmap-auto-arrange/);
+  for (const button of toolCluster.matchAll(/<button[\s\S]*?>/g)) {
+    const tag = button[0];
+    assert.doesNotMatch(tag, /size=\{\d+\}>\s*[A-Za-z]/, "a tool must not carry a text caption");
+  }
+  // The old captions are gone from the bar for good.
+  assert.doesNotMatch(toolCluster, /<span className="hidden sm:inline">Arrange<\/span>/);
+  assert.doesNotMatch(toolCluster, /<span className="hidden sm:inline">Fit<\/span>/);
+  // …but every tool still says what it is to a screen reader and a tooltip.
+  assert.match(toolCluster, /aria-label="Poora map fit karein"/);
+  assert.match(toolCluster, /title="Fit to screen/);
+});
+
+test("the status strip never scrolls sideways (the 'toolbar slid left' fix)", () => {
+  // A scrollable strip KEEPS the offset the browser hands it while scrolling
+  // a focused tile into view (soft keyboard, rotation, reopen) and never
+  // gives it back — the bar then paints from the middle with its left edge
+  // cut off, which is exactly the "toolbar khisak gaya" report. It is clipped
+  // now, sizes itself, and resets any leftover offset when the sheet opens.
+  assert.match(toolbar, /overflow-hidden/);
+  assert.doesNotMatch(toolbar, /overflow-x-auto/, "the strip must not be a scroll container");
+  assert.doesNotMatch(toolbar, /overflow-x-scroll/);
+  // Only the map-name pill may shrink, so no tool can be pushed off the bar.
+  assert.match(toolbar, /flex min-w-0 flex-1 items-center/);
+  assert.match(toolbar, /<span className="min-w-0 truncate normal-case" data-mm-map-name>/);
+  // …and any offset a browser still managed to set is cleared on open.
+  assert.match(panel, /if \(strip && strip\.scrollLeft !== 0\) strip\.scrollLeft = 0;/);
+  assert.match(panel, /const statusRef = useRef<HTMLDivElement>\(null\);/);
+});
+
+test("the toolbar measures itself and sizes its tiles for phone, tablet and desktop", () => {
+  // A landscape split panel is narrower than the screen it sits on, so the
+  // strip watches its OWN width (not the viewport) and drops to the compact
+  // tile — that is what keeps every tool on the bar everywhere.
+  assert.match(panel, /const \[toolbarCompact, setToolbarCompact\] = useState\(false\);/);
+  assert.match(panel, /const MIN_FULL_TOOLBAR_WIDTH_PX = 360;/);
+  assert.match(panel, /setToolbarCompact\(width < MIN_FULL_TOOLBAR_WIDTH_PX\);/);
+  assert.match(panel, /data-compact=\{toolbarCompact \? "true" : "false"\}/);
+  // The tile size is one custom property that steps up with the screen…
+  assert.match(styles, /\[data-course-mindmap-status\] \{\s*--mm-tool-size: 30px;/);
+  assert.match(styles, /@media \(min-width: 640px\) \{\s*\[data-course-mindmap-status\] \{\s*--mm-tool-size: 34px;/);
+  assert.match(styles, /@media \(min-width: 1024px\) \{\s*\[data-course-mindmap-status\] \{\s*--mm-tool-size: 38px;/);
+  // …and drops (with the map name) when the sheet itself is narrow.
+  assert.match(styles, /\[data-course-mindmap-status\]\[data-compact="true"\] \{\s*--mm-tool-size: 28px;/);
+  assert.match(styles, /\[data-course-mindmap-status\]\[data-compact="true"\] \[data-mm-map-name\] \{\s*display: none;/);
+  // The glyph is sized from the tile, so it stays proportional at every step.
+  assert.match(styles, /\.mm-tool > svg \{\s*width: 58%;/);
+});
+
+test("cloud save is an icon with a blinking beacon, and the words moved to its menu", () => {
+  // The "Cloud par saved" text was the widest thing on the bar; it is a cloud
+  // icon now, tinted by the state, with a blinking dot while there is a
+  // message — and tapping it still shows the message (plus a save-now action).
+  assert.match(toolbar, /data-course-mindmap-save/);
+  assert.match(toolbar, /data-save-status=\{status\}/);
+  assert.match(toolbar, /data-blink=\{saveBlink \? "true" : "false"\}/);
+  assert.match(toolbar, /status === "saving" \? <CloudUpload \/> : status === "saved" \? <CloudCheck \/> : status === "error" \? <CloudAlert \/> : <Cloud \/>/);
+  assert.match(toolbar, /\{saveBlink \? <span className="mm-blink" data-course-mindmap-save-blink aria-hidden="true" \/> : null\}/);
+  assert.match(toolbar, /<ToolbarMenu[\s\S]*?label="Cloud save"[\s\S]*?data-course-mindmap-save-label/);
+  assert.match(toolbar, /data-course-mindmap-save-now/);
+  // The beacon blinks (and only while a message is live): a finished save
+  // blinks for a beat, an in-flight or failed one keeps blinking.
+  assert.match(panel, /const SAVED_BLINK_MS = 2400;/);
+  assert.match(panel, /if \(status === "saving" \|\| status === "error"\) \{\s*setSaveBlink\(true\);/);
+  assert.match(styles, /@keyframes mm-blink \{/);
+  assert.match(styles, /\.mm-blink \{[\s\S]*?animation: mm-blink 1\.05s ease-in-out infinite;/);
+  // It rides the tile's top-right corner and inherits the status colour.
+  assert.match(styles, /\.mm-blink \{[\s\S]*?position: absolute;\s*top: -1px;\s*right: -1px;/);
+  assert.match(styles, /\.mm-blink \{[\s\S]*?background: currentColor;/);
+});
+
+test("one align icon opens a small drop-down with the box alignment + text fit", () => {
+  // "jo nodes boxes hain unka alignment — wrapping ya clip — ek icon, click
+  // karne par chhota sa drop down".
+  assert.match(toolbar, /data-course-mindmap-align/);
+  assert.match(toolbar, /aria-haspopup="menu"/);
+  assert.match(toolbar, /<ToolbarMenu[\s\S]*?label="Boxes ka alignment"/);
+  // The two groups the learner asked for: where the boxes sit, and what a
+  // long label does inside one.
+  assert.match(panel, /const ARRANGEMENT_OPTIONS/);
+  assert.match(panel, /const TEXT_FIT_OPTIONS/);
+  assert.match(panel, /\{ value: "tree", label: "Tree", hint: "Classic mind map — dono taraf branches", Icon: Network \}/);
+  assert.match(panel, /\{ value: "line", label: "Ek line", hint: "Saare boxes ek hi line mein", Icon: Rows3 \}/);
+  assert.match(panel, /\{ value: "stack", label: "Ek column", hint: "Saare boxes ek ke neeche ek", Icon: Columns3 \}/);
+  assert.match(panel, /\{ value: "wrap", label: "Wrap", hint: "Lamba text agli line mein ghoom jayega", Icon: WrapText \}/);
+  assert.match(panel, /\{ value: "clip", label: "Ek line · clip", hint: "Har box ek line ka, aage “…”", Icon: Type \}/);
+  // It is a radio list: the picked option is marked, and picking closes it.
+  assert.match(panel, /role="menuitemradio"/);
+  assert.match(panel, /aria-checked=\{arrangement === option\.value\}/);
+  assert.match(panel, /setAlignMenuOpen\(false\);/);
+  // Small and clamped inside the viewport, and portalled so the clipped strip
+  // cannot slice it in half.
+  assert.match(panel, /const MENU_WIDTH_PX = 224;/);
+  assert.match(panel, /createPortal\(/);
+  assert.match(panel, /window\.addEventListener\("scroll", measure, true\)/);
+  assert.match(panel, /if \(event\.key === "Escape"\) onClose\(\);/);
+  assert.match(styles, /\.mm-menu \{[\s\S]*?max-width: min\(17rem, calc\(100vw - 16px\)\);/);
+});
+
+test("the align choices are views, not data: remembered per device, never saved to the map", () => {
+  // Flipping to "one line" must not cost a Firestore write or show up as an
+  // edit, so both live in localStorage next to the theme + double-tap picks.
+  assert.match(panel, /const arrangementStorageKey = "dc\.mindMapArrangement";/);
+  assert.match(panel, /const textFitStorageKey = "dc\.mindMapTextFit";/);
+  assert.match(panel, /localStorage\.setItem\(arrangementStorageKey, arrangement\)/);
+  assert.match(panel, /localStorage\.setItem\(textFitStorageKey, textFit\)/);
+  assert.match(panel, /normalizeArrangement\(/);
+  // The map document itself is untouched by either choice.
+  const doc = readSource("src/course/useCourseMindMap.ts");
+  assert.doesNotMatch(doc, /arrangement/, "the stored map carries no arrangement");
+  // …and flipping it re-frames the canvas, or the new line sits off-screen.
+  assert.match(panel, /void fitView\(\{ duration: 320, padding: 0\.2 \}\), 60/);
+});
+
+test("the clip text fit is honoured by BOTH the layout measurement and the box", () => {
+  // A one-line box must be MEASURED as one line, or the row reserves space
+  // for text that is never painted.
+  assert.match(panel, /measure: \{ maxLines: textFit === "clip" \? 1 : 0 \}/);
+  assert.match(panel, /textFit === "clip" \? \(/);
+  assert.match(panel, /data-mind-node-text-fit="clip"/);
+  assert.match(panel, /data-mind-node-text-fit="wrap"/);
+  assert.match(panel, /textFit,/);
 });

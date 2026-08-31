@@ -37,6 +37,7 @@ import {
   moveNode,
   moveNodeSubtree,
   nextNodeId,
+  normalizeArrangement,
   parseMindMap,
   removeNode,
   rootId,
@@ -832,4 +833,151 @@ test("a parsed legacy map re-faces itself from its pins without storing anything
   assert.equal(Object.prototype.hasOwnProperty.call(stored.nodes[0], "facing"), false);
   const reloaded = parseMindMap(stored);
   assert.equal(boxOf(reloaded, id).facing, "right", "the flip survives a Firestore round-trip");
+});
+
+// ---------------------------------------------------------------------------
+// Arrangements — the same map, aligned differently
+//
+// The toolbar's align menu offers "tree" (the classic two-sided tidy tree),
+// "line" (every box in one horizontal row) and "stack" (every box in one
+// vertical column). All three are VIEWS of one map: no branch is added,
+// dropped or re-parented, so a learner can flip between them (and the choice
+// is a per-device preference, never a Firestore write).
+// ---------------------------------------------------------------------------
+
+const branchy = () => {
+  let mind = createMindMap("Centre", "Map");
+  for (const branch of ["Left one", "Right one", "Right two"]) {
+    const made = addChildNode(mind, rootId(), branch);
+    mind = made.mind;
+    mind = addChildNode(mind, made.nodeId, `${branch} child`).mind;
+  }
+  return mind;
+};
+
+test("an unknown arrangement falls back to the tidy tree", () => {
+  assert.equal(normalizeArrangement("tree"), "tree");
+  assert.equal(normalizeArrangement("line"), "line");
+  assert.equal(normalizeArrangement("stack"), "stack");
+  assert.equal(normalizeArrangement("nonsense"), "tree");
+  assert.equal(normalizeArrangement(undefined), "tree");
+  assert.equal(normalizeArrangement(null), "tree");
+  // …which is why a map laid out with no options looks like the tree.
+  assert.deepEqual(layoutMindMap(branchy()).nodes, layoutMindMap(branchy(), { arrange: "weird" }).nodes);
+});
+
+test("one line: every box shares ONE row, in reading order, with the row's height", () => {
+  const mind = branchy();
+  const { nodes, edges } = layoutMindMap(mind, { arrange: "line" });
+  assert.equal(nodes.length, 7, "every node is on the canvas — none is hidden");
+  assert.equal(edges.length, 6, "every branch still has its rope");
+
+  // Reading order: the centre first, then depth-first through the branches.
+  assert.equal(nodes[0].id, rootId(), "the centre opens the row");
+  for (let index = 1; index < nodes.length; index += 1) {
+    const previous = nodes[index - 1];
+    const node = nodes[index];
+    assert.ok(
+      node.x >= previous.x + previous.width,
+      `box ${index} must sit clear of the one before it in the row`,
+    );
+    assert.equal(node.y, previous.y, "the whole row shares one top edge");
+  }
+  // Uniform height, so the row reads as a straight line of equal cards.
+  const heights = new Set(nodes.map((node) => node.height));
+  assert.equal(heights.size, 1, "one row → one height");
+
+  // A child follows its parent in the row, so every rope points right.
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  for (const edge of edges) {
+    assert.ok(byId.get(edge.target).x > byId.get(edge.source).x, "children sit east of their parent");
+    assert.equal(edge.facing, "right");
+  }
+});
+
+test("one column: every box shares ONE column, in reading order, with the column's width", () => {
+  const mind = branchy();
+  const { nodes, edges } = layoutMindMap(mind, { arrange: "stack" });
+  assert.equal(nodes.length, 7);
+  assert.equal(edges.length, 6);
+  for (let index = 1; index < nodes.length; index += 1) {
+    const previous = nodes[index - 1];
+    const node = nodes[index];
+    assert.ok(node.y >= previous.y + previous.height, "boxes stack downward without overlapping");
+  }
+  // Uniform width, and every box centred on the same axis.
+  const widths = new Set(nodes.map((node) => node.width));
+  assert.equal(widths.size, 1, "one column → one width");
+  const centres = new Set(nodes.map((node) => Math.round(node.x + node.width / 2)));
+  assert.equal(centres.size, 1, "every box is centred on the column");
+  // Nothing is east or west of anything in a column, so the ropes stay put
+  // instead of flipping per pixel (they all take the same face).
+  assert.deepEqual([...new Set(edges.map((edge) => edge.facing))], ["right"]);
+});
+
+test("an arrangement is a VIEW: the tree underneath is untouched", () => {
+  const mind = branchy();
+  const tree = layoutMindMap(mind, { arrange: "tree" });
+  const line = layoutMindMap(mind, { arrange: "line" });
+  const stack = layoutMindMap(mind, { arrange: "stack" });
+  // Same boxes, same branches — only the geometry differs.
+  assert.deepEqual(
+    tree.nodes.map((node) => node.id).sort(),
+    line.nodes.map((node) => node.id).sort(),
+  );
+  assert.deepEqual(
+    tree.edges.map((edge) => edge.id).sort(),
+    stack.edges.map((edge) => edge.id).sort(),
+  );
+  for (const [name, view] of [["line", line], ["stack", stack]]) {
+    for (const node of view.nodes) {
+      const known = node.id === rootId() || mind.nodes.some((entry) => String(entry.id) === node.id);
+      assert.ok(known, `every box in the ${name} view is a real node of the map`);
+    }
+  }
+  // …and no view writes anything back into it.
+  const before = JSON.stringify(mind);
+  layoutMindMap(mind, { arrange: "line" });
+  layoutMindMap(mind, { arrange: "stack" });
+  assert.equal(JSON.stringify(mind), before, "laying out must never mutate the map");
+});
+
+test("a hand-placed pin still wins in a line or a column", () => {
+  // Dragging must not become a no-op just because the learner is looking at
+  // the map in another alignment.
+  const mind = branchy();
+  const child = mind.nodes[0].id;
+  const pinned = setNodePosition(mind, child, 640, 240);
+  for (const arrange of ["line", "stack"]) {
+    const box = layoutMindMap(pinned, { arrange }).nodes.find((node) => node.id === String(child));
+    assert.equal(box.x, 640, `the pin is honoured in ${arrange}`);
+    assert.equal(box.y, 240, `the pin is honoured in ${arrange}`);
+    assert.equal(box.manual, true);
+  }
+});
+
+test("a collapsed branch stays collapsed in every arrangement", () => {
+  const mind = branchy();
+  const hidden = toggleCollapsed(mind, mind.nodes[0].id);
+  for (const arrange of ["tree", "line", "stack"]) {
+    const view = layoutMindMap(hidden, { arrange });
+    assert.equal(view.nodes.length, 6, `${arrange} hides the collapsed child`);
+    assert.equal(view.edges.length, 5, `${arrange} hides its rope too`);
+  }
+});
+
+test("clip mode measures one line, so the box is only one line tall", () => {
+  const long = "yeh topic kaafi lamba hai aur wrap hone par kai line le lega";
+  const wrapped = measureTopic(long);
+  const clipped = measureTopic(long, { maxLines: 1 });
+  assert.equal(clipped.lines, 1);
+  assert.ok(clipped.height < wrapped.height, "a clipped box reserves less height than a wrapped one");
+  assert.equal(clipped.height, wrapped.height - (wrapped.lines - 1) * 17);
+  // …and the layout carries it: every box in a clipped map is one line tall.
+  const mind = addChildNode(createMindMap(long), rootId(), long).mind;
+  const boxes = layoutMindMap(mind, { arrange: "line", measure: { maxLines: 1 } }).nodes;
+  assert.deepEqual([...new Set(boxes.map((node) => node.height))], [45], "one line of 17px + 14px padding");
+  // A clipped map is never TALLER than the wrapped map it came from.
+  const wrappedBoxes = layoutMindMap(mind, { arrange: "line" }).nodes;
+  assert.ok(boxes[0].height < wrappedBoxes[0].height);
 });
