@@ -387,7 +387,7 @@ export default function NotesPanel({
           underneath and shown again the moment the note is reopened. */}
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {notes.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-300 bg-white/80 p-4 text-center text-xs font-semibold text-slate-500">
+          <p className="rounded-lg border border-dashed border-[var(--course-border)] bg-[var(--course-soft)] p-4 text-center text-xs font-semibold text-[var(--course-muted)]">
             No notes yet — tap + to add one.
           </p>
         ) : (
@@ -400,7 +400,6 @@ export default function NotesPanel({
                   className="relative aspect-square overflow-visible rounded-2xl p-2.5"
                   data-course-note
                   data-note-id={note.id}
-                  style={{ background: "#ffffff", border: "1px solid rgba(148,163,184,0.35)", boxShadow: "0 4px 14px -4px rgba(15,23,42,0.18), 0 2px 6px -2px rgba(15,23,42,0.1)" }}
                 >
                   <div className="flex h-full flex-col overflow-hidden">
                     <div

@@ -24,7 +24,7 @@ export function FlowPathHeader({
   return (
     <header className="fixed inset-x-0 top-0 z-40 flex justify-center px-3 pt-3 sm:px-6 sm:pt-4">
       <motion.div
-        initial={{ opacity: 0, y: -16 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         className="glass-panel flex w-full max-w-5xl items-center justify-between gap-3 rounded-2xl px-3.5 py-2.5 sm:px-5 sm:py-3"

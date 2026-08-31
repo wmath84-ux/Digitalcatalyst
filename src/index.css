@@ -1528,11 +1528,13 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    library is the panel's HOME screen and it owns the whole sheet, so the same
    measurement should also hold for the portrait sheet on small phones instead
    of leaving a second, viewport-based rule in charge there.
-   The `min(…, 100%)` guard is the other addition: a sheet dragged to its 10%
-   minimum is narrower than one 160 px card, and the grid must then shrink to
-   the container instead of overflowing it. */
+   No `min(160px, 100%)` guard here — the notes grid never had one, and that
+   is deliberate parity: a sheet dragged shut gets narrower than one card, and
+   the cards must then keep their 160 px floor and CLIP at the sheet edge
+   (exactly how the Note Library behaves while being dismissed) instead of
+   shrinking to a sliver with the container. */
 [data-course-mindmap-map-grid] {
-  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 
 /* Mind map library cards: the same raised-surface treatment the note squares
@@ -1586,8 +1588,12 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 
 /* Course Player — square note cards lift off the panel with a mixed
-   blue gradient glow so the boxes stay readable against both themes. */
+   blue gradient glow so the boxes stay readable against both themes.
+   `color` is pinned here (rather than inherited) so a saved note's preview
+   text is ALWAYS legible on the card in both themes — in dark mode the
+   shell hands the card white text, and a light/white card would swallow it. */
 [data-course-notes-grid] [data-course-note] {
+  color: var(--course-text);
   background:
     linear-gradient(165deg, rgb(125 211 252 / 0.22), rgb(37 99 235 / 0.08) 46%, rgb(29 78 216 / 0.04)),
     var(--course-soft);
@@ -1622,6 +1628,10 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   min-width: 0;
   overflow: hidden;
   text-align: center;
+  /* The card's own theme text — the preview block keeps its formatting, but
+     unstyled text must never inherit a shell colour that clashes with the
+     card surface in either theme. */
+  color: var(--course-text);
 }
 
 .course-note-card-preview > * {

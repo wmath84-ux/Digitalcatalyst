@@ -89,7 +89,7 @@ export function ActivityCard({ activity, status, side, onComplete, completing, o
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: side === "right" ? 28 : -28, scale: 0.92 }}
+      initial={false}
       animate={{
         opacity: isCompleted ? 0.78 : 1,
         x: 0,

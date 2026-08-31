@@ -14,7 +14,7 @@ export function PlusNode({ active, onOpen }: PlusNodeProps) {
     <motion.button
       ref={ref}
       type="button"
-      initial={{ opacity: 0, scale: 0.5 }}
+      initial={false}
       animate={{ opacity: 1, scale: active ? 0 : 1 }}
       whileHover={{ scale: 1.16, rotate: 90 }}
       whileTap={{ scale: 0.9 }}
