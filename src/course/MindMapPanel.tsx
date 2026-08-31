@@ -33,10 +33,12 @@
 //                    same way, so closing the editor and tapping the canvas
 //                    is one and the same action).
 //   double-tap     → with "double-tap delete" switched ON from the toolbar,
-//                    a double-tap deletes the node and its whole branch.
-//                    The mode is OFF by default and is toggled by the
-//                    pointer button in the toolbar, so a stray second tap can
-//                    never delete a branch by accident.
+//                    a double-tap asks for confirmation before the node and
+//                    its whole branch are removed. The mode is OFF by default
+//                    and is toggled by the pointer button in the toolbar, so
+//                    a stray second tap can never delete a branch by accident
+//                    — and no tap deletes anything without the explicit
+//                    confirmation step.
 //   toolbar trash  → deletes the SELECTED branch (a node that was just
 //                    tapped or dragged). The root can never be deleted.
 //
@@ -172,6 +174,7 @@ import {
   type MindMapArrangement,
 } from "../../utils/mindMapTree";
 import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
+import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import {
   getCoursePanelSession,
   setMindMapSessionTheme,
@@ -1009,6 +1012,21 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const [renameDraft, setRenameDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Deletion is always gated behind a confirmation overlay — a branch (toolbar
+  // trash / double-tap) or a whole map (library trash). Nothing is removed by
+  // the first tap; the red confirm button is the only path that deletes.
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteMapKey, setDeleteMapKey] = useState<string | null>(null);
+
+  // If the panel closes while a confirmation is open (programmatic close /
+  // tab switch), drop the pending target so a stale dialog can never float
+  // over the player after the sheet is gone.
+  useEffect(() => {
+    if (!open) {
+      setDeleteTargetId(null);
+      setDeleteMapKey(null);
+    }
+  }, [open]);
   // Theme: null → track the Course Player; a value → the learner's own pick
   // for THIS window, kept in the player's panel session for this visit.
   const [themeOverride, setThemeOverride] = useState<MindMapTheme | null>(
@@ -1274,14 +1292,29 @@ function MindMapCanvas(props: MindMapPanelProps) {
     [onMindChange],
   );
 
-  const handleDelete = useCallback(
+  // FIRST step of branch deletion: open the confirmation overlay. The node is
+  // only removed when the learner taps the red confirm button (`performDelete`).
+  const requestDelete = useCallback((id: string) => {
+    setDeleteMapKey(null);
+    setDeleteTargetId(id);
+  }, []);
+
+  // SECOND step: the confirmed destructive action.
+  const performDelete = useCallback(
     (id: string) => {
       onMindChange((current) => removeNode(current, id));
       setSelectedId((current) => (current === id ? null : current));
       setEditingId((current) => (current === id ? null : current));
+      setDeleteTargetId(null);
     },
     [onMindChange],
   );
+
+  // FIRST step of whole-map deletion (map library card).
+  const requestMapDelete = useCallback((mapKey: string) => {
+    setDeleteTargetId(null);
+    setDeleteMapKey(mapKey);
+  }, []);
 
   const handleOpenEditor = useCallback((id: string) => {
     // Single tap on a node opens the editor directly. Selection is implied
@@ -1328,6 +1361,8 @@ function MindMapCanvas(props: MindMapPanelProps) {
       setLibraryOpen(false);
       setSelectedId(null);
       setEditingId(null);
+      setDeleteTargetId(null);
+      setDeleteMapKey(null);
     },
     [activeMapKey, onSelectMap],
   );
@@ -1348,6 +1383,17 @@ function MindMapCanvas(props: MindMapPanelProps) {
   // The root can never be deleted, so the toolbar trash only arms itself for
   // a real branch selection.
   const canDeleteSelected = selectedId != null && selectedId !== rootId();
+
+  // ── Confirmation overlay content (branch + whole map) ───────────────────
+  const deleteTargetNode = deleteTargetId
+    ? mind.nodes.find((node) => String(node.id) === String(deleteTargetId)) || null
+    : null;
+  const deleteTargetBranchCount = deleteTargetId
+    ? collectSubtreeIds(mind, deleteTargetId).length
+    : 0;
+  const deleteMapEntry = deleteMapKey
+    ? maps.find((entry) => entry.mapKey === deleteMapKey) || null
+    : null;
 
   // ── React Flow nodes + edges, derived from the layout ──────────────────
   const layoutNodes: Node<MindNodeData>[] = useMemo(() => {
@@ -1395,7 +1441,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
         textFit,
         deleteOnDoubleTap: doubleTapDelete,
         onAddChild: handleAddChild,
-        onDelete: handleDelete,
+        onDelete: requestDelete,
         onOpenEditor: handleOpenEditor,
         onCloseEditor: handleCloseEditor,
         onCommitTopic: handleCommitTopic,
@@ -1412,7 +1458,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
     textFit,
     doubleTapDelete,
     handleAddChild,
-    handleDelete,
+    requestDelete,
     handleOpenEditor,
     handleCloseEditor,
     handleCommitTopic,
@@ -1701,7 +1747,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
             >
               <Trash2 size={11} />
               <p className="text-center text-[11px] font-semibold">
-                Double-tap delete ON — node par double-tap karke branch hatayein
+                Double-tap delete ON — node par double-tap, phir Confirm dabayein
               </p>
             </div>
           </div>
@@ -1837,7 +1883,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
                         )}
                         <button
                           type="button"
-                          onClick={() => onDeleteMap?.(entry.mapKey)}
+                          onClick={() => requestMapDelete(entry.mapKey)}
                           className="grid h-7 w-7 place-items-center rounded-lg bg-rose-500/90 text-white transition hover:brightness-110"
                           aria-label="Map delete karein"
                           title="Yeh mind map delete karein"
@@ -2116,7 +2162,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           <button
             type="button"
             onClick={() => {
-              if (selectedId) handleDelete(selectedId);
+              if (selectedId) requestDelete(selectedId);
             }}
             disabled={!canDeleteSelected}
             className="mm-tool mm-tool-danger"
@@ -2139,7 +2185,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
             aria-pressed={doubleTapDelete}
             className={`mm-tool ${doubleTapDelete ? "mm-tool-violet" : ""}`}
             aria-label={doubleTapDelete ? "Double-tap delete band karein" : "Double-tap delete chaalu karein"}
-            title={doubleTapDelete ? "Double-tap delete ON — band karne ke liye dabayein" : "Double-tap delete — node par double-tap karke delete karein"}
+            title={doubleTapDelete ? "Double-tap delete ON — band karne ke liye dabayein" : "Double-tap delete — node par double-tap, phir Confirm"}
             data-course-mindmap-dbl-delete
             data-active={doubleTapDelete ? "true" : "false"}
           >
@@ -2174,6 +2220,48 @@ function MindMapCanvas(props: MindMapPanelProps) {
           {errorMessage}
         </p>
       ) : null}
+
+      {/* ── Branch delete confirmation ────────────────────────────────────
+          Every branch delete path lands here first (toolbar trash AND the
+          double-tap mode): nothing is removed until the red confirm button is
+          tapped. Portalled to <body> so the clipped canvas sheet never cuts
+          it off, and it is always above the player overlay + dock. */}
+      <ConfirmDeleteDialog
+        open={Boolean(deleteTargetId)}
+        title="Delete this branch?"
+        message={
+          deleteTargetNode
+            ? `"${deleteTargetNode.topic || "This branch"}" and its ${deleteTargetBranchCount} linked node${deleteTargetBranchCount === 1 ? "" : "s"} will be permanently removed from this mind map.`
+            : "This branch and every node linked to it will be permanently removed."
+        }
+        detail="The root idea stays untouched. This action cannot be undone."
+        confirmLabel="Delete branch"
+        confirmTitle="Delete branch"
+        onConfirm={() => {
+          if (deleteTargetId) performDelete(deleteTargetId);
+        }}
+        onCancel={() => setDeleteTargetId(null)}
+      />
+
+      {/* ── Whole-map delete confirmation (map library) ─────────────────── */}
+      <ConfirmDeleteDialog
+        open={Boolean(deleteMapKey)}
+        title="Delete this mind map?"
+        message={
+          deleteMapEntry
+            ? `"${deleteMapEntry.title || deleteMapEntry.rootTopic || "Untitled map"}" and every branch inside it will be permanently removed from this module.`
+            : "This mind map and every branch inside it will be permanently removed."
+        }
+        detail="This action cannot be undone."
+        confirmLabel="Delete map"
+        confirmTitle="Delete map"
+        onConfirm={() => {
+          const key = deleteMapKey;
+          setDeleteMapKey(null);
+          if (key) onDeleteMap?.(key);
+        }}
+        onCancel={() => setDeleteMapKey(null)}
+      />
     </div>
   );
 }

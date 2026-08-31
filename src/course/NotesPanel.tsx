@@ -39,6 +39,7 @@ import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
 import type { CoursePlayerNote } from "../types/course";
 import RichTextEditor from "./RichTextEditor";
+import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { combineHtml } from "./notesStore";
 import { getCoursePanelSession, setNotesSessionView } from "./coursePanelSession";
 import { firstRichTextBlock, isEmptyRichText, plainToRichText, richTextToPlain, splitFirstHeading } from "../utils/richText";
@@ -114,6 +115,14 @@ export default function NotesPanel({
   );
   const [editDraft, setEditDraft] = useState(restoreEdit ? sessionNotes.draft : "");
   const [editTitle, setEditTitle] = useState(restoreEdit ? sessionNotes.title : "");
+
+  // Deletion is a two-step act: the red trash opens a confirmation overlay
+  // and the note is removed ONLY after the learner taps the red confirm
+  // button. Cancel / backdrop tap / Escape never delete.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const pendingDeleteNote = pendingDeleteId
+    ? notes.find((note) => note.id === pendingDeleteId) || null
+    : null;
 
   const editorOpen = composing || Boolean(editingId);
 
@@ -292,7 +301,7 @@ export default function NotesPanel({
                       </button>
                       <button
                         type="button"
-                        onClick={() => onDelete(note.id)}
+                        onClick={() => setPendingDeleteId(note.id)}
                         className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-rose-400 to-rose-600 text-white shadow-md shadow-rose-200/50 transition hover:brightness-110"
                         aria-label="Delete note"
                         data-course-note-delete
@@ -307,6 +316,27 @@ export default function NotesPanel({
           </ul>
         )}
       </div>
+
+      {/* Two-step delete confirmation. Rendered through a portal so the
+          player's clipped/overflow-hidden sheet can never cut it off, and
+          it always sits above the overlay + dock on phones and tablets. */}
+      <ConfirmDeleteDialog
+        open={Boolean(pendingDeleteNote)}
+        title="Delete this note?"
+        message={
+          pendingDeleteNote
+            ? `"${notePreview(pendingDeleteNote) || "Untitled note"}" will be permanently removed from your notes.`
+            : ""
+        }
+        detail={pendingDeleteNote ? "This action cannot be undone." : null}
+        confirmLabel="Delete note"
+        confirmTitle="Delete note"
+        onConfirm={() => {
+          if (pendingDeleteId) onDelete(pendingDeleteId);
+          setPendingDeleteId(null);
+        }}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }
