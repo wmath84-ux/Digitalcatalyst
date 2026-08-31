@@ -369,22 +369,41 @@ export default function SubscriptionsPage() {
     <div className="space-y-3 pb-6 lg:space-y-4">
       <Tabs tabs={[{ key: "plans", label: "Plans" }, { key: "features", label: "Features" }, { key: "products", label: "Products" }, { key: "logic", label: "Subscription Logic" }, { key: "referrals", label: "Referrals" }]} active={tab} onChange={setTab} />
 
+      <div className="flex flex-wrap gap-1.5">
+        {([
+          { key: "plans", n: "1", label: "Selling packages" },
+          { key: "features", n: "2", label: "App features" },
+          { key: "products", n: "3", label: "Courses" },
+          { key: "logic", n: "4", label: "Who sees what + subscriber prices" },
+          { key: "referrals", n: "5", label: "Referrals" },
+        ] as const).map((step) => (
+          <button
+            key={step.key}
+            type="button"
+            onClick={() => setTab(step.key)}
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${tab === step.key ? "border-violet-400 bg-violet-50 text-violet-800" : "border-slate-200 bg-white text-slate-600"}`}
+          >
+            {step.n} · {step.label}
+          </button>
+        ))}
+      </div>
+
       {tab === "plans" && (
         <div className="space-y-3 lg:space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">{plans.length} plan(s)</p>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">1 · Selling packages</p>
+              <p className="text-xs text-slate-500">{plans.length} plan(s) — public checkout price, plus a subscriber-only override in Edit.</p>
+            </div>
             <PrimaryButton onClick={() => setEditingPlan(EMPTY_PLAN)}>+ Add plan</PrimaryButton>
           </div>
           <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-3 text-xs leading-relaxed text-violet-900">
-            <p className="font-semibold">💡 Customise prices for subscribed users</p>
+            <p className="font-semibold">💡 Customise subscriptions — including subscriber-only prices</p>
             <p className="mt-1 text-[11px]">
-              Every price on this page is per subscriber: the <strong>plan price</strong> is
-              charged at checkout, and each <strong>feature / product</strong> can have its own
-              monthly, yearly and per-plan rate (or be free on a specific plan). Set an item
-              cheaper on a higher plan — or free on it — and upgrading becomes cheaper than
-              buying the item separately. Existing members can upgrade to any plan, and they
-              can also add features / courses to their current plan while paying only for the
-              new items.
+              Public <strong>plan price</strong> is charged at checkout. Each plan, feature and product can also have a
+              <strong> subscriber-only price</strong> (existing members see it on upgrade/renewal; blank = same as public).
+              Features/products can be monthly, yearly, per-plan, or free on a plan. Test Bank + School AI limits are per duration.
+              Guest vs member visibility lives on <strong>Subscription Logic</strong> (step 4).
             </p>
           </div>
           {plans.length === 0 ? <EmptyState title="No plans yet" /> : (
@@ -396,7 +415,18 @@ export default function SubscriptionsPage() {
                     <Pill tone={p.active ? "success" : "default"}>{p.active ? "active" : "inactive"}</Pill>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">{p.description}</p>
-                  <p className="mt-1 text-xs text-slate-600">{p.billingCycles?.map((c) => `${c.label}: ${Number(c.price) === 0 ? "FREE" : `₹${c.price}`}`).join(" · ")}</p>
+                  <p className="mt-1 text-xs text-slate-600">Public: {p.billingCycles?.map((c) => `${c.label}: ${Number(c.price) === 0 ? "FREE" : `₹${c.price}`}`).join(" · ")}</p>
+                  {(p.subscriberPricingOverride?.monthly != null || p.subscriberPricingOverride?.yearly != null || p.subscriberPricingOverride?.lifetime != null) ? (
+                    <p className="mt-0.5 text-[11px] font-semibold text-emerald-700">
+                      Subscriber-only: {[
+                        p.subscriberPricingOverride?.monthly != null ? `mo ₹${p.subscriberPricingOverride.monthly}` : null,
+                        p.subscriberPricingOverride?.yearly != null ? `yr ₹${p.subscriberPricingOverride.yearly}` : null,
+                        p.subscriberPricingOverride?.lifetime != null ? `life ₹${p.subscriberPricingOverride.lifetime}` : null,
+                      ].filter(Boolean).join(" · ")}
+                    </p>
+                  ) : (
+                    <p className="mt-0.5 text-[11px] text-slate-400">Subscriber-only price: same as public (set in Edit)</p>
+                  )}
                   <p className="mt-1 text-[11px] font-semibold text-indigo-600">
                     Test Bank: {p.revisionTestBankLimits?.monthly === -1 ? "Unlimited" : `${p.revisionTestBankLimits?.monthly ?? 20} monthly`} · {p.revisionTestBankLimits?.yearly === -1 ? "Unlimited yearly" : `${p.revisionTestBankLimits?.yearly ?? 20} yearly`}
                   </p>
@@ -651,6 +681,7 @@ export default function SubscriptionsPage() {
           <RecordCard>
             <div className="space-y-4">
               <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Step C · Plans & subscriber-only prices</p>
                 <h3 className="text-sm font-semibold text-slate-900">Plan visibility + subscriber-only price</h3>
                 <p className="mt-1 text-xs text-slate-500">
                   Choose which plans show on the subscription page for guests vs existing subscribers, which cycles are visible for each, and the per-plan override price that only EXISTING subscribers see.
@@ -872,37 +903,6 @@ export default function SubscriptionsPage() {
                       revisionTestBankLimits: {
                         monthly: Math.max(-1, Math.min(1000, Math.round(Number(e.target.value) || 0))),
                         yearly: editingPlan.revisionTestBankLimits?.yearly ?? 20,
-                      },
-                    })}
-                  />
-                </Field>
-                <Field label="Yearly saved tests">
-                  <input
-                    className={inputClass}
-                    type="number"
-                    min={-1}
-                    max={1000}
-                    value={editingPlan.revisionTestBankLimits?.yearly ?? 20}
-                    onChange={(e) => setEditingPlan({
-                      ...editingPlan,
-                      revisionTestBankLimits: {
-                        monthly: editingPlan.revisionTestBankLimits?.monthly ?? 20,
-                        yearly: Math.max(-1, Math.min(1000, Math.round(Number(e.target.value) || 0))),
-                      },
-                    })}
-                  />
-                </Field>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3">
-              <p className="text-sm font-semibold text-slate-900">School AI allowances</p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-                Configure each billing duration independently. Every successfully generated complete test uses one daily generation. Cost budget is the maximum school-model spend for that purchased term; leave it blank for unlimited. A learner&apos;s own API key never uses either allowance.
-              </p>
-              {(["monthly", "yearly"] as const).map((cycle) => {
-                const allowance = editingPlan.aiAllowances?.[cycle] ?? { dailyGenerationLimit: 20, costBudgetMicros: -1 };
-              yearly: editingPlan.revisionTestBankLimits?.yearly ?? 20,
                       },
                     })}
                   />
@@ -1577,6 +1577,18 @@ export default function SubscriptionsPage() {
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" className="h-5 w-5" checked={!!editingSubscriptionProduct.included} onChange={(e) => setEditingSubscriptionProduct({ ...editingSubscriptionProduct, included: e.target.checked, individualPrice: e.target.checked ? "0" : (editingSubscriptionProduct.individualPrice || "0") })} />
               Free / included (unlocks for free when any plan is purchased)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" className="h-5 w-5" checked={!!editingSubscriptionProduct.active} onChange={(e) => setEditingSubscriptionProduct({ ...editingSubscriptionProduct, active: e.target.checked })} />
+              Active / selectable on subscription page
+            </label>
+          </div>
+        )}
+      </Sheet>
+    </div>
+  );
+}
+s purchased)
             </label>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" className="h-5 w-5" checked={!!editingSubscriptionProduct.active} onChange={(e) => setEditingSubscriptionProduct({ ...editingSubscriptionProduct, active: e.target.checked })} />
