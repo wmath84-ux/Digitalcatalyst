@@ -1588,15 +1588,3 @@ export default function SubscriptionsPage() {
     </div>
   );
 }
-s purchased)
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" className="h-5 w-5" checked={!!editingSubscriptionProduct.active} onChange={(e) => setEditingSubscriptionProduct({ ...editingSubscriptionProduct, active: e.target.checked })} />
-              Active / selectable on subscription page
-            </label>
-          </div>
-        )}
-      </Sheet>
-    </div>
-  );
-}
