@@ -9,6 +9,8 @@
 
 ## 0. Status
 
+**Rollout complete — Waves 0–6 shipped on `arena/01a05c86-digitalcatalyst`, PR #527 against `main`.** 21 of the 22 registry items are live on every in-scope surface; `glass-dock` stays unadopted by decision D4. The app-wide invariants this document defends: the vendored files are never edited for app look, all app-specific ink is additive `.dc-*` CSS under `html[data-glass="on"]`, `?glass=off` restores the pre-rollout paint with no code change, and 64 `tests/liquidGlassWave*Contract.test.mjs` assertions pin the public props, `data-*` hooks, a11y roles, the frozen paths and every *deliberate non-change*.
+
 **Decisions locked by the owner (2026-09-01):**
 
 | # | Decision | Outcome |
