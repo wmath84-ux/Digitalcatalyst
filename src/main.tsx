@@ -1101,7 +1101,12 @@ function RootPage(): ReactNode {
     // working Retry / Back / Home actions.
     return (
       <FlowPathErrorBoundary>
-        <FlowPathApp onNavigateToHome={() => { window.location.hash = HOME_HASH; }} />
+        <FlowPathApp
+          onNavigateToHome={() => { window.location.hash = HOME_HASH; }}
+          favoritesCount={favoriteIds.size}
+          onOpenFavorites={() => { window.location.hash = FAVORITES_HASH; }}
+          onOpenNotifications={() => { window.location.hash = NOTIFICATIONS_HASH; }}
+        />
       </FlowPathErrorBoundary>
     );
   }

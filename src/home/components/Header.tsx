@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useRef } from "react";
-import { Bell, Heart, Plus, Search, Trophy, X } from "lucide-react";
+import { Bell, Heart, Search, Trophy, UserRound, X } from "lucide-react";
 import type { Product } from "../types";
 import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
 import BrandMark from "../../components/BrandMark";
@@ -72,7 +72,10 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
     }
     const desktop = document.querySelector("[data-desktop-content]");
     if (desktop instanceof HTMLElement) scrollers.push(desktop);
-    if (scrollers.length === 0) return;
+    // Pages that render this header outside an app frame (FlowPath) scroll
+    // the document itself, so fall back to the window as the scroller —
+    // the collapse animation then behaves exactly like it does on Home.
+    const useWindowScroll = scrollers.length === 0;
 
     const measureSeat = () => {
       if (!(frame instanceof HTMLElement)) return;
@@ -87,7 +90,9 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
     let raf = 0;
     const apply = () => {
       raf = 0;
-      const y = Math.max(0, ...scrollers.map((node) => node.scrollTop));
+      const y = useWindowScroll
+        ? Math.max(0, window.scrollY)
+        : Math.max(0, ...scrollers.map((node) => node.scrollTop));
       const t = Math.min(1, Math.max(0, y / COLLAPSE_RANGE));
       header.style.setProperty("--home-collapse", t.toFixed(3));
       if (t >= 0.88) header.setAttribute("data-collapsed", "true");
@@ -97,11 +102,13 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       if (raf) return;
       raf = requestAnimationFrame(apply);
     };
-    scrollers.forEach((node) => node.addEventListener("scroll", onScroll, { passive: true }));
+    if (useWindowScroll) window.addEventListener("scroll", onScroll, { passive: true });
+    else scrollers.forEach((node) => node.addEventListener("scroll", onScroll, { passive: true }));
     window.addEventListener("resize", measureSeat);
     apply();
     return () => {
-      scrollers.forEach((node) => node.removeEventListener("scroll", onScroll));
+      if (useWindowScroll) window.removeEventListener("scroll", onScroll);
+      else scrollers.forEach((node) => node.removeEventListener("scroll", onScroll));
       window.removeEventListener("resize", measureSeat);
       if (raf) cancelAnimationFrame(raf);
     };
@@ -156,16 +163,17 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             <Trophy size={17} strokeWidth={2.4} className="shrink-0" />
             <span className="hidden text-xs font-bold tracking-tight min-[430px]:inline">Leaderboard</span>
           </button>
-          {/* Quick shortcut to the FlowPath / task-planning dashboard (the same
-              page that opens on a long-press of the Home button). */}
+          {/* Profile shortcut — this slot used to hold the FlowPath "+"
+              button; FlowPath moved to the footer dock (former Profile slot)
+              and Profile now lives here in the header. */}
           <button
             type="button"
-            aria-label="Open FlowPath planning"
-            title="FlowPath planning"
-            onClick={() => { window.location.hash = "#/flowpath"; }}
+            aria-label="Open profile"
+            title="Profile"
+            onClick={() => { window.location.hash = "#/profile"; }}
             className="grid h-9 w-9 place-items-center rounded-xl border border-white/35 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition hover:bg-white/24 active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
           >
-            <Plus size={18} strokeWidth={2.6} />
+            <UserRound size={18} strokeWidth={2.4} />
           </button>
           <button
             type="button"

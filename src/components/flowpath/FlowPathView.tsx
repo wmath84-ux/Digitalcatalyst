@@ -539,7 +539,7 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
 
       <main
         ref={containerRef}
-        className="relative mx-auto w-full max-w-3xl px-4 pt-28 pb-44 sm:px-8 sm:pt-32"
+        className="relative mx-auto w-full max-w-3xl px-4 pt-6 pb-44 sm:px-8 sm:pt-8"
         style={{ minHeight: totalHeight }}
       >
         <Ribbon width={width} height={totalHeight} visibleChunks={visibleChunkPoints} theme={resolvedTheme} />

@@ -22,7 +22,9 @@ export function FlowPathHeader({
   });
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 flex justify-center px-3 pt-3 sm:px-6 sm:pt-4">
+    // In-flow (not fixed) so it sits just below the home-style greeting
+    // header that FlowPathApp pins on top, and scrolls away with content.
+    <header className="relative z-20 flex justify-center px-3 pt-4 sm:px-6 sm:pt-5">
       <motion.div
         initial={false}
         animate={{ opacity: 1, y: 0 }}

@@ -232,6 +232,22 @@ export function PlusIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/**
+ * FlowPath — a small workflow glyph (node → elbow connector → node) drawn in
+ * the same stroke style as the rest of the footer icons. Used by the main
+ * footer dock's FlowPath shortcut (which replaced the Profile tab; Profile
+ * now lives in the home header).
+ */
+export function FlowPathIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <rect x="3" y="3" width="7.5" height="7.5" rx="2" />
+      <circle cx="17.5" cy="17.5" r="3.5" />
+      <path d="M6.75 10.5v3.75a2 2 0 0 0 2 2H14" />
+    </svg>
+  );
+}
+
 export function FilterIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" {...base} {...props}>
