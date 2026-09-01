@@ -4491,6 +4491,14 @@ html[data-course-player-active="true"] {
    When the ACTUAL revision container is below 860 px, those pages re-flow to a
    single readable column (the shell still owns the scroll). */
 @container dc-rev (max-width: 859px) {
+  /* The dashboard needs the higher-specificity variant too: the desktop
+     grid rule targets `[data-revision-page-main] > [data-revision-page=
+     "dashboard"]` (0,3,0 + !important), which out-ranked the plain
+     (0,2,0) selector here — the parent stayed a 12-column grid while its
+     panels dropped to `grid-column: auto`, crushing every card into a
+     ~58 px strip on 960–1240 px windows (tablet landscape / small
+     desktop with the side rail). */
+  .dc-desktop-shell [data-revision-page-main] > [data-rev-layout="dashboard"],
   .dc-desktop-shell [data-rev-layout="dashboard"],
   .dc-desktop-shell [data-rev-layout="progress"],
   .dc-desktop-shell [data-rev-layout="weak"],
@@ -5949,4 +5957,51 @@ html[data-course-player-active="true"] {
     overflow-x: clip;
     max-width: 100%;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   REVISION IN THE DESKTOP SHELL — mobile-parity header overlay + frost
+   ══════════════════════════════════════════════════════════════════════
+   On a phone the revision headers are glass overlays: the page scroller
+   extends UP behind the chrome and carries the seat as padding, so cards
+   visibly frost through the header while scrolling. Inside the desktop
+   shell (the side-panel bands: >= 960 px and tablet landscape) the seat
+   was instead applied as padding-top on [data-desktop-content], which
+   parked the WHOLE revision frame below the absolute glass top bar — the
+   inner scroller clipped its cards at the bar's bottom edge, content
+   never passed underneath, and the top bar read as a flat opaque strip.
+   The desktop `padding: clamp(...) !important` shorthand also crushed the
+   AppHeader seat on sub-pages, hiding the first ~40px of content behind
+   the back-button header.
+
+   Mirror of the phone model (see the max-width:959px rules above):
+     • Tab pages (Dashboard / Weak Topics / Progress / Profile): the seat
+       moves INSIDE [data-revision-page-main], the shell body loses its
+       pad, and the scroller now runs up behind the glass top bar — cards
+       frost through it exactly like the phone header.
+     • Test Bank + AppHeader sub-pages: the shell body keeps the pad (its
+       sticky search rows and the absolute AppHeader are seated against
+       the scroller top, same as the phone, where the pad lives on
+       [data-revision-content]) — and sub-pages get their AppHeader seat
+       back so content starts below the back-button header and frosts
+       under it while scrolling.
+   Appended last on purpose: these fight `!important` band paddings, so
+   they need equal importance and a later cascade position. */
+.dc-desktop-shell [data-desktop-content]:has(> main [data-revision-app]):not(:has([data-revision-app-header])):not(:has([data-rev-bank-header])) {
+  padding-top: 0 !important;
+}
+.dc-desktop-shell [data-desktop-content]:has(> main [data-revision-app]):not(:has([data-revision-app-header])):not(:has([data-rev-bank-header])) [data-revision-page-main] {
+  padding-top: calc(var(--desktop-topbar-height) + clamp(12px, 1.2vw, 20px)) !important;
+  background-color: transparent;
+}
+.dc-desktop-shell [data-desktop-topbar][data-topbar-tabs] ~ [data-desktop-content]:has(> main [data-revision-app]):not(:has([data-revision-app-header])):not(:has([data-rev-bank-header])) [data-revision-page-main] {
+  padding-top: calc(var(--desktop-topbar-height) + 2.75rem + clamp(12px, 1.2vw, 20px)) !important;
+}
+
+/* Sub-pages (AI settings / generator / bulk import / player / results):
+   restore the AppHeader seat the desktop `padding` shorthand was eating,
+   so the page starts below the back-button glass bar and scrolls under
+   it with frost — the same overlay model the phone uses. */
+.dc-desktop-shell [data-page-enter-panel]:has(> [data-revision-app-header]) > [data-revision-page-main] {
+  padding-top: calc(var(--dc-revision-app-header-seat) + 12px) !important;
 }
