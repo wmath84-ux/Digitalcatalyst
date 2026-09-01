@@ -34,6 +34,7 @@ import NotificationsPage from "./components/NotificationsPage";
 import SearchPage from "./components/SearchPage";
 import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
+import GlassCommandPalette from "./components/GlassCommandPalette";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BrandingProvider, useBranding } from "./context/BrandingContext";
 import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
@@ -1246,6 +1247,11 @@ createRoot(document.getElementById("root")!).render(
           <CommerceProvider>
             <Root />
             <RenewalNotice />
+            {/* ⌘K palette (Wave 3). Mounted beside the banner host so one
+                instance survives navigation, and inside CatalogProvider because
+                it lists live catalogue titles. It steps aside on admin and
+                player routes and when `data-glass="off"`. */}
+            <GlassCommandPalette />
             <PortraitOnlyGuard />
           </CommerceProvider>
         </CatalogProvider>

@@ -1,6 +1,8 @@
 import { Heart, ShoppingCart, Star } from "lucide-react";
 import { Product } from "../types";
 import { formatINR } from "../utils/format";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { LiquidMetalButton } from "@/components/ui/LiquidMetalButton";
 
 interface FavoriteCardProps {
   product: Product;
@@ -22,8 +24,11 @@ export default function FavoriteCard({
   );
 
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-[1.7rem] border border-white/70 bg-white/62 shadow-[0_18px_42px_-24px_rgba(79,70,229,0.42)] backdrop-blur-xl">
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/35 via-transparent to-transparent" />
+    <GlassCard
+      tint={0.5}
+      contentClassName="p-0"
+      className="group relative flex flex-col overflow-hidden"
+    >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
         <button
           type="button"
@@ -75,26 +80,31 @@ export default function FavoriteCard({
           </span>
         </div>
         <div className="mt-2 flex items-center gap-2">
-          <button
+          {/* Both actions are glass buttons now, so they share one height and one
+              press. `disabled` is the pack's own dimming rather than a second
+              colour scheme — "In Cart" reads as an unavailable action, not as a
+              different kind of button. */}
+          <LiquidMetalButton
+            tone="silver"
+            className="flex-1"
+            aria-label={`Remove ${product.title} from favourites`}
             onClick={() => onRemove(product.id)}
-            className="flex-1 rounded-xl border border-slate-200 py-2 text-[11px] font-bold text-slate-500 transition active:scale-95"
           >
-            Remove
-          </button>
-          <button
-            onClick={() => !inCart && onAddToCart(product.id)}
+            <span className="text-[11px] font-bold">Remove</span>
+          </LiquidMetalButton>
+          <LiquidMetalButton
+            tone="primary"
+            className="flex-1"
             disabled={inCart}
-            className={`flex flex-1 items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
-              inCart
-                ? "bg-emerald-50 text-emerald-600"
-                : "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-indigo-200"
-            }`}
+            onClick={() => !inCart && onAddToCart(product.id)}
           >
-            <ShoppingCart size={13} />
-            {inCart ? "In Cart" : "Add"}
-          </button>
+            <span className="flex items-center gap-1 text-[11px] font-bold">
+              <ShoppingCart size={13} />
+              {inCart ? "In Cart" : "Add"}
+            </span>
+          </LiquidMetalButton>
         </div>
       </div>
-    </div>
+    </GlassCard>
   );
 }

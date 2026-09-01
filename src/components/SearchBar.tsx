@@ -1,4 +1,10 @@
 import { GlassSurface } from "@/components/ui/glass";
+import {
+  GlassSelect,
+  GlassSelectContent,
+  GlassSelectItem,
+  GlassSelectTrigger,
+} from "@/components/ui/glass-select";
 import { SearchIcon, XIcon } from "./icons";
 
 type SearchBarProps = {
@@ -83,20 +89,25 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
         </div>
       </div>
 
-      {/* The sort control is a native <select>: it becomes `glass-select` in
-          Wave 3, when the store screens are converted. */}
+      {/* Wave 3 (commerce): the sort control is `glass-select`. It is a listbox,
+          not a native select, so the ink for the trigger and the portaled panel
+          comes from `.dc-glass-select*` in src/glass.css; the option list keeps
+          the pack's own keyboard behaviour (Enter selects, Escape closes) and
+          `aria-haspopup="listbox"` / `role="option"` come from the item itself. */}
       <div className="flex justify-end">
-        <select
-          value={sort}
-          onChange={(e) => onSortChange(e.target.value)}
-          className="rounded-xl border border-white/70 bg-white/65 px-3 py-2 text-xs font-semibold text-slate-700 shadow-md shadow-indigo-200/40 backdrop-blur-md transition focus:outline-none focus:ring-2 focus:ring-indigo-300/50"
-        >
-          {SORT_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+        <GlassSelect value={sort} onValueChange={onSortChange}>
+          <GlassSelectTrigger
+            aria-label="Sort products"
+            className="dc-glass-select h-9 w-auto min-w-[11rem] text-xs font-bold"
+          />
+          <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Sort options">
+            {SORT_OPTIONS.map((option) => (
+              <GlassSelectItem key={option} value={option}>
+                {option}
+              </GlassSelectItem>
+            ))}
+          </GlassSelectContent>
+        </GlassSelect>
       </div>
     </div>
   );

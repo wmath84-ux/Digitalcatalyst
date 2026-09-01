@@ -234,3 +234,121 @@ html[data-glass="on"] :where(.dc-chrome-disc):hover > div[aria-hidden]:nth-of-ty
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Wave 3 · commerce ──────────────────────────────────────────────────── */
+
+/* Cards: `glass-card` paints a dark-page rim; on a white page the card needs a
+ * hairline + its own lift so the grid does not read as a sheet of nothing.
+ * `GlassCard` (src/components/ui/GlassCard.tsx) carries the hook class and
+ * re-inks the label colours with tailwind-merge, so only the rim is done here. */
+html[data-glass="on"] :where(.dc-glass-card) > div[aria-hidden]:nth-of-type(4) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(148, 163, 184, 0.22),
+    0 18px 42px -24px rgba(79, 70, 229, 0.42);
+}
+
+/* `glass-toggle-group` used as a LIGHT segmented control (the store filter row
+ * and the product page's tab strip — hence `dc-segment`): the pack's indicator is
+ * white on dark, so it becomes the app's indigo droplet and the unselected
+ * labels get re-inked. The `> div:last-child` step is the surface's content wrapper — the
+ * indicator lives inside it, which is why it still tracks a horizontally
+ * scrolled row. */
+html[data-glass="on"] .dc-segment > div:last-child > div[aria-hidden] {
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.92), rgba(124, 58, 237, 0.92)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 6px 16px -8px rgba(79, 70, 229, 0.55) !important;
+}
+
+html[data-glass="on"] .dc-segment [data-toggle] {
+  color: rgb(71 85 105); /* slate-600 */
+}
+
+html[data-glass="on"] .dc-segment [data-toggle]:hover {
+  color: rgb(15 23 42);
+}
+
+html[data-glass="on"] .dc-segment [data-toggle][aria-pressed="true"] {
+  color: #fff;
+}
+
+/* `glass-select`: the trigger is a plain button (not a surface), so its light
+ * ink is set here; the list is a portaled `GlassSurface` panel, so the options
+ * are re-inked against that. Both blocks are unlayered, which is what lets them
+ * beat the pack's utility classes without editing the vendored file. */
+html[data-glass="on"] .dc-glass-select {
+  border-color: rgba(226, 232, 240, 1);
+  background: rgba(255, 255, 255, 0.7);
+  color: rgb(30 41 59);
+  backdrop-filter: blur(10px) saturate(1.3);
+}
+
+html[data-glass="on"] .dc-glass-select:hover {
+  border-color: rgba(165, 180, 252, 1);
+}
+
+html[data-glass="on"] .dc-glass-select svg {
+  color: rgb(100 116 139);
+}
+
+html[data-glass="on"] .dc-glass-select-pop [role="option"] {
+  color: rgb(51 65 85);
+}
+
+html[data-glass="on"] .dc-glass-select-pop [role="option"]:hover,
+html[data-glass="on"] .dc-glass-select-pop [role="option"]:focus {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+html[data-glass="on"] .dc-glass-select-pop [role="option"][aria-selected="true"] {
+  color: rgb(67 56 202);
+  font-weight: 700;
+}
+
+html[data-glass="on"] .dc-glass-select-pop [role="option"] svg {
+  color: rgb(79 70 229);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The filter droplet still moves to the right chip, it just does not spring. */
+  html[data-glass="on"] .dc-segment > div:last-child > div[aria-hidden] {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Controls the pack ships for DARK pages that commerce puts on white: the
+ * unchecked box/dot and an unselected tile are `bg-white/[0.06]` with a white
+ * hairline, i.e. invisible on `bg-white`. Re-inked here — `:not([aria-checked])`
+ * so the pack's own accent-filled *checked* state (a utility class, and correct
+ * on light) is left completely alone. */
+html[data-glass="on"] :where(.dc-choice):not([aria-checked="true"]) {
+  border-color: rgb(203 213 225);
+  background-color: rgba(255, 255, 255, 0.72);
+}
+
+html[data-glass="on"] :where(.dc-choice):not([aria-checked="true"]):hover {
+  border-color: rgb(129 140 248);
+}
+
+html[data-glass="on"] :where(.dc-tile):not([data-selected]) {
+  border-color: rgb(226 232 240);
+  background-color: rgba(255, 255, 255, 0.55);
+}
+
+html[data-glass="on"] :where(.dc-tile):not([data-selected]):hover {
+  border-color: rgb(165 180 252);
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Selected swatches get the pack's white ring, which vanishes on a white page. */
+html[data-glass="on"] :where(.dc-swatch[aria-checked="true"]) {
+  --tw-ring-color: rgb(99 102 241);
+  --tw-ring-offset-color: #fff;
+}
+
+/* Accordions / sheets / menus used as light panels: the chevron and the label
+   hierarchy are re-inked, the frost + rim stay the pack's. */
+html[data-glass="on"] :where(.dc-panel) svg {
+  color: rgb(100 116 139);
+}

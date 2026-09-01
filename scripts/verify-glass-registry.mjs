@@ -73,6 +73,25 @@ const LOCAL_ADAPTATIONS = {
     ["  const rootRef = useRef<HTMLElement>(null);", "  const rootRef = useRef<HTMLDivElement>(null);"],
     ["  const El = Tag as React.ElementType;", '  const El = Tag as "div";'], // (comment lines are stripped by normalize)
   ],
+  // Wave 3 items: this tsconfig exposes no global `React` namespace, so the
+  // three items that spelled types as `React.X` import them explicitly. Nothing
+  // but the type reference changed.
+  "glass-dropdown-menu.tsx": [
+    ["  triggerRef: React.RefObject<HTMLButtonElement | null>;", "  triggerRef: RefObject<HTMLButtonElement | null>;"],
+    ["", "  type RefObject,"],
+  ],
+  "glass-select.tsx": [
+    ["  triggerRef: React.RefObject<HTMLButtonElement | null>;", "  triggerRef: RefObject<HTMLButtonElement | null>;"],
+    ["", "  type RefObject,"],
+  ],
+  "glass-sheet.tsx": [
+    ["        } as React.CSSProperties}", "        } as CSSProperties}"],
+    ["", "  type CSSProperties,"],
+  ],
+  "glass-command.tsx": [
+    ["  const onInputKey = (e: React.KeyboardEvent) => {", "  const onInputKey = (e: ReactKeyboardEvent) => {"],
+    ["", "  type KeyboardEvent as ReactKeyboardEvent,"],
+  ],
   "glass-motion.ts": [
     // upstream has no `previous()`; we expose the write-only field so
     // `noUnusedLocals` stays satisfied without deleting engine state.

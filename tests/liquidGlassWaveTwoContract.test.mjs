@@ -134,16 +134,24 @@ test("top-bar actions keep their data hook and gain disc + tooltip", () => {
   assert.match(topBarButton, /badge > 99 \? "99\+"/);
 });
 
-test("⌘K focuses the global search instead of pretending to be a palette", () => {
-  // `glass-command` is not vendored yet (Wave 3), so the shortcut must drive the
-  // real field. It also has to stay out of the way of text editing and obey the
-  // kill switch.
-  assert.match(shell, /\(event\.metaKey \|\| event\.ctrlKey\) && event\.key\.toLowerCase\(\) === "k"/);
-  assert.match(shell, /data-desktop-search/);
-  assert.match(shell, /field\.focus\(\);\s*field\.select\(\);/);
-  assert.match(shell, /event\.preventDefault\(\)/);
-  assert.match(shell, /isContentEditable/, "typing in the Flowpath editor must not lose the selection");
-  assert.match(shell, /dataset\.glass === "off"/, "the kill switch disables the new shortcut too");
+test("⌘K is owned by exactly one component — the registry palette", () => {
+  // Wave 2 shipped a focus-the-field stand-in because `glass-command` had not
+  // transferred yet. Wave 3 vendored it, so the stand-in is deleted rather than
+  // left running beside the real palette (two handlers on one key = a toggle that
+  // immediately re-opens, plus a doubled preventDefault).
+  assert.doesNotMatch(shell, /metaKey|ctrlKey/, "the shell must not bind ⌘K any more");
+  assert.match(shell, /GlassCommandPalette/, "…and must point at the component that does");
+  assert.match(shell, /data-desktop-search/, "the field the palette can be pointed at still exists");
+
+  const palette = read("src/components/GlassCommandPalette.tsx");
+  assert.match(palette, /<GlassCommand\b/, "the palette is the vendored item, not a hand-rolled dialog");
+  assert.match(palette, /shortcut=\{false\}/, "the wrapper keeps the key binding so the kill switch works");
+  assert.match(palette, /dataset\.glass !== "off"/);
+  assert.ok(palette.includes('startsWith("#/admin")'), "admin routes keep the browser's ⌘K");
+  assert.match(palette, /isTyping\(event\.target\)/, "⌘K inside a field selects its text, as users expect");
+  assert.match(palette, /GlassCommandEmpty/, "a filter with no matches says so");
+  assert.match(palette, /slice\(0, 24\)/, "the catalogue list is capped: hidden items are still mounted DOM");
+  assert.match(read("src/main.tsx"), /<GlassCommandPalette \/>/, "one instance, mounted next to the banner host");
 });
 
 test("the rail's quick-stats card is glass and its CTAs are the registry button", () => {
@@ -176,7 +184,11 @@ test("the store search keeps its public API and its tap-to-search contract", () 
   }
   assert.match(searchBar, /<GlassSurface\b/, "the ad-hoc white pill is replaced by the pack lens");
   assert.doesNotMatch(searchBar, /className="[^"]*bg-white\/60/, "no leftover ad-hoc frost on the capsule itself");
-  assert.match(searchBar, /<select\b/, "glass-select is Wave 3, so the native sort control stays");
+  // Wave 3 note: this used to assert the native <select> stayed. It no longer
+  // does — `glass-select` transferred, so the sort control is the registry
+  // listbox; the tap-target contract above is what has to survive.
+  assert.doesNotMatch(searchBar, /<select\b/, "the native sort select is gone");
+  assert.match(searchBar, /<GlassSelect\b/);
 });
 
 // ── light-chrome CSS + vendored files ────────────────────────────────────────

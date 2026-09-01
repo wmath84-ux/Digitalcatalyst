@@ -15,6 +15,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Glass, GlassLens, GlassSurface, useGlassDark } from "@/components/ui/glass";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassInput } from "@/components/ui/glass-input";
+import { GlassAccordion, GlassAccordionContent, GlassAccordionItem, GlassAccordionTrigger } from "@/components/ui/glass-accordion";
+import { GlassCard, GlassCardContent, GlassCardDescription, GlassCardFooter, GlassCardHeader, GlassCardTitle } from "@/components/ui/GlassCard";
+import { GlassCheckbox } from "@/components/ui/glass-checkbox";
+import { GlassDropdownContent, GlassDropdownItem, GlassDropdownLabel, GlassDropdownMenu, GlassDropdownTrigger } from "@/components/ui/glass-dropdown-menu";
+import { GlassRadio, GlassRadioGroup } from "@/components/ui/glass-radio";
+import { GlassSelect, GlassSelectContent, GlassSelectItem, GlassSelectTrigger } from "@/components/ui/glass-select";
+import { GlassSheet, GlassSheetClose, GlassSheetContent, GlassSheetDescription, GlassSheetTitle, GlassSheetTrigger } from "@/components/ui/glass-sheet";
+import { GlassSwatch, GlassSwatchGroup } from "@/components/ui/glass-swatch";
+import { GlassTile } from "@/components/ui/glass-tile";
+import { GlassToggleGroup, GlassToggleItem } from "@/components/ui/glass-toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -109,6 +119,14 @@ export default function GlassPreviewPage() {
   // Wave 1 = the shared primitives. These three pieces of state drive them, so
   // this sandbox is also the manual test for the wrappers every page reuses.
   const [query, setQuery] = useState("");
+  // Wave 3 · commerce controls are live here, so every one of them is a real
+  // controlled component rather than a screenshot of one.
+  const [commerceTab, setCommerceTab] = useState("overview");
+  const [commerceSort, setCommerceSort] = useState("recommended");
+  const [giftWrap, setGiftWrap] = useState(false);
+  const [plan, setPlan] = useState("monthly");
+  const [tile, setTile] = useState("notes");
+  const [swatch, setSwatch] = useState("indigo");
   const [railRow, setRailRow] = useState(0);
   const [tab, setTab] = useState("day");
   const [modalOpen, setModalOpen] = useState(false);
@@ -349,6 +367,121 @@ export default function GlassPreviewPage() {
                 <span className="relative text-[13px] font-bold">{label}</span>
               </button>
             ))}
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur-xl">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">Wave 3 · commerce</h2>
+            <p className="text-[11px] font-semibold text-slate-400">press ⌘K / Ctrl+K — the palette is mounted app-wide</p>
+          </header>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <GlassCard tint={0.55} contentClassName="p-0" className="overflow-hidden">
+              <div className="relative aspect-[16/9] bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500">
+                <GlassCardHeader className="absolute bottom-0 w-full p-4">
+                  <GlassCardTitle className="text-white">UX Research Sprint</GlassCardTitle>
+                  <GlassCardDescription className="text-white/80">the card is `glass-card`; the media stays edge-to-edge</GlassCardDescription>
+                </GlassCardHeader>
+              </div>
+              <div className="p-4">
+                <GlassCardContent>
+                  Cart and favourite cards use this same wrapper, so the store grid, `#/favorites` and `#/cart` share one surface.
+                </GlassCardContent>
+                <GlassCardFooter>
+                  <LiquidMetalButton tone="primary" className="flex-1"><span className="text-[12px] font-bold">Add to cart</span></LiquidMetalButton>
+                  <GlassDropdownMenu>
+                    <GlassDropdownTrigger className="rounded-full border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">
+                      More
+                    </GlassDropdownTrigger>
+                    <GlassDropdownContent tint={0.92} className="dc-panel w-48">
+                      <GlassDropdownLabel>Save for later</GlassDropdownLabel>
+                      <GlassDropdownItem>Add to favourites</GlassDropdownItem>
+                      <GlassDropdownItem>Share</GlassDropdownItem>
+                    </GlassDropdownContent>
+                  </GlassDropdownMenu>
+                </GlassCardFooter>
+              </div>
+            </GlassCard>
+
+            <div className="flex flex-col gap-3">
+              <GlassToggleGroup className="dc-segment" tint={0.5} value={commerceTab} onValueChange={setCommerceTab} aria-label="Product sections">
+                {["overview", "curriculum", "instructor"].map((id) => (
+                  <GlassToggleItem key={id} value={id} className="px-3 py-2 text-xs font-semibold capitalize">{id}</GlassToggleItem>
+                ))}
+              </GlassToggleGroup>
+              <p className="text-[11px] font-semibold text-slate-500">
+                the store filter row and the product page tab strip are this control · selected: <strong>{commerceTab}</strong>
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <GlassSelect value={commerceSort} onValueChange={setCommerceSort}>
+                  <GlassSelectTrigger aria-label="Sort" className="dc-glass-select h-9 w-auto min-w-[11rem] text-xs font-bold" />
+                  <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Sort options">
+                    {["recommended", "price-low", "top-rated"].map((id) => (
+                      <GlassSelectItem key={id} value={id}>{id}</GlassSelectItem>
+                    ))}
+                  </GlassSelectContent>
+                </GlassSelect>
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                  <GlassCheckbox className="dc-choice" ariaLabel="Gift wrap" checked={giftWrap} onCheckedChange={setGiftWrap} />
+                  Gift wrap
+                </label>
+              </div>
+
+              <GlassRadioGroup value={plan} onValueChange={setPlan} aria-label="Plan" className="gap-2">
+                {["monthly", "annual"].map((id) => (
+                  <label key={id} className="flex items-center gap-2 text-xs font-bold capitalize text-slate-600">
+                    <GlassRadio className="dc-choice" value={id} ariaLabel={id} />
+                    {id}
+                  </label>
+                ))}
+              </GlassRadioGroup>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex gap-2">
+                  {(["notes", "videos", "mocks"] as const).map((id) => (
+                    <GlassTile key={id} className="dc-tile size-16 aspect-auto text-[10px] font-bold capitalize" selected={tile === id} onClick={() => setTile(id)}>
+                      {id}
+                    </GlassTile>
+                  ))}
+                </div>
+                <GlassSwatchGroup value={swatch} onValueChange={setSwatch} aria-label="Accent">
+                  {[["indigo", "#6366f1"], ["teal", "#14b8a6"], ["rose", "#f43f5e"]].map(([id, color]) => (
+                    <GlassSwatch key={id} className="dc-swatch" color={color} value={id} title={id} size={26} />
+                  ))}
+                </GlassSwatchGroup>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <GlassAccordion defaultValue={["refund"]} tint={0.55} className="dc-panel text-slate-900" aria-label="Course FAQ">
+              {[
+                ["refund", "Refund window", "14 days, no questions — the accordion body animates with the pack's grid-rows transition."],
+                ["certificate", "Certificate", "Issued per module completion and downloadable from your library."],
+              ].map(([id, title, body]) => (
+                <GlassAccordionItem key={id} value={id}>
+                  <GlassAccordionTrigger className="text-sm font-bold text-slate-800">{title}</GlassAccordionTrigger>
+                  <GlassAccordionContent className="text-slate-600">{body}</GlassAccordionContent>
+                </GlassAccordionItem>
+              ))}
+            </GlassAccordion>
+
+            <GlassSheet>
+              <div className="flex h-full flex-col items-start justify-center gap-2 rounded-2xl border border-slate-200/70 bg-white/60 p-4">
+                <p className="text-xs font-semibold text-slate-500">Mobile filters and the coupon drawer are a sheet — portaled, Escape + scrim dismiss, body scroll lock.</p>
+                <GlassSheetTrigger className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">Open filters sheet</GlassSheetTrigger>
+              </div>
+              <GlassSheetContent side="right" tint={0.86} className="dc-panel text-slate-900">
+                <GlassSheetTitle className="text-slate-900">Refine</GlassSheetTitle>
+                <GlassSheetDescription className="text-slate-500">Same controls, drawer-shaped.</GlassSheetDescription>
+                <div className="mt-4 flex gap-2">
+                  <LiquidMetalButton tone="silver" className="w-28"><span className="text-xs font-bold">Reset</span></LiquidMetalButton>
+                  <GlassSheetClose className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white">Done</GlassSheetClose>
+                </div>
+              </GlassSheetContent>
+            </GlassSheet>
           </div>
         </section>
 

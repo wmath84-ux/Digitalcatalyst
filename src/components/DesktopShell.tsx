@@ -284,38 +284,9 @@ export default function DesktopShell({
     }
   }, [query]);
 
-  // ⌘K / Ctrl+K focuses (and pre-selects) the global search field — the
-  // keyboard affordance the pack's `glass-command` palette would normally own.
-  // That registry item is still unretrieved in this repo, so Wave 2 ships the
-  // shortcut against the real input instead of a half-wired palette; when
-  // `glass-command` lands in Wave 3 this handler becomes its opener.
-  //
-  // Skipped while the learner is already inside a field (so ⌘K keeps working
-  // in the Flowpath editor) and while glass is off (kill switch = no new
-  // behaviour at all).
-  useEffect(() => {
-    if (!onSearch) return undefined;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        if (document.documentElement.dataset.glass === "off") return;
-        const from = event.target as HTMLElement | null;
-        const typing =
-          !!from &&
-          (from.tagName === "INPUT" ||
-            from.tagName === "TEXTAREA" ||
-            from.tagName === "SELECT" ||
-            from.isContentEditable);
-        if (typing) return;
-        const field = document.querySelector<HTMLInputElement>("[data-desktop-search]");
-        if (!field) return;
-        event.preventDefault();
-        field.focus();
-        field.select();
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onSearch]);
+  // ⌘K is owned by <GlassCommandPalette/> (src/components/GlassCommandPalette.tsx),
+  // mounted once in main.tsx — Wave 2 shipped a focus-the-field stand-in here and
+  // the real registry palette replaced it, so the shortcut has exactly one owner.
 
   const handleNavigate = useCallback((hash: string) => {
     // Use the same hash protocol as the rest of the app so all
