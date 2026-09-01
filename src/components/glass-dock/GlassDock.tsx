@@ -150,12 +150,10 @@ function DockItem({
           width: size,
           height: size,
           y,
-          background: active ? `${GLASS_ACCENT}33` : 'rgba(255,255,255,0.16)',
-          border: active ? `1px solid ${GLASS_ACCENT}66` : '1px solid rgba(255,255,255,0.38)',
+          background: active ? `${GLASS_ACCENT}28` : 'transparent',
+          border: active ? `1px solid ${GLASS_ACCENT}66` : '1px solid transparent',
           borderRadius: GLASS_PILL_RADIUS,
-          boxShadow: active
-            ? `0 0 16px ${GLASS_ACCENT}55, inset 0 1px 1px rgba(255,255,255,0.7)`
-            : 'inset 0 1px 1px rgba(255,255,255,0.7)',
+          boxShadow: active ? `0 0 16px ${GLASS_ACCENT}55` : 'none',
         }}
         whileTap={{ scale: 0.82 }}
         className={`relative flex items-center justify-center select-none ${buttonProps?.className ?? ''}`}
@@ -225,8 +223,8 @@ export default function GlassDock({
       style={{
         touchAction: 'none',
         borderRadius: GLASS_RADIUS,
-        boxShadow:
-          'inset 0 1px 1px rgba(255,255,255,0.9), inset 0 0 0 1px rgba(255,255,255,0.4), 0 14px 38px -12px rgba(0,0,0,0.28)',
+        background: 'transparent',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35), 0 10px 28px -12px rgba(0,0,0,0.18)',
       }}
       data-glass-dock=""
       data-site-footer={siteFooter ? '' : undefined}

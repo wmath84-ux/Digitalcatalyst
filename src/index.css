@@ -5354,14 +5354,13 @@ html[data-course-player-active="true"] {
 /* ══════════════════════════════════════════════════════════════════════
    GLASS DOCK — macOS-style magnifying footer on mobile + tablet
    ══════════════════════════════════════════════════════════════════════
-   The capsule hugs its icons in the original in-flow footer slot — no
-   full-width white strip, no height:0 overlay (that overlay left a blank
-   band and shifted content up). Frost / tint / blur / refraction live on
-   the GlassMaterial layer (WebsiteGlass numbers: radius 20, strength
-   0.28, frost 0.3, tint 0.15, blur 4.4px). Nearby icons scale
-   (MAG_SCALE 1.55) and lift (−12 px). The tablet `* { max-width: 100% }`
-   pass would freeze that spring width, so the dock and every child opt
-   out. Overflow stays visible so the lift + tooltip are not clipped. */
+   The capsule hugs its icons. The wrapping nav is an overlay (not an
+   in-flow slot) so the page paints under the dock — that is what lets
+   frost actually frost, instead of sampling a reserved white band.
+   Scrollers keep a padding-bottom equal to the old footer height so
+   content does not jump up. Nearby icons scale (MAG_SCALE 1.55) and
+   lift (−12 px). The tablet `* { max-width: 100% }` pass would freeze
+   that spring width, so the dock and every child opt out. */
 [data-glass-dock],
 [data-glass-dock] * {
   max-width: none !important;
@@ -5369,6 +5368,7 @@ html[data-course-player-active="true"] {
 
 [data-glass-dock] {
   overflow: visible;
+  isolation: isolate;
   background: transparent !important;
 }
 
@@ -5383,6 +5383,27 @@ html[data-course-player-active="true"] {
   width: max-content;
   max-width: 100%;
   margin-inline: auto;
+}
+
+/* Overlay footer: the frame (or revision column) is the containing
+   block, so the dock sits on the page instead of occupying a white
+   strip. Padding on the scroller replaces the space sticky used to
+   take, so the last items stay reachable — and only on bands where
+   the dock is actually visible (not desktop / tablet-landscape). */
+[data-app-frame]:has(> [data-site-footer-nav]),
+[data-revision-content]:has(> [data-site-footer-nav]) {
+  position: relative;
+}
+@media (max-width: 959px) {
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-footer-nav]) > main {
+    padding-bottom: 5.75rem;
+  }
+}
+@media (max-width: 767px) {
+  [data-app-frame]:has(> [data-site-footer-nav]) [data-myday-content] > main,
+  [data-revision-content]:has(> [data-site-footer-nav]) > [data-revision-page-main] {
+    padding-bottom: 5.75rem;
+  }
 }
 
 /* Desktop / tablet-landscape shell only: a thin transparent hit line

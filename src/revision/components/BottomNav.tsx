@@ -62,7 +62,7 @@ export default function BottomNav({ route }: { route: string }) {
     // (src/components/ui/PageTabs.tsx). Below 768 px nothing changes.
     <nav
       data-site-footer-nav
-      className="pointer-events-none sticky bottom-0 z-30 w-full overflow-visible px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 md:hidden"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 w-full overflow-visible px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 md:hidden"
       aria-label="Bottom navigation"
     >
       <div data-site-footer className="pointer-events-auto mx-auto w-max max-w-full">

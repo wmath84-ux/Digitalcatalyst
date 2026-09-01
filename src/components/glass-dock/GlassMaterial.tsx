@@ -1,17 +1,15 @@
 'use client'
 
 /**
- * WebsiteGlass lens chrome for our MAG dock.
+ * WebsiteGlass lens chrome for our MAG dock — look only, no extra bar.
  *
- * Visual knobs are copied from websiteglass GlassDock defaults:
+ * Defaults from websiteglass GlassDock:
  *   radius 20 · strength 0.28 · frost 0.3
  *   tint = min(0.5, frost * 0.5) = 0.15
  *   blur = 2 + frost * 8 = 4.4
- *   accent #38bdf8 · tint colour 255,255,255 (light)
  *
- * Chromium gets SVG feDisplacementMap rim refraction via backdrop-filter;
- * other engines fall back to the same frost/tint/sheen without the bend.
- * This is look-only — MAG animation lives in GlassDock.
+ * No opaque white fill. The dock stays see-through; Chromium gets rim
+ * refraction, everyone else gets frost blur on whatever is behind.
  */
 
 import { useEffect, useId, useRef, useState } from 'react'
@@ -138,10 +136,15 @@ export default function GlassMaterial({
   const backdrop =
     supported && map
       ? `url(#${filterId}) blur(${blur}px) saturate(1.6)`
-      : `blur(${Math.max(blur, 8)}px) saturate(1.6)`
+      : `blur(${Math.max(blur, 12)}px) saturate(1.6)`
 
   return (
-    <div ref={rootRef} className="pointer-events-none absolute inset-0 z-0 overflow-hidden" style={{ borderRadius: radius }} aria-hidden>
+    <div
+      ref={rootRef}
+      className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+      style={{ borderRadius: radius }}
+      aria-hidden
+    >
       {supported && map && (
         <svg width="0" height="0" className="absolute">
           <filter id={filterId} x="-8%" y="-8%" width="116%" height="116%" colorInterpolationFilters="sRGB">
@@ -154,23 +157,9 @@ export default function GlassMaterial({
         className="absolute inset-0"
         style={{
           borderRadius: radius,
+          background: `linear-gradient(165deg, rgba(186,230,253,${0.12 + tint * 0.2}), rgba(255,255,255,${tint * 0.1}) 42%, rgba(196,181,253,${0.1 + tint * 0.16}))`,
           backdropFilter: backdrop,
           WebkitBackdropFilter: backdrop,
-        }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          borderRadius: radius,
-          background: `rgba(${GLASS_TINT_RGB},${tint * 0.42})`,
-        }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          borderRadius: radius,
-          background:
-            'linear-gradient(135deg, rgba(255,255,255,0.32) 0%, transparent 38%, transparent 62%, rgba(255,255,255,0.14) 100%)',
         }}
       />
     </div>

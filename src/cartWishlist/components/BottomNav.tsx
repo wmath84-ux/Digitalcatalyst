@@ -57,7 +57,7 @@ export default function BottomNav({
   return (
     <nav
       data-site-footer-nav
-      className="pointer-events-none sticky bottom-0 z-30 w-full overflow-visible px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 md:px-6"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 w-full overflow-visible px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 md:px-6"
       aria-label="Cart and wishlist"
     >
       <div data-site-footer className="pointer-events-auto mx-auto w-max max-w-full">
