@@ -5,6 +5,11 @@ import { db } from "../firebase";
 import "@xyflow/react/dist/style.css";
 import "./index.css";
 import "./landing.css";
+// Liquid Glass v2 — the "Black Ice" palette tokens + the fixed backdrop layer.
+// Imported before glass.css so the component ink rules there win any tie.
+// Inert unless src/lib/glass.ts sets html[data-glass="on"], and admin is forced
+// to `off`, so this never leaks into the admin surface.
+import "./glass-theme.css";
 // Liquid Glass material layer (website-glass). Inert until
 // src/lib/glass.ts applies a tier to <html>; see docs/liquid-glass-rollout-plan.md.
 import "./glass.css";

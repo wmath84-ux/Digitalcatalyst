@@ -341,6 +341,7 @@ bash run_tests.sh 2>&1 | grep -E "^not ok|^# (tests|pass|fail)"   # expect the s
 npm run build                                              # expect ok
 grep -c "oklch(" dist/index.html                           # expect 0 — hard gate
 grep -c "in oklab" dist/index.html                         # expect ≤ the recorded ceiling
+node scripts/verify-backdrop.mjs                           # Wave 1+: §2 paint + invariants
 git diff --stat -- src/components/BottomNav.tsx src/components/glass-dock src/admin src/components/admin
                                                            # expect EMPTY, every wave, no exceptions
 node scripts/glass-coverage.mjs                            # expect: bare counts down, never up

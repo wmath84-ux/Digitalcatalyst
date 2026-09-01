@@ -1,0 +1,243 @@
+/*
+ * Liquid Glass v2 — "Black Ice" theme tokens + the fixed backdrop.
+ *
+ * This file is the single source of truth for the v2 palette. Everything here
+ * is sampled from the owner's reference screenshot; the numbers are recorded in
+ * docs/liquid-glass-v2-brief.md §2 (region table) and §3 (palette rule).
+ *
+ * Three rules govern this file:
+ *
+ *   1. THE BACKDROP IS THE DESIGN. It is one fixed layer, painted entirely by
+ *      soft radial gradients. Blur comes from the gradients' own falloff —
+ *      there is no filter, no backdrop-filter and no @keyframes on this layer,
+ *      and `scripts/glass-coverage.mjs` fails the build if one ever appears.
+ *
+ *   2. FALLBACK-FIRST (brief §3a). Every enhancement declaration is preceded
+ *      by a plain one, so an engine that drops the enhancement degrades to a
+ *      solid colour instead of losing the surface. No interpolation keyword
+ *      (`in oklab` / `in oklch`) is written by hand anywhere in this file.
+ *
+ *   3. `background-attachment: fixed` is never used — it is broken on iOS
+ *      Safari. The layer is a real fixed-position element instead.
+ *
+ * Inert unless `html[data-glass="on"]` (see src/lib/glass.ts), so `?glass=off`
+ * still renders the pre-rollout paint, and admin — which main.tsx forces to
+ * `off` — never sees any of it.
+ */
+
+:root {
+  /* ── §2 backdrop palette ──────────────────────────────────────────────────
+     Stored as bare channels so each gradient stop can carry its own alpha via
+     `rgb(var(--…) / a)`. Sampled from the reference screenshot; positions are
+     % of the viewport and the layer is fixed, so they do not move on scroll. */
+  --dc-bd-base: #0a0c12;            /* blue-biased near-black. Never #000. */
+  --dc-bd-vignette: 6 7 12;         /* deep shade, bottom + corners */
+  --dc-bd-blue-core: 44 53 126;     /* #2c357e — dominant glow, top-left */
+  --dc-bd-blue-hot: 37 48 143;      /* #25308f — hot point inside it */
+  --dc-bd-teal-core: 18 117 106;    /* #12756a — the only green in the design */
+  --dc-bd-teal-deep: 15 95 87;      /* #0f5f57 */
+  --dc-bd-violet-bridge: 58 33 89;  /* #3a2159 — makes blue→purple continuous */
+  --dc-bd-purple-core: 109 33 132;  /* #6d2184 — brightest chroma on the page */
+  --dc-bd-purple-hot: 122 36 136;   /* #7a2488 — nothing may be brighter */
+
+  /* ── §3 palette rule: black + white + at most 2–3 accents ─────────────────
+     Ink on paper and paper on ink are never pure, because pure black on white
+     glass and pure white on this backdrop both halate on cheap panels. */
+  --dc-ink-on-paper: #0b0d12;
+  --dc-paper-on-ink: 255 255 255;   /* used at 0.92, never 1 */
+  --dc-paper-on-ink-alpha: 0.92;
+
+  /* Accents: indigo is already the app's brand ring; emerald is success/paid.
+     The backdrop's own teal and purple are the only other colours allowed. */
+  --dc-accent-indigo: 79 70 229;    /* indigo-600 */
+  --dc-accent-indigo-deep: 67 56 202;
+  --dc-accent-violet: 124 58 237;   /* violet-600 */
+  --dc-accent-fuchsia: 192 38 211;  /* fuchsia-600 */
+  --dc-accent-emerald: 5 150 105;   /* emerald-600 */
+  --dc-accent-emerald-lite: 16 185 129;
+
+  /* ── z-index scale (brief §4) ─────────────────────────────────────────────
+     One documented ladder, reused instead of renumbered. Nothing inside
+     src/components/BottomNav.tsx is touched by it. */
+  --dc-z-backdrop: -1;      /* the fixed gradient — never 0, never isolated */
+  --dc-z-content: 0;
+  --dc-z-sticky: 20;
+  --dc-z-chrome: 40;        /* fixed header / footer / dock */
+  --dc-z-overlay: 60;       /* sheets, popovers, command palette */
+  --dc-z-dialog: 80;        /* modal dialogs + their scrim */
+  --dc-z-toast: 90;         /* always above a dialog that triggered it */
+}
+
+/* ══ THE BACKDROP ═══════════════════════════════════════════════════════════
+   The whole component's paint. Five huge, soft radial glows over a near-black
+   base; each spans 45–70% of the viewport with a long falloff tail, which is
+   where the "blur" actually comes from. Luminance stays low and even so the
+   glass cards still read as glass — nothing here is brighter than the purple
+   core.
+   ════════════════════════════════════════════════════════════════════════ */
+
+.dc-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: var(--dc-z-backdrop);
+  pointer-events: none;
+  /* 1. plain fallback — always survives */
+  background-color: var(--dc-bd-base);
+  /* 2. enhancement — the first listed layer paints on top */
+  background-image:
+    radial-gradient(58% 72% at 12% 30%, rgb(var(--dc-bd-blue-core) / 0.95) 0%, rgb(var(--dc-bd-blue-hot) / 0.42) 38%, transparent 68%),
+    radial-gradient(52% 60% at 40% 80%, rgb(var(--dc-bd-teal-core) / 0.72) 0%, rgb(var(--dc-bd-teal-deep) / 0.3) 40%, transparent 70%),
+    radial-gradient(46% 56% at 90% 15%, rgb(var(--dc-bd-purple-core) / 0.8) 0%, rgb(var(--dc-bd-purple-hot) / 0.34) 42%, transparent 72%),
+    radial-gradient(70% 40% at 45% 5%, rgb(var(--dc-bd-violet-bridge) / 0.6) 0%, transparent 70%),
+    radial-gradient(120% 90% at 50% 100%, rgb(var(--dc-bd-vignette) / 0.85) 0%, transparent 55%);
+  /* NO filter. NO backdrop-filter. NO @keyframes. NO !important. Ever. */
+}
+
+html[data-glass="on"] .dc-backdrop {
+  display: block;
+}
+
+/* ── Dither overlay ──────────────────────────────────────────────────────────
+   Large soft gradients band badly on old LCD panels. A static feTurbulence
+   tile at 3.5% breaks the steps up. It is its own fixed layer above the
+   gradient, it never animates, and it is never a `filter:` on scrolling
+   content. Inlined as a data URI (306 bytes) so the single-file build stays
+   self-contained and there is no asset path to deploy. ──────────────────── */
+.dc-grain {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: var(--dc-z-backdrop);
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
+  background-repeat: repeat;
+  background-size: 180px 180px;
+}
+
+html[data-glass="on"] .dc-grain {
+  display: block;
+}
+
+/* ── Gamut probe ─────────────────────────────────────────────────────────────
+   "Har device pe same colour", precisely. Wide gamut is a bonus and never a
+   requirement: the sRGB declaration above is the fallback and is written
+   first, so a device that fails either probe simply keeps it.
+
+   (The brief sketched this as `@supports (color: color-gamut: srgb)`, which is
+   a media feature rather than a colour and would never match — the working
+   probe for a wide-gamut display is `color(display-p3 …)` support.) ─────── */
+@supports (color: color(display-p3 1 0 0)) {
+  @media (color-gamut: p3) {
+    .dc-backdrop {
+      /* Same palette, expressed in the panel's own gamut so the purple core
+         keeps its chroma instead of being clipped on the way to sRGB. */
+      background-image:
+        radial-gradient(58% 72% at 12% 30%, color(display-p3 0.173 0.208 0.494 / 0.95) 0%, color(display-p3 0.145 0.188 0.561 / 0.42) 38%, transparent 68%),
+        radial-gradient(52% 60% at 40% 80%, color(display-p3 0.071 0.459 0.416 / 0.72) 0%, color(display-p3 0.059 0.373 0.341 / 0.3) 40%, transparent 70%),
+        radial-gradient(46% 56% at 90% 15%, color(display-p3 0.427 0.129 0.518 / 0.8) 0%, color(display-p3 0.478 0.141 0.533 / 0.34) 42%, transparent 72%),
+        radial-gradient(70% 40% at 45% 5%, color(display-p3 0.227 0.129 0.349 / 0.6) 0%, transparent 70%),
+        radial-gradient(120% 90% at 50% 100%, color(display-p3 0.024 0.027 0.047 / 0.85) 0%, transparent 55%);
+    }
+  }
+}
+
+/* Flat sRGB fallback — the same palette, no widening. Restated explicitly so
+   that if a later wave widens the base declaration, sRGB devices are pinned
+   to the sampled values and still look intentional. */
+@media (color-gamut: srgb) {
+  .dc-backdrop {
+    background-color: #0a0c12;
+    background-image:
+      radial-gradient(58% 72% at 12% 30%, rgba(44, 53, 126, 0.95) 0%, rgba(37, 48, 143, 0.42) 38%, transparent 68%),
+      radial-gradient(52% 60% at 40% 80%, rgba(18, 117, 106, 0.72) 0%, rgba(15, 95, 87, 0.3) 40%, transparent 70%),
+      radial-gradient(46% 56% at 90% 15%, rgba(109, 33, 132, 0.8) 0%, rgba(122, 36, 136, 0.34) 42%, transparent 72%),
+      radial-gradient(70% 40% at 45% 5%, rgba(58, 33, 89, 0.6) 0%, transparent 70%),
+      radial-gradient(120% 90% at 50% 100%, rgba(6, 7, 12, 0.85) 0%, transparent 55%);
+  }
+}
+
+/* ══ LETTING THE BACKDROP THROUGH ════════════════════════════════════════════
+   `src/index.css` paints `html, body, #root { background-color: #ffffff }`.
+   The root element's background is propagated to the canvas and painted below
+   everything, so it is harmless — but `body` and `#root` are real boxes, and
+   an in-flow background paints *above* negative z-index content. Left white,
+   they would hide the backdrop completely.
+
+   Both go transparent when glass is on. `html` keeps its white so the canvas
+   behind the backdrop is still opaque (and so `?glass=off` is byte-identical
+   to the pre-rollout paint). Admin never reaches this: main.tsx forces its
+   tier to `off`.
+   ════════════════════════════════════════════════════════════════════════ */
+
+html[data-glass="on"] body,
+html[data-glass="on"] #root {
+  background-color: transparent;
+}
+
+/* The desktop shell's page wash is the same story: a light grey plate that
+   would sit on top of the backdrop. The rail and the content cards keep their
+   own paint — re-inking those is Wave 2 and Wave 3, not here. */
+html[data-glass="on"] .dc-desktop-shell {
+  background-color: transparent;
+}
+
+/* ══ IDENTITY GRADIENTS ══════════════════════════════════════════════════════
+   The three gradient families that are identity rather than decoration, so
+   they survive the Wave 3–5 purge of `bg-gradient-to-*`. Each is written
+   fallback-first: a solid `background-color` that always survives, then a
+   `linear-gradient()` with NO interpolation keyword — an engine without
+   gradient colour-space interpolation drops the gradient and keeps the solid.
+
+   Not yet wired up. The elements that carry these are pinned by contract
+   tests (`liquidGlassWaveSixContract` asserts the `.dc-quote` class string;
+   `storeFiltersAdminProductContract` and `profilePlanGlowContract` assert
+   `from-indigo-600 via-violet-600 to-fuchsia-600`), so the swap lands with
+   the wave that owns each surface, together with its contract update.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Brand CTA — the primary buy/subscribe action. */
+.dc-cta-brand {
+  background-color: rgb(var(--dc-accent-indigo));
+  background-image: linear-gradient(
+    90deg,
+    rgb(var(--dc-accent-indigo)) 0%,
+    rgb(var(--dc-accent-violet)) 52%,
+    rgb(var(--dc-accent-fuchsia)) 100%
+  );
+}
+
+/* Checkout amount card — the "total payable" plate. */
+.dc-amount-card {
+  background-color: rgb(var(--dc-accent-indigo-deep));
+  background-image: linear-gradient(
+    135deg,
+    rgb(var(--dc-accent-indigo)) 0%,
+    rgb(var(--dc-accent-violet)) 100%
+  );
+}
+
+/* Success / paid confirmation. */
+.dc-cta-paid {
+  background-color: rgb(var(--dc-accent-emerald));
+  background-image: linear-gradient(
+    90deg,
+    rgb(var(--dc-accent-emerald)) 0%,
+    rgb(var(--dc-accent-emerald-lite)) 100%
+  );
+}
+
+/* Provider marks. `meta.gradient` is data-driven (it comes off the provider
+   record, not a stylesheet), so it cannot be tokenised here — this is the
+   documented exception, and this neutral plate is its fallback-first base so
+   a provider whose gradient is missing still renders a legible mark. */
+.dc-provider-mark {
+  background-color: rgb(var(--dc-accent-indigo));
+  background-image: linear-gradient(
+    135deg,
+    rgb(var(--dc-accent-indigo)) 0%,
+    rgb(var(--dc-accent-violet)) 100%
+  );
+}

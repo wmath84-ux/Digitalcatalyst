@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FlowPathView } from "./components/flowpath/FlowPathView";
 import Header from "./home/components/Header";
+import { GlassBackdrop } from "./components/ui/GlassBackdrop";
 import { useAuth } from "./context/AuthContext";
 
 interface FlowPathAppProps {
@@ -34,6 +35,13 @@ export default function FlowPathApp({
 
   return (
     <div className="flowpath-app relative min-h-screen bg-[var(--fp-bg-0)] text-fp-text">
+      {/* Black Ice backdrop. Mounted per the v2 brief; it sits BEHIND
+          FlowPath's own opaque themed paint (bg-[var(--fp-bg-0)]) and so is
+          inert until Wave 4 decides what FlowPath does with it. The theme is
+          deliberately untouched here — flowpath/hooks/useTheme.ts owns
+          data-theme on <html> and a forced dark layer broke its light theme
+          in a previous rollout. */}
+      <GlassBackdrop />
       {/* ambient dimensional background. Fixed on the standalone page;
           inside the desktop shell a CSS override re-anchors it to the
           page column (absolute) so the dark canvas never bleeds over

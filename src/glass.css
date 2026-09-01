@@ -63,6 +63,44 @@ html[data-glass="lite"] {
   --glass-strength-panel: 0.1;
 }
 
+/* ── flat tier (Liquid Glass v2): zero live blur ANYWHERE ────────────────────
+   `flat` keeps every shape, tint and rim but strips backdrop-filter from the
+   whole document — pack surfaces, the app's own `backdrop-blur-*` utilities,
+   everything. It is what `?glass=flat` and `prefers-reduced-transparency:
+   reduce` resolve to.
+
+   Document-wide rather than limited to `[data-glass-surface]` on purpose: most
+   of the live blur in this app today is hand-written Tailwind, not pack
+   surfaces, so a tier that only silenced the pack would not honour the
+   request. The Black Ice backdrop is unaffected — it carries no blur by
+   design — so `flat` still gets the full v2 background.
+
+   Universal selector + !important is deliberate: a kill switch has to beat
+   every utility, and it only ever matches while flat is active. ──────────── */
+html[data-glass-tier="flat"] :where(*) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ── z-index scale (Liquid Glass v2, brief §4) ───────────────────────────────
+   One documented ladder. The tokens live in src/glass-theme.css next to the
+   palette they belong to:
+
+     --dc-z-backdrop  -1   the fixed Black Ice layer. Never 0, and never its
+                           own isolation context — it has to sit behind the
+                           page, not merely behind its siblings.
+     --dc-z-content    0   ordinary page content
+     --dc-z-sticky    20   in-flow sticky headers inside a scroller
+     --dc-z-chrome    40   the fixed header / footer / dock
+     --dc-z-overlay   60   sheets, popovers, command palette
+     --dc-z-dialog    80   modal dialogs and their scrim
+     --dc-z-toast     90   above a dialog that triggered it
+
+   Reuse these instead of inventing a number. The 28 existing `fixed inset-0`
+   overlays still carry their scattered `z-[50]`…`z-[9999]` values; they move
+   onto this ladder as each surface is reworked in Waves 2–6. Nothing inside
+   src/components/BottomNav.tsx is renumbered — that file is frozen. ──────── */
+
 /* ── focus: a lens has no border of its own, so the ring is the only reliable
  *    keyboard affordance. Applied to whatever the component renders as the
  *    focusable node. ───────────────────────────────────────────────────────── */
