@@ -155,7 +155,7 @@ function ProductCardList({
               ? "cursor-default border border-amber-200/70 bg-amber-100/70 text-amber-800 backdrop-blur"
               : purchased || inCart
                 ? "cursor-default border border-emerald-200/70 bg-emerald-100/70 text-emerald-700 backdrop-blur"
-                : "bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-[0.98]"
+                : "dc-cta-brand text-white shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-[0.98]"
           }`}
         >
           {purchased ? "Purchased" : unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to Cart"}
