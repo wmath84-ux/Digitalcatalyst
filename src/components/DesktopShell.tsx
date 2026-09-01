@@ -56,6 +56,7 @@ import { useCatalog } from "../context/CatalogContext";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
 import { useFeatureVisibilityMap } from "../context/FeatureVisibilityContext";
 import BrandMark from "./BrandMark";
+import DesktopPeekDock from "./glass-dock/DesktopPeekDock";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { cn } from "../utils/cn";
 import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";
@@ -572,6 +573,11 @@ export default function DesktopShell({
           </div>
         </TopBarTabsProvider>
       </div>
+
+      {/* MAG dock peek — only on shell screens (rail instead of the
+          always-on bottom footer). A thin transparent line at the
+          viewport bottom reveals the dock; leaving hides it. */}
+      <DesktopPeekDock active={active} purchasesBadge={ownedCount} />
     </div>
   );
 }

@@ -5384,3 +5384,38 @@ html[data-course-player-active="true"] {
   max-width: 100%;
   margin-inline: auto;
 }
+
+/* Desktop / tablet-landscape shell only: a thin transparent hit line
+   at the very bottom of the viewport. Hovering it reveals the MAG
+   dock; leaving hides it. Idle height is just the line so it cannot
+   leave a blank band. Phone + tablet-portrait keep the always-on
+   footer and never mount this node. */
+[data-desktop-peek-dock] {
+  pointer-events: none;
+}
+
+[data-desktop-peek-line] {
+  pointer-events: auto;
+  width: 100%;
+  height: 8px;
+  background: transparent;
+  max-width: none !important;
+}
+
+[data-desktop-peek-panel] {
+  pointer-events: none;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+[data-desktop-peek-dock][data-open="true"] [data-desktop-peek-panel] {
+  pointer-events: auto;
+  height: auto;
+  overflow: visible;
+  opacity: 1;
+  transform: none;
+  padding-bottom: 6px;
+}
