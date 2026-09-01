@@ -14,12 +14,73 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Glass, GlassLens, GlassSurface, useGlassDark } from "@/components/ui/glass";
 import { GlassButton } from "@/components/ui/glass-button";
+import { GlassInput } from "@/components/ui/glass-input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/glass-tooltip";
+import { Bell, Heart, Search } from "lucide-react";
 import PageTabs from "@/components/ui/PageTabs";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import LiquidMetalButton from "@/components/ui/LiquidMetalButton";
 import Toast, { type ToastMessage } from "@/components/ui/Toast";
 import { applyGlassTier, detectGlassTier, liveLensCount, strengthFor, toGlassRgb, type GlassTier } from "@/lib/glass";
+
+/** A faithful copy of `HeaderIconButton` / the top-bar action discs — the real
+ *  chrome builds these from the same props, so this is a preview, not a fork. */
+function ChromeDisc({
+  label,
+  hint,
+  badge,
+  active = false,
+  tone = "neutral",
+}: {
+  label: string;
+  hint?: string;
+  badge?: number;
+  active?: boolean;
+  tone?: "neutral" | "accent";
+}) {
+  return (
+    <TooltipProvider delayMs={320}>
+      <Tooltip>
+        <TooltipTrigger
+          aria-label={label}
+          className={`relative grid h-10 w-10 place-items-center rounded-full transition ${
+            active
+              ? tone === "accent"
+                ? "text-white"
+                : "text-indigo-600"
+              : "text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <GlassSurface
+            tint={active ? 0.7 : 0.55}
+            tintColor={tone === "accent" ? "99,102,241" : "255,255,255"}
+            blur={12}
+            saturation={1.35}
+            radius={999}
+            className="dc-chrome-disc pointer-events-none absolute inset-0"
+          />
+          <span className="relative">
+            {label === "Notifications" ? <Bell size={17} /> : label === "Search" ? <Search size={17} /> : <Heart size={17} />}
+          </span>
+          {badge ? (
+            <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white ring-2 ring-white">
+              {badge}
+            </span>
+          ) : null}
+        </TooltipTrigger>
+        <TooltipContent side="bottom" tint={0.85}>
+          <span className="text-slate-800">{hint ?? label}</span>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 const TINT_BG =
   "radial-gradient(120% 90% at 12% 8%, #38bdf8 0%, transparent 46%)," +
@@ -47,6 +108,8 @@ export default function GlassPreviewPage() {
   const [drag, setDrag] = useState({ x: 0, y: 0 });
   // Wave 1 = the shared primitives. These three pieces of state drive them, so
   // this sandbox is also the manual test for the wrappers every page reuses.
+  const [query, setQuery] = useState("");
+  const [railRow, setRailRow] = useState(0);
   const [tab, setTab] = useState("day");
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -219,6 +282,74 @@ export default function GlassPreviewPage() {
             Selected: <strong>{tab}</strong> — the tab strip is the pack’s spring indicator; the sheet,
             confirm dialog and toast are the same components every feature page now renders.
           </p>
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur-xl">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">Wave 2 · global chrome</h2>
+            <p className="text-[11px] font-semibold text-slate-400">
+              the exact material the site header + desktop shell now use
+            </p>
+          </header>
+
+          {/* Action discs: one `GlassSurface` lens under each glyph, hover/focus
+              label from `glass-tooltip`, badge kept from the old markup. */}
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/70 bg-white/75 px-3 py-2.5">
+            <ChromeDisc label="Notifications" hint="3 unread" badge={3} />
+            <ChromeDisc label="Wishlist" hint="Saved courses" />
+            <ChromeDisc label="Cart" hint="2 items" badge={2} tone="accent" />
+            <ChromeDisc label="Profile" hint="Account" active />
+            <ChromeDisc label="Search" hint="Jump to search" />
+          </div>
+
+          {/* The light-mode overrides live in src/glass.css under
+              `.dc-glass-input`: white-on-glass text, placeholder and focus ring
+              are re-inked so the field stays readable on a white bar. */}
+          <div className="relative flex items-center rounded-2xl border border-slate-200/70 bg-gradient-to-br from-slate-50 to-white p-3">
+            <div className="w-[320px] max-w-full">
+              <GlassInput
+                className="dc-glass-input w-full"
+                tint={0.55}
+                radius={14}
+                icon={<Search className="h-4 w-4" aria-hidden="true" />}
+                placeholder="Search Digital Catalyst…"
+                aria-label="Preview search field"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <p className="ml-3 text-[11px] font-semibold text-slate-400">
+              ⌘K / Ctrl+K focuses the real top-bar field
+            </p>
+          </div>
+
+          {/* Rail selection: the active row carries a lens over the app’s
+              indigo identity, inactive rows stay flat (lens budget). */}
+          <div className="flex flex-col gap-0.5 rounded-2xl border border-slate-200/70 bg-white/85 p-2">
+            {(["My Day", "Store", "Revision"] as const).map((label, i) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setRailRow(i)}
+                className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2 text-left transition ${
+                  railRow === i
+                    ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {railRow === i ? (
+                  <GlassSurface
+                    tint={0.22}
+                    blur={10}
+                    saturation={1.3}
+                    radius={14}
+                    className="pointer-events-none absolute inset-0"
+                  />
+                ) : null}
+                <span className="relative text-[13px] font-bold">{label}</span>
+              </button>
+            ))}
+          </div>
         </section>
 
         <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Glass sheet">

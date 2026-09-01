@@ -181,3 +181,56 @@ html[data-glass="on"] :where(.dc-page-tabs-list) div[aria-hidden] {
     animation: none !important;
   }
 }
+
+/* ── Wave 2 · global chrome ─────────────────────────────────────────────── */
+
+/* `glass-input` is authored for glass on a DARK page (white label, white
+ * placeholder, white caret, white focus ring). The desktop top bar is a light
+ * strip, so the text layer is re-inked here instead of editing the vendored
+ * item — `.dc-glass-input` is applied at the call site in DesktopShell.tsx and
+ * a class+element selector outranks the pack's bare utility classes.
+ *
+ * The right padding leaves room for the clear chip, which stays an absolutely
+ * positioned sibling in the shell (the registry item has no slot for it). */
+html[data-glass="on"] .dc-glass-input input {
+  color: rgb(30 41 59); /* slate-800 */
+  caret-color: rgb(79 70 229);
+  padding-right: 2rem;
+}
+
+html[data-glass="on"] .dc-glass-input input::placeholder {
+  color: rgb(148 163 184); /* slate-400 */
+}
+
+html[data-glass="on"] .dc-glass-input span.shrink-0 {
+  color: rgb(100 116 139); /* slate-500 — the search glyph */
+}
+
+/* The focus ring: the pack paints a white inset hairline, which disappears on
+ * a light bar, so it is re-tinted to the app's indigo. `!important` because the
+ * glow layer carries an inline box-shadow (set once by the vendored item). */
+html[data-glass="on"] .dc-glass-input > div > div[aria-hidden] {
+  box-shadow:
+    inset 0 0 0 1.5px rgba(99, 102, 241, 0.45),
+    0 0 18px -4px rgba(99, 102, 241, 0.35) !important;
+}
+
+/* Header + top-bar action discs: on a light background the white frost needs a
+ * slightly stronger rim to read as a lens rather than a smudge. `GlassSurface`
+ * stacks its layers in a fixed order — backdrop, tint, sheen, rim, content —
+ * so the 4th `aria-hidden` div is the rim layer this rule re-inks. */
+html[data-glass="on"] :where(.dc-chrome-disc) > div[aria-hidden]:nth-of-type(4) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(148, 163, 184, 0.28);
+}
+
+html[data-glass="on"] :where(.dc-chrome-disc):hover > div[aria-hidden]:nth-of-type(4) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(99, 102, 241, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Tooltips in the registry animate opacity + scale; the fade stays (it is a
+   * state change, not movement) but the pop is flattened. */
+  html[data-glass="on"] :where([role="tooltip"]) {
+    transition-duration: 0.01ms !important;
+  }
+}

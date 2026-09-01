@@ -1,3 +1,4 @@
+import { GlassSurface } from "@/components/ui/glass";
 import { SearchIcon, XIcon } from "./icons";
 
 type SearchBarProps = {
@@ -22,8 +23,16 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
 
   return (
     <div className="space-y-2 px-4">
+      {/* Wave 2 (global chrome): the capsule used to be an ad-hoc
+          `bg-white/60 border-white/70 shadow-lg backdrop-blur-xl` div. It is
+          now a `GlassSurface` lens, i.e. the same refraction layer the header
+          discs and the desktop top bar use, so the store's search reads as one
+          material with the rest of the chrome. The interaction contract is
+          untouched: still a `role="button"` tap target (`data-store-search-trigger`)
+          that hands its draft query to `#/search?q=`, still keyboard-operable,
+          still clearable. */}
       <div
-        className="flex cursor-pointer items-center gap-2 rounded-2xl border border-white/70 bg-white/60 px-4 py-3.5 shadow-lg shadow-indigo-200/40 backdrop-blur-xl transition focus-within:border-indigo-400/70 focus-within:bg-white/80 focus-within:ring-2 focus-within:ring-indigo-300/50 hover:bg-white/75 active:scale-[0.99]"
+        className="group relative block w-full cursor-pointer overflow-hidden rounded-2xl text-left outline-none transition focus-visible:ring-2 focus-visible:ring-indigo-400/70 active:scale-[0.99]"
         onClick={openSearchPage}
         role="button"
         tabIndex={0}
@@ -35,34 +44,47 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
         }}
         data-store-search-trigger
       >
-        <SearchIcon className="h-5 w-5 shrink-0 text-slate-500" />
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={openSearchPage}
-          placeholder="Search courses, notes, class, subject..."
-          className="w-full min-w-0 cursor-pointer bg-transparent text-[15px] font-medium text-slate-900 placeholder:text-slate-500 focus:outline-none"
-          readOnly
+        <GlassSurface
+          tint={0.62}
+          tintColor="255,255,255"
+          blur={18}
+          saturation={1.4}
+          radius={18}
+          className="pointer-events-none absolute inset-0 transition duration-200 group-hover:brightness-[1.02]"
         />
-        {value ? (
-          <button
-            type="button"
-            aria-label="Clear search"
-            onClick={(e) => {
-              e.stopPropagation();
-              onChange("");
-            }}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
-          >
-            <XIcon className="h-4 w-4" />
-          </button>
-        ) : (
-          <span className="hidden shrink-0 rounded-md bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 sm:inline">
-            Tap to search
-          </span>
-        )}
+        <div className="relative flex items-center gap-2 px-4 py-3.5">
+          <SearchIcon className="h-5 w-5 shrink-0 text-slate-500" />
+          <input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={openSearchPage}
+            placeholder="Search courses, notes, class, subject..."
+            aria-label="Search the catalogue"
+            className="w-full min-w-0 cursor-pointer bg-transparent text-[15px] font-medium text-slate-900 placeholder:text-slate-500 focus:outline-none"
+            readOnly
+          />
+          {value ? (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange("");
+              }}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+            >
+              <XIcon className="h-4 w-4" />
+            </button>
+          ) : (
+            <span className="hidden shrink-0 rounded-md bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 sm:inline">
+              Tap to search
+            </span>
+          )}
+        </div>
       </div>
 
+      {/* The sort control is a native <select>: it becomes `glass-select` in
+          Wave 3, when the store screens are converted. */}
       <div className="flex justify-end">
         <select
           value={sort}

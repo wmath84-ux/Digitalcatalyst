@@ -61,6 +61,19 @@ import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { cn } from "../utils/cn";
 import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";
 
+// Wave 2 (global chrome) — the website-glass pack. `glass-tooltip` and
+// `glass-input` are vendored registry items; `GlassSurface` is the shared
+// refraction layer and `LiquidMetalButton` our wrapper around `glass-button`.
+import { GlassSurface } from "@/components/ui/glass";
+import { GlassInput } from "@/components/ui/glass-input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/glass-tooltip";
+import { LiquidMetalButton } from "@/components/ui/LiquidMetalButton";
+
 /** The hash-prefixed routes the rail can drive. Each one navigates by
  *  setting `window.location.hash` so the change is persistent + the
  *  global `Root` switch in `main.tsx` picks the right page. */
@@ -271,6 +284,39 @@ export default function DesktopShell({
     }
   }, [query]);
 
+  // ⌘K / Ctrl+K focuses (and pre-selects) the global search field — the
+  // keyboard affordance the pack's `glass-command` palette would normally own.
+  // That registry item is still unretrieved in this repo, so Wave 2 ships the
+  // shortcut against the real input instead of a half-wired palette; when
+  // `glass-command` lands in Wave 3 this handler becomes its opener.
+  //
+  // Skipped while the learner is already inside a field (so ⌘K keeps working
+  // in the Flowpath editor) and while glass is off (kill switch = no new
+  // behaviour at all).
+  useEffect(() => {
+    if (!onSearch) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        if (document.documentElement.dataset.glass === "off") return;
+        const from = event.target as HTMLElement | null;
+        const typing =
+          !!from &&
+          (from.tagName === "INPUT" ||
+            from.tagName === "TEXTAREA" ||
+            from.tagName === "SELECT" ||
+            from.isContentEditable);
+        if (typing) return;
+        const field = document.querySelector<HTMLInputElement>("[data-desktop-search]");
+        if (!field) return;
+        event.preventDefault();
+        field.focus();
+        field.select();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onSearch]);
+
   const handleNavigate = useCallback((hash: string) => {
     // Use the same hash protocol as the rest of the app so all
     // sessionStorage + auth guards see the change.
@@ -389,7 +435,15 @@ export default function DesktopShell({
               rather than a flat list of links. Shows the learner's
               cart size + favorites so the rail doubles as a status
               indicator. */}
-          <div className="mx-2 mt-3 rounded-2xl border border-slate-200/70 bg-gradient-to-br from-slate-50 to-white p-3">
+          <div className="relative mx-2 mt-3 overflow-hidden rounded-2xl border border-slate-200/70 p-3">
+            <GlassSurface
+              tint={0.5}
+              blur={14}
+              saturation={1.3}
+              radius={18}
+              className="pointer-events-none absolute inset-0"
+            />
+            <div className="relative">
             <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Quick stats</p>
             <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
               <RailStat label="Cart" value={cartCount} />
@@ -397,20 +451,24 @@ export default function DesktopShell({
               <RailStat label="Owned" value={ownedCount} />
               <RailStat label="Inbox" value={notifications} highlight={notifications > 0} />
             </dl>
-            <button
-              type="button"
+            {/* 44 px tall by design: `LiquidMetalButton` fixes the capsule height
+                on the surface it renders, and fighting that with an override on
+                the button only grows the hit box past the paint. */}
+            <LiquidMetalButton
               onClick={() => handleNavigate("#/flowpath")}
-              className="mt-3 w-full rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-3 py-2 text-[11px] font-black text-white shadow-sm transition hover:brightness-110 active:scale-95"
+              tone="primary"
+              className="mt-3"
             >
-              plan today in Flowpath
-            </button>
-            <button
-              type="button"
+              <span className="text-[11px] font-black">plan today in Flowpath</span>
+            </LiquidMetalButton>
+            <LiquidMetalButton
               onClick={() => handleNavigate("#/leaderboard")}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 active:scale-95"
+              tone="silver"
+              className="mt-2"
             >
-              <Trophy size={12} /> Leaderboard
-            </button>
+              <Trophy size={12} /> <span className="text-[11px] font-black">Leaderboard</span>
+            </LiquidMetalButton>
+            </div>
           </div>
         </nav>
 
@@ -483,10 +541,21 @@ export default function DesktopShell({
                 have no handler (e.g. media viewers, fullscreen flows). */}
             {onSearch ? (
               <div className="relative flex w-[320px] max-w-[36vw] items-center">
-                <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-slate-400" />
-                <input
+                {/* `glass-input` capsule. The field used to be a plain
+                    `bg-slate-50` box with an absolutely positioned icon; the
+                    registry item owns both (icon slot + focus glow) and its
+                    lens refracts the page content scrolling under the bar.
+                    Text colour for this LIGHT chrome is overridden by
+                    `.dc-glass-input` in src/glass.css — the item ships
+                    white-on-glass for dark pages. */}
+                <GlassInput
                   type="search"
+                  className="dc-glass-input w-full"
+                  tint={0.55}
+                  radius={14}
+                  icon={<Search className="h-4 w-4" aria-hidden="true" />}
                   value={query}
+                  data-desktop-search
                   onChange={(e) => setQuery(e.target.value)}
                   onFocus={() => {
                     // A bare focus jumps to the search page with no
@@ -499,11 +568,13 @@ export default function DesktopShell({
                       event.preventDefault();
                       handleSearchSubmit();
                     }
+                    if (event.key === "Escape" && query) {
+                      event.preventDefault();
+                      setQuery("");
+                    }
                   }}
                   placeholder={`Search ${appName}…`}
                   aria-label="Search"
-                  className="w-full rounded-xl border border-slate-200/80 bg-slate-50/80 py-2 pl-10 pr-9 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
-                  data-desktop-search
                 />
                 {query ? (
                   <button
@@ -618,17 +689,31 @@ function RailItem({
       type="button"
       onClick={() => onNavigate(entry.hash)}
       aria-current={active ? "page" : undefined}
+      aria-label={active ? `${entry.label} (current page)` : entry.label}
       data-desktop-rail-item={entry.key}
       data-active={active ? "true" : "false"}
-      className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition ${
+      className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2 text-left transition ${
         active
           ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/30"
           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
       }`}
       title={entry.description}
     >
+      {/* The selected row gets the lens: a refracting droplet over the app's
+          indigo identity, so "where am I" is a material change, not just a
+          colour change. Only the selected row has one — a rail of eight
+          stacked lenses is exactly the perf trap the rollout plan warns about. */}
+      {active ? (
+        <GlassSurface
+          tint={0.22}
+          blur={10}
+          saturation={1.3}
+          radius={14}
+          className="pointer-events-none absolute inset-0"
+        />
+      ) : null}
       <span
-        className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${
+        className={`relative grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${
           active
             ? "bg-white/20 text-white"
             : "bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-indigo-600"
@@ -636,7 +721,7 @@ function RailItem({
       >
         <Icon size={15} />
       </span>
-      <span className="min-w-0 flex-1">
+      <span className="relative min-w-0 flex-1">
         <span className="block truncate text-[13px] font-bold leading-tight">{entry.label}</span>
         <span
           className={`block truncate text-[10.5px] font-medium leading-tight ${
@@ -648,7 +733,7 @@ function RailItem({
       </span>
       {entry.badge && entry.badge > 0 ? (
         <span
-          className={`grid h-5 min-w-[20px] place-items-center rounded-full px-1.5 text-[10px] font-black ${
+          className={`relative grid h-5 min-w-[20px] place-items-center rounded-full px-1.5 text-[10px] font-black ${
             active ? "bg-white text-indigo-700" : "bg-indigo-100 text-indigo-700"
           }`}
         >
@@ -745,26 +830,42 @@ function TopBarButton({
   onClick: () => void;
   active?: boolean;
 }) {
+  // Same shape as the site header's action discs (see src/components/Header.tsx):
+  // the registry tooltip replaces the native `title`, and a `GlassSurface`
+  // disc sits *behind* the glyph so the row reads as one material. The old
+  // hover/active classes stay, so nothing is lost when `data-glass="off"`.
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={ariaLabel}
-      title={ariaLabel}
-      data-desktop-topbar-button={ariaLabel.toLowerCase()}
-      className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-xl transition ${
-        active
-          ? "bg-indigo-50 text-indigo-600"
-          : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-      }`}
-    >
-      {icon}
-      {badge && badge > 0 ? (
-        <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white ring-2 ring-white">
-          {badge > 99 ? "99+" : badge}
-        </span>
-      ) : null}
-    </button>
+    <TooltipProvider delayMs={320}>
+      <Tooltip>
+        <TooltipTrigger
+          onClick={onClick}
+          aria-label={ariaLabel}
+          data-desktop-topbar-button={ariaLabel.toLowerCase()}
+          className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-xl transition ${
+            active
+              ? "bg-indigo-50 text-indigo-600"
+              : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+          }`}
+        >
+          <GlassSurface
+            tint={active ? 0.7 : 0.55}
+            blur={12}
+            saturation={1.35}
+            radius={12}
+            className="dc-chrome-disc pointer-events-none absolute inset-0"
+          />
+          <span className="relative grid place-items-center">{icon}</span>
+          {badge && badge > 0 ? (
+            <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white ring-2 ring-white">
+              {badge > 99 ? "99+" : badge}
+            </span>
+          ) : null}
+        </TooltipTrigger>
+        <TooltipContent side="bottom" tint={0.85}>
+          <span className="text-slate-800">{ariaLabel}</span>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
