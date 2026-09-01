@@ -1,16 +1,14 @@
 'use client'
 
 /**
- * Renders a horizontally scrollable glass dock of labeled icons.
- * Nearby icons magnify and lift as the pointer moves across the dock.
+ * Renders a glass dock of labeled icons in the original footer slot.
+ * Nearby icons magnify and lift as the pointer or finger moves across.
+ * Lifting a finger on an icon selects it.
  *
- * Animation constants, spring physics, distance mapping, tooltip chrome
- * and glass materials are copied EXACTLY from the provided GlassDock
- * spec so the magnification reads identically on tablet and mobile.
+ * MAG constants match the GlassDock spec. The capsule hugs its icons —
+ * no full-width strip. Finish is frosted watercolor glass, not white.
  *
- * Old footer implementations are stored at:
- *   src/components/glass-dock/stored/
- * Navigation / hold / badge logic stays in each BottomNav caller.
+ * Old footer implementations: src/components/glass-dock/stored/
  */
 
 import { useRef, type CSSProperties, type ComponentType, type ReactNode, type Ref } from 'react'
@@ -52,6 +50,7 @@ export type GlassDockItem = {
 }
 
 function DockItem({
+  id,
   icon: Icon,
   color,
   label,
@@ -64,10 +63,12 @@ function DockItem({
   buttonProps,
   dataAttrs,
   onSelect,
+  skipClickRef,
 }: GlassDockItem & {
   mouseX: MotionValue<number>
   index: number
   onSelect: () => void
+  skipClickRef: { current: boolean }
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -97,20 +98,21 @@ function DockItem({
   return (
     <motion.div
       ref={ref}
+      data-glass-dock-item={id}
       className="group relative flex cursor-pointer flex-col items-center"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 200, damping: 18, delay: index * 0.04 }}
     >
       <motion.div
-        className={`pointer-events-none absolute -top-10 rounded-lg px-3 py-1.5 text-xs font-medium text-white/90 ${
+        className={`pointer-events-none absolute -top-10 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-800/90 ${
           active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         }`}
         style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          background: 'rgba(125, 211, 252, 0.22)',
+          backdropFilter: 'blur(16px) saturate(1.8)',
+          WebkitBackdropFilter: 'blur(16px) saturate(1.8)',
+          border: '1px solid rgba(125, 211, 252, 0.35)',
           transition: 'opacity 0.15s',
         }}
       >
@@ -128,6 +130,11 @@ function DockItem({
         onPointerCancel={() => buttonProps?.onPointerCancel?.()}
         onContextMenu={(event) => buttonProps?.onContextMenu?.(event)}
         onClick={(event) => {
+          if (skipClickRef.current) {
+            skipClickRef.current = false
+            event.preventDefault()
+            return
+          }
           buttonProps?.onClick?.(event)
           if (event.defaultPrevented) return
           onSelect()
@@ -136,19 +143,14 @@ function DockItem({
           width: size,
           height: size,
           y,
-          background: `${color}18`,
-          border: `1px solid ${color}22`,
+          background: `linear-gradient(160deg, ${color}33, ${color}14)`,
+          border: `1px solid ${color}40`,
           borderRadius: 12,
-          boxShadow: active ? `0 0 16px ${color}55` : undefined,
+          boxShadow: active ? `0 0 16px ${color}55` : `inset 0 1px 0 ${color}55`,
         }}
         whileTap={{ scale: 0.82 }}
         className={`relative flex items-center justify-center select-none ${buttonProps?.className ?? ''}`}
       >
-        {dataAttrs
-          ? Object.entries(dataAttrs).map(([key, value]) =>
-              value === undefined ? null : <span key={key} hidden {...{ [key]: value }} />,
-            )
-          : null}
         <span className="flex items-center justify-center" style={{ color }}>
           <Icon size={22} className="h-[22px] w-[22px] shrink-0" style={{ color }} />
         </span>
@@ -163,6 +165,17 @@ function DockItem({
   )
 }
 
+function idFromPoint(clientX: number, clientY: number): string | null {
+  const stack = document.elementsFromPoint(clientX, clientY)
+  for (const node of stack) {
+    if (!(node instanceof Element)) continue
+    const item = node.closest('[data-glass-dock-item]')
+    const id = item?.getAttribute('data-glass-dock-item')
+    if (id) return id
+  }
+  return null
+}
+
 export default function GlassDock({
   items,
   onSelect,
@@ -175,49 +188,49 @@ export default function GlassDock({
   leading?: ReactNode
 }) {
   const mouseX = useMotionValue(-200)
+  const skipClickRef = useRef(false)
 
   const trackPointer = (clientX: number) => mouseX.set(clientX)
   const resetPointer = () => mouseX.set(-200)
 
   return (
-    <div className="pointer-events-none flex w-full overflow-x-auto py-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <motion.div
-        initial={{ y: 50 }}
-        animate={{ y: 0 }}
-        transition={{ type: 'spring', stiffness: 180, damping: 20 }}
-        onMouseMove={(e) => trackPointer(e.clientX)}
-        onMouseLeave={resetPointer}
-        onPointerMove={(e) => trackPointer(e.clientX)}
-        onPointerLeave={resetPointer}
-        onPointerCancel={resetPointer}
-        className="pointer-events-auto relative isolate mx-auto flex shrink-0 items-end gap-2 rounded-3xl px-4 pb-3 pt-3"
-        style={{
-          background: 'rgba(26, 26, 25, 0.78)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 8px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
-        }}
-        data-glass-dock=""
-        data-site-footer={siteFooter ? '' : undefined}
-      >
-        <div
-          className="pointer-events-none absolute inset-0 z-[-1] rounded-3xl"
-          style={{
-            background: 'rgba(255, 255, 255, 0.06)',
-            backdropFilter: 'blur(24px) saturate(1.8)',
-            WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-          }}
+    <motion.div
+      initial={{ y: 50 }}
+      animate={{ y: 0 }}
+      transition={{ type: 'spring', stiffness: 180, damping: 20 }}
+      onPointerDown={(event) => {
+        if (event.pointerType !== 'mouse') trackPointer(event.clientX)
+      }}
+      onPointerMove={(event) => trackPointer(event.clientX)}
+      onPointerLeave={resetPointer}
+      onPointerUp={(event) => {
+        if (event.pointerType === 'mouse') return
+        const id = idFromPoint(event.clientX, event.clientY)
+        resetPointer()
+        if (!id) return
+        skipClickRef.current = true
+        window.setTimeout(() => {
+          skipClickRef.current = false
+        }, 400)
+        onSelect(id)
+      }}
+      onPointerCancel={resetPointer}
+      className="relative isolate mx-auto flex w-max max-w-full shrink-0 items-end gap-2 rounded-3xl px-3 py-2"
+      style={{ touchAction: 'none' }}
+      data-glass-dock=""
+      data-site-footer={siteFooter ? '' : undefined}
+    >
+      {leading}
+      {items.map((item, i) => (
+        <DockItem
+          key={item.id}
+          {...item}
+          mouseX={mouseX}
+          index={i}
+          skipClickRef={skipClickRef}
+          onSelect={() => onSelect(item.id)}
         />
-        {leading}
-        {items.map((item, i) => (
-          <DockItem
-            key={item.id}
-            {...item}
-            mouseX={mouseX}
-            index={i}
-            onSelect={() => onSelect(item.id)}
-          />
-        ))}
-      </motion.div>
-    </div>
+      ))}
+    </motion.div>
   )
 }
