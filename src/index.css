@@ -5406,21 +5406,34 @@ html[data-course-player-active="true"] {
   }
 }
 
-/* Desktop / tablet-landscape shell only: a thin transparent hit line
-   at the very bottom of the viewport. Hovering it reveals the MAG
-   dock; leaving hides it. Idle height is just the line so it cannot
-   leave a blank band. Phone + tablet-portrait keep the always-on
-   footer and never mount this node. */
+/* Desktop / tablet-landscape shell only: a thin frosted glass line
+   sits at the very bottom CENTRE — the same footer-nav slot the MAG
+   dock occupies. Always visible (watercolor frost, never a white
+   strip). Hovering it reveals the dock; leaving hides it. Phone +
+   tablet-portrait keep the always-on footer and never mount this. */
 [data-desktop-peek-dock] {
   pointer-events: none;
 }
 
+[data-desktop-peek-line],
+[data-desktop-peek-line] * {
+  max-width: none !important;
+}
+
 [data-desktop-peek-line] {
   pointer-events: auto;
-  width: 100%;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: min(22rem, 68vw);
   height: 8px;
-  background: transparent;
-  max-width: none !important;
+  margin: 0 auto 8px;
+  border-radius: 9999px;
+  background: transparent !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.32),
+    0 10px 28px -12px rgba(0, 0, 0, 0.18);
 }
 
 [data-desktop-peek-panel] {

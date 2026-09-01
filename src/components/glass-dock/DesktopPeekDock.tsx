@@ -4,15 +4,16 @@
  * Hover-to-reveal MAG dock for screens that use the desktop shell
  * (left rail / side panel instead of the always-on bottom footer).
  *
- * A thin transparent hit line sits at the very bottom of the viewport.
- * Pointer enter activates the same GlassDock (MAG, click, Home hold →
- * FlowPath). Pointer leave hides it. The line collapses to 8 px when
- * idle so it cannot leave a blank band or steal page clicks.
+ * A thin frosted-glass line sits at the very bottom centre of the
+ * viewport (the footer-nav slot). Always visible. Pointer enter
+ * activates the same GlassDock (MAG, click, Home hold → FlowPath).
+ * Pointer leave hides it. Phone + tablet-portrait never mount this.
  */
 
 import { useCallback, useRef, useState } from 'react'
 import { BagIcon, CalendarIcon, HomeIcon, SparkBookIcon, StoreIcon, UserIcon } from '../icons'
 import GlassDock, { type GlassDockItem } from './GlassDock'
+import GlassMaterial from './GlassMaterial'
 import type { TabKey } from '../BottomNav'
 import type { DesktopRailKey } from '../DesktopShell'
 
@@ -210,7 +211,9 @@ export default function DesktopPeekDock({
           onPointerEnter={show}
           onPointerLeave={hide}
           onPointerDown={show}
-        />
+        >
+          <GlassMaterial radius={6} />
+        </div>
       </div>
     </>
   )

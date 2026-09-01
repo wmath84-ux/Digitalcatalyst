@@ -47,8 +47,13 @@ test("desktop shell peeks the MAG dock from a thin bottom line, not the persiste
   assert.match(shell, /<DesktopPeekDock /);
   assert.match(peek, /data-desktop-peek-dock/);
   assert.match(peek, /data-desktop-peek-line/);
+  assert.match(peek, /GlassMaterial/);
   assert.doesNotMatch(peek, /data-site-footer-nav/);
   assert.doesNotMatch(peek, /data-site-footer/);
   assert.match(css, /\[data-desktop-peek-line\]/);
   assert.match(css, /\[data-desktop-peek-dock\]\[data-open="true"\] \[data-desktop-peek-panel\]/);
+  const lineBlock = css.slice(css.indexOf("[data-desktop-peek-line] {"));
+  assert.match(lineBlock, /width:\s*min\(/, "the peek line is a centred capsule, not a full-bleed strip");
+  assert.match(lineBlock, /border-radius:\s*9999px/);
+  assert.match(lineBlock, /background:\s*transparent !important/);
 });
