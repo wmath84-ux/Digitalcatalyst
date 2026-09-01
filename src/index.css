@@ -3029,15 +3029,14 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 
 /* The desktop shell's body carries `px-6 py-6` (and `padding: clamp(12px,
-   1.5vw, 24px) !important` in the tablet-landscape band), so its top padding
-   pushed the whole revision frame — feature header included — away from the
-   top bar. On AI Configuration / Bulk Import that left the header floating in
-   a band of wallpaper instead of sitting flush under the main header, and the
-   frame (pinned to the full height just below) overflowed by the same amount
-   at the bottom. Zero the block padding whenever the shell hosts Revision;
-   `!important` matches the tablet-landscape rule it has to beat. */
+   1.5vw, 24px) !important` in the tablet-landscape band). The top bar now
+   overlays the scroller, so Revision still needs a top seat equal to the
+   bar height — never extra gutter, and never leftover bottom padding that
+   would overflow the pinned frame. `!important` matches the tablet-landscape
+   rule it has to beat. */
 .dc-desktop-shell [data-desktop-content]:has(> main > [data-revision-app]) {
-  padding-block: 0 !important;
+  padding-top: var(--desktop-topbar-height) !important;
+  padding-bottom: 0 !important;
 }
 
 /* Revision Studio desktop experience - OPTIMIZED compact, no empty space */
@@ -5557,4 +5556,115 @@ html[data-course-player-active="true"] {
   [data-home-header] [data-home-greeting] {
     transform: none;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   CHROME OVERLAY — headers float over the page like the MAG footer
+   ══════════════════════════════════════════════════════════════════════
+   Frost only frosts if content can scroll UNDER the glass. The header
+   therefore leaves the flow (`position: absolute`) and the scroller
+   keeps a padding-top equal to the header seat so the first content
+   is never hidden. That pad is transparent: it shows the page
+   background (frame / shell / profile wash), never a separate white
+   strip. Gated the same way as footer overlay padding so a
+   `display:none` site header on desktop cannot stack leftover pad. */
+
+:root {
+  --dc-site-header-seat: 4.25rem; /* 68px — matches .dc-page-tabs */
+}
+
+@media (min-width: 768px) {
+  :root {
+    --dc-site-header-seat: 5rem; /* 80px tablet portrait header */
+  }
+}
+
+@media (max-width: 959px) {
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-header]) {
+    position: relative;
+  }
+
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame] > [data-site-header] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    z-index: 30;
+  }
+
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-header]:not([data-home-header])):not(:has(> [data-search-bar])) > main {
+    padding-top: var(--dc-site-header-seat);
+    background-color: transparent;
+  }
+
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-home-header]) > main {
+    padding-top: var(--dc-home-header-seat, 12.5rem);
+    background-color: transparent;
+  }
+
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-header]) > [data-search-bar] {
+    margin-top: var(--dc-site-header-seat);
+  }
+
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-header]) > [data-myday-content] {
+    padding-top: calc(var(--dc-site-header-seat) + 1.5rem);
+    background-color: transparent;
+  }
+
+  /* Phone: `.dc-page-tabs` stays in the DOM on the five tab routes
+     (`hidden md:block` → display:none). `:has(> .dc-page-tabs)` still
+     matches a display:none sibling, so the no-tabs pad would skip and
+     the first content would hide under the overlay header. Always pad
+     revision-content on this band. Nested max-width 767 so tablet
+     portrait (visible tabs) does not also inherit this pad. */
+  @media (max-width: 767px) {
+    html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-revision-frame]:has(> [data-site-header]) > [data-revision-content] {
+      padding-top: var(--dc-site-header-seat);
+      background-color: transparent;
+    }
+  }
+}
+
+@media (min-width: 768px) and (max-width: 959px) {
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-revision-frame]:has(> [data-site-header]) > .dc-page-tabs {
+    margin-top: var(--dc-site-header-seat);
+  }
+
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-revision-frame]:has(> [data-site-header]):not(:has(> .dc-page-tabs)) > [data-revision-content] {
+    padding-top: var(--dc-site-header-seat);
+    background-color: transparent;
+  }
+}
+
+.dc-desktop-shell [data-desktop-main] {
+  position: relative;
+  min-height: 0;
+}
+
+.dc-desktop-shell [data-desktop-topbar] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+}
+
+.dc-desktop-shell [data-desktop-content] {
+  padding-top: calc(var(--desktop-topbar-height) + 1.5rem) !important;
+  background-color: transparent;
+}
+
+.dc-desktop-shell [data-desktop-topbar][data-topbar-tabs] ~ [data-desktop-content] {
+  padding-top: calc(var(--desktop-topbar-height) + 2.75rem + 1.5rem) !important;
+}
+
+.dc-desktop-shell [data-desktop-content]:has(> main > [data-revision-app]) {
+  padding-top: var(--desktop-topbar-height) !important;
+  padding-bottom: 0 !important;
+}
+
+.dc-desktop-shell [data-desktop-topbar][data-topbar-tabs] ~ [data-desktop-content]:has(> main > [data-revision-app]) {
+  padding-top: calc(var(--desktop-topbar-height) + 2.75rem) !important;
+  padding-bottom: 0 !important;
 }

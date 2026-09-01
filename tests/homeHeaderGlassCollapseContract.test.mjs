@@ -46,6 +46,20 @@ test("Home header collapses on scroll to brand + action buttons", () => {
   assert.match(css, /\[data-home-header\]\[data-collapsed\] \[data-home-search-slot\]/);
 });
 
+test("Home overlay seat is the expanded header height, not the collapse", () => {
+  // Overlay padding lives on the scroller. If it shrank with --home-collapse
+  // the content would double-move (header shrinks AND the pad shrinks).
+  // Measure with collapse forced to 0, write the expanded height on the frame.
+  assert.match(homeHeader, /const measureSeat = /);
+  assert.match(homeHeader, /setProperty\("--home-collapse", "0"\)/);
+  assert.match(homeHeader, /setProperty\("--dc-home-header-seat"/);
+  assert.match(homeHeader, /closest\("\[data-app-frame\]"\)/);
+  assert.match(homeHeader, /header\.offsetHeight/);
+  const overlay = css.slice(css.lastIndexOf("CHROME OVERLAY"));
+  assert.match(overlay, /var\(--dc-home-header-seat/);
+  assert.doesNotMatch(overlay, /--home-collapse/);
+});
+
 test("shared, desktop, revision and search headers use watercolor glass, not opaque white", () => {
   assert.match(sharedHeader, /data-site-header/);
   assert.match(sharedHeader, /bg-white\/75/);

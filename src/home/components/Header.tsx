@@ -74,6 +74,16 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
     if (desktop instanceof HTMLElement) scrollers.push(desktop);
     if (scrollers.length === 0) return;
 
+    const measureSeat = () => {
+      if (!(frame instanceof HTMLElement)) return;
+      const collapse = header.style.getPropertyValue("--home-collapse");
+      header.style.setProperty("--home-collapse", "0");
+      frame.style.setProperty("--dc-home-header-seat", `${header.offsetHeight}px`);
+      if (collapse) header.style.setProperty("--home-collapse", collapse);
+      else header.style.removeProperty("--home-collapse");
+    };
+    measureSeat();
+
     let raf = 0;
     const apply = () => {
       raf = 0;
@@ -88,9 +98,11 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       raf = requestAnimationFrame(apply);
     };
     scrollers.forEach((node) => node.addEventListener("scroll", onScroll, { passive: true }));
+    window.addEventListener("resize", measureSeat);
     apply();
     return () => {
       scrollers.forEach((node) => node.removeEventListener("scroll", onScroll));
+      window.removeEventListener("resize", measureSeat);
       if (raf) cancelAnimationFrame(raf);
     };
   }, []);

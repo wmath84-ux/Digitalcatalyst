@@ -447,8 +447,10 @@ export default function DesktopShell({
         </div>
       </aside>
 
-      {/* ── Main column (top bar + page body + optional side panel) ── */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* ── Main column (top bar overlays the scroller so MAG frost
+          samples page content; clearance padding lives on
+          [data-desktop-content] and inherits the shell background.) ── */}
+      <div className="relative flex min-w-0 flex-1 flex-col" data-desktop-main>
         {/* Top bar — global actions shared across every page.
             A page can publish its own page-switcher into this bar through
             `useRegisterTopBarTabs` (see src/components/TopBarTabsContext.tsx);
@@ -457,7 +459,7 @@ export default function DesktopShell({
         <header
           data-desktop-topbar
           data-topbar-tabs={topBarTabs ? topBarTabs.feature : undefined}
-          className="sticky top-0 z-30 shrink-0 border-b border-slate-200/80 bg-white/85 px-6 backdrop-blur-2xl"
+          className="absolute inset-x-0 top-0 z-30 border-b border-slate-200/80 bg-white/85 px-6 backdrop-blur-2xl"
         >
           <div data-desktop-topbar-row className="flex h-16 items-center gap-4">
             <div className="min-w-0 flex-1">
