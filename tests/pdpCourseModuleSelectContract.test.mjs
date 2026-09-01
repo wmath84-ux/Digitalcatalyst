@@ -27,6 +27,32 @@ test("product detail always offers a subscription-style module picker", () => {
   assert.match(modal, /Select all/);
 });
 
+const css = fs.readFileSync("src/index.css", "utf8");
+
+test("PDP module picker is a viewport-capped overlay, not a full-black sheet", () => {
+  assert.match(modal, /data-pdp-module-select-overlay/);
+  assert.match(modal, /createPortal/);
+  assert.match(modal, /document\.body/);
+  assert.match(modal, /bg-indigo-950\/30/);
+  assert.doesNotMatch(modal, /bg-black\/55/);
+  assert.match(modal, /min-h-0/);
+  assert.match(
+    css,
+    /\[data-pdp-module-select-overlay\][\s\S]{0,240}rgba\(49,\s*46,\s*129,\s*0\.28\)/,
+    "PDP overlay scrim must be the same translucent indigo as the subscription gate",
+  );
+  assert.match(
+    css,
+    /\[data-pdp-module-select-overlay\] \[data-pdp-module-select-modal\] \{\s*width:\s*min\(100%,\s*28rem\)/,
+    "tablet * { max-width: 100% } must not stretch the picker to the full viewport",
+  );
+  assert.match(
+    css,
+    /\[data-pdp-module-select-overlay\] \[data-pdp-module-select-modal\] \{[\s\S]{0,200}max-height:\s*calc\(100vh - 1\.5rem\)/,
+    "the picker card must be height-capped to the viewport",
+  );
+});
+
 test("checkout proceed is not blocked for paid quotes", () => {
   assert.match(checkout, /disabled=\{showLoading\}/);
   assert.doesNotMatch(checkout, /finalTotal > 0/);

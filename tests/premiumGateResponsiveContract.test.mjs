@@ -310,3 +310,60 @@ test("premium gate animations respect prefers-reduced-motion", () => {
     "the gate's entrance animation must be suppressed under prefers-reduced-motion",
   );
 });
+
+// ---------------------------------------------------------------------------
+// 8. Viewport-safe overlay: not oversized, not clipped, not a black scrim
+// ---------------------------------------------------------------------------
+
+test("modal overlay portals to document.body so a parent frame cannot clip it", () => {
+  assert.match(src, /createPortal/);
+  assert.match(src, /document\.body/);
+  assert.match(src, /lockBodyScroll/);
+});
+
+test("modal overlay uses a light indigo scrim, not a solid black backdrop", () => {
+  assert.match(src, /bg-indigo-950\/30/);
+  assert.doesNotMatch(src, /bg-slate-950\/60/);
+  assert.doesNotMatch(src, /bg-black\/55/);
+  assert.match(
+    css,
+    /rgba\(49,\s*46,\s*129,\s*0\.28\)/,
+    "CSS must pin a translucent indigo scrim so the page stays visible behind the card",
+  );
+});
+
+test("modal card is a flex column with min-h-0 so overflow scrolls inside, not off-screen", () => {
+  assert.match(src, /dc-premium-modal-inner[^\"]*min-h-0/);
+  assert.match(src, /dc-premium-sheet[^\"]*min-h-0[^\"]*overflow-y-auto/);
+  assert.match(
+    css,
+    /\.dc-premium-modal-inner \{[\s\S]{0,280}overflow:\s*hidden/,
+    "the inner column must clip to the viewport cap",
+  );
+  assert.match(
+    css,
+    /\.dc-premium-sheet \{\s*max-height:\s*100%;\s*min-height:\s*0;\s*overflow-y:\s*auto/,
+    "the sheet must scroll internally when content is taller than the viewport",
+  );
+});
+
+test("modal height uses a 100vh fallback then upgrades to 100dvh", () => {
+  assert.match(
+    css,
+    /\.dc-premium-modal-inner \{[\s\S]{0,280}max-height:\s*calc\(100vh - 1\.5rem\)/,
+    "engines without dvh must still clamp the card to the viewport",
+  );
+  assert.match(
+    css,
+    /@supports \(height: 100dvh\) \{\s*\.dc-premium-modal-inner \{\s*max-height: calc\(100dvh - 1\.5rem\)/,
+    "dvh-capable engines upgrade the clamp to the dynamic viewport",
+  );
+});
+
+test("tablet global h1 clamp does not inflate the gate headline", () => {
+  assert.match(
+    css,
+    /\[data-premium-gate\] h1[\s\S]{0,80}font-size:\s*clamp/,
+    "gate h1 must opt out of the 640–1366 px global h1 clamp",
+  );
+});

@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { BadgeCheck, Check, Search, Sparkles, X } from "lucide-react";
 import type { CanonicalCourseModule } from "../../types/commerce";
 import { getModuleEffectivePrice } from "../../../utils/pdpSelection";
+import { lockBodyScroll, unlockBodyScroll } from "../ui/overlayBounds";
 
 const formatPrice = (value: number | null) => {
   if (value === null || !Number.isFinite(value)) return "Included";
@@ -61,14 +63,28 @@ export default function ModuleSelectModal({
     .filter((module) => selectedIds.includes(module.id))
     .reduce((sum, module) => sum + (getModuleEffectivePrice(module, fallbackPrice) || 0), 0);
 
+  useEffect(() => {
+    if (!open) return;
+    lockBodyScroll();
+    return () => unlockBodyScroll();
+  }, [open]);
+
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 backdrop-blur-sm sm:items-center sm:p-6" onClick={onClose}>
+  // Portal to document.body so a parent overflow-hidden / backdrop-filter
+  // frame cannot clip the picker, and tablet `* { max-width: 100% }` cannot
+  // stretch the card to the full viewport. CSS then caps height and width
+  // so the sheet stays fully visible on phone, every tablet size, and desktop.
+  const overlay = (
+    <div
+      className="fixed inset-0 z-[90] flex items-end justify-center bg-indigo-950/30 p-3 backdrop-blur-md sm:items-center sm:p-6"
+      data-pdp-module-select-overlay
+      onClick={onClose}
+    >
       <div
         onClick={(event) => event.stopPropagation()}
         data-pdp-module-select-modal
-        className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-3xl"
+        className="flex min-h-0 w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-3xl"
       >
         <div className="flex justify-center pb-1 pt-3 sm:hidden">
           <div className="h-1.5 w-12 rounded-full bg-slate-200" />
@@ -118,7 +134,7 @@ export default function ModuleSelectModal({
           <span className="text-xs font-medium text-violet-600">{filtered.length} modules</span>
         </button> : null}
 
-        <div className="flex-1 overflow-y-auto px-5 pb-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4">
           {modules.length === 0 ? (
             <div data-pdp-no-modules className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-16 text-center">
               <PackageOpenIcon />
@@ -187,6 +203,9 @@ export default function ModuleSelectModal({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined" || !document.body) return overlay;
+  return createPortal(overlay, document.body);
 }
 
 function PackageOpenIcon() {

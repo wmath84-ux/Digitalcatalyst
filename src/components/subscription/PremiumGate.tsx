@@ -48,6 +48,8 @@
 //   - The two CTAs (Subscribe / Maybe later) are both real buttons so
 //     keyboard users can reach them.
 
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Check, Sparkles, Crown, Zap } from "lucide-react";
 import {
   BankIcon,
@@ -62,6 +64,7 @@ import {
   NotebookPen as NotebookPenIcon,
 } from "lucide-react";
 import { useBranding } from "@/context/BrandingContext";
+import { lockBodyScroll, unlockBodyScroll } from "../ui/overlayBounds";
 
 type GateVariant = "revision" | "myday";
 
@@ -175,7 +178,7 @@ function GateContent({
       className={
         asPage
           ? "dc-premium-page min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-white [-webkit-overflow-scrolling:touch]"
-          : "dc-premium-sheet relative w-full overflow-y-auto overscroll-y-contain rounded-t-[1.75rem] bg-white shadow-[0_-20px_60px_-12px_rgba(79,70,229,0.35)] sm:rounded-[1.75rem] sm:shadow-[0_25px_70px_-12px_rgba(79,70,229,0.5)]"
+          : "dc-premium-sheet relative min-h-0 w-full flex-1 overflow-y-auto overscroll-contain rounded-t-[1.75rem] bg-white shadow-[0_-20px_60px_-12px_rgba(79,70,229,0.35)] sm:rounded-[1.75rem] sm:shadow-[0_25px_70px_-12px_rgba(79,70,229,0.5)]"
       }
     >
       {/* Blurred background blobs. They are inside the card and scale with
@@ -248,7 +251,7 @@ function GateContent({
 
         {/* Perks — each row scales its icon and text together. Gap
             shrinks on small phones, grows on tablet+. */}
-        <div className="relative mt-[clamp(1.25rem,3.5vw,1.75rem)] grid grid-cols-1 gap-[clamp(0.6rem,1.5vw,0.85rem)]">
+        <div className="relative mt-[clamp(1.25rem,3.5vw,1.75rem)] grid grid-cols-1 gap-[clamp(0.6rem,1.5vw,0.85rem)] sm:grid-cols-2">
           {perks.map(({ icon: Icon, title, text }) => (
             <div
               key={title}
@@ -391,6 +394,14 @@ export default function PremiumGate({
   asPage = false,
   subtitle,
 }: Props) {
+  // Modal overlay only: lock the page behind the gate so a finger on
+  // the card cannot also scroll the Revision / My Day scroller.
+  useEffect(() => {
+    if (!open || asPage) return;
+    lockBodyScroll();
+    return () => unlockBodyScroll();
+  }, [open, asPage]);
+
   if (!open) return null;
 
   if (asPage) {
@@ -406,23 +417,28 @@ export default function PremiumGate({
     );
   }
 
-  return (
+  // Portal to document.body so a parent `overflow: hidden` /
+  // `backdrop-filter` frame (phone app card, Revision studio) cannot
+  // clip the overlay or become its containing block. The card is then
+  // viewport-capped with an inner scroller so the close (X) and CTA
+  // stay reachable on every phone / tablet / desktop size.
+  const overlay = (
     <div
       role="dialog"
       aria-modal="true"
       aria-label={variant === "myday" ? "My Day Premium" : "Revision Studio subscription"}
       data-premium-gate-modal
-      className="dc-premium-modal fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+      className="dc-premium-modal fixed inset-0 z-[90] flex items-end justify-center bg-indigo-950/30 p-3 backdrop-blur-md sm:items-center sm:p-6"
       onClick={onClose}
     >
       {/* Fluid container: on mobile it is full-width bottom sheet; on
           tablet/desktop it is a centred card that maxes out at 640 px
           so it never feels oversized on a 27" monitor. */}
       <div
-        className="dc-premium-modal-inner w-full [width:min(100vw,640px)]"
+        className="dc-premium-modal-inner flex min-h-0 w-full [width:min(100vw,640px)] flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="overflow-hidden rounded-t-[1.75rem] border-0 bg-white shadow-2xl sm:rounded-[1.75rem] sm:border-4 sm:border-white/80 sm:shadow-[0_25px_70px_-12px_rgba(79,70,229,0.5)] sm:ring-1 sm:ring-indigo-200">
+        <div className="flex min-h-0 max-h-full flex-col overflow-hidden rounded-t-[1.75rem] border-0 bg-white shadow-2xl sm:rounded-[1.75rem] sm:border-4 sm:border-white/80 sm:shadow-[0_25px_70px_-12px_rgba(79,70,229,0.5)] sm:ring-1 sm:ring-indigo-200">
           <GateContent
             variant={variant}
             userName={userName}
@@ -435,4 +451,7 @@ export default function PremiumGate({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined" || !document.body) return overlay;
+  return createPortal(overlay, document.body);
 }

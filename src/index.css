@@ -5211,13 +5211,30 @@ html[data-course-player-active="true"] {
    page variant the same fluid max if it is ever rendered as modal. */
 .dc-premium-modal-inner {
   width: min(100vw, 640px);
-  max-height: calc(100dvh - 1.5rem);
+  max-width: 100%;
+  /* 100vh first so engines without dvh still clamp; @supports upgrades. */
+  max-height: calc(100vh - 1.5rem);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  .dc-premium-modal-inner {
+    max-height: calc(100dvh - 1.5rem);
+  }
 }
 
 @media (min-width: 640px) {
   .dc-premium-modal-inner {
     /* Sm: a touch of vertical breathing room above/below the card. */
-    max-height: min(680px, calc(100dvh - 2rem));
+    max-height: min(640px, calc(100vh - 2rem));
+  }
+  @supports (height: 100dvh) {
+    .dc-premium-modal-inner {
+      max-height: min(640px, calc(100dvh - 2rem));
+    }
   }
 }
 
@@ -5263,7 +5280,10 @@ html[data-course-player-active="true"] {
    via the shell clamp(); on phones the sheet rounds only on the top
    corners, on tablet+ the sm: rounded-2xl utility takes over. */
 .dc-premium-sheet {
-  max-height: calc(100dvh - 4rem);
+  max-height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Perk row hover — a quiet lift, kept on the cards only (the close
@@ -5777,4 +5797,124 @@ html[data-course-player-active="true"] {
   [data-revision-content] [data-page-enter-panel] > [data-revision-page-main] {
     animation: none !important;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VIEWPORT-SAFE OVERLAYS — PremiumGate + PDP module picker
+   ══════════════════════════════════════════════════════════════════════
+   Both cards used to grow past the viewport (overflow-hidden wrapper
+   without a flex/min-h-0 chain) and sit on a near-black scrim. Tablet
+   `* { max-width: 100% }` (640–1366) stretched the PDP sheet full-width
+   and the global `h1 { font-size: clamp(1.5rem, 2.5vw, 2rem) !important }`
+   inflated the gate headline. These unlayered rules, later than every
+   tablet pass, keep the card fully visible on phone / every tablet /
+   desktop: lighter indigo scrim, width cap, 100vh→100dvh height cap,
+   inner scroll. */
+
+.dc-premium-modal,
+[data-pdp-module-select-overlay] {
+  /* Beat tablet `* { max-width: 100% }` so a portalled overlay is not
+     squeezed to a parent width of 0 / stretched to 100vw of a padded box. */
+  max-width: none !important;
+  background: rgba(49, 46, 129, 0.28) !important;
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.dc-premium-modal-inner,
+.dc-premium-modal-inner > *,
+[data-pdp-module-select-overlay] [data-pdp-module-select-modal] {
+  max-width: none;
+}
+
+.dc-premium-modal-inner {
+  width: min(100vw, 640px);
+  max-width: 100%;
+  max-height: calc(100vh - 1.5rem);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dc-premium-modal-inner > * {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.dc-premium-sheet {
+  max-height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@supports (height: 100dvh) {
+  .dc-premium-modal-inner {
+    max-height: calc(100dvh - 1.5rem);
+  }
+}
+
+@media (min-width: 640px) {
+  .dc-premium-modal-inner {
+    max-height: min(640px, calc(100vh - 2rem));
+  }
+  @supports (height: 100dvh) {
+    .dc-premium-modal-inner {
+      max-height: min(640px, calc(100dvh - 2rem));
+    }
+  }
+}
+
+/* Tablet h1/h2/button clamps must not blow up the gate. */
+[data-premium-gate] h1 {
+  font-size: clamp(1.15rem, 3.2vw, 1.5rem) !important;
+}
+[data-premium-gate] h2 {
+  font-size: clamp(0.95rem, 2.4vw, 1.2rem) !important;
+}
+[data-premium-gate] button {
+  font-size: inherit;
+}
+
+[data-pdp-module-select-overlay] [data-pdp-module-select-modal] {
+  width: min(100%, 28rem);
+  max-width: min(100%, 28rem);
+  max-height: calc(100vh - 1.5rem);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  [data-pdp-module-select-overlay] [data-pdp-module-select-modal] {
+    max-height: calc(100dvh - 1.5rem);
+  }
+}
+
+@media (min-width: 640px) {
+  [data-pdp-module-select-overlay] [data-pdp-module-select-modal] {
+    width: min(100%, 32rem);
+    max-width: min(100%, 32rem);
+  }
+}
+
+@media (min-width: 960px) {
+  [data-pdp-module-select-overlay] [data-pdp-module-select-modal] {
+    width: min(100%, 36rem);
+    max-width: min(100%, 36rem);
+  }
+}
+
+[data-pdp-module-select-modal] h2 {
+  font-size: clamp(1rem, 2.2vw, 1.2rem) !important;
+}
+[data-pdp-module-select-modal] button {
+  font-size: 0.875rem;
 }
