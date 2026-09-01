@@ -131,8 +131,8 @@ test("My Day renders no horizontal tab strip", () => {
 test("the footer pill is hidden on tablet + desktop for both features", () => {
   // My Day already released the pill at 768 px; Revision now does the same, so
   // no desktop / tablet user gets a phone-style floating bar.
-  assert.match(myDayFooter, /className="pointer-events-none sticky bottom-0[^"]*md:hidden"/);
-  assert.match(revisionFooter, /className="pointer-events-none sticky bottom-0[^"]*md:hidden"/);
+  assert.match(myDayFooter, /className="pointer-events-none absolute inset-x-0 bottom-0[^"]*md:hidden"/);
+  assert.match(revisionFooter, /className="pointer-events-none absolute inset-x-0 bottom-0[^"]*md:hidden"/);
 });
 
 test("the in-body row stays text-only, phone-hidden and revision-only", () => {

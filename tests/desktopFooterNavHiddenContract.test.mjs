@@ -1,9 +1,9 @@
 // tests/desktopFooterNavHiddenContract.test.mjs
 //
 // Footer navigation (the floating bottom pill) must never appear on
-// desktop. The persistent left rail is the primary nav. The previous
-// hide rule targeted `[data-site-footer].dc-footer-shell`, but those
-// attributes live on DIFFERENT elements, so the pill stayed visible.
+// desktop as persistent chrome. The persistent left rail is the primary
+// nav. A hover-to-reveal MAG dock (`[data-desktop-peek-dock]`) is allowed
+// on shell screens only — it is not tagged as the site footer.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -39,4 +39,21 @@ test("desktop CSS actually hides the footer nav, not a non-matching selector", (
 
 test("tablet-as-desktop also hides the wrapping footer nav", () => {
   assert.match(css, /html\[data-tablet-landscape-desktop="true"\] \[data-site-footer-nav\]/);
+});
+
+test("desktop shell peeks the MAG dock from a thin bottom line, not the persistent footer", () => {
+  const shell = fs.readFileSync("src/components/DesktopShell.tsx", "utf8");
+  const peek = fs.readFileSync("src/components/glass-dock/DesktopPeekDock.tsx", "utf8");
+  assert.match(shell, /<DesktopPeekDock /);
+  assert.match(peek, /data-desktop-peek-dock/);
+  assert.match(peek, /data-desktop-peek-line/);
+  assert.match(peek, /GlassMaterial/);
+  assert.doesNotMatch(peek, /data-site-footer-nav/);
+  assert.doesNotMatch(peek, /data-site-footer/);
+  assert.match(css, /\[data-desktop-peek-line\]/);
+  assert.match(css, /\[data-desktop-peek-dock\]\[data-open="true"\] \[data-desktop-peek-panel\]/);
+  const lineBlock = css.slice(css.indexOf("[data-desktop-peek-line] {"));
+  assert.match(lineBlock, /width:\s*min\(/, "the peek line is a centred capsule, not a full-bleed strip");
+  assert.match(lineBlock, /border-radius:\s*9999px/);
+  assert.match(lineBlock, /background:\s*transparent !important/);
 });

@@ -134,23 +134,27 @@ test("the tablet tab row keeps its offsets — it sits under the site header", (
   assert.match(css, /\.dc-page-tabs\s*\{\s*position: sticky;/);
 });
 
-test("the desktop shell body does not pad the revision frame away from the top bar", () => {
+test("the desktop shell body seats the revision frame under the overlay top bar", () => {
   // On desktop / tablet landscape the website header is hidden and the shell's
-  // sticky top bar is the main header. Its body wrapper (`px-6 py-6`, or a
-  // clamped `!important` padding in the tablet-landscape band) pushed the whole
-  // frame down, so the header was never flush. Zero the block padding whenever
-  // the shell hosts Revision.
+  // top bar overlays the scroller. Its body wrapper (`px-6 py-6`, or a clamped
+  // `!important` padding in the tablet-landscape band) would otherwise hide
+  // the first content. Seat the frame by the bar height and keep the bottom
+  // flush so the pinned revision column does not overflow.
   const rule = innermostRules(css).find(
     (candidate) =>
       candidate.selector.includes("[data-desktop-content]") &&
-      candidate.selector.includes("data-revision-app"),
+      candidate.selector.includes("data-revision-app") &&
+      !candidate.selector.includes("data-topbar-tabs"),
   );
   assert.ok(rule, "expected a [data-desktop-content]:has(… [data-revision-app]) rule");
-  assert.match(rule.body, /padding-block:\s*0\s*!important/);
+  assert.match(rule.body, /padding-top:\s*var\(--desktop-topbar-height\)\s*!important/);
+  assert.match(rule.body, /padding-bottom:\s*0\s*!important/);
+  assert.doesNotMatch(rule.body, /padding-block:\s*0/);
   // It must outrank the tablet-landscape `padding: clamp(…)!important`, so it
   // cannot sit behind a >=960px gate.
+  const marker = "padding-top: var(--desktop-topbar-height) !important";
   const gated = /@media[^{]*min-width:\s*960px[^{]*\{[^}]*$/.test(
-    css.slice(0, css.indexOf("padding-block: 0 !important")),
+    css.slice(0, css.indexOf(marker)),
   );
   assert.equal(gated, false, "the padding override must not be gated to >=960px only");
 });

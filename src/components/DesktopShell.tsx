@@ -56,6 +56,7 @@ import { useCatalog } from "../context/CatalogContext";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
 import { useFeatureVisibilityMap } from "../context/FeatureVisibilityContext";
 import BrandMark from "./BrandMark";
+import DesktopPeekDock from "./glass-dock/DesktopPeekDock";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { cn } from "../utils/cn";
 import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";
@@ -321,7 +322,11 @@ export default function DesktopShell({
   const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
 
   return (
-    <div className="dc-desktop-shell flex min-h-[100dvh] w-full bg-[#f6f7fb] text-slate-900" data-desktop-shell data-tablet-responsive>
+    <div
+      className="dc-desktop-shell flex min-h-[100dvh] w-full bg-[#f6f7fb] text-slate-900"
+      data-desktop-shell
+      data-tablet-responsive
+    >
       {/* ── Persistent left rail ─────────────────────────────────────
           Tablet landscape: width scales with clamp() so it fits tablet screens
       */}
@@ -334,7 +339,7 @@ export default function DesktopShell({
         {/* Brand block — same logo + name that lives in the mobile header,
             so the rail feels like a continuation of the app's identity
             rather than a separate desktop chrome. */}
-        <div className="flex items-center gap-3 px-5 py-5">
+        <div className="flex items-center gap-3 px-5 pb-5 pt-5">
           <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/40">
             {customLogo ? <BrandMark className="h-11 w-11" /> : <Sparkles className="h-5 w-5" />}
           </div>
@@ -446,8 +451,10 @@ export default function DesktopShell({
         </div>
       </aside>
 
-      {/* ── Main column (top bar + page body + optional side panel) ── */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* ── Main column (top bar overlays the scroller so MAG frost
+          samples page content; clearance padding lives on
+          [data-desktop-content] and inherits the shell background.) ── */}
+      <div className="relative flex min-w-0 flex-1 flex-col" data-desktop-main>
         {/* Top bar — global actions shared across every page.
             A page can publish its own page-switcher into this bar through
             `useRegisterTopBarTabs` (see src/components/TopBarTabsContext.tsx);
@@ -456,7 +463,7 @@ export default function DesktopShell({
         <header
           data-desktop-topbar
           data-topbar-tabs={topBarTabs ? topBarTabs.feature : undefined}
-          className="sticky top-0 z-30 shrink-0 border-b border-slate-200/80 bg-white/85 px-6 backdrop-blur-2xl"
+          className="absolute inset-x-0 top-0 z-30 border-b border-slate-200/80 bg-white/85 px-6 backdrop-blur-2xl"
         >
           <div data-desktop-topbar-row className="flex h-16 items-center gap-4">
             <div className="min-w-0 flex-1">
@@ -572,6 +579,12 @@ export default function DesktopShell({
           </div>
         </TopBarTabsProvider>
       </div>
+
+      {/* MAG dock peek — only on shell screens (rail instead of the
+          always-on bottom footer). A thin transparent line at the
+          bottom centre of the PAGE column reveals the dock; leaving
+          hides it. The left rail stays visible. */}
+      <DesktopPeekDock active={active} purchasesBadge={ownedCount} />
     </div>
   );
 }

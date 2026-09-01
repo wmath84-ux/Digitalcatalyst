@@ -45,13 +45,14 @@ import { buildCheckoutSessionRecord, writeToSessionStorage as writeCheckoutToSto
 import type { CheckoutSelection } from "./types/commerce";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
 import type { PaidCourseUpdate } from "./types/course";
-import { isDesktopBrowserLocked, isInstalledMobilePwa, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
+import { isInstalledMobilePwa } from "./utils/pwaInstall";
 import { disablePageZoom } from "./utils/disablePageZoom";
 import { setThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/themeColor";
 import { initOrientationLock } from "./utils/appOrientation";
 import { recordRouteVisit } from "./utils/routeHistory";
 import { requiresAuthentication } from "./utils/appRoutes";
 import AppShell from "./components/AppShell";
+import PageEnter, { pageEnterAppKey } from "./components/PageEnter";
 import { resolveActiveFromHash } from "./components/DesktopShell";
 import { useResponsiveCategory } from "./utils/responsive";
 import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
@@ -346,14 +347,10 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
   // The landing page is a standalone marketing page: wrapping it in the
   // app shell squeezed the hero into a small box beside the rail, hid the
   // sections below from the page scroll and stretched the fixed header
-  // edge-to-edge. It renders full-bleed at every size instead — desktop
-  // browsers are locked to it anyway (Open App shows the install-PWA
-  // notice), so any hash that ends up rendering the landing also passes
-  // through unchanged.
+  // edge-to-edge. It renders full-bleed at every size instead.
   if (
     !hash
     || hash.startsWith(LANDING_HASH)
-    || isDesktopBrowserLocked()
     || hash.startsWith("#/checkout")
     || hash.startsWith("#/auth")
     || hash.startsWith("#/admin")
@@ -385,7 +382,6 @@ function RootPage(): ReactNode {
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
-  const [desktopLocked, setDesktopLocked] = useState(() => isDesktopBrowserLocked());
   const [installedMobilePwa, setInstalledMobilePwa] = useState(() => isInstalledMobilePwa());
   // Live viewport category so the AppShell wrapper re-renders when the
   // learner resizes across the desktop / tablet / mobile boundaries.
@@ -395,7 +391,7 @@ function RootPage(): ReactNode {
   const landingRouteRequested = !hash || hash.startsWith(LANDING_HASH);
   // Mobile + installed PWA: never show landing. Everyone else on mobile
   // (logged in or not) starts on landing and opens the app from there.
-  const skipLandingForInstalledMobilePwa = Boolean(installedMobilePwa && landingRouteRequested && !desktopLocked);
+  const skipLandingForInstalledMobilePwa = Boolean(installedMobilePwa && landingRouteRequested);
 
   const shoppingProducts: CartProduct[] = useMemo(() => catalogProducts.map((product) => ({
     id: product.id,
@@ -440,7 +436,6 @@ function RootPage(): ReactNode {
 
   useEffect(() => {
     const syncInstallState = () => {
-      setDesktopLocked(isDesktopBrowserLocked());
       setInstalledMobilePwa(isInstalledMobilePwa());
     };
     const handleHashChange = () => setHash(window.location.hash);
@@ -458,13 +453,15 @@ function RootPage(): ReactNode {
   }, []);
 
   useEffect(() => {
-    if (!desktopLocked) return;
-    if (hash.startsWith(ADMIN_HASH) || hash.startsWith(ADMIN_LOGIN_HASH)) return;
-    if (!hash || hash.startsWith(LANDING_HASH)) return;
-    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${LANDING_HASH}`);
-    setHash(LANDING_HASH);
-    showDesktopMaintenanceNotice();
-  }, [desktopLocked, hash]);
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.querySelectorAll(
+      "[data-desktop-content], [data-app-frame] > main, [data-revision-page-main], [data-myday-content] > main, [data-profile-content], [data-pdp-scroll]",
+    ).forEach((node) => {
+      if (node instanceof HTMLElement) node.scrollTop = 0;
+    });
+  }, [hash]);
 
   useEffect(() => {
     if (!skipLandingForInstalledMobilePwa) return;
@@ -888,10 +885,6 @@ function RootPage(): ReactNode {
     setThemeColor(darkScreen ? THEME_COLOR_DARK : THEME_COLOR_LIGHT);
   }, [hash, loading, skipLandingForInstalledMobilePwa, protectedRoutePending, user, catalogLoading, openingAnimationEnabled]);
 
-  if (desktopLocked && !hash.startsWith(ADMIN_HASH) && !hash.startsWith(ADMIN_LOGIN_HASH)) {
-    return <LandingApp />;
-  }
-
   const launchPending =
     loading
     || skipLandingForInstalledMobilePwa
@@ -919,6 +912,7 @@ function RootPage(): ReactNode {
   if (!hash || hash.startsWith(LANDING_HASH)) return <LandingApp />;
   if (hash.startsWith(HOME_HASH)) {
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <HomeApp
         favoriteIds={favoriteIds}
         onToggleFavorite={handleToggleFavorite}
@@ -944,6 +938,7 @@ function RootPage(): ReactNode {
           window.location.hash = NOTIFICATIONS_HASH;
         }}
       />
+      </PageEnter>
     );
   }
   if (hash.startsWith(AUTH_HASH)) return <AuthApp />;
@@ -951,6 +946,7 @@ function RootPage(): ReactNode {
 
   if (hash.startsWith(CART_HASH) || hash.startsWith(FAVORITES_HASH)) {
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <CartWishlistApp
         activeTab={hash.startsWith(CART_HASH) ? "cart" : "favorites"}
         cartProducts={cartProducts}
@@ -980,6 +976,7 @@ function RootPage(): ReactNode {
           if (product) navigateToProduct({ id: product.id, title: product.title });
         }}
       />
+      </PageEnter>
     );
   }
 
@@ -997,6 +994,7 @@ function RootPage(): ReactNode {
   }
   if (hash.startsWith(SUBSCRIPTION_HASH)) {
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <SubscriptionApp
         cartCount={cartIds.size}
         purchasesBadge={purchasedIds.size}
@@ -1017,6 +1015,7 @@ function RootPage(): ReactNode {
           else if (tab === "profile") window.location.hash = PROFILE_HASH;
         }}
       />
+      </PageEnter>
     );
   }
   if (hash.startsWith(NOTIFICATIONS_HASH)) {
@@ -1079,6 +1078,7 @@ function RootPage(): ReactNode {
   if (hash.startsWith(COURSE_HASH)) {
     if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <CourseRouteGuard
         product={selectedCourseProduct}
         onCheckout={(price) => navigateToCheckout(price)}
@@ -1086,12 +1086,13 @@ function RootPage(): ReactNode {
         onPurchaseUpdate={handlePurchaseUpdate}
         initialModuleId={selectedCourseModuleId || undefined}
       />
+      </PageEnter>
     );
   }
   // Settings renders inside the desktop shell like the Profile page does.
   if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
-  if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
-  if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
+  if (hash.startsWith(PROFILE_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><ProfileApp /></PageEnter>;
+  if (hash.startsWith(MY_DAY_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><MyDayApp /></PageEnter>;
   if (hash.startsWith(LEADERBOARD_HASH)) return <LeaderboardApp />;
   if (hash.startsWith(FLOWPATH_HASH)) {
     // The boundary keeps a FlowPath render crash contained to this
@@ -1104,9 +1105,10 @@ function RootPage(): ReactNode {
       </FlowPathErrorBoundary>
     );
   }
-  if (hash.startsWith(REVISION_HASH)) return <RevisionApp />;
+  if (hash.startsWith(REVISION_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><RevisionApp /></PageEnter>;
   if (hash.startsWith(PRODUCT_HASH)) {
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <PdpWithOwnership
         product={selectedCatalogProduct}
         onCheckout={navigateToCheckout}
@@ -1129,10 +1131,12 @@ function RootPage(): ReactNode {
           else if (tab === "profile") window.location.hash = PROFILE_HASH;
         }}
       />
+      </PageEnter>
     );
   }
   if (hash.startsWith(STORE_HASH)) {
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <StoreApp
         onNavigateToProduct={navigateToProduct}
         onNavigateToMyDay={() => {
@@ -1160,10 +1164,12 @@ function RootPage(): ReactNode {
           window.location.hash = CART_HASH;
         }}
       />
+      </PageEnter>
     );
   }
 
   return (
+    <PageEnter pageKey={pageEnterAppKey(HOME_HASH)}>
     <HomeApp
       favoriteIds={favoriteIds}
       onToggleFavorite={handleToggleFavorite}
@@ -1189,6 +1195,7 @@ function RootPage(): ReactNode {
         window.location.hash = NOTIFICATIONS_HASH;
       }}
     />
+    </PageEnter>
   );
 }
 

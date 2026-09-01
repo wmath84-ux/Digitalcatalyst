@@ -249,7 +249,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
 
       <div className="space-y-4">
         <SearchBar value={search} onChange={setSearch} sort={sort} onSortChange={setSort} />
-        <div className="sticky top-0 z-20 border-b border-white/60 bg-white/55 py-2.5 shadow-[0_10px_30px_-18px_rgba(49,46,129,0.55)] backdrop-blur-2xl backdrop-saturate-150">
+        <div data-store-filter-bar className="sticky top-0 z-20 border-b border-white/60 bg-white/55 py-2.5 shadow-[0_10px_30px_-18px_rgba(49,46,129,0.55)] backdrop-blur-2xl backdrop-saturate-150">
           <div className="relative flex items-center">
             <div className="flex-1 overflow-hidden pr-14">
               <FilterChips filters={chips} activeId={activeFilter.id} onSelect={setActiveFilterId} />

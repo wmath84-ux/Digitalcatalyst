@@ -7,20 +7,20 @@ const landing = fs.readFileSync("src/LandingApp.tsx", "utf8");
 const overlays = fs.readFileSync("src/components/landing/LandingOverlays.tsx", "utf8");
 const pwa = fs.readFileSync("src/utils/pwaInstall.ts", "utf8");
 
-test("desktop browser is locked to landing unless the PWA is installed", () => {
-  assert.match(pwa, /export function isDesktopBrowserLocked/);
-  assert.match(pwa, /!isMobileScreenSize\(\) && !isPwaInstalled\(\)/);
-  assert.match(main, /isDesktopBrowserLocked/);
-  assert.match(main, /desktopLocked && !hash\.startsWith\(ADMIN_HASH\)/);
-  assert.match(main, /return <LandingApp \/>/);
+test("desktop browsers are not locked to landing", () => {
+  assert.doesNotMatch(pwa, /export function isDesktopBrowserLocked/);
+  assert.doesNotMatch(pwa, /showDesktopMaintenanceNotice/);
+  assert.doesNotMatch(main, /isDesktopBrowserLocked/);
+  assert.doesNotMatch(main, /desktopLocked/);
+  assert.doesNotMatch(main, /showDesktopMaintenanceNotice/);
 });
 
-test("Open App on desktop shows the under-preparation PWA notice", () => {
-  assert.match(landing, /isDesktopBrowserLocked/);
-  assert.match(landing, /showDesktopMaintenanceNotice/);
-  assert.match(overlays, /Under Preparation/);
-  assert.match(overlays, /Instead of using the website, install the PWA app and use it/);
-  assert.match(overlays, /Install PWA/);
+test("Open App on desktop enters the app instead of an under-preparation notice", () => {
+  assert.match(landing, /window\.location\.hash = HOME_HASH/);
+  assert.doesNotMatch(landing, /isDesktopBrowserLocked/);
+  assert.doesNotMatch(landing, /showDesktopMaintenanceNotice/);
+  assert.doesNotMatch(overlays, /Under Preparation/);
+  assert.doesNotMatch(overlays, /desktop website is under preparation/);
 });
 
 test("installed mobile PWA skips landing regardless of login", () => {

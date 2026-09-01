@@ -13,16 +13,15 @@ test("an installed mobile PWA skips landing and opens Home", () => {
   // an INSTALLED mobile PWA goes straight to Home (see the comment
   // above skipLandingForInstalledMobilePwa in src/main.tsx). The test
   // was pinning the superseded policy, not catching a regression.
-  assert.match(main, /installedMobilePwa && landingRouteRequested && !desktopLocked/);
+  assert.match(main, /installedMobilePwa && landingRouteRequested/);
   assert.match(main, /history\.replaceState[\s\S]*HOME_HASH/);
   assert.match(main, /setHash\(HOME_HASH\)/);
 });
 
-test("desktop browser stays on landing and never opens the learner app", () => {
-  assert.match(main, /isDesktopBrowserLocked/);
-  assert.match(main, /desktopLocked/);
-  assert.match(main, /showDesktopMaintenanceNotice/);
-  assert.match(main, /if \(desktopLocked && !hash\.startsWith\(ADMIN_HASH\)/);
+test("desktop browser can open the learner app from landing", () => {
+  assert.doesNotMatch(main, /isDesktopBrowserLocked/);
+  assert.doesNotMatch(main, /desktopLocked/);
+  assert.doesNotMatch(main, /showDesktopMaintenanceNotice/);
 });
 
 test("main routing helpers stay intact so the production build can parse", () => {

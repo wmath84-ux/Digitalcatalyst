@@ -4,7 +4,6 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export const PWA_INSTALL_OPEN_EVENT = "eduvora-open-install";
-export const DESKTOP_MAINTENANCE_EVENT = "eduvora-desktop-maintenance";
 
 let deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
 
@@ -22,12 +21,6 @@ if (typeof window !== "undefined") {
 export function openInstallPanel() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(PWA_INSTALL_OPEN_EVENT));
-  }
-}
-
-export function showDesktopMaintenanceNotice() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(DESKTOP_MAINTENANCE_EVENT));
   }
 }
 
@@ -64,18 +57,6 @@ export function isMobileScreenSize(): boolean {
   // Tablet landscape desktop should NOT be considered mobile
   if (isTabletLandscapeDesktop()) return false;
   return window.innerWidth <= MOBILE_BREAKPOINT;
-}
-
-/**
- * Wide desktop browser (not the installed PWA). The landing page is the
- * default entry for these users — the desktop experience inside the app
- * is fully supported (it is a real desktop layout with a left rail), but
- * new desktop visitors get to see the marketing landing first, exactly
- * like a normal website. After they tap "Open App" the hash routes into
- * the desktop shell, and re-visits land directly inside the app.
- */
-export function isDesktopBrowserLocked(): boolean {
-  return !isMobileScreenSize() && !isPwaInstalled();
 }
 
 /**

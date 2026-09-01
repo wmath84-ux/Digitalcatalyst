@@ -3029,15 +3029,14 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 
 /* The desktop shell's body carries `px-6 py-6` (and `padding: clamp(12px,
-   1.5vw, 24px) !important` in the tablet-landscape band), so its top padding
-   pushed the whole revision frame — feature header included — away from the
-   top bar. On AI Configuration / Bulk Import that left the header floating in
-   a band of wallpaper instead of sitting flush under the main header, and the
-   frame (pinned to the full height just below) overflowed by the same amount
-   at the bottom. Zero the block padding whenever the shell hosts Revision;
-   `!important` matches the tablet-landscape rule it has to beat. */
-.dc-desktop-shell [data-desktop-content]:has(> main > [data-revision-app]) {
-  padding-block: 0 !important;
+   1.5vw, 24px) !important` in the tablet-landscape band). The top bar now
+   overlays the scroller, so Revision still needs a top seat equal to the
+   bar height — never extra gutter, and never leftover bottom padding that
+   would overflow the pinned frame. `!important` matches the tablet-landscape
+   rule it has to beat. */
+.dc-desktop-shell [data-desktop-content]:has(> main [data-revision-app]) {
+  padding-top: var(--desktop-topbar-height) !important;
+  padding-bottom: 0 !important;
 }
 
 /* Revision Studio desktop experience - OPTIMIZED compact, no empty space */
@@ -3046,7 +3045,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     height: 100dvh;
     overflow: hidden;
   }
-  .dc-desktop-shell [data-desktop-content]:has(> main > [data-revision-app]) {
+  .dc-desktop-shell [data-desktop-content]:has(> main [data-revision-app]) {
     align-items: stretch;
   }
   .dc-desktop-shell [data-revision-app] {
@@ -3977,7 +3976,7 @@ html[data-course-player-active="true"] {
    the feature to `100dvh` while the shell row is shorter than that by the top
    bar + gutters. Filling the row instead keeps exactly one surface — the page's
    `[data-revision-page-main]` — scrolling, with nothing cut off at the bottom. */
-.dc-desktop-shell [data-desktop-content] > main > [data-revision-app] {
+.dc-desktop-shell [data-desktop-content] > main [data-revision-app] {
   height: 100% !important;
   min-height: 0 !important;
   max-height: 100% !important;
@@ -4268,7 +4267,7 @@ html[data-course-player-active="true"] {
 }
 
 /* ── 2. Revision inside the desktop shell: one scroller, not two ─────────
-   `.dc-desktop-shell [data-desktop-content] > main > [data-revision-app]`
+   `.dc-desktop-shell [data-desktop-content] > main [data-revision-app]`
    asks for `height: 100%`, but the shell's `<main>` only ever declared
    `min-height: 100%` — an auto height, so the percentage resolved to `auto`,
    the revision app grew with its content and the shell's row scrolled
@@ -4815,7 +4814,28 @@ html[data-course-player-active="true"] {
    element could not override the old `[data-revision-app-header]` offsets.
    Keep this rule unlayered so the two never disagree. */
 [data-revision-app-header] {
+  position: absolute;
   top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  width: 100%;
+}
+
+/* Overlay AppHeader onto the page scroller so cards frost through it,
+   the same way Store / Home headers overlay their mains. JSX still
+   says `sticky top-0`; this unlayered rule is what actually seats it. */
+[data-revision-content] [data-page-enter-panel] {
+  position: relative;
+}
+
+:root {
+  --dc-revision-app-header-seat: 3.5rem; /* min-h-[56px] of AppHeader */
+}
+
+[data-page-enter-panel]:has(> [data-revision-app-header]) > [data-revision-page-main] {
+  padding-top: var(--dc-revision-app-header-seat);
+  background-color: transparent;
 }
 
 /* ── 2. Revision dashboard test cards: compact on small screens ─────────── */
@@ -5191,13 +5211,30 @@ html[data-course-player-active="true"] {
    page variant the same fluid max if it is ever rendered as modal. */
 .dc-premium-modal-inner {
   width: min(100vw, 640px);
-  max-height: calc(100dvh - 1.5rem);
+  max-width: 100%;
+  /* 100vh first so engines without dvh still clamp; @supports upgrades. */
+  max-height: calc(100vh - 1.5rem);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  .dc-premium-modal-inner {
+    max-height: calc(100dvh - 1.5rem);
+  }
 }
 
 @media (min-width: 640px) {
   .dc-premium-modal-inner {
     /* Sm: a touch of vertical breathing room above/below the card. */
-    max-height: min(680px, calc(100dvh - 2rem));
+    max-height: min(640px, calc(100vh - 2rem));
+  }
+  @supports (height: 100dvh) {
+    .dc-premium-modal-inner {
+      max-height: min(640px, calc(100dvh - 2rem));
+    }
   }
 }
 
@@ -5243,7 +5280,10 @@ html[data-course-player-active="true"] {
    via the shell clamp(); on phones the sheet rounds only on the top
    corners, on tablet+ the sm: rounded-2xl utility takes over. */
 .dc-premium-sheet {
-  max-height: calc(100dvh - 4rem);
+  max-height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Perk row hover — a quiet lift, kept on the cards only (the close
@@ -5349,4 +5389,532 @@ html[data-course-player-active="true"] {
   max-width: 100%;
   box-sizing: border-box;
   overflow: hidden;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   GLASS DOCK — macOS-style magnifying footer on mobile + tablet
+   ══════════════════════════════════════════════════════════════════════
+   The capsule hugs its icons. The wrapping nav is an overlay (not an
+   in-flow slot) so the page paints under the dock — that is what lets
+   frost actually frost, instead of sampling a reserved white band.
+   Scrollers keep a padding-bottom equal to the old footer height so
+   content does not jump up. Nearby icons scale (MAG_SCALE 1.55) and
+   lift (−12 px). The tablet `* { max-width: 100% }` pass would freeze
+   that spring width, so the dock and every child opt out. */
+[data-glass-dock],
+[data-glass-dock] * {
+  max-width: none !important;
+}
+
+[data-glass-dock] {
+  overflow: visible;
+  isolation: isolate;
+  background: transparent !important;
+}
+
+[data-site-footer-nav]:has([data-glass-dock]) {
+  overflow: visible !important;
+  background: transparent !important;
+}
+
+[data-site-footer]:has([data-glass-dock]),
+[data-site-footer][data-glass-dock] {
+  background: transparent !important;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+/* Overlay footer: the frame (or revision column) is the containing
+   block, so the dock sits on the page instead of occupying a white
+   strip. Clearance is only the dock height, only on bands where the
+   dock is visible, and never stacked on Revision pages that already
+   pad themselves. Page jumps reset scroll in main.tsx so leftover
+   bottom space cannot linger after a route change. */
+[data-app-frame]:has(> [data-site-footer-nav]),
+[data-revision-content]:has(> [data-site-footer-nav]) {
+  position: relative;
+}
+@media (max-width: 959px) {
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-footer-nav]) > main {
+    padding-bottom: 4.5rem;
+  }
+}
+@media (max-width: 767px) {
+  [data-app-frame]:has(> [data-site-footer-nav]) [data-myday-content] > main {
+    padding-bottom: 4.5rem;
+  }
+}
+
+/* Desktop / tablet-landscape shell only: a thin frosted glass line
+   sits at the very bottom CENTRE — the same footer-nav slot the MAG
+   dock occupies. Always visible (watercolor frost, never a white
+   strip). Hovering it reveals the dock; leaving hides it. Phone +
+   tablet-portrait keep the always-on footer and never mount this. */
+[data-desktop-peek-dock] {
+  pointer-events: none;
+  /* Fallback before JS measures `[data-desktop-main]`: sit to the
+     right of the left rail so the line is never viewport-centred
+     (that reads as shifted once the side panel is in the layout). */
+  left: var(--desktop-rail-width, 260px);
+  right: 0;
+  width: auto;
+}
+
+[data-desktop-peek-dock][data-page-seat="true"] {
+  right: auto;
+}
+
+[data-desktop-peek-line],
+[data-desktop-peek-line] * {
+  max-width: none !important;
+}
+
+[data-desktop-peek-line] {
+  pointer-events: auto;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: min(22rem, 68%);
+  height: 8px;
+  margin: 0 auto 8px;
+  border-radius: 9999px;
+  background: transparent !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.32),
+    0 10px 28px -12px rgba(0, 0, 0, 0.18);
+}
+
+[data-desktop-peek-panel] {
+  pointer-events: none;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+[data-desktop-peek-dock][data-open="true"] [data-desktop-peek-panel] {
+  pointer-events: auto;
+  height: auto;
+  overflow: visible;
+  opacity: 1;
+  transform: none;
+  padding-bottom: 6px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   CHROME GLASS — MAG / WebsiteGlass frost on every header
+   ══════════════════════════════════════════════════════════════════════
+   Same watercolor lens the dock uses (sky 186,230,253 → white sheen →
+   violet 196,181,253, frost blur 18px, saturate 160%). No opaque white
+   strip. Home keeps its admin-custom gradient stops as a translucent
+   wash over that frost, and shrinks to brand + action buttons as the
+   page scroller moves. */
+
+:root {
+  --dc-chrome-glass:
+    linear-gradient(165deg, rgba(186, 230, 253, 0.18), rgba(255, 255, 255, 0.08) 42%, rgba(196, 181, 253, 0.16));
+  --dc-chrome-glass-blur: blur(18px) saturate(160%);
+  --dc-chrome-glass-rim:
+    inset 0 1px 1px rgba(255, 255, 255, 0.72),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+[data-site-header]:not([data-home-header]) {
+  isolation: isolate;
+  background: var(--dc-chrome-glass) !important;
+  backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  box-shadow: var(--dc-chrome-glass-rim), 0 14px 38px -18px rgba(0, 0, 0, 0.16);
+}
+
+.dc-desktop-shell [data-desktop-topbar] {
+  background: var(--dc-chrome-glass) !important;
+  backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.42) !important;
+  box-shadow: var(--dc-chrome-glass-rim);
+}
+
+[data-revision-app-header] {
+  background: var(--dc-chrome-glass) !important;
+  backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.42) !important;
+  box-shadow: var(--dc-chrome-glass-rim), 0 10px 30px -18px rgba(79, 70, 229, 0.22);
+}
+
+[data-search-bar],
+[data-store-filter-bar],
+.dc-page-tabs,
+[data-admin-topbar],
+[data-admin-shell] > header,
+[data-rev-bank-header],
+[data-revision-page-main] > .dc-glass-toolbar.sticky,
+[data-revision-app] .dc-glass-toolbar {
+  background: var(--dc-chrome-glass) !important;
+  backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
+}
+
+[data-home-header] {
+  --home-collapse: 0;
+  isolation: isolate;
+  padding-bottom: calc(2rem * (1 - var(--home-collapse) * 0.68));
+  border-bottom-left-radius: calc(32px * (1 - var(--home-collapse) * 0.55));
+  border-bottom-right-radius: calc(32px * (1 - var(--home-collapse) * 0.55));
+}
+
+[data-home-header] [data-home-orbs] {
+  opacity: calc(1 - var(--home-collapse) * 0.88);
+}
+
+[data-home-header] [data-home-welcome] {
+  max-height: calc((1 - var(--home-collapse)) * 1.15rem);
+  opacity: calc(1 - var(--home-collapse));
+  overflow: hidden;
+  transform: translateY(calc(var(--home-collapse) * -4px));
+}
+
+[data-home-header] [data-home-search-slot] {
+  max-height: calc((1 - var(--home-collapse)) * 6.25rem);
+  margin-top: calc((1 - var(--home-collapse)) * 1.25rem);
+  opacity: calc(1 - var(--home-collapse));
+  overflow: hidden;
+  transform: translateY(calc(var(--home-collapse) * -8px));
+}
+
+[data-home-header][data-collapsed] [data-home-search-slot] {
+  pointer-events: none;
+}
+
+[data-home-header] [data-home-brand] {
+  transform: scale(calc(1 - var(--home-collapse) * 0.12));
+  transform-origin: left center;
+}
+
+[data-home-header] [data-home-greeting] {
+  transform: scale(calc(1 - var(--home-collapse) * 0.06));
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-home-header] [data-home-welcome],
+  [data-home-header] [data-home-search-slot],
+  [data-home-header] [data-home-orbs],
+  [data-home-header] [data-home-brand],
+  [data-home-header] [data-home-greeting] {
+    transform: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   CHROME OVERLAY — headers float over the page like the MAG footer
+   ══════════════════════════════════════════════════════════════════════
+   Frost only frosts if content can scroll UNDER the glass. The header
+   therefore leaves the flow (`position: absolute`) and the scroller
+   keeps a padding-top equal to the header seat so the first content
+   is never hidden. That pad is transparent: it shows the page
+   background (frame / shell / profile wash), never a separate white
+   strip. Gated the same way as footer overlay padding so a
+   `display:none` site header on desktop cannot stack leftover pad. */
+
+:root {
+  --dc-site-header-seat: 4.25rem; /* 68px — matches .dc-page-tabs */
+}
+
+@media (min-width: 768px) {
+  :root {
+    --dc-site-header-seat: 5rem; /* 80px tablet portrait header */
+  }
+}
+
+@media (max-width: 959px) {
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-header]) {
+    position: relative;
+  }
+
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame] > [data-site-header] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    z-index: 30;
+  }
+
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-header]:not([data-home-header])):not(:has(> [data-search-bar])) > main {
+    padding-top: var(--dc-site-header-seat);
+    background-color: transparent;
+  }
+
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-home-header]) > main {
+    padding-top: var(--dc-home-header-seat, 12.5rem);
+    background-color: transparent;
+  }
+
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-header]) > [data-search-bar] {
+    margin-top: var(--dc-site-header-seat);
+  }
+
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-header]) > [data-myday-content] {
+    padding-top: calc(var(--dc-site-header-seat) + 1.5rem);
+    background-color: transparent;
+  }
+
+  /* Phone Revision: pad the INNER scroller so cards scroll under the
+     overlay site header (frost only frosts if content is behind it).
+     Nested max-width 767 so tablet portrait (visible tabs) does not
+     also inherit this pad. Subpages with AppHeader keep the pad on
+     `[data-revision-content]` so that header is not covered by the
+     site header. Test Bank keeps the column pad so its sticky search
+     stays flush under the site header. */
+  @media (max-width: 767px) {
+    html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-revision-frame]:has(> [data-site-header]):not(:has([data-revision-app-header])):not(:has([data-rev-bank-header])) [data-revision-page-main] {
+      padding-top: var(--dc-site-header-seat);
+      background-color: transparent;
+    }
+
+    html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-revision-frame]:has(> [data-site-header]):has([data-revision-app-header]) > [data-revision-content],
+    html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-revision-frame]:has(> [data-site-header]):has([data-rev-bank-header]) > [data-revision-content] {
+      padding-top: var(--dc-site-header-seat);
+      background-color: transparent;
+    }
+  }
+}
+
+@media (min-width: 768px) and (max-width: 959px) {
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-revision-frame]:has(> [data-site-header]) > .dc-page-tabs {
+    margin-top: var(--dc-site-header-seat);
+  }
+
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-revision-frame]:has(> [data-site-header]):not(:has(> .dc-page-tabs)) > [data-revision-content] {
+    padding-top: var(--dc-site-header-seat);
+    background-color: transparent;
+  }
+}
+
+.dc-desktop-shell [data-desktop-main] {
+  position: relative;
+  min-height: 0;
+}
+
+.dc-desktop-shell [data-desktop-topbar] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+}
+
+.dc-desktop-shell [data-desktop-content] {
+  padding-top: calc(var(--desktop-topbar-height) + 1.5rem) !important;
+  background-color: transparent;
+}
+
+.dc-desktop-shell [data-desktop-topbar][data-topbar-tabs] ~ [data-desktop-content] {
+  padding-top: calc(var(--desktop-topbar-height) + 2.75rem + 1.5rem) !important;
+}
+
+.dc-desktop-shell [data-desktop-content]:has(> main [data-revision-app]) {
+  padding-top: var(--desktop-topbar-height) !important;
+  padding-bottom: 0 !important;
+}
+
+.dc-desktop-shell [data-desktop-topbar][data-topbar-tabs] ~ [data-desktop-content]:has(> main [data-revision-app]) {
+  padding-top: calc(var(--desktop-topbar-height) + 2.75rem) !important;
+  padding-bottom: 0 !important;
+}
+
+/* Peek line width is a fraction of the PAGE column host, never the viewport. */
+[data-desktop-peek-line] {
+  width: min(22rem, 68%) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PAGE ENTER — landing Hero + Header motion on listed app pages
+   ══════════════════════════════════════════════════════════════════════
+   Hero: opacity 0 → 1, y 30 → 0, 0.8s, delay 0.15s.
+   Header: y -40 → 0, opacity 0 → 1, 0.7s ease-out.
+   CSS only — no AnimatePresence wait. prefers-reduced-motion skips.
+   The [data-page-enter] wrapper is `display: contents` so it never
+   becomes a transform containing block for overlay headers. Mobile
+   therefore uses two layers (header from above, body from below).
+   Desktop animates the page column only; the shell topbar is outside
+   [data-page-enter] and stays put. Revision / My Day inner pages
+   replay via [data-page-enter-panel] so the apps themselves are not
+   remounted. */
+
+@keyframes dc-page-enter-body {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes dc-page-enter-header {
+  from { opacity: 0; transform: translateY(-40px); }
+  to { opacity: 1; transform: none; }
+}
+
+[data-page-enter] [data-site-header],
+[data-page-enter] [data-course-header],
+[data-page-enter] [data-course-landscape-header] {
+  animation: dc-page-enter-header 0.7s ease-out both;
+}
+
+/* Body of every listed page except Revision / My Day (those replay
+   through [data-page-enter-panel] so inner navigation does not reset
+   paywall / loading state). Cart has no <main>, so the catch-all
+   covers the flex body sibling of the overlay header. */
+[data-page-enter] [data-app-frame] > *:not([data-site-header]):not([data-site-footer-nav]):not([data-site-footer]):not(nav):not([data-revision-content]):not([data-myday-content]):not(.dc-page-tabs),
+[data-page-enter] [data-course-player] > section,
+[data-page-enter] [data-course-landscape-content] {
+  animation: dc-page-enter-body 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+[data-myday-content] [data-page-enter-panel] {
+  animation: dc-page-enter-body 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+[data-revision-content] [data-page-enter-panel] > [data-revision-app-header] {
+  animation: dc-page-enter-header 0.7s ease-out both;
+}
+
+[data-revision-content] [data-page-enter-panel] > [data-revision-page-main] {
+  animation: dc-page-enter-body 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-page-enter] [data-site-header],
+  [data-page-enter] [data-course-header],
+  [data-page-enter] [data-course-landscape-header],
+  [data-page-enter] [data-app-frame] > *:not([data-site-header]):not([data-site-footer-nav]):not([data-site-footer]):not(nav):not([data-revision-content]):not([data-myday-content]):not(.dc-page-tabs),
+  [data-page-enter] [data-course-player] > section,
+  [data-page-enter] [data-course-landscape-content],
+  [data-myday-content] [data-page-enter-panel],
+  [data-revision-content] [data-page-enter-panel] > [data-revision-app-header],
+  [data-revision-content] [data-page-enter-panel] > [data-revision-page-main] {
+    animation: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VIEWPORT-SAFE OVERLAYS — PremiumGate + PDP module picker
+   ══════════════════════════════════════════════════════════════════════
+   Both cards used to grow past the viewport (overflow-hidden wrapper
+   without a flex/min-h-0 chain) and sit on a near-black scrim. Tablet
+   `* { max-width: 100% }` (640–1366) stretched the PDP sheet full-width
+   and the global `h1 { font-size: clamp(1.5rem, 2.5vw, 2rem) !important }`
+   inflated the gate headline. These unlayered rules, later than every
+   tablet pass, keep the card fully visible on phone / every tablet /
+   desktop: lighter indigo scrim, width cap, 100vh→100dvh height cap,
+   inner scroll. */
+
+.dc-premium-modal,
+[data-pdp-module-select-overlay] {
+  /* Beat tablet `* { max-width: 100% }` so a portalled overlay is not
+     squeezed to a parent width of 0 / stretched to 100vw of a padded box. */
+  max-width: none !important;
+  background: rgba(49, 46, 129, 0.28) !important;
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.dc-premium-modal-inner,
+.dc-premium-modal-inner > *,
+[data-pdp-module-select-overlay] [data-pdp-module-select-modal] {
+  max-width: none;
+}
+
+.dc-premium-modal-inner {
+  width: min(100vw, 640px);
+  max-width: 100%;
+  max-height: calc(100vh - 1.5rem);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dc-premium-modal-inner > * {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.dc-premium-sheet {
+  max-height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@supports (height: 100dvh) {
+  .dc-premium-modal-inner {
+    max-height: calc(100dvh - 1.5rem);
+  }
+}
+
+@media (min-width: 640px) {
+  .dc-premium-modal-inner {
+    max-height: min(640px, calc(100vh - 2rem));
+  }
+  @supports (height: 100dvh) {
+    .dc-premium-modal-inner {
+      max-height: min(640px, calc(100dvh - 2rem));
+    }
+  }
+}
+
+/* Tablet h1/h2/button clamps must not blow up the gate. */
+[data-premium-gate] h1 {
+  font-size: clamp(1.15rem, 3.2vw, 1.5rem) !important;
+}
+[data-premium-gate] h2 {
+  font-size: clamp(0.95rem, 2.4vw, 1.2rem) !important;
+}
+[data-premium-gate] button {
+  font-size: inherit;
+}
+
+[data-pdp-module-select-overlay] [data-pdp-module-select-modal] {
+  width: min(100%, 28rem);
+  max-width: min(100%, 28rem);
+  max-height: calc(100vh - 1.5rem);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  [data-pdp-module-select-overlay] [data-pdp-module-select-modal] {
+    max-height: calc(100dvh - 1.5rem);
+  }
+}
+
+@media (min-width: 640px) {
+  [data-pdp-module-select-overlay] [data-pdp-module-select-modal] {
+    width: min(100%, 32rem);
+    max-width: min(100%, 32rem);
+  }
+}
+
+@media (min-width: 960px) {
+  [data-pdp-module-select-overlay] [data-pdp-module-select-modal] {
+    width: min(100%, 36rem);
+    max-width: min(100%, 36rem);
+  }
+}
+
+[data-pdp-module-select-modal] h2 {
+  font-size: clamp(1rem, 2.2vw, 1.2rem) !important;
+}
+[data-pdp-module-select-modal] button {
+  font-size: 0.875rem;
 }
