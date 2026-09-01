@@ -1,3 +1,4 @@
+import { GlassTile } from "../../components/ui/glass-tile";
 // Shared "Connect your AI provider" form.
 //
 // Used by the student AI Settings page and the admin panel's AI Generate
@@ -46,14 +47,12 @@ function ProviderTile({
   onSelect: () => void;
 }) {
   return (
-    <button
+    <GlassTile
       type="button"
       onClick={onSelect}
-      aria-pressed={selected}
-      className={`group relative flex flex-col items-start gap-2 rounded-2xl border p-3 text-left transition-all active:scale-[0.98] ${
-        selected
-          ? `border-transparent bg-white shadow-md ring-2 ${meta.ring}`
-          : "border-slate-300 bg-white hover:border-slate-400 hover:shadow-sm"
+      selected={selected}
+      className={`dc-tile group relative flex aspect-auto min-h-[92px] flex-col items-start justify-start gap-2 rounded-2xl p-3 text-left ${
+        selected ? meta.ring : ""
       }`}
     >
       {selected && (
@@ -70,7 +69,7 @@ function ProviderTile({
         <span className="block truncate text-[13px] font-bold text-slate-900">{meta.name}</span>
         <span className="mt-0.5 block text-[10px] leading-tight text-slate-500">{meta.tagline}</span>
       </span>
-    </button>
+    </GlassTile>
   );
 }
 

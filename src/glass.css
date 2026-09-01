@@ -352,3 +352,46 @@ html[data-glass="on"] :where(.dc-swatch[aria-checked="true"]) {
 html[data-glass="on"] :where(.dc-panel) svg {
   color: rgb(100 116 139);
 }
+
+/* ── Wave 4 · learning surfaces ───────────────────────────────────────────
+   Same rule as every earlier wave: only *ink* is corrected here, never
+   structure, so `?glass=off` still restores the published material. */
+
+/* Selected tiles (AI provider picker, question-mode picker). The pack marks a
+   selected tile with a sky ring and a white ring — on a white page that reads
+   as nothing at all — so the accent follows the app's indigo. The frost, the
+   press gel and the sheen stay the pack's, and the unselected state keeps its
+   `:not([data-selected])` guard above so the pack's own hover still shows. */
+html[data-glass="on"] :where(.dc-tile)[data-selected] {
+  border-color: rgb(99 102 241);
+  background-color: rgba(255, 255, 255, 0.94);
+  --tw-ring-color: rgb(99 102 241 / 0.3);
+  --tw-ring-offset-color: #fff;
+}
+html[data-glass="on"] :where(.dc-tile)[data-selected]:hover {
+  background-color: #fff;
+}
+
+/* A segment control used as a toolbar row (revision's Saved-Tests / Smart-
+   Revision switch) has to fill its container; the pack surface is
+   inline-flex by nature, which is right for a chip row and wrong for a bar. */
+html[data-glass="on"] :where(.dc-segment)[data-stretch] > div[role="group"] {
+  width: 100%;
+  justify-content: space-between;
+}
+
+/* FlowPath renders a dark canvas without ever setting `.dark` or
+   `data-theme`, so the pack resolves its palette to "light" there and paints a
+   black rail that simply disappears. Only the rail, the fill and the thumb
+   shadow are re-inked — the geometry, the spring and the gel squish are the
+   registry's. */
+html[data-glass="on"] .dc-slider-on-dark > span:first-child {
+  background: rgb(255 255 255 / 0.16) !important;
+}
+html[data-glass="on"] .dc-slider-on-dark > span:nth-child(2) {
+  background: #0a84ff !important;
+}
+html[data-glass="on"] .dc-slider-on-dark > span:nth-child(3) {
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.45), 0 0 0 0.5px rgb(255 255 255 / 0.18) !important;
+}
+

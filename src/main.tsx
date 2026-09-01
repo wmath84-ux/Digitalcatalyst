@@ -35,6 +35,7 @@ import SearchPage from "./components/SearchPage";
 import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import GlassCommandPalette from "./components/GlassCommandPalette";
+import { ToastViewport } from "./components/ui/glass-toast";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BrandingProvider, useBranding } from "./context/BrandingContext";
 import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
@@ -1252,6 +1253,10 @@ createRoot(document.getElementById("root")!).render(
                 it lists live catalogue titles. It steps aside on admin and
                 player routes and when `data-glass="off"`. */}
             <GlassCommandPalette />
+            {/* Wave 4: the glass toast host moved up here so any route can
+                raise `toast.*()` without prop plumbing — FlowPath's old
+                top-centre div was the last one carrying its own copy. */}
+            <ToastViewport />
             <PortraitOnlyGuard />
           </CommerceProvider>
         </CatalogProvider>

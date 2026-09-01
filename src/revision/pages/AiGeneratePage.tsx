@@ -1,3 +1,4 @@
+import { GlassTile } from "../../components/ui/glass-tile";
 // Student-facing AI test generator.
 //
 // The learner picks Class → Subject → Chapter → Topic from four cascading
@@ -819,25 +820,25 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   </span>
                 </div>
                 <div data-rev-question-mode-grid className="mt-3 grid grid-cols-3 gap-1.5">
+                  {/* Wave 4: selectable cells -> registry glass-tile (frost, press gel,
+                      shared selected ring); aria-pressed comes from the pack. */}
                   {QUESTION_MODE_OPTIONS.map((m) => (
-                    <button
+                    <GlassTile
                       key={m.value}
                       type="button"
                       disabled={phase === "generating"}
                       onClick={() => setQuestionMode(m.value)}
-                      aria-pressed={questionMode === m.value}
-                      className={`flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-xl border px-2 text-center transition active:scale-[0.97] ${
+                      selected={questionMode === m.value}
+                      className={`dc-tile min-h-[72px] aspect-auto rounded-xl px-2 py-2 text-center ${
                         phase === "generating" ? "opacity-40" : ""
-                      } ${
-                        questionMode === m.value
-                          ? "border-indigo-500 bg-white text-indigo-700 ring-2 ring-indigo-200"
-                          : "border-slate-300 bg-white text-slate-700"
                       }`}
                     >
-                      <span className="text-base">{m.emoji}</span>
-                      <span className="text-[11px] font-extrabold leading-tight">{m.label}</span>
-                      <span className="line-clamp-2 text-[9px] font-medium leading-tight text-slate-500">{m.desc}</span>
-                    </button>
+                      <span className="flex flex-col items-center gap-1">
+                        <span className="text-base">{m.emoji}</span>
+                        <span className="text-[11px] font-extrabold leading-tight">{m.label}</span>
+                        <span className="line-clamp-2 text-[9px] font-medium leading-tight text-slate-500">{m.desc}</span>
+                      </span>
+                    </GlassTile>
                   ))}
                 </div>
               </div>

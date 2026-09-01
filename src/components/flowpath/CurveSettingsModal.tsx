@@ -1,3 +1,4 @@
+import { GlassSlider } from "../ui/glass-slider";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { GitBranch, RotateCcw, X } from "lucide-react";
@@ -134,14 +135,18 @@ function Slider({
         <span>{label}</span>
         <span>{format(value)}</span>
       </label>
-      <input
-        type="range"
+      {/* Wave 4: native range -> registry glass-slider. The thumb is a lens
+          that squashes with drag velocity, and ←/→/Home/End come with it.
+          `dc-slider-on-dark` re-inks rail + fill for FlowPath's dark canvas,
+          because the pack picks its palette from prefers-color-scheme. */}
+      <GlassSlider
         min={min}
         max={max}
         step={step}
         value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="fp-slider w-full"
+        onValueChange={onChange}
+        ariaLabel={label}
+        className="dc-slider-on-dark w-full"
       />
     </div>
   );

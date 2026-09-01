@@ -92,6 +92,25 @@ const LOCAL_ADAPTATIONS = {
     ["  const onInputKey = (e: React.KeyboardEvent) => {", "  const onInputKey = (e: ReactKeyboardEvent) => {"],
     ["", "  type KeyboardEvent as ReactKeyboardEvent,"],
   ],
+  // Wave 4 items: same story — no global `React` namespace in this tsconfig.
+  "glass-switch.tsx": [
+    ["  const onDown = (e: React.PointerEvent<HTMLButtonElement>) => {", "  const onDown = (e: ReactPointerEvent<HTMLButtonElement>) => {"],
+    ["  const onMove = (e: React.PointerEvent<HTMLButtonElement>) => {", "  const onMove = (e: ReactPointerEvent<HTMLButtonElement>) => {"],
+    ["  const onKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {", "  const onKey = (e: ReactKeyboardEvent<HTMLButtonElement>) => {"],
+    ["", "  type KeyboardEvent as ReactKeyboardEvent,"],
+    ["", "  type PointerEvent as ReactPointerEvent,"],
+  ],
+  "glass-slider.tsx": [
+    ["  const onDown = (e: React.PointerEvent<HTMLDivElement>) => {", "  const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {"],
+    ["  const onMove = (e: React.PointerEvent<HTMLDivElement>) => {", "  const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {"],
+    ["  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {", "  const onKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {"],
+    ["", "  type KeyboardEvent as ReactKeyboardEvent,"],
+    ["", "  type PointerEvent as ReactPointerEvent,"],
+  ],
+  "glass-popover.tsx": [
+    ["  triggerRef: React.RefObject<HTMLButtonElement | null>;", "  triggerRef: RefObject<HTMLButtonElement | null>;"],
+    ["", "  type RefObject,"],
+  ],
   "glass-motion.ts": [
     // upstream has no `previous()`; we expose the write-only field so
     // `noUnusedLocals` stays satisfied without deleting engine state.

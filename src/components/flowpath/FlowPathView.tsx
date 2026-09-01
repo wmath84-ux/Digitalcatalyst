@@ -1,3 +1,4 @@
+import { toast } from "../ui/glass-toast";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Trash2, BookOpen } from "lucide-react";
@@ -267,7 +268,6 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
   const [curve, setCurve] = useState<CurveOverride>(loadCurveOverride);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ msg: string; key: number } | null>(null);
   const [lecturePickerOpen, setLecturePickerOpen] = useState<boolean>(false);
   const [lectureSubmitting, setLectureSubmitting] = useState<boolean>(false);
 
@@ -442,13 +442,6 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
     setPulseSegment({ key: pulseToken.key, d: buildSmoothPath(pts) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pulseToken]);
-
-  // auto-dismiss toast
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2000);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   const handleOpenMenu = useCallback((afterId: string | null, rect: DOMRect) => {
     setMenu({ afterId, rect });
@@ -639,7 +632,7 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
           try {
             const res = await flowpathBulk(lecturePickerUid(), lectures as Array<Record<string, unknown>>);
             if (res.ok) {
-              setToast({ msg: `Scheduled ${lectures.length} lecture${lectures.length === 1 ? "" : "s"}`, key: Date.now() });
+              toast.success(`Scheduled ${lectures.length} lecture${lectures.length === 1 ? "" : "s"}`);
               return { ok: true };
             }
             return { ok: false, error: res.error || "Failed." };
@@ -665,31 +658,13 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
           setCreateType({ type, afterId: currentId });
         }}
         onPlanLectures={() => setLecturePickerOpen(true)}
-        onStub={(group, label) => setToast({ msg: `${group} · ${label}`, key: Date.now() })}
+        onStub={(group, label) => toast.info(`${group} · ${label} — coming soon`)}
         onNavigateToHome={onNavigateToHome}
         resolvedTheme={resolvedTheme}
         onToggleTheme={toggleTheme}
         onOpenCurve={() => setCurveOpen(true)}
       />
 
-      {/* stub feedback toast */}
-      <div className="pointer-events-none fixed inset-x-0 top-20 z-[65] flex justify-center px-4">
-        <AnimatePresence>
-          {toast && (
-            <motion.div
-              key={toast.key}
-              initial={{ opacity: 0, y: -14, scale: 0.92 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 320, damping: 24 }}
-              className="glass-panel-strong rounded-full px-4 py-2 text-xs font-medium text-fp-text"
-            >
-              {toast.msg}
-              <span className="text-fp-muted"> — coming soon</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
     </div>
   );
 }

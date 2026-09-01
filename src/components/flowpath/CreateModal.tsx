@@ -1,3 +1,4 @@
+import { GlassSlider } from "../ui/glass-slider";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -272,13 +273,16 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
                   <span>Progress</span>
                   <span>{progress}%</span>
                 </label>
-                <input
-                  type="range"
+                {/* Wave 4: native range -> registry glass-slider (same 0-100
+                    scale, same step-free drag semantics, plus keyboard). */}
+                <GlassSlider
                   min={0}
                   max={100}
+                  step={1}
                   value={progress}
-                  onChange={(e) => setProgress(Number(e.target.value))}
-                  className="w-full accent-blue-400"
+                  onValueChange={setProgress}
+                  ariaLabel="Progress"
+                  className="dc-slider-on-dark w-full"
                 />
               </div>
             )}

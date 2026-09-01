@@ -24,6 +24,9 @@ import { GlassSelect, GlassSelectContent, GlassSelectItem, GlassSelectTrigger } 
 import { GlassSheet, GlassSheetClose, GlassSheetContent, GlassSheetDescription, GlassSheetTitle, GlassSheetTrigger } from "@/components/ui/glass-sheet";
 import { GlassSwatch, GlassSwatchGroup } from "@/components/ui/glass-swatch";
 import { GlassTile } from "@/components/ui/glass-tile";
+import { GlassSwitch } from "@/components/ui/glass-switch";
+import { GlassSlider } from "@/components/ui/glass-slider";
+import { Popover, PopoverContent, PopoverItem, PopoverSeparator, PopoverTrigger } from "@/components/ui/glass-popover";
 import { GlassToggleGroup, GlassToggleItem } from "@/components/ui/glass-toggle-group";
 import {
   Tooltip,
@@ -128,6 +131,10 @@ export default function GlassPreviewPage() {
   const [tile, setTile] = useState("notes");
   const [swatch, setSwatch] = useState("indigo");
   const [railRow, setRailRow] = useState(0);
+  // Wave 4 · the learning-surface primitives (switch, slider, tile, popover).
+  const [curveOn, setCurveOn] = useState(true);
+  const [curve, setCurve] = useState(62);
+  const [mode, setMode] = useState("recall");
   const [tab, setTab] = useState("day");
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -483,6 +490,79 @@ export default function GlassPreviewPage() {
               </GlassSheetContent>
             </GlassSheet>
           </div>
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur-xl">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">Wave 4 · learning surfaces</h2>
+            <p className="text-[11px] font-semibold text-slate-400">glass-switch · glass-slider · glass-tile · glass-popover</p>
+          </header>
+
+          <Row label="glass-switch">
+            <GlassSwitch checked={curveOn} onCheckedChange={setCurveOn} ariaLabel="Curve override" />
+            <span className="text-xs font-semibold text-slate-500">
+              {curveOn ? "on" : "off"} — drag it: the thumb squashes along the travel and turns into a real lens while held.
+              FlowPath's revision-curve row uses this exact component.
+            </span>
+          </Row>
+
+          <Row label="glass-slider">
+            <div className="w-full max-w-sm">
+              <GlassSlider min={0} max={100} value={curve} onValueChange={setCurve} ariaLabel="Curve strength" />
+              <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                {curve}% · ← → adjust, PageUp/PageDown jump 10%, Home/End snap. Both FlowPath sliders
+                (curve settings + activity progress) are this component now.
+              </p>
+            </div>
+          </Row>
+
+          <Row label="glass-tile">
+            <div className="grid w-full max-w-md grid-cols-3 gap-1.5">
+              {[
+                { v: "recall", e: "🎯", t: "Recall", d: "Short-answer recall" },
+                { v: "mcq", e: "🔤", t: "MCQ", d: "Four options" },
+                { v: "mixed", e: "🧩", t: "Mixed", d: "Both, shuffled" },
+              ].map((o) => (
+                <GlassTile
+                  key={o.v}
+                  selected={mode === o.v}
+                  onClick={() => setMode(o.v)}
+                  className="dc-tile min-h-[72px] aspect-auto rounded-xl px-2 py-2 text-center"
+                >
+                  <span className="flex flex-col items-center gap-1">
+                    <span className="text-base">{o.e}</span>
+                    <span className="text-[11px] font-extrabold leading-tight">{o.t}</span>
+                    <span className="text-[9px] font-medium leading-tight text-slate-500">{o.d}</span>
+                  </span>
+                </GlassTile>
+              ))}
+            </div>
+          </Row>
+
+          <Row label="glass-popover">
+            <Popover>
+              <PopoverTrigger className="rounded-full border border-slate-200 bg-white/80 px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-white">
+                Add to day
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="start" tint={0.8}>
+                <PopoverItem className="text-slate-700 hover:bg-slate-900/5" onClick={() => { setMode("recall"); }}>
+                  Revision session
+                </PopoverItem>
+                <PopoverItem className="text-slate-700 hover:bg-slate-900/5" onClick={() => setMode("mcq")}>
+                  Practice questions
+                </PopoverItem>
+                <PopoverSeparator className="bg-slate-900/10" />
+                <PopoverItem className="text-slate-700 hover:bg-slate-900/5" onClick={() => setMode("mixed")}>
+                  Note
+                </PopoverItem>
+              </PopoverContent>
+            </Popover>
+            <p className="max-w-md text-[11px] font-semibold text-slate-500">
+              Portalled and fixed-positioned, so no ancestor clips it; it re-places on scroll and closes on outside
+              mousedown or Escape. The item ink is overridden for the light page (the pack ships dark-first). My Day's
+              Create menu keeps its pinned drop-up geometry instead of this.
+            </p>
+          </Row>
         </section>
 
         <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Glass sheet">
