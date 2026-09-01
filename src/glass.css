@@ -518,3 +518,47 @@ html[data-glass="on"] :where(.dc-field, .dc-glass-select, .dc-segment, .dc-tile,
     animation: none !important;
   }
 }
+
+/* ── Wave 2 (v2) · fixed chrome surface over the Black Ice backdrop ──────────
+ * The header and footer keep their position, their markup and every animation
+ * (hide-on-scroll, collapse, dock behaviour) untouched; only their *surface*
+ * changes, and only in CSS — the chrome TSX is not edited here, and
+ * src/components/BottomNav.tsx + src/components/glass-dock/** are frozen, so
+ * they get nothing at all (the mobile footer already sits fine on the backdrop).
+ *
+ * The frost is a translucent *white* over the dark backdrop on purpose: the
+ * chrome's ink is dark slate (`text-slate-900`), so a light frost keeps it
+ * ≥4.5:1 without touching a single label. The rim is an inset hairline drawn
+ * with box-shadow (never `border`) so no fixed bar shifts by a pixel and the
+ * hide-on-scroll / collapse geometry is bit-identical.
+ * `?glass=off` drops every rule below and restores the pre-rollout paint.
+ * --------------------------------------------------------------------------- */
+
+html[data-glass="on"] :where([data-site-header]) {
+  background-color: rgb(var(--dc-paper-on-ink) / 0.78);
+  box-shadow:
+    inset 0 -1px 0 rgb(var(--dc-paper-on-ink) / 0.28),
+    0 10px 28px -20px rgb(0 0 0 / 0.7);
+}
+
+/* The home header paints its own brand gradient + blur inline
+   (src/home/components/Header.tsx, pinned by homeHeaderGlassCollapse), so it
+   gets only the rim — its background is left alone. */
+html[data-glass="on"] :where([data-home-header]) {
+  box-shadow:
+    inset 0 -1px 0 rgb(var(--dc-paper-on-ink) / 0.28),
+    0 10px 28px -20px rgb(0 0 0 / 0.7);
+}
+
+/* Desktop rail + top bar are the fixed chrome on tablet-landscape / desktop. */
+html[data-glass="on"] :where([data-desktop-rail]) {
+  background-color: rgb(var(--dc-paper-on-ink) / 0.82);
+  box-shadow: inset -1px 0 0 rgb(var(--dc-paper-on-ink) / 0.28);
+}
+
+html[data-glass="on"] :where([data-desktop-topbar]) {
+  background-color: rgb(var(--dc-paper-on-ink) / 0.82);
+  box-shadow:
+    inset 0 -1px 0 rgb(var(--dc-paper-on-ink) / 0.28),
+    0 10px 28px -20px rgb(0 0 0 / 0.7);
+}
