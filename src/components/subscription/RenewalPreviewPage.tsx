@@ -18,6 +18,9 @@
 // Because it shares the real helpers, whatever appears here is exactly
 // what a buyer sees on that day — this is a preview, not a mock-up.
 
+import { GlassSelect, GlassSelectContent, GlassSelectItem, GlassSelectTrigger } from "../ui/glass-select";
+import { GlassSlider } from "../ui/glass-slider";
+import { GlassCheckbox } from "../ui/glass-checkbox";
 import { useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -121,15 +124,15 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
               </span>
             </div>
 
-            <input
-              type="range"
+            <GlassSlider
               min={-12}
               max={40}
               step={1}
               value={offsetDays}
-              onChange={(event) => setOffsetDays(Number(event.target.value))}
+              onValueChange={setOffsetDays}
+              ariaLabel="Days to expiry"
               data-preview-slider
-              className="mt-3 w-full accent-violet-600"
+              className="mt-3 w-full"
             />
 
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -152,37 +155,30 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <label className="block">
                 <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-400">Plan</span>
-                <select
-                  value={planName}
-                  onChange={(event) => setPlanName(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-800"
-                >
-                  {["Basic", "Premium", "Pro"].map((name) => (
-                    <option key={name} value={name}>{name}</option>
-                  ))}
-                </select>
+                <GlassSelect value={planName} onValueChange={setPlanName}>
+                  <GlassSelectTrigger aria-label="Plan" className="dc-glass-select h-9 w-full text-xs font-bold" />
+                  <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Plan options">
+                    {["Basic", "Premium", "Pro"].map((name) => (
+                      <GlassSelectItem key={name} value={name}>{name}</GlassSelectItem>
+                    ))}
+                  </GlassSelectContent>
+                </GlassSelect>
               </label>
               <label className="block">
                 <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-400">Cycle</span>
-                <select
-                  value={cycle}
-                  onChange={(event) => setCycle(event.target.value as "monthly" | "yearly")}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-800"
-                >
-                  <option value="monthly">Monthly</option>
-                  <option value="yearly">Yearly</option>
-                </select>
+                <GlassSelect value={cycle} onValueChange={(v) => setCycle(v as "monthly" | "yearly")}>
+                  <GlassSelectTrigger aria-label="Cycle" className="dc-glass-select h-9 w-full text-xs font-bold" />
+                  <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Cycle options">
+                    <GlassSelectItem value="monthly">Monthly</GlassSelectItem>
+                    <GlassSelectItem value="yearly">Yearly</GlassSelectItem>
+                  </GlassSelectContent>
+                </GlassSelect>
               </label>
             </div>
 
             <div className="mt-3 flex items-center gap-3">
               <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={optOut}
-                  onChange={(event) => setOptOut(event.target.checked)}
-                  className="h-4 w-4 accent-violet-600"
-                />
+                <GlassCheckbox checked={optOut} onCheckedChange={setOptOut} ariaLabel="Reminder opt-out" />
                 Reminder opt-out
               </label>
               {dismissed.length > 0 ? (

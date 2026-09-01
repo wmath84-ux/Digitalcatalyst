@@ -7,6 +7,7 @@
 // The card scales with the viewer stage (phone, every tablet width,
 // landscape rails, desktop) so controls never clip or hide.
 
+import { GlassSlider } from "../components/ui/glass-slider";
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw, Volume2, VolumeX, Repeat } from "lucide-react";
 
@@ -125,16 +126,18 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
 
   const seekBar = (
     <>
-      <input
-        type="range"
+      {/* Wave 5: the seek bar is the registry slider (`data-course-audio-seek`
+          stays, so the player contract still finds it). `max` falls back to 1
+          while metadata is loading because the pack normalises by range. */}
+      <GlassSlider
         min={0}
-        max={duration || 0}
+        max={duration || 1}
         step={0.1}
         value={Math.min(currentTime, duration || 0)}
-        onChange={(event) => seek(Number(event.target.value))}
-        className="h-1.5 w-full min-w-0 cursor-pointer appearance-none rounded-full bg-[var(--course-soft-hover)] accent-violet-400"
-        aria-label="Seek"
+        onValueChange={seek}
+        ariaLabel="Seek"
         data-course-audio-seek
+        className="dc-slider-on-dark dc-slider-violet w-full min-w-0"
       />
       <div className="mt-1 flex items-center justify-between text-[10px] font-bold tabular-nums text-[var(--course-muted)] sm:mt-2">
         <span data-course-audio-current>{formatTime(currentTime)}</span>

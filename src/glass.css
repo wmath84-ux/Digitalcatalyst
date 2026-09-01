@@ -395,3 +395,27 @@ html[data-glass="on"] .dc-slider-on-dark > span:nth-child(3) {
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.45), 0 0 0 0.5px rgb(255 255 255 / 0.18) !important;
 }
 
+/* Wave 5 · account + player. `.dc-field` gives the profile/settings form fields
+   the same frost + rim as the pack's search pill without borrowing that
+   component's pill anatomy; `.dc-switch` keeps this app's indigo→violet accent
+   on the registry switch (its default is iOS green); `.dc-slider-violet` is the
+   course player's seek bar, whose accent is violet everywhere in that surface. */
+html[data-glass="on"] :where(.dc-field) {
+  border-color: rgb(226 232 240 / 0.9);
+  background-color: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(10px) saturate(1.5);
+  -webkit-backdrop-filter: blur(10px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+html[data-glass="on"] :where(.dc-field):focus {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-color: rgb(129 140 248);
+}
+html[data-glass="on"] .dc-switch[aria-checked="true"] > span:first-child {
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
+}
+html[data-glass="on"] .dc-slider-violet > span:nth-child(2) {
+  background: #a78bfa !important;
+}
+
+

@@ -131,6 +131,12 @@ export default function GlassPreviewPage() {
   const [tile, setTile] = useState("notes");
   const [swatch, setSwatch] = useState("indigo");
   const [railRow, setRailRow] = useState(0);
+  // Wave 5 · account + player: the recipe the profile/settings rows and the
+  // course player now share.
+  const [pushOn, setPushOn] = useState(true);
+  const [bio, setBio] = useState("");
+  const [seek, setSeek] = useState(38);
+  const [sortDemo, setSortDemo] = useState("recommended");
   // Wave 4 · the learning-surface primitives (switch, slider, tile, popover).
   const [curveOn, setCurveOn] = useState(true);
   const [curve, setCurve] = useState(62);
@@ -562,6 +568,63 @@ export default function GlassPreviewPage() {
               mousedown or Escape. The item ink is overridden for the light page (the pack ships dark-first). My Day's
               Create menu keeps its pinned drop-up geometry instead of this.
             </p>
+          </Row>
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur-xl">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">Wave 5 · account &amp; player</h2>
+            <p className="text-[11px] font-semibold text-slate-400">the exact recipes profile, settings, search and #/course/:id use</p>
+          </header>
+
+          <Row label="preference row">
+            <div className="flex w-full max-w-md items-center gap-3 rounded-2xl border border-slate-100 bg-white/70 p-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
+                <Bell className="h-4 w-4" />
+              </span>
+              <span className="flex-1 text-sm font-bold text-slate-900">Push notifications</span>
+              <GlassSwitch checked={pushOn} onCheckedChange={setPushOn} ariaLabel="Push notifications" className="dc-switch shrink-0" />
+            </div>
+          </Row>
+
+          <Row label="form field">
+            <div className="w-full max-w-sm">
+              <span className="mb-1 block text-[11px] font-black uppercase tracking-wider text-slate-500">Bio</span>
+              <input
+                value={bio}
+                onChange={(e) => setBio(e.target.value.slice(0, 240))}
+                placeholder="Tell learners about yourself"
+                className="dc-field w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              />
+              <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                `glass-input` is the pack’s search pill (radius 9999, no textarea twin), so profile fields take the
+                same frost as a `.dc-field` class instead of the wrong anatomy.
+              </p>
+            </div>
+          </Row>
+
+          <Row label="listbox">
+            <GlassSelect value={sortDemo} onValueChange={setSortDemo}>
+              <GlassSelectTrigger aria-label="Sort results" className="dc-glass-select h-9 min-w-[11rem] text-xs font-bold" />
+              <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Sort options">
+                {["recommended", "newest", "price-low", "rating"].map((v) => (
+                  <GlassSelectItem key={v} value={v}>{v}</GlassSelectItem>
+                ))}
+              </GlassSelectContent>
+            </GlassSelect>
+            <p className="max-w-xs text-[11px] font-semibold text-slate-500">
+              Every remaining native select outside admin — FlowPath’s editor, the model picker, search sort, the
+              renewal preview — renders this listbox now.
+            </p>
+          </Row>
+
+          <Row label="seek bar">
+            <div className="w-full max-w-sm rounded-2xl bg-slate-950 p-3">
+              <GlassSlider min={0} max={180} value={seek} onValueChange={setSeek} ariaLabel="Audio seek" className="dc-slider-on-dark dc-slider-violet w-full" />
+              <p className="mt-1 text-[10px] font-bold tabular-nums text-white/60">
+                {Math.floor(seek / 60)}:{String(seek % 60).padStart(2, "0")} / 3:00 — the course player’s audio transport
+              </p>
+            </div>
           </Row>
         </section>
 

@@ -18,6 +18,7 @@
 // desktop shell (left rail + top bar) takes over automatically on
 // >= 1024 px viewports.
 
+import { GlassSelect, GlassSelectContent, GlassSelectItem, GlassSelectTrigger } from "./ui/glass-select";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Search as SearchIcon, X } from "lucide-react";
 import type { Product } from "../data/products";
@@ -262,18 +263,22 @@ export default function SearchPage({
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <select
-              value={sort}
-              onChange={(event) => setSort(event.target.value as SortKey)}
-              aria-label="Sort by"
-              className="rounded-xl border border-slate-200/70 bg-white/85 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-700 shadow-sm backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-indigo-300/50"
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            {/* Wave 5: `#/search` and the store now share one sort control —
+                the registry listbox from Wave 3 — instead of a native popup
+                that no amount of CSS can match the app's material. */}
+            <GlassSelect value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+              <GlassSelectTrigger
+                aria-label="Sort by"
+                className="dc-glass-select h-8 min-w-[9.5rem] text-[11px] font-bold uppercase tracking-wide"
+              />
+              <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Sort options">
+                {SORT_OPTIONS.map((option) => (
+                  <GlassSelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </GlassSelectItem>
+                ))}
+              </GlassSelectContent>
+            </GlassSelect>
             <span
               data-search-result-count
               className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500"

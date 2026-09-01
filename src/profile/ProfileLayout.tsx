@@ -1,3 +1,5 @@
+import { GlassSwitch } from "../components/ui/glass-switch";
+import { GlassSurface } from "../components/ui/glass";
 import { useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowRight,
@@ -69,8 +71,13 @@ const EYEBROW = "text-[10px] font-black uppercase tracking-[0.16em] text-indigo-
 const ICON_CHIP =
   "grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 md:h-12 md:w-12";
 const STAT_CHIP = "rounded-2xl bg-slate-50 px-2.5 py-2.5 text-center ring-1 ring-slate-100";
+// Wave 5: `glass-input` is the pack's *search* pill (radius 9999, focus glow,
+// no textarea twin), so profile fields do not wear it as a skin. Same material,
+// right anatomy: the frost + rim come from `.dc-field` in src/glass.css and the
+// native `<input>`/`<textarea>` keep `required`, `inputMode`, `rows` and the
+// validation copy exactly as the profile contract expects.
 const INPUT =
-  "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100";
+  "dc-field w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100";
 
 const formatDate = (value: number): string => {
   if (!value) return "Not set";
@@ -723,7 +730,14 @@ function UpgradePoint({ children }: { children: ReactNode }) {
 export function BaseModal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 sm:items-center sm:p-6">
-      <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl">
+      {/* Sheet corners on phones, card corners on desktop — the same rule the
+          shared Modal has followed since Wave 1, so profile + settings dialogs
+          now agree with the rest of the app. */}
+      <GlassSurface
+        tint={0.78}
+        radius={24}
+        className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl p-6 sm:rounded-3xl"
+      >
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-xl font-black text-slate-950">{title}</h2>
           <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200">
@@ -731,7 +745,7 @@ export function BaseModal({ title, onClose, children }: { title: string; onClose
           </button>
         </div>
         {children}
-      </div>
+      </GlassSurface>
     </div>
   );
 }
@@ -741,16 +755,20 @@ export function PreferenceRow({ icon, label, checked, onChange }: { icon: ReactN
     <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">{icon}</span>
       <span className="flex-1 text-sm font-bold text-slate-900">{label}</span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
+      {/* Wave 5: this was a hand-built 44×24 track with a translated knob.
+          The registry switch keeps the same { checked, onChange } API and adds
+          what the fake one could not: the knob squashes along the travel while
+          you drag, it can be flipped with Space/Enter, `role="switch"` +
+          `aria-checked` come from the component, and holding it turns the knob
+          into a real refracting lens. The indigo→violet identity is preserved
+          in src/glass.css (`.dc-switch`), not by forking the component. */}
+      <GlassSwitch
+        checked={checked}
+        onCheckedChange={onChange}
+        ariaLabel={label}
         data-on={checked ? "true" : "false"}
-        onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? "bg-gradient-to-r from-indigo-600 to-violet-600" : "bg-slate-200"}`}
-      >
-        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${checked ? "left-[22px]" : "left-0.5"}`} />
-      </button>
+        className="dc-switch shrink-0"
+      />
     </div>
   );
 }
