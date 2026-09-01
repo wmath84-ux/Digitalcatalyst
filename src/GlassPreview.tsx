@@ -14,6 +14,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Glass, GlassLens, GlassSurface, useGlassDark } from "@/components/ui/glass";
 import { GlassButton } from "@/components/ui/glass-button";
+import PageTabs from "@/components/ui/PageTabs";
+import Modal from "@/components/ui/Modal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import LiquidMetalButton from "@/components/ui/LiquidMetalButton";
+import Toast, { type ToastMessage } from "@/components/ui/Toast";
 import { applyGlassTier, detectGlassTier, liveLensCount, strengthFor, toGlassRgb, type GlassTier } from "@/lib/glass";
 
 const TINT_BG =
@@ -40,6 +45,14 @@ export default function GlassPreviewPage() {
   const [dome, setDome] = useState(0.1);
   const [radius, setRadius] = useState(24);
   const [drag, setDrag] = useState({ x: 0, y: 0 });
+  // Wave 1 = the shared primitives. These three pieces of state drive them, so
+  // this sandbox is also the manual test for the wrappers every page reuses.
+  const [tab, setTab] = useState("day");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const say = (text: string, type: ToastMessage["type"] = "success") =>
+    setToasts((prev) => [...prev, { id: `${Date.now()}${Math.random()}`, text, type }]);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const lensId = useMemo(() => Symbol("preview-lens"), []);
 
@@ -180,6 +193,55 @@ export default function GlassPreviewPage() {
             </Glass>
           </div>
         </section>
+
+        <section className="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur-xl">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">Wave 1 · shared primitives</h2>
+            <div className="flex gap-2">
+              <LiquidMetalButton tone="silver" onClick={() => setModalOpen(true)}>Open sheet</LiquidMetalButton>
+              <LiquidMetalButton tone="danger" onClick={() => setConfirmOpen(true)}>Confirm delete</LiquidMetalButton>
+              <LiquidMetalButton tone="primary" onClick={() => say("Toast raised through the glass viewport.")}>Toast</LiquidMetalButton>
+            </div>
+          </header>
+          <PageTabs
+            items={[
+              { id: "day", label: "Day", hint: "Today’s plan" },
+              { id: "tasks", label: "Tasks" },
+              { id: "notes", label: "Notes" },
+            ]}
+            activeId={tab}
+            onSelect={setTab}
+            ariaLabel="Preview pages"
+            feature="preview"
+            onHome={() => setTab("day")}
+          />
+          <p className="text-xs text-slate-500">
+            Selected: <strong>{tab}</strong> — the tab strip is the pack’s spring indicator; the sheet,
+            confirm dialog and toast are the same components every feature page now renders.
+          </p>
+        </section>
+
+        <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Glass sheet">
+          <p className="text-sm text-slate-600">
+            Phone width = a bottom sheet with top corners; from 640 px it becomes a centred card, and inside the
+            desktop shell it stays constrained to the content column. That behaviour is the app’s existing
+            overlay maths — only the panel material changed.
+          </p>
+          <div className="mt-5 flex gap-3">
+            <LiquidMetalButton tone="silver" className="flex-1" onClick={() => setModalOpen(false)}>Close</LiquidMetalButton>
+            <LiquidMetalButton tone="primary" className="flex-1" onClick={() => { setModalOpen(false); say("Saved."); }}>Save</LiquidMetalButton>
+          </div>
+        </Modal>
+
+        <ConfirmDialog
+          open={confirmOpen}
+          title="Delete activity?"
+          message="This removes it from My Day. The confirmation reads the same as before, on frosted glass."
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={() => { setConfirmOpen(false); say("Deleted.", "error"); }}
+        />
+
+        <Toast toasts={toasts} onRemove={(id) => setToasts((prev) => prev.filter((t2) => t2.id !== id))} />
 
         <p className="text-xs text-slate-500">
           Wave 0 = install only: 22 registry items land in `src/components/ui/`, nothing in the app changes yet.

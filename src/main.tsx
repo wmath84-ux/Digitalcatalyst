@@ -55,6 +55,7 @@ import { setThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/them
 import { initOrientationLock } from "./utils/appOrientation";
 import { recordRouteVisit } from "./utils/routeHistory";
 import { requiresAuthentication } from "./utils/appRoutes";
+import { applyGlassTier, detectGlassTier } from "./lib/glass";
 import AppShell from "./components/AppShell";
 import PageEnter, { pageEnterAppKey } from "./components/PageEnter";
 import { resolveActiveFromHash } from "./components/DesktopShell";
@@ -678,6 +679,17 @@ function RootPage(): ReactNode {
     if (typeof window !== "undefined") {
       recordRouteVisit(hash, window.sessionStorage);
     }
+  }, [hash]);
+
+  // Liquid Glass material layer (website-glass rollout — Wave 1). The tier is
+  // resolved per route on purpose: the admin panel has its own chrome and the
+  // rollout deliberately leaves it (and the bottom footer nav) untouched, so
+  // the material is forced `off` there. Every rule in src/glass.css is gated on
+  // html[data-glass="on"], and the vendored components read their own theme,
+  // so `off` genuinely restores the pre-glass UI rather than half-applying it.
+  useEffect(() => {
+    const adminRoute = hash.startsWith(ADMIN_HASH) || hash.startsWith(ADMIN_LOGIN_HASH);
+    applyGlassTier(adminRoute ? "off" : detectGlassTier());
   }, [hash]);
 
   useEffect(() => {

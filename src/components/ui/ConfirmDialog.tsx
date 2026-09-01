@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { GlassSurface } from "./glass";
+import { LiquidMetalButton } from "./LiquidMetalButton";
 import {
   lockBodyScroll,
   unlockBodyScroll,
@@ -15,6 +17,8 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Danger is the default because every current call-site deletes something. */
+  tone?: "danger" | "primary";
 }
 
 /**
@@ -24,6 +28,11 @@ interface ConfirmDialogProps {
  * or the desktop shell's left rail on a small tablet in landscape —
  * stays visible and untouched). The panel is capped to the visible height,
  * so short landscape screens scroll internally instead of overflowing.
+ *
+ * Wave 1 (liquid glass): frosted `GlassSurface` panel + the pack's gel-press
+ * buttons for Cancel / Delete, so the destructive action has weight without
+ * the flat solid pill. `role="alertdialog"`, Escape-to-cancel and the shared
+ * scroll lock are unchanged.
  */
 export default function ConfirmDialog({
   open,
@@ -32,6 +41,7 @@ export default function ConfirmDialog({
   confirmLabel = "Delete",
   onConfirm,
   onCancel,
+  tone = "danger",
 }: ConfirmDialogProps) {
   const boundsRef = useOverlayBounds();
   const { scoped, box } = useOverlayBox(open, boundsRef);
@@ -76,31 +86,32 @@ export default function ConfirmDialog({
         )}
         onClick={onCancel}
       />
-      <div
-        className="relative max-h-full w-full max-w-sm animate-scaleIn overflow-y-auto overscroll-contain rounded-2xl bg-white p-6 shadow-2xl custom-scrollbar"
+      <GlassSurface
+        tint={0.9}
+        tintColor="255,255,255"
+        blur={26}
+        saturation={1.35}
+        radius={0}
+        style={{ borderRadius: "var(--glass-sheet-radius)" }}
+        className="glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden shadow-2xl"
+        contentClassName="max-h-full overflow-y-auto overscroll-contain p-6 custom-scrollbar"
         role="alertdialog"
         aria-modal="true"
       >
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+        <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-rose-100 text-rose-600 ring-1 ring-white/70">
           <AlertTriangle className="h-6 w-6" />
         </div>
         <h3 className="text-lg font-bold text-slate-900">{title}</h3>
         <p className="mt-1.5 text-sm text-slate-500">{message}</p>
         <div className="mt-6 flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-          >
+          <LiquidMetalButton tone="silver" onClick={onCancel} className="flex-1">
             Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 rounded-xl bg-rose-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-rose-200 transition hover:bg-rose-700"
-          >
+          </LiquidMetalButton>
+          <LiquidMetalButton tone={tone} onClick={onConfirm} className="flex-1">
             {confirmLabel}
-          </button>
+          </LiquidMetalButton>
         </div>
-      </div>
+      </GlassSurface>
     </div>
   );
 }

@@ -106,3 +106,78 @@ html[data-glass="on"] {
 html[data-glass="on"] :where([data-glass="panel"]) {
   box-decoration-break: clone;
 }
+
+/* ── Wave 1: shared primitives (Modal / ConfirmDialog / MacWindowModal /
+ *    Toast / PageTabs / LiquidMetalButton) ─────────────────────────────────
+ * These rules are the parts a `GlassSurface` cannot express as a prop — the
+ * responsive corner shape of a sheet vs a card, the entry motion, and the
+ * light-theme droplet colour. Keeping them here (instead of editing the
+ * vendored files) is what lets `npx shadcn add` be re-run without a conflict.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Phones: bottom sheet -> top corners only. From the sm band up the panel is
+     a card, so all four corners round. Modal/MacWindowModal read this through
+     their inline `style` because an inline border-radius beats a class. */
+  --glass-sheet-radius: 1.75rem 1.75rem 0 0;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --glass-sheet-radius: 1.5rem;
+  }
+}
+
+@keyframes glass-sheet-rise {
+  from { opacity: 0; transform: translate3d(0, 26px, 0) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes glass-card-pop {
+  from { opacity: 0; transform: translate3d(0, 6px, 0) scale(0.965); }
+  to   { opacity: 1; transform: none; }
+}
+
+html[data-glass="on"] :where(.glass-dialog-in) {
+  animation: glass-sheet-rise 0.26s cubic-bezier(0.22, 1.15, 0.36, 1.06) both;
+}
+
+@media (min-width: 640px) {
+  html[data-glass="on"] :where(.glass-dialog-in) {
+    animation-name: glass-card-pop;
+    animation-duration: 0.2s;
+  }
+}
+
+@keyframes glass-toast-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+html[data-glass="on"] :where(.glass-toast-in) {
+  animation: glass-toast-in 0.22s cubic-bezier(0.22, 1.15, 0.36, 1.06) both;
+}
+
+/* The legacy gradient button becomes a lens. `.liquid-metal-button` keeps its
+ * layout, focus-visible and disabled rules from liquidMetalButton.css; only the
+ * opaque paint is removed, so `data-glass="off"` restores the exact old look. */
+html[data-glass="on"] :where(.liquid-metal-button) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  isolation: auto;
+}
+
+/* PageTabs sits on a white strip, so the upstream droplet (white-on-dark) gets
+ * an indigo wash; it targets the pill element inside the list we tag from
+ * src/components/ui/PageTabs.tsx. */
+html[data-glass="on"] :where(.dc-page-tabs-list) div[aria-hidden] {
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.2), rgba(56, 189, 248, 0.24)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 6px 16px -8px rgba(79, 70, 229, 0.5) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-glass="on"] :where(.glass-dialog-in, .glass-toast-in) {
+    animation: none !important;
+  }
+}
