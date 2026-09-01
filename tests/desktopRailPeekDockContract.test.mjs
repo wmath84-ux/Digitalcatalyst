@@ -1,9 +1,9 @@
 // tests/desktopRailPeekDockContract.test.mjs
 //
 // Desktop / tablet-landscape peek dock must sit on the PAGE column
-// (not the full viewport), so an open left rail cannot make it look
-// left-shifted. The rail has a glass toggle at its top-left; opening
-// the dock hides the rail, pointer-leave shows it again.
+// (`[data-desktop-main]`), not the full viewport including the left
+// rail. There is no rail-hide toggle and the dock does not collapse
+// the side panel when it opens.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -15,7 +15,7 @@ const peek = fs.readFileSync("src/components/glass-dock/DesktopPeekDock.tsx", "u
 
 test("peek dock measures the page column instead of the full viewport", () => {
   assert.match(peek, /data-page-seat/);
-  assert.match(peek, /\[data-desktop-content\] > main/);
+  assert.match(peek, /\[data-desktop-main\]/);
   assert.match(peek, /getBoundingClientRect/);
   assert.match(peek, /ResizeObserver/);
   assert.match(peek, /host\.style\.left/);
@@ -27,32 +27,20 @@ test("peek dock measures the page column instead of the full viewport", () => {
   );
 });
 
-test("peek dock reports open/close so the shell can hide the rail", () => {
-  assert.match(peek, /onOpenChange/);
-  assert.match(shell, /onOpenChange=\{setPeekOpen\}/);
-  assert.match(shell, /data-peek-open/);
-  assert.match(shell, /data-rail-hidden/);
-  assert.match(shell, /railHidden = railCollapsed \|\| peekOpen/);
-});
-
-test("left rail has a glass toggle at its top-left to open and close", () => {
-  assert.match(shell, /data-desktop-rail-toggle/);
-  assert.match(shell, /RailGlassToggle/);
-  assert.match(shell, /PanelLeftClose/);
-  assert.match(shell, /Show side panel/);
-  assert.match(shell, /Hide side panel/);
-  assert.match(shell, /GlassMaterial/);
-  assert.match(css, /\[data-desktop-rail-toggle\]/);
-});
-
-test("CSS collapses the rail when hidden and snaps it back after peek close", () => {
-  assert.match(css, /\[data-rail-hidden="true"\] \[data-desktop-rail\]/);
-  assert.match(css, /width:\s*0 !important/);
-  assert.match(css, /\[data-peek-open="false"\]\[data-rail-collapsed="false"\] \[data-desktop-rail\]/);
-  assert.match(css, /transition-duration:\s*0s/);
+test("the side panel has no hide button and the dock does not collapse it", () => {
+  assert.doesNotMatch(shell, /data-desktop-rail-toggle/);
+  assert.doesNotMatch(shell, /RailGlassToggle/);
+  assert.doesNotMatch(shell, /railCollapsed/);
+  assert.doesNotMatch(shell, /railHidden/);
+  assert.doesNotMatch(shell, /setPeekOpen/);
+  assert.doesNotMatch(shell, /onOpenChange/);
+  assert.doesNotMatch(peek, /onOpenChange/);
+  assert.doesNotMatch(css, /\[data-desktop-rail-toggle\]/);
+  assert.doesNotMatch(css, /\[data-rail-hidden="true"\]/);
 });
 
 test("peek line width is a fraction of the page column, not 68vw", () => {
   const lineBlock = css.slice(css.lastIndexOf("[data-desktop-peek-line] {"));
   assert.match(lineBlock, /width:\s*min\(22rem,\s*68%\)/);
+  assert.doesNotMatch(css, /68vw/);
 });

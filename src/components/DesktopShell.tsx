@@ -40,8 +40,6 @@ import {
   Heart,
   Home,
   LogOut,
-  PanelLeft,
-  PanelLeftClose,
   Search,
   Settings,
   ShoppingBag,
@@ -51,7 +49,6 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import GlassMaterial from "./glass-dock/GlassMaterial";
 import { useAuth } from "../context/AuthContext";
 import { useBranding } from "../context/BrandingContext";
 import { useCommerce } from "../context/CommerceContext";
@@ -239,9 +236,6 @@ export default function DesktopShell({
   // `null` on every other page, so the extra header row only exists while the
   // publishing page is mounted.
   const [topBarTabs, setTopBarTabs] = useState<TopBarTabsConfig | null>(null);
-  const [railCollapsed, setRailCollapsed] = useState(false);
-  const [peekOpen, setPeekOpen] = useState(false);
-  const railHidden = railCollapsed || peekOpen;
 
   // Keep the search input in sync with the page's own query when the
   // page changes the initial value. The dependency is the string so
@@ -332,9 +326,6 @@ export default function DesktopShell({
       className="dc-desktop-shell flex min-h-[100dvh] w-full bg-[#f6f7fb] text-slate-900"
       data-desktop-shell
       data-tablet-responsive
-      data-rail-hidden={railHidden ? "true" : "false"}
-      data-rail-collapsed={railCollapsed ? "true" : "false"}
-      data-peek-open={peekOpen ? "true" : "false"}
     >
       {/* ── Persistent left rail ─────────────────────────────────────
           Tablet landscape: width scales with clamp() so it fits tablet screens
@@ -348,13 +339,7 @@ export default function DesktopShell({
         {/* Brand block — same logo + name that lives in the mobile header,
             so the rail feels like a continuation of the app's identity
             rather than a separate desktop chrome. */}
-        <div className="flex items-center px-3 pt-3">
-          <RailGlassToggle
-            collapsed={false}
-            onClick={() => setRailCollapsed(true)}
-          />
-        </div>
-        <div className="flex items-center gap-3 px-5 pb-5 pt-3">
+        <div className="flex items-center gap-3 px-5 pb-5 pt-5">
           <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/40">
             {customLogo ? <BrandMark className="h-11 w-11" /> : <Sparkles className="h-5 w-5" />}
           </div>
@@ -470,13 +455,6 @@ export default function DesktopShell({
           samples page content; clearance padding lives on
           [data-desktop-content] and inherits the shell background.) ── */}
       <div className="relative flex min-w-0 flex-1 flex-col" data-desktop-main>
-        {railCollapsed && !peekOpen ? (
-          <RailGlassToggle
-            collapsed
-            floating
-            onClick={() => setRailCollapsed(false)}
-          />
-        ) : null}
         {/* Top bar — global actions shared across every page.
             A page can publish its own page-switcher into this bar through
             `useRegisterTopBarTabs` (see src/components/TopBarTabsContext.tsx);
@@ -604,37 +582,11 @@ export default function DesktopShell({
 
       {/* MAG dock peek — only on shell screens (rail instead of the
           always-on bottom footer). A thin transparent line at the
-          viewport bottom reveals the dock; leaving hides it. */}
-      <DesktopPeekDock active={active} purchasesBadge={ownedCount} onOpenChange={setPeekOpen} />
+          bottom centre of the PAGE column reveals the dock; leaving
+          hides it. The left rail stays visible. */}
+      <DesktopPeekDock active={active} purchasesBadge={ownedCount} />
     </div>
   );
-}
-
-function RailGlassToggle({
-  collapsed,
-  floating = false,
-  onClick,
-}: {
-  collapsed: boolean
-  floating?: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      data-desktop-rail-toggle=""
-      data-floating={floating ? "true" : "false"}
-      aria-label={collapsed ? "Show side panel" : "Hide side panel"}
-      aria-expanded={!collapsed}
-      title={collapsed ? "Show side panel" : "Hide side panel"}
-      onClick={onClick}
-    >
-      <GlassMaterial radius={12} />
-      <span className="relative z-[1] grid place-items-center text-slate-700">
-        {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
-      </span>
-    </button>
-  )
 }
 
 function RailGroup({ label, children }: { label: string; children: ReactNode }) {
