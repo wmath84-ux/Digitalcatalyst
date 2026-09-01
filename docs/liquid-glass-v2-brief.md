@@ -143,6 +143,50 @@ done   # then convert those rgb() triplets to hex
 
 ---
 
+## 3a. The fallback-first rule (binding, all waves)
+
+> **Every enhancement declaration must be preceded by a plain fallback declaration.**
+
+Applies to `linear-gradient()` / `radial-gradient()`, `oklch()` / `lab()` / `color()`,
+`color-mix()`, `backdrop-filter`, and anything else an older engine may drop whole. Write the
+boring version first, then the enhancement:
+
+```css
+.dc-cta {
+  background-color: #4338ca;                          /* 1. plain — always survives */
+  background-image: linear-gradient(135deg, #6366f1, #4338ca);  /* 2. enhancement */
+}
+```
+
+An engine that does not understand declaration 2 discards that one declaration and keeps
+declaration 1, so the surface degrades to a solid brand fill instead of disappearing. An engine
+that understands both uses the gradient. **No interpolation keyword** (`in oklab`, `in oklch`) in
+hand-written CSS — see below.
+
+### `in oklab` — owner decision 2026-09-01 (option c)
+
+Tailwind v4 compiles every `bg-gradient-to-*` / `bg-linear-to-*` utility to
+`--tw-gradient-position: to bottom in oklab`. Lightning CSS will **not** strip that keyword —
+custom-property values are opaque to it, and it leaves the keyword alone even in a gradient it can
+parse directly. Engines without gradient colour-space interpolation (Chrome <111, Safari <16.2,
+Firefox <113) therefore drop the whole `linear-gradient()`. This is the same silent-vanish failure
+class as `oklch()`, and it is **not** fixed by the Wave 0 downlevelling.
+
+The decision:
+
+- **No post-pass strip.** Rewriting `in oklab` → sRGB interpolation regresses banding on the
+  modern engines that are the majority of traffic, to help a shrinking tail.
+- **No 0-ceiling.** `in oklab` in dist is a *recorded ceiling* that may only decrease; the number
+  is published in every wave report.
+- **Surviving identity gradients become hand-written tokens** in `src/glass-theme.css`, written
+  fallback-first and with no interpolation keyword: the brand CTA, the checkout amount card, and
+  the `meta.gradient` provider marks. Those stop depending on Tailwind's gradient utilities
+  entirely.
+- **Decorative `bg-gradient-*` sites stay exactly as they are** for now and get deleted in
+  Waves 3–5, which is what actually drives the ceiling down.
+
+---
+
 ## 4. Layout contract
 
 ```
@@ -169,8 +213,20 @@ done   # then convert those rgb() triplets to hex
 - z-index: 28 fixed `inset-0` overlays exist with `z-[50]` … `z-[9999]` scattered. The backdrop is
   `z-index: -1` (never 0, never an isolate context). Add a single documented scale in
   `src/glass.css` and reuse it; do not renumber anything inside BottomNav.
-- Viewport units: **12 `100vh` sites** → `100svh` with the `@supports (height: 100dvh)` pattern the
-  repo already uses at `src/index.css:988`. Mobile URL bar must not clip the first/last row.
+- Viewport units: the **12 bare `100vh` sites** → keep `100vh` as the universal fallback and add
+  the `@supports (height: 100dvh)` upgrade the repo already uses at `src/index.css:988`. Mobile
+  URL bar must not clip the first/last row.
+
+  **Use `dvh`. Do not introduce `svh`.** (Owner decision 2026-09-01; an earlier draft of this
+  bullet said "→ 100svh with the `@supports (height: 100dvh)` pattern", which conflated the two.)
+  With a fixed header *and* a fixed footer, `svh` sizes the frame to the *small* viewport — the
+  one with the URL bar showing — so when the bar collapses a dead band opens up under the footer.
+  `dvh` tracks the viewport that is actually visible, and the safe-area padding the chrome
+  already applies covers the inset case. `src/index.css` is 65 × `100dvh` and 0 × `svh`, and
+  `tests/tabletPageScrollContract.test.mjs`, `tests/premiumGateResponsiveContract.test.mjs` and
+  `tests/revisionSubmitOverlayContract.test.mjs` all pin the `100vh`-base + `@supports` upgrade
+  shape, so `svh` would also fight the existing test suite.
+
 - `background-attachment: fixed` stays at **0 usages** — it is broken on iOS Safari. The fixed layer
   is a real element.
 
@@ -212,8 +268,16 @@ checkout, `#/my-day`, `#/flowpath`, `#/revision`, `#/course/:id`, `#/profile`, `
 
 ## 6. Waves — one commit each, then STOP and report
 
-Baseline numbers from the merged tree (measure again at the start of the session; these are the
-"before" numbers the whole plan is judged against):
+Baseline numbers from the merged tree, measured during the first rollout.
+
+> **These published figures are superseded.** Owner decision 2026-09-01: the definitions in
+> `scripts/glass-coverage.mjs` are authoritative, because the numbers below came from an earlier
+> ad-hoc method that cannot be reproduced (it reports 159 painted panels where the script finds
+> 301, 84 backdrop-blur where the script finds 90, 394 `<button>` where the script finds 393, and
+> counts `glass-card` usage at 42 where the script's direct-import count is 0 because this app
+> reaches the registry card through the `GlassCard` wrapper). Keep the block below as historical
+> context only. **Judge every wave against `docs/baselines/glass-coverage-baseline.json`, never
+> against this list**, and print the script's table in every wave report.
 
 ```
 267 non-admin component files · 394 <button> · 69 <input> · 9 <textarea>
@@ -226,7 +290,7 @@ radio 2 · swatch 2 · dropdown-menu 1 · dialog 0* · tabs 0*   (* = hidden ins
 
 | Wave | Name | Files | What it must achieve (exit criterion) |
 | --- | --- | --- | --- |
-| **0** | **Fix the floor first** (no design work) | 3–4 | browserslist in package.json so Lightning CSS downlevels `oklch()` → in dist/index.html, `grep -c "oklch("` must be **0**; `100vh`→svh/dvh via the existing `@supports` pattern; `?glass=off` still renders the pre-rollout paint. **Owner approves the build before Wave 1.** |
+| **0** | **Fix the floor first** (no design work) | 3–4 | browserslist in package.json so Lightning CSS downlevels `oklch()` → in dist/index.html, `grep -c "oklch("` must be **0**; the 12 bare `100vh` sites gain the `@supports (height: 100dvh)` upgrade (**dvh, not svh** — see §4); `?glass=off` still renders the pre-rollout paint. **Owner approves the build before Wave 1.** |
 | **1** | **Backdrop + tokens** | 6–8 | `src/glass-theme.css` (palette §2/§3 as tokens) + `src/components/ui/GlassBackdrop.tsx` (fixed, z-index:-1, pointer-events:none, no filter) mounted in AppShell, DesktopShell, My Day shell, FlowPath shell, course player shell — **not** in main.tsx; page roots go `bg-transparent`; noise overlay asset added; tiers extended: full / lite / flat / off where *flat = zero live blur anywhere*. Exit: backdrop pixel-matches §2 on 3 viewports; git diff on admin paths is empty; `?glass=flat` still readable. |
 | **2** | **Chrome: fixed header + footer, backgrounds only** | 4 | Header/BottomNav/Dock keep 100% of their markup and animation; only their surface (frost, rim, safe-area padding) changes. Exit: the header's pinned tests pass unchanged; hide-on-scroll + collapse behave as before; backdrop-filter count outside header/footer/dialog = 0 (this is the invariant Wave 3 then preserves). |
 | **3** | **Middle band, page by page** (batch 1–3) | ~45 | Store + product + cart + favourites + `#/search`: the 159 painted panels lose their blur, gain `.dc-card` tint+rim over the backdrop; `data-*` hooks and layout untouched. Exit: 84 → ≤20 backdrop-blur sites; screenshots on 320/390/768/1440 reviewed by owner. |
@@ -244,15 +308,27 @@ owner reviews personally — do not start the next wave without a go-ahead.
 
 `scripts/glass-coverage.mjs` — no dependencies, prints a table and exits non-zero on regression:
 
-- per-item usage count for all 22 registry components in app code (excluding `src/components/ui/`)
+- per-item usage count for all 22 registry components in app code (excluding `src/components/ui/`),
+  split into **`direct-imports`** (report only) and **`render-sites`** (the ratchet)
 - bare primitives: `<button>`, `<input>`, `<textarea>`, `rounded-* bg-white` panels,
   `backdrop-blur-*` sites **outside** header/footer/dialog, native `title=`
-- grep for `oklch(` in dist/index.html after a build
+- grep for `oklch(` in dist/index.html after a build (hard cap 0)
+- `in oklab` in dist/index.html after a build — a **recorded ceiling that may only decrease**, not
+  a hard 0 (see §3a)
+- unpaired `100vh`: a `100vh` utility with no matching `supports-[height:100dvh]:` upgrade
 - fixed-layer invariants: backdrop must have no filter, no `@keyframes`, no `!important`
 - `background-attachment: fixed` count (must stay 0)
 
 Strip comments before matching (`/\*…\*/`, `//`) — three separate failures in the previous rollout
 came from greps matching the author's own explanatory comments.
+
+**Why adoption is split in two.** Wrapper-mediated adoption is legitimate adoption: `ProductCard`,
+`CartItemCard` and `FavoriteCard` all render the registry card through `src/components/ui/GlassCard.tsx`
+(which pins light-ink defaults over the pack's white-on-dark card), and `PageTabs` / `Toast` do the
+same for `glass-tabs` / `glass-toast`. A direct-import-only count reads **0** for `glass-card`,
+`glass-tabs` and `glass-dialog`, so migrating a page to the wrapper would look like a regression.
+`render-sites` = direct + wrapper-mediated renders, and **that** is the number Waves 3–6 must
+climb. Print both in every wave report.
 
 ---
 
@@ -263,10 +339,17 @@ npx tsc -p tsconfig.json --noEmit                          # expect 7 errors = r
 node scripts/verify-glass-registry.mjs                     # expect: 0 DRIFT (SKIPs without egress)
 bash run_tests.sh 2>&1 | grep -E "^not ok|^# (tests|pass|fail)"   # expect the same 8 pre-existing names
 npm run build                                              # expect ok
+grep -c "oklch(" dist/index.html                           # expect 0 — hard gate
+grep -c "in oklab" dist/index.html                         # expect ≤ the recorded ceiling
 git diff --stat -- src/components/BottomNav.tsx src/components/glass-dock src/admin src/components/admin
                                                            # expect EMPTY, every wave, no exceptions
 node scripts/glass-coverage.mjs                            # expect: bare counts down, never up
 ```
+
+`grep -c` counts *lines*, and the built CSS is minified onto one line, so use
+`grep -o "in oklab" dist/index.html | wc -l` for the real occurrence count — that is what
+`glass-coverage.mjs` records and what the ceiling is compared against. Publish the number in every
+wave report.
 
 Baseline failing test names at the time of writing (pre-existing on main, **not** to be fixed
 here — but they must not grow):

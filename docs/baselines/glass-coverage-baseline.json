@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-01T17:13:09.781Z",
+  "generatedAt": "2026-09-01T17:32:22.334Z",
   "files": {
     "nonAdmin": 295,
     "appCode": 263
@@ -30,58 +30,103 @@
     "backgroundAttachmentFixed": 0
   },
   "build": {
+    "distPresent": true,
     "oklchInDist": 0,
-    "distPresent": true
+    "inOklabInDist": 530
   },
   "pack": {
-    "total": 190,
-    "direct": {
-      "glass": 21,
-      "glass-button": 2,
-      "glass-switch": 3,
-      "glass-slider": 7,
-      "glass-tabs": 0,
-      "glass-tooltip": 29,
-      "glass-input": 2,
-      "glass-popover": 7,
-      "glass-dialog": 0,
-      "glass-dock": 0,
-      "glass-tile": 4,
-      "glass-swatch": 2,
-      "glass-card": 0,
-      "glass-checkbox": 2,
-      "glass-radio": 2,
-      "glass-toggle-group": 9,
-      "glass-accordion": 4,
-      "glass-dropdown-menu": 6,
-      "glass-select": 38,
-      "glass-sheet": 6,
-      "glass-toast": 1,
-      "glass-command": 11
-    },
-    "viaWrapper": {
-      "glass": 20,
-      "glass-button": 0,
-      "glass-switch": 0,
-      "glass-slider": 0,
-      "glass-tabs": 2,
-      "glass-tooltip": 0,
-      "glass-input": 0,
-      "glass-popover": 0,
-      "glass-dialog": 0,
-      "glass-dock": 0,
-      "glass-tile": 0,
-      "glass-swatch": 0,
-      "glass-card": 9,
-      "glass-checkbox": 0,
-      "glass-radio": 0,
-      "glass-toggle-group": 0,
-      "glass-accordion": 0,
-      "glass-dropdown-menu": 0,
-      "glass-select": 0,
-      "glass-sheet": 0,
-      "glass-toast": 3,
-      "glass-command": 0
+    "directImports": 156,
+    "viaWrapper": 34,
+    "renderSites": 190,
+    "perItem": {
+      "glass": {
+        "direct": 21,
+        "viaWrapper": 20
+      },
+      "glass-button": {
+        "direct": 2,
+        "viaWrapper": 0
+      },
+      "glass-switch": {
+        "direct": 3,
+        "viaWrapper": 0
+      },
+      "glass-slider": {
+        "direct": 7,
+        "viaWrapper": 0
+      },
+      "glass-tabs": {
+        "direct": 0,
+        "viaWrapper": 2
+      },
+      "glass-tooltip": {
+        "direct": 29,
+        "viaWrapper": 0
+      },
+      "glass-input": {
+        "direct": 2,
+        "viaWrapper": 0
+      },
+      "glass-popover": {
+        "direct": 7,
+        "viaWrapper": 0
+      },
+      "glass-dialog": {
+        "direct": 0,
+        "viaWrapper": 0
+      },
+      "glass-dock": {
+        "direct": 0,
+        "viaWrapper": 0
+      },
+      "glass-tile": {
+        "direct": 4,
+        "viaWrapper": 0
+      },
+      "glass-swatch": {
+        "direct": 2,
+        "viaWrapper": 0
+      },
+      "glass-card": {
+        "direct": 0,
+        "viaWrapper": 9
+      },
+      "glass-checkbox": {
+        "direct": 2,
+        "viaWrapper": 0
+      },
+      "glass-radio": {
+        "direct": 2,
+        "viaWrapper": 0
+      },
+      "glass-toggle-group": {
+        "direct": 9,
+        "viaWrapper": 0
+      },
+      "glass-accordion": {
+        "direct": 4,
+        "viaWrapper": 0
+      },
+      "glass-dropdown-menu": {
+        "direct": 6,
+        "viaWrapper": 0
+      },
+      "glass-select": {
+        "direct": 38,
+        "viaWrapper": 0
+      },
+      "glass-sheet": {
+        "direct": 6,
+        "viaWrapper": 0
+      },
+      "glass-toast": {
+        "direct": 1,
+        "viaWrapper": 3
+      },
+      "glass-command": {
+        "direct": 11,
+        "viaWrapper": 0
+      }
     }
   }
 }

@@ -9,7 +9,8 @@
  * No dependencies — node builtins only, so it runs before `npm install`.
  *
  * What it measures (docs/liquid-glass-v2-brief.md §7):
- *   · per-item usage of all 22 registry components in app code
+ *   · per-item usage of all 22 registry components in app code, reported two
+ *     ways — `direct-imports` (context only) and `render-sites` (the ratchet)
  *   · bare primitives that should migrate to the pack: <button>, <input>,
  *     <textarea>, hand-painted `rounded-* bg-white` panels, native `title=`
  *   · backdrop-blur-* sites, split into fixed chrome (allowed) and the
@@ -17,10 +18,16 @@
  *     is recomputed on every frame)
  *   · viewport units: a bare `100vh` is only acceptable as a fallback paired
  *     with a `100dvh` upgrade (the pattern at src/index.css:988)
- *   · build output: `oklch(` must be fully downlevelled out of dist/index.html
+ *   · build output: `oklch(` must be fully downlevelled out of dist/index.html;
+ *     `in oklab` is a recorded ceiling that may only decrease
  *   · fixed-layer invariants: the backdrop may not carry a filter, an
  *     animation or an !important; `background-attachment: fixed` must stay at
  *     0 (it is broken on iOS Safari)
+ *
+ * The numbers this script prints are AUTHORITATIVE. The figures published in
+ * §6 of the brief were measured by a different, earlier method and are
+ * superseded — compare wave to wave against docs/baselines/, not against the
+ * brief.
  *
  * Two rules this script holds itself to, both learned the hard way in the
  * first rollout:
@@ -339,10 +346,25 @@ const fixedLayer = {
 
 /* ── build output ───────────────────────────────────────────────────────── */
 
-const build = { oklchInDist: null, distPresent: existsSync(DIST_INDEX) };
-if (build.distPresent) {
-  build.oklchInDist = count(readFileSync(DIST_INDEX, "utf8"), /oklch\(/g);
-}
+const distHtml = existsSync(DIST_INDEX) ? readFileSync(DIST_INDEX, "utf8") : null;
+const build = {
+  distPresent: distHtml != null,
+  /* Tailwind v4 emits oklch() for its whole palette; Lightning CSS lowers all
+     of it at the browserslist floor. Hard-capped at 0 — see Wave 0. */
+  oklchInDist: distHtml == null ? null : count(distHtml, /oklch\(/g),
+  /* Tailwind also writes `--tw-gradient-position: to bottom in oklab`, which
+     Lightning CSS will NOT strip (custom-property values are opaque to it, and
+     it leaves the keyword alone even when it can see it directly). Engines
+     without gradient colour-space interpolation — Chrome <111, Safari <16.2,
+     Firefox <113 — drop the whole linear-gradient().
+
+     Owner decision 2026-09-01 (option c): no post-pass strip (it regresses
+     banding on modern engines) and no 0-ceiling. The decorative sites are
+     deleted in Waves 3–5 and the surviving identity gradients are hand-written
+     in src/glass-theme.css with a solid fallback first, so this number is a
+     RECORDED CEILING that may only ever go down. */
+  inOklabInDist: distHtml == null ? null : count(distHtml, /in oklab/g),
+};
 
 /* ── report ─────────────────────────────────────────────────────────────── */
 
@@ -363,7 +385,10 @@ const METRICS = [
   { group: "fixed layer", key: "fixedLayer.backgroundAttachmentFixed", label: "background-attachment: fixed", direction: "down", max: 0 },
   { group: "fixed layer", key: "fixedLayer.backdropViolations", label: "backdrop filter/animation/!important", direction: "down", max: 0 },
   { group: "build", key: "build.oklchInDist", label: "oklch( in dist/index.html", direction: "down", max: 0 },
-  { group: "adoption", key: "pack.total", label: "registry component usages", direction: "up" },
+  { group: "build", key: "build.inOklabInDist", label: "in oklab in dist (ceiling, not 0)", direction: "down" },
+  { group: "adoption", key: "pack.renderSites", label: "render-sites (RATCHET)", direction: "up" },
+  { group: "adoption", key: "pack.directImports", label: "direct-imports (report only)", direction: "flat" },
+  { group: "adoption", key: "pack.viaWrapper", label: "  of which via app wrapper", direction: "flat" },
 ];
 
 const current = {
@@ -375,9 +400,28 @@ const current = {
   fixedLayer,
   build,
   pack: {
-    total: packTotal,
-    direct: Object.fromEntries(packDirect),
-    viaWrapper: Object.fromEntries(packViaWrapper),
+    /**
+     * Two numbers, on purpose (owner decision 2026-09-01):
+     *
+     *   directImports — JSX rendered from a symbol imported straight out of a
+     *     `glass-*` registry module. Report only: it reads 0 for glass-card,
+     *     glass-dialog and glass-tabs purely because this app reaches them
+     *     through an app-layer wrapper (ProductCard / CartItemCard /
+     *     FavoriteCard → GlassCard; PageTabs; Toast), which is legitimate
+     *     adoption and must never look like a regression.
+     *
+     *   renderSites — directImports + wrapper-mediated renders. THIS is the
+     *     ratchet; it is the count that has to climb across Waves 3–6.
+     */
+    directImports: [...packDirect.values()].reduce((a, b) => a + b, 0),
+    viaWrapper: [...packViaWrapper.values()].reduce((a, b) => a + b, 0),
+    renderSites: packTotal,
+    perItem: Object.fromEntries(
+      [...packDirect.keys()].map((item) => [
+        item,
+        { direct: packDirect.get(item), viaWrapper: packViaWrapper.get(item) },
+      ]),
+    ),
   },
 };
 
@@ -437,7 +481,7 @@ function main() {
   out.push(...rows);
   out.push("");
   out.push("  registry component usage in app code (JSX actually rendered)");
-  out.push(`    ${pad("item", 24)} ${pad("direct", 8)} ${pad("wrapper", 9)} total`);
+  out.push(`    ${pad("item", 24)} ${pad("direct", 8)} ${pad("wrapper", 9)} render-sites`);
   const itemNames = [...packDirect.keys()].sort(
     (a, b) => packDirect.get(b) + packViaWrapper.get(b) - (packDirect.get(a) + packViaWrapper.get(a)) || a.localeCompare(b),
   );
@@ -446,7 +490,10 @@ function main() {
     const wrapped = packViaWrapper.get(item);
     out.push(`    ${pad(item, 24)} ${pad(direct, 8)} ${pad(wrapped, 9)} ${direct + wrapped}`);
   }
-  out.push(`    ${pad("TOTAL", 24)} ${pad([...packDirect.values()].reduce((a, b) => a + b, 0), 8)} ${pad([...packViaWrapper.values()].reduce((a, b) => a + b, 0), 9)} ${packTotal}`);
+  out.push(
+    `    ${pad("TOTAL", 24)} ${pad(current.pack.directImports, 8)} ${pad(current.pack.viaWrapper, 9)} ${current.pack.renderSites}`,
+  );
+  out.push("    (direct-imports is reported for context only; render-sites is the ratchet)");
 
   if (backdropViolations.length > 0) {
     out.push("");
