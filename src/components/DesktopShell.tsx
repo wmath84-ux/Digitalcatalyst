@@ -156,6 +156,9 @@ function resolveActiveFromHash(hash: string): DesktopRailKey {
   if (hash.startsWith("#/favorites")) return "favorites";
   if (hash.startsWith("#/cart")) return "purchases";
   if (hash.startsWith("#/my-day")) return "myday";
+  // FlowPath is the planning dashboard — keep the My Day family lit while
+  // it is open (the top bar shows its own FlowPath title via AppShell).
+  if (hash.startsWith("#/flowpath")) return "myday";
   if (hash.startsWith("#/revision")) return "revision";
   // The Settings page is its own route; without this the rail falls back to
   // "home" and no entry lights up while the learner is on it.

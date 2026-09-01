@@ -356,14 +356,17 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith("#/admin")
     || hash.startsWith("#/admin-login")
     || hash.startsWith("#/course/")
-    || hash.startsWith("#/flowpath")
     || hash.startsWith(PROFILE_PREVIEW_HASH)
   ) {
     return <>{children}</>;
   }
 
   return (
-    <AppShell active={resolveActiveFromHash(hash)}>
+    <AppShell
+      active={resolveActiveFromHash(hash)}
+      pageTitle={hash.startsWith("#/flowpath") ? "FlowPath" : undefined}
+      pageSubtitle={hash.startsWith("#/flowpath") ? "Your day. Your goals. One continuous flow." : undefined}
+    >
       {children}
     </AppShell>
   );
@@ -1101,7 +1104,12 @@ function RootPage(): ReactNode {
     // working Retry / Back / Home actions.
     return (
       <FlowPathErrorBoundary>
-        <FlowPathApp onNavigateToHome={() => { window.location.hash = HOME_HASH; }} />
+        <FlowPathApp
+          onNavigateToHome={() => { window.location.hash = HOME_HASH; }}
+          favoritesCount={favoriteIds.size}
+          onOpenFavorites={() => { window.location.hash = FAVORITES_HASH; }}
+          onOpenNotifications={() => { window.location.hash = NOTIFICATIONS_HASH; }}
+        />
       </FlowPathErrorBoundary>
     );
   }

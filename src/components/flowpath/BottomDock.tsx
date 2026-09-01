@@ -1,25 +1,28 @@
 import { useRef, useState } from "react";
-import { motion } from "framer-motion";
 import {
   BellRing,
-  BookOpen,
   CalendarClock,
   CalendarRange,
   CheckSquare,
-  House,
-  Landmark,
+  GraduationCap,
   LayoutDashboard,
+  Landmark,
+  Moon,
+  Palette,
   Plus,
+  Settings,
   StickyNote,
+  Sun,
   Sunrise,
   TrendingUp,
   UserRound,
-  type LucideIcon,
 } from "lucide-react";
 import type { ActivityType } from "../../flowpath/types/flowpath";
 import { ACTIVITY_TYPE_META } from "../../flowpath/types/flowpath";
 import { ACTIVITY_ICONS } from "./icons";
 import { RadialMenu, type RadialItem } from "./RadialMenu";
+import GlassDock, { type GlassDockItem } from "../glass-dock/GlassDock";
+import { CalendarIcon, HomeIcon, SparkBookIcon } from "../icons";
 
 /**
  * Map a dock radial item to the real app route it should open. "Create" is
@@ -93,16 +96,31 @@ interface BottomDockProps {
   onPlanLectures?: () => void;
   onStub: (group: string, label: string) => void;
   onNavigateToHome?: () => void;
+  /** Settings gear — the controls of the old fixed FLOWPATH title bar.
+   *  Tapping the gear opens a radial with these options; each one keeps
+   *  its original behaviour (theme toggles in place, Flow Curve opens
+   *  the same CurveSettingsModal overlay as before). */
+  resolvedTheme?: "dark" | "light";
+  onToggleTheme?: () => void;
+  onOpenCurve?: () => void;
 }
 
-export function BottomDock({ onCreateType, onPlanLectures, onStub, onNavigateToHome }: BottomDockProps) {
+export function BottomDock({
+  onCreateType,
+  onPlanLectures,
+  onStub,
+  onNavigateToHome,
+  resolvedTheme = "dark",
+  onToggleTheme,
+  onOpenCurve,
+}: BottomDockProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
 
-  const homeRef = useRef<HTMLButtonElement>(null);
   const mydayRef = useRef<HTMLButtonElement>(null);
   const createRef = useRef<HTMLButtonElement>(null);
   const revisionRef = useRef<HTMLButtonElement>(null);
   const lectureRef = useRef<HTMLButtonElement>(null);
+  const settingsRef = useRef<HTMLButtonElement>(null);
 
   const createItems: RadialItem[] = (Object.keys(ACTIVITY_TYPE_META) as ActivityType[]).map(
     (t) => ({
@@ -112,6 +130,17 @@ export function BottomDock({ onCreateType, onPlanLectures, onStub, onNavigateToH
       color: ACTIVITY_TYPE_META[t].color,
     })
   );
+
+  // The old FLOWPATH header's controls, now behind the dock's gear.
+  const settingsItems: RadialItem[] = [
+    { id: "set-curve", label: "Flow Curve", icon: Palette, color: "#c084fc" },
+    {
+      id: "set-theme",
+      label: resolvedTheme === "dark" ? "Light Mode" : "Dark Mode",
+      icon: resolvedTheme === "dark" ? Sun : Moon,
+      color: "#f5b969",
+    },
+  ];
 
   function openMenu(
     ref: React.RefObject<HTMLButtonElement | null>,
@@ -123,73 +152,55 @@ export function BottomDock({ onCreateType, onPlanLectures, onStub, onNavigateToH
     }
   }
 
+  // Icon-only glass dock — the exact same component the Home page footer
+  // uses (GlassDock), so the look (frost / refraction / transparency), the
+  // pointer + finger magnify animation and the label tooltips all behave
+  // identically. Selecting an item either navigates (Home) or opens the
+  // same radial menus the old pill dock had (MyDay / Create / Revision).
+  const items: GlassDockItem[] = [
+    { id: "home", label: "Home", icon: HomeIcon, color: "#FFBE0B" },
+    { id: "myday", label: "My Day", icon: CalendarIcon, color: "#06D6A0", buttonRef: mydayRef },
+    { id: "create", label: "Create", icon: Plus, color: "#8b7bff", buttonRef: createRef },
+    { id: "revision", label: "Revision", icon: SparkBookIcon, color: "#3A86FF", buttonRef: revisionRef },
+    ...(onPlanLectures
+      ? [{ id: "lectures", label: "Lectures", icon: GraduationCap, color: "#f5b969", buttonRef: lectureRef } as GlassDockItem]
+      : []),
+    { id: "settings", label: "Settings", icon: Settings, color: "#94a3b8", buttonRef: settingsRef },
+  ];
+
   return (
     <>
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-6">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="glass-panel-strong pointer-events-auto flex items-center gap-1 rounded-full p-1.5 sm:gap-1.5 sm:p-2"
-          style={{
-            boxShadow:
-              "0 0 0 1px var(--fp-border) inset, 0 0 40px -6px rgba(139,123,255,0.45), 0 25px 60px -20px rgba(0,0,0,0.9)",
-          }}
-        >
-          {/* Home — single tap navigates straight to the home page. The
-              long-press radial menu was removed in favour of a simpler
-              one-tap interaction (the home radial now lives in the
-              user-triggered FlowPath "open" affordance, not the dock). */}
-          <button
-            ref={homeRef}
-            type="button"
-            aria-label="Go to Home Page"
-            onClick={() => {
-              if (onNavigateToHome) onNavigateToHome();
+      <div data-fp-dock className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2">
+        <div className="pointer-events-auto mx-auto w-max max-w-full">
+          <GlassDock
+            items={items}
+            onSelect={(id) => {
+              if (id === "home") {
+                if (onNavigateToHome) onNavigateToHome();
+                return;
+              }
+              if (id === "myday") {
+                openMenu(mydayRef, MYDAY_ITEMS, "MyDay");
+                return;
+              }
+              if (id === "create") {
+                openMenu(createRef, createItems, "Create");
+                return;
+              }
+              if (id === "revision") {
+                openMenu(revisionRef, REVISION_ITEMS, "Revision");
+                return;
+              }
+              if (id === "lectures" && onPlanLectures) {
+                onPlanLectures();
+                return;
+              }
+              if (id === "settings") {
+                openMenu(settingsRef, settingsItems, "Settings");
+              }
             }}
-            className="grid h-10 w-10 shrink-0 select-none place-items-center rounded-full border border-fp-border bg-fp-surface text-fp-muted transition hover:bg-fp-surface-hover hover:text-fp-text sm:h-11 sm:w-11"
-          >
-            <House className="h-[18px] w-[18px]" />
-          </button>
-
-          <DockButton
-            buttonRef={mydayRef}
-            icon={Sunrise}
-            label="MyDay"
-            onClick={() => openMenu(mydayRef, MYDAY_ITEMS, "MyDay")}
           />
-
-          {/* Create — primary */}
-          <motion.button
-            ref={createRef}
-            type="button"
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.96 }}
-            onClick={() => openMenu(createRef, createItems, "Create")}
-            className="relative flex shrink-0 items-center gap-1.5 overflow-hidden rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 px-4 py-2.5 text-sm font-semibold text-white sm:gap-2 sm:px-6 sm:py-3"
-            style={{ boxShadow: "0 10px 30px -10px rgba(139,123,255,0.85)" }}
-          >
-            <span className="fp-shimmer pointer-events-none absolute inset-0" />
-            <Plus className="h-4 w-4" strokeWidth={2.6} />
-            <span className="font-display hidden tracking-wide min-[380px]:inline">CREATE</span>
-          </motion.button>
-
-          <DockButton
-            buttonRef={revisionRef}
-            icon={BookOpen}
-            label="Revision"
-            onClick={() => openMenu(revisionRef, REVISION_ITEMS, "Revision")}
-          />
-
-          {onPlanLectures ? (
-            <DockButton
-              buttonRef={lectureRef}
-              icon={Sunrise}
-              label="Lectures"
-              onClick={onPlanLectures}
-            />
-          ) : null}
-        </motion.div>
+        </div>
       </div>
 
       <RadialMenu
@@ -201,6 +212,17 @@ export function BottomDock({ onCreateType, onPlanLectures, onStub, onNavigateToH
           setMenu(null);
           if (group === "Create") {
             onCreateType(id as ActivityType);
+            return;
+          }
+          // Settings gear options — same behaviour as the old header
+          // controls: theme flips in place, Flow Curve opens the same
+          // CurveSettingsModal overlay it always did.
+          if (id === "set-theme") {
+            if (onToggleTheme) onToggleTheme();
+            return;
+          }
+          if (id === "set-curve") {
+            if (onOpenCurve) onOpenCurve();
             return;
           }
           const route = ROUTE_FOR_ITEM[id];
@@ -215,31 +237,5 @@ export function BottomDock({ onCreateType, onPlanLectures, onStub, onNavigateToH
         }}
       />
     </>
-  );
-}
-
-function DockButton({
-  buttonRef,
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  buttonRef: React.RefObject<HTMLButtonElement | null>;
-  icon: LucideIcon;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <motion.button
-      ref={buttonRef}
-      type="button"
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.94 }}
-      onClick={onClick}
-      className="flex shrink-0 items-center gap-1.5 rounded-full border border-fp-border bg-fp-surface px-3 py-2.5 text-fp-muted transition-colors hover:bg-fp-surface-hover hover:text-fp-text sm:gap-2 sm:px-4 sm:py-3"
-    >
-      <Icon className="h-4 w-4" />
-      <span className="text-xs font-semibold tracking-wide min-[430px]:inline">{label}</span>
-    </motion.button>
   );
 }

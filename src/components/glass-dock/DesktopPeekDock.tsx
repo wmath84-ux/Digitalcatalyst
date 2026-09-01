@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BagIcon, CalendarIcon, HomeIcon, SparkBookIcon, StoreIcon, UserIcon } from '../icons'
+import { BagIcon, CalendarIcon, FlowPathIcon, HomeIcon, SparkBookIcon, StoreIcon } from '../icons'
 import GlassDock, { type GlassDockItem } from './GlassDock'
 import GlassMaterial from './GlassMaterial'
 import type { TabKey } from '../BottomNav'
@@ -24,7 +24,9 @@ const TABS: { key: TabKey; label: string; icon: typeof HomeIcon; color: string; 
   { key: 'myday', label: 'My Day', icon: CalendarIcon, color: '#06D6A0', hash: '#/my-day' },
   { key: 'store', label: 'Store', icon: StoreIcon, color: '#FF7B54', hash: '#/store' },
   { key: 'purchases', label: 'Purchases', icon: BagIcon, color: '#C9A96E', hash: '#/store/purchases' },
-  { key: 'profile', label: 'Profile', icon: UserIcon, color: '#B388FF', hash: '#/profile' },
+  // Profile moved to the header/rail; its dock slot opens FlowPath (same
+  // swap as the mobile footer dock in BottomNav).
+  { key: 'flowpath', label: 'FlowPath', icon: FlowPathIcon, color: '#B388FF', hash: '#/flowpath' },
   { key: 'revision', label: 'Revision', icon: SparkBookIcon, color: '#3A86FF', hash: '#/revision' },
 ]
 
@@ -33,7 +35,7 @@ const RING_R = 18
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_R
 
 function railToTab(active: DesktopRailKey): TabKey | null {
-  if (active === 'favorites' || active === 'settings') return null
+  if (active === 'favorites' || active === 'settings' || active === 'profile') return null
   return active
 }
 

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Maximize2, Minimize, Minimize2, Monitor, Moon, PanelBottomClose, PanelBottomOpen, Smartphone, Sun } from "lucide-react";
+import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Maximize2, Minimize, Minimize2, Monitor, Moon, PanelBottomClose, PanelBottomOpen, Smartphone, Snowflake, Sun } from "lucide-react";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer from "./course/ResourceViewer";
 import CourseOverlay, { type DockTab } from "./course/CourseOverlay";
+import SnowOverlay from "./course/SnowOverlay";
 import MindMapPanel from "./course/MindMapPanel";
 import useCourseMindMap from "./course/useCourseMindMap";
 import { combineHtml, loadLocalNotes, persistLocalNotes } from "./course/notesStore";
@@ -223,6 +224,17 @@ const loadCourseTheme = (): CoursePlayerTheme => {
   }
 };
 
+// Snow mode — a purely cosmetic, interactive snowfall over the whole player
+// (see src/course/SnowOverlay.tsx). Remembered per device like the theme.
+const courseSnowStorageKey = "dc.coursePlayerSnow";
+const loadCourseSnow = (): boolean => {
+  try {
+    return localStorage.getItem(courseSnowStorageKey) === "1";
+  } catch {
+    return false;
+  }
+};
+
 // ── Desktop site switch ─────────────────────────────────────────────────
 // This is the in-app equivalent of the browser's own "Desktop site" toggle.
 // It matters most for the case it was added for: a learner whose phone
@@ -294,6 +306,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // button stays correct even when the learner swipes out of fullscreen.
   const [courseFullscreen, setCourseFullscreen] = useState<boolean>(() => isCoursePlayerFullscreen());
   const [theme, setTheme] = useState<CoursePlayerTheme>(loadCourseTheme);
+  // Snow mode — cosmetic interactive snowfall over the whole player.
+  const [snowMode, setSnowMode] = useState<boolean>(loadCourseSnow);
   // ── Chrome visibility ───────────────────────────────────────────────────
   // Two independent direct toggles live in the header, just like the theme
   // button. One hides the resource header/footer; the other hides the Course
@@ -423,6 +437,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       /* private mode / storage disabled — keep the in-memory preference */
     }
   }, [theme]);
+
+  // Snow mode is remembered the same way the theme is.
+  useEffect(() => {
+    try {
+      localStorage.setItem(courseSnowStorageKey, snowMode ? "1" : "0");
+    } catch {
+      /* private mode / storage disabled — keep the in-memory preference */
+    }
+  }, [snowMode]);
 
   // Applying the mode does what the browser's own "Desktop site" switch
   // would have done: it rewrites the layout viewport, so the app and every
@@ -928,6 +951,28 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     </button>
   );
 
+  // Snow mode — one tap starts a continuous, interactive snowfall over the
+  // whole player (SnowOverlay). The button lights up sky-blue while it
+  // snows so the learner can always find the switch again.
+  const snowToggle = (
+    <button
+      type="button"
+      onClick={() => setSnowMode((on) => !on)}
+      className={`course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl transition ${
+        snowMode
+          ? "bg-sky-500 text-white shadow-lg shadow-sky-500/30"
+          : "bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+      }`}
+      aria-label={snowMode ? "Stop snowfall" : "Start snowfall"}
+      title={snowMode ? "Stop snowfall" : "Start snowfall"}
+      aria-pressed={snowMode}
+      data-course-snow-toggle
+      data-snow={snowMode ? "on" : "off"}
+    >
+      <Snowflake size={18} />
+    </button>
+  );
+
   // The toggle that hides / shows the secondary header strip. The icon always
   // previews the action the next tap will take, the label matches, and a soft
   // ring lights up in its active state so the learner can find it again from
@@ -1165,6 +1210,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         {playerChromeToggle}
         {showViewportToggle ? viewportToggle : null}
         {themeToggle}
+        {snowToggle}
         {/* Secondary strip toggle is always reachable in the rail — landscape
             does not have a separate "Row 2" so the rail itself is the only
             home this control can live in. */}
@@ -1247,6 +1293,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     return (
       <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" data-course-statusbar-hidden={courseFullscreen ? "true" : "false"} style={{ colorScheme: browserColorScheme }}>
         {landscapeLayout()}
+        {snowMode ? <SnowOverlay theme={theme} /> : null}
       </div>
     );
   }
@@ -1311,6 +1358,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             {playerChromeToggle}
             {showViewportToggle ? viewportToggle : null}
             {themeToggle}
+            {snowToggle}
             {secondaryStripToggle}
           </div>
         </div>
@@ -1324,6 +1372,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         {playerChromeHidden ? null : overlay}
         {chromeRestoreButton}
       </section>
+      {snowMode ? <SnowOverlay theme={theme} /> : null}
     </div>
   );
 }

@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from "react";
-import { BagIcon, CalendarIcon, HomeIcon, SparkBookIcon, StoreIcon, UserIcon } from "./icons";
+import { BagIcon, CalendarIcon, FlowPathIcon, HomeIcon, SparkBookIcon, StoreIcon } from "./icons";
 import GlassDock, { type GlassDockItem } from "./glass-dock/GlassDock";
 
-export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision";
+export type TabKey = "home" | "myday" | "store" | "purchases" | "profile" | "revision" | "flowpath";
 
 type BottomNavProps = {
   active: TabKey | null;
@@ -22,7 +22,9 @@ const TABS: { key: TabKey; label: string; icon: typeof HomeIcon; color: string }
   { key: "myday", label: "My Day", icon: CalendarIcon, color: "#06D6A0" },
   { key: "store", label: "Store", icon: StoreIcon, color: "#FF7B54" },
   { key: "purchases", label: "Purchases", icon: BagIcon, color: "#C9A96E" },
-  { key: "profile", label: "Profile", icon: UserIcon, color: "#B388FF" },
+  // Profile moved to the home header (where the FlowPath "+" shortcut used
+  // to live); its dock slot now opens the FlowPath planning dashboard.
+  { key: "flowpath", label: "FlowPath", icon: FlowPathIcon, color: "#B388FF" },
   { key: "revision", label: "Revision", icon: SparkBookIcon, color: "#3A86FF" },
 ];
 
@@ -200,7 +202,8 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
                 suppressClickRef.current = false;
                 return;
               }
-              if (key === "revision") window.location.hash = "#/revision";
+              if (key === "flowpath") window.location.hash = "#/flowpath";
+              else if (key === "revision") window.location.hash = "#/revision";
               else onChange(key);
             }}
           />
