@@ -1,0 +1,87 @@
+{
+  "generatedAt": "2026-09-01T17:13:09.781Z",
+  "files": {
+    "nonAdmin": 295,
+    "appCode": 263
+  },
+  "bare": {
+    "button": 393,
+    "input": 69,
+    "textarea": 9,
+    "paintedPanel": 301,
+    "nativeTitle": 126
+  },
+  "blur": {
+    "content": 78,
+    "chrome": 12
+  },
+  "viewport": {
+    "bareVh": 14,
+    "unpairedVh": 0
+  },
+  "layout": {
+    "fixedInset0": 28,
+    "bgGradientTo": 162,
+    "minWidthBreakpoint": 19
+  },
+  "fixedLayer": {
+    "backdropRulesSeen": 0,
+    "backdropViolations": 0,
+    "backgroundAttachmentFixed": 0
+  },
+  "build": {
+    "oklchInDist": 0,
+    "distPresent": true
+  },
+  "pack": {
+    "total": 190,
+    "direct": {
+      "glass": 21,
+      "glass-button": 2,
+      "glass-switch": 3,
+      "glass-slider": 7,
+      "glass-tabs": 0,
+      "glass-tooltip": 29,
+      "glass-input": 2,
+      "glass-popover": 7,
+      "glass-dialog": 0,
+      "glass-dock": 0,
+      "glass-tile": 4,
+      "glass-swatch": 2,
+      "glass-card": 0,
+      "glass-checkbox": 2,
+      "glass-radio": 2,
+      "glass-toggle-group": 9,
+      "glass-accordion": 4,
+      "glass-dropdown-menu": 6,
+      "glass-select": 38,
+      "glass-sheet": 6,
+      "glass-toast": 1,
+      "glass-command": 11
+    },
+    "viaWrapper": {
+      "glass": 20,
+      "glass-button": 0,
+      "glass-switch": 0,
+      "glass-slider": 0,
+      "glass-tabs": 2,
+      "glass-tooltip": 0,
+      "glass-input": 0,
+      "glass-popover": 0,
+      "glass-dialog": 0,
+      "glass-dock": 0,
+      "glass-tile": 0,
+      "glass-swatch": 0,
+      "glass-card": 9,
+      "glass-checkbox": 0,
+      "glass-radio": 0,
+      "glass-toggle-group": 0,
+      "glass-accordion": 0,
+      "glass-dropdown-menu": 0,
+      "glass-select": 0,
+      "glass-sheet": 0,
+      "glass-toast": 3,
+      "glass-command": 0
+    }
+  }
+}
