@@ -19,7 +19,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Download, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
-import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
 
 interface ImageViewerProps {
   url: string;
@@ -178,38 +177,53 @@ export default function ImageViewer({ url, name, initialScale, initialOffset, on
           />
         )}
       </div>
-      <div
-        className="absolute inset-x-0 bottom-0 z-10 px-2"
-        onPointerDown={(event) => event.stopPropagation()}
-        onPointerMove={(event) => event.stopPropagation()}
-        onPointerUp={(event) => event.stopPropagation()}
-        onWheel={(event) => event.stopPropagation()}
-      >
-        <GlassDock
-          leading={
-            <span
-              className="mb-2 min-w-12 self-center text-center text-xs font-black text-white/90"
-              data-course-image-zoom-pct
-            >
-              {Math.round(scale * 100)}%
-            </span>
-          }
-          items={
-            [
-              { id: "zoom-out", label: "Zoom out", icon: Minus, color: "#B388FF", dataAttrs: { "data-course-image-zoom-out": "" } },
-              { id: "zoom-in", label: "Zoom in", icon: Plus, color: "#FFBE0B", dataAttrs: { "data-course-image-zoom-in": "" } },
-              { id: "reset", label: "Reset", icon: RotateCcw, color: "#C9A96E", dataAttrs: { "data-course-image-zoom-reset": "" } },
-              { id: "fit", label: "Fit", icon: Maximize, color: "#06D6A0", dataAttrs: { "data-course-image-zoom-fit": "" } },
-              { id: "download", label: "Download", icon: Download, color: "#FF5C8A", dataAttrs: { "data-course-image-download": "" } },
-            ] satisfies GlassDockItem[]
-          }
-          onSelect={(id) => {
-            if (id === "zoom-out") applyZoom(scaleRef.current - 0.25);
-            else if (id === "zoom-in") applyZoom(scaleRef.current + 0.25);
-            else if (id === "reset" || id === "fit") applyZoom(1);
-            else if (id === "download") void download();
-          }}
-        />
+      <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-[var(--course-border)] bg-[var(--course-surface-translucent)] p-1.5 text-[var(--course-text)] shadow-2xl backdrop-blur">
+        <button
+          type="button"
+          onClick={() => applyZoom(scaleRef.current - 0.25)}
+          className="grid h-9 w-9 place-items-center rounded-full hover:bg-[var(--course-soft-hover)]"
+          aria-label="Zoom out"
+          data-course-image-zoom-out
+        >
+          <Minus size={16} />
+        </button>
+        <span className="min-w-12 text-center text-xs font-black" data-course-image-zoom-pct>{Math.round(scale * 100)}%</span>
+        <button
+          type="button"
+          onClick={() => applyZoom(scaleRef.current + 0.25)}
+          className="grid h-9 w-9 place-items-center rounded-full hover:bg-[var(--course-soft-hover)]"
+          aria-label="Zoom in"
+          data-course-image-zoom-in
+        >
+          <Plus size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyZoom(1)}
+          className="grid h-9 w-9 place-items-center rounded-full hover:bg-[var(--course-soft-hover)]"
+          aria-label="Reset zoom"
+          data-course-image-zoom-reset
+        >
+          <RotateCcw size={15} />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyZoom(1)}
+          className="flex h-9 items-center gap-1.5 rounded-full bg-[var(--course-soft-hover)] px-3 text-[11px] font-black hover:bg-[var(--course-strong)]"
+          aria-label="Fit to screen"
+          data-course-image-zoom-fit
+        >
+          <Maximize size={12} /> Fit
+        </button>
+        <button
+          type="button"
+          onClick={() => void download()}
+          className="flex h-9 items-center gap-1.5 rounded-full bg-violet-500 px-3 text-xs font-black text-white"
+          aria-label="Download image"
+          data-course-image-download
+        >
+          <Download size={14} /> Download
+        </button>
       </div>
       <p className="pointer-events-none absolute left-3 top-3 rounded-full bg-[var(--course-surface-translucent)] px-3 py-1.5 text-[10px] font-bold text-[var(--course-muted)]">
         Pinch/wheel to zoom · double-click zoom · drag to pan

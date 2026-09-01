@@ -5350,3 +5350,24 @@ html[data-course-player-active="true"] {
   box-sizing: border-box;
   overflow: hidden;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   GLASS DOCK — macOS-style magnifying footer on mobile + tablet
+   ══════════════════════════════════════════════════════════════════════
+   Nearby icons scale (MAG_SCALE 1.55) and lift (−12 px) as the pointer
+   moves. The tablet `* { max-width: 100% }` pass would freeze that spring
+   width, so the dock and every child opt out. Overflow stays visible so
+   the lift + tooltip are not clipped by the sticky footer. */
+[data-glass-dock],
+[data-glass-dock] * {
+  max-width: none !important;
+}
+
+[data-glass-dock] {
+  overflow: visible;
+  border-radius: 1.5rem !important;
+}
+
+[data-site-footer-nav]:has([data-glass-dock]) {
+  overflow: visible;
+}
