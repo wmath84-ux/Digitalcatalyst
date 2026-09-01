@@ -18,6 +18,13 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+/** strip comments so a note *about* a removed class cannot satisfy an assertion */
+const code = (src) =>
+  src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("//"))
+    .join("\n");
 const exists = (p) => fs.existsSync(new URL(`../${p}`, import.meta.url));
 
 test("Wave 4 installs the last three interactive registry items", () => {
@@ -66,11 +73,19 @@ test("FlowPath's native range inputs became the registry slider", () => {
     const s = read(f);
     assert.match(s, /<GlassSlider/, `${f} has no slider`);
     assert.match(s, /from "\.\.\/ui\/glass-slider"/);
-    assert.doesNotMatch(s, /type="range"/, `${f} still renders a native range`);
-    assert.match(s, /dc-slider-on-dark/);
+    assert.doesNotMatch(code(s), /type="range"/, `${f} still renders a native range`);
+    // Wave 6 correction, asserted here so it cannot silently come back: FlowPath
+    // must NOT force the dark palette. `flowpath/hooks/useTheme.ts` writes
+    // `data-theme` on <html> (dark default, removed on unmount), so the pack's
+    // own `useGlassDark()` already picks the right ink — and an `!important`
+    // dark rule would have broken FlowPath's *light* theme. The class now belongs
+    // to the course player, which has no theme attribute at all.
+    assert.doesNotMatch(code(s), /dc-slider-on-dark/);
   }
-  // the dark-canvas correction is CSS, so it disappears with the kill switch
+  // the dark-canvas correction (course player) is CSS, so it disappears with
+  // the kill switch
   const css = read("src/glass.css");
+  assert.match(css, /course player's seek bar/);  // (the sentence wraps in the file)
   assert.match(css, /html\[data-glass="on"\] \.dc-slider-on-dark > span:first-child/);
   assert.match(css, /dc-slider-on-dark > span:nth-child\(2\)/);
 });

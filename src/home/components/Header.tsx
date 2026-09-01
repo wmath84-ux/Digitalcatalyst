@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useRef } from "react";
 import { Bell, Heart, Search, Trophy, UserRound, X } from "lucide-react";
 import type { Product } from "../types";
 import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/glass-tooltip";
 import BrandMark from "../../components/BrandMark";
 import { useBranding } from "../../context/BrandingContext";
 import { DEFAULT_HOME_GRADIENT_FROM, DEFAULT_HOME_GRADIENT_TO } from "../../utils/branding";
@@ -158,7 +159,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             type="button"
             aria-label="Leaderboard"
             onClick={() => { window.location.hash = "#/leaderboard"; }}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/35 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition hover:bg-white/24 active:scale-95 min-[390px]:h-10 min-[390px]:w-10 min-[430px]:w-auto min-[430px]:gap-1.5 min-[430px]:px-3"
+            className="dc-home-pill flex h-9 w-9 items-center justify-center rounded-xl border border-white/35 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition hover:bg-white/24 active:scale-95 min-[390px]:h-10 min-[390px]:w-10 min-[430px]:w-auto min-[430px]:gap-1.5 min-[430px]:px-3"
           >
             <Trophy size={17} strokeWidth={2.4} className="shrink-0" />
             <span className="hidden text-xs font-bold tracking-tight min-[430px]:inline">Leaderboard</span>
@@ -166,20 +167,27 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           {/* Profile shortcut — this slot used to hold the FlowPath "+"
               button; FlowPath moved to the footer dock (former Profile slot)
               and Profile now lives here in the header. */}
-          <button
-            type="button"
-            aria-label="Open profile"
-            title="Profile"
-            onClick={() => { window.location.hash = "#/profile"; }}
-            className="grid h-9 w-9 place-items-center rounded-xl border border-white/35 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition hover:bg-white/24 active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
-          >
-            <UserRound size={18} strokeWidth={2.4} />
-          </button>
+          {/* The hero's last native `title` bubble became the same delayed,
+              focusable glass tooltip the app-wide header uses (Wave 2), so the
+              shortcut reads identically on keyboard and touch. */}
+          <Tooltip>
+            <TooltipTrigger
+              type="button"
+              aria-label="Open profile"
+              onClick={() => { window.location.hash = "#/profile"; }}
+              className="dc-home-pill grid h-9 w-9 place-items-center rounded-xl border border-white/35 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition hover:bg-white/24 active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
+            >
+              <UserRound size={18} strokeWidth={2.4} />
+            </TooltipTrigger>
+            <TooltipContent side="bottom" tint={0.85}>
+              <span className="text-slate-800">Profile</span>
+            </TooltipContent>
+          </Tooltip>
           <button
             type="button"
             aria-label="Notifications"
             onClick={onOpenNotifications}
-            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
+            className="dc-home-pill relative flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
           >
             <Bell size={18} strokeWidth={2.4} />
             {unreadNotificationCount > 0 && <span aria-label={`${unreadNotificationCount} unread notifications`} className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold ring-2 ring-indigo-600">{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}</span>}
@@ -188,7 +196,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             type="button"
             aria-label="Favorites"
             onClick={onOpenFavorites}
-            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
+            className="dc-home-pill relative flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
           >
             <Heart size={18} strokeWidth={2.4} fill="currentColor" />
             {favoritesCount > 0 && (

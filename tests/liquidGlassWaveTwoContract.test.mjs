@@ -239,8 +239,13 @@ test("the preview shows the wave, and the home header stays out of it", () => {
   for (const name of ["<GlassInput", "<ChromeDisc", "<TooltipContent"]) {
     assert.ok(preview.includes(name), `#/dev/glass-preview must render ${name}`);
   }
-  // The home page has its own header with its own collapse contract; converting
-  // it is a Wave 3 job (homeHeaderGlassCollapseContract), not a Wave 2 surprise.
+  // The home page has its own header with its own collapse contract
+  // (homeHeaderGlassCollapseContract), so Wave 2 left it alone on purpose.
+  // Wave 6 is the wave that was allowed to touch it — and only with the two
+  // additive, pinned-by-name changes below, never by pulling Wave 2's chrome
+  // components in. See tests/liquidGlassWaveSixContract.test.mjs.
   const homeHeader = read("src/home/components/Header.tsx");
-  assert.doesNotMatch(homeHeader, /glass-tooltip|GlassSurface/, "home header is intentionally not touched yet");
+  assert.match(homeHeader, /dc-home-pill/, "Wave 6 adopted the hero pills");
+  assert.match(homeHeader, /glass-tooltip/, "Wave 6 replaced the hero's last native title");
+  assert.doesNotMatch(homeHeader, /GlassSurface/, "the hero header still paints no glass surface of its own");
 });

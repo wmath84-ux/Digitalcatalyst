@@ -418,4 +418,65 @@ html[data-glass="on"] .dc-slider-violet > span:nth-child(2) {
   background: #a78bfa !important;
 }
 
+/* ── Wave 6 · polish: the last hand-painted surfaces + a11y / motion guards ── */
 
+/* Home + checkout light cards. `bg-white` + a hairline ring was written out at
+   four call sites; one class now carries the frost, the inset highlight and the
+   long soft shadow, and `?glass=off` falls back to the flat card underneath
+   because the utility classes are still in the markup. */
+html[data-glass="on"] :where(.dc-card) {
+  background-color: rgba(255, 255, 255, 0.72);
+  border-color: rgba(255, 255, 255, 0.7);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  backdrop-filter: blur(14px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 12px 28px -18px rgba(15, 23, 42, 0.3);
+}
+
+/* The hero's action pills sit on a saturated gradient, so their frost has to
+   read as a lens edge rather than as a grey box: top highlight, faint bottom
+   inset, and the drop shadow pushed deep into the indigo behind them. */
+html[data-glass="on"] :where(.dc-home-pill) {
+  border-color: rgba(255, 255, 255, 0.28);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 24px -12px rgba(30, 27, 75, 0.55);
+}
+html[data-glass="on"] :where(.dc-home-pill):hover {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.12));
+}
+
+/* The amount card on checkout is brand paint, not glass — it only gets the
+   rim + top highlight, so the number stays on solid indigo (a payment figure
+   must never sit on a translucent fill). */
+html[data-glass="on"] :where(.dc-quote) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 18px 40px -24px rgba(49, 46, 129, 0.8);
+}
+
+/* Focus is the one affordance glass must never soften: the pack puts rings on
+   its own controls, but the CSS-inked app surfaces (.dc-field, .dc-home-pill,
+   the re-inked segments/tiles) inherit whatever the page set. Give every one of
+   them the same visible ring, keyboard-only so pointer users see no change. */
+html[data-glass="on"] :where(.dc-field, .dc-glass-select, .dc-segment, .dc-tile, .dc-home-pill, .dc-card[data-glass-focusable]):focus-visible {
+  outline: 2px solid rgb(99 102 241);
+  outline-offset: 2px;
+}
+
+/* Motion budget for the pieces Waves 3-5 added. The registry handles its own
+   springs (glass-motion's reduceMotion()), but the CSS-driven parts — the
+   segment droplet's 0.28s transform, a tile's active scale, the confirm card's
+   scale-in — still need the media query. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-glass="on"] :where(.dc-segment, .dc-tile, .dc-switch, .dc-home-pill, .dc-card, .dc-field),
+  html[data-glass="on"] :where(.dc-segment, .dc-tile, .dc-switch, .dc-card) * {
+    transition-duration: 1ms !important;
+    animation: none !important;
+  }
+}

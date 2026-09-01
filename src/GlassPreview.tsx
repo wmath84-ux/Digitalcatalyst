@@ -34,7 +34,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/glass-tooltip";
-import { Bell, Heart, Search } from "lucide-react";
+import { Bell, Heart, Search, Trophy, UserRound } from "lucide-react";
 import PageTabs from "@/components/ui/PageTabs";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -623,6 +623,60 @@ export default function GlassPreviewPage() {
               <GlassSlider min={0} max={180} value={seek} onValueChange={setSeek} ariaLabel="Audio seek" className="dc-slider-on-dark dc-slider-violet w-full" />
               <p className="mt-1 text-[10px] font-bold tabular-nums text-white/60">
                 {Math.floor(seek / 60)}:{String(seek % 60).padStart(2, "0")} / 3:00 — the course player’s audio transport
+              </p>
+            </div>
+          </Row>
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-3xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur-xl">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">Wave 6 · hero pills &amp; checkout</h2>
+            <p className="text-[11px] font-semibold text-slate-400">identity stays, the gloss is added on top</p>
+          </header>
+
+          <Row label="home pills">
+            <div className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-700 px-3 py-2.5">
+              {(["trophy", "user", "bell", "heart"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  aria-label={`Hero ${k}`}
+                  className="dc-home-pill grid h-9 w-9 place-items-center rounded-xl border border-white/35 bg-white/16 text-white backdrop-blur-md transition hover:bg-white/24 active:scale-90"
+                >
+                  {k === "trophy" ? <Trophy className="h-4 w-4" /> : k === "user" ? <UserRound className="h-4 w-4" /> : k === "bell" ? <Bell className="h-4 w-4" /> : <Heart className="h-4 w-4" />}
+                </button>
+              ))}
+            </div>
+            <p className="max-w-xs text-[11px] font-semibold text-slate-500">
+              `#/home` used to hand-paint these four pills (the same border + fill + shadow typed out four times).
+              `.dc-home-pill` carries the rim and the top highlight instead, so the pack keeps its press behaviour
+              and the hero keeps its depth.
+            </p>
+          </Row>
+
+          <Row label="pay CTA">
+            <div className="w-full max-w-sm">
+              <button
+                type="button"
+                className="relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-emerald-600 py-4 text-base font-black text-white shadow-lg transition active:scale-[0.98]"
+              >
+                <GlassSurface tint={0.7} radius={16} className="pointer-events-none absolute inset-0" />
+                <span className="relative z-10 flex items-center gap-2">Pay securely — &#8377;1,499</span>
+              </button>
+              <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                Checkout's money button keeps its solid emerald — the frost sits *behind* the label, never under it.
+                The amount card above it gets a rim only (`.dc-quote`) for the same reason.
+              </p>
+            </div>
+          </Row>
+
+          <Row label="flowpath light">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+              <GlassSlider min={0} max={100} value={curve} onValueChange={setCurve} ariaLabel="Curve strength (light canvas)" className="w-full" />
+              <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                Wave 6 removed `dc-slider-on-dark` from FlowPath: `useTheme` already writes `data-theme` on
+                `&lt;html&gt;`, so the slider follows the theme the user picked — this is the same control on a light
+                canvas, which the forced rule used to break.
               </p>
             </div>
           </Row>

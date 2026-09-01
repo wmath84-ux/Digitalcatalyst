@@ -269,10 +269,13 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
 
             {type === "revision" && (
               <div>
-                <label className="mb-1 flex justify-between text-[11px] font-medium uppercase tracking-wide text-fp-muted">
+                {/* Wave 6 (a11y): a <label> pointing at a `role="slider"` div
+                    labels nothing, so the caption is plain text; the slider
+                    carries its own accessible name. */}
+                <div className="mb-1 flex justify-between text-[11px] font-medium uppercase tracking-wide text-fp-muted">
                   <span>Progress</span>
                   <span>{progress}%</span>
-                </label>
+                </div>
                 {/* Wave 4: native range -> registry glass-slider (same 0-100
                     scale, same step-free drag semantics, plus keyboard). */}
                 <GlassSlider
@@ -282,7 +285,7 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
                   value={progress}
                   onValueChange={setProgress}
                   ariaLabel="Progress"
-                  className="dc-slider-on-dark w-full"
+                  className="w-full"
                 />
               </div>
             )}

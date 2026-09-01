@@ -151,6 +151,10 @@ export function ToastViewport({ className }: { className?: string }) {
 
   return createPortal(
     <div
+      /* No role/aria-live on this wrapper on purpose: each GlassToastCard is
+         already `role="status"` (or `role="alert"` for errors), which makes it a
+         live region by itself. A second aria-live up here would announce every
+         toast twice. */
       className={cn(
         "pointer-events-none fixed inset-x-0 bottom-20 z-[120] flex flex-col items-center gap-2 px-4 sm:bottom-6",
         className,
