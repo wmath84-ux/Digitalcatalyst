@@ -63,13 +63,19 @@ test("Home overlay pad is the expanded header, never the collapse", () => {
 
 test("phone Revision pads even when a hidden page-tabs sibling exists", () => {
   // `hidden md:block` leaves `.dc-page-tabs` in the DOM on phone tab routes.
-  // The always-on pad must live inside a max-width 767 gate so tablet
-  // portrait (visible tabs) does not also inherit it.
+  // The pad must live inside a max-width 767 gate so tablet portrait
+  // (visible tabs) does not also inherit it. Tab pages pad the INNER
+  // scroller so cards frost under the overlay site header; AppHeader
+  // subpages and Test Bank keep the column pad so those bars stay seated.
   const phonePad = overlay.slice(
-    overlay.indexOf("Always pad"),
+    overlay.indexOf("Phone Revision"),
     overlay.indexOf("@media (min-width: 768px) and (max-width: 959px)"),
   );
   assert.match(phonePad, /@media \(max-width: 767px\)/);
+  assert.match(
+    phonePad,
+    /:not\(:has\(\[data-revision-app-header\]\)\):not\(:has\(\[data-rev-bank-header\]\)\) \[data-revision-page-main\] \{\s*padding-top:\s*var\(--dc-site-header-seat\)/,
+  );
   assert.match(phonePad, /> \[data-revision-content\] \{\s*padding-top:\s*var\(--dc-site-header-seat\)/);
   assert.doesNotMatch(phonePad, /:not\(:has\(> \.dc-page-tabs\)\)/);
 

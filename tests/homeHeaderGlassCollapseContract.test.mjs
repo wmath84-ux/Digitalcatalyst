@@ -70,6 +70,7 @@ test("shared, desktop, revision and search headers use watercolor glass, not opa
   assert.match(css, /\[data-site-header\]:not\(\[data-home-header\]\)/);
   assert.match(css, /\.dc-desktop-shell \[data-desktop-topbar\]/);
   assert.match(css, /\[data-revision-app-header\]/);
+  assert.match(css, /\[data-revision-app\] \.dc-glass-toolbar/);
   assert.match(css, /\[data-search-bar\]/);
   assert.match(css, /rgba\(186,\s*230,\s*253/);
   assert.match(css, /rgba\(196,\s*181,\s*253/);

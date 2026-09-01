@@ -12,15 +12,15 @@ type AppHeaderProps = {
 /**
  * The feature's own header, ported from the reference design.
  *
- * PageShell renders it as a flex sibling ABOVE the page scroller
- * (`[data-revision-page-main]`), so it is permanently parked at the top of
- * `[data-revision-content]` — directly under the website header on a phone /
- * tablet portrait, and under the desktop top bar from 960 px up. `sticky
- * top-0` only matters if that container ever becomes the scroller itself: the
- * inset MUST stay 0, because a sticky inset also pushes a box down when its
- * static position is above it, which is what dropped this header into the
- * middle of the page when `index.css` carried per-band 68/80/64 px offsets
- * for `[data-revision-app-header]`.
+ * PageShell still renders it as a sibling ABOVE the page scroller
+ * (`[data-revision-page-main]`). Unlayered CSS then takes it out of
+ * flow (`position: absolute; top: 0`) so page cards scroll UNDER the
+ * MAG frost — the same overlay model as Store / Home. The scroller
+ * keeps `--dc-revision-app-header-seat` of padding-top so the first
+ * content is not hidden. The inset MUST stay 0: a sticky inset also
+ * pushes a box down when its static position is above it, which is
+ * what dropped this header into the middle of the page when
+ * `index.css` carried per-band 68/80/64 px offsets.
  */
 export default function AppHeader({ title, subtitle, backHref, rightSlot }: AppHeaderProps) {
   const { navigate } = useExitGuard();

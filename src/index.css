@@ -4814,7 +4814,28 @@ html[data-course-player-active="true"] {
    element could not override the old `[data-revision-app-header]` offsets.
    Keep this rule unlayered so the two never disagree. */
 [data-revision-app-header] {
+  position: absolute;
   top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  width: 100%;
+}
+
+/* Overlay AppHeader onto the page scroller so cards frost through it,
+   the same way Store / Home headers overlay their mains. JSX still
+   says `sticky top-0`; this unlayered rule is what actually seats it. */
+[data-revision-content] [data-page-enter-panel] {
+  position: relative;
+}
+
+:root {
+  --dc-revision-app-header-seat: 3.5rem; /* min-h-[56px] of AppHeader */
+}
+
+[data-page-enter-panel]:has(> [data-revision-app-header]) > [data-revision-page-main] {
+  padding-top: var(--dc-revision-app-header-seat);
+  background-color: transparent;
 }
 
 /* ── 2. Revision dashboard test cards: compact on small screens ─────────── */
@@ -5511,7 +5532,8 @@ html[data-course-player-active="true"] {
 [data-admin-topbar],
 [data-admin-shell] > header,
 [data-rev-bank-header],
-[data-revision-page-main] > .dc-glass-toolbar.sticky {
+[data-revision-page-main] > .dc-glass-toolbar.sticky,
+[data-revision-app] .dc-glass-toolbar {
   background: var(--dc-chrome-glass) !important;
   backdrop-filter: var(--dc-chrome-glass-blur) !important;
   -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
@@ -5622,14 +5644,21 @@ html[data-course-player-active="true"] {
     background-color: transparent;
   }
 
-  /* Phone: `.dc-page-tabs` stays in the DOM on the five tab routes
-     (`hidden md:block` → display:none). `:has(> .dc-page-tabs)` still
-     matches a display:none sibling, so the no-tabs pad would skip and
-     the first content would hide under the overlay header. Always pad
-     revision-content on this band. Nested max-width 767 so tablet
-     portrait (visible tabs) does not also inherit this pad. */
+  /* Phone Revision: pad the INNER scroller so cards scroll under the
+     overlay site header (frost only frosts if content is behind it).
+     Nested max-width 767 so tablet portrait (visible tabs) does not
+     also inherit this pad. Subpages with AppHeader keep the pad on
+     `[data-revision-content]` so that header is not covered by the
+     site header. Test Bank keeps the column pad so its sticky search
+     stays flush under the site header. */
   @media (max-width: 767px) {
-    html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-revision-frame]:has(> [data-site-header]) > [data-revision-content] {
+    html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-revision-frame]:has(> [data-site-header]):not(:has([data-revision-app-header])):not(:has([data-rev-bank-header])) [data-revision-page-main] {
+      padding-top: var(--dc-site-header-seat);
+      background-color: transparent;
+    }
+
+    html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-revision-frame]:has(> [data-site-header]):has([data-revision-app-header]) > [data-revision-content],
+    html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-revision-frame]:has(> [data-site-header]):has([data-rev-bank-header]) > [data-revision-content] {
       padding-top: var(--dc-site-header-seat);
       background-color: transparent;
     }

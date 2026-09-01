@@ -134,6 +134,10 @@ test("the seat override comes after every band padding it beats", () => {
   for (const rule of innermostRules(after)) {
     if (!/padding/.test(rule.body)) continue;
     if (rule.selector.includes("[data-rev-bank-header]")) continue;
+    // Overlay seats for other Revision pages pad the same scroller hook
+    // but explicitly skip Test Bank (or only fire when AppHeader is present).
+    if (rule.selector.includes(":not(:has([data-rev-bank-header]))")) continue;
+    if (rule.selector.includes("[data-revision-app-header]")) continue;
     assert.doesNotMatch(
       rule.selector,
       /\[data-revision-page-main\](\s*>\s*\.animate-fade-in)?\s*$/,
