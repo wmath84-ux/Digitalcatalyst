@@ -2066,6 +2066,17 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 .dc-app-shell {
   position: relative;
   isolation: isolate;
+  /* The decorative aurora orbs below (::before / ::after) intentionally
+     bleed past the shell's edges (left: -5rem / right: -4rem). Without
+     clipping, the ::after orb pokes 64px past the RIGHT edge of the page,
+     and mobile Chrome responds by widening the layout viewport by those
+     64px (shrink-to-fit). The result was the bug users hit on phones and
+     tablets: dragging the page revealed a blank band on the right and the
+     bottom, as if the whole app had extra padding. `overflow: clip` cuts
+     the orbs at the shell's own box — unlike `overflow: hidden` it does
+     NOT create a scroll container, so body scrolling and sticky headers
+     inside the shell keep working exactly as before. */
+  overflow: clip;
   background:
     radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.22), transparent 48%),
     radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.18), transparent 42%),
@@ -5917,4 +5928,25 @@ html[data-course-player-active="true"] {
 }
 [data-pdp-module-select-modal] button {
   font-size: 0.875rem;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MOBILE / TABLET VIEWPORT GUARD — no phantom padding on the right/bottom
+   ══════════════════════════════════════════════════════════════════════
+   Any element that pokes past the right edge of the document makes mobile
+   browsers widen the layout viewport (shrink-to-fit). The page then pans
+   into blank space on the right AND the bottom — users read that as "extra
+   padding" even though no element carries it. The dc-app-shell orbs were
+   one such source (fixed at the source with `overflow: clip`); this guard
+   makes sure no future decorative bleed can reintroduce the bug on touch
+   devices. Desktop (1024+) is exempt so wide admin tables may still rely
+   on document-level horizontal scrolling if they ever need it.
+   `clip` (not `hidden`) keeps html/body from becoming scroll containers,
+   so position: sticky and body scrolling behave exactly as before. */
+@media (max-width: 1023px) {
+  html,
+  body {
+    overflow-x: clip;
+    max-width: 100%;
+  }
 }
