@@ -356,14 +356,17 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith("#/admin")
     || hash.startsWith("#/admin-login")
     || hash.startsWith("#/course/")
-    || hash.startsWith("#/flowpath")
     || hash.startsWith(PROFILE_PREVIEW_HASH)
   ) {
     return <>{children}</>;
   }
 
   return (
-    <AppShell active={resolveActiveFromHash(hash)}>
+    <AppShell
+      active={resolveActiveFromHash(hash)}
+      pageTitle={hash.startsWith("#/flowpath") ? "FlowPath" : undefined}
+      pageSubtitle={hash.startsWith("#/flowpath") ? "Your day. Your goals. One continuous flow." : undefined}
+    >
       {children}
     </AppShell>
   );

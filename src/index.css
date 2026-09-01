@@ -6005,3 +6005,28 @@ html[data-course-player-active="true"] {
 .dc-desktop-shell [data-page-enter-panel]:has(> [data-revision-app-header]) > [data-revision-page-main] {
   padding-top: calc(var(--dc-revision-app-header-seat) + 12px) !important;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   FLOWPATH INSIDE THE DESKTOP SHELL (side panel + top bar)
+   ══════════════════════════════════════════════════════════════════════
+   FlowPath now renders through the shared AppShell → DesktopShell on
+   desktop and tablet-landscape, so it gets the side rail + glass top bar
+   like every other page. Three shell-specific adjustments:
+     • the ambient dark background was `fixed inset-0` (fills the whole
+       viewport on the standalone phone page) — inside the shell it is
+       re-anchored to the page column so it never paints over the rail
+       or the top bar;
+     • the dark canvas gets the same rounded page treatment as other
+       shell pages and clips its own decorations;
+     • the fixed bottom dock centers over the CONTENT column, not the
+       whole viewport (which would offset it by half the rail width). */
+.dc-desktop-shell [data-fp-ambient] {
+  position: absolute;
+}
+.dc-desktop-shell .flowpath-app {
+  border-radius: 24px;
+  overflow: clip;
+}
+.dc-desktop-shell [data-fp-dock] {
+  left: var(--desktop-rail-width, 260px);
+}

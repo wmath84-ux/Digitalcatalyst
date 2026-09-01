@@ -34,8 +34,11 @@ export default function FlowPathApp({
 
   return (
     <div className="flowpath-app relative min-h-screen bg-[var(--fp-bg-0)] text-fp-text">
-      {/* ambient dimensional background */}
-      <div className="pointer-events-none fixed inset-0 z-0">
+      {/* ambient dimensional background. Fixed on the standalone page;
+          inside the desktop shell a CSS override re-anchors it to the
+          page column (absolute) so the dark canvas never bleeds over
+          the side rail / top bar. */}
+      <div data-fp-ambient className="pointer-events-none fixed inset-0 z-0">
         <div
           className="absolute inset-0"
           style={{

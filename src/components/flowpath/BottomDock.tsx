@@ -7,8 +7,12 @@ import {
   GraduationCap,
   LayoutDashboard,
   Landmark,
+  Moon,
+  Palette,
   Plus,
+  Settings,
   StickyNote,
+  Sun,
   Sunrise,
   TrendingUp,
   UserRound,
@@ -92,15 +96,31 @@ interface BottomDockProps {
   onPlanLectures?: () => void;
   onStub: (group: string, label: string) => void;
   onNavigateToHome?: () => void;
+  /** Settings gear — the controls of the old fixed FLOWPATH title bar.
+   *  Tapping the gear opens a radial with these options; each one keeps
+   *  its original behaviour (theme toggles in place, Flow Curve opens
+   *  the same CurveSettingsModal overlay as before). */
+  resolvedTheme?: "dark" | "light";
+  onToggleTheme?: () => void;
+  onOpenCurve?: () => void;
 }
 
-export function BottomDock({ onCreateType, onPlanLectures, onStub, onNavigateToHome }: BottomDockProps) {
+export function BottomDock({
+  onCreateType,
+  onPlanLectures,
+  onStub,
+  onNavigateToHome,
+  resolvedTheme = "dark",
+  onToggleTheme,
+  onOpenCurve,
+}: BottomDockProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   const mydayRef = useRef<HTMLButtonElement>(null);
   const createRef = useRef<HTMLButtonElement>(null);
   const revisionRef = useRef<HTMLButtonElement>(null);
   const lectureRef = useRef<HTMLButtonElement>(null);
+  const settingsRef = useRef<HTMLButtonElement>(null);
 
   const createItems: RadialItem[] = (Object.keys(ACTIVITY_TYPE_META) as ActivityType[]).map(
     (t) => ({
@@ -110,6 +130,17 @@ export function BottomDock({ onCreateType, onPlanLectures, onStub, onNavigateToH
       color: ACTIVITY_TYPE_META[t].color,
     })
   );
+
+  // The old FLOWPATH header's controls, now behind the dock's gear.
+  const settingsItems: RadialItem[] = [
+    { id: "set-curve", label: "Flow Curve", icon: Palette, color: "#c084fc" },
+    {
+      id: "set-theme",
+      label: resolvedTheme === "dark" ? "Light Mode" : "Dark Mode",
+      icon: resolvedTheme === "dark" ? Sun : Moon,
+      color: "#f5b969",
+    },
+  ];
 
   function openMenu(
     ref: React.RefObject<HTMLButtonElement | null>,
@@ -134,11 +165,12 @@ export function BottomDock({ onCreateType, onPlanLectures, onStub, onNavigateToH
     ...(onPlanLectures
       ? [{ id: "lectures", label: "Lectures", icon: GraduationCap, color: "#f5b969", buttonRef: lectureRef } as GlassDockItem]
       : []),
+    { id: "settings", label: "Settings", icon: Settings, color: "#94a3b8", buttonRef: settingsRef },
   ];
 
   return (
     <>
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2">
+      <div data-fp-dock className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2">
         <div className="pointer-events-auto mx-auto w-max max-w-full">
           <GlassDock
             items={items}
@@ -161,6 +193,10 @@ export function BottomDock({ onCreateType, onPlanLectures, onStub, onNavigateToH
               }
               if (id === "lectures" && onPlanLectures) {
                 onPlanLectures();
+                return;
+              }
+              if (id === "settings") {
+                openMenu(settingsRef, settingsItems, "Settings");
               }
             }}
           />
@@ -176,6 +212,17 @@ export function BottomDock({ onCreateType, onPlanLectures, onStub, onNavigateToH
           setMenu(null);
           if (group === "Create") {
             onCreateType(id as ActivityType);
+            return;
+          }
+          // Settings gear options — same behaviour as the old header
+          // controls: theme flips in place, Flow Curve opens the same
+          // CurveSettingsModal overlay it always did.
+          if (id === "set-theme") {
+            if (onToggleTheme) onToggleTheme();
+            return;
+          }
+          if (id === "set-curve") {
+            if (onOpenCurve) onOpenCurve();
             return;
           }
           const route = ROUTE_FOR_ITEM[id];

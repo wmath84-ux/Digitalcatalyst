@@ -103,7 +103,7 @@ import {
   type FlowRow,
   type LayoutConfig,
 } from "../../flowpath/lib/layout";
-import { animateScrollTo } from "../../flowpath/lib/scroll";
+import { animateScrollTo, getScrollParent } from "../../flowpath/lib/scroll";
 import type { CurveOverride } from "../../flowpath/types/curve";
 import { DEFAULT_CURVE_OVERRIDE } from "../../flowpath/types/curve";
 import { CurveSettingsModal } from "./CurveSettingsModal";
@@ -115,7 +115,6 @@ import { RadialMenu, type RadialItem } from "./RadialMenu";
 import { CreateModal } from "./CreateModal";
 import { EmptyState } from "./EmptyState";
 import { BottomDock } from "./BottomDock";
-import { FlowPathHeader } from "./Header";
 import { ACTIVITY_ICONS } from "./icons";
 
 const SCROLL_BUFFER = 2000;
@@ -252,7 +251,7 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
     }
     return merged;
   }, [items, firestoreItems, currentId]);
-  const { mode: themeMode, resolved: resolvedTheme, toggle: toggleTheme } = useTheme();
+  const { resolved: resolvedTheme, toggle: toggleTheme } = useTheme();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -327,10 +326,14 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
     }
 
     measure();
-    window.addEventListener("scroll", onScroll, { passive: true });
+    // capture: true so scroll events from ANY scroller reach us — the
+    // standalone page scrolls the window, but inside the desktop shell
+    // the page column scrolls [data-desktop-content] (scroll events do
+    // not bubble, they only pass through the capture phase).
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
     window.addEventListener("resize", onScroll, { passive: true });
     return () => {
-      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", onScroll, { capture: true } as EventListenerOptions);
       window.removeEventListener("resize", onScroll);
       cancelAnimationFrame(raf);
     };
@@ -374,13 +377,18 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         if (cancelled || !containerRef.current) return;
+        const scroller = getScrollParent(containerRef.current);
         const rect = containerRef.current.getBoundingClientRect();
-        const targetAbsolute = rect.top + window.scrollY + row.y + row.height / 2;
-        const targetScroll = Math.max(0, targetAbsolute - window.innerHeight / 2);
+        const originTop = scroller ? scroller.getBoundingClientRect().top : 0;
+        const scrollY = scroller ? scroller.scrollTop : window.scrollY;
+        const viewportH = scroller ? scroller.clientHeight : window.innerHeight;
+        const targetAbsolute = rect.top - originTop + scrollY + row.y + row.height / 2;
+        const targetScroll = Math.max(0, targetAbsolute - viewportH / 2);
         if (reduced) {
-          window.scrollTo(0, targetScroll);
+          if (scroller) scroller.scrollTo(0, targetScroll);
+          else window.scrollTo(0, targetScroll);
         } else {
-          animateScrollTo(targetScroll, 950, () => cancelled);
+          animateScrollTo(targetScroll, 950, () => cancelled, scroller);
         }
       })
     );
@@ -398,12 +406,20 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
     const row = rows.find((r) => r.id === justCreatedId);
     setHighlightId(justCreatedId);
     if (row && containerRef.current) {
+      const scroller = getScrollParent(containerRef.current);
       const rect = containerRef.current.getBoundingClientRect();
-      const targetAbsolute = rect.top + window.scrollY + row.y + row.height / 2;
-      const targetScroll = Math.max(0, targetAbsolute - window.innerHeight / 2);
+      const originTop = scroller ? scroller.getBoundingClientRect().top : 0;
+      const scrollY = scroller ? scroller.scrollTop : window.scrollY;
+      const viewportH = scroller ? scroller.clientHeight : window.innerHeight;
+      const targetAbsolute = rect.top - originTop + scrollY + row.y + row.height / 2;
+      const targetScroll = Math.max(0, targetAbsolute - viewportH / 2);
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (reduced) window.scrollTo(0, targetScroll);
-      else animateScrollTo(targetScroll, 800, () => false);
+      if (reduced) {
+        if (scroller) scroller.scrollTo(0, targetScroll);
+        else window.scrollTo(0, targetScroll);
+      } else {
+        animateScrollTo(targetScroll, 800, () => false, scroller);
+      }
     }
     const t1 = setTimeout(() => clearJustCreated(), 400);
     const t2 = setTimeout(() => setHighlightId(null), 2200);
@@ -530,12 +546,10 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
 
   return (
     <div className="relative">
-      <FlowPathHeader
-        themeMode={themeMode}
-        resolvedTheme={resolvedTheme}
-        onToggleTheme={toggleTheme}
-        onOpenCurve={() => setCurveOpen(true)}
-      />
+      {/* The old fixed FLOWPATH title bar is gone — its controls (theme
+          toggle + flow-curve settings) now live behind the Settings gear
+          in the bottom dock, so the home-style header above stays the
+          only page chrome. */}
 
       <main
         ref={containerRef}
@@ -653,6 +667,9 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
         onPlanLectures={() => setLecturePickerOpen(true)}
         onStub={(group, label) => setToast({ msg: `${group} · ${label}`, key: Date.now() })}
         onNavigateToHome={onNavigateToHome}
+        resolvedTheme={resolvedTheme}
+        onToggleTheme={toggleTheme}
+        onOpenCurve={() => setCurveOpen(true)}
       />
 
       {/* stub feedback toast */}
