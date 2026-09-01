@@ -187,10 +187,10 @@ export default function BottomNav({ active, onChange, storeBadge, purchasesBadge
 
       <nav
         data-site-footer-nav
-        className="pointer-events-none sticky bottom-0 z-30 h-0 w-full overflow-visible md:px-6"
+        className="pointer-events-none sticky bottom-0 z-30 w-full overflow-visible px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 md:px-6"
         aria-label="Primary"
       >
-        <div data-site-footer className="pointer-events-auto absolute bottom-[max(env(safe-area-inset-bottom),10px)] left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2">
+        <div data-site-footer className="pointer-events-auto mx-auto w-max max-w-full">
           <GlassDock
             siteFooter
             items={items}

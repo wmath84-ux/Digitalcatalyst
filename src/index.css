@@ -5354,12 +5354,14 @@ html[data-course-player-active="true"] {
 /* ══════════════════════════════════════════════════════════════════════
    GLASS DOCK — macOS-style magnifying footer on mobile + tablet
    ══════════════════════════════════════════════════════════════════════
-   The capsule hugs its icons in the original footer slot — no full-width
-   white strip. Frosted watercolor glass (not a white or dark bar).
-   Nearby icons scale (MAG_SCALE 1.55) and lift (−12 px). The tablet
-   `* { max-width: 100% }` pass would freeze that spring width, so the
-   dock and every child opt out. Overflow stays visible so the lift +
-   tooltip are not clipped. */
+   The capsule hugs its icons in the original in-flow footer slot — no
+   full-width white strip, no height:0 overlay (that overlay left a blank
+   band and shifted content up). Frost / tint / blur / refraction live on
+   the GlassMaterial layer (WebsiteGlass numbers: radius 20, strength
+   0.28, frost 0.3, tint 0.15, blur 4.4px). Nearby icons scale
+   (MAG_SCALE 1.55) and lift (−12 px). The tablet `* { max-width: 100% }`
+   pass would freeze that spring width, so the dock and every child opt
+   out. Overflow stays visible so the lift + tooltip are not clipped. */
 [data-glass-dock],
 [data-glass-dock] * {
   max-width: none !important;
@@ -5367,27 +5369,12 @@ html[data-course-player-active="true"] {
 
 [data-glass-dock] {
   overflow: visible;
-  border-radius: 1.5rem !important;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(125, 211, 252, 0.22) 0%,
-      rgba(167, 139, 250, 0.14) 48%,
-      rgba(110, 231, 183, 0.18) 100%
-    ) !important;
-  backdrop-filter: blur(28px) saturate(2.4);
-  -webkit-backdrop-filter: blur(28px) saturate(2.4);
-  border: 1px solid rgba(165, 243, 252, 0.42) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.38),
-    inset 0 -1px 0 rgba(125, 211, 252, 0.18),
-    0 10px 28px rgba(14, 165, 233, 0.14);
+  background: transparent !important;
 }
 
 [data-site-footer-nav]:has([data-glass-dock]) {
   overflow: visible !important;
   background: transparent !important;
-  height: 0 !important;
 }
 
 [data-site-footer]:has([data-glass-dock]),

@@ -6,13 +6,19 @@
  * Lifting a finger on an icon selects it.
  *
  * MAG constants match the GlassDock spec. The capsule hugs its icons —
- * no full-width strip. Finish is frosted watercolor glass, not white.
+ * no full-width strip. Bar finish is WebsiteGlass refraction / frost /
+ * tint / blur (strength 0.28, frost 0.3, radius 20, accent #38bdf8).
  *
  * Old footer implementations: src/components/glass-dock/stored/
  */
 
 import { useRef, type CSSProperties, type ComponentType, type ReactNode, type Ref } from 'react'
 import { motion, useMotionValue, useSpring, useTransform, type MotionValue } from 'framer-motion'
+import GlassMaterial, {
+  GLASS_ACCENT,
+  GLASS_PILL_RADIUS,
+  GLASS_RADIUS,
+} from './GlassMaterial'
 
 export const ICON_SIZE = 44
 export const MAG_RANGE = 120
@@ -99,9 +105,9 @@ function DockItem({
     <motion.div
       ref={ref}
       data-glass-dock-item={id}
-      className="group relative flex cursor-pointer flex-col items-center"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      className="group relative z-10 flex cursor-pointer flex-col items-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={{ type: 'spring', stiffness: 200, damping: 18, delay: index * 0.04 }}
     >
       <motion.div
@@ -109,10 +115,11 @@ function DockItem({
           active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         }`}
         style={{
-          background: 'rgba(125, 211, 252, 0.22)',
-          backdropFilter: 'blur(16px) saturate(1.8)',
-          WebkitBackdropFilter: 'blur(16px) saturate(1.8)',
-          border: '1px solid rgba(125, 211, 252, 0.35)',
+          background: 'rgba(255, 255, 255, 0.22)',
+          backdropFilter: 'blur(16px) saturate(1.6)',
+          WebkitBackdropFilter: 'blur(16px) saturate(1.6)',
+          border: '1px solid rgba(255, 255, 255, 0.4)',
+          boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.9), 0 8px 20px -10px rgba(0,0,0,0.22)',
           transition: 'opacity 0.15s',
         }}
       >
@@ -143,16 +150,18 @@ function DockItem({
           width: size,
           height: size,
           y,
-          background: `linear-gradient(160deg, ${color}33, ${color}14)`,
-          border: `1px solid ${color}40`,
-          borderRadius: 12,
-          boxShadow: active ? `0 0 16px ${color}55` : `inset 0 1px 0 ${color}55`,
+          background: active ? `${GLASS_ACCENT}33` : 'rgba(255,255,255,0.16)',
+          border: active ? `1px solid ${GLASS_ACCENT}66` : '1px solid rgba(255,255,255,0.38)',
+          borderRadius: GLASS_PILL_RADIUS,
+          boxShadow: active
+            ? `0 0 16px ${GLASS_ACCENT}55, inset 0 1px 1px rgba(255,255,255,0.7)`
+            : 'inset 0 1px 1px rgba(255,255,255,0.7)',
         }}
         whileTap={{ scale: 0.82 }}
         className={`relative flex items-center justify-center select-none ${buttonProps?.className ?? ''}`}
       >
-        <span className="flex items-center justify-center" style={{ color }}>
-          <Icon size={22} className="h-[22px] w-[22px] shrink-0" style={{ color }} />
+        <span className="flex items-center justify-center" style={{ color: active ? GLASS_ACCENT : color }}>
+          <Icon size={22} className="h-[22px] w-[22px] shrink-0" style={{ color: active ? GLASS_ACCENT : color }} />
         </span>
         {extra}
         {!!badge && badge > 0 && (
@@ -195,9 +204,6 @@ export default function GlassDock({
 
   return (
     <motion.div
-      initial={{ y: 50 }}
-      animate={{ y: 0 }}
-      transition={{ type: 'spring', stiffness: 180, damping: 20 }}
       onPointerDown={(event) => {
         if (event.pointerType !== 'mouse') trackPointer(event.clientX)
       }}
@@ -215,11 +221,17 @@ export default function GlassDock({
         onSelect(id)
       }}
       onPointerCancel={resetPointer}
-      className="relative isolate mx-auto flex w-max max-w-full shrink-0 items-end gap-2 rounded-3xl px-3 py-2"
-      style={{ touchAction: 'none' }}
+      className="relative mx-auto flex w-max max-w-full shrink-0 items-end gap-2 px-3 py-2"
+      style={{
+        touchAction: 'none',
+        borderRadius: GLASS_RADIUS,
+        boxShadow:
+          'inset 0 1px 1px rgba(255,255,255,0.9), inset 0 0 0 1px rgba(255,255,255,0.4), 0 14px 38px -12px rgba(0,0,0,0.28)',
+      }}
       data-glass-dock=""
       data-site-footer={siteFooter ? '' : undefined}
     >
+      <GlassMaterial />
       {leading}
       {items.map((item, i) => (
         <DockItem
