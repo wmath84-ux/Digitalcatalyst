@@ -45,7 +45,7 @@ import { buildCheckoutSessionRecord, writeToSessionStorage as writeCheckoutToSto
 import type { CheckoutSelection } from "./types/commerce";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
 import type { PaidCourseUpdate } from "./types/course";
-import { isDesktopBrowserLocked, isInstalledMobilePwa, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
+import { isInstalledMobilePwa } from "./utils/pwaInstall";
 import { disablePageZoom } from "./utils/disablePageZoom";
 import { setThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/themeColor";
 import { initOrientationLock } from "./utils/appOrientation";
@@ -346,14 +346,10 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
   // The landing page is a standalone marketing page: wrapping it in the
   // app shell squeezed the hero into a small box beside the rail, hid the
   // sections below from the page scroll and stretched the fixed header
-  // edge-to-edge. It renders full-bleed at every size instead — desktop
-  // browsers are locked to it anyway (Open App shows the install-PWA
-  // notice), so any hash that ends up rendering the landing also passes
-  // through unchanged.
+  // edge-to-edge. It renders full-bleed at every size instead.
   if (
     !hash
     || hash.startsWith(LANDING_HASH)
-    || isDesktopBrowserLocked()
     || hash.startsWith("#/checkout")
     || hash.startsWith("#/auth")
     || hash.startsWith("#/admin")
@@ -385,7 +381,6 @@ function RootPage(): ReactNode {
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
-  const [desktopLocked, setDesktopLocked] = useState(() => isDesktopBrowserLocked());
   const [installedMobilePwa, setInstalledMobilePwa] = useState(() => isInstalledMobilePwa());
   // Live viewport category so the AppShell wrapper re-renders when the
   // learner resizes across the desktop / tablet / mobile boundaries.
@@ -395,7 +390,7 @@ function RootPage(): ReactNode {
   const landingRouteRequested = !hash || hash.startsWith(LANDING_HASH);
   // Mobile + installed PWA: never show landing. Everyone else on mobile
   // (logged in or not) starts on landing and opens the app from there.
-  const skipLandingForInstalledMobilePwa = Boolean(installedMobilePwa && landingRouteRequested && !desktopLocked);
+  const skipLandingForInstalledMobilePwa = Boolean(installedMobilePwa && landingRouteRequested);
 
   const shoppingProducts: CartProduct[] = useMemo(() => catalogProducts.map((product) => ({
     id: product.id,
@@ -440,7 +435,6 @@ function RootPage(): ReactNode {
 
   useEffect(() => {
     const syncInstallState = () => {
-      setDesktopLocked(isDesktopBrowserLocked());
       setInstalledMobilePwa(isInstalledMobilePwa());
     };
     const handleHashChange = () => setHash(window.location.hash);
@@ -458,13 +452,15 @@ function RootPage(): ReactNode {
   }, []);
 
   useEffect(() => {
-    if (!desktopLocked) return;
-    if (hash.startsWith(ADMIN_HASH) || hash.startsWith(ADMIN_LOGIN_HASH)) return;
-    if (!hash || hash.startsWith(LANDING_HASH)) return;
-    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${LANDING_HASH}`);
-    setHash(LANDING_HASH);
-    showDesktopMaintenanceNotice();
-  }, [desktopLocked, hash]);
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.querySelectorAll(
+      "[data-desktop-content], [data-app-frame] > main, [data-revision-page-main], [data-myday-content] > main, [data-profile-content], [data-pdp-scroll]",
+    ).forEach((node) => {
+      if (node instanceof HTMLElement) node.scrollTop = 0;
+    });
+  }, [hash]);
 
   useEffect(() => {
     if (!skipLandingForInstalledMobilePwa) return;
@@ -887,10 +883,6 @@ function RootPage(): ReactNode {
       || hash.startsWith(ADMIN_LOGIN_HASH);
     setThemeColor(darkScreen ? THEME_COLOR_DARK : THEME_COLOR_LIGHT);
   }, [hash, loading, skipLandingForInstalledMobilePwa, protectedRoutePending, user, catalogLoading, openingAnimationEnabled]);
-
-  if (desktopLocked && !hash.startsWith(ADMIN_HASH) && !hash.startsWith(ADMIN_LOGIN_HASH)) {
-    return <LandingApp />;
-  }
 
   const launchPending =
     loading

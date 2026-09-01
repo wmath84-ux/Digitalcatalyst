@@ -8,11 +8,7 @@ import Features from "./components/landing/Features";
 import CtaBanner from "./components/landing/CtaBanner";
 import Footer from "./components/landing/Footer";
 import LandingOverlays from "./components/landing/LandingOverlays";
-import {
-  OPEN_APP_EVENT,
-  isDesktopBrowserLocked,
-  showDesktopMaintenanceNotice,
-} from "@/utils/pwaInstall";
+import { OPEN_APP_EVENT } from "@/utils/pwaInstall";
 
 /** Hash that routes to the main HomeApp inside Root (src/main.tsx). */
 const HOME_HASH = "#/home";
@@ -22,10 +18,6 @@ export default function LandingApp() {
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleOpenApp = useCallback(() => {
-    if (isDesktopBrowserLocked()) {
-      showDesktopMaintenanceNotice();
-      return;
-    }
     setIsExiting(true);
     exitTimerRef.current = setTimeout(() => {
       window.location.hash = HOME_HASH;

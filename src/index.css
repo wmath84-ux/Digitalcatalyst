@@ -5387,22 +5387,22 @@ html[data-course-player-active="true"] {
 
 /* Overlay footer: the frame (or revision column) is the containing
    block, so the dock sits on the page instead of occupying a white
-   strip. Padding on the scroller replaces the space sticky used to
-   take, so the last items stay reachable — and only on bands where
-   the dock is actually visible (not desktop / tablet-landscape). */
+   strip. Clearance is only the dock height, only on bands where the
+   dock is visible, and never stacked on Revision pages that already
+   pad themselves. Page jumps reset scroll in main.tsx so leftover
+   bottom space cannot linger after a route change. */
 [data-app-frame]:has(> [data-site-footer-nav]),
 [data-revision-content]:has(> [data-site-footer-nav]) {
   position: relative;
 }
 @media (max-width: 959px) {
   html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-footer-nav]) > main {
-    padding-bottom: 5.75rem;
+    padding-bottom: 4.5rem;
   }
 }
 @media (max-width: 767px) {
-  [data-app-frame]:has(> [data-site-footer-nav]) [data-myday-content] > main,
-  [data-revision-content]:has(> [data-site-footer-nav]) > [data-revision-page-main] {
-    padding-bottom: 5.75rem;
+  [data-app-frame]:has(> [data-site-footer-nav]) [data-myday-content] > main {
+    padding-bottom: 4.5rem;
   }
 }
 

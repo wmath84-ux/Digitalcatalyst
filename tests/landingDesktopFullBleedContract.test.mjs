@@ -25,7 +25,7 @@ const cta = fs.readFileSync("src/components/landing/CtaBanner.tsx", "utf8");
 test("DesktopAppHost passes the landing routes through without the app shell", () => {
   const host = main.slice(main.indexOf("function DesktopAppHost"), main.indexOf("function RootPage"));
   assert.match(host, /!hash\s*\|\|\s*hash\.startsWith\(LANDING_HASH\)/, "empty hash + #/landing skip the shell");
-  assert.match(host, /isDesktopBrowserLocked\(\)/, "a locked desktop always renders landing full-bleed, whatever the hash");
+  assert.doesNotMatch(host, /isDesktopBrowserLocked/, "desktop is no longer locked to landing");
 });
 
 test("non-landing desktop routes still get the AppShell", () => {
