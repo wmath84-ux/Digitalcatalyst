@@ -3034,7 +3034,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    bar height — never extra gutter, and never leftover bottom padding that
    would overflow the pinned frame. `!important` matches the tablet-landscape
    rule it has to beat. */
-.dc-desktop-shell [data-desktop-content]:has(> main > [data-revision-app]) {
+.dc-desktop-shell [data-desktop-content]:has(> main [data-revision-app]) {
   padding-top: var(--desktop-topbar-height) !important;
   padding-bottom: 0 !important;
 }
@@ -3045,7 +3045,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     height: 100dvh;
     overflow: hidden;
   }
-  .dc-desktop-shell [data-desktop-content]:has(> main > [data-revision-app]) {
+  .dc-desktop-shell [data-desktop-content]:has(> main [data-revision-app]) {
     align-items: stretch;
   }
   .dc-desktop-shell [data-revision-app] {
@@ -3976,7 +3976,7 @@ html[data-course-player-active="true"] {
    the feature to `100dvh` while the shell row is shorter than that by the top
    bar + gutters. Filling the row instead keeps exactly one surface — the page's
    `[data-revision-page-main]` — scrolling, with nothing cut off at the bottom. */
-.dc-desktop-shell [data-desktop-content] > main > [data-revision-app] {
+.dc-desktop-shell [data-desktop-content] > main [data-revision-app] {
   height: 100% !important;
   min-height: 0 !important;
   max-height: 100% !important;
@@ -4267,7 +4267,7 @@ html[data-course-player-active="true"] {
 }
 
 /* ── 2. Revision inside the desktop shell: one scroller, not two ─────────
-   `.dc-desktop-shell [data-desktop-content] > main > [data-revision-app]`
+   `.dc-desktop-shell [data-desktop-content] > main [data-revision-app]`
    asks for `height: 100%`, but the shell's `<main>` only ever declared
    `min-height: 100%` — an auto height, so the percentage resolved to `auto`,
    the revision app grew with its content and the shell's row scrolled
@@ -5670,12 +5670,12 @@ html[data-course-player-active="true"] {
   padding-top: calc(var(--desktop-topbar-height) + 2.75rem + 1.5rem) !important;
 }
 
-.dc-desktop-shell [data-desktop-content]:has(> main > [data-revision-app]) {
+.dc-desktop-shell [data-desktop-content]:has(> main [data-revision-app]) {
   padding-top: var(--desktop-topbar-height) !important;
   padding-bottom: 0 !important;
 }
 
-.dc-desktop-shell [data-desktop-topbar][data-topbar-tabs] ~ [data-desktop-content]:has(> main > [data-revision-app]) {
+.dc-desktop-shell [data-desktop-topbar][data-topbar-tabs] ~ [data-desktop-content]:has(> main [data-revision-app]) {
   padding-top: calc(var(--desktop-topbar-height) + 2.75rem) !important;
   padding-bottom: 0 !important;
 }
@@ -5764,5 +5764,71 @@ html[data-course-player-active="true"] {
   .dc-desktop-shell [data-desktop-rail],
   [data-desktop-peek-dock] {
     transition: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PAGE ENTER — landing Hero + Header motion on listed app pages
+   ══════════════════════════════════════════════════════════════════════
+   Hero: opacity 0 → 1, y 30 → 0, 0.8s, delay 0.15s.
+   Header: y -40 → 0, opacity 0 → 1, 0.7s ease-out.
+   CSS only — no AnimatePresence wait. prefers-reduced-motion skips.
+   The [data-page-enter] wrapper is `display: contents` so it never
+   becomes a transform containing block for overlay headers. Mobile
+   therefore uses two layers (header from above, body from below).
+   Desktop animates the page column only; the shell topbar is outside
+   [data-page-enter] and stays put. Revision / My Day inner pages
+   replay via [data-page-enter-panel] so the apps themselves are not
+   remounted. */
+
+@keyframes dc-page-enter-body {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes dc-page-enter-header {
+  from { opacity: 0; transform: translateY(-40px); }
+  to { opacity: 1; transform: none; }
+}
+
+[data-page-enter] [data-site-header],
+[data-page-enter] [data-course-header],
+[data-page-enter] [data-course-landscape-header] {
+  animation: dc-page-enter-header 0.7s ease-out both;
+}
+
+/* Body of every listed page except Revision / My Day (those replay
+   through [data-page-enter-panel] so inner navigation does not reset
+   paywall / loading state). Cart has no <main>, so the catch-all
+   covers the flex body sibling of the overlay header. */
+[data-page-enter] [data-app-frame] > *:not([data-site-header]):not([data-site-footer-nav]):not([data-site-footer]):not(nav):not([data-revision-content]):not([data-myday-content]):not(.dc-page-tabs),
+[data-page-enter] [data-course-player] > section,
+[data-page-enter] [data-course-landscape-content] {
+  animation: dc-page-enter-body 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+[data-myday-content] [data-page-enter-panel] {
+  animation: dc-page-enter-body 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+[data-revision-content] [data-page-enter-panel] > [data-revision-app-header] {
+  animation: dc-page-enter-header 0.7s ease-out both;
+}
+
+[data-revision-content] [data-page-enter-panel] > [data-revision-page-main] {
+  animation: dc-page-enter-body 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-page-enter] [data-site-header],
+  [data-page-enter] [data-course-header],
+  [data-page-enter] [data-course-landscape-header],
+  [data-page-enter] [data-app-frame] > *:not([data-site-header]):not([data-site-footer-nav]):not([data-site-footer]):not(nav):not([data-revision-content]):not([data-myday-content]):not(.dc-page-tabs),
+  [data-page-enter] [data-course-player] > section,
+  [data-page-enter] [data-course-landscape-content],
+  [data-myday-content] [data-page-enter-panel],
+  [data-revision-content] [data-page-enter-panel] > [data-revision-app-header],
+  [data-revision-content] [data-page-enter-panel] > [data-revision-page-main] {
+    animation: none !important;
   }
 }

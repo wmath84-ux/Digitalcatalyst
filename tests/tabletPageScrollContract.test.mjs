@@ -110,7 +110,7 @@ test("Revision keeps one scroller instead of getting a second one", () => {
   );
   // …and the feature fills the shell row instead of the raw viewport, so the
   // top bar + gutters cannot push its bottom edge (and a second scroller) in.
-  const revision = ".dc-desktop-shell [data-desktop-content] > main > [data-revision-app]";
+  const revision = ".dc-desktop-shell [data-desktop-content] > main [data-revision-app]";
   declares(revision, "height:\\s*100%\\s*!important", "max-height:\\s*100%\\s*!important");
 });
 

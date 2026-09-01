@@ -657,6 +657,7 @@ export default function App() {
                 </p>
               </div>
             )}
+            <div key={activeSection} data-page-enter-panel="">
             {activeSection === "overview" && (
               <section className="space-y-8">
                 <GreetingHeader
@@ -720,6 +721,7 @@ export default function App() {
                 onRequireAccess={requireMyDayAccess}
               />
             )}
+            </div>
           </main>
         </div>
 

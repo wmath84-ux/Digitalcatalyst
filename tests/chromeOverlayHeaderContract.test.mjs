@@ -94,7 +94,7 @@ test("desktop top bar overlays the shell scroller", () => {
   );
   assert.match(
     overlay,
-    /\[data-desktop-content\]:has\(> main > \[data-revision-app\]\) \{\s*padding-top:\s*var\(--desktop-topbar-height\) !important;\s*padding-bottom:\s*0 !important/,
+    /\[data-desktop-content\]:has\(> main \[data-revision-app\]\) \{\s*padding-top:\s*var\(--desktop-topbar-height\) !important;\s*padding-bottom:\s*0 !important/,
   );
 });
 

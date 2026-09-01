@@ -52,6 +52,7 @@ import { initOrientationLock } from "./utils/appOrientation";
 import { recordRouteVisit } from "./utils/routeHistory";
 import { requiresAuthentication } from "./utils/appRoutes";
 import AppShell from "./components/AppShell";
+import PageEnter, { pageEnterAppKey } from "./components/PageEnter";
 import { resolveActiveFromHash } from "./components/DesktopShell";
 import { useResponsiveCategory } from "./utils/responsive";
 import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
@@ -911,6 +912,7 @@ function RootPage(): ReactNode {
   if (!hash || hash.startsWith(LANDING_HASH)) return <LandingApp />;
   if (hash.startsWith(HOME_HASH)) {
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <HomeApp
         favoriteIds={favoriteIds}
         onToggleFavorite={handleToggleFavorite}
@@ -936,6 +938,7 @@ function RootPage(): ReactNode {
           window.location.hash = NOTIFICATIONS_HASH;
         }}
       />
+      </PageEnter>
     );
   }
   if (hash.startsWith(AUTH_HASH)) return <AuthApp />;
@@ -943,6 +946,7 @@ function RootPage(): ReactNode {
 
   if (hash.startsWith(CART_HASH) || hash.startsWith(FAVORITES_HASH)) {
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <CartWishlistApp
         activeTab={hash.startsWith(CART_HASH) ? "cart" : "favorites"}
         cartProducts={cartProducts}
@@ -972,6 +976,7 @@ function RootPage(): ReactNode {
           if (product) navigateToProduct({ id: product.id, title: product.title });
         }}
       />
+      </PageEnter>
     );
   }
 
@@ -989,6 +994,7 @@ function RootPage(): ReactNode {
   }
   if (hash.startsWith(SUBSCRIPTION_HASH)) {
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <SubscriptionApp
         cartCount={cartIds.size}
         purchasesBadge={purchasedIds.size}
@@ -1009,6 +1015,7 @@ function RootPage(): ReactNode {
           else if (tab === "profile") window.location.hash = PROFILE_HASH;
         }}
       />
+      </PageEnter>
     );
   }
   if (hash.startsWith(NOTIFICATIONS_HASH)) {
@@ -1071,6 +1078,7 @@ function RootPage(): ReactNode {
   if (hash.startsWith(COURSE_HASH)) {
     if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <CourseRouteGuard
         product={selectedCourseProduct}
         onCheckout={(price) => navigateToCheckout(price)}
@@ -1078,12 +1086,13 @@ function RootPage(): ReactNode {
         onPurchaseUpdate={handlePurchaseUpdate}
         initialModuleId={selectedCourseModuleId || undefined}
       />
+      </PageEnter>
     );
   }
   // Settings renders inside the desktop shell like the Profile page does.
   if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
-  if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
-  if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
+  if (hash.startsWith(PROFILE_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><ProfileApp /></PageEnter>;
+  if (hash.startsWith(MY_DAY_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><MyDayApp /></PageEnter>;
   if (hash.startsWith(LEADERBOARD_HASH)) return <LeaderboardApp />;
   if (hash.startsWith(FLOWPATH_HASH)) {
     // The boundary keeps a FlowPath render crash contained to this
@@ -1096,9 +1105,10 @@ function RootPage(): ReactNode {
       </FlowPathErrorBoundary>
     );
   }
-  if (hash.startsWith(REVISION_HASH)) return <RevisionApp />;
+  if (hash.startsWith(REVISION_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><RevisionApp /></PageEnter>;
   if (hash.startsWith(PRODUCT_HASH)) {
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <PdpWithOwnership
         product={selectedCatalogProduct}
         onCheckout={navigateToCheckout}
@@ -1121,10 +1131,12 @@ function RootPage(): ReactNode {
           else if (tab === "profile") window.location.hash = PROFILE_HASH;
         }}
       />
+      </PageEnter>
     );
   }
   if (hash.startsWith(STORE_HASH)) {
     return (
+      <PageEnter pageKey={pageEnterAppKey(hash)}>
       <StoreApp
         onNavigateToProduct={navigateToProduct}
         onNavigateToMyDay={() => {
@@ -1152,10 +1164,12 @@ function RootPage(): ReactNode {
           window.location.hash = CART_HASH;
         }}
       />
+      </PageEnter>
     );
   }
 
   return (
+    <PageEnter pageKey={pageEnterAppKey(HOME_HASH)}>
     <HomeApp
       favoriteIds={favoriteIds}
       onToggleFavorite={handleToggleFavorite}
@@ -1181,6 +1195,7 @@ function RootPage(): ReactNode {
         window.location.hash = NOTIFICATIONS_HASH;
       }}
     />
+    </PageEnter>
   );
 }
 
