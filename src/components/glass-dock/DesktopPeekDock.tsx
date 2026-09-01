@@ -5,12 +5,14 @@
  * (left rail / side panel instead of the always-on bottom footer).
  *
  * A thin frosted-glass line sits at the very bottom centre of the
- * viewport (the footer-nav slot). Always visible. Pointer enter
- * activates the same GlassDock (MAG, click, Home hold → FlowPath).
- * Pointer leave hides it. Phone + tablet-portrait never mount this.
+ * PAGE column (not the full viewport — the left rail / right side
+ * panel are excluded so the dock does not look shifted). Always
+ * visible. Pointer enter activates the same GlassDock (MAG, click,
+ * Home hold → FlowPath). Pointer leave hides it. Phone + tablet-
+ * portrait never mount this.
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { BagIcon, CalendarIcon, HomeIcon, SparkBookIcon, StoreIcon, UserIcon } from '../icons'
 import GlassDock, { type GlassDockItem } from './GlassDock'
 import GlassMaterial from './GlassMaterial'
@@ -38,9 +40,11 @@ function railToTab(active: DesktopRailKey): TabKey | null {
 export default function DesktopPeekDock({
   active,
   purchasesBadge,
+  onOpenChange,
 }: {
   active: DesktopRailKey
   purchasesBadge?: number
+  onOpenChange?: (open: boolean) => void
 }) {
   const [open, setOpen] = useState(false)
   const [holding, setHolding] = useState(false)
@@ -49,6 +53,9 @@ export default function DesktopPeekDock({
   const suppressClickRef = useRef(false)
   const homeBtnRef = useRef<HTMLButtonElement>(null)
   const closeTimerRef = useRef<number | null>(null)
+  const hostRef = useRef<HTMLDivElement>(null)
+  const onOpenChangeRef = useRef(onOpenChange)
+  onOpenChangeRef.current = onOpenChange
 
   const show = useCallback(() => {
     if (closeTimerRef.current !== null) {
@@ -56,14 +63,49 @@ export default function DesktopPeekDock({
       closeTimerRef.current = null
     }
     setOpen(true)
+    onOpenChangeRef.current?.(true)
   }, [])
 
   const hide = useCallback(() => {
     if (closeTimerRef.current !== null) clearTimeout(closeTimerRef.current)
     closeTimerRef.current = window.setTimeout(() => {
       setOpen(false)
+      onOpenChangeRef.current?.(false)
       closeTimerRef.current = null
     }, 80)
+  }, [])
+
+  // Centre on the page column (`[data-desktop-content] > main`), not the
+  // full viewport. Left rail / right side panel then shift the seat
+  // automatically when they open or close.
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return undefined
+    const apply = () => {
+      const page =
+        document.querySelector('.dc-desktop-shell [data-desktop-content] > main') ||
+        document.querySelector('.dc-desktop-shell [data-desktop-main]')
+      if (!(page instanceof HTMLElement)) return
+      const box = page.getBoundingClientRect()
+      host.style.left = `${Math.max(0, box.left)}px`
+      host.style.width = `${Math.max(0, box.width)}px`
+      host.setAttribute('data-page-seat', 'true')
+    }
+    apply()
+    const page =
+      document.querySelector('.dc-desktop-shell [data-desktop-content] > main') ||
+      document.querySelector('.dc-desktop-shell [data-desktop-main]')
+    const rail = document.querySelector('.dc-desktop-shell [data-desktop-rail]')
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(apply)
+    if (ro && page instanceof HTMLElement) ro.observe(page)
+    if (ro && rail instanceof HTMLElement) ro.observe(rail)
+    window.addEventListener('resize', apply)
+    const frame = requestAnimationFrame(apply)
+    return () => {
+      cancelAnimationFrame(frame)
+      ro?.disconnect()
+      window.removeEventListener('resize', apply)
+    }
   }, [])
 
   const startHold = useCallback(() => {
@@ -187,9 +229,10 @@ export default function DesktopPeekDock({
       )}
 
       <div
+        ref={hostRef}
         data-desktop-peek-dock=""
         data-open={open ? 'true' : 'false'}
-        className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center"
+        className="fixed bottom-0 z-50 flex flex-col items-center"
       >
         <div data-desktop-peek-panel="" aria-hidden={!open} onPointerEnter={show} onPointerLeave={hide}>
           <GlassDock
