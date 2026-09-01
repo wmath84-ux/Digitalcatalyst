@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useEffect, useRef } from "react";
 import { Bell, Heart, Plus, Search, Trophy, X } from "lucide-react";
 import type { Product } from "../types";
 import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
@@ -24,6 +24,27 @@ const typeLabel: Record<string, string> = {
   live: "Live Class",
 };
 
+const COLLAPSE_RANGE = 96;
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const raw = hex.trim().replace("#", "");
+  const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
+  if (!/^[0-9a-f]{6}$/i.test(full)) return null;
+  return {
+    r: parseInt(full.slice(0, 2), 16),
+    g: parseInt(full.slice(2, 4), 16),
+    b: parseInt(full.slice(4, 6), 16),
+  };
+}
+
+/** Brand stops stay customisable; alpha keeps the MAG/WebsiteGlass frost see-through. */
+function brandGlassGradient(from: string, to: string) {
+  const start = hexToRgb(from);
+  const end = hexToRgb(to);
+  if (!start || !end) return `linear-gradient(to bottom right, ${from}, ${to})`;
+  return `linear-gradient(to bottom right, rgba(${start.r},${start.g},${start.b},0.58), rgba(${end.r},${end.g},${end.b},0.48))`;
+}
+
 const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications },
   ref,
@@ -36,20 +57,74 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   const { homeGradientFrom, homeGradientTo } = useBranding();
   const gradientFrom = homeGradientFrom || DEFAULT_HOME_GRADIENT_FROM;
   const gradientTo = homeGradientTo || DEFAULT_HOME_GRADIENT_TO;
+  const headerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    const scrollers: HTMLElement[] = [];
+    const frame = header.closest("[data-app-frame]");
+    if (frame instanceof HTMLElement) {
+      const main = frame.querySelector(":scope > main");
+      if (main instanceof HTMLElement) scrollers.push(main);
+      scrollers.push(frame);
+    }
+    const desktop = document.querySelector("[data-desktop-content]");
+    if (desktop instanceof HTMLElement) scrollers.push(desktop);
+    if (scrollers.length === 0) return;
+
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      const y = Math.max(0, ...scrollers.map((node) => node.scrollTop));
+      const t = Math.min(1, Math.max(0, y / COLLAPSE_RANGE));
+      header.style.setProperty("--home-collapse", t.toFixed(3));
+      if (t >= 0.88) header.setAttribute("data-collapsed", "true");
+      else header.removeAttribute("data-collapsed");
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(apply);
+    };
+    scrollers.forEach((node) => node.addEventListener("scroll", onScroll, { passive: true }));
+    apply();
+    return () => {
+      scrollers.forEach((node) => node.removeEventListener("scroll", onScroll));
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
   return (
     <header
+      ref={headerRef}
       data-site-header
-      className="relative overflow-hidden rounded-b-[32px] border-b border-white/20 px-4 pb-8 pt-[calc(1.5rem+env(safe-area-inset-top))] text-white shadow-[0_24px_50px_-26px_rgba(49,46,129,0.7)] min-[390px]:px-5"
-      style={{ backgroundImage: `linear-gradient(to bottom right, ${gradientFrom}, ${gradientTo})` }}
+      data-home-header
+      className="relative z-30 overflow-hidden rounded-b-[32px] border-b border-white/25 px-4 pb-8 pt-[calc(1.5rem+env(safe-area-inset-top))] text-white shadow-[0_24px_50px_-26px_rgba(49,46,129,0.42)] min-[390px]:px-5"
+      style={{
+        backgroundImage: brandGlassGradient(gradientFrom, gradientTo),
+        backdropFilter: "blur(18px) saturate(160%)",
+        WebkitBackdropFilter: "blur(18px) saturate(160%)",
+      }}
       data-home-gradient-from={gradientFrom}
       data-home-gradient-to={gradientTo}
     >
-      <div aria-hidden className="pointer-events-none absolute -left-10 top-10 h-32 w-32 rounded-full bg-white/12 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-cyan-300/20 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/10 to-transparent" />
-      <div className="relative flex min-w-0 items-center justify-between gap-2">
+      <div
+        aria-hidden
+        data-home-glass-sheen
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: "linear-gradient(135deg, rgba(255,255,255,0.32) 0%, transparent 38%, transparent 62%, rgba(255,255,255,0.14) 100%)",
+        }}
+      />
+      <div aria-hidden data-home-orbs className="pointer-events-none absolute -left-10 top-10 h-32 w-32 rounded-full bg-white/12 blur-3xl" />
+      <div aria-hidden data-home-orbs className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-cyan-300/20 blur-3xl" />
+      <div aria-hidden data-home-orbs className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/10 to-transparent" />
+      <div data-home-chrome className="relative flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 min-[390px]:gap-3">
-          <BrandMark className="h-10 w-10 shrink-0 rounded-2xl bg-white/15 ring-1 ring-white/25 min-[390px]:h-11 min-[390px]:w-11" />
+          <span data-home-brand className="shrink-0">
+            <BrandMark className="h-10 w-10 rounded-2xl bg-white/15 ring-1 ring-white/25 min-[390px]:h-11 min-[390px]:w-11" />
+          </span>
           <div className="min-w-0 flex-1 overflow-hidden">
             <p data-home-welcome className="truncate whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-white/70 min-[390px]:text-xs">
               Good to see you 👋
@@ -59,7 +134,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             </h1>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
+        <div data-home-actions className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
           <button
             type="button"
             aria-label="Leaderboard"
@@ -105,7 +180,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         </div>
       </div>
 
-      <div className="relative mt-5">
+      <div data-home-search-slot className="relative mt-5">
         <div
           className="dc-glass-toolbar flex cursor-pointer items-center gap-2 rounded-2xl px-4 py-3 transition active:scale-[0.99]"
           onClick={() => {

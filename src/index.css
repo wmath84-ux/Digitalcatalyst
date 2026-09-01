@@ -5440,3 +5440,108 @@ html[data-course-player-active="true"] {
   transform: none;
   padding-bottom: 6px;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   CHROME GLASS — MAG / WebsiteGlass frost on every header
+   ══════════════════════════════════════════════════════════════════════
+   Same watercolor lens the dock uses (sky 186,230,253 → white sheen →
+   violet 196,181,253, frost blur 18px, saturate 160%). No opaque white
+   strip. Home keeps its admin-custom gradient stops as a translucent
+   wash over that frost, and shrinks to brand + action buttons as the
+   page scroller moves. */
+
+:root {
+  --dc-chrome-glass:
+    linear-gradient(165deg, rgba(186, 230, 253, 0.18), rgba(255, 255, 255, 0.08) 42%, rgba(196, 181, 253, 0.16));
+  --dc-chrome-glass-blur: blur(18px) saturate(160%);
+  --dc-chrome-glass-rim:
+    inset 0 1px 1px rgba(255, 255, 255, 0.72),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+[data-site-header]:not([data-home-header]) {
+  isolation: isolate;
+  background: var(--dc-chrome-glass) !important;
+  backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  box-shadow: var(--dc-chrome-glass-rim), 0 14px 38px -18px rgba(0, 0, 0, 0.16);
+}
+
+.dc-desktop-shell [data-desktop-topbar] {
+  background: var(--dc-chrome-glass) !important;
+  backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.42) !important;
+  box-shadow: var(--dc-chrome-glass-rim);
+}
+
+[data-revision-app-header] {
+  background: var(--dc-chrome-glass) !important;
+  backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.42) !important;
+  box-shadow: var(--dc-chrome-glass-rim), 0 10px 30px -18px rgba(79, 70, 229, 0.22);
+}
+
+[data-search-bar],
+[data-store-filter-bar],
+.dc-page-tabs,
+[data-admin-topbar],
+[data-admin-shell] > header,
+[data-rev-bank-header],
+[data-revision-page-main] > .dc-glass-toolbar.sticky {
+  background: var(--dc-chrome-glass) !important;
+  backdrop-filter: var(--dc-chrome-glass-blur) !important;
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
+}
+
+[data-home-header] {
+  --home-collapse: 0;
+  isolation: isolate;
+  padding-bottom: calc(2rem * (1 - var(--home-collapse) * 0.68));
+  border-bottom-left-radius: calc(32px * (1 - var(--home-collapse) * 0.55));
+  border-bottom-right-radius: calc(32px * (1 - var(--home-collapse) * 0.55));
+}
+
+[data-home-header] [data-home-orbs] {
+  opacity: calc(1 - var(--home-collapse) * 0.88);
+}
+
+[data-home-header] [data-home-welcome] {
+  max-height: calc((1 - var(--home-collapse)) * 1.15rem);
+  opacity: calc(1 - var(--home-collapse));
+  overflow: hidden;
+  transform: translateY(calc(var(--home-collapse) * -4px));
+}
+
+[data-home-header] [data-home-search-slot] {
+  max-height: calc((1 - var(--home-collapse)) * 6.25rem);
+  margin-top: calc((1 - var(--home-collapse)) * 1.25rem);
+  opacity: calc(1 - var(--home-collapse));
+  overflow: hidden;
+  transform: translateY(calc(var(--home-collapse) * -8px));
+}
+
+[data-home-header][data-collapsed] [data-home-search-slot] {
+  pointer-events: none;
+}
+
+[data-home-header] [data-home-brand] {
+  transform: scale(calc(1 - var(--home-collapse) * 0.12));
+  transform-origin: left center;
+}
+
+[data-home-header] [data-home-greeting] {
+  transform: scale(calc(1 - var(--home-collapse) * 0.06));
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-home-header] [data-home-welcome],
+  [data-home-header] [data-home-search-slot],
+  [data-home-header] [data-home-orbs],
+  [data-home-header] [data-home-brand],
+  [data-home-header] [data-home-greeting] {
+    transform: none;
+  }
+}
