@@ -1,0 +1,20 @@
+# Baseline captured 2026-09-01T10:40Z on dc251c6
+
+## npx tsc --noEmit (src project) — pre-existing errors:
+  src/components/subscription/HiddenFeatureHint.tsx(23,7): error TS17001: JSX elements cannot have multiple attributes with the same name.
+  src/components/subscription/SubscriberActiveBadge.tsx(20,7): error TS17001: JSX elements cannot have multiple attributes with the same name.
+  src/components/subscription/SubscriberOnlyPriceBadge.tsx(31,7): error TS17001: JSX elements cannot have multiple attributes with the same name.
+  src/hooks/useSubscriptionGateLogic.ts(122,17): error TS6133: 'k' is declared but its value is never read.
+  src/hooks/useSubscriptionGateLogic.ts(122,20): error TS6133: 'v' is declared but its value is never read.
+  src/lib/admin/client.ts(436,13): error TS6133: 'productIdKey' is declared but its value is never read.
+  src/subscription/components/SubscriptionPage.tsx(31,1): error TS6133: 'SubscriberOnlyPriceBadge' is declared but its value is never read.
+
+## bash run_tests.sh — pre-existing failures (8/1899):
+  not ok 57 - tests/flowpathFirstPaintContract.test.mjs
+  not ok 842 - home header has a Plus shortcut next to the leaderboard that opens FlowPath
+  not ok 845 - the FlowPath route is wrapped in an error boundary with working escapes
+  not ok 877 - Home header collapses on scroll to brand + action buttons
+  not ok 907 - non-landing desktop routes still get the AppShell
+  not ok 1276 - the install panel shows Add-to-Home-Screen help when Chrome has no prompt
+  not ok 1488 - RevisionApp gates paywalled actions with the floating premium gate
+  not ok 1516 - the seat override comes after every band padding it beats
