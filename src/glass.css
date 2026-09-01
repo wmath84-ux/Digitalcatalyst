@@ -562,3 +562,13 @@ html[data-glass="on"] :where([data-desktop-topbar]) {
     inset 0 -1px 0 rgb(var(--dc-paper-on-ink) / 0.28),
     0 10px 28px -20px rgb(0 0 0 / 0.7);
 }
+
+/* ── Wave 3 · let the store float on the Black Ice backdrop ──────────────────
+ * The store painted its own opaque light wash + pastel glow blobs behind the
+ * frosted cards (src/components/StorePage.tsx, tagged `data-glass-ambient`).
+ * Under glass those are dropped so the page backdrop shows through the gaps
+ * between the frosted surfaces; the cards and filter bar keep their own frost,
+ * so their dark ink stays readable. `?glass=off` keeps the old wash.          */
+html[data-glass="on"] :where([data-glass-ambient]) {
+  display: none;
+}

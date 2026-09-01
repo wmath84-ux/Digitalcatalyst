@@ -240,10 +240,10 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
   return (
     <div className="relative overflow-hidden pb-6">
       {/* Ambient colour wash behind the frosted surfaces */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-indigo-50 via-slate-50 to-white" />
-      <div aria-hidden className="pointer-events-none absolute -left-24 top-10 -z-10 h-64 w-64 rounded-full bg-violet-300/35 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute -right-24 top-52 -z-10 h-72 w-72 rounded-full bg-sky-300/30 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute bottom-24 left-1/3 -z-10 h-72 w-72 rounded-full bg-fuchsia-200/30 blur-3xl" />
+      <div aria-hidden data-glass-ambient className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-indigo-50 via-slate-50 to-white" />
+      <div aria-hidden data-glass-ambient className="pointer-events-none absolute -left-24 top-10 -z-10 h-64 w-64 rounded-full bg-violet-300/35 blur-3xl" />
+      <div aria-hidden data-glass-ambient className="pointer-events-none absolute -right-24 top-52 -z-10 h-72 w-72 rounded-full bg-sky-300/30 blur-3xl" />
+      <div aria-hidden data-glass-ambient className="pointer-events-none absolute bottom-24 left-1/3 -z-10 h-72 w-72 rounded-full bg-fuchsia-200/30 blur-3xl" />
 
       <Hero resourceCount={filtered.length} />
 
