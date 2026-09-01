@@ -5,6 +5,9 @@ import { db } from "../firebase";
 import "@xyflow/react/dist/style.css";
 import "./index.css";
 import "./landing.css";
+// Liquid Glass material layer (website-glass). Inert until
+// src/lib/glass.ts applies a tier to <html>; see docs/liquid-glass-rollout-plan.md.
+import "./glass.css";
 import StoreApp from "./App";
 import HomeApp from "./home/App";
 import PdpApp from "./PdpApp";
@@ -17,6 +20,7 @@ import SettingsPage from "./settings/SettingsPage";
 import SubscriberExperiencePage from "./profile/SubscriberExperiencePage";
 import ProfilePreview from "./profile/ProfilePreview";
 import MindMapPreview from "./course/MindMapPreview";
+import GlassPreviewPage from "./GlassPreview";
 import CourseRouteGuard from "./components/CourseRouteGuard";
 import CartWishlistApp from "./CartWishlistApp";
 import SubscriptionApp from "./subscription/App";
@@ -128,6 +132,10 @@ const RENEWAL_PREVIEW_HASH = "#/dev/subscription-preview";
 const PROFILE_PREVIEW_HASH = "#/dev/profile-preview";
 // TEMPORARY dev sandbox for the mind map toolbar (removed before merge).
 const MINDMAP_PREVIEW_HASH = "#/dev/mindmap-preview";
+// Developer sandbox for the Liquid Glass material layer (website-glass).
+// Renders the vendored registry components with no app data; see
+// docs/liquid-glass-rollout-plan.md.
+const GLASS_PREVIEW_HASH = "#/dev/glass-preview";
 const FLOWPATH_HASH = "#/flowpath";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
@@ -357,6 +365,7 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith("#/admin-login")
     || hash.startsWith("#/course/")
     || hash.startsWith(PROFILE_PREVIEW_HASH)
+    || hash.startsWith(GLASS_PREVIEW_HASH)
   ) {
     return <>{children}</>;
   }
@@ -1077,6 +1086,7 @@ function RootPage(): ReactNode {
   }
   if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return <SubscriberExperiencePage />;
   if (hash.startsWith(PROFILE_PREVIEW_HASH)) return <ProfilePreview />;
+  if (hash.startsWith(GLASS_PREVIEW_HASH)) return <GlassPreviewPage />;
   if (hash.startsWith(MINDMAP_PREVIEW_HASH)) return <MindMapPreview />;
   if (hash.startsWith(COURSE_HASH)) {
     if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;

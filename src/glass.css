@@ -1,0 +1,108 @@
+/*
+ * Liquid Glass design layer (website-glass rollout — Wave 0).
+ *
+ * This file owns EVERYTHING that the vendored registry components cannot
+ * express as props: the token scale, the global quality tier, the a11y focus
+ * ring, and the "no backdrop-filter at all" fallback. It is intentionally
+ * inert until `data-glass="on"` is set on <html> (see src/lib/glass.ts), so
+ * Wave 0 ships with the app looking exactly as it did before.
+ *
+ * Rules for the waves that follow:
+ *   1. Never restyle glass internals from src/index.css. If a component needs
+ *      a tweak, do it here under one of the documented attribute hooks below,
+ *      or pass the component's real props. That keeps `npx shadcn add`
+ *      re-runnable (vendored files must stay byte-comparable to the registry).
+ *   2. All selectors are low-specificity (:where / attribute hooks) so the
+ *      6 000 lines of hand-tuned breakpoint CSS in src/index.css keep winning
+ *      layout fights. Glass is a material layer, not a layout layer.
+ *   3. Anything a user can *touch* may refract. Content that *scrolls* must
+ *      not (see the lens budget in src/lib/glass.ts) — that is what keeps a
+ *      mid-range Android phone at 60fps.
+ */
+
+:root {
+  /* material */
+  --glass-tint-light: 255 255 255;
+  --glass-tint-dark: 60 62 68;
+  --glass-accent-rgb: 56 189 248; /* overwritten at runtime from BrandingContext */
+  --glass-radius-sm: 10px;
+  --glass-radius-md: 14px;
+  --glass-radius-lg: 20px;
+  --glass-radius-xl: 24px;
+  --glass-radius-2xl: 30px;
+
+  /* strength per role — mirrored by GLASS_STRENGTH in src/lib/glass.ts, which
+     is what actually reaches the components (they take numeric props). */
+  --glass-strength-chrome: 0.5;
+  --glass-strength-control: 0.32;
+  --glass-strength-panel: 0.22;
+
+  /* overlays */
+  --glass-scrim-light: 15 23 42;
+  --glass-scrim-dark: 2 6 23;
+  --glass-scrim-alpha: 0.34;
+
+  /* sheets respect the same insets the app already uses elsewhere */
+  --glass-sheet-gap: max(10px, env(safe-area-inset-bottom, 0px));
+  --glass-side-gutter: max(12px, env(safe-area-inset-left, 0px));
+}
+
+/* ── quality tiers ──────────────────────────────────────────────────────────
+ * Set once by glassQualityTier(): full = real refraction, lite = same shapes
+ * with half the bending, off = no lens effects at all (kill switch).
+ * ────────────────────────────────────────────────────────────────────────── */
+html[data-glass="off"] [data-glass-lens],
+html[data-glass="off"] [data-glass-surface] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-glass="lite"] {
+  --glass-strength-chrome: 0.26;
+  --glass-strength-control: 0.16;
+  --glass-strength-panel: 0.1;
+}
+
+/* ── focus: a lens has no border of its own, so the ring is the only reliable
+ *    keyboard affordance. Applied to whatever the component renders as the
+ *    focusable node. ───────────────────────────────────────────────────────── */
+html[data-glass="on"] :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--glass-accent-rgb) / 0.95);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* ── no backdrop-filter support at all (very old WebView / FF <103): the frost
+ *    disappears, so panels fall back to the app's opaque surface instead of
+ *    looking broken. ────────────────────────────────────────────────────────── */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-glass="on"] :where([data-glass-surface]) {
+    background: light-dark(#ffffff, #0f172a) !important;
+    border: 1px solid light-dark(#e2e8f0, #1e293b) !important;
+  }
+}
+
+/* ── motion: glass-motion already collapses springs under
+ *    prefers-reduced-motion; this covers the CSS-driven bits (sheen shimmer,
+ *    dock magnification, entry scale) so nothing keeps animating. ───────────── */
+@media (prefers-reduced-motion: reduce) {
+  html[data-glass="on"] :where([data-glass-lens], [data-glass-surface], [data-glass-pill]) {
+    transition-duration: 1ms !important;
+    animation: none !important;
+  }
+}
+
+/* ── contrast safety net: labels sit on a translucent material, so the app's
+ *    text colour has to survive whatever is behind it. Both tokens resolve to
+ *    slate-900 / slate-50 by default; page code may override locally. ───────── */
+html[data-glass="on"] {
+  --glass-label: light-dark(#0f172a, #f8fafc);
+  --glass-label-muted: light-dark(#475569, #cbd5e1);
+}
+
+/* ── long lists: never refract a lens per row. The tile/list wrappers opt out
+ *    with data-glass="panel" and get frost only. This is the single most
+ *    effective perf lever in the whole rollout. ────────────────────────────── */
+html[data-glass="on"] :where([data-glass="panel"]) {
+  box-decoration-break: clone;
+}

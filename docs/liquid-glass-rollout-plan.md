@@ -7,6 +7,40 @@
 
 ---
 
+## 0. Status
+
+**Decisions locked by the owner (2026-09-01):**
+
+| # | Decision | Outcome |
+| --- | --- | --- |
+| D1 | Immersive surfaces | **All in** — `#/course/:id` gets liquid glass *inside* the player too (toolbar, overlays, resource list, mind-map panel), plus `#/landing` and `#/auth` |
+| D2 | Intensity | **Full iOS Liquid Glass everywhere** (strong refraction on controls, `dome` + magnification on). Consequence I take responsibility for: the perf guardrails in rule 1/3/4 of §4 stay, because the user's audience is mid-range Android — full look, capped *count* of lenses. `lite` tier stays reachable via `?glass=lite` |
+| D3 | Delivery | **Wave by wave**, one commit per wave, live preview + sign-off between waves |
+| D4 | `glass-dock` | **Desktop only** (macOS-style magnifying dock in `DesktopShell`). The mobile footer nav (`BottomNav` + `components/glass-dock/**`) stays frozen — D2 does not override that |
+
+**Wave 0 — install: DONE (visual change: none).**
+
+Landed:
+
+- `src/components/ui/glass.tsx` — the lens engine (`Glass`, `GlassLens`, `GlassSurface`, `useGlassDark`, `refractionSupported`)
+- `src/components/ui/glass-motion.ts` — `Track`, `spring`, `glide`, `easeGel/easeSoft/easeOutBack`, `overdrag`, `clamp`, `reduceMotion`
+- `src/components/ui/glass-button.tsx` — capsule + icon-disc gel press
+- `src/lib/utils.ts` — re-export shim for the shadcn `@/lib/utils` convention (so vendored files stay untouched)
+- `components.json` — registry wired (`website-glass` → `https://websiteglass.com/r/{name}.json`) so `npx shadcn@latest add …` works from your machine
+- `src/glass.css` — token scale, quality tiers, focus ring, `@supports` fallback, reduced-motion, safe-area gutter (all gated on `html[data-glass]`)
+- `src/lib/glass.ts` — tier detection (`full`/`lite`/`off`), `applyGlassTier` kill switch, `strengthFor(role)`, `toGlassRgb` (brand accent → `"r,g,b"` prop), lens budget
+- `scripts/verify-glass-registry.mjs` — re-fetches the 22 upstream files and diffs them against the vendored copies, with an auditable allowlist of the 4 `[digitalcatalyst]` adaptations
+- `#/dev/glass-preview` (`src/GlassPreview.tsx`) — sandbox to review material, tier and per-role strength at any width
+
+Gates at this commit: `tsc --noEmit` **7 errors = baseline**, `run_tests.sh` **1891/1899 = baseline**, `npm run build` ok, and `git diff` shows **no** change under `src/admin`, `src/components/admin`, `src/components/BottomNav.tsx`, `src/components/glass-dock`.
+
+Remaining in the pack: **19 of 22 items** (`glass-slider`, `glass-tabs`, `glass-tooltip`, `glass-input`, `glass-popover`, `glass-dialog`, `glass-dock`, `glass-tile`, `glass-swatch`, `glass-card`, `glass-checkbox`, `glass-radio`, `glass-toggle-group`, `glass-accordion`, `glass-dropdown-menu`, `glass-select`, `glass-sheet`, `glass-toast`, `glass-command`) — they stream in from the same document as the waves below, and §3 stays the contract for where each one lands.
+
+Upstream adaptations needed so far (all recorded in `LOCAL_ADAPTATIONS` in the verify script): React 19 `JSX` namespace (`as?: ElementType`, `const El = Tag as "div"`), `useRef<HTMLDivElement>`, and exposing upstream's write-only `Track.lastValue` as `previous()` for `noUnusedLocals`. No engine behaviour was changed.
+
+
+---
+
 ## 1. Research findings — website-glass (source of truth)
 
 Researched from `https://websiteglass.com/docs`, `/docs/components/glass`, `/llms.txt`, `/llms-full.txt` and the live registry item `https://websiteglass.com/r/glass.json`.
@@ -163,14 +197,10 @@ Estimated effort: **Wave 0–1 in the next 1–2 turns** (that is where the sour
 
 ---
 
-## 7. Decisions I need from you (D1–D4)
+## 7. Decisions (locked — see §0)
 
-| # | Question | My default if you say nothing |
-| --- | --- | --- |
-| D1 | Immersive surfaces — `#/course/:id` player, `#/landing`, `#/auth`: glass too, or leave as-is? | Landing + auth **in**, course player **chrome only** (toolbar/overlays in, canvas/reader content untouched) |
-| D2 | Intensity | **Subtle-by-default** (`strength` 0.22–0.32 like our current dock) with strong lenses (0.5) only on dialogs, dock, ⌘K and header |
-| D3 | Delivery | **Waves with preview + sign-off after each** (safer, you see it working on 360 px and 1440 px early) |
-| D4 | `glass-dock` on desktop only? | Yes — desktop peek dock, mobile footer nav frozen |
+D1 all-in (course player included) · D2 full iOS intensity with a capped lens *count* ·
+D3 wave-by-wave with preview sign-off · D4 `glass-dock` on desktop only. |
 
 ---
 
