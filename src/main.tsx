@@ -5,6 +5,9 @@ import { db } from "../firebase";
 import "@xyflow/react/dist/style.css";
 import "./index.css";
 import "./landing.css";
+// Liquid Glass material layer (website-glass). Inert until
+// src/lib/glass.ts applies a tier to <html>; see docs/liquid-glass-rollout-plan.md.
+import "./glass.css";
 import StoreApp from "./App";
 import HomeApp from "./home/App";
 import PdpApp from "./PdpApp";
@@ -17,6 +20,7 @@ import SettingsPage from "./settings/SettingsPage";
 import SubscriberExperiencePage from "./profile/SubscriberExperiencePage";
 import ProfilePreview from "./profile/ProfilePreview";
 import MindMapPreview from "./course/MindMapPreview";
+import GlassPreviewPage from "./GlassPreview";
 import CourseRouteGuard from "./components/CourseRouteGuard";
 import CartWishlistApp from "./CartWishlistApp";
 import SubscriptionApp from "./subscription/App";
@@ -30,6 +34,8 @@ import NotificationsPage from "./components/NotificationsPage";
 import SearchPage from "./components/SearchPage";
 import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
+import GlassCommandPalette from "./components/GlassCommandPalette";
+import { ToastViewport } from "./components/ui/glass-toast";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BrandingProvider, useBranding } from "./context/BrandingContext";
 import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
@@ -51,6 +57,7 @@ import { setThemeColor, THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "./utils/them
 import { initOrientationLock } from "./utils/appOrientation";
 import { recordRouteVisit } from "./utils/routeHistory";
 import { requiresAuthentication } from "./utils/appRoutes";
+import { applyGlassTier, detectGlassTier } from "./lib/glass";
 import AppShell from "./components/AppShell";
 import PageEnter, { pageEnterAppKey } from "./components/PageEnter";
 import { resolveActiveFromHash } from "./components/DesktopShell";
@@ -128,6 +135,10 @@ const RENEWAL_PREVIEW_HASH = "#/dev/subscription-preview";
 const PROFILE_PREVIEW_HASH = "#/dev/profile-preview";
 // TEMPORARY dev sandbox for the mind map toolbar (removed before merge).
 const MINDMAP_PREVIEW_HASH = "#/dev/mindmap-preview";
+// Developer sandbox for the Liquid Glass material layer (website-glass).
+// Renders the vendored registry components with no app data; see
+// docs/liquid-glass-rollout-plan.md.
+const GLASS_PREVIEW_HASH = "#/dev/glass-preview";
 const FLOWPATH_HASH = "#/flowpath";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
@@ -357,6 +368,7 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith("#/admin-login")
     || hash.startsWith("#/course/")
     || hash.startsWith(PROFILE_PREVIEW_HASH)
+    || hash.startsWith(GLASS_PREVIEW_HASH)
   ) {
     return <>{children}</>;
   }
@@ -669,6 +681,17 @@ function RootPage(): ReactNode {
     if (typeof window !== "undefined") {
       recordRouteVisit(hash, window.sessionStorage);
     }
+  }, [hash]);
+
+  // Liquid Glass material layer (website-glass rollout — Wave 1). The tier is
+  // resolved per route on purpose: the admin panel has its own chrome and the
+  // rollout deliberately leaves it (and the bottom footer nav) untouched, so
+  // the material is forced `off` there. Every rule in src/glass.css is gated on
+  // html[data-glass="on"], and the vendored components read their own theme,
+  // so `off` genuinely restores the pre-glass UI rather than half-applying it.
+  useEffect(() => {
+    const adminRoute = hash.startsWith(ADMIN_HASH) || hash.startsWith(ADMIN_LOGIN_HASH);
+    applyGlassTier(adminRoute ? "off" : detectGlassTier());
   }, [hash]);
 
   useEffect(() => {
@@ -1077,6 +1100,7 @@ function RootPage(): ReactNode {
   }
   if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return <SubscriberExperiencePage />;
   if (hash.startsWith(PROFILE_PREVIEW_HASH)) return <ProfilePreview />;
+  if (hash.startsWith(GLASS_PREVIEW_HASH)) return <GlassPreviewPage />;
   if (hash.startsWith(MINDMAP_PREVIEW_HASH)) return <MindMapPreview />;
   if (hash.startsWith(COURSE_HASH)) {
     if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;
@@ -1224,6 +1248,15 @@ createRoot(document.getElementById("root")!).render(
           <CommerceProvider>
             <Root />
             <RenewalNotice />
+            {/* ⌘K palette (Wave 3). Mounted beside the banner host so one
+                instance survives navigation, and inside CatalogProvider because
+                it lists live catalogue titles. It steps aside on admin and
+                player routes and when `data-glass="off"`. */}
+            <GlassCommandPalette />
+            {/* Wave 4: the glass toast host moved up here so any route can
+                raise `toast.*()` without prop plumbing — FlowPath's old
+                top-centre div was the last one carrying its own copy. */}
+            <ToastViewport />
             <PortraitOnlyGuard />
           </CommerceProvider>
         </CatalogProvider>

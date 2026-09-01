@@ -1,3 +1,4 @@
+import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 import { useEffect, useMemo, useState } from "react";
 import {
   Archive,
@@ -216,21 +217,29 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
           top", not "the top plus padding". The row keeps its own `py-3`, so
           the breathing room lives inside the glass bar instead of above it. */}
       <div data-rev-bank-header className="dc-glass-toolbar border-b border-white/60 px-4 py-3 lg:px-0 lg:max-w-[1200px] lg:mx-auto lg:rounded-2xl">
-        <div data-rev-bank-view-switch className="dc-glass-soft grid grid-cols-2 rounded-2xl p-1">
-          <button
-            type="button"
-            onClick={() => setView("tests")}
-            className={`flex min-h-[42px] items-center justify-center gap-2 rounded-xl text-xs font-black transition ${view === "tests" ? "border border-indigo-300/70 bg-indigo-500/15 text-indigo-700 shadow-sm backdrop-blur" : "text-slate-600"}`}
+        {/* Wave 4: the two hand-rolled boxes became the registry
+            `glass-toggle-group`. One droplet slides between the views instead
+            of two backgrounds flickering, and the active state is now the same
+            material as the store's sort/segment controls. The
+            `data-rev-bank-view-switch` hook stays on the wrapper so the
+            responsive contract keeps finding it; `data-stretch` asks the pack
+            surface to fill the toolbar row (see src/glass.css). */}
+        <div data-rev-bank-view-switch>
+          <GlassToggleGroup
+            className="dc-segment flex w-full rounded-2xl p-1"
+            data-stretch
+            tint={0.5}
+            value={view}
+            onValueChange={(next) => setView(next === "smart" ? "smart" : "tests")}
+            aria-label="Test bank view"
           >
-            <Archive className="h-4 w-4" /> Saved Tests
-          </button>
-          <button
-            type="button"
-            onClick={() => setView("smart")}
-            className={`flex min-h-[42px] items-center justify-center gap-2 rounded-xl text-xs font-black transition ${view === "smart" ? "border border-indigo-300/70 bg-indigo-500/15 text-indigo-700 shadow-sm backdrop-blur" : "text-slate-600"}`}
-          >
-            <BrainCircuit className="h-4 w-4" /> Smart Revision
-          </button>
+            <GlassToggleItem value="tests" className="min-h-[42px] flex-1 justify-center whitespace-nowrap px-3.5 text-xs font-black">
+              <Archive className="h-4 w-4" /> Saved Tests
+            </GlassToggleItem>
+            <GlassToggleItem value="smart" className="min-h-[42px] flex-1 justify-center whitespace-nowrap px-3.5 text-xs font-black">
+              <BrainCircuit className="h-4 w-4" /> Smart Revision
+            </GlassToggleItem>
+          </GlassToggleGroup>
         </div>
       </div>
 

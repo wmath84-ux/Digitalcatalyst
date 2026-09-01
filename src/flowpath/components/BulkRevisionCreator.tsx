@@ -17,6 +17,7 @@
 //     plan gates into users/{uid}/revisionTests/{id} and the
 //     others get a per-slot error in the response.
 
+import { GlassSelect, GlassSelectContent, GlassSelectItem, GlassSelectTrigger } from "../../components/ui/glass-select";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, Trash2, X } from "lucide-react";
@@ -201,19 +202,27 @@ export function BulkRevisionCreator({ open, onClose, uid, onBulkCreate }: BulkRe
                       placeholder={`Test ${i + 1} title`}
                       className="col-span-5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
                     />
-                    <select
+                    {/* Wave 5: same preset side-effect (difficulty also writes
+                        the question count + minutes), registry listbox instead
+                        of a native popup the bulk creator could not style. */}
+                    <GlassSelect
                       value={slot.difficulty}
-                      onChange={(e) => {
-                        const diff = e.target.value as keyof typeof DIFFICULTY_PRESETS;
+                      onValueChange={(v) => {
+                        const diff = v as keyof typeof DIFFICULTY_PRESETS;
                         const preset = DIFFICULTY_PRESETS[diff];
                         setSlot(i, { difficulty: diff, questions: preset.questions, minutes: preset.minutes });
                       }}
-                      className="col-span-3 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
                     >
-                      {Object.entries(DIFFICULTY_PRESETS).map(([k, v]) => (
-                        <option key={k} value={k}>{v.label}</option>
-                      ))}
-                    </select>
+                      <GlassSelectTrigger
+                        aria-label="Difficulty"
+                        className="dc-glass-select col-span-3 h-9 w-full text-sm"
+                      />
+                      <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Difficulty options">
+                        {Object.entries(DIFFICULTY_PRESETS).map(([k, v]) => (
+                          <GlassSelectItem key={k} value={k}>{v.label}</GlassSelectItem>
+                        ))}
+                      </GlassSelectContent>
+                    </GlassSelect>
                     <input
                       type="number"
                       min={1}

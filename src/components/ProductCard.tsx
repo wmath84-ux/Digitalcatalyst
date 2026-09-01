@@ -1,4 +1,7 @@
 import type { Product } from "../data/products";
+import { GlassCard } from "./ui/GlassCard";
+import { LiquidMetalButton } from "./ui/LiquidMetalButton";
+import { GlassSurface } from "./ui/glass";
 import { HeartIcon, StarIcon } from "./icons";
 
 type ProductCardProps = {
@@ -26,12 +29,17 @@ export default function ProductCard({
   const unavailable = product.availableForSale === false && !purchased;
 
   return (
-    <div
+    /* Wave 3 (commerce): the card is `glass-card`, so the material, the rim and
+       the sheen come from the pack — the hand-painted `bg-white/60`, the
+       `shadow-[…]` and the separate fake "Glass sheen" layer are gone
+       (`GlassSurface` paints a real specular sheen, which is what that div was
+       imitating). `contentClassName="p-0"` keeps the media edge-to-edge. */
+    <GlassCard
+      tint={0.55}
       onClick={() => onView(product)}
-      className="group relative flex flex-col overflow-hidden rounded-3xl border border-white/70 bg-white/60 shadow-[0_14px_40px_-20px_rgba(49,46,129,0.65)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-indigo-200/80 hover:bg-white/80 hover:shadow-[0_22px_55px_-18px_rgba(79,70,229,0.55)]"
+      contentClassName="p-0"
+      className="group relative flex h-full flex-col overflow-hidden transition duration-300 hover:-translate-y-1"
     >
-      {/* Glass sheen */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-br from-white/60 via-transparent to-transparent opacity-70" />
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
         <img src={product.image} alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
 
@@ -65,11 +73,22 @@ export default function ProductCard({
             event.stopPropagation();
             onToggleWishlist(product.id);
           }}
-          className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/60 bg-white/70 text-slate-600 shadow-lg shadow-slate-900/10 backdrop-blur-md transition hover:scale-105 hover:bg-white/90 active:scale-95"
+          className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full text-slate-600 transition hover:scale-105 active:scale-95"
         >
+          {/* the same action disc the header and the desktop top bar use, so a
+              save control reads identically everywhere in the app */}
+          <GlassSurface
+            tint={wishlisted ? 0.72 : 0.62}
+            tintColor={wishlisted ? "254,226,226" : "255,255,255"}
+            blur={12}
+            saturation={1.35}
+            radius={999}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+          />
           <HeartIcon
             filled={wishlisted}
-            className={`h-4 w-4 ${wishlisted ? "text-rose-500" : "text-slate-600"}`}
+            className={`relative h-4 w-4 ${wishlisted ? "text-rose-500" : "text-slate-600"}`}
           />
         </button>
       </div>
@@ -96,25 +115,38 @@ export default function ProductCard({
           )}
         </div>
 
-        <button
-          type="button"
-          disabled={purchased || inCart || unavailable}
-          onClick={(event) => {
-            event.stopPropagation();
-            if (!unavailable) onAddToCart(product.id);
-          }}
-          className={`mt-1 flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-extrabold uppercase tracking-wide transition ${
-            unavailable
-              ? "cursor-default border border-amber-200/70 bg-amber-100/70 text-amber-800 backdrop-blur"
-              : purchased || inCart
-                ? "cursor-default border border-emerald-200/70 bg-emerald-100/70 text-emerald-700 backdrop-blur"
-                : "bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-[0.98]"
-          }`}
-        >
-          <span>{purchased ? "Purchased" : unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to Cart"}</span>
-          <span>{unavailable ? "Soon" : `₹${product.price}`}</span>
-        </button>
+        {/* Two states on purpose: when the card can be acted on it is a
+            `glass-button` capsule (gel press included); when it cannot, it stays
+            a flat status plate — a disabled lens reads as "dimmed glass", which
+            is a worse affordance for Purchased / Coming soon than a solid tint. */}
+        {purchased || inCart || unavailable ? (
+          <div
+            className={`mt-1 flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-extrabold uppercase tracking-wide ${
+              unavailable
+                ? "cursor-default border border-amber-200/70 bg-amber-100/70 text-amber-800"
+                : "cursor-default border border-emerald-200/70 bg-emerald-100/70 text-emerald-700"
+            }`}
+          >
+            <span>{purchased ? "Purchased" : unavailable ? "Not for sale" : "In Cart"}</span>
+            <span>{unavailable ? "Soon" : `₹${product.price}`}</span>
+          </div>
+        ) : (
+          <LiquidMetalButton
+            tone="primary"
+            aria-label={`Add ${product.title} to cart for ₹${product.price}`}
+            className="mt-1"
+            onClick={(event) => {
+              event.stopPropagation();
+              onAddToCart(product.id);
+            }}
+          >
+            <span className="flex w-full items-center justify-between gap-2 text-[12px] font-extrabold uppercase tracking-wide">
+              <span>Add to Cart</span>
+              <span>₹{product.price}</span>
+            </span>
+          </LiquidMetalButton>
+        )}
       </div>
-    </div>
+    </GlassCard>
   );
 }

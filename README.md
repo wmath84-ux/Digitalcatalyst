@@ -15,6 +15,40 @@ The removed PostgreSQL/JWT and Next.js authentication implementations must not b
 - Deploy `firestore.rules` and `storage.rules` before using protected user/admin data.
 - The Firebase web configuration is initialized in `firebase.ts`; Firebase web API keys are public project identifiers, while all server secrets must remain in deployment environment variables.
 
+## Liquid Glass UI system
+
+The app's chrome, commerce, learning and account surfaces render through the
+[website-glass](https://websiteglass.com/docs) registry (22 Apple-style Liquid Glass
+components). 21 of the 22 are adopted; `glass-dock` is deliberately not — the mobile
+footer navigation and the desktop peek dock keep this repo's own material.
+
+- **Components** live in `src/components/ui/glass-*.tsx` (vendored, kept
+  byte-comparable to the registry — do not edit them for app look). Shared wrappers
+  that pages actually import: `ui/Modal`, `ui/ConfirmDialog`, `ui/MacWindowModal`,
+  `ui/Toast`, `ui/PageTabs`, `ui/GlassCard`, `ui/LiquidMetalButton`.
+- **App-specific styling** lives in `src/glass.css` under `html[data-glass="on"]`,
+  as `.dc-*` classes. They re-ink the pack's dark-first material for this app's light
+  surfaces (frost, rim, accent for selected/checked states) and are additive: the
+  original utility classes stay in the markup, so the CSS is the only thing that
+  changes.
+- **Tiers and the kill switch**: `src/lib/glass.ts` resolves `full / lite / off`
+  from engine + device capability, and honours `?glass=off` (flat fallback, every
+  `.dc-*` rule stops applying) and `?glass=lite` (frost, no refraction). The choice
+  persists in `localStorage`. `prefers-reduced-motion` drops to `lite` and the
+  CSS-level motion opt-out covers the animated pieces.
+- **Sandbox**: `#/dev/glass-preview` exercises every primitive plus one section per
+  rollout wave, with a live lens counter and the tier switch.
+- **Fidelity**: `node scripts/verify-glass-registry.mjs` re-fetches each registry
+  item and diffs it against the vendored file (documented local deviations are
+  listed in `LOCAL_ADAPTATIONS`); `--write` re-vendors. Run it where egress to
+  `websiteglass.com` exists.
+- **Contracts**: `tests/liquidGlassWave*Contract.test.mjs` pin the surface swap —
+  public props, `data-*` hooks, a11y roles — and several deliberately-recorded
+  non-changes (revision's stable `.rev-card`, My Day's Create-menu drop-up, the
+  frozen dock/footer-nav, no per-card lens in scrolling grids).
+
+Full wave-by-wave record: `docs/liquid-glass-rollout-plan.md`.
+
 ## Secure Razorpay checkout
 
 Paid checkout is server-authoritative. `/api/razorpay/create-order` verifies the Firebase ID token, reads the product and price from Firestore, and creates the Razorpay order. `/api/razorpay/verify-payment` verifies the signature and captured amount with Razorpay before writing the purchase entitlement and order through Firebase Admin.

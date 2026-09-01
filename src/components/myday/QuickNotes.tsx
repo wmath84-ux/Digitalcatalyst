@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, CheckSquare, ChevronDown, ChevronUp, NotebookPen, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/glass-tooltip";
 import type { NoteColor, QuickNote } from "../../types";
 import { cn } from "../../utils/cn";
 
@@ -118,27 +119,40 @@ function BigNoteEditor({
           surfaceClassName ?? "bg-white/80",
         )}
       />
+      {/* Wave 4: the two icon actions keep their hooks and colours, but the
+          browser's grey `title` bubble became the glass tooltip (delayed,
+          focusable, and it no longer leaks into screenshots). The cancel hint
+          also lost its stale half-Hinglish wording. */}
+      <TooltipProvider delayMs={300}>
       <div className="flex items-center justify-end gap-1.5">
         {onDelete ? (
-          <button
-            onClick={onDelete}
-            aria-label="Delete note"
-            title="Delete note"
-            data-myday-note-editor-delete
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/60 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger
+              onClick={onDelete}
+              aria-label="Delete note"
+              data-myday-note-editor-delete
+              className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/60 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
+            >
+              <Trash2 className="h-4 w-4" />
+            </TooltipTrigger>
+            <TooltipContent side="top" tint={0.85}>
+              <span className="text-slate-800">Delete note</span>
+            </TooltipContent>
+          </Tooltip>
         ) : null}
-        <button
-          onClick={onCancel}
-          aria-label="Cancel editing"
-          title="Cancel (editor band karein, bina save kiye)"
-          data-myday-note-editor-cancel
-          className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/60 text-slate-500 transition hover:bg-white"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger
+            onClick={onCancel}
+            aria-label="Cancel editing"
+            data-myday-note-editor-cancel
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/60 text-slate-500 transition hover:bg-white"
+          >
+            <X className="h-4 w-4" />
+          </TooltipTrigger>
+          <TooltipContent side="top" tint={0.85}>
+            <span className="text-slate-800">Close without saving</span>
+          </TooltipContent>
+        </Tooltip>
         {/* Checkbox-style Save: one click saves the note AND closes the
             editor. It sits next to Delete / Cancel, styled like a check
             box so the action is unmistakable. */}
@@ -153,6 +167,7 @@ function BigNoteEditor({
           {kind === "edit" ? <Check className="h-4 w-4" strokeWidth={3} /> : <CheckSquare className="h-4 w-4" strokeWidth={2.5} />}
         </button>
       </div>
+      </TooltipProvider>
     </div>
   );
 }
@@ -470,22 +485,32 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
                           className="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <button
-                            onClick={() => startEdit(note)}
-                            aria-label="Edit note"
-                            title="Edit note"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg opacity-50 transition hover:bg-white/60 hover:opacity-100"
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </button>
-                          <button
-                            onClick={() => onDelete(note.id)}
-                            aria-label="Delete note"
-                            title="Delete note"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg opacity-50 transition hover:bg-white/60 hover:opacity-100"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
+                          <TooltipProvider delayMs={300}>
+                            <Tooltip>
+                              <TooltipTrigger
+                                onClick={() => startEdit(note)}
+                                aria-label="Edit note"
+                                className="flex h-7 w-7 items-center justify-center rounded-lg opacity-50 transition hover:bg-white/60 hover:opacity-100"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" tint={0.85}>
+                                <span className="text-slate-800">Edit note</span>
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger
+                                onClick={() => onDelete(note.id)}
+                                aria-label="Delete note"
+                                className="flex h-7 w-7 items-center justify-center rounded-lg opacity-50 transition hover:bg-white/60 hover:opacity-100"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" tint={0.85}>
+                                <span className="text-slate-800">Delete note</span>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
                     </div>

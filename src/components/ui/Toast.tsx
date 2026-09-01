@@ -1,6 +1,29 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Info, XCircle, X, type LucideIcon } from "lucide-react";
+import { CheckCircle2, Info, XCircle, type LucideIcon } from "lucide-react";
+import { GlassToastCard, type GlassToastTone } from "./glass-toast";
 import { cn } from "../../utils/cn";
+
+/**
+ * Toast — the app's existing, prop-driven toast surface.
+ *
+ * Wave 1 (liquid glass) keeps this component's public API exactly as it was —
+ * `{ toasts, onRemove }`, `ToastMessage`, `ToastType` — because My Day (and
+ * later every other feature) already feeds it state. Only the *material*
+ * changed: each row is now the pack's `GlassToastCard`, i.e. a frosted
+ * `GlassSurface` chip with a specular rim, which is what the standalone
+ * `toast.success()/error()/info()` singleton in ./glass-toast renders too.
+ * One look, two entry points.
+ *
+ * Behaviour unchanged: 4 s auto-dismiss, a 300 ms exit before the parent is
+ * asked to remove the entry, `role=alert` on errors, and the readable
+ * rose-on-white error style (see glass-toast.tsx for why).
+ *
+ * One deliberate promotion: the stack moved from z-[70] to z-[120], the same
+ * band the portal-driven `ToastViewport` uses. A toast raised by a dialog
+ * (coupon applied, entitlement saved) used to land *behind* that dialog, which
+ * reads as "nothing happened"; the course player's own confirm sheet already
+ * lives at 120, so both sit in the same layer and DOM order decides.
+ */
 
 export type ToastType = "success" | "error" | "info";
 
@@ -21,18 +44,15 @@ const icons: Record<ToastType, LucideIcon> = {
   info: Info,
 };
 
-const styles: Record<ToastType, string> = {
-  // Use a light, high-contrast surface for errors. A solid red pill can hide
-  // the message on some devices / dark-theme CSS, which is what users see as
-  // "ek pura red box jisme kuch bhi nahi dikhta". The dark red text on white
-  // is readable while still being unmistakably an error.
-  success: "bg-emerald-600 text-white shadow-emerald-900/20",
-  error: "bg-white text-rose-700 border border-rose-300 shadow-rose-200/70",
-  info: "bg-slate-800 text-white shadow-slate-900/30",
+const toneOf: Record<ToastType, GlassToastTone> = {
+  success: "success",
+  error: "error",
+  info: "info",
 };
 
 function ToastItem({ toast, onRemove }: { toast: ToastMessage; onRemove: (id: string) => void }) {
   const [visible, setVisible] = useState(false);
+  const Icon = icons[toast.type];
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
@@ -43,38 +63,14 @@ function ToastItem({ toast, onRemove }: { toast: ToastMessage; onRemove: (id: st
     return () => clearTimeout(timer);
   }, [toast.id, onRemove]);
 
-  const Icon = icons[toast.type];
-
   return (
-    <div
-      role={toast.type === "error" ? "alert" : "status"}
-      aria-live={toast.type === "error" ? "assertive" : "polite"}
-      className={cn(
-        "flex items-start gap-2.5 rounded-xl px-4 py-3 shadow-xl transition-all duration-300",
-        styles[toast.type],
-        visible ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0",
-      )}
-    >
-      <Icon
-        className={cn("h-4.5 w-4.5 mt-0.5 shrink-0", toast.type === "error" ? "text-rose-600" : "text-white")}
-        aria-hidden="true"
+    <div className={cn("transition-all duration-300", visible ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0")}>
+      <GlassToastCard
+        text={toast.text}
+        tone={toneOf[toast.type]}
+        icon={<Icon className="size-4.5" aria-hidden="true" />}
+        onDismiss={() => onRemove(toast.id)}
       />
-      <span
-        className="min-w-0 flex-1 break-words text-left text-sm font-semibold leading-snug"
-        style={toast.type === "error" ? { color: "#9f1239" } : { color: "#fff" }}
-      >
-        {toast.text}
-      </span>
-      <button
-        onClick={() => onRemove(toast.id)}
-        aria-label="Dismiss notification"
-        className={cn(
-          "mt-0.5 shrink-0 rounded-md p-0.5 transition hover:opacity-100",
-          toast.type === "error" ? "text-rose-400 opacity-70 hover:bg-rose-100" : "text-white/80 opacity-70 hover:bg-white/10",
-        )}
-      >
-        <X className="h-4 w-4" />
-      </button>
     </div>
   );
 }
@@ -83,9 +79,11 @@ export default function Toast({ toasts, onRemove }: ToastProps) {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-20 left-1/2 z-[70] flex w-full max-w-sm -translate-x-1/2 flex-col gap-2 px-4 sm:bottom-6">
+    <div className="pointer-events-none fixed bottom-20 left-1/2 z-[120] flex w-full max-w-sm -translate-x-1/2 flex-col gap-2 px-4 sm:bottom-6">
       {toasts.map((t) => (
-        <ToastItem key={t.id} toast={t} onRemove={onRemove} />
+        <div key={t.id} className="pointer-events-auto">
+          <ToastItem toast={t} onRemove={onRemove} />
+        </div>
       ))}
     </div>
   );

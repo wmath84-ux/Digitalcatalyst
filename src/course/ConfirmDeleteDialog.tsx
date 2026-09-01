@@ -24,6 +24,7 @@
 // Escape and Cancel all dismiss without deleting — no destructive action is
 // ever reachable without an explicit second tap on the red button.
 
+import { GlassSurface } from "../components/ui/glass";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, Trash2 } from "lucide-react";
@@ -92,11 +93,13 @@ export default function CourseConfirmDialog({
         data-course-confirm-backdrop
       />
 
-      <div
+      <GlassSurface
         role="alertdialog"
         aria-modal="true"
         aria-label={title}
-        className="relative z-10 w-[min(100%,26rem)] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/40 animate-scaleIn"
+        tint={0.9}
+        radius={16}
+        className="relative z-10 w-[min(100%,26rem)] shrink-0 overflow-hidden rounded-2xl shadow-2xl shadow-slate-950/40 animate-scaleIn"
         style={{ maxHeight: "max(18rem, min(70vh, 70dvh))" }}
         data-course-confirm-card
       >
@@ -149,7 +152,7 @@ export default function CourseConfirmDialog({
             </button>
           </div>
         </div>
-      </div>
+      </GlassSurface>
     </div>,
     document.body,
   );

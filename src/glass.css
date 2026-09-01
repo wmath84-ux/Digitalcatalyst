@@ -1,0 +1,482 @@
+/*
+ * Liquid Glass design layer (website-glass rollout — Wave 0).
+ *
+ * This file owns EVERYTHING that the vendored registry components cannot
+ * express as props: the token scale, the global quality tier, the a11y focus
+ * ring, and the "no backdrop-filter at all" fallback. It is intentionally
+ * inert until `data-glass="on"` is set on <html> (see src/lib/glass.ts), so
+ * Wave 0 ships with the app looking exactly as it did before.
+ *
+ * Rules for the waves that follow:
+ *   1. Never restyle glass internals from src/index.css. If a component needs
+ *      a tweak, do it here under one of the documented attribute hooks below,
+ *      or pass the component's real props. That keeps `npx shadcn add`
+ *      re-runnable (vendored files must stay byte-comparable to the registry).
+ *   2. All selectors are low-specificity (:where / attribute hooks) so the
+ *      6 000 lines of hand-tuned breakpoint CSS in src/index.css keep winning
+ *      layout fights. Glass is a material layer, not a layout layer.
+ *   3. Anything a user can *touch* may refract. Content that *scrolls* must
+ *      not (see the lens budget in src/lib/glass.ts) — that is what keeps a
+ *      mid-range Android phone at 60fps.
+ */
+
+:root {
+  /* material */
+  --glass-tint-light: 255 255 255;
+  --glass-tint-dark: 60 62 68;
+  --glass-accent-rgb: 56 189 248; /* overwritten at runtime from BrandingContext */
+  --glass-radius-sm: 10px;
+  --glass-radius-md: 14px;
+  --glass-radius-lg: 20px;
+  --glass-radius-xl: 24px;
+  --glass-radius-2xl: 30px;
+
+  /* strength per role — mirrored by GLASS_STRENGTH in src/lib/glass.ts, which
+     is what actually reaches the components (they take numeric props). */
+  --glass-strength-chrome: 0.5;
+  --glass-strength-control: 0.32;
+  --glass-strength-panel: 0.22;
+
+  /* overlays */
+  --glass-scrim-light: 15 23 42;
+  --glass-scrim-dark: 2 6 23;
+  --glass-scrim-alpha: 0.34;
+
+  /* sheets respect the same insets the app already uses elsewhere */
+  --glass-sheet-gap: max(10px, env(safe-area-inset-bottom, 0px));
+  --glass-side-gutter: max(12px, env(safe-area-inset-left, 0px));
+}
+
+/* ── quality tiers ──────────────────────────────────────────────────────────
+ * Set once by glassQualityTier(): full = real refraction, lite = same shapes
+ * with half the bending, off = no lens effects at all (kill switch).
+ * ────────────────────────────────────────────────────────────────────────── */
+html[data-glass="off"] [data-glass-lens],
+html[data-glass="off"] [data-glass-surface] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-glass="lite"] {
+  --glass-strength-chrome: 0.26;
+  --glass-strength-control: 0.16;
+  --glass-strength-panel: 0.1;
+}
+
+/* ── focus: a lens has no border of its own, so the ring is the only reliable
+ *    keyboard affordance. Applied to whatever the component renders as the
+ *    focusable node. ───────────────────────────────────────────────────────── */
+html[data-glass="on"] :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--glass-accent-rgb) / 0.95);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* ── no backdrop-filter support at all (very old WebView / FF <103): the frost
+ *    disappears, so panels fall back to the app's opaque surface instead of
+ *    looking broken. ────────────────────────────────────────────────────────── */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-glass="on"] :where([data-glass-surface]) {
+    background: light-dark(#ffffff, #0f172a) !important;
+    border: 1px solid light-dark(#e2e8f0, #1e293b) !important;
+  }
+}
+
+/* ── motion: glass-motion already collapses springs under
+ *    prefers-reduced-motion; this covers the CSS-driven bits (sheen shimmer,
+ *    dock magnification, entry scale) so nothing keeps animating. ───────────── */
+@media (prefers-reduced-motion: reduce) {
+  html[data-glass="on"] :where([data-glass-lens], [data-glass-surface], [data-glass-pill]) {
+    transition-duration: 1ms !important;
+    animation: none !important;
+  }
+}
+
+/* ── contrast safety net: labels sit on a translucent material, so the app's
+ *    text colour has to survive whatever is behind it. Both tokens resolve to
+ *    slate-900 / slate-50 by default; page code may override locally. ───────── */
+html[data-glass="on"] {
+  --glass-label: light-dark(#0f172a, #f8fafc);
+  --glass-label-muted: light-dark(#475569, #cbd5e1);
+}
+
+/* ── long lists: never refract a lens per row. The tile/list wrappers opt out
+ *    with data-glass="panel" and get frost only. This is the single most
+ *    effective perf lever in the whole rollout. ────────────────────────────── */
+html[data-glass="on"] :where([data-glass="panel"]) {
+  box-decoration-break: clone;
+}
+
+/* ── Wave 1: shared primitives (Modal / ConfirmDialog / MacWindowModal /
+ *    Toast / PageTabs / LiquidMetalButton) ─────────────────────────────────
+ * These rules are the parts a `GlassSurface` cannot express as a prop — the
+ * responsive corner shape of a sheet vs a card, the entry motion, and the
+ * light-theme droplet colour. Keeping them here (instead of editing the
+ * vendored files) is what lets `npx shadcn add` be re-run without a conflict.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Phones: bottom sheet -> top corners only. From the sm band up the panel is
+     a card, so all four corners round. Modal/MacWindowModal read this through
+     their inline `style` because an inline border-radius beats a class. */
+  --glass-sheet-radius: 1.75rem 1.75rem 0 0;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --glass-sheet-radius: 1.5rem;
+  }
+}
+
+@keyframes glass-sheet-rise {
+  from { opacity: 0; transform: translate3d(0, 26px, 0) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes glass-card-pop {
+  from { opacity: 0; transform: translate3d(0, 6px, 0) scale(0.965); }
+  to   { opacity: 1; transform: none; }
+}
+
+html[data-glass="on"] :where(.glass-dialog-in) {
+  animation: glass-sheet-rise 0.26s cubic-bezier(0.22, 1.15, 0.36, 1.06) both;
+}
+
+@media (min-width: 640px) {
+  html[data-glass="on"] :where(.glass-dialog-in) {
+    animation-name: glass-card-pop;
+    animation-duration: 0.2s;
+  }
+}
+
+@keyframes glass-toast-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+html[data-glass="on"] :where(.glass-toast-in) {
+  animation: glass-toast-in 0.22s cubic-bezier(0.22, 1.15, 0.36, 1.06) both;
+}
+
+/* The legacy gradient button becomes a lens. `.liquid-metal-button` keeps its
+ * layout, focus-visible and disabled rules from liquidMetalButton.css; only the
+ * opaque paint is removed, so `data-glass="off"` restores the exact old look. */
+html[data-glass="on"] :where(.liquid-metal-button) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  isolation: auto;
+}
+
+/* PageTabs sits on a white strip, so the upstream droplet (white-on-dark) gets
+ * an indigo wash; it targets the pill element inside the list we tag from
+ * src/components/ui/PageTabs.tsx. */
+html[data-glass="on"] :where(.dc-page-tabs-list) div[aria-hidden] {
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.2), rgba(56, 189, 248, 0.24)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 6px 16px -8px rgba(79, 70, 229, 0.5) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-glass="on"] :where(.glass-dialog-in, .glass-toast-in) {
+    animation: none !important;
+  }
+}
+
+/* ── Wave 2 · global chrome ─────────────────────────────────────────────── */
+
+/* `glass-input` is authored for glass on a DARK page (white label, white
+ * placeholder, white caret, white focus ring). The desktop top bar is a light
+ * strip, so the text layer is re-inked here instead of editing the vendored
+ * item — `.dc-glass-input` is applied at the call site in DesktopShell.tsx and
+ * a class+element selector outranks the pack's bare utility classes.
+ *
+ * The right padding leaves room for the clear chip, which stays an absolutely
+ * positioned sibling in the shell (the registry item has no slot for it). */
+html[data-glass="on"] .dc-glass-input input {
+  color: rgb(30 41 59); /* slate-800 */
+  caret-color: rgb(79 70 229);
+  padding-right: 2rem;
+}
+
+html[data-glass="on"] .dc-glass-input input::placeholder {
+  color: rgb(148 163 184); /* slate-400 */
+}
+
+html[data-glass="on"] .dc-glass-input span.shrink-0 {
+  color: rgb(100 116 139); /* slate-500 — the search glyph */
+}
+
+/* The focus ring: the pack paints a white inset hairline, which disappears on
+ * a light bar, so it is re-tinted to the app's indigo. `!important` because the
+ * glow layer carries an inline box-shadow (set once by the vendored item). */
+html[data-glass="on"] .dc-glass-input > div > div[aria-hidden] {
+  box-shadow:
+    inset 0 0 0 1.5px rgba(99, 102, 241, 0.45),
+    0 0 18px -4px rgba(99, 102, 241, 0.35) !important;
+}
+
+/* Header + top-bar action discs: on a light background the white frost needs a
+ * slightly stronger rim to read as a lens rather than a smudge. `GlassSurface`
+ * stacks its layers in a fixed order — backdrop, tint, sheen, rim, content —
+ * so the 4th `aria-hidden` div is the rim layer this rule re-inks. */
+html[data-glass="on"] :where(.dc-chrome-disc) > div[aria-hidden]:nth-of-type(4) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(148, 163, 184, 0.28);
+}
+
+html[data-glass="on"] :where(.dc-chrome-disc):hover > div[aria-hidden]:nth-of-type(4) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(99, 102, 241, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Tooltips in the registry animate opacity + scale; the fade stays (it is a
+   * state change, not movement) but the pop is flattened. */
+  html[data-glass="on"] :where([role="tooltip"]) {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Wave 3 · commerce ──────────────────────────────────────────────────── */
+
+/* Cards: `glass-card` paints a dark-page rim; on a white page the card needs a
+ * hairline + its own lift so the grid does not read as a sheet of nothing.
+ * `GlassCard` (src/components/ui/GlassCard.tsx) carries the hook class and
+ * re-inks the label colours with tailwind-merge, so only the rim is done here. */
+html[data-glass="on"] :where(.dc-glass-card) > div[aria-hidden]:nth-of-type(4) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(148, 163, 184, 0.22),
+    0 18px 42px -24px rgba(79, 70, 229, 0.42);
+}
+
+/* `glass-toggle-group` used as a LIGHT segmented control (the store filter row
+ * and the product page's tab strip — hence `dc-segment`): the pack's indicator is
+ * white on dark, so it becomes the app's indigo droplet and the unselected
+ * labels get re-inked. The `> div:last-child` step is the surface's content wrapper — the
+ * indicator lives inside it, which is why it still tracks a horizontally
+ * scrolled row. */
+html[data-glass="on"] .dc-segment > div:last-child > div[aria-hidden] {
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.92), rgba(124, 58, 237, 0.92)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 6px 16px -8px rgba(79, 70, 229, 0.55) !important;
+}
+
+html[data-glass="on"] .dc-segment [data-toggle] {
+  color: rgb(71 85 105); /* slate-600 */
+}
+
+html[data-glass="on"] .dc-segment [data-toggle]:hover {
+  color: rgb(15 23 42);
+}
+
+html[data-glass="on"] .dc-segment [data-toggle][aria-pressed="true"] {
+  color: #fff;
+}
+
+/* `glass-select`: the trigger is a plain button (not a surface), so its light
+ * ink is set here; the list is a portaled `GlassSurface` panel, so the options
+ * are re-inked against that. Both blocks are unlayered, which is what lets them
+ * beat the pack's utility classes without editing the vendored file. */
+html[data-glass="on"] .dc-glass-select {
+  border-color: rgba(226, 232, 240, 1);
+  background: rgba(255, 255, 255, 0.7);
+  color: rgb(30 41 59);
+  backdrop-filter: blur(10px) saturate(1.3);
+}
+
+html[data-glass="on"] .dc-glass-select:hover {
+  border-color: rgba(165, 180, 252, 1);
+}
+
+html[data-glass="on"] .dc-glass-select svg {
+  color: rgb(100 116 139);
+}
+
+html[data-glass="on"] .dc-glass-select-pop [role="option"] {
+  color: rgb(51 65 85);
+}
+
+html[data-glass="on"] .dc-glass-select-pop [role="option"]:hover,
+html[data-glass="on"] .dc-glass-select-pop [role="option"]:focus {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+html[data-glass="on"] .dc-glass-select-pop [role="option"][aria-selected="true"] {
+  color: rgb(67 56 202);
+  font-weight: 700;
+}
+
+html[data-glass="on"] .dc-glass-select-pop [role="option"] svg {
+  color: rgb(79 70 229);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The filter droplet still moves to the right chip, it just does not spring. */
+  html[data-glass="on"] .dc-segment > div:last-child > div[aria-hidden] {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Controls the pack ships for DARK pages that commerce puts on white: the
+ * unchecked box/dot and an unselected tile are `bg-white/[0.06]` with a white
+ * hairline, i.e. invisible on `bg-white`. Re-inked here — `:not([aria-checked])`
+ * so the pack's own accent-filled *checked* state (a utility class, and correct
+ * on light) is left completely alone. */
+html[data-glass="on"] :where(.dc-choice):not([aria-checked="true"]) {
+  border-color: rgb(203 213 225);
+  background-color: rgba(255, 255, 255, 0.72);
+}
+
+html[data-glass="on"] :where(.dc-choice):not([aria-checked="true"]):hover {
+  border-color: rgb(129 140 248);
+}
+
+html[data-glass="on"] :where(.dc-tile):not([data-selected]) {
+  border-color: rgb(226 232 240);
+  background-color: rgba(255, 255, 255, 0.55);
+}
+
+html[data-glass="on"] :where(.dc-tile):not([data-selected]):hover {
+  border-color: rgb(165 180 252);
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Selected swatches get the pack's white ring, which vanishes on a white page. */
+html[data-glass="on"] :where(.dc-swatch[aria-checked="true"]) {
+  --tw-ring-color: rgb(99 102 241);
+  --tw-ring-offset-color: #fff;
+}
+
+/* Accordions / sheets / menus used as light panels: the chevron and the label
+   hierarchy are re-inked, the frost + rim stay the pack's. */
+html[data-glass="on"] :where(.dc-panel) svg {
+  color: rgb(100 116 139);
+}
+
+/* ── Wave 4 · learning surfaces ───────────────────────────────────────────
+   Same rule as every earlier wave: only *ink* is corrected here, never
+   structure, so `?glass=off` still restores the published material. */
+
+/* Selected tiles (AI provider picker, question-mode picker). The pack marks a
+   selected tile with a sky ring and a white ring — on a white page that reads
+   as nothing at all — so the accent follows the app's indigo. The frost, the
+   press gel and the sheen stay the pack's, and the unselected state keeps its
+   `:not([data-selected])` guard above so the pack's own hover still shows. */
+html[data-glass="on"] :where(.dc-tile)[data-selected] {
+  border-color: rgb(99 102 241);
+  background-color: rgba(255, 255, 255, 0.94);
+  --tw-ring-color: rgb(99 102 241 / 0.3);
+  --tw-ring-offset-color: #fff;
+}
+html[data-glass="on"] :where(.dc-tile)[data-selected]:hover {
+  background-color: #fff;
+}
+
+/* A segment control used as a toolbar row (revision's Saved-Tests / Smart-
+   Revision switch) has to fill its container; the pack surface is
+   inline-flex by nature, which is right for a chip row and wrong for a bar. */
+html[data-glass="on"] :where(.dc-segment)[data-stretch] > div[role="group"] {
+  width: 100%;
+  justify-content: space-between;
+}
+
+/* FlowPath renders a dark canvas without ever setting `.dark` or
+   `data-theme`, so the pack resolves its palette to "light" there and paints a
+   black rail that simply disappears. Only the rail, the fill and the thumb
+   shadow are re-inked — the geometry, the spring and the gel squish are the
+   registry's. */
+html[data-glass="on"] .dc-slider-on-dark > span:first-child {
+  background: rgb(255 255 255 / 0.16) !important;
+}
+html[data-glass="on"] .dc-slider-on-dark > span:nth-child(2) {
+  background: #0a84ff !important;
+}
+html[data-glass="on"] .dc-slider-on-dark > span:nth-child(3) {
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.45), 0 0 0 0.5px rgb(255 255 255 / 0.18) !important;
+}
+
+/* Wave 5 · account + player. `.dc-field` gives the profile/settings form fields
+   the same frost + rim as the pack's search pill without borrowing that
+   component's pill anatomy; `.dc-switch` keeps this app's indigo→violet accent
+   on the registry switch (its default is iOS green); `.dc-slider-violet` is the
+   course player's seek bar, whose accent is violet everywhere in that surface. */
+html[data-glass="on"] :where(.dc-field) {
+  border-color: rgb(226 232 240 / 0.9);
+  background-color: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(10px) saturate(1.5);
+  -webkit-backdrop-filter: blur(10px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+html[data-glass="on"] :where(.dc-field):focus {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-color: rgb(129 140 248);
+}
+html[data-glass="on"] .dc-switch[aria-checked="true"] > span:first-child {
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
+}
+html[data-glass="on"] .dc-slider-violet > span:nth-child(2) {
+  background: #a78bfa !important;
+}
+
+/* ── Wave 6 · polish: the last hand-painted surfaces + a11y / motion guards ── */
+
+/* Home + checkout light cards. `bg-white` + a hairline ring was written out at
+   four call sites; one class now carries the frost, the inset highlight and the
+   long soft shadow, and `?glass=off` falls back to the flat card underneath
+   because the utility classes are still in the markup. */
+html[data-glass="on"] :where(.dc-card) {
+  background-color: rgba(255, 255, 255, 0.72);
+  border-color: rgba(255, 255, 255, 0.7);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  backdrop-filter: blur(14px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 12px 28px -18px rgba(15, 23, 42, 0.3);
+}
+
+/* The hero's action pills sit on a saturated gradient, so their frost has to
+   read as a lens edge rather than as a grey box: top highlight, faint bottom
+   inset, and the drop shadow pushed deep into the indigo behind them. */
+html[data-glass="on"] :where(.dc-home-pill) {
+  border-color: rgba(255, 255, 255, 0.28);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 24px -12px rgba(30, 27, 75, 0.55);
+}
+html[data-glass="on"] :where(.dc-home-pill):hover {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.12));
+}
+
+/* The amount card on checkout is brand paint, not glass — it only gets the
+   rim + top highlight, so the number stays on solid indigo (a payment figure
+   must never sit on a translucent fill). */
+html[data-glass="on"] :where(.dc-quote) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 18px 40px -24px rgba(49, 46, 129, 0.8);
+}
+
+/* Focus is the one affordance glass must never soften: the pack puts rings on
+   its own controls, but the CSS-inked app surfaces (.dc-field, .dc-home-pill,
+   the re-inked segments/tiles) inherit whatever the page set. Give every one of
+   them the same visible ring, keyboard-only so pointer users see no change. */
+html[data-glass="on"] :where(.dc-field, .dc-glass-select, .dc-segment, .dc-tile, .dc-home-pill, .dc-card[data-glass-focusable]):focus-visible {
+  outline: 2px solid rgb(99 102 241);
+  outline-offset: 2px;
+}
+
+/* Motion budget for the pieces Waves 3-5 added. The registry handles its own
+   springs (glass-motion's reduceMotion()), but the CSS-driven parts — the
+   segment droplet's 0.28s transform, a tile's active scale, the confirm card's
+   scale-in — still need the media query. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-glass="on"] :where(.dc-segment, .dc-tile, .dc-switch, .dc-home-pill, .dc-card, .dc-field),
+  html[data-glass="on"] :where(.dc-segment, .dc-tile, .dc-switch, .dc-card) * {
+    transition-duration: 1ms !important;
+    animation: none !important;
+  }
+}

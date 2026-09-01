@@ -1,6 +1,7 @@
 import { Trash2 } from "lucide-react";
 import { Product } from "../types";
 import { formatINR } from "../utils/format";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 interface CartItemCardProps {
   product: Product;
@@ -10,8 +11,13 @@ interface CartItemCardProps {
 
 export default function CartItemCard({ product, onRemove, onOpen }: CartItemCardProps) {
   return (
-    <div className="group relative flex gap-3 overflow-hidden rounded-[1.7rem] border border-white/70 bg-white/62 p-2.5 shadow-[0_18px_42px_-24px_rgba(79,70,229,0.42)] backdrop-blur-xl">
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent" />
+    /* Wave 3 (commerce): the row is a `glass-card` — the pack's surface already
+       paints the specular sheen this file was faking with its own gradient div. */
+    <GlassCard
+      tint={0.5}
+      contentClassName="flex gap-3 p-2.5"
+      className="group relative overflow-hidden"
+    >
       <button
         type="button"
         onClick={() => onOpen?.(product.id)}
@@ -54,6 +60,6 @@ export default function CartItemCard({ product, onRemove, onOpen }: CartItemCard
           </button>
         </div>
       </div>
-    </div>
+    </GlassCard>
   );
 }

@@ -21,6 +21,7 @@
 //      existing My Day reminder path; this modal just unifies the
 //      surface for every kind.
 
+import { GlassSelect, GlassSelectContent, GlassSelectItem, GlassSelectTrigger } from "../../components/ui/glass-select";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, Clock, Repeat, X } from "lucide-react";
@@ -70,6 +71,45 @@ const DEFAULT_FORM_STATE: Partial<FlowPathActivity> = {
   },
   recurrence: undefined,
 };
+
+/**
+ * Wave 5 of the website-glass rollout: this modal carried seven hand-styled
+ * `<select>` elements, all with the same border + `focus:border-indigo-500`
+ * recipe. They render through one helper on top of the registry's
+ * `glass-select` now, so the listbox (portaled, Escape-to-close, ✓ on the
+ * active row) is identical everywhere and there is one place left to fix.
+ * Values and the `setForm` patches are unchanged — the editor still writes the
+ * exact same union types the server multiplexer accepts.
+ */
+function FieldSelect({
+  label,
+  value,
+  options,
+  onChange,
+  className,
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  return (
+    <GlassSelect value={value} onValueChange={onChange}>
+      <GlassSelectTrigger
+        aria-label={label}
+        className={`dc-glass-select mt-1 h-9 w-full text-sm ${className ?? ""}`}
+      />
+      <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label={label}>
+        {options.map((option) => (
+          <GlassSelectItem key={option.value} value={option.value}>
+            {option.label}
+          </GlassSelectItem>
+        ))}
+      </GlassSelectContent>
+    </GlassSelect>
+  );
+}
 
 export function ActivityEditor({
   open,
@@ -272,27 +312,29 @@ export function ActivityEditor({
                     </label>
                     <label className="block">
                       <span className="text-[11px] font-semibold text-slate-600">Priority</span>
-                      <select
+                      <FieldSelect
+                        label="Priority"
                         value={form.taskPriority || "medium"}
-                        onChange={(e) => setForm((f) => ({ ...f, taskPriority: e.target.value as "low" | "medium" | "high" }))}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
-                      >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                      </select>
+                        onChange={(v) => setForm((f) => ({ ...f, taskPriority: v as "low" | "medium" | "high" }))}
+                        options={[
+                          { value: "low", label: "Low" },
+                          { value: "medium", label: "Medium" },
+                          { value: "high", label: "High" },
+                        ]}
+                      />
                     </label>
                     <label className="block">
                       <span className="text-[11px] font-semibold text-slate-600">Status</span>
-                      <select
+                      <FieldSelect
+                        label="Status"
                         value={form.taskStatus || "pending"}
-                        onChange={(e) => setForm((f) => ({ ...f, taskStatus: e.target.value as "pending" | "in-progress" | "completed" }))}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="in-progress">In progress</option>
-                        <option value="completed">Completed</option>
-                      </select>
+                        onChange={(v) => setForm((f) => ({ ...f, taskStatus: v as "pending" | "in-progress" | "completed" }))}
+                        options={[
+                          { value: "pending", label: "Pending" },
+                          { value: "in-progress", label: "In progress" },
+                          { value: "completed", label: "Completed" },
+                        ]}
+                      />
                     </label>
                   </div>
                 ) : null}
@@ -331,17 +373,18 @@ export function ActivityEditor({
                     </label>
                     <label className="block">
                       <span className="text-[11px] font-semibold text-slate-600">Type</span>
-                      <select
+                      <FieldSelect
+                        label="Schedule type"
                         value={form.scheduleType || "personal"}
-                        onChange={(e) => setForm((f) => ({ ...f, scheduleType: e.target.value as "class" | "study" | "break" | "personal" | "exam" }))}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
-                      >
-                        <option value="class">Class</option>
-                        <option value="study">Study</option>
-                        <option value="break">Break</option>
-                        <option value="personal">Personal</option>
-                        <option value="exam">Exam</option>
-                      </select>
+                        onChange={(v) => setForm((f) => ({ ...f, scheduleType: v as "class" | "study" | "break" | "personal" | "exam" }))}
+                        options={[
+                          { value: "class", label: "Class" },
+                          { value: "study", label: "Study" },
+                          { value: "break", label: "Break" },
+                          { value: "personal", label: "Personal" },
+                          { value: "exam", label: "Exam" },
+                        ]}
+                      />
                     </label>
                   </div>
                 ) : null}
@@ -350,15 +393,12 @@ export function ActivityEditor({
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <label className="block">
                       <span className="text-[11px] font-semibold text-slate-600">Color</span>
-                      <select
+                      <FieldSelect
+                        label="Note colour"
                         value={form.noteColor || "amber"}
-                        onChange={(e) => setForm((f) => ({ ...f, noteColor: e.target.value as FlowPathActivity["noteColor"] }))}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
-                      >
-                        {["amber", "sky", "rose", "emerald", "violet"].map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
+                        onChange={(v) => setForm((f) => ({ ...f, noteColor: v as FlowPathActivity["noteColor"] }))}
+                        options={["amber", "sky", "rose", "emerald", "violet"].map((c) => ({ value: c, label: c }))}
+                      />
                     </label>
                   </div>
                 ) : null}
@@ -379,28 +419,30 @@ export function ActivityEditor({
                       </label>
                       <label className="block">
                         <span className="text-[11px] font-semibold text-slate-600">Difficulty</span>
-                        <select
+                        <FieldSelect
+                          label="Difficulty"
                           value={form.testConfig?.difficulty || "medium"}
-                          onChange={(e) => setForm((f) => ({ ...f, testConfig: { ...(f.testConfig || DEFAULT_FORM_STATE.testConfig!), difficulty: e.target.value as "easy" | "medium" | "hard" | "mixed" } }))}
-                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
-                        >
-                          <option value="easy">Easy</option>
-                          <option value="medium">Medium</option>
-                          <option value="hard">Hard</option>
-                          <option value="mixed">Mixed</option>
-                        </select>
+                          onChange={(v) => setForm((f) => ({ ...f, testConfig: { ...(f.testConfig || DEFAULT_FORM_STATE.testConfig!), difficulty: v as "easy" | "medium" | "hard" | "mixed" } }))}
+                          options={[
+                            { value: "easy", label: "Easy" },
+                            { value: "medium", label: "Medium" },
+                            { value: "hard", label: "Hard" },
+                            { value: "mixed", label: "Mixed" },
+                          ]}
+                        />
                       </label>
                       <label className="block">
                         <span className="text-[11px] font-semibold text-slate-600">Mode</span>
-                        <select
+                        <FieldSelect
+                          label="Question mode"
                           value={form.testConfig?.questionMode || "mixed"}
-                          onChange={(e) => setForm((f) => ({ ...f, testConfig: { ...(f.testConfig || DEFAULT_FORM_STATE.testConfig!), questionMode: e.target.value as "theory" | "application" | "mixed" } }))}
-                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
-                        >
-                          <option value="theory">Theory</option>
-                          <option value="application">Application</option>
-                          <option value="mixed">Mixed</option>
-                        </select>
+                          onChange={(v) => setForm((f) => ({ ...f, testConfig: { ...(f.testConfig || DEFAULT_FORM_STATE.testConfig!), questionMode: v as "theory" | "application" | "mixed" } }))}
+                          options={[
+                            { value: "theory", label: "Theory" },
+                            { value: "application", label: "Application" },
+                            { value: "mixed", label: "Mixed" },
+                          ]}
+                        />
                       </label>
                       <label className="block">
                         <span className="text-[11px] font-semibold text-slate-600">Time (min)</span>
@@ -471,15 +513,16 @@ export function ActivityEditor({
                     {scheduleMode === "recurring" ? (
                       <label className="col-span-2 block">
                         <span className="text-[11px] font-semibold text-slate-600">Repeat</span>
-                        <select
+                        <FieldSelect
+                          label="Repeats"
                           value={form.recurrence?.freq || "daily"}
-                          onChange={(e) => setForm((f) => ({ ...f, recurrence: { ...(f.recurrence || { freq: "daily" as const }), freq: e.target.value as "daily" | "weekly" | "monthly" } }))}
-                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
-                        >
-                          <option value="daily">Every day</option>
-                          <option value="weekly">Every week</option>
-                          <option value="monthly">Every month</option>
-                        </select>
+                          onChange={(v) => setForm((f) => ({ ...f, recurrence: { ...(f.recurrence || { freq: "daily" as const }), freq: v as "daily" | "weekly" | "monthly" } }))}
+                          options={[
+                            { value: "daily", label: "Every day" },
+                            { value: "weekly", label: "Every week" },
+                            { value: "monthly", label: "Every month" },
+                          ]}
+                        />
                       </label>
                     ) : null}
                   </div>

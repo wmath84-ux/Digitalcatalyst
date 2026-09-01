@@ -1,3 +1,5 @@
+import { GlassTile } from "../../components/ui/glass-tile";
+import { GlassSelect, GlassSelectContent, GlassSelectItem, GlassSelectTrigger } from "../../components/ui/glass-select";
 // Shared "Connect your AI provider" form.
 //
 // Used by the student AI Settings page and the admin panel's AI Generate
@@ -46,14 +48,12 @@ function ProviderTile({
   onSelect: () => void;
 }) {
   return (
-    <button
+    <GlassTile
       type="button"
       onClick={onSelect}
-      aria-pressed={selected}
-      className={`group relative flex flex-col items-start gap-2 rounded-2xl border p-3 text-left transition-all active:scale-[0.98] ${
-        selected
-          ? `border-transparent bg-white shadow-md ring-2 ${meta.ring}`
-          : "border-slate-300 bg-white hover:border-slate-400 hover:shadow-sm"
+      selected={selected}
+      className={`dc-tile group relative flex aspect-auto min-h-[92px] flex-col items-start justify-start gap-2 rounded-2xl p-3 text-left ${
+        selected ? meta.ring : ""
       }`}
     >
       {selected && (
@@ -70,7 +70,7 @@ function ProviderTile({
         <span className="block truncate text-[13px] font-bold text-slate-900">{meta.name}</span>
         <span className="mt-0.5 block text-[10px] leading-tight text-slate-500">{meta.tagline}</span>
       </span>
-    </button>
+    </GlassTile>
   );
 }
 
@@ -327,24 +327,36 @@ export default function AiConfigForm({
             </span>
           )}
         </div>
-        <select
-          className="mt-1.5 w-full appearance-none rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-          value={value.model}
-          disabled={allModels.length === 0}
-          onChange={(e) => onChange({ ...value, model: e.target.value })}
-        >
-          {allModels.length === 0 && (
-            <option value="">
-              {hasKey ? (loadingModels ? "Loading models…" : "No models — load available models") : "Add an API key to see models"}
-            </option>
-          )}
-          {allModels.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-          {hasKey && value.model && !modelKnown && <option value={value.model}>{value.model} (custom)</option>}
-        </select>
+        {/* Wave 5: the model picker keeps its three empty states, the
+            "load models" gate and the (custom) fallback row — only the popup
+            changed. `disabled` moves to the trigger, the placeholder carries the
+            copy the old single-option <select> used to fake. */}
+        <GlassSelect value={value.model} onValueChange={(v) => onChange({ ...value, model: v })}>
+          <GlassSelectTrigger
+            aria-label="Model"
+            disabled={allModels.length === 0}
+            placeholder={
+              allModels.length > 0
+                ? "Select a model"
+                : hasKey
+                  ? loadingModels
+                    ? "Loading models…"
+                    : "No models — load available models"
+                  : "Add an API key to see models"
+            }
+            className="dc-glass-select mt-1.5 h-11 w-full text-sm font-medium"
+          />
+          <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Model options">
+            {allModels.map((m) => (
+              <GlassSelectItem key={m.id} value={m.id}>
+                {m.name}
+              </GlassSelectItem>
+            ))}
+            {hasKey && value.model && !modelKnown ? (
+              <GlassSelectItem value={value.model}>{value.model} (custom)</GlassSelectItem>
+            ) : null}
+          </GlassSelectContent>
+        </GlassSelect>
         <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
           {value.model ? `Using ${value.model} — questions are generated with this model.` : "Pick the model used for question generation."}
         </p>

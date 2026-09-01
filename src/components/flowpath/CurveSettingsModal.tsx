@@ -1,3 +1,4 @@
+import { GlassSlider } from "../ui/glass-slider";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { GitBranch, RotateCcw, X } from "lucide-react";
@@ -130,18 +131,28 @@ function Slider({
 }) {
   return (
     <div>
-      <label className="mb-2 flex justify-between text-[11px] font-medium uppercase tracking-wide text-fp-muted">
+      {/* Wave 6 (a11y): this was a <label>, but a `role="slider"` div is not a
+          labelable element, so the label pointed at nothing. The slider names
+          itself via aria-label; the caption is plain text now. */}
+      <div className="mb-2 flex justify-between text-[11px] font-medium uppercase tracking-wide text-fp-muted">
         <span>{label}</span>
         <span>{format(value)}</span>
-      </label>
-      <input
-        type="range"
+      </div>
+      {/* Wave 4: native range -> registry glass-slider. The thumb is a lens
+          that squashes with drag velocity, and ←/→/Home/End come with it.
+          Wave 6 note: this used to carry `dc-slider-on-dark` to force the dark
+          palette. `flowpath/hooks/useTheme.ts` already writes `data-theme` on
+          <html>` (dark default, removed on unmount), so the pack picks the
+          right ink by itself — and the forced rule was wrong for FlowPath's
+          light theme, which is why it is gone. */}
+      <GlassSlider
         min={min}
         max={max}
         step={step}
         value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="fp-slider w-full"
+        onValueChange={onChange}
+        ariaLabel={label}
+        className="w-full"
       />
     </div>
   );

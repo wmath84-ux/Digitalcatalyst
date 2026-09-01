@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  GlassToggleGroup,
+  GlassToggleItem,
+} from "./components/ui/glass-toggle-group";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import {
   ArrowUpRight,
@@ -722,8 +726,26 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
         data-pdp-tabbar
         className={`sticky top-0 z-30 bg-white/95 px-3 pb-2 pt-3 backdrop-blur transition-shadow duration-200 ${tabBarStuck ? "shadow-[0_10px_24px_-12px_rgba(24,24,27,0.28)]" : "rounded-t-[23px]"}`}
       >
-        <div className="flex gap-1 overflow-x-auto rounded-2xl bg-zinc-100/70 p-1.5">
-          {tabs.map((item) => <button key={item} onClick={() => onTab(item)} className={`flex-1 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition ${tab === item ? "bg-white text-zinc-900 shadow" : "text-zinc-500 hover:text-zinc-700"}`}>{item}</button>)}
+        {/* Wave 3 (commerce): the tab strip is the pack's `glass-toggle-group`,
+            the same control the store filter row uses — one sliding droplet
+            instead of repainting a white pill per click. The sticky bar around it
+            (`data-pdp-tabbar`, its stuck shadow, `rounded-t-[23px]`) is untouched,
+            and so is every `data-pdp-curriculum*` hook. `dc-segment` is the
+            light-theme ink in src/glass.css. */}
+        <div className="flex overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <GlassToggleGroup
+            className="dc-segment shrink-0"
+            tint={0.5}
+            value={tab}
+            onValueChange={(next) => onTab(next as DetailTab)}
+            aria-label="Product details"
+          >
+            {tabs.map((item) => (
+              <GlassToggleItem key={item} value={item} className="whitespace-nowrap px-3.5 py-2 text-xs font-semibold">
+                {item}
+              </GlassToggleItem>
+            ))}
+          </GlassToggleGroup>
         </div>
       </div>
       <div className="p-4 pt-3">

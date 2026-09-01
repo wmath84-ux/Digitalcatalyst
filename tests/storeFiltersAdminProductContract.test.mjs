@@ -185,10 +185,17 @@ test("product detail no longer shows the Secure checkout / Instant access / Life
 /* ------------------------------------------------------------------ */
 
 test("store surfaces use frosted glass, colour and depth", () => {
+  // [liquid-glass · Wave 3] The store's frost moved from hand-written utility
+  // classes onto the vendored pack: `GlassCard` / `GlassSurface` set
+  // `backdrop-filter` inline and paint their own specular rim, and translucency
+  // is the surface's `tint` rather than a `bg-white/60`. The intent of this test
+  // — every store surface is frosted, translucent and has depth — is unchanged,
+  // so the markers now accept either implementation. Anything that still paints
+  // its own frost (StorePage, Hero) is checked exactly as before.
   for (const [name, source] of [["StorePage", storePage], ["ProductCard", productCard], ["FilterChips", filterChips], ["Hero", hero]]) {
-    assert.match(source, /backdrop-blur/, `${name} should use backdrop blur`);
-    assert.match(source, /bg-white\/\d/, `${name} should use translucent surfaces`);
-    assert.match(source, /shadow-/, `${name} should carry shadows`);
+    assert.match(source, /backdrop-blur|<GlassSurface|<GlassCard|GlassToggleGroup/, `${name} should use backdrop blur (or the pack's refraction layer)`);
+    assert.match(source, /bg-white\/\d|tint=\{/, `${name} should use translucent surfaces`);
+    assert.match(source, /shadow-|<GlassSurface|<GlassCard/, `${name} should carry shadows (or the pack's rim)`);
   }
   // Ambient colour behind the frosted layers.
   assert.match(storePage, /blur-3xl/);

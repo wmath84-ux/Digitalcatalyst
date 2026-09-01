@@ -1,3 +1,4 @@
+import { Tabs, TabsList, TabsTrigger } from "./glass-tabs";
 import { cn } from "../../utils/cn";
 
 /**
@@ -11,16 +12,23 @@ import { cn } from "../../utils/cn";
  * This row is the desktop-tablet answer: one quiet line of plain text
  * directly under the header, in the spot a desktop user expects the tabs.
  *
- * Rules the feature screens rely on:
- *   • Text only — no icons, no pills, no gradients on the label. The active
- *     page is marked by colour + a thin underline on the rule, exactly like a
- *     desktop tab strip.
+ * Rules the feature screens rely on (unchanged by the glass pass):
+ *   • Text only — no icons (no lucide import), no gradients on the label. The
+ *     active page is marked by colour plus the glass indicator, so the strip
+ *     still reads as a tab bar rather than a button group.
  *   • It renders from `md` (768 px) up and is fully hidden on mobile, so the
  *     phone chrome is untouched and the two never stack.
  *   • It lives in the page body (not inside a scroll container), so the row
- *     stays put while each page's own list scrolls beneath it.
- *   • `onHome` is an optional plain "Home" shortcut at the right end, because
- *     the hidden bottom pill used to carry Home.
+ *     stays put while each page's own list scrolls beneath it — the sticky
+ *     offset is owned by `.dc-page-tabs` in src/index.css, and `data-page-tabs`
+ *     still tags the feature for page CSS + contract tests.
+ *   • `onHome` is an optional plain "Home" shortcut at the right end.
+ *
+ * Wave 1 change: the underline is replaced by the pack's spring-driven glass
+ * indicator (`TabsList` in ./glass-tabs) — a droplet pill that stretches along
+ * its travel and settles round, driven by the shared `Track`/`spring` core.
+ * The tab strip sits on a light surface, so the trigger colours are overridden
+ * (upstream ships white-on-dark); `cn`/tailwind-merge resolves that cleanly.
  */
 export interface PageTabItem {
   /** Value handed back to `onSelect`; also what `activeId` is compared to. */
@@ -79,36 +87,33 @@ export default function PageTabs({
       )}
     >
       <div className="mx-auto flex w-full max-w-7xl items-center gap-x-2 gap-y-1 px-4 sm:px-6 md:px-8 lg:px-10">
-        <div className="-mb-px flex min-w-0 flex-wrap items-center gap-x-0.5">
-          {items.map((item) => {
-            const isActive = item.id === activeId;
-            return (
-              <button
+        {/* `value` is driven from the route/section the page is on, so the
+            indicator springs to the right place on navigation too. */}
+        <Tabs value={activeId ?? ""} onValueChange={onSelect}>
+          <TabsList
+            tint={0.55}
+            role="tablist"
+            aria-orientation="horizontal"
+            className="dc-page-tabs-list border border-slate-200/60 bg-white/45 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
+          >
+            {items.map((item) => (
+              <TabsTrigger
                 key={item.id}
-                type="button"
-                onClick={() => onSelect(item.id)}
+                value={item.id}
                 title={item.hint}
-                aria-current={isActive ? "page" : undefined}
+                aria-current={item.id === activeId ? "page" : undefined}
                 className={cn(
-                  "relative rounded-t-xl px-3 py-3 text-sm font-semibold outline-none transition-colors duration-200",
-                  "focus-visible:ring-2 focus-visible:ring-indigo-300/70",
-                  isActive ? "text-indigo-600" : "text-slate-500 hover:bg-slate-100/70 hover:text-slate-900",
+                  "px-3 py-1.5 text-sm font-semibold transition-colors duration-200",
+                  item.id === activeId
+                    ? "text-indigo-600"
+                    : "text-slate-500 hover:text-slate-900",
                 )}
               >
                 {item.label}
-                {/* The active marker sits on the row's own bottom rule, so the
-                    strip reads as a tab bar rather than a button group. */}
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "absolute inset-x-2 bottom-0 h-[3px] rounded-full transition-opacity duration-200",
-                    isActive ? "bg-gradient-to-r from-indigo-500 to-violet-500 opacity-100" : "opacity-0",
-                  )}
-                />
-              </button>
-            );
-          })}
-        </div>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
 
         {onHome ? (
           <button
