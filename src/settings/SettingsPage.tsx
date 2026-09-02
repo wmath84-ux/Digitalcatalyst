@@ -148,13 +148,13 @@ export default function SettingsPage() {
           <div data-settings-layout className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <header className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <button
-                  type="button"
+                <GlassButton
+                  variant="capsule"
                   onClick={() => { window.location.hash = "#/profile"; }}
-                  className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[11px] font-black text-white/75 transition hover:border-indigo-400/30 hover:text-indigo-300"
+                  className="mb-2 [&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-[11px] [&>span>div]:font-black"
                 >
-                  <ArrowLeft size={13} /> Back to Profile
-                </button>
+                  <span className="inline-flex items-center gap-1.5 text-white/85"><ArrowLeft size={13} /> Back to Profile</span>
+                </GlassButton>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Your space</p>
                 <h1 className="mt-1 text-2xl font-black tracking-tight text-white">Settings</h1>
                 <p className="mt-0.5 text-xs font-medium text-white/55">

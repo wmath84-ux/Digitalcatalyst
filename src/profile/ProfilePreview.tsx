@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { GlassCard } from "../components/ui/glass-card";
+import { GlassToggleGroup, GlassToggleItem } from "../components/ui/glass-toggle-group";
 import ProfileLayout, { type MembershipTier } from "./ProfileLayout";
 
 /**
@@ -44,7 +45,7 @@ export default function ProfilePreview() {
           <p className="mt-0.5 text-xs font-medium text-white/55">Resets at midnight.</p>
         </div>
       </div>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+      <div className="mt-4 h-2 overflow-hidden rounded-full border border-white/15">
         <div className="h-full w-1/4 rounded-full bg-emerald-600" />
       </div>
     </GlassCard>
@@ -72,21 +73,16 @@ export default function ProfilePreview() {
       <div className="sticky top-0 z-40 border-b border-white/10 px-4 py-3">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-white/[0.12] px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">Dev preview</span>
+            <span className="rounded-md border border-white/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">Dev preview</span>
             <span className="text-xs font-semibold text-white/55">Profile layout · no data</span>
           </div>
-          <div className="flex items-center gap-1 rounded-xl bg-white/[0.06] p-1">
+          <GlassToggleGroup className="dc-segment" value={scenario} onValueChange={(next) => setScenario(next as Scenario)} aria-label="Preview scenario">
             {(["free", "premium", "expired"] as Scenario[]).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setScenario(s)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-black capitalize transition ${scenario === s ? "bg-white/[0.12] text-white" : "text-white/55 hover:text-white/85"}`}
-              >
+              <GlassToggleItem key={s} value={s} className="px-3 py-1.5 text-xs font-black capitalize">
                 {s}
-              </button>
+              </GlassToggleItem>
             ))}
-          </div>
+          </GlassToggleGroup>
         </div>
       </div>
 

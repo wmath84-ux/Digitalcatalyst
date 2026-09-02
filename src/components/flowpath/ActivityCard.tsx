@@ -1,4 +1,6 @@
 import { motion } from "framer-motion";
+import { GlassSurface } from "../ui/glass";
+import { GlassButton } from "../ui/glass-button";
 import { Check, Circle, Clock3 } from "lucide-react";
 import type { Activity, ActivityStatus } from "../../flowpath/types/flowpath";
 import { flowPathKindMeta } from "../../flowpath/types/flowpath";
@@ -64,7 +66,7 @@ function CardBody({ activity }: { activity: Activity }) {
         <div className="mt-2">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-fp-text-10">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-400 to-cyan-300"
+              className="h-full rounded-full bg-cyan-400"
               style={{ width: `${activity.progress ?? 0}%` }}
             />
           </div>
@@ -129,13 +131,7 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
         filter: isCompleted ? "saturate(0.7) brightness(0.95)" : "saturate(1) brightness(1)",
       }}
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-      className={`pointer-events-auto relative w-full rounded-2xl p-3.5 sm:p-4 ${
-        isCurrent ? "glass-panel-strong" : "glass-panel"
-      } ${onEdit ? "cursor-pointer transition hover:border-fp-text-30" : ""}`}
-      style={{
-        boxShadow: isCurrent ? `0 0 40px -8px ${meta.glow}` : undefined,
-        borderColor: isOverdue ? "rgba(251,113,133,0.35)" : undefined,
-      }}
+      className={`pointer-events-auto relative w-full rounded-2xl outline-none ${onEdit ? "cursor-pointer" : ""}`}
       onClick={() => {
         // Don't open the edit modal when the user clicked the inner
         // status / completion controls — those have their own click
@@ -154,6 +150,14 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
       }}
       aria-label={onEdit ? `Edit ${activity.title}` : undefined}
     >
+      {/* Wave 13c: the card is the pack GlassSurface — `.glass-panel` /
+          `.glass-panel-strong` gradient plates + glow shadow removed. State
+          (now / overdue) is a ring, because colour carries meaning there. */}
+      <GlassSurface
+        radius={16}
+        className={`rounded-2xl ${isCurrent ? "ring-1 ring-violet-400/50" : ""} ${isOverdue ? "ring-1 ring-rose-400/40" : ""}`}
+        contentClassName="p-3.5 sm:p-4"
+      >
       {isCurrent && (
         <span className="fp-shimmer pointer-events-none absolute inset-0 rounded-2xl" />
       )}
@@ -197,14 +201,13 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
         </div>
 
         {!isCompleted && (
-          <button
-            type="button"
+          <GlassButton
             onClick={(e) => {
               e.stopPropagation();
               onComplete();
             }}
             aria-label="Mark complete"
-            className="group relative mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-fp-text-20 bg-fp-text-5 transition hover:border-emerald-400/70 hover:bg-emerald-400/10"
+            className="group relative mt-0.5 shrink-0 [&_.size-12]:size-6"
           >
             {completing ? (
               <motion.svg
@@ -226,24 +229,23 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
             ) : (
               <Circle className="h-3 w-3 text-fp-text-30 group-hover:fp-text-emerald" />
             )}
-          </button>
+          </GlassButton>
         )}
         {isCompleted && (
-          <button
-            type="button"
+          <GlassButton
             onClick={(e) => {
               e.stopPropagation();
               if (onUncomplete) onUncomplete();
               else onComplete();
             }}
             aria-label="Restore activity (undo complete)"
-            title="Tap to restore"
-            className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-400/15 fp-text-emerald transition hover:bg-emerald-400/30"
+            className="mt-0.5 shrink-0 [&_.size-12]:size-6 [&_svg]:fp-text-emerald"
           >
             <Check className="h-3.5 w-3.5" />
-          </button>
+          </GlassButton>
         )}
       </div>
+      </GlassSurface>
     </motion.div>
   );
 }

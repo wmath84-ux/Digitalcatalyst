@@ -22,6 +22,9 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, Trash2, X } from "lucide-react";
 import type { FlowPathActivity } from "../types/flowpath";
+import { GlassSurface } from "../../components/ui/glass";
+import { GlassButton } from "../../components/ui/glass-button";
+import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 
 interface BulkRevisionCreatorProps {
   open: boolean;
@@ -134,7 +137,7 @@ export function BulkRevisionCreator({ open, onClose, uid, onBulkCreate }: BulkRe
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4"
           role="dialog"
           aria-modal="true"
           data-bulk-revision-creator
@@ -144,55 +147,53 @@ export function BulkRevisionCreator({ open, onClose, uid, onBulkCreate }: BulkRe
             initial={{ scale: 0.96, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.96, opacity: 0, y: 20 }}
-            className="relative flex max-h-[88vh] w-full max-w-[680px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl shadow-slate-900/20"
+            className="relative w-full max-w-[680px]"
           >
-            <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-white px-5 py-3">
+          {/* Wave 13: the creator is the pack GlassSurface (Dialog values) —
+              no white panel, no indigo header gradient. */}
+          <GlassSurface radius={24} className="text-white" contentClassName="flex max-h-[88vh] flex-col overflow-hidden p-0">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
               <div>
-                <h3 className="text-base font-black tracking-tight text-slate-900">Create multiple tests</h3>
-                <p className="mt-0.5 text-xs font-medium text-slate-500">
+                <h3 className="text-base font-black tracking-tight text-white">Create multiple tests</h3>
+                <p className="mt-0.5 text-xs font-medium text-white/55">
                   Ship 2-3 revision tests in one click. Each slot becomes its own test in the bank.
                 </p>
               </div>
-              <button
-                type="button"
+              <GlassButton
                 onClick={onClose}
                 disabled={submitting}
                 aria-label="Close"
-                className="grid h-9 w-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 disabled:opacity-40"
+                className="disabled:opacity-40 [&_.size-12]:size-9"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </GlassButton>
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-4">
               <div className="mb-3 flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => { setApplyPreset("easy-medium-hard"); applyPresetEazyMediumHard(); }}
-                  data-preset="easy-medium-hard"
-                  className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
-                    applyPreset === "easy-medium-hard" ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
+                <GlassToggleGroup
+                  className="dc-segment"
+                  value={applyPreset}
+                  onValueChange={(next) => {
+                    if (next === "easy-medium-hard") { setApplyPreset("easy-medium-hard"); applyPresetEazyMediumHard(); }
+                    else setApplyPreset("manual");
+                  }}
+                  aria-label="Slot preset"
                 >
-                  Easy / Medium / Hard
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setApplyPreset("manual")}
-                  data-preset="manual"
-                  className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
-                    applyPreset === "manual" ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  Manual per slot
-                </button>
+                  <GlassToggleItem value="easy-medium-hard" data-preset="easy-medium-hard" className="px-3 py-1.5 text-xs font-bold">
+                    Easy / Medium / Hard
+                  </GlassToggleItem>
+                  <GlassToggleItem value="manual" data-preset="manual" className="px-3 py-1.5 text-xs font-bold">
+                    Manual per slot
+                  </GlassToggleItem>
+                </GlassToggleGroup>
               </div>
 
               <div className="space-y-2">
                 {slots.map((slot, i) => (
                   <div
                     key={i}
-                    className="grid grid-cols-12 gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5"
+                    className="grid grid-cols-12 gap-2 rounded-lg border border-white/10 p-2.5"
                     data-slot-index={i}
                   >
                     <input
@@ -200,7 +201,7 @@ export function BulkRevisionCreator({ open, onClose, uid, onBulkCreate }: BulkRe
                       value={slot.title}
                       onChange={(e) => setSlot(i, { title: e.target.value })}
                       placeholder={`Test ${i + 1} title`}
-                      className="col-span-5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                      className="dc-field col-span-5 rounded-full border px-3 py-1.5 text-sm text-white outline-none"
                     />
                     {/* Wave 5: same preset side-effect (difficulty also writes
                         the question count + minutes), registry listbox instead
@@ -229,7 +230,7 @@ export function BulkRevisionCreator({ open, onClose, uid, onBulkCreate }: BulkRe
                       max={100}
                       value={slot.questions}
                       onChange={(e) => setSlot(i, { questions: Number(e.target.value || 0) })}
-                      className="col-span-2 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-indigo-500"
+                      className="dc-field col-span-2 rounded-full border px-2 py-1.5 text-sm text-white outline-none"
                       title="Question count"
                     />
                     <input
@@ -238,57 +239,56 @@ export function BulkRevisionCreator({ open, onClose, uid, onBulkCreate }: BulkRe
                       max={240}
                       value={slot.minutes}
                       onChange={(e) => setSlot(i, { minutes: Number(e.target.value || 0) })}
-                      className="col-span-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-indigo-500"
+                      className="dc-field col-span-1 rounded-full border px-2 py-1.5 text-sm text-white outline-none"
                       title="Estimated minutes"
                     />
-                    <button
-                      type="button"
+                    <GlassButton
                       onClick={() => removeSlot(i)}
                       disabled={slots.length <= 1}
                       aria-label="Remove slot"
-                      className="col-span-1 grid place-items-center rounded-lg border border-rose-200 bg-white text-rose-500 transition hover:bg-rose-50 disabled:opacity-30"
+                      className="col-span-1 justify-self-center disabled:opacity-30 [&_.size-12]:size-8 [&_svg]:text-rose-300"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </GlassButton>
                   </div>
                 ))}
               </div>
 
-              <button
-                type="button"
+              <GlassButton
+                variant="capsule"
                 onClick={addSlot}
                 disabled={slots.length >= 5}
-                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-white py-2 text-xs font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 disabled:opacity-40"
+                className="mt-2 w-full disabled:opacity-40 [&>span>div]:h-9 [&>span>div]:w-full [&>span>div]:rounded-lg [&>span>div]:text-xs [&>span>div]:font-semibold"
               >
-                <Plus className="h-3.5 w-3.5" /> Add slot ({slots.length}/5)
-              </button>
+                <span className="inline-flex items-center gap-1.5"><Plus className="h-3.5 w-3.5" /> Add slot ({slots.length}/5)</span>
+              </GlassButton>
 
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Schedule (optional)</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">Leave blank to send immediately.</p>
+              <div className="mt-4 rounded-xl border border-white/10 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-white/55">Schedule (optional)</p>
+                <p className="mt-0.5 text-[11px] text-white/55">Leave blank to send immediately.</p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <input
                     type="date"
                     value={scheduledFor}
                     onChange={(e) => setScheduledFor(e.target.value)}
-                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                    className="dc-field rounded-full border px-3 py-1.5 text-sm text-white outline-none"
                   />
                   <input
                     type="time"
                     value={timeStr}
                     onChange={(e) => setTimeStr(e.target.value)}
-                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                    className="dc-field rounded-full border px-3 py-1.5 text-sm text-white outline-none"
                   />
                 </div>
               </div>
 
               {error ? (
-                <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
+                <p className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/15 px-3 py-2 text-sm text-rose-200">{error}</p>
               ) : null}
               {results ? (
-                <div className="mt-3 space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="mt-3 space-y-1 rounded-lg border border-white/10 p-3">
                   {results.map((r, i) => (
-                    <p key={i} className={`text-xs ${r.ok ? "text-emerald-700" : "text-rose-600"}`}>
+                    <p key={i} className={`text-xs ${r.ok ? "text-emerald-300" : "text-rose-300"}`}>
                       Test {i + 1}: {r.ok ? "✓ Created" : r.error}
                     </p>
                   ))}
@@ -296,28 +296,29 @@ export function BulkRevisionCreator({ open, onClose, uid, onBulkCreate }: BulkRe
               ) : null}
             </div>
 
-            <div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/60 px-5 py-3">
-              <span className="text-[11px] text-slate-500">{slots.length} test{slots.length === 1 ? "" : "s"} will be created with shared batchId.</span>
+            <div className="flex items-center justify-between gap-2 border-t border-white/10 px-5 py-3">
+              <span className="text-[11px] text-white/55">{slots.length} test{slots.length === 1 ? "" : "s"} will be created with shared batchId.</span>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
+                <GlassButton
+                  variant="capsule"
                   onClick={onClose}
                   disabled={submitting}
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-40"
+                  className="disabled:opacity-40 [&>span>div]:h-10 [&>span>div]:px-3 [&>span>div]:text-sm [&>span>div]:font-semibold"
                 >
                   Cancel
-                </button>
+                </GlassButton>
                 <button
                   type="button"
                   onClick={handleSubmit}
                   disabled={submitting || slots.length === 0}
                   data-submit-bulk
-                  className="h-10 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-40"
+                  className="h-10 rounded-full bg-indigo-600 px-4 text-sm font-black text-white transition hover:bg-indigo-500 disabled:opacity-40"
                 >
                   {submitting ? "Creating…" : `Create ${slots.length} test${slots.length === 1 ? "" : "s"}`}
                 </button>
               </div>
             </div>
+          </GlassSurface>
           </motion.div>
         </motion.div>
       ) : null}

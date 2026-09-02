@@ -1,5 +1,5 @@
 import { GlassSwitch } from "../components/ui/glass-switch";
-import { GlassCard } from "../components/ui/glass-card";
+import { GlassCard } from "../components/ui/GlassCard";
 import { GlassButton } from "../components/ui/glass-button";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/glass-dialog";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -68,14 +68,14 @@ const BTN_SECONDARY = "w-full [&>span>div]:w-full";
 const EYEBROW = "text-[10px] font-black uppercase tracking-[0.16em] text-indigo-300";
 const ICON_CHIP =
   "grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30 md:h-12 md:w-12";
-const STAT_CHIP = "rounded-2xl bg-white/[0.06] px-2.5 py-2.5 text-center ring-1 ring-white/10";
+const STAT_CHIP = "rounded-2xl px-2.5 py-2.5 text-center ring-1 ring-white/15";
 // Wave 5: `glass-input` is the pack's *search* pill (radius 9999, focus glow,
 // no textarea twin), so profile fields do not wear it as a skin. Same material,
 // right anatomy: the frost + rim come from `.dc-field` in src/glass.css and the
 // native `<input>`/`<textarea>` keep `required`, `inputMode`, `rows` and the
 // validation copy exactly as the profile contract expects.
 const INPUT =
-  "dc-field w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/40 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30 disabled:text-white/55";
+  "dc-field w-full rounded-full border border-white/10 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/40 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30 disabled:text-white/55";
 
 const formatDate = (value: number): string => {
   if (!value) return "Not set";
@@ -293,24 +293,23 @@ export default function ProfileLayout({
               <h3 className="mt-1 text-base font-black text-white">Notifications & privacy</h3>
               <p className="mt-0.5 text-xs font-medium text-white/55">Saved securely to your account.</p>
             </div>
-            <button
-              type="button"
+            <GlassButton
               onClick={onOpenSettings}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30 transition hover:bg-indigo-500/20 active:scale-95"
+              className="shrink-0 [&_.size-12]:size-10 [&_svg]:text-indigo-300"
               aria-label="Open preferences"
             >
               <Bell size={18} />
-            </button>
+            </GlassButton>
           </div>
         </GlassCard>
 
-        <button
-          type="button"
+        <GlassButton
+          variant="capsule"
           onClick={onLogout}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-400/30 bg-rose-500/15 py-4 text-sm font-black text-rose-300 transition hover:bg-rose-500/20 active:scale-[0.99] md:rounded-xl lg:py-3"
+          className="w-full text-rose-300 [&>span>div]:h-auto [&>span>div]:w-full [&>span>div]:py-4 [&>span>div]:text-sm [&>span>div]:font-black [&>span>div]:ring-1 [&>span>div]:ring-rose-400/30 lg:[&>span>div]:py-3"
         >
-          <LogOut size={17} /> Log out
-        </button>
+          <span className="inline-flex items-center gap-2 text-rose-300"><LogOut size={17} /> Log out</span>
+        </GlassButton>
 
         <nav aria-label="Legal" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-1 text-[11px] font-semibold text-white/55">
           <a href="/privacy-policy.html" className="transition hover:text-violet-300 hover:underline">Privacy Policy</a>
@@ -359,11 +358,11 @@ function ProfileHero({
     <GlassCard data-profile-hero className="relative overflow-hidden">
       <div className="relative">
         <div className="flex items-center gap-4">
-          <div className="shrink-0 rounded-2xl bg-white/[0.08] p-[3px] ring-1 ring-white/20">
+          <div className="shrink-0 rounded-2xl p-[3px] ring-1 ring-white/20">
             {photoURL ? (
               <img src={photoURL} alt="" className="h-16 w-16 rounded-[14px] object-cover md:h-20 md:w-20" />
             ) : (
-              <div className="grid h-16 w-16 place-items-center rounded-[14px] bg-white/[0.12] text-xl font-black text-white md:h-20 md:w-20 md:text-2xl">
+              <div className="grid h-16 w-16 place-items-center rounded-[14px] bg-indigo-500/20 text-xl font-black text-white md:h-20 md:w-20 md:text-2xl">
                 {initials}
               </div>
             )}
@@ -371,7 +370,7 @@ function ProfileHero({
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ring-white/20">
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ring-white/25">
                 {active ? <BadgeCheck className="h-3 w-3" /> : <UserRound className="h-3 w-3" />}
                 {planLabel}
               </span>
@@ -390,7 +389,7 @@ function ProfileHero({
         </div>
 
         {bio ? (
-          <p className="mt-3 rounded-2xl bg-white/[0.06] px-4 py-3 text-sm leading-6 text-white/85 ring-1 ring-white/10">
+          <p className="mt-3 rounded-2xl px-4 py-3 text-sm leading-6 text-white/85 ring-1 ring-white/15">
             {bio}
           </p>
         ) : null}
@@ -423,7 +422,7 @@ function MembershipCard({
     <GlassCard data-profile-membership-tier={tier} data-profile-membership-card>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl shadow-md ${active ? "bg-indigo-600 text-white shadow-indigo-500/30" : "bg-white/[0.06] text-white/55"}`}>
+          <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${active ? "bg-indigo-600 text-white" : "ring-1 ring-white/15 text-white/55"}`}>
             {TIER_ICONS[tier]}
           </span>
           <div>
@@ -518,7 +517,7 @@ function ReferralCard({ code, used, appName, onCopy }: { code: string; used: boo
       </div>
       {used ? (
         <div data-profile-referral-used className="mt-3">
-          <div className="flex items-center justify-between gap-2 rounded-xl bg-white/[0.06] px-3 py-2.5 ring-1 ring-white/10">
+          <div className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 ring-1 ring-white/15">
             <code className="min-w-0 truncate text-sm font-black text-white/55 line-through decoration-2 decoration-rose-400">{code}</code>
             <span className="shrink-0 rounded-full bg-amber-500/20 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-amber-200">Used</span>
           </div>
@@ -527,9 +526,9 @@ function ReferralCard({ code, used, appName, onCopy }: { code: string; used: boo
       ) : (
         <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-indigo-400/30 bg-indigo-500/15 px-3 py-2.5">
           <code className="min-w-0 truncate text-sm font-black text-indigo-200">{code}</code>
-          <button type="button" onClick={onCopy} className="shrink-0 rounded-lg bg-white/[0.08] px-2.5 py-1 text-[10px] font-black text-indigo-200 ring-1 ring-indigo-400/30">
+          <GlassButton variant="capsule" onClick={onCopy} className="shrink-0 text-indigo-200 [&>span>div]:h-7 [&>span>div]:rounded-lg [&>span>div]:px-2.5 [&>span>div]:text-[10px] [&>span>div]:font-black">
             Copy
-          </button>
+          </GlassButton>
         </div>
       )}
     </GlassCard>
@@ -563,35 +562,37 @@ function LibraryCard({
 
       <div className="mt-4 flex items-center justify-between rounded-2xl bg-indigo-500/15 px-3 py-2.5 ring-1 ring-indigo-400/30">
         <span className="text-xs font-bold text-white/75">{ownedCount} owned {ownedCount === 1 ? "course" : "courses"}</span>
-        <button
-          type="button"
+        <GlassButton
+          variant="capsule"
           onClick={onOpenPurchases}
-          className="inline-flex items-center gap-1 rounded-lg bg-white/[0.08] px-2.5 py-1 text-[10px] font-black text-indigo-200 ring-1 ring-indigo-400/30 transition hover:bg-indigo-500/15"
+          className="shrink-0 text-indigo-200 [&>span>div]:h-7 [&>span>div]:rounded-lg [&>span>div]:px-2.5 [&>span>div]:text-[10px] [&>span>div]:font-black"
         >
-          View all <ArrowRight className="h-3 w-3" />
-        </button>
+          <span className="inline-flex items-center gap-1">View all <ArrowRight className="h-3 w-3" /></span>
+        </GlassButton>
       </div>
 
       {items.length > 0 ? (
         <div className="mt-4 space-y-2">
           {items.slice(0, 3).map((product) => (
-            <button
-              type="button"
+            <GlassButton
+              variant="capsule"
               key={product.id}
               onClick={() => onOpenCourse(product.id)}
-              className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-2 text-left transition hover:bg-white/[0.06] active:scale-[0.99]"
+              className="w-full text-left [&>span>div]:h-auto [&>span>div]:w-full [&>span>div]:rounded-2xl [&>span>div]:p-2 [&>span>div>span]:w-full"
             >
-              <img src={product.image} alt="" className="h-12 w-16 shrink-0 rounded-xl object-cover" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-black text-white">{product.title}</span>
-                <span className="text-xs font-medium text-white/55">Owned · Open course</span>
+              <span className="flex w-full items-center gap-3">
+                <img src={product.image} alt="" className="h-12 w-16 shrink-0 rounded-xl object-cover" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-black text-white">{product.title}</span>
+                  <span className="text-xs font-medium text-white/55">Owned · Open course</span>
+                </span>
+                <ChevronRight size={16} className="shrink-0 text-white/40" />
               </span>
-              <ChevronRight size={16} className="shrink-0 text-white/40" />
-            </button>
+            </GlassButton>
           ))}
         </div>
       ) : (
-        <p className="mt-4 rounded-2xl bg-white/[0.06] px-3 py-2.5 text-xs font-semibold leading-5 text-white/55 ring-1 ring-white/10">
+        <p className="mt-4 rounded-2xl px-3 py-2.5 text-xs font-semibold leading-5 text-white/55 ring-1 ring-white/15">
           Nothing owned yet — find a course in the store to start your library.
         </p>
       )}
@@ -647,7 +648,7 @@ function ProfileRenewalCard({
             <span>Current access window</span>
             <span>{progress}% remaining</span>
           </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="mt-2 h-2 overflow-hidden rounded-full border border-white/15">
             <div data-renewal-progress className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${progress}%` }} />
           </div>
         </div>
@@ -667,18 +668,18 @@ function ProfileRenewalCard({
           type="button"
           onClick={onRenew}
           data-renewal-card-cta
-          className={`flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-black text-white transition active:scale-[0.98] ${expired ? "bg-rose-600" : "bg-indigo-600"}`}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-black text-white transition active:scale-[0.98] ${expired ? "bg-rose-600 hover:bg-rose-500" : "bg-indigo-600 hover:bg-indigo-500"}`}
         >
           {expired ? "Renew access" : "Renew / extend access"}
         </button>
-        <button
-          type="button"
+        <GlassButton
+          variant="capsule"
           onClick={() => onToggleReminders(!subscription.reminderOptOut)}
           data-renewal-reminder-toggle
-          className="flex shrink-0 items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-3 text-[11px] font-black text-white/75 transition hover:bg-white/[0.08] active:scale-[0.98]"
+          className="shrink-0 [&>span>div]:h-auto [&>span>div]:px-3 [&>span>div]:py-3 [&>span>div]:text-[11px] [&>span>div]:font-black"
         >
           {subscription.reminderOptOut ? "Reminders off" : "Reminders on"}
-        </button>
+        </GlassButton>
       </div>
       <p className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-white/55">
         <ShieldCheck className="h-3.5 w-3.5 shrink-0" /> No automatic charge without your confirmation.
@@ -699,15 +700,19 @@ function StatChip({ label, value, valueAttr }: { label: string; value: string; v
 
 function QuickStat({ icon, value, label, tone, onClick }: { icon: ReactNode; value: number; label: string; tone: string; onClick: () => void }) {
   return (
-    <button
-      type="button"
+    /* Wave 13: the quick stat is a clickable pack GlassCard. */
+    <GlassCard
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="rounded-2xl border border-white/10 bg-white/[0.06] p-3 text-center transition hover:bg-white/[0.08] active:scale-[0.97] md:rounded-xl md:p-3.5"
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+      className="cursor-pointer text-center transition active:scale-[0.97]"
+      contentClassName="p-3 md:p-3.5"
     >
       <span className={`mx-auto grid h-10 w-10 place-items-center rounded-xl ring-1 md:h-11 md:w-11 ${tone}`}>{icon}</span>
       <span className="mt-2 block text-2xl font-black text-white md:text-3xl">{value}</span>
       <span className="block text-[10px] font-bold uppercase tracking-wide text-white/55 md:text-[11px]">{label}</span>
-    </button>
+    </GlassCard>
   );
 }
 
@@ -735,7 +740,7 @@ export function BaseModal({ title, onClose, children }: { title: string; onClose
 
 export function PreferenceRow({ icon, label, checked, onChange }: { icon: ReactNode; label: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+    <div className="flex items-center gap-3 rounded-2xl border border-white/10 p-4">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30">{icon}</span>
       <span className="flex-1 text-sm font-bold text-white">{label}</span>
       {/* Wave 5: this was a hand-built 44×24 track with a translated knob.

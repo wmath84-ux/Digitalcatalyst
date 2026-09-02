@@ -622,3 +622,26 @@ Kept (pinned): `contentClassName="flex gap-3 p-2.5"`, `aria-label="Remove item"`
 **Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 192 → 175, `bg-white panels` 137 → 95, gradients 21 (=), `native title=` 126 (=), render-sites 598 → 623 · backdrop OK · frozen diff empty.
 
 **Wave 13c next:** FlowPath + Profile + Settings.
+
+### Phase B · Wave 13c — FlowPath + Profile + Settings (+ A8 FlowPath background) (2026-09-02)
+
+| Old | New |
+|---|---|
+| `ProfileLayout` stat chips / inputs `bg-white/[0.06–0.12]`, Bell / Log out / Copy / View all / library rows / reminder toggle `<button>`, `QuickStat` div, renewal CTA `rounded-2xl` | outlined chips, `.dc-field`, **`GlassButton`** (icon / capsule rows), **`GlassCard role="button"`**, `rounded-full` |
+| `ProfilePreview` scenario picker `<button>` pills | **`GlassToggleGroup`** (`dc-segment`) |
+| `SettingsPage` Back `<button>` | **`GlassButton variant="capsule"`** |
+| `ActivityEditor` scrim `backdrop-blur-md`, white panel `bg-white shadow-2xl` + header gradient, ✕, KIND_TABS + schedule-mode `<button>` pills, Cancel, `rounded-lg` inputs, slate plates/ink | scrim `bg-black/55`, pack **`GlassSurface radius={24}`** (Dialog values), `GlassButton` size-9, **`GlassToggleGroup`** (`dc-segment`, `data-kind-tab` / `data-schedule-mode` kept on items), capsule, `.dc-field rounded-full`, `border-white/10` + white ink |
+| `LecturePicker` scrim blur, white panel + `from-cyan-50` header gradient, ✕, step strip `bg-slate-50/60`, queue plate `bg-cyan-50/40` + rose remove `<button>`, Cancel, course search `<input>`, course rows `<button bg-white>`, "Preview" chip `bg-amber-100`, course plate, Change course, module rows `<button>`, summary plate, minutes/date/time inputs, schedule-mode pills, Back | as above; step strip `border-white/10` (`data-step-indicator`, `bg-emerald-500` / `bg-cyan-600` kept), `bg-cyan-500/10` queue + `GlassButton` size-7, **`GlassInput icon`** (`data-field="course-search"` kept), **`GlassCard role="button"`** rows (`data-course-id/-preview` kept), `bg-amber-500/15` chip, outlined plate, capsule, **`GlassTile selected`** (`data-module-id/-selected` kept), `.dc-field`, **`GlassToggleGroup`** (`data-schedule-mode`), capsule. Cyan primary kept (`bg-cyan-600 rounded-full`). |
+| `BulkRevisionCreator` scrim blur, white panel + `from-indigo-50` gradient, ✕, preset `<button>` pills, slot plates `bg-slate-50/60` + rose remove, dashed "Add slot" `bg-white`, inputs, result plate, Cancel, submit `shadow-sm` | pack **`GlassSurface radius={24}`**, `GlassButton` size-9, **`GlassToggleGroup`** (`data-preset` kept; `applyPresetEazyMediumHard` on select), outlined slots + `GlassButton` size-8, capsule w-full, `.dc-field`, outlined, capsule, `rounded-full` indigo |
+| `components/flowpath/CreateModal` `.fp-overlay`, `.glass-panel-strong` sheet + `meta.glow` shadow, ✕, priority `<button>` pills, `bg-fp-text-5` inputs, Cancel, submit `linear-gradient(meta.color)` + glow | `bg-black/55`, pack **`GlassSurface radius={24}`**, `GlassButton` size-8, **`GlassToggleGroup`** (`dc-segment`), `.dc-field`, capsule, solid `meta.color` `rounded-full` (type colour carries meaning) |
+| `CurveSettingsModal` same sheet/overlay, Reset `bg-fp-surface`, Done `bg-gradient-to-r from-violet-500 … shadow-lg` | pack **`GlassSurface radius={24}`**, capsule, `rounded-full bg-indigo-600` |
+| `RadialMenu` `.fp-overlay`, `.glass-panel-strong` items + colour glow | `bg-black/55`, pack **`GlassSurface radius={16}`** per item |
+| `ActivityCard` `.glass-panel` / `.glass-panel-strong` + glow shadow, progress `bg-gradient-to-r from-blue-400 to-cyan-300`, complete/restore `<button>` discs | pack **`GlassSurface radius={16}`** (now → `ring-violet-400/50`, overdue → `ring-rose-400/40`), solid `bg-cyan-400`, `GlassButton` size-6 |
+| `FlowPathErrorBoundary` `bg-[var(--fp-bg-0)]` page, gradient Try-again + glow, `bg-fp-surface` buttons | on the backdrop, pack **`GlassSurface radius={24}`** panel, `rounded-full bg-indigo-600`, capsules |
+| `PlusNode` frost disc `bg-fp-text-6 backdrop-blur-md` + highlight gradient + shadow | pack **Glass Button disc** (`GlassSurface tint={0.4} radius={999}`) |
+| `FlowPathView` delete badge glow shadow | `bg-rose-600`, no shadow |
+| **A8 · `FlowPathApp`** `bg-[var(--fp-bg-0)]` page fill + `data-fp-ambient` layer (3 radial gradients, `.fp-bg-grid`, 3 orbs, 22 particles) | removed — FlowPath sits on the single blurred backdrop (`.flowpath-app` scope + `.flowpath-app .glass-panel` CSS kept for `flowpathRoutingContract`; no JSX consumer left) |
+
+**Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 175 → 139, `bg-white panels` 95 → 46, gradients 21 → 14, `native title=` 126 → 125, render-sites 623 → 675 · backdrop OK · frozen diff empty.
+
+**Wave 14 next:** cleanup (`landing.css` `.glass-panel` / `.pulse-glow` / `.bg-grid`, `.fp-*` ambience CSS, remaining `dc-glass-toolbar` consumers, coverage baseline re-record), then A7 banner gradients.

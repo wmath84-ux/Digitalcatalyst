@@ -771,8 +771,7 @@ function ActivityRowItem({
                 onDelete();
               }}
               aria-label="Delete activity"
-              className="absolute -right-2.5 -top-2.5 z-[60] grid h-7 w-7 place-items-center rounded-full border border-rose-300/50 bg-rose-500 text-white"
-              style={{ boxShadow: "0 8px 22px -8px rgba(244,63,94,0.9), 0 0 14px rgba(244,63,94,0.5)" }}
+              className="absolute -right-2.5 -top-2.5 z-[60] grid h-7 w-7 place-items-center rounded-full bg-rose-600 text-white"
             >
               <Trash2 className="h-3.5 w-3.5" strokeWidth={2.4} />
             </motion.button>

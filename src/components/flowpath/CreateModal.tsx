@@ -1,4 +1,7 @@
 import { GlassSlider } from "../ui/glass-slider";
+import { GlassSurface } from "../ui/glass";
+import { GlassButton } from "../ui/glass-button";
+import { GlassToggleGroup, GlassToggleItem } from "../ui/glass-toggle-group";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -155,16 +158,18 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
       >
-        <div className="fp-overlay absolute inset-0" onClick={onClose} />
+        <div className="absolute inset-0 bg-black/55" onClick={onClose} />
         <motion.form
           onSubmit={handleSubmit}
           initial={{ opacity: 0, y: 60, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 40, scale: 0.96 }}
           transition={{ type: "spring", stiffness: 260, damping: 26 }}
-          className="glass-panel-strong relative z-10 w-full max-w-md rounded-t-3xl p-5 sm:rounded-3xl sm:p-6"
-          style={{ boxShadow: `0 0 60px -14px ${meta.glow}, 0 40px 90px -30px rgba(0,0,0,0.9)` }}
+          className="relative z-10 w-full max-w-md"
         >
+        {/* Wave 13c: the sheet is the pack GlassSurface (Dialog values) — the
+            `.glass-panel-strong` gradient plate + glow shadow are gone. */}
+        <GlassSurface radius={24} className="text-fp-text" contentClassName="p-5 sm:p-6">
           <div className="mb-4 flex items-center gap-3">
             <span
               className="grid h-10 w-10 place-items-center rounded-xl"
@@ -180,14 +185,13 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
                 {isEditing ? `Edit ${meta.label}` : meta.label}
               </h2>
             </div>
-            <button
-              type="button"
+            <GlassButton
               onClick={onClose}
-              className="ml-auto grid h-8 w-8 place-items-center rounded-full text-fp-muted transition hover:bg-fp-surface-hover hover:text-fp-text"
+              className="ml-auto [&_.size-12]:size-8"
               aria-label="Close"
             >
               <X className="h-4 w-4" />
-            </button>
+            </GlassButton>
           </div>
 
           <div className="space-y-3.5">
@@ -200,7 +204,7 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={`e.g. ${placeholderFor(type)}`}
-                className="w-full rounded-xl border border-fp-text-15 bg-fp-text-5 px-3.5 py-2.5 text-sm text-fp-text placeholder-fp-text-30 outline-none transition focus:border-violet-400/60 focus:bg-fp-text-6"
+                className="dc-field w-full rounded-full border px-3.5 py-2.5 text-sm text-fp-text outline-none"
               />
             </div>
 
@@ -212,7 +216,7 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
                 type="datetime-local"
                 value={datetimeLocal}
                 onChange={(e) => setDatetimeLocal(e.target.value)}
-                className="w-full rounded-xl border border-fp-text-15 bg-fp-text-5 px-3.5 py-2.5 text-sm text-fp-text outline-none transition focus:border-violet-400/60 [color-scheme:dark]"
+                className="dc-field w-full rounded-full border px-3.5 py-2.5 text-sm text-fp-text outline-none [color-scheme:dark]"
               />
             </div>
 
@@ -221,22 +225,13 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-fp-muted">
                   Priority
                 </label>
-                <div className="flex gap-2">
+                <GlassToggleGroup className="dc-segment w-full" value={priority} onValueChange={(next) => setPriority(next as Priority)} aria-label="Priority">
                   {(["low", "medium", "high"] as Priority[]).map((p) => (
-                    <button
-                      type="button"
-                      key={p}
-                      onClick={() => setPriority(p)}
-                      className={`flex-1 rounded-xl border px-3 py-2 text-xs font-medium capitalize transition ${
-                        priority === p
-                          ? "border-violet-400/60 bg-violet-400/15 text-fp-text"
-                          : "border-fp-text-15 bg-fp-text-5 text-fp-muted hover:bg-fp-text-6"
-                      }`}
-                    >
+                    <GlassToggleItem key={p} value={p} className="flex-1 px-3 py-2 text-xs font-medium capitalize">
                       {p}
-                    </button>
+                    </GlassToggleItem>
                   ))}
-                </div>
+                </GlassToggleGroup>
               </div>
             )}
 
@@ -250,7 +245,7 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
                     type="time"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full rounded-xl border border-fp-text-15 bg-fp-text-5 px-3 py-2.5 text-sm text-fp-text outline-none focus:border-violet-400/60 [color-scheme:dark]"
+                    className="dc-field w-full rounded-full border px-3.5 py-2.5 text-sm text-fp-text outline-none [color-scheme:dark]"
                   />
                 </div>
                 <div>
@@ -261,7 +256,7 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
                     type="time"
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full rounded-xl border border-fp-text-15 bg-fp-text-5 px-3 py-2.5 text-sm text-fp-text outline-none focus:border-violet-400/60 [color-scheme:dark]"
+                    className="dc-field w-full rounded-full border px-3.5 py-2.5 text-sm text-fp-text outline-none [color-scheme:dark]"
                   />
                 </div>
               </div>
@@ -301,7 +296,7 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
                     min={1}
                     value={totalQuestions}
                     onChange={(e) => setTotalQuestions(Number(e.target.value))}
-                    className="w-full rounded-xl border border-fp-text-15 bg-fp-text-5 px-3 py-2.5 text-sm text-fp-text outline-none focus:border-violet-400/60"
+                    className="dc-field w-full rounded-full border px-3.5 py-2.5 text-sm text-fp-text outline-none"
                   />
                 </div>
                 <div>
@@ -313,7 +308,7 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
                     min={0}
                     value={completedQuestions}
                     onChange={(e) => setCompletedQuestions(Number(e.target.value))}
-                    className="w-full rounded-xl border border-fp-text-15 bg-fp-text-5 px-3 py-2.5 text-sm text-fp-text outline-none focus:border-violet-400/60"
+                    className="dc-field w-full rounded-full border px-3.5 py-2.5 text-sm text-fp-text outline-none"
                   />
                 </div>
               </div>
@@ -328,7 +323,7 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
-                  className="w-full resize-none rounded-xl border border-fp-text-15 bg-fp-text-5 px-3.5 py-2.5 text-sm text-fp-text placeholder-fp-text-30 outline-none focus:border-violet-400/60"
+                  className="dc-field w-full resize-none rounded-xl border px-3.5 py-2.5 text-sm text-fp-text outline-none"
                   placeholder="Add a little detail..."
                 />
               </div>
@@ -336,24 +331,24 @@ export function CreateModal({ type, onClose, onCreate, editing = null }: CreateM
           </div>
 
           <div className="mt-5 flex gap-2.5">
-            <button
-              type="button"
+            <GlassButton
+              variant="capsule"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-fp-text-15 bg-fp-text-5 py-2.5 text-sm font-medium text-fp-muted transition hover:bg-fp-text-6 hover:text-fp-text"
+              className="flex-1 [&>span]:w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:rounded-full [&>span>div]:px-4"
             >
               Cancel
-            </button>
+            </GlassButton>
+            {/* the activity colour carries meaning (type), so it stays — as a
+                solid fill, not a gradient + glow */}
             <button
               type="submit"
-              className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
-              style={{
-                background: `linear-gradient(135deg, ${meta.color}, ${meta.color}aa)`,
-                boxShadow: `0 10px 30px -10px ${meta.glow}`,
-              }}
+              className="flex-1 rounded-full py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
+              style={{ background: meta.color }}
             >
               {isEditing ? "Save changes" : "Create"}
             </button>
           </div>
+        </GlassSurface>
         </motion.form>
       </motion.div>
     </AnimatePresence>,

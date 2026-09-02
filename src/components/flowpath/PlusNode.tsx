@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { motion } from "framer-motion";
+import { GlassSurface } from "../ui/glass";
 import { Plus } from "lucide-react";
 
 interface PlusNodeProps {
@@ -23,13 +24,13 @@ export function PlusNode({ active, onOpen }: PlusNodeProps) {
         if (ref.current) onOpen(ref.current.getBoundingClientRect());
       }}
       aria-label="Add activity"
-      className="fp-floaty relative grid h-8 w-8 place-items-center rounded-full border border-fp-text-20 bg-fp-text-6 text-fp-text-70 backdrop-blur-md transition-colors hover:border-violet-400/70 hover:text-fp-text sm:h-9 sm:w-9"
-      style={{
-        boxShadow: "0 0 0 1px var(--fp-text-6) inset, 0 8px 20px -10px rgba(0,0,0,0.7)",
-      }}
+      className="fp-floaty relative rounded-full text-fp-text-70 outline-none transition-colors hover:text-fp-text"
     >
-      <span className="pointer-events-none absolute inset-[1px] rounded-full bg-gradient-to-br from-white/10 to-transparent" />
-      <Plus className="h-4 w-4" strokeWidth={2.4} />
+      {/* Wave 13c: the node is a pack Glass Button disc (GlassSurface, tint
+          0.4, radius 999) — the frost plate + highlight gradient are gone. */}
+      <GlassSurface tint={0.4} radius={999} className="h-8 w-8 sm:h-9 sm:w-9" contentClassName="grid h-full w-full place-items-center">
+        <Plus className="h-4 w-4" strokeWidth={2.4} />
+      </GlassSurface>
     </motion.button>
   );
 }
