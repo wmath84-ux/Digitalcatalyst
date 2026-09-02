@@ -59,14 +59,14 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
           className="pointer-events-none absolute inset-0 transition duration-200 group-hover:brightness-[1.02]"
         />
         <div className="relative flex items-center gap-2 px-4 py-3.5">
-          <SearchIcon className="h-5 w-5 shrink-0 text-slate-500" />
+          <SearchIcon className="h-5 w-5 shrink-0 text-white/55" />
           <input
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onFocus={openSearchPage}
             placeholder="Search courses, notes, class, subject..."
             aria-label="Search the catalogue"
-            className="w-full min-w-0 cursor-pointer bg-transparent text-[15px] font-medium text-slate-900 placeholder:text-slate-500 focus:outline-none"
+            className="w-full min-w-0 cursor-pointer bg-transparent text-[15px] font-medium text-white placeholder:text-white/55 focus:outline-none"
             readOnly
           />
           {value ? (

@@ -534,10 +534,10 @@ function PremiumProductContent({
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
               </div>
               <div className="absolute right-3 top-3 flex gap-2">
-                <button onClick={() => onToggleFavorite?.(product.id)} aria-label="Save product" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/85 text-zinc-700 shadow-md backdrop-blur-md transition active:scale-95">
+                <button onClick={() => onToggleFavorite?.(product.id)} aria-label="Save product" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-zinc-700 shadow-md backdrop-blur-md transition active:scale-95">
                   <Heart className={`h-4 w-4 ${favorite ? "fill-rose-500 text-rose-500" : ""}`} />
                 </button>
-                <a href={selectedImage} target="_blank" rel="noreferrer" aria-label="Open image" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/85 text-zinc-700 shadow-md backdrop-blur-md">
+                <a href={selectedImage} target="_blank" rel="noreferrer" aria-label="Open image" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-zinc-700 shadow-md backdrop-blur-md">
                   <Expand className="h-4 w-4" />
                 </a>
               </div>
@@ -570,7 +570,7 @@ function PremiumProductContent({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/70 bg-white/55 p-3 text-[11px] text-zinc-600 shadow-lg shadow-indigo-200/30 backdrop-blur-xl">
+            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/70 bg-white/55 p-3 text-[11px] text-zinc-600 shadow-lg backdrop-blur-xl">
               <Meta icon={Clock} text={product.classLevel} />
               <Meta icon={BarChart3} text={product.subject} />
               <Meta icon={Globe} text={product.category} />
@@ -582,7 +582,7 @@ function PremiumProductContent({
                 <section data-pdp-upgrade-box className="relative overflow-hidden rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 shadow-[0_10px_50px_-15px_rgba(99,102,241,0.35)]">
                   <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-indigo-200/40 blur-2xl" />
                   <div className="relative flex items-start gap-3">
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-200">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md">
                       <Zap size={20} />
                     </span>
                     <div className="min-w-0 flex-1">
@@ -594,18 +594,18 @@ function PremiumProductContent({
                       <p className="mt-1 text-xs leading-5 text-zinc-600">New modules or files were added after your original purchase. Review exactly what is new before upgrading.</p>
                     </div>
                   </div>
-                  <button onClick={handleBuyUpgrade} className="relative mt-4 w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-black text-white shadow-md shadow-indigo-200 transition hover:brightness-110 active:scale-[0.99]">
+                  <button onClick={handleBuyUpgrade} className="relative mt-4 w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-black text-white shadow-md transition hover:brightness-110 active:scale-[0.99]">
                     Buy upgrade · {formatPrice(availablePaidUpdates[0].cashPrice)}
                   </button>
                   {onOpenCourse ? (
-                    <button onClick={() => onOpenCourse(product)} className="relative mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-indigo-200 bg-white/80 py-2.5 text-xs font-bold text-indigo-600 transition hover:bg-indigo-50">
+                    <button onClick={() => onOpenCourse(product)} className="relative mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-indigo-200 bg-white/[0.08] py-2.5 text-xs font-bold text-indigo-600 transition hover:bg-indigo-50">
                       <PlayCircle className="h-4 w-4" /> Open course in library
                     </button>
                   ) : null}
                 </section>
               ) : null
             ) : (
-              <div className="relative overflow-hidden rounded-3xl border border-white/70 bg-white/60 p-5 shadow-[0_18px_55px_-18px_rgba(79,70,229,0.45)] backdrop-blur-2xl">
+              <div className="relative overflow-hidden rounded-3xl border border-white/70 bg-white/[0.08] p-5 shadow-[0_18px_55px_-18px_rgba(79,70,229,0.45)] backdrop-blur-2xl">
                 <div className="relative flex flex-wrap items-end gap-2">
                   <span className="text-4xl font-extrabold tracking-tight text-zinc-900">{formatPrice(product.price)}</span>
                   {product.originalPrice > product.price && <span className="mb-1 text-base text-zinc-400 line-through">{formatPrice(product.originalPrice)}</span>}
@@ -615,14 +615,14 @@ function PremiumProductContent({
                   <button disabled={unavailable} onClick={primaryAction} className="group flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 px-4 py-3.5 text-sm font-bold text-white shadow-[0_14px_34px_-10px_rgba(99,102,241,0.85)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:from-amber-200 disabled:via-amber-200 disabled:to-amber-300 disabled:text-amber-900 disabled:shadow-none active:scale-[0.98]">
                     <Zap className="h-4 w-4 fill-current" /> {unavailable ? "Coming soon" : "Buy Now"}
                   </button>
-                  <button disabled={inCart || unavailable} onClick={() => !unavailable && onAddToCart?.(product.id)} className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/60 px-3 py-3.5 text-sm font-bold text-indigo-700 shadow-lg shadow-indigo-200/40 backdrop-blur-xl transition hover:bg-white/85 disabled:opacity-60">
+                  <button disabled={inCart || unavailable} onClick={() => !unavailable && onAddToCart?.(product.id)} className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/[0.08] px-3 py-3.5 text-sm font-bold text-indigo-700 shadow-lg backdrop-blur-xl transition hover:bg-white/[0.08] disabled:opacity-60">
                     <ShoppingCart className="h-4 w-4" /> {unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to Cart"}
                   </button>
                 </div>
                 <div className="relative mt-3 flex justify-end">
                   <div ref={shareRef} className="relative">
-                    <button type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/65 text-indigo-600 shadow-md shadow-indigo-200/40 backdrop-blur-md transition hover:bg-white/90"><Share2 className="h-4 w-4" /></button>
-                    <div data-product-share className="absolute right-0 top-12 z-50 w-60 rounded-2xl border border-white/70 bg-white/85 p-3 shadow-2xl shadow-indigo-900/20 backdrop-blur-2xl" hidden={!shareOpen}>
+                    <button type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/65 text-indigo-600 shadow-md backdrop-blur-md transition hover:bg-white/[0.08]"><Share2 className="h-4 w-4" /></button>
+                    <div data-product-share className="absolute right-0 top-12 z-50 w-60 rounded-2xl border border-white/70 bg-white/[0.08] p-3 shadow-2xl shadow-indigo-900/20 backdrop-blur-2xl" hidden={!shareOpen}>
                       <p className="pb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Share this product</p>
                       <div className="space-y-1.5">
                         <button type="button" onClick={() => void shareNative()} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><Share2 className="h-3.5 w-3.5" /> Share via device</button>
@@ -637,13 +637,13 @@ function PremiumProductContent({
             )}
 
             {unavailable && (
-              <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 p-4 text-sm text-amber-900 shadow-lg shadow-amber-200/30 backdrop-blur-xl">
+              <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 p-4 text-sm text-amber-900 shadow-lg backdrop-blur-xl">
                 This product is published for preview, but checkout is not enabled yet.
               </div>
             )}
 
             {!isProductOwned && !unavailable && canShowCouponInput && (
-              <div className="rounded-2xl border border-white/70 bg-white/60 p-4 shadow-lg shadow-indigo-200/30 backdrop-blur-xl">
+              <div className="rounded-2xl border border-white/70 bg-white/[0.08] p-4 shadow-lg backdrop-blur-xl">
                 <PromoCodeInput
                   kind="coupon"
                   label="Have a coupon? Enter the code below."
@@ -720,7 +720,7 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
   }, []);
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/70 bg-white/60 shadow-[0_16px_45px_-20px_rgba(49,46,129,0.55)] backdrop-blur-xl">
+    <section className="overflow-hidden rounded-3xl border border-white/70 bg-white/[0.08] shadow-[0_16px_45px_-20px_rgba(49,46,129,0.55)] backdrop-blur-xl">
       <div ref={sentinelRef} aria-hidden className="h-px" />
       <div
         data-pdp-tabbar
@@ -801,7 +801,7 @@ function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, de
       data-paid={paid ? "true" : "false"}
     >
       <button type="button" onClick={() => onExpandModule(open ? null : module.id)} className={`flex w-full items-center gap-3 px-3 py-3 text-left ${paid ? "bg-amber-100/40" : "bg-zinc-50/60"}`}>
-        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm ${paid ? "bg-gradient-to-br from-amber-500 to-orange-600 shadow-amber-200" : "bg-gradient-to-br from-indigo-600 to-violet-600 shadow-indigo-200"}`}>{index + 1}</span>
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm ${paid ? "bg-gradient-to-br from-amber-500 to-orange-600" : "bg-gradient-to-br from-indigo-600 to-violet-600"}`}>{index + 1}</span>
         <span className="min-w-0 flex-1">
           <span className={`block truncate text-sm font-semibold ${paid ? "text-amber-950" : "text-zinc-800"}`}>{module.title}</span>
           {paid ? (
@@ -859,7 +859,7 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
   const visibleReviews = reviews.slice(0, visibleCount);
   const remaining = Math.max(0, reviews.length - visibleCount);
   return (
-    <section id="product-reviews" className="scroll-mt-36 rounded-3xl border border-white/70 bg-white/60 p-5 shadow-[0_16px_45px_-20px_rgba(49,46,129,0.55)] backdrop-blur-xl">
+    <section id="product-reviews" className="scroll-mt-36 rounded-3xl border border-white/70 bg-white/[0.08] p-5 shadow-[0_16px_45px_-20px_rgba(49,46,129,0.55)] backdrop-blur-xl">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-zinc-900">Ratings & Reviews</h2>
         <button onClick={onToggleComposer} className="rounded-full bg-zinc-900 px-3 py-2 text-[11px] font-semibold text-white">{composerOpen ? "Cancel" : canReview ? "Write a review" : "Review eligibility"}</button>
@@ -885,7 +885,7 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
       {reviews.length > 0 ? (
         <div className="mt-4 space-y-3">
           {visibleReviews.map((review) => (
-            <article key={review.id} className="rounded-2xl border border-white/70 bg-white/55 p-4 shadow-sm shadow-indigo-200/25 backdrop-blur-md">
+            <article key={review.id} className="rounded-2xl border border-white/70 bg-white/55 p-4 backdrop-blur-md">
               <div className="flex items-center gap-3">
                 <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>{review.initials}</div>
                        <div className="min-w-0 flex-1"><p className="flex items-center gap-1 text-sm font-semibold text-zinc-800"><span className="truncate">{review.name}</span>{review.verifiedPurchase && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}</p><p className="text-[11px] text-zinc-400">{review.date}</p></div>
@@ -912,9 +912,9 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
 
 function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavigate?: (product: Product) => void }) {
   return (
-    <section className="rounded-3xl border border-white/70 bg-white/60 p-5 shadow-[0_16px_45px_-20px_rgba(49,46,129,0.55)] backdrop-blur-xl">
+    <section className="rounded-3xl border border-white/70 bg-white/[0.08] p-5 shadow-[0_16px_45px_-20px_rgba(49,46,129,0.55)] backdrop-blur-xl">
       <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-bold text-zinc-900">You may also like</h2><p className="text-[10px] text-zinc-400">Matched from the live catalog</p></div><ArrowUpRight className="h-4 w-4 text-zinc-400" /></div>
-      <div className="space-y-3">{products.map((item) => <button key={item.id} onClick={() => onNavigate?.(item)} className="group flex w-full overflow-hidden rounded-2xl border border-white/70 bg-white/60 text-left shadow-md shadow-indigo-200/30 backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-white/85 hover:shadow-xl hover:shadow-indigo-300/40"><img src={item.image} alt={item.title} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-zinc-800">{item.title}</span><span className="flex items-center gap-1 text-xs text-zinc-500"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-zinc-900">{formatPrice(item.price)}</span></span></button>)}</div>
+      <div className="space-y-3">{products.map((item) => <button key={item.id} onClick={() => onNavigate?.(item)} className="group flex w-full overflow-hidden rounded-2xl border border-white/70 bg-white/[0.08] text-left shadow-md backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-white/[0.08] hover:shadow-xl"><img src={item.image} alt={item.title} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-zinc-800">{item.title}</span><span className="flex items-center gap-1 text-xs text-zinc-500"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-zinc-900">{formatPrice(item.price)}</span></span></button>)}</div>
     </section>
   );
 }
@@ -975,4 +975,4 @@ const curriculumContainsId = (modules: CurriculumModule[], id: string): boolean 
 
 export const countCurriculumResources = (modules: CurriculumModule[]): number =>
   modules.reduce((sum, module) => sum + (module.resources?.length || 0) + countCurriculumResources(module.modules || []), 0);
-function MissingProduct({ onBack }: { onBack: () => void }) { return <div className="grid min-h-[70vh] place-items-center bg-slate-50 px-6 text-center"><div><ShoppingBag className="mx-auto h-12 w-12 text-slate-300" /><h1 className="mt-4 text-2xl font-black text-slate-900">Product not found</h1><p className="mt-2 text-sm text-slate-500">It may have been hidden or removed from the live catalog.</p><button onClick={onBack} className="mt-6 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white">Back to store</button></div></div>; }
+function MissingProduct({ onBack }: { onBack: () => void }) { return <div className="grid min-h-[70vh] place-items-center bg-slate-50 px-6 text-center"><div><ShoppingBag className="mx-auto h-12 w-12 text-white/40" /><h1 className="mt-4 text-2xl font-black text-white">Product not found</h1><p className="mt-2 text-sm text-white/55">It may have been hidden or removed from the live catalog.</p><button onClick={onBack} className="mt-6 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white">Back to store</button></div></div>; }

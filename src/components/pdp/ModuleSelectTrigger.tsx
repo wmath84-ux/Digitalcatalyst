@@ -27,9 +27,9 @@ export default function ModuleSelectTrigger({ totalModules, selectedCount, selec
             <LayoutGrid className="h-5 w-5 text-violet-600" />
           </div>
           <div className="min-w-0 text-left">
-            <p className="text-sm font-bold text-slate-800">Select course modules</p>
+            <p className="text-sm font-bold text-white/85">Select course modules</p>
             {selectedCount === 0 ? (
-              <p className="truncate text-xs text-slate-400">
+              <p className="truncate text-xs text-white/55">
                 {totalModules === 0 ? "No modules yet · tap to view" : `${totalModules} module${totalModules === 1 ? "" : "s"} available · pick what you need`}
               </p>
             ) : (
@@ -45,7 +45,7 @@ export default function ModuleSelectTrigger({ totalModules, selectedCount, selec
               {selectedCount}
             </span>
           ) : null}
-          <ChevronRight className="h-4 w-4 text-slate-300" />
+          <ChevronRight className="h-4 w-4 text-white/40" />
         </div>
       </button>
     </div>

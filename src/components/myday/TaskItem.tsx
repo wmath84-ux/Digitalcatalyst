@@ -21,20 +21,20 @@ const priorityConfig: Record<Task["priority"], { label: string; cls: string }> =
 const statusConfig: Record<Task["status"], { border: string; bg: string; badge: string; badgeText: string }> = {
   completed: {
     border: "border-emerald-200/80",
-    bg: "bg-white/72 backdrop-blur-xl",
+    bg: "bg-white/[0.08] backdrop-blur-xl",
     badge: "border border-emerald-200/80 bg-emerald-100/80 text-emerald-700",
     badgeText: "Done",
   },
   "in-progress": {
     border: "border-sky-200/80",
-    bg: "bg-white/72 backdrop-blur-xl",
+    bg: "bg-white/[0.08] backdrop-blur-xl",
     badge: "border border-sky-200/80 bg-sky-100/80 text-sky-700",
     badgeText: "In Progress",
   },
   pending: {
-    border: "border-slate-200/80",
-    bg: "bg-white/72 backdrop-blur-xl",
-    badge: "border border-slate-200/80 bg-white/70 text-slate-600",
+    border: "border-white/10/80",
+    bg: "bg-white/[0.08] backdrop-blur-xl",
+    badge: "border border-white/10/80 bg-white/[0.08] text-white/75",
     badgeText: "Pending",
   },
 };
@@ -80,7 +80,7 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
       )}
     >
       {/* Drag handle hint */}
-      <div className="hidden sm:flex shrink-0 items-center text-slate-300 cursor-grab">
+      <div className="hidden sm:flex shrink-0 items-center text-white/40 cursor-grab">
         <GripVertical className="h-4 w-4" />
       </div>
 
@@ -91,10 +91,10 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
         className={cn(
           "mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200 sm:mt-0",
           done
-            ? "border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-200"
+            ? "border-emerald-500 bg-emerald-500 text-white"
             : task.status === "in-progress"
               ? "border-sky-400 text-transparent hover:border-sky-500 hover:bg-sky-50"
-              : "border-slate-300 text-transparent hover:border-indigo-400 hover:bg-indigo-50",
+              : "border-white/10 text-transparent hover:border-indigo-400 hover:bg-indigo-50",
         )}
       >
         <Check className="h-3 w-3" strokeWidth={3} />
@@ -104,20 +104,20 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
       <div className="min-w-0 flex-1">
         <p
           className={cn(
-            "text-sm font-semibold text-slate-800 transition-all sm:text-[15px]",
-            done && "text-slate-400 line-through",
+            "text-sm font-semibold text-white/85 transition-all sm:text-[15px]",
+            done && "text-white/55 line-through",
           )}
         >
           {highlightQuery ? highlightText(task.title, highlightQuery) : task.title}
         </p>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {task.subject && (
-            <span className="rounded-md border border-white/70 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium text-slate-500 backdrop-blur">
+            <span className="rounded-md border border-white/70 bg-white/[0.08] px-1.5 py-0.5 text-[11px] font-medium text-white/55 backdrop-blur">
               {highlightQuery ? highlightText(task.subject, highlightQuery) : task.subject}
             </span>
           )}
           {task.time && (
-            <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-slate-400">
+            <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-white/55">
               <Clock3 className="h-3 w-3" />
               {formatTime12(task.time)}
             </span>
@@ -144,14 +144,14 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(task); }}
           aria-label="Edit task"
-          className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+          className="flex h-8 w-8 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
           aria-label="Delete task"
-          className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+          className="flex h-8 w-8 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-rose-50 hover:text-rose-600"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>

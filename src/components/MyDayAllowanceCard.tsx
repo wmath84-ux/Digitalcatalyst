@@ -38,8 +38,8 @@ function formatResetClock(resetAt: number): string {
 function Stat({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
     <div className={`rounded-2xl p-3 text-center ring-1 ${tone}`}>
-      <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{label}</p>
-      <p className="mt-1 truncate text-xs font-black text-slate-900">{value}</p>
+      <p className="text-[9px] font-black uppercase tracking-wider text-white/55">{label}</p>
+      <p className="mt-1 truncate text-xs font-black text-white">{value}</p>
     </div>
   );
 }
@@ -128,7 +128,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600">My Day allowance</p>
-              <h3 data-myday-allowance-headline className="mt-1 text-lg font-black leading-tight text-slate-950">
+              <h3 data-myday-allowance-headline className="mt-1 text-lg font-black leading-tight text-white">
                 {resolved ? headline : "Checking today’s allowance…"}
               </h3>
             </div>
@@ -153,8 +153,8 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
             {loading ? (
               <div className="space-y-3">
                 <div className="h-3 w-3/4 animate-pulse rounded-full bg-indigo-100" />
-                <div className="h-2.5 animate-pulse rounded-full bg-slate-200" />
-                <p className="text-xs font-semibold text-slate-500">Loading used, remaining and reset information from the server…</p>
+                <div className="h-2.5 animate-pulse rounded-full bg-white/[0.12]" />
+                <p className="text-xs font-semibold text-white/55">Loading used, remaining and reset information from the server…</p>
               </div>
             ) : (
               <div className="flex items-start gap-2 text-amber-800">
@@ -169,14 +169,14 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
         ) : unlimited ? (
           <div className="mt-5 flex items-start gap-2.5 rounded-2xl border border-violet-100 bg-violet-50 p-4">
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" />
-            <p className="text-xs font-bold leading-5 text-slate-700">
+            <p className="text-xs font-bold leading-5 text-white/85">
               Tasks, schedule, reminders and notes all save to your account without a daily cap.
             </p>
           </div>
         ) : (
           <>
             <div className="mt-5">
-              <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+              <div className="flex items-center justify-between text-[11px] font-bold text-white/55">
                 <span>Today · {freeLimit > 0 ? `${freeUsed} / ${freeLimit} used` : "no free creations"}</span>
                 <span className={exhausted || browseOnlyPlan ? "text-amber-700" : "text-indigo-700"}>
                   {browseOnlyPlan ? "Subscribers only" : `${freeRemaining} left`}
@@ -201,7 +201,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
                   <Stat label="Resets" value={resetAt ? formatResetClock(resetAt) : "Daily"} tone="bg-slate-50 ring-slate-100" />
                 </div>
 
-                <p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
+                <p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-white/55">
                   <Clock3 className="h-3.5 w-3.5 shrink-0" /> Fresh allowance in {resetIn} · counted in your own time zone.
                 </p>
               </>
@@ -209,7 +209,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
           </>
         )}
 
-        {resolved ? <p className="mt-4 text-xs leading-5 text-slate-600">{description}</p> : null}
+        {resolved ? <p className="mt-4 text-xs leading-5 text-white/75">{description}</p> : null}
 
         {error && resolved ? (
           <p className="mt-3 flex items-start gap-1.5 rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-semibold leading-5 text-amber-700">

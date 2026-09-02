@@ -1015,14 +1015,12 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 .dc-desktop-shell [data-desktop-rail] [data-desktop-rail-item]:hover:not([data-active="true"]) {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
 }
 .dc-desktop-shell [data-desktop-rail] [data-desktop-rail-item][data-active="true"] {
-  /* The active item is a gradient pill — same brand colour as the
-     mobile / tablet accent, but rendered as a proper desktop button
-     rather than a tap target. */
-  background-image: linear-gradient(135deg, #6366f1, #8b5cf6);
+  /* Phase A: solid brand pill (no gradient anywhere). */
+  background-color: #4f46e5;
   color: #ffffff;
   box-shadow:
     0 6px 16px -8px rgba(99, 102, 241, 0.6),
@@ -1036,16 +1034,13 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
 /* The top bar — pill-style icon buttons, an inline search input, a
    page title that mirrors the current section. */
 .dc-desktop-shell [data-desktop-topbar] {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.86));
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  /* Phase A: no paint of its own — the chrome glass below is the material. */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .dc-desktop-shell [data-desktop-topbar-button]:hover {
-  background: #f1f5f9 !important;
-  color: #4f46e5 !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
 }
 
 /* Page body: comfortable gutters, but the content still caps at a
@@ -5467,12 +5462,24 @@ html[data-course-player-active="true"] {
    page scroller moves. */
 
 :root {
-  --dc-chrome-glass:
-    linear-gradient(165deg, rgba(186, 230, 253, 0.18), rgba(255, 255, 255, 0.08) 42%, rgba(196, 181, 253, 0.16));
-  --dc-chrome-glass-blur: blur(18px) saturate(160%);
+  /* Phase A: exactly the pack's GlassSurface dark material at its defaults
+     (websiteglass.com GlassSurface tint 0.5: rgba(60,62,68, 0.5*0.42=0.21) ·
+     blur 14*(0.4+0.5*0.6)=9.8px · saturate 1+0.6*0.5=1.3 · dark rimShadow) so every header reads as the same
+     component the cards use. Light scheme swaps to the light material. */
+  --dc-chrome-glass: rgba(60, 62, 68, 0.21);
+  --dc-chrome-glass-blur: blur(9.8px) saturate(1.3);
   --dc-chrome-glass-rim:
-    inset 0 1px 1px rgba(255, 255, 255, 0.72),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+html.light [data-site-header]:not([data-home-header]),
+html.light .dc-desktop-shell [data-desktop-topbar],
+html.light [data-revision-app-header] {
+  --dc-chrome-glass: rgba(255, 255, 255, 0.21);
+  --dc-chrome-glass-rim:
+    inset 0 1px 1px rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
 [data-site-header]:not([data-home-header]) {
@@ -5487,7 +5494,7 @@ html[data-course-player-active="true"] {
   background: var(--dc-chrome-glass) !important;
   backdrop-filter: var(--dc-chrome-glass-blur) !important;
   -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
-  border-bottom-color: rgba(255, 255, 255, 0.42) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
   box-shadow: var(--dc-chrome-glass-rim);
 }
 

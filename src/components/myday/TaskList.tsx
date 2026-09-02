@@ -79,12 +79,12 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-5 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-300/50">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg">
             <ClipboardList className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-slate-900 sm:text-lg">Today's Tasks</h2>
-            <p className="text-xs font-medium text-slate-500">
+            <h2 className="text-base font-extrabold text-white sm:text-lg">Today's Tasks</h2>
+            <p className="text-xs font-medium text-white/55">
               {counts.completed} of {counts.all} completed
             </p>
           </div>
@@ -101,7 +101,7 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
           </button>
           <button
             onClick={onAdd}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-2 text-xs font-semibold text-white shadow-lg shadow-indigo-200/50 transition hover:shadow-xl hover:shadow-indigo-200/70 sm:px-4 sm:text-sm"
+            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-2 text-xs font-semibold text-white shadow-lg transition hover:shadow-xl hover: sm:px-4 sm:text-sm"
           >
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Add Task</span>
@@ -117,15 +117,15 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
             ? "ring-2 ring-indigo-100/70"
             : "focus-within:ring-2 focus-within:ring-indigo-100/70"
         )}>
-          <Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-indigo-500" : "text-slate-400")} />
+          <Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-indigo-500" : "text-white/55")} />
           <input
             value={globalSearch || localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             placeholder="Search tasks by title or subject..."
             disabled={!!globalSearch}
             className={cn(
-              "w-full bg-transparent text-sm outline-none placeholder:text-slate-400",
-              globalSearch ? "text-indigo-700" : "text-slate-700"
+              "w-full bg-transparent text-sm outline-none placeholder:text-white/55",
+              globalSearch ? "text-indigo-700" : "text-white/85"
             )}
           />
           {isSearchActive && (
@@ -148,7 +148,7 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
 
       {/* Filter tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto px-4 pt-3.5 pb-1 sm:px-6 hide-scrollbar">
-        <ListFilter className="h-4 w-4 shrink-0 text-slate-400 mr-1" />
+        <ListFilter className="h-4 w-4 shrink-0 text-white/55 mr-1" />
         {filters.map((f) => (
           <button
             key={f.key}
@@ -158,14 +158,14 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
               "relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all",
               filter === f.key
                 ? "border border-indigo-300/70 bg-indigo-500/15 text-indigo-700 shadow-[0_14px_30px_-18px_rgba(79,70,229,0.65)] backdrop-blur-xl"
-                : "dc-glass-chip text-slate-500 hover:bg-white/80 hover:text-slate-700",
+                : "dc-glass-chip text-white/55 hover:bg-white/[0.08] hover:text-white/85",
               globalSearch && "opacity-50 cursor-not-allowed"
             )}
           >
             {f.label}
             <span className={cn(
               "ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold",
-              filter === f.key ? "bg-white/20 text-white" : "bg-slate-200/60 text-slate-400",
+              filter === f.key ? "bg-white/20 text-white" : "bg-white/[0.12]/60 text-white/55",
             )}>
               {counts[f.key]}
             </span>
@@ -179,13 +179,13 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
           <div className="dc-glass flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-indigo-200/70 bg-white/45 py-12 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 shadow-inner">
               {isSearchActive ? (
-                <Search className="h-6 w-6 text-slate-400" />
+                <Search className="h-6 w-6 text-white/55" />
               ) : (
-                <ClipboardList className="h-6 w-6 text-slate-400" />
+                <ClipboardList className="h-6 w-6 text-white/55" />
               )}
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-500">
+              <p className="text-sm font-bold text-white/55">
                 {isSearchActive
                   ? `No tasks match "${searchQuery}"`
                   : "No tasks in this category"}

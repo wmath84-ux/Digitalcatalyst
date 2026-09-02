@@ -202,7 +202,7 @@ export default function SearchPage({
 
         <div
           data-search-bar
-          className="sticky top-[68px] z-20 border-b border-slate-200/60 bg-white/85 px-4 pb-3 pt-3 shadow-[0_4px_18px_-12px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:top-[72px] sm:px-5 sm:pt-3 md:top-[80px] md:px-8 md:pt-4"
+          className="sticky top-[68px] z-20 border-b border-white/10/60 bg-white/[0.08] px-4 pb-3 pt-3 shadow-[0_4px_18px_-12px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:top-[72px] sm:px-5 sm:pt-3 md:top-[80px] md:px-8 md:pt-4"
         >
           <div className="flex items-center gap-2">
             <button
@@ -223,7 +223,7 @@ export default function SearchPage({
               data-search-input
               className="flex flex-1 items-center gap-2 rounded-2xl border border-slate-200/80 bg-white px-3.5 py-2.5 shadow-sm transition focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-200/60"
             >
-              <SearchIcon className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={2.4} />
+              <SearchIcon className="h-4 w-4 shrink-0 text-white/55" strokeWidth={2.4} />
               <input
                 ref={inputRef}
                 value={query}
@@ -234,7 +234,7 @@ export default function SearchPage({
                 spellCheck={false}
                 placeholder="Search by title, subject, instructor..."
                 aria-label="Search products"
-                className="w-full min-w-0 bg-transparent text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                className="w-full min-w-0 bg-transparent text-sm font-medium text-white placeholder:text-white/55 focus:outline-none"
               />
               {query ? (
                 <button
@@ -307,8 +307,8 @@ export default function SearchPage({
                     onClick={() => setActiveFilterId(chip.id)}
                     className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                       active
-                        ? "border-indigo-500 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-300/50"
-                        : "border-slate-200/70 bg-white/80 text-slate-600 hover:border-indigo-300 hover:text-indigo-600"
+                        ? "border-indigo-500 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md"
+                        : "border-white/10/70 bg-white/[0.08] text-white/75 hover:border-indigo-300 hover:text-indigo-600"
                     }`}
                   >
                     {chip.label}
@@ -335,15 +335,15 @@ export default function SearchPage({
               {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
                 <div
                   key={index}
-                  className="h-64 animate-pulse rounded-2xl border border-slate-200/60 bg-white/70 shadow-sm"
+                  className="h-64 animate-pulse rounded-2xl border border-white/10/60 bg-white/[0.08]"
                 />
               ))}
             </div>
           ) : showEmpty ? (
-            <div className="mt-10 flex flex-col items-center gap-3 rounded-3xl border border-dashed border-indigo-200/80 bg-white/55 px-6 py-14 text-center shadow-xl shadow-indigo-200/30 backdrop-blur-xl">
+            <div className="mt-10 flex flex-col items-center gap-3 rounded-3xl border border-dashed border-indigo-200/80 bg-white/55 px-6 py-14 text-center shadow-xl backdrop-blur-xl">
               <BookOpenIcon className="h-8 w-8 text-indigo-400" />
-              <p className="text-sm font-bold text-slate-800">No results</p>
-              <p className="max-w-xs text-xs font-medium text-slate-500">
+              <p className="text-sm font-bold text-white/85">No results</p>
+              <p className="max-w-xs text-xs font-medium text-white/55">
                 {queryIsLive
                   ? `We couldn't find anything for "${query.trim()}". Try a different keyword or clear the filter.`
                   : "Start typing to search the catalog. The list updates live as you type."}

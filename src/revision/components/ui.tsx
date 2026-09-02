@@ -14,7 +14,7 @@ export function FullScreenLoader({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
       <Spinner className="h-8 w-8" />
-      <p className="text-sm font-medium text-slate-600">{label}</p>
+      <p className="text-sm font-medium text-white/75">{label}</p>
     </div>
   );
 }
@@ -62,12 +62,12 @@ export function EmptyState({
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
       {icon && (
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 shadow-sm shadow-indigo-100">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
           {icon}
         </div>
       )}
-      <h3 className="text-base font-bold text-slate-900">{title}</h3>
-      {description && <p className="max-w-[280px] text-sm leading-relaxed text-slate-600">{description}</p>}
+      <h3 className="text-base font-bold text-white">{title}</h3>
+      {description && <p className="max-w-[280px] text-sm leading-relaxed text-white/75">{description}</p>}
       {action}
     </div>
   );
@@ -76,11 +76,11 @@ export function EmptyState({
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 py-16 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-rose-600 shadow-sm shadow-rose-100">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-rose-600 shadow-rose-100">
         <AlertIcon className="h-8 w-8" />
       </div>
-      <h3 className="text-base font-bold text-slate-900">Something went wrong</h3>
-      <p className="max-w-[280px] text-sm leading-relaxed text-slate-600">{message}</p>
+      <h3 className="text-base font-bold text-white">Something went wrong</h3>
+      <p className="max-w-[280px] text-sm leading-relaxed text-white/75">{message}</p>
       {onRetry && (
         <button
           type="button"

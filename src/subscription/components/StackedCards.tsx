@@ -88,7 +88,7 @@ function TopCard({ card, onSwipe, activeIndex, total }: TopCardProps) {
               {card.eyebrow}
             </span>
           </div>
-          <h3 className="text-2xl font-extrabold leading-tight text-white drop-">
+          <h3 className="text-2xl font-extrabold leading-tight text-white drop-shadow-sm">
             {card.title}
           </h3>
           <p className="mt-1 text-sm leading-snug text-white/80">

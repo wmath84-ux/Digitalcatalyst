@@ -13,30 +13,30 @@ export default function Hero({ resourceCount }: HeroProps) {
       <div aria-hidden data-glass-ambient className="pointer-events-none absolute -bottom-20 -left-10 h-52 w-52 rounded-full bg-sky-300/30 blur-3xl" />
 
       <div className="relative">
-        <p className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/60 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-indigo-700 shadow-sm shadow-indigo-200/60 backdrop-blur-md">
+        <p className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/[0.08] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-indigo-700 backdrop-blur-md">
           Learning marketplace
         </p>
-        <h2 className="mt-2.5 text-[28px] font-extrabold leading-tight tracking-tight text-slate-900">
+        <h2 className="mt-2.5 text-[28px] font-extrabold leading-tight tracking-tight text-white">
           Find the right
           <br />
           <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 bg-clip-text text-transparent">
             resource, faster
           </span>
         </h2>
-        <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-600">
+        <p className="mt-2 max-w-sm text-sm leading-relaxed text-white/75">
           Search focused notes, courses, PDFs, and study tools by subject, class, or format.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/55 px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-md shadow-indigo-200/40 backdrop-blur-md">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/55 px-3 py-1.5 text-xs font-semibold text-white/85 shadow-md backdrop-blur-md">
             <ZapIcon className="h-3.5 w-3.5 text-amber-500" />
             Instant download
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/55 px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-md shadow-indigo-200/40 backdrop-blur-md">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/55 px-3 py-1.5 text-xs font-semibold text-white/85 shadow-md backdrop-blur-md">
             <ShieldIcon className="h-3.5 w-3.5 text-emerald-500" />
             Secure checkout
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/55 px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-md shadow-indigo-200/40 backdrop-blur-md">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/55 px-3 py-1.5 text-xs font-semibold text-white/85 shadow-md backdrop-blur-md">
             <ZapIcon className="h-3.5 w-3.5 text-amber-500" />
             Lifetime access
           </span>

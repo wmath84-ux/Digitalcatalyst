@@ -77,7 +77,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
   const streakSlot = useMemo(
     () =>
       data.quickStats.streak > 0 ? (
-        <div className="flex items-center gap-1 rounded-full border border-orange-200 bg-orange-100 px-2.5 py-1.5 text-orange-700 shadow-sm">
+        <div className="flex items-center gap-1 rounded-full border border-orange-200 bg-orange-100 px-2.5 py-1.5 text-orange-700">
           <FlameIcon className="h-4 w-4" />
           <span className="text-xs font-bold">{data.quickStats.streak}</span>
         </div>
@@ -122,13 +122,13 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
         <div className="space-y-4 lg:space-y-3">
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[15px] font-bold text-slate-900 lg:text-[14px]">Weak Topics</h2>
+            <h2 className="text-[15px] font-bold text-white lg:text-[14px]">Weak Topics</h2>
             <button type="button" onClick={() => navigate("#/revision/weak-topics")} className="text-xs font-semibold text-indigo-600">
               View all
             </button>
           </div>
           {data.weakTopicSummary.length === 0 ? (
-            <p className="text-sm text-slate-600">No weak topics yet. Complete a revision plan to build your learning profile.</p>
+            <p className="text-sm text-white/75">No weak topics yet. Complete a revision plan to build your learning profile.</p>
           ) : (
             <div className="space-y-3">
               {data.weakTopicSummary.map((topic) => (
@@ -136,8 +136,8 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg">{topic.subjectIcon}</div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                      <p className="truncate text-sm font-medium text-slate-800">{topic.topicName}</p>
-                      <span className="ml-2 flex items-center gap-1 text-xs font-semibold text-slate-600">
+                      <p className="truncate text-sm font-medium text-white/85">{topic.topicName}</p>
+                      <span className="ml-2 flex items-center gap-1 text-xs font-semibold text-white/75">
                         {trendIcon(topic.trend)} {topic.accuracy}%
                       </span>
                     </div>
@@ -151,7 +151,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
 
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[15px] font-bold text-slate-900">Revision Bank</h2>
+            <h2 className="text-[15px] font-bold text-white">Revision Bank</h2>
             <button type="button" onClick={() => navigate("#/revision/bank")} className="text-xs font-semibold text-indigo-600">
               Open
             </button>
@@ -166,7 +166,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
               <SparklesIcon className="h-4 w-4" /> Revise {data.revisionBankSummary.due} due question{data.revisionBankSummary.due === 1 ? "" : "s"}
             </PrimaryButton>
           ) : (
-            <p className="mt-3 text-center text-xs font-medium text-slate-500">
+            <p className="mt-3 text-center text-xs font-medium text-white/55">
               {data.revisionBankSummary.total === 0 ? "Your revision bank will grow from your completed plans." : "You're all caught up on revisions 🎉"}
             </p>
           )}
@@ -188,7 +188,7 @@ function FirstRevisionCard({ onGenerate }: { onGenerate: () => void }) {
       <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/10" />
       <div className="absolute -bottom-16 -left-12 h-44 w-44 rounded-full bg-indigo-300/10" />
       <div className="relative flex min-h-0 flex-1 flex-col p-5 lg:p-4">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 shadow-sm backdrop-blur lg:h-10 lg:w-10 lg:rounded-xl">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur lg:h-10 lg:w-10 lg:rounded-xl">
           <SparklesIcon className="h-6 w-6" />
         </span>
         <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-violet-100">Your first revision plan</p>
@@ -254,7 +254,7 @@ function RevisionPlanCarousel({ plans, onOpen }: { plans: CustomTestListItem[]; 
             <ChevronLeftIcon className="h-5 w-5" />
           </button>
           <div className="min-w-[132px] text-center">
-            <p className="text-xs font-semibold text-slate-500">Swipe to change plan</p>
+            <p className="text-xs font-semibold text-white/55">Swipe to change plan</p>
             <div className="mt-1.5 flex justify-center gap-1">
               {plans.map((item, index) => (
                 <span key={item.id} className={`h-1.5 rounded-full transition-all ${index === activeIndex ? "w-5 bg-indigo-600" : "w-1.5 bg-slate-300"}`} />
@@ -280,7 +280,7 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
   return (
     /* Same fill chain as `FirstRevisionCard` — `flex-auto`, not `flex-1`, so the
        card can never be squeezed below its content. */
-    <div className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-900 p-0 text-white shadow-lg shadow-indigo-200">
+    <div className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-900 p-0 text-white shadow-lg">
       <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-violet-400/15" />
       <div className="relative flex min-h-0 flex-1 flex-col p-5">
         <div className="flex shrink-0 items-start justify-between gap-3">
@@ -332,7 +332,7 @@ function PlanRow({ label, value }: { label: string; value: string }) {
 function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-white py-3 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)] lg:rounded-xl lg:py-2 lg:shadow-sm">
-      {icon}<span className="text-base font-bold text-slate-900 lg:text-sm">{value}</span><span className="text-[10px] font-medium text-slate-500 lg:text-[9px]">{label}</span>
+      {icon}<span className="text-base font-bold text-white lg:text-sm">{value}</span><span className="text-[10px] font-medium text-white/55 lg:text-[9px]">{label}</span>
     </div>
   );
 }

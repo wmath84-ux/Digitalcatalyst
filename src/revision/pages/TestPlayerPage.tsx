@@ -242,7 +242,7 @@ export default function TestPlayerPage({
                   {question.subjectIcon} {question.subjectName} · {question.topicName}
                 </span>
               </div>
-              <h2 className="text-[19px] font-semibold leading-snug text-slate-900">{question.prompt}</h2>
+              <h2 className="text-[19px] font-semibold leading-snug text-white">{question.prompt}</h2>
 
               <div className="mt-5 space-y-3">
                 {question.options.map((opt, idx) => {
@@ -274,7 +274,7 @@ export default function TestPlayerPage({
               <button
                 type="button"
                 onClick={goNext}
-                className="mt-4 flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-slate-500 active:text-slate-600"
+                className="mt-4 flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-white/55 active:text-white/75"
               >
                 Skip this question
               </button>
@@ -312,7 +312,7 @@ function ReviewBeforeSubmit({
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        <p className="mb-4 text-sm text-slate-600">
+        <p className="mb-4 text-sm text-white/75">
           Tap any question to jump back and change your answer before you submit.
         </p>
         <div className="grid grid-cols-5 gap-2.5">
@@ -334,7 +334,7 @@ function ReviewBeforeSubmit({
             );
           })}
         </div>
-        <div className="mt-5 flex items-center gap-4 text-xs font-medium text-slate-600">
+        <div className="mt-5 flex items-center gap-4 text-xs font-medium text-white/75">
           <span className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-indigo-400" /> Answered
           </span>
@@ -445,14 +445,14 @@ function SubmitConfirmModal({
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
           <CheckIcon className="h-7 w-7" />
         </div>
-        <h3 id="rev-submit-title" className="text-center text-base font-semibold text-slate-900 sm:text-lg">Submit your test?</h3>
+        <h3 id="rev-submit-title" className="text-center text-base font-semibold text-white sm:text-lg">Submit your test?</h3>
         {unansweredCount > 0 ? (
-          <p className="mt-2 text-center text-sm leading-relaxed text-slate-600">
+          <p className="mt-2 text-center text-sm leading-relaxed text-white/75">
             You have <span className="font-semibold text-amber-600">{unansweredCount} unanswered question{unansweredCount === 1 ? "" : "s"}</span>{" "}
             that will be marked as skipped. This can&apos;t be undone.
           </p>
         ) : (
-          <p className="mt-2 text-center text-sm leading-relaxed text-slate-600">
+          <p className="mt-2 text-center text-sm leading-relaxed text-white/75">
             All questions are answered. Once submitted, you can&apos;t change your answers.
           </p>
         )}

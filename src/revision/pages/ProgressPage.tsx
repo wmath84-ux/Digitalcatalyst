@@ -17,8 +17,8 @@ function BarChart({ data }: { data: { label: string; accuracy: number; attempted
   if (!hasAny) {
     return (
       <div className="py-6 text-center">
-        <p className="text-sm font-medium text-slate-500">No attempts in this period yet.</p>
-        <p className="mt-0.5 text-[11px] text-slate-400">Complete a test or revision session to see your activity bars.</p>
+        <p className="text-sm font-medium text-white/55">No attempts in this period yet.</p>
+        <p className="mt-0.5 text-[11px] text-white/55">Complete a test or revision session to see your activity bars.</p>
       </div>
     );
   }
@@ -31,12 +31,12 @@ function BarChart({ data }: { data: { label: string; accuracy: number; attempted
           <div key={`${d.label}-${i}`} className="flex flex-1 flex-col items-center gap-1.5">
             <div className="flex h-32 w-full items-end">
               <div
-                className={`w-full rounded-t-md transition-[height] duration-300 ease-out ${d.attempted === 0 ? "bg-slate-200" : "bg-gradient-to-t from-indigo-500 to-violet-400"}`}
+                className={`w-full rounded-t-md transition-[height] duration-300 ease-out ${d.attempted === 0 ? "bg-white/[0.12]" : "bg-gradient-to-t from-indigo-500 to-violet-400"}`}
                 style={{ height: `${heightPct}%` }}
                 title={`${d.attempted} attempted · ${d.accuracy}% accuracy`}
               />
             </div>
-            <span className="w-full truncate text-center text-[9px] font-medium text-slate-500">{d.label}</span>
+            <span className="w-full truncate text-center text-[9px] font-medium text-white/55">{d.label}</span>
           </div>
         );
       })}
@@ -49,8 +49,8 @@ function Sparkline({ points }: { points: { date: string; score: number }[] }) {
   if (safe.length === 0) {
     return (
       <div className="py-6 text-center">
-        <p className="text-sm font-medium text-slate-500">No completed tests yet.</p>
-        <p className="mt-0.5 text-[11px] text-slate-400">Your score trend will appear here after your first test.</p>
+        <p className="text-sm font-medium text-white/55">No completed tests yet.</p>
+        <p className="mt-0.5 text-[11px] text-white/55">Your score trend will appear here after your first test.</p>
       </div>
     );
   }
@@ -72,7 +72,7 @@ function Sparkline({ points }: { points: { date: string; score: number }[] }) {
           return <circle key={i} cx={x} cy={y} r={3} fill="#4f46e5" />;
         })}
       </svg>
-      <div className="mt-1 flex justify-between text-[10px] font-medium text-slate-500">
+      <div className="mt-1 flex justify-between text-[10px] font-medium text-white/55">
         <span>{safe[0]?.date}</span>
         <span>{safe[safe.length - 1]?.date}</span>
       </div>
@@ -101,7 +101,7 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
         <div data-rev-panel="secondary" className="space-y-4 lg:col-span-8 lg:space-y-3">
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[15px] font-bold text-slate-900 lg:text-[14px]">Activity</h2>
+            <h2 className="text-[15px] font-bold text-white lg:text-[14px]">Activity</h2>
             <div className="flex rounded-full bg-slate-100 p-0.5 text-xs font-semibold">
               {RANGE_TABS.map((r) => (
                 <button
@@ -109,7 +109,7 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
                   type="button"
                   onClick={() => setRange(r.value)}
                   className={`min-h-[30px] rounded-full px-3 transition ${
-                    range === r.value ? "bg-white text-indigo-600 shadow-sm" : "text-slate-600"
+                    range === r.value ? "bg-white text-indigo-600 shadow-sm" : "text-white/75"
                   }`}
                 >
                   {r.label}
@@ -125,12 +125,12 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
         </Card>
 
         <Card>
-          <h2 className="mb-2 text-[15px] font-bold text-slate-900">Recent Test Score Trend</h2>
+          <h2 className="mb-2 text-[15px] font-bold text-white">Recent Test Score Trend</h2>
           <Sparkline points={data.accuracyTrend} />
         </Card>
 
         <Card>
-          <h2 className="mb-3 text-[15px] font-bold text-slate-900">Activity History</h2>
+          <h2 className="mb-3 text-[15px] font-bold text-white">Activity History</h2>
           {data.activityHistory.length === 0 ? (
             <EmptyState title="No activity yet" description="Complete a test or revision session to see it here." />
           ) : (
@@ -145,10 +145,10 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
                     {a.type === "test" ? <ChartIcon className="h-4.5 w-4.5" /> : <SparklesIcon className="h-4.5 w-4.5" />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800">{a.title}</p>
-                    <p className="text-xs text-slate-500">{a.detail}</p>
+                    <p className="text-sm font-semibold text-white/85">{a.title}</p>
+                    <p className="text-xs text-white/55">{a.detail}</p>
                   </div>
-                  <span className="shrink-0 text-[11px] font-semibold text-slate-500">
+                  <span className="shrink-0 text-[11px] font-semibold text-white/55">
                     {a.date ? new Date(a.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
                   </span>
                 </div>
@@ -164,11 +164,11 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
 
 function TotalCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
   return (
-    <div className="rev-card flex items-center gap-3 rounded-2xl p-3 lg:rounded-xl lg:p-2.5 lg:shadow-sm">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">{icon}</span>
+    <div className="rev-card flex items-center gap-3 rounded-2xl p-3 lg:rounded-xl lg:p-2.5">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.06]">{icon}</span>
       <div className="min-w-0 flex-1">
-        <span className="block truncate text-lg font-bold leading-tight text-slate-900">{value}</span>
-        <span className="block truncate text-[11px] font-medium text-slate-500">{label}</span>
+        <span className="block truncate text-lg font-bold leading-tight text-white">{value}</span>
+        <span className="block truncate text-[11px] font-medium text-white/55">{label}</span>
       </div>
     </div>
   );

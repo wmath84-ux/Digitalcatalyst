@@ -156,7 +156,7 @@ export default function AuthForm() {
             className={`rounded-xl py-2 text-sm font-semibold capitalize transition ${
               mode === item
                 ? "bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-lg"
-                : "text-slate-400 hover:text-white"
+                : "text-white/55 hover:text-white"
             } disabled:cursor-not-allowed disabled:opacity-60`}
           >
             {item === "signup" ? "Sign Up" : item}
@@ -167,7 +167,7 @@ export default function AuthForm() {
       <h1 className="text-2xl font-black text-white">
         {mode === "login" ? "Welcome back" : "Create your account"}
       </h1>
-      <p className="mt-1 text-sm text-slate-400">
+      <p className="mt-1 text-sm text-white/55">
         {mode === "login"
           ? `Log in securely and continue your ${appName} journey.`
           : "Create your Firebase-secured learner account."}
@@ -180,7 +180,7 @@ export default function AuthForm() {
         className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white px-4 py-3 font-bold text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {googleSubmitting ? (
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-violet-600" />
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/10 border-t-violet-600" />
         ) : (
           <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.31v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.09Z" />
@@ -194,7 +194,7 @@ export default function AuthForm() {
 
       <div className="my-5 flex items-center gap-3">
         <span className="h-px flex-1 bg-white/10" />
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">or continue with email</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-white/55">or continue with email</span>
         <span className="h-px flex-1 bg-white/10" />
       </div>
 
@@ -209,7 +209,7 @@ export default function AuthForm() {
               className="space-y-4 overflow-hidden"
             >
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Full Name</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/55">Full Name</label>
                 <input
                   required
                   autoComplete="name"
@@ -220,9 +220,9 @@ export default function AuthForm() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Mobile Number</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/55">Mobile Number</label>
                 <div className="flex overflow-hidden rounded-xl border border-white/10 bg-white/5 focus-within:border-violet-400">
-                  <span className="grid place-items-center border-r border-white/10 px-3 text-sm font-semibold text-slate-400">+91</span>
+                  <span className="grid place-items-center border-r border-white/10 px-3 text-sm font-semibold text-white/55">+91</span>
                   <input
                     required
                     inputMode="numeric"
@@ -239,7 +239,7 @@ export default function AuthForm() {
         </AnimatePresence>
 
         <div>
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Email</label>
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/55">Email</label>
           <input
             required
             type="email"
@@ -252,7 +252,7 @@ export default function AuthForm() {
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Password</label>
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/55">Password</label>
           <div className="relative">
             <input
               required
@@ -267,7 +267,7 @@ export default function AuthForm() {
             <button
               type="button"
               onClick={() => setShowPassword((visible) => !visible)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-white/55 hover:bg-white/10 hover:text-white"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -318,17 +318,17 @@ export default function AuthForm() {
         </motion.button>
       </form>
 
-      <p className="mt-6 text-center text-xs leading-5 text-slate-500">
+      <p className="mt-6 text-center text-xs leading-5 text-white/55">
         Firebase securely manages your credentials and persistent login session. Your password is never stored in this app.
       </p>
 
-      <p className="mt-4 text-center text-[11px] leading-5 text-slate-500">
+      <p className="mt-4 text-center text-[11px] leading-5 text-white/55">
         By continuing you agree to our{" "}
-        <a href="/terms-of-service.html" className="font-semibold text-slate-300 underline-offset-2 hover:text-white hover:underline">
+        <a href="/terms-of-service.html" className="font-semibold text-white/40 underline-offset-2 hover:text-white hover:underline">
           Terms of Service
         </a>{" "}
         and{" "}
-        <a href="/privacy-policy.html" className="font-semibold text-slate-300 underline-offset-2 hover:text-white hover:underline">
+        <a href="/privacy-policy.html" className="font-semibold text-white/40 underline-offset-2 hover:text-white hover:underline">
           Privacy Policy
         </a>
         .

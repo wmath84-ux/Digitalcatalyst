@@ -58,7 +58,7 @@ test("the card is sized by its content on every band", () => {
 test("the card body has no stretch spacer left", () => {
   assert.doesNotMatch(page, /<div className="min-h-0 flex-1" \/>/);
   // The attempts line keeps its own rhythm instead of being pushed by a filler.
-  assert.match(page, /<div className="mt-2 flex items-center justify-between text-\[10px\] text-slate-500">/);
+  assert.match(page, /<div className="mt-2 flex items-center justify-between text-\[10px\] text-white\/55">/);
   // The scrollable list INSIDE the history overlay still keeps its flex chain —
   // that `min-h-0 flex-1` is a different thing and must stay.
   assert.match(page, /className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2\.5"/);

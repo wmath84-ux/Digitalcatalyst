@@ -24,8 +24,8 @@ export function PurchasesTab({
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
           <BagIcon className="h-7 w-7" />
         </div>
-        <h2 className="text-xl font-extrabold text-slate-900">No purchases yet</h2>
-        <p className="max-w-xs text-sm text-slate-500">
+        <h2 className="text-xl font-extrabold text-white">No purchases yet</h2>
+        <p className="max-w-xs text-sm text-white/55">
           Resources you buy or claim for free from the Store will appear here for lifetime access.
         </p>
       </div>
@@ -34,7 +34,7 @@ export function PurchasesTab({
 
   return (
     <div data-library-list className="space-y-3 px-4 pb-8 pt-6">
-      <h2 className="text-lg font-extrabold text-slate-900">Your purchases</h2>
+      <h2 className="text-lg font-extrabold text-white">Your purchases</h2>
       {items.map((item) => (
         <div
           key={item.id}
@@ -59,11 +59,11 @@ export function PurchasesTab({
           <img
             src={item.image}
             alt={item.title}
-            className="relative h-16 w-24 shrink-0 rounded-xl object-cover ring-1 ring-inset ring-slate-200/70"
+            className="relative h-16 w-24 shrink-0 rounded-xl object-cover ring-1 ring-inset ring-white/10/70"
           />
           <div className="relative min-w-0 flex-1">
-            <p className="truncate text-sm font-bold text-slate-900">{item.title}</p>
-            <p className="text-xs text-slate-500">by {item.instructor}</p>
+            <p className="truncate text-sm font-bold text-white">{item.title}</p>
+            <p className="text-xs text-white/55">by {item.instructor}</p>
           </div>
           <span className="relative shrink-0 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-500 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-md shadow-emerald-500/30">
             Owned

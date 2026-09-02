@@ -343,7 +343,7 @@ export default function DesktopShell({
 
   return (
     <div
-      className="dc-desktop-shell flex min-h-[100dvh] w-full text-slate-900"
+      className="dc-desktop-shell flex min-h-[100dvh] w-full text-white"
       data-desktop-shell
       data-tablet-responsive
     >
@@ -352,7 +352,7 @@ export default function DesktopShell({
       */}
       <aside
         data-desktop-rail
-        className="sticky top-0 z-40 flex h-[100dvh] w-[260px] shrink-0 flex-col border-r border-slate-200/80 bg-white/85 backdrop-blur-2xl max-[1023px]:w-[clamp(200px,22vw,260px)] landscape:max-[1023px]:w-[clamp(200px,22vw,240px)]"
+        className="sticky top-0 z-40 flex h-[100dvh] w-[260px] shrink-0 flex-col border-r border-white/10 max-[1023px]:w-[clamp(200px,22vw,260px)] landscape:max-[1023px]:w-[clamp(200px,22vw,240px)]"
         aria-label="Primary"
         style={{ width: 'clamp(200px, 22vw, 260px)' } as any}
       >
@@ -360,12 +360,12 @@ export default function DesktopShell({
             so the rail feels like a continuation of the app's identity
             rather than a separate desktop chrome. */}
         <div className="flex items-center gap-3 px-5 pb-5 pt-5">
-          <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/40">
+          <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-indigo-600 text-white ring-1 ring-white/20">
             {customLogo ? <BrandMark className="h-11 w-11" /> : <Sparkles className="h-5 w-5" />}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-[15px] font-black tracking-tight text-slate-900">{appName}</p>
-            <p className="truncate text-[11px] font-semibold text-slate-400">Learning workspace</p>
+            <p className="truncate text-[15px] font-black tracking-tight text-white">{appName}</p>
+            <p className="truncate text-[11px] font-semibold text-white/55">Learning workspace</p>
           </div>
         </div>
 
@@ -406,7 +406,7 @@ export default function DesktopShell({
               rather than a flat list of links. Shows the learner's
               cart size + favorites so the rail doubles as a status
               indicator. */}
-          <div className="relative mx-2 mt-3 overflow-hidden rounded-2xl border border-slate-200/70 p-3">
+          <div className="relative mx-2 mt-3 overflow-hidden rounded-2xl border border-white/10 p-3">
             <GlassSurface
               tint={0.5}
               blur={14}
@@ -415,7 +415,7 @@ export default function DesktopShell({
               className="pointer-events-none absolute inset-0"
             />
             <div className="relative">
-            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Quick stats</p>
+            <p className="text-[10px] font-black uppercase tracking-wider text-white/55">Quick stats</p>
             <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
               <RailStat label="Cart" value={cartCount} />
               <RailStat label="Favorites" value={favoritesCount} />
@@ -447,26 +447,26 @@ export default function DesktopShell({
             at the bottom, with a one-click logout. Keeping the rail
             signed-in-aware means the desktop chrome is never an
             anonymous sidebar. */}
-        <div className="border-t border-slate-200/80 p-3">
+        <div className="border-t border-white/10 p-3">
           {user ? (
-            <div className="flex items-center gap-2.5 rounded-2xl p-2 transition hover:bg-slate-50">
+            <div className="flex items-center gap-2.5 rounded-2xl p-2 transition hover:bg-white/[0.06]">
               {user.photoURL ? (
-                <img src={user.photoURL} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-slate-200" />
+                <img src={user.photoURL} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
               ) : (
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-black text-white">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-indigo-600 text-xs font-black text-white">
                   {initials}
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[12px] font-black text-slate-900">{user.name}</p>
-                <p className="truncate text-[10px] font-semibold text-slate-400">{user.email}</p>
+                <p className="truncate text-[12px] font-black text-white">{user.name}</p>
+                <p className="truncate text-[10px] font-semibold text-white/55">{user.email}</p>
               </div>
               <button
                 type="button"
                 onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })}
                 aria-label="Log out"
                 title="Log out"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white/55 transition hover:bg-rose-500/15 hover:text-rose-300"
               >
                 <LogOut size={14} />
               </button>
@@ -475,7 +475,7 @@ export default function DesktopShell({
             <button
               type="button"
               onClick={() => handleNavigate("#/auth?mode=login")}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2.5 text-xs font-black text-white transition hover:bg-slate-800"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/[0.1] px-3 py-2.5 text-xs font-black text-white transition hover:bg-white/[0.14]"
             >
               <Crown size={13} /> Sign in
             </button>
@@ -495,14 +495,14 @@ export default function DesktopShell({
         <header
           data-desktop-topbar
           data-topbar-tabs={topBarTabs ? topBarTabs.feature : undefined}
-          className="absolute inset-x-0 top-0 z-30 border-b border-slate-200/80 bg-white/85 px-6 backdrop-blur-2xl"
+          className="absolute inset-x-0 top-0 z-30 border-b border-white/10 px-6"
         >
           <div data-desktop-topbar-row className="flex h-16 items-center gap-4">
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-base font-black tracking-tight text-slate-900" data-desktop-page-title>
+              <h1 className="truncate text-base font-black tracking-tight text-white" data-desktop-page-title>
                 {resolvedTitle}
               </h1>
-              <p className="truncate text-[11px] font-semibold text-slate-400" data-desktop-page-subtitle>
+              <p className="truncate text-[11px] font-semibold text-white/55" data-desktop-page-subtitle>
                 {resolvedSubtitle}
               </p>
             </div>
@@ -552,7 +552,7 @@ export default function DesktopShell({
                     type="button"
                     onClick={() => setQuery("")}
                     aria-label="Clear search"
-                    className="absolute right-2 grid h-6 w-6 place-items-center rounded-full text-slate-400 transition hover:bg-slate-200/60 hover:text-slate-700"
+                    className="absolute right-2 grid h-6 w-6 place-items-center rounded-full text-white/55 transition hover:bg-white/[0.1] hover:text-white/85"
                   >
                     <X size={12} />
                   </button>
@@ -637,7 +637,7 @@ export default function DesktopShell({
 function RailGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="mt-4 first:mt-2">
-      <p className="px-3 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+      <p className="px-3 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
         {label}
       </p>
       <div className="flex flex-col gap-0.5">{children}</div>
@@ -666,7 +666,7 @@ function RailItem({
       className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2 text-left transition ${
         active
           ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/30"
-          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          : "text-white/75 hover:bg-white/[0.08] hover:text-white"
       }`}
       title={entry.description}
     >
@@ -687,7 +687,7 @@ function RailItem({
         className={`relative grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${
           active
             ? "bg-white/20 text-white"
-            : "bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-indigo-600"
+            : "bg-white/[0.08] text-white/55 group-hover:bg-white/[0.14] group-hover:text-white"
         }`}
       >
         <Icon size={15} />
@@ -696,7 +696,7 @@ function RailItem({
         <span className="block truncate text-[13px] font-bold leading-tight">{entry.label}</span>
         <span
           className={`block truncate text-[10.5px] font-medium leading-tight ${
-            active ? "text-white/80" : "text-slate-400"
+            active ? "text-white/80" : "text-white/55"
           }`}
         >
           {entry.description}
@@ -717,9 +717,9 @@ function RailItem({
 
 function RailStat({ label, value, highlight = false }: { label: string; value: number; highlight?: boolean }) {
   return (
-    <div className="rounded-xl border border-slate-200/70 bg-white/80 px-2 py-1.5">
-      <dt className="text-[9px] font-black uppercase tracking-wider text-slate-400">{label}</dt>
-      <dd className={`mt-0.5 text-base font-black ${highlight ? "text-indigo-600" : "text-slate-900"}`}>
+    <div className="rounded-xl border border-white/10 bg-white/[0.06] px-2 py-1.5">
+      <dt className="text-[9px] font-black uppercase tracking-wider text-white/55">{label}</dt>
+      <dd className={`mt-0.5 text-base font-black ${highlight ? "text-indigo-600" : "text-white"}`}>
         {value > 99 ? "99+" : value}
       </dd>
     </div>
@@ -740,7 +740,7 @@ function TopBarTabRow({ config }: { config: TopBarTabsConfig }) {
     <nav
       data-desktop-topbar-tabs={config.feature}
       aria-label={config.ariaLabel}
-      className="flex items-center gap-x-0.5 overflow-x-auto border-t border-slate-200/70 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex items-center gap-x-0.5 overflow-x-auto border-t border-white/10 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <div className="-mb-px flex min-w-0 items-center gap-x-0.5">
         {config.items.map((item) => {
@@ -757,7 +757,7 @@ function TopBarTabRow({ config }: { config: TopBarTabsConfig }) {
               className={cn(
                 "relative shrink-0 rounded-t-xl px-3 py-2.5 text-[13px] font-bold outline-none transition-colors duration-200",
                 "focus-visible:ring-2 focus-visible:ring-indigo-300/70",
-                isActive ? "text-indigo-600" : "text-slate-500 hover:bg-slate-100/70 hover:text-slate-900",
+                isActive ? "text-indigo-600" : "text-white/55 hover:bg-white/[0.06]/70 hover:text-white",
               )}
             >
               {item.label}
@@ -779,7 +779,7 @@ function TopBarTabRow({ config }: { config: TopBarTabsConfig }) {
           onClick={config.onHome}
           data-topbar-tab="home"
           title={`Back to ${config.homeLabel ?? "Home"}`}
-          className="ml-auto shrink-0 rounded-xl px-2 py-2.5 text-[13px] font-bold text-slate-400 outline-none transition-colors duration-200 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-300/70"
+          className="ml-auto shrink-0 rounded-xl px-2 py-2.5 text-[13px] font-bold text-white/55 outline-none transition-colors duration-200 hover:text-white focus-visible:ring-2 focus-visible:ring-indigo-300/70"
         >
           {config.homeLabel ?? "Home"}
         </button>
@@ -815,7 +815,7 @@ function TopBarButton({
           className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-xl transition ${
             active
               ? "bg-indigo-50 text-indigo-600"
-              : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              : "text-white/55 hover:bg-white/[0.08] hover:text-white"
           }`}
         >
           <GlassSurface
@@ -833,7 +833,7 @@ function TopBarButton({
           ) : null}
         </TooltipTrigger>
         <TooltipContent side="bottom" tint={0.85}>
-          <span className="text-slate-800">{ariaLabel}</span>
+          <span className="text-white">{ariaLabel}</span>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

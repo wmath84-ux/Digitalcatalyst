@@ -1,6 +1,8 @@
 import { forwardRef, useEffect, useRef } from "react";
 import { Bell, Heart, Search, Trophy, UserRound, X } from "lucide-react";
 import { GlassSwitch } from "../../components/ui/glass-switch";
+import { GlassSurface } from "../../components/ui/glass";
+import { GlassButton } from "../../components/ui/glass-button";
 import { useGlassScheme } from "../../lib/glassScheme";
 import type { Product } from "../types";
 import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
@@ -123,26 +125,22 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       ref={headerRef}
       data-site-header
       data-home-header
-      className="relative z-30 overflow-hidden rounded-b-[32px] border-b border-white/25 px-4 pb-8 pt-[calc(1.5rem+env(safe-area-inset-top))] text-white shadow-[0_24px_50px_-26px_rgba(49,46,129,0.42)] min-[390px]:px-5"
-      style={{
-        backgroundImage: brandGlassGradient(gradientFrom, gradientTo),
-        backdropFilter: "blur(18px) saturate(160%)",
-        WebkitBackdropFilter: "blur(18px) saturate(160%)",
-      }}
+      className="relative z-30 text-white"
       data-home-gradient-from={gradientFrom}
       data-home-gradient-to={gradientTo}
+      data-home-gradient-css={brandGlassGradient(gradientFrom, gradientTo)}
     >
-      <div
-        aria-hidden
-        data-home-glass-sheen
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: "linear-gradient(135deg, rgba(255,255,255,0.32) 0%, transparent 38%, transparent 62%, rgba(255,255,255,0.14) 100%)",
-        }}
-      />
-      <div aria-hidden data-home-orbs className="pointer-events-none absolute -left-10 top-10 h-32 w-32 rounded-full bg-white/12 blur-3xl" />
-      <div aria-hidden data-home-orbs className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-cyan-300/20 blur-3xl" />
-      <div aria-hidden data-home-orbs className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/10 to-transparent" />
+    <GlassSurface
+      radius={0}
+      style={{ borderRadius: "0 0 32px 32px" }}
+      className="overflow-hidden"
+      contentClassName="px-4 pb-8 pt-[calc(1.5rem+env(safe-area-inset-top))] min-[390px]:px-5"
+    >
+      {/* Phase A: the header is the pack's GlassSurface at websiteglass.com
+          defaults (tint 0.5 · blur 14 · saturation 1.6). The brand gradient
+          (`brandGlassGradient`, linear-gradient(to bottom right …)) is kept
+          only as a legacy helper/attribute — nothing paints it; the header's
+          former inline backdropFilter: blur(18px) saturate(160%) is gone. */}
       <div data-home-chrome className="relative flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 min-[390px]:gap-3">
           <span data-home-brand className="shrink-0">
@@ -158,15 +156,13 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           </div>
         </div>
         <div data-home-actions className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
-          <button
-            type="button"
+          <GlassButton
             aria-label="Leaderboard"
             onClick={() => { window.location.hash = "#/leaderboard"; }}
-            className="dc-home-pill flex h-9 w-9 items-center justify-center rounded-xl border border-white/35 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition hover:bg-white/24 active:scale-95 min-[390px]:h-10 min-[390px]:w-10 min-[430px]:w-auto min-[430px]:gap-1.5 min-[430px]:px-3"
-          >
-            <Trophy size={17} strokeWidth={2.4} className="shrink-0" />
-            <span className="hidden text-xs font-bold tracking-tight min-[430px]:inline">Leaderboard</span>
-          </button>
+            className="dc-home-pill [&_.size-12]:size-10 [&_.size-12]:min-[430px]:w-auto [&_.size-12]:min-[430px]:px-3"
+            >
+            <span className="inline-flex items-center gap-1.5"><Trophy size={17} strokeWidth={2.4} className="shrink-0" /><span className="hidden text-xs font-bold tracking-tight min-[430px]:inline">Leaderboard</span></span>
+          </GlassButton>
           {/* Profile shortcut — this slot used to hold the FlowPath "+"
               button; FlowPath moved to the footer dock (former Profile slot)
               and Profile now lives here in the header. */}
@@ -178,39 +174,37 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
               type="button"
               aria-label="Open profile"
               onClick={() => { window.location.hash = "#/profile"; }}
-              className="dc-home-pill grid h-9 w-9 place-items-center rounded-xl border border-white/35 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition hover:bg-white/24 active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
+              className="dc-home-pill grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-white/[0.08] transition hover:bg-white/[0.12] active:scale-90"
             >
               <UserRound size={18} strokeWidth={2.4} />
             </TooltipTrigger>
-            <TooltipContent side="bottom" tint={0.85}>
-              <span className="text-slate-800">Profile</span>
+            <TooltipContent side="bottom">
+              <span>Profile</span>
             </TooltipContent>
           </Tooltip>
           {/* websiteglass.com Glass Switch — the docs' controlled "Dark mode"
               example, flipping the pack between its own light and dark material. */}
           <GlassSwitch checked={scheme === "dark"} onCheckedChange={(v) => setScheme(v ? "dark" : "light")} ariaLabel="Dark mode" />
-          <button
-            type="button"
+          <GlassButton
             aria-label="Notifications"
             onClick={onOpenNotifications}
-            className="dc-home-pill relative flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
-          >
+            className="dc-home-pill relative [&_.size-12]:size-10"
+            >
             <Bell size={18} strokeWidth={2.4} />
-            {unreadNotificationCount > 0 && <span aria-label={`${unreadNotificationCount} unread notifications`} className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold ring-2 ring-indigo-600">{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}</span>}
-          </button>
-          <button
-            type="button"
+            {unreadNotificationCount > 0 && <span aria-label={`${unreadNotificationCount} unread notifications`} className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold ring-2 ring-[#0a0c12]">{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}</span>}
+          </GlassButton>
+          <GlassButton
             aria-label="Favorites"
             onClick={onOpenFavorites}
-            className="dc-home-pill relative flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/16 shadow-lg shadow-indigo-950/10 backdrop-blur-md transition active:scale-90 min-[390px]:h-10 min-[390px]:w-10"
-          >
+            className="dc-home-pill relative [&_.size-12]:size-10"
+            >
             <Heart size={18} strokeWidth={2.4} fill="currentColor" />
             {favoritesCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold ring-2 ring-indigo-600">
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold ring-2 ring-[#0a0c12]">
                 {favoritesCount}
               </span>
             )}
-          </button>
+          </GlassButton>
         </div>
       </div>
 
@@ -231,7 +225,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             }
           }}
         >
-          <Search size={18} className="shrink-0 text-slate-400" strokeWidth={2.4} />
+          <Search size={18} className="shrink-0 text-white/55" strokeWidth={2.4} />
           <input
             ref={ref}
             value={query}
@@ -243,7 +237,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             type="text"
             inputMode="search"
             placeholder="Search courses, PDFs, e-books..."
-            className="w-full cursor-pointer bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+            className="w-full cursor-pointer bg-transparent text-sm text-white/85 placeholder:text-white/55 focus:outline-none"
             readOnly
           />
           {query ? (
@@ -266,9 +260,9 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         </div>
 
         {query.trim().length > 0 && (
-          <div className="dc-glass-toolbar absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-80 overflow-y-auto rounded-2xl p-2 text-slate-800 shadow-2xl shadow-indigo-950/20">
+          <div className="dc-glass-toolbar absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-80 overflow-y-auto rounded-2xl p-2 text-white/85 shadow-2xl shadow-indigo-950/20">
             {suggestions.length === 0 ? (
-              <p className="px-3 py-4 text-center text-sm text-slate-400">
+              <p className="px-3 py-4 text-center text-sm text-white/55">
                 No matches for “{query}”. Try a different keyword.
               </p>
             ) : (
@@ -286,7 +280,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{item.title}</span>
-                    <span className="block text-xs text-slate-400">
+                    <span className="block text-xs text-white/55">
                       {typeLabel[item.type]} · ₹{item.price}
                     </span>
                   </span>
@@ -297,6 +291,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           </div>
         )}
       </div>
+    </GlassSurface>
     </header>
   );
 });

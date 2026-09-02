@@ -56,8 +56,8 @@ export function ExitGuardProvider({
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/50 backdrop-blur-sm sm:items-center">
           <div className="mx-auto w-full max-w-[480px] rounded-t-3xl bg-white p-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] shadow-2xl sm:rounded-3xl">
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200 sm:hidden" />
-            <h3 className="text-lg font-semibold text-slate-900">Leave this screen?</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">{guard.message}</p>
+            <h3 className="text-lg font-semibold text-white">Leave this screen?</h3>
+            <p className="mt-2 text-sm leading-relaxed text-white/75">{guard.message}</p>
             <div className="mt-5 flex gap-3">
               <button
                 type="button"

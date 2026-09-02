@@ -8,6 +8,8 @@
  * in the future flow through automatically.
  */
 
+import { GlassCard } from "../../components/ui/glass-card";
+
 export interface ContinueLearningItem {
   /** Product id — used as the React key. */
   id: string;
@@ -32,7 +34,7 @@ export default function ContinueLearning({ items }: ContinueLearningProps) {
   return (
     <section className="px-5 pt-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-bold text-slate-900">Continue Learning</h2>
+        <h2 className="text-base font-bold text-white">Continue Learning</h2>
         {items.length === 1 && (
           <span className="text-xs font-semibold text-indigo-600">{Math.round(items[0].progress)}% done</span>
         )}
@@ -53,26 +55,26 @@ function ContinueLearningCard({ item, showProgressLabel }: { item: ContinueLearn
   const open = item.onOpen || item.onResume;
 
   return (
-    <div
+    <GlassCard
       role="button"
       tabIndex={0}
       onClick={open}
       onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") open(); }}
-      className="dc-card flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-white p-3 text-left shadow-md shadow-slate-300/70 ring-1 ring-slate-200/80 transition active:scale-[0.98]"
+      className="dc-card w-full cursor-pointer text-left transition active:scale-[0.98] [&>div:last-child]:flex [&>div:last-child]:items-center [&>div:last-child]:gap-3"
     >
-      <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-white/60">
+      <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-white/[0.06] ring-1 ring-white/10">
         <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
       </div>
 
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-sm font-semibold text-slate-800">{item.title}</h3>
+        <h3 className="truncate text-sm font-semibold text-white/85">{item.title}</h3>
         <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-xs text-slate-400">{item.author}</p>
+          <p className="truncate text-xs text-white/55">{item.author}</p>
           {showProgressLabel && (
-            <span className="flex-shrink-0 text-[11px] font-semibold text-indigo-600">{Math.round(progress)}% done</span>
+            <span className="flex-shrink-0 text-[11px] font-semibold text-indigo-300">{Math.round(progress)}% done</span>
           )}
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
           <div
             className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-500 transition-all duration-500 ease-out"
             style={{ width: `${progress}%` }}
@@ -92,6 +94,6 @@ function ContinueLearningCard({ item, showProgressLabel }: { item: ContinueLearn
       >
         {isComplete ? "Completed ✓" : "Resume ▶"}
       </button>
-    </div>
+    </GlassCard>
   );
 }

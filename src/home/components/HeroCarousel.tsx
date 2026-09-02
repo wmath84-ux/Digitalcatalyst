@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Banner } from "../types";
+import { GlassButton } from "../../components/ui/glass-button";
 
 interface HeroCarouselProps {
   banners: Banner[];
@@ -139,14 +140,14 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
                       {banner.title}
                     </h3>
                     <p className="mt-1 text-xs text-white/85 leading-snug md:text-sm md:mt-2 md:max-w-md">{banner.subtitle}</p>
-                    <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-xs font-bold text-slate-900 shadow-sm transition active:scale-95 md:mt-4 md:px-5 md:py-2 md:text-sm">
-                      {banner.cta}
+                    <GlassButton variant="capsule" tabIndex={-1} className="mt-3 md:mt-4 [&_.h-12]:h-9 [&_.h-12]:px-4 md:[&_.h-12]:h-10 [&_.h-12]:text-xs md:[&_.h-12]:text-sm">
+                      <span className="inline-flex items-center gap-1.5 font-bold">{banner.cta}
                       {linked && (
                         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}>
                           <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       )}
-                    </span>
+                    </span></GlassButton>
                   </div>
                   <img
                     src={banner.image}

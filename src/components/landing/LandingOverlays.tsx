@@ -73,11 +73,11 @@ export default function LandingOverlays() {
                 <BrandMark className="h-12 w-12 shrink-0 rounded-2xl" fallbackLetter />
                 <div className="min-w-0 flex-1">
                   <h2 className="text-base font-black text-white">{`Install ${appName}`}</h2>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-300">
+                  <p className="mt-1 text-xs leading-relaxed text-white/40">
                     Add the secure PWA to your home screen for fullscreen access, faster loading, and offline support.
                   </p>
                 </div>
-                <button type="button" onClick={() => setInstallOpen(false)} className="text-slate-400">✕</button>
+                <button type="button" onClick={() => setInstallOpen(false)} className="text-white/55">✕</button>
               </div>
 
               {manualHelp && (
@@ -90,7 +90,7 @@ export default function LandingOverlays() {
                 <button
                   type="button"
                   onClick={() => setInstallOpen(false)}
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-bold text-slate-300"
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-bold text-white/40"
                 >
                   Not now
                 </button>
@@ -98,7 +98,7 @@ export default function LandingOverlays() {
                   type="button"
                   disabled={installing}
                   onClick={() => void handleInstall()}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 py-3 text-sm font-black text-slate-950 disabled:opacity-60"
+                  className="flex-1 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 py-3 text-sm font-black text-white disabled:opacity-60"
                 >
                   {installed ? "Installed ✓" : installing ? "Opening…" : "Install"}
                 </button>

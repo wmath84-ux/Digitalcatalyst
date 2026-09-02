@@ -36,18 +36,18 @@ export default function CartItemCard({ product, onRemove, onOpen }: CartItemCard
             <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-500">
               {product.category}
             </span>
-            <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-slate-900">
+            <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-white">
               {product.title}
             </h3>
-            <p className="text-[11px] text-slate-400">{product.author}</p>
+            <p className="text-[11px] text-white/55">{product.author}</p>
           </button>
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-[14px] font-extrabold text-slate-900">
+            <span className="text-[14px] font-extrabold text-white">
               {formatINR(product.price)}
             </span>
-            <span className="text-[10px] text-slate-400 line-through">
+            <span className="text-[10px] text-white/55 line-through">
               {formatINR(product.originalPrice)}
             </span>
           </div>

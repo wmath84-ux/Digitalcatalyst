@@ -40,7 +40,7 @@ export default function ProductCard({
       contentClassName="p-0"
       className="group relative flex h-full flex-col overflow-hidden transition duration-300 hover:-translate-y-1"
     >
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-white/[0.06]">
         <img src={product.image} alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
 
         <div className="absolute left-2 top-2 z-20 flex gap-1.5">
@@ -55,7 +55,7 @@ export default function ProductCard({
             </span>
           )}
           {!purchased && !unavailable && product.tags.includes("SALE") && (
-            <span className="rounded-full bg-teal-400 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-900 shadow">
+            <span className="rounded-full bg-teal-400 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow">
               Sale
             </span>
           )}
@@ -73,7 +73,7 @@ export default function ProductCard({
             event.stopPropagation();
             onToggleWishlist(product.id);
           }}
-          className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full text-slate-600 transition hover:scale-105 active:scale-95"
+          className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full text-white/75 transition hover:scale-105 active:scale-95"
         >
           {/* the same action disc the header and the desktop top bar use, so a
               save control reads identically everywhere in the app */}
@@ -88,7 +88,7 @@ export default function ProductCard({
           />
           <HeartIcon
             filled={wishlisted}
-            className={`relative h-4 w-4 ${wishlisted ? "text-rose-500" : "text-slate-600"}`}
+            className={`relative h-4 w-4 ${wishlisted ? "text-rose-500" : "text-white/75"}`}
           />
         </button>
       </div>
@@ -96,18 +96,18 @@ export default function ProductCard({
       <div className="relative z-20 flex flex-1 flex-col gap-2 p-4">
         <div className="flex items-center gap-1.5 text-sm">
           <StarIcon className="h-4 w-4 text-amber-400" />
-          <span className="font-bold text-slate-900">{product.rating.toFixed(1)}</span>
-          <span className="text-slate-500">({product.reviews} review{product.reviews === 1 ? "" : "s"})</span>
+          <span className="font-bold text-white">{product.rating.toFixed(1)}</span>
+          <span className="text-white/55">({product.reviews} review{product.reviews === 1 ? "" : "s"})</span>
         </div>
 
-        <h3 className="text-[15px] font-extrabold leading-snug text-slate-900">{product.title}</h3>
-        <p className="text-sm font-medium text-slate-600">by {product.instructor}</p>
+        <h3 className="text-[15px] font-extrabold leading-snug text-white">{product.title}</h3>
+        <p className="text-sm font-medium text-white/75">by {product.instructor}</p>
 
         <div className="mt-auto flex items-center gap-2 pt-1">
           {product.originalPrice > product.price && (
-            <span className="text-sm text-slate-500 line-through">₹{product.originalPrice}</span>
+            <span className="text-sm text-white/55 line-through">₹{product.originalPrice}</span>
           )}
-          <span className="text-lg font-extrabold text-slate-900">₹{product.price}</span>
+          <span className="text-lg font-extrabold text-white">₹{product.price}</span>
           {discount > 0 && (
             <span className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-bold text-rose-600">
               -{discount}%

@@ -458,19 +458,10 @@ html[data-glass="on"] .dc-slider-violet > span:nth-child(2) {
 
 /* ── Wave 6 · polish: the last hand-painted surfaces + a11y / motion guards ── */
 
-/* Home + checkout light cards. `bg-white` + a hairline ring was written out at
-   four call sites; one class now carries the frost, the inset highlight and the
-   long soft shadow, and `?glass=off` falls back to the flat card underneath
-   because the utility classes are still in the markup. */
+/* Phase A: `.dc-card` no longer paints — ContinueLearning IS the pack GlassCard
+   now. The hook stays for the coverage script only. */
 html[data-glass="on"] :where(.dc-card) {
-  background-color: rgba(255, 255, 255, 0.72);
-  border-color: rgba(255, 255, 255, 0.7);
-  -webkit-backdrop-filter: blur(14px) saturate(1.6);
-  backdrop-filter: blur(14px) saturate(1.6);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 1px 2px rgba(15, 23, 42, 0.06),
-    0 12px 28px -18px rgba(15, 23, 42, 0.3);
+  background-color: transparent;
 }
 
 /* The hero's action pills sit on a saturated gradient, so their frost has to
@@ -614,102 +605,17 @@ html[data-glass="on"] :where([data-pdp-loose]) :where(h1, h2, p, span, a, button
   }
 }
 
-/* ── Part 1 · strip decorative gradient backgrounds (owner direction) ────────
- * One background only: the blurred Black Ice backdrop. Every decorative
- * `bg-gradient-to-*` wash / sheen / glow loses its background-image under glass
- * so the single backdrop shows through. Excluded:
- *   • [data-banner-id] — home hero banners stay (owner: "banner rahega")
- *   • <button> / <a>   — CTAs keep their paint for now; they become glass
- *                        components in the next part, not a blind strip.
- * Source classes are untouched, so every source-string contract still matches.
- * ?glass=off restores every gradient. */
-html[data-glass="on"] [class*="bg-gradient-to"]:not([data-banner-id]):not(button):not(a) {
-  background-image: none;
-}
-
-/* ── Part 2 · white ink on the backdrop (owner direction) ────────────────────
- * After Part 1 the page background is the dark backdrop, so the base text ink
- * goes light. Dark ink is preserved inside any white / frosted card
- * ([class*="bg-white"] covers bg-white, bg-white/60, bg-white/80 …) so card
- * text stays readable on its frost. A child with its own explicit text-* utility
- * still wins, so already-coloured text is untouched. Admin is data-glass="off",
- * so it is unaffected. ?glass=off restores the dark ink. */
+/* Phase A (2026-09-02) — owner direction: the former Parts 1 / 1e / 1f / 2 / 2b
+ * blanket overrides are GONE. They repainted every `bg-white` as a 55 % white
+ * frost with dark ink and every gradient CTA as solid indigo — which is exactly
+ * the "white / frost header, white buttons" the owner kept seeing. Surfaces are
+ * now fixed at the source: pack components (GlassCard / GlassSurface /
+ * GlassButton …) at websiteglass.com defaults, white ink in the JSX. */
 html[data-glass="on"] body {
   color: rgb(var(--dc-paper-on-ink) / 0.92);
 }
-html[data-glass="on"] [class*="bg-white"] {
-  color: rgb(15 23 42); /* slate-900 — dark ink inside white/frosted cards */
-}
 
-/* ── Part 2b · home header inline gradient (owner: no gradient anywhere) ─────
- * The home header paints its brand gradient with an INLINE style
- * (Header.tsx: `backgroundImage: brandGlassGradient(...)`), which a class-based
- * rule can't reach — inline styles only yield to !important. Under glass the
- * gradient is dropped (the header keeps its inline backdrop-filter, so it becomes
- * a frosted bar over the backdrop) and its ink goes white. Scoped to
- * [data-home-header] + background-image only — this is NOT the FlowPath dark-ink
- * !important the owner vetoed. Source untouched, so homeHeaderGlassCollapse's
- * source assertions still match. ?glass=off restores the gradient + dark ink. */
-html[data-glass="on"] [data-home-header] {
-  background-image: none !important;
-  color: rgb(var(--dc-paper-on-ink) / 0.95);
-}
-html[data-glass="on"] [data-home-header] :where(h1, p, span, a, button, svg):not([class*="bg-"]) {
-  color: rgb(var(--dc-paper-on-ink) / 0.95);
-}
-
-/* Phase A (2026-09-02): the former Part 1b/1c/1d overrides (shell gradient,
- * frame wash, aurora orbs, profile wash) are gone — that paint no longer exists
- * in src/index.css or the page JSX, so there is nothing left to neutralise. */
-
-/* ── Part 1e · CTA/button gradients -> solid brand, subscription heroes clear ─
- * Part 1 deliberately skipped <button>/<a> so CTAs wouldn't go invisible. Now
- * their gradient is replaced with a SOLID brand indigo (no gradient anywhere),
- * keeping them visible until Part 3 swaps them for glass buttons. Banners are
- * excluded. The subscription/profile `.dc-glass-hero` cards painted their own
- * radial-gradient in index.css — under glass they go transparent so the backdrop
- * shows. Gated on data-glass="on"; ?glass=off restores gradients. */
-html[data-glass="on"] :where(button, a):not([data-banner-id])[class*="bg-gradient-to"] {
-  background-image: none;
-  background-color: #4f46e5;
-}
-/* Phase A: `.dc-glass-hero*` is now the GlassSurface material at the source
- * (src/index.css) — no override needed. */
-
-/* ── Part 1f · every solid white panel -> frosted glass (no white pages) ─────
- * The owner wants no opaque white pages anywhere — checkout, course-player
- * overlays (module/notes), subscription, profile, all of it — so the single
- * backdrop shows on every device. Every SOLID `bg-white` (but not the already
- * translucent `bg-white/60` glass) becomes a 55%-white frosted panel with blur:
- * the backdrop glows through, the dark ink stays readable on the frost, and no
- * page reads as a flat white sheet. Gated on data-glass="on"; ?glass=off keeps
- * the opaque white. */
-html[data-glass="on"] [class*="bg-white"]:not([class*="bg-white/"]) {
-  background-color: rgb(var(--dc-paper-on-ink) / 0.55);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  backdrop-filter: blur(14px) saturate(140%);
-}
-
-/* ── Part 1g · the last CSS-file surfaces: course, flowpath, chrome, revision ─
- * These paint their backgrounds in src/index.css (not via bg-white/bg-gradient
- * classes), so the earlier rules couldn't reach them. Under glass the course
- * cards/surfaces, revision cards and the desktop topbar/rail become the same
- * 55%-white frost; the FlowPath background grid and the mobile-header / footer
- * glow gradients are removed; the premium CTA's gradient overlay goes solid.
- * The .dc-glass* material sheens are intentionally kept (that IS the glass).
- * Gated on data-glass="on"; ?glass=off restores everything. */
-html[data-glass="on"] [data-course-mindmap-map-card],
-html[data-glass="on"] [data-course-notes-grid] [data-course-note],
-html[data-glass="on"] .course-audio-surface,
-html[data-glass="on"] .course-image-surface,
-html[data-glass="on"] .rev-card,
-html[data-glass="on"] .dc-desktop-shell [data-desktop-topbar],
-html[data-glass="on"] .dc-desktop-shell [data-desktop-rail] {
-  background: rgb(var(--dc-paper-on-ink) / 0.55) !important;
-  background-image: none !important;
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  backdrop-filter: blur(14px) saturate(140%);
-}
+/* ── Part 1g (kept) · decorative glows / grid that only CSS files paint ───── */
 html[data-glass="on"] .fp-bg-grid,
 html[data-glass="on"] .mobile-header-glow::before,
 html[data-glass="on"] .mobile-header-glow::after,

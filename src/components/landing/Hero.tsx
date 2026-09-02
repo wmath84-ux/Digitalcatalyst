@@ -34,7 +34,7 @@ export default function Hero() {
             ) : null}
           </h1>
 
-          <p className="mt-6 max-w-xl text-base leading-relaxed text-slate-300 sm:text-lg">
+          <p className="mt-6 max-w-xl text-base leading-relaxed text-white/40 sm:text-lg">
             Premium PDFs, cinematic video lectures, and a focused study planner —
             one immersive platform engineered to accelerate how you learn.
           </p>
@@ -60,7 +60,7 @@ export default function Hero() {
             </motion.button>
           </div>
 
-          <div className="mt-10 flex flex-wrap gap-6 text-sm text-slate-400">
+          <div className="mt-10 flex flex-wrap gap-6 text-sm text-white/55">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400" /> 50k+ Students
             </div>
@@ -78,7 +78,7 @@ export default function Hero() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1, duration: 1 }}
-        className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2 text-xs uppercase tracking-[0.3em] text-slate-500"
+        className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2 text-xs uppercase tracking-[0.3em] text-white/55"
       >
         ▼ Scroll to Explore
       </motion.div>

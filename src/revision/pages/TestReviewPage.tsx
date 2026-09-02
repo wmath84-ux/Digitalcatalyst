@@ -31,18 +31,18 @@ export default function TestReviewPage({ uid, route, attemptId }: { uid: string;
                 ? "border-emerald-300 bg-emerald-50"
                 : status === "wrong"
                   ? "border-rose-300 bg-rose-50"
-                  : "border-slate-300 bg-slate-50";
+                  : "border-white/10 bg-white/[0.06]";
             return (
               <Card key={q.id} className={`border-2 ${statusStyles}`}>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-bold text-slate-500">Q{idx + 1}</span>
+                  <span className="text-xs font-bold text-white/55">Q{idx + 1}</span>
                   <Badge tone={q.difficulty}>{q.difficulty}</Badge>
                   <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                     {q.subjectIcon} {q.subjectName} · {q.topicName}
                   </span>
                   <StatusPill status={status} />
                 </div>
-                <p className="text-[15px] font-semibold leading-snug text-slate-900">{q.prompt}</p>
+                <p className="text-[15px] font-semibold leading-snug text-white">{q.prompt}</p>
 
                 <div className="mt-3 space-y-2">
                   {q.options.map((opt, optIdx) => {
@@ -53,7 +53,7 @@ export default function TestReviewPage({ uid, route, attemptId }: { uid: string;
                     else if (isUserOpt && !isCorrectOpt) cls = "border-rose-300 bg-rose-100 text-rose-800";
                     return (
                       <div key={optIdx} className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm font-medium ${cls}`}>
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/70 text-[11px] font-bold">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-bold">
                           {OPTION_LETTERS[optIdx]}
                         </span>
                         <span className="flex-1">{opt}</span>
@@ -64,9 +64,9 @@ export default function TestReviewPage({ uid, route, attemptId }: { uid: string;
                   })}
                 </div>
 
-                <div className="mt-3 rounded-xl bg-white/80 p-3">
-                  <p className="text-xs font-bold text-slate-600">Explanation</p>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-700">{q.explanation}</p>
+                <div className="mt-3 rounded-xl bg-white/[0.08] p-3">
+                  <p className="text-xs font-bold text-white/75">Explanation</p>
+                  <p className="mt-1 text-sm leading-relaxed text-white/85">{q.explanation}</p>
                 </div>
               </Card>
             );

@@ -9,13 +9,13 @@ export default function Footer() {
   return (
     // The landing no longer lives inside the desktop shell, so the footer
     // (privacy / terms links) shows on every viewport size again.
-    <footer className="border-t border-white/10 px-6 py-10 text-slate-500 sm:px-8">
+    <footer className="border-t border-white/10 px-6 py-10 text-white/55 sm:px-8">
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
         <div className="flex items-center gap-2">
           <BrandMark className="h-8 w-8 rounded-lg" fallbackLetter />
-          <span className="text-sm font-semibold text-slate-300">
+          <span className="text-sm font-semibold text-white/40">
             {appName}
-            {tagline ? <span className="text-slate-500"> | {tagline}</span> : null}
+            {tagline ? <span className="text-white/55"> | {tagline}</span> : null}
           </span>
         </div>
         <p className="text-xs">© {new Date().getFullYear()} {appName}. All rights reserved.</p>
@@ -23,17 +23,17 @@ export default function Footer() {
           <button
             type="button"
             onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-            className="hover:text-slate-300"
+            className="hover:text-white/40"
           >
             Features
           </button>
-          <button type="button" onClick={openApp} className="hover:text-slate-300">
+          <button type="button" onClick={openApp} className="hover:text-white/40">
             Open App
           </button>
-          <a href="/privacy-policy.html" className="hover:text-slate-300">
+          <a href="/privacy-policy.html" className="hover:text-white/40">
             Privacy Policy
           </a>
-          <a href="/terms-of-service.html" className="hover:text-slate-300">
+          <a href="/terms-of-service.html" className="hover:text-white/40">
             Terms of Service
           </a>
         </div>

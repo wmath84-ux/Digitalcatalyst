@@ -615,12 +615,12 @@ export default function App() {
                 value={globalSearch}
                 onChange={(e) => setGlobalSearch(e.target.value)}
                 placeholder="Search tasks, notes..."
-                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                className="w-full bg-transparent text-sm text-white/85 outline-none placeholder:text-white/55"
               />
               {globalSearch && (
                 <button
                   onClick={() => { setGlobalSearch(""); setShowMobileSearch(false); }}
-                  className="shrink-0 rounded-full p-1 text-slate-400 transition hover:bg-white/80 hover:text-slate-600"
+                  className="shrink-0 rounded-full p-1 text-white/55 transition hover:bg-white/[0.08] hover:text-white/75"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -646,7 +646,7 @@ export default function App() {
                 the allowance at the exact moment a creation is blocked. */}
             {(!cloudLoaded || savingMyDay || cloudSyncFailed) && (
               <div className="mb-3 text-center">
-                <p className={cloudSyncFailed ? "text-[11px] font-bold text-amber-700" : "text-[11px] font-semibold text-slate-400"}>
+                <p className={cloudSyncFailed ? "text-[11px] font-bold text-amber-700" : "text-[11px] font-semibold text-white/55"}>
                   {savingMyDay
                     ? "Saving My Day…"
                     : cloudSyncFailed

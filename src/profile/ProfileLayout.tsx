@@ -702,7 +702,7 @@ function QuickStat({ icon, value, label, tone, onClick }: { icon: ReactNode; val
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-white/10 bg-white/[0.06] p-3 text-center transition hover:bg-white/[0.08] active:scale-[0.97] md:rounded-xl md:p-3.5 md:"
+      className="rounded-2xl border border-white/10 bg-white/[0.06] p-3 text-center transition hover:bg-white/[0.08] active:scale-[0.97] md:rounded-xl md:p-3.5"
     >
       <span className={`mx-auto grid h-10 w-10 place-items-center rounded-xl ring-1 md:h-11 md:w-11 ${tone}`}>{icon}</span>
       <span className="mt-2 block text-2xl font-black text-white md:text-3xl">{value}</span>

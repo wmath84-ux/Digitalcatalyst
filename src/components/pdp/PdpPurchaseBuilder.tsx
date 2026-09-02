@@ -431,7 +431,7 @@ function ExtraModeChip({ active, onClick, children }: { active: boolean; onClick
       onClick={onClick}
       className={`inline-flex items-center justify-center rounded-2xl border px-3 py-2 text-xs font-black transition sm:text-sm ${
         active
-          ? "border-violet-600 bg-violet-600 text-white shadow-md shadow-violet-200"
+          ? "border-violet-600 bg-violet-600 text-white shadow-md"
           : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:text-violet-700"
       }`}
     >
@@ -473,7 +473,7 @@ function FullCoursePanel({
           {isProductOwned ? "Owned" : formatPrice(fullCourse.effectivePrice) || "Free"}
         </span>
         {!isProductOwned && fullCourse.salePrice !== null && fullCourse.salePrice < fullCourse.regularPrice ? (
-          <span className="pb-1 text-base text-slate-400 line-through sm:text-lg">
+          <span className="pb-1 text-base text-white/55 line-through sm:text-lg">
             {formatPriceValue(fullCourse.regularPrice)}
           </span>
         ) : null}
@@ -483,12 +483,12 @@ function FullCoursePanel({
           </span>
         ) : null}
       </div>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-white/55">
         Full course · {modules.length} module{modules.length === 1 ? "" : "s"} · Lifetime access
       </p>
       <div className="mt-4">
-        <p className="text-xs font-black uppercase tracking-wider text-slate-400">What's included</p>
-        <ul className="mt-2 space-y-1.5 text-xs text-slate-600 sm:text-sm">
+        <p className="text-xs font-black uppercase tracking-wider text-white/55">What's included</p>
+        <ul className="mt-2 space-y-1.5 text-xs text-white/75 sm:text-sm">
           {modules.slice(0, 6).map((m) => (
             <li key={m.id} className="flex items-center gap-2">
               <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
@@ -496,7 +496,7 @@ function FullCoursePanel({
             </li>
           ))}
           {modules.length > 6 ? (
-            <li className="text-xs font-semibold text-slate-500">+ {modules.length - 6} more module{modules.length - 6 === 1 ? "" : "s"}</li>
+            <li className="text-xs font-semibold text-white/55">+ {modules.length - 6} more module{modules.length - 6 === 1 ? "" : "s"}</li>
           ) : null}
         </ul>
       </div>
@@ -526,7 +526,7 @@ function ResourceSelector({
   }
   return (
     <div className="space-y-2">
-      <p className="px-1 text-xs font-black uppercase tracking-wider text-slate-400">
+      <p className="px-1 text-xs font-black uppercase tracking-wider text-white/55">
         Individually purchasable resources
       </p>
       {resources.map((r) => {
@@ -542,7 +542,7 @@ function ResourceSelector({
             data-pdp-resource
             data-resource-id={r.id}
             className={`flex items-start gap-3 rounded-2xl border bg-white p-3 shadow-sm transition sm:p-4 ${
-              isSelected ? "border-violet-500 ring-2 ring-violet-200" : "border-slate-200"
+              isSelected ? "border-violet-500 ring-2 ring-violet-200" : "border-white/10"
             }`}
           >
             <button
@@ -556,7 +556,7 @@ function ResourceSelector({
                   ? "cursor-not-allowed border-emerald-500 bg-emerald-500 text-white"
                   : isSelected
                     ? "border-violet-600 bg-violet-600 text-white"
-                    : "border-slate-300 bg-white"
+                    : "border-white/10 bg-white"
               }`}
             >
               {isOwned ? <Unlock size={12} /> : isSelected ? <Check size={14} /> : null}
@@ -566,7 +566,7 @@ function ResourceSelector({
                 <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-slate-50 text-slate-500">
                   <TypeIcon size={12} />
                 </span>
-                <h3 className="min-w-0 truncate text-sm font-black text-slate-900">{r.name}</h3>
+                <h3 className="min-w-0 truncate text-sm font-black text-white">{r.name}</h3>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
                   {RESOURCE_TYPE_LABEL[r.type] || r.type}
                 </span>
@@ -576,19 +576,19 @@ function ResourceSelector({
                   </span>
                 ) : null}
               </div>
-              <p className="mt-1 truncate text-xs text-slate-500">
+              <p className="mt-1 truncate text-xs text-white/55">
                 {r.parentTitle ? `From “${r.parentTitle}”` : ""}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs">
                 {price !== null ? (
                   <>
-                    <span className="font-black text-slate-900">{formatPrice(price)}</span>
+                    <span className="font-black text-white">{formatPrice(price)}</span>
                     {sale !== null && sale < (regular ?? Number.POSITIVE_INFINITY) ? (
-                      <span className="text-slate-400 line-through">{formatPriceValue(regular)}</span>
+                      <span className="text-white/55 line-through">{formatPriceValue(regular)}</span>
                     ) : null}
                   </>
                 ) : (
-                  <span className="text-slate-400">No price</span>
+                  <span className="text-white/55">No price</span>
                 )}
 
               </div>
@@ -618,7 +618,7 @@ function PaidUpdateSelector({
   }
   return (
     <div className="space-y-2">
-      <p className="px-1 text-xs font-black uppercase tracking-wider text-slate-400">Available paid updates</p>
+      <p className="px-1 text-xs font-black uppercase tracking-wider text-white/55">Available paid updates</p>
       {updates.map((u) => {
         const isSelected = selectedId === u.id;
         return (
@@ -629,26 +629,26 @@ function PaidUpdateSelector({
             data-update-id={u.id}
             onClick={() => onSelect(isSelected ? null : u.id)}
             className={`flex w-full items-start gap-3 rounded-2xl border bg-white p-3 text-left shadow-sm transition sm:p-4 ${
-              isSelected ? "border-violet-500 ring-2 ring-violet-200" : "border-slate-200 hover:border-violet-300"
+              isSelected ? "border-violet-500 ring-2 ring-violet-200" : "border-white/10 hover:border-violet-300"
             }`}
           >
             <span
               className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 ${
-                isSelected ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300 bg-white"
+                isSelected ? "border-violet-600 bg-violet-600 text-white" : "border-white/10 bg-white"
               }`}
             >
               {isSelected ? <Check size={14} /> : null}
             </span>
             <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-black text-slate-900">{u.title}</h3>
+              <h3 className="text-sm font-black text-white">{u.title}</h3>
               {u.description ? (
-                <p className="mt-1 line-clamp-2 text-xs text-slate-500 sm:text-sm">{u.description}</p>
+                <p className="mt-1 line-clamp-2 text-xs text-white/55 sm:text-sm">{u.description}</p>
               ) : null}
               <p className="mt-1 text-[11px] font-semibold text-violet-600">Includes {u.includedModuleIds.length} module{u.includedModuleIds.length === 1 ? "" : "s"} and {u.includedResourceIds.length} file{u.includedResourceIds.length === 1 ? "" : "s"}</p>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs">
-                <span className="font-black text-slate-900">{formatPrice(u.cashPrice)}</span>
+                <span className="font-black text-white">{formatPrice(u.cashPrice)}</span>
                 {u.publishDate ? (
-                  <span className="text-slate-400">Published {new Date(u.publishDate).toLocaleDateString("en-IN")}</span>
+                  <span className="text-white/55">Published {new Date(u.publishDate).toLocaleDateString("en-IN")}</span>
                 ) : null}
               </div>
             </div>
@@ -673,12 +673,12 @@ function SummaryPanel({
   return (
     <section data-pdp-summary className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-black uppercase tracking-wider text-slate-400">Order summary</p>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{summary.selectedCount} item{summary.selectedCount === 1 ? "" : "s"}</p>
+        <p className="text-xs font-black uppercase tracking-wider text-white/55">Order summary</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-white/55">{summary.selectedCount} item{summary.selectedCount === 1 ? "" : "s"}</p>
       </div>
       <div className="mt-3 space-y-1.5 text-sm">
         {summary.selectedTitles.length > 0 ? (
-          <ul className="space-y-1 text-xs text-slate-600 sm:text-sm">
+          <ul className="space-y-1 text-xs text-white/75 sm:text-sm">
             {summary.lineItems.filter((l) => !l.alreadyOwned).map((line) => (
               <li key={line.id} className="flex items-center gap-2">
                 <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-violet-100 text-violet-700">
@@ -686,14 +686,14 @@ function SummaryPanel({
                 </span>
                 <span className="truncate">{line.title}</span>
                 {line.parentTitle ? (
-                  <span className="ml-1 truncate text-xs text-slate-400">· {line.parentTitle}</span>
+                  <span className="ml-1 truncate text-xs text-white/55">· {line.parentTitle}</span>
                 ) : null}
-                <span className="ml-auto shrink-0 font-bold text-slate-900">
+                <span className="ml-auto shrink-0 font-bold text-white">
                   {line.regularPrice === line.effectivePrice
                     ? formatPriceValue(line.effectivePrice)
                     : (
                       <span className="inline-flex items-center gap-1">
-                        <span className="text-slate-400 line-through">{formatPriceValue(line.regularPrice)}</span>
+                        <span className="text-white/55 line-through">{formatPriceValue(line.regularPrice)}</span>
                         <span>{formatPriceValue(line.effectivePrice)}</span>
                       </span>
                     )}
@@ -702,13 +702,13 @@ function SummaryPanel({
             ))}
           </ul>
         ) : (
-          <p className="text-xs italic text-slate-400 sm:text-sm">Nothing selected yet — choose a mode above.</p>
+          <p className="text-xs italic text-white/55 sm:text-sm">Nothing selected yet — choose a mode above.</p>
         )}
       </div>
-      <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-sm">
-        <div className="flex items-center justify-between text-slate-500">
+      <div className="mt-3 space-y-1.5 border-t border-white/10 pt-3 text-sm">
+        <div className="flex items-center justify-between text-white/55">
           <span>Regular subtotal</span>
-          <span className="font-medium text-slate-700">{formatPriceValue(summary.regularSubtotal) || "₹0"}</span>
+          <span className="font-medium text-white/85">{formatPriceValue(summary.regularSubtotal) || "₹0"}</span>
         </div>
         {summary.saleSavings > 0 ? (
           <div className="flex items-center justify-between text-emerald-600">
@@ -718,7 +718,7 @@ function SummaryPanel({
             <span className="font-medium">− {formatPriceValue(summary.saleSavings) || ""}</span>
           </div>
         ) : null}
-        <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-base font-black text-slate-900 sm:text-lg">
+        <div className="flex items-center justify-between border-t border-white/10 pt-2 text-base font-black text-white sm:text-lg">
           <span>Total due today</span>
           <span>{formatPrice(summary.effectiveSubtotal)}</span>
         </div>
@@ -728,7 +728,7 @@ function SummaryPanel({
           <span className="inline-flex items-center gap-1">
             <ShoppingBag size={12} /> Full course: {formatPriceValue(summary.fullCourse.effectivePrice)}
           </span>
-          <span className="font-semibold text-slate-700">{diffLabel}</span>
+          <span className="font-semibold text-white/85">{diffLabel}</span>
         </div>
       ) : null}
     </section>
@@ -829,7 +829,7 @@ function CtaBar({
         type="button"
         onClick={onPreview}
         disabled={disabled}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-violet-200 transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-4 text-base font-black text-white shadow-lg transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <Star className="hidden sm:block" size={16} />
         {icon ? (() => {
@@ -838,8 +838,8 @@ function CtaBar({
         })() : null}
         <span className="truncate">{label}</span>
       </button>
-      {helper ? <p className="px-1 text-center text-[11px] font-semibold text-slate-400">{helper}</p> : null}
-      <p className="px-1 text-center text-[10px] font-medium text-slate-400">
+      {helper ? <p className="px-1 text-center text-[11px] font-semibold text-white/55">{helper}</p> : null}
+      <p className="px-1 text-center text-[10px] font-medium text-white/55">
         Preview-only — payment wiring is coming next.
       </p>
     </div>

@@ -135,7 +135,7 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600">School AI allowance</p>
-              <h3 className="mt-1 truncate text-lg font-black text-slate-950">
+              <h3 className="mt-1 truncate text-lg font-black text-white">
                 {hasAuthoritativeSnapshot
                   ? `${snap.planName} · ${snap.planId === "free" ? "No billing cycle" : `${formatCycle(snap.cycle)} billing`}`
                   : "Checking your effective plan…"}
@@ -164,8 +164,8 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
             {syncing ? (
               <div className="space-y-3">
                 <div className="h-3 w-3/4 animate-pulse rounded-full bg-violet-100" />
-                <div className="h-2.5 animate-pulse rounded-full bg-slate-200" />
-                <p className="text-xs font-semibold text-slate-500">Loading used, remaining and reset information from the server…</p>
+                <div className="h-2.5 animate-pulse rounded-full bg-white/[0.12]" />
+                <p className="text-xs font-semibold text-white/55">Loading used, remaining and reset information from the server…</p>
               </div>
             ) : (
               <div className="flex items-start gap-2 text-amber-800">
@@ -180,20 +180,20 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
         ) : (
           <>
             <div className="mt-5">
-              <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+              <div className="flex items-center justify-between text-[11px] font-bold text-white/55">
                 <span>Today · {snap.dailyUnlimited ? "no daily cap" : `${snap.dailyUsed} / ${snap.dailyLimit} used`}</span>
                 <span className="text-violet-700">{dailyLeftLabel}</span>
               </div>
               <Bar used={snap.dailyUsed} limit={snap.dailyLimit} unlimited={snap.dailyUnlimited} tone="bg-violet-500" />
               {!snap.dailyUnlimited && (
-                <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
+                <p className="mt-1.5 text-[11px] font-semibold text-white/55">
                   Resets in {dailyResetIn} · {new Date(snap.dailyResetsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.
                 </p>
               )}
             </div>
 
             <div className="mt-4">
-              <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+              <div className="flex items-center justify-between text-[11px] font-bold text-white/55">
                 <span className="inline-flex items-center gap-1">
                   <Clock3 className="h-3.5 w-3.5" />
                   {snap.windowHours}-hour safety window · {snap.windowUnlimited ? "no cap" : `${snap.windowUsed} / ${snap.windowLimit} used`}
@@ -202,13 +202,13 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
               </div>
               <Bar used={snap.windowUsed} limit={snap.windowLimit} unlimited={snap.windowUnlimited} tone="bg-indigo-500" />
               {!snap.windowUnlimited && snap.windowUsed > 0 && (
-                <p className="mt-1.5 text-[11px] font-semibold text-slate-400">Oldest use in this window frees in {windowResetIn}.</p>
+                <p className="mt-1.5 text-[11px] font-semibold text-white/55">Oldest use in this window frees in {windowResetIn}.</p>
               )}
             </div>
 
             {snap.costEnabled && (
               <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50/60 p-3">
-                <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+                <div className="flex items-center justify-between text-[11px] font-bold text-white/55">
                   <span className="inline-flex items-center gap-1">
                     <Coins className="h-3.5 w-3.5 text-amber-600" />
                     Model cost this term · {snap.costUnlimited ? "no cap" : `$${(snap.costUsedMicros / 1_000_000).toFixed(4)} / $${(snap.costBudgetMicros / 1_000_000).toFixed(2)}`}
@@ -216,9 +216,9 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
                   <span className="text-amber-700">{snap.costUnlimited ? "Unlimited" : `$${(snap.costRemainingMicros / 1_000_000).toFixed(4)} left`}</span>
                 </div>
                 <Bar used={snap.costUsedMicros} limit={snap.costBudgetMicros} unlimited={snap.costUnlimited} tone="bg-amber-500" />
-                {snap.termEndsAt > now && <p className="mt-1.5 text-[11px] font-semibold text-slate-400">Budget term ends {new Date(snap.termEndsAt).toLocaleDateString()}.</p>}
+                {snap.termEndsAt > now && <p className="mt-1.5 text-[11px] font-semibold text-white/55">Budget term ends {new Date(snap.termEndsAt).toLocaleDateString()}.</p>}
                 {record.lastUsage && (
-                  <p className="mt-1 text-[10px] leading-relaxed text-slate-400">
+                  <p className="mt-1 text-[10px] leading-relaxed text-white/55">
                     Last test: {record.lastUsage.totalTokens.toLocaleString()} tokens ({record.lastUsage.usageSource}) · {record.lastUsage.model} · ${(record.lastUsage.actualCostMicros / 1_000_000).toFixed(4)}
                   </p>
                 )}
@@ -228,7 +228,7 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
             {snap.blockedReason ? (
               <p className="mt-4 rounded-2xl bg-rose-50 px-3 py-2.5 text-xs font-semibold leading-5 text-rose-700">{snap.blockedReason}</p>
             ) : (
-              <p className="mt-4 text-xs leading-5 text-slate-600">
+              <p className="mt-4 text-xs leading-5 text-white/75">
                 One complete school-AI test uses one generation. Provider failure, incomplete output and your own API key do not use this allowance.
               </p>
             )}

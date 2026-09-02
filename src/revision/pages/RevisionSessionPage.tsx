@@ -67,7 +67,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
       <PageShell route={route} title="Revision Session" backHref="#/revision/bank" hideNav>
         {isInvalidState ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-            <p className="text-sm text-slate-600">This session has already finished.</p>
+            <p className="text-sm text-white/75">This session has already finished.</p>
             <PrimaryButton className="w-auto px-6" onClick={() => navigate(`#/revision/session/${sessionId}/result`)}>
               View Results
             </PrimaryButton>
@@ -154,7 +154,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
                   {question.subjectIcon} {question.subjectName} · {question.topicName}
                 </span>
               </div>
-              <h2 className="text-[19px] font-semibold leading-snug text-slate-900">{question.prompt}</h2>
+              <h2 className="text-[19px] font-semibold leading-snug text-white">{question.prompt}</h2>
 
               <div className="mt-5 space-y-3">
                 {question.options.map((opt, idx) => {
@@ -185,7 +185,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
               <button
                 type="button"
                 onClick={goNext}
-                className="mt-4 flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-slate-500 active:text-slate-600"
+                className="mt-4 flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-white/55 active:text-white/75"
               >
                 Skip this question
               </button>
@@ -210,7 +210,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
             )}
           </PrimaryButton>
         </div>
-        <p className="pb-2 text-center text-[11px] font-medium text-slate-500">{answeredCount} of {total} answered</p>
+        <p className="pb-2 text-center text-[11px] font-medium text-white/55">{answeredCount} of {total} answered</p>
       </div>
     </PageShell>
   );

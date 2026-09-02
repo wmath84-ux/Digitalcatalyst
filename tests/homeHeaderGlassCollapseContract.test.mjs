@@ -72,8 +72,9 @@ test("shared, desktop, revision and search headers use watercolor glass, not opa
   assert.match(css, /\[data-revision-app-header\]/);
   assert.match(css, /\[data-revision-app\] \.dc-glass-toolbar/);
   assert.match(css, /\[data-search-bar\]/);
-  assert.match(css, /rgba\(186,\s*230,\s*253/);
-  assert.match(css, /rgba\(196,\s*181,\s*253/);
+  // Phase A: the chrome token is the pack GlassSurface dark material at its defaults.
+  assert.match(css, /--dc-chrome-glass: rgba\(60, 62, 68, 0\.21\)/);
+  assert.match(css, /--dc-chrome-glass-blur: blur\(9\.8px\) saturate\(1\.3\)/);
   assert.doesNotMatch(
     css.slice(css.lastIndexOf("CHROME GLASS")),
     /rgba\(255,\s*255,\s*255,\s*0\.9[0-9]\)/,

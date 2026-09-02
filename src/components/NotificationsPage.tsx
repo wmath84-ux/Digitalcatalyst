@@ -88,7 +88,7 @@ function notificationIcon(notification: SiteNotification): IconStyle {
     case "subscription":
       return { Icon: CreditCard, bg: "bg-purple-50", color: "text-purple-600" };
     default:
-      return { Icon: Sparkles, bg: "bg-slate-50", color: "text-slate-600" };
+      return { Icon: Sparkles, bg: "bg-white/[0.06]", color: "text-white/75" };
   }
 }
 
@@ -231,7 +231,7 @@ export default function NotificationsPage({
                 onClick={markAllRead}
                 aria-label="Mark all read"
                 title="Mark all read"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm shadow-indigo-200 transition hover:bg-indigo-700 active:scale-95"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-700 active:scale-95"
               >
                 <CheckIcon className="h-5 w-5" />
               </button>
@@ -250,7 +250,7 @@ export default function NotificationsPage({
                     onClick={() => setActiveFilter(key)}
                     className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition ${
                       isActive
-                        ? "border-indigo-500 bg-indigo-600 text-white shadow-sm"
+                        ? "border-indigo-500 bg-indigo-600 text-white"
                         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                     }`}
                   >
@@ -274,8 +274,8 @@ export default function NotificationsPage({
           {pushPermission === "default" && (
             <div className="mx-4 mt-1 flex items-center justify-between gap-3 rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-100">
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-900">Get alerts on your phone</p>
-                <p className="mt-0.5 text-xs text-slate-500">Allow notifications to receive purchase unlocks and reminders as system alerts.</p>
+                <p className="text-sm font-bold text-white">Get alerts on your phone</p>
+                <p className="mt-0.5 text-xs text-white/55">Allow notifications to receive purchase unlocks and reminders as system alerts.</p>
               </div>
               <button
                 type="button"
@@ -288,8 +288,8 @@ export default function NotificationsPage({
           )}
           {pushPermission === "denied" && (
             <div className="mx-4 mt-1 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-100">
-              <p className="text-sm font-bold text-slate-900">Notifications are blocked</p>
-              <p className="mt-0.5 text-xs text-slate-500">Enable them in your browser's site settings (usually under App info → Notifications) to receive system alerts.</p>
+              <p className="text-sm font-bold text-white">Notifications are blocked</p>
+              <p className="mt-0.5 text-xs text-white/55">Enable them in your browser's site settings (usually under App info → Notifications) to receive system alerts.</p>
             </div>
           )}
 
@@ -298,17 +298,17 @@ export default function NotificationsPage({
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
                 <BellIcon className="h-7 w-7" />
               </div>
-              <h3 className="text-xl font-extrabold text-slate-900">
+              <h3 className="text-xl font-extrabold text-white">
                 {activeFilter === "all" ? "No notifications yet" : `No ${FILTER_META[activeFilter as Exclude<NotificationFilterKey, "all">].label} notifications`}
               </h3>
-              <p className="max-w-xs text-sm text-slate-500">
+              <p className="max-w-xs text-sm text-white/55">
                 {activeFilter === "all"
                   ? "Store updates, course unlocks, and study reminders will show up here."
                   : FILTER_META[activeFilter as Exclude<NotificationFilterKey, "all">].hint}
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 px-2 pb-6">
+            <div className="divide-y divide-white/10 px-2 pb-6">
               {visibleItems.map((notification) => {
                 return (
                   <button
@@ -331,9 +331,9 @@ export default function NotificationsPage({
                       );
                     })()}
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-bold text-slate-900">{notification.title}</span>
-                      <span className="mt-0.5 block text-xs leading-5 text-slate-500">{notification.body}</span>
-                      <span className="mt-1 block text-[11px] font-semibold text-slate-400">{timeAgo(notification.createdAt)}</span>
+                      <span className="block text-sm font-bold text-white">{notification.title}</span>
+                      <span className="mt-0.5 block text-xs leading-5 text-white/55">{notification.body}</span>
+                      <span className="mt-1 block text-[11px] font-semibold text-white/55">{timeAgo(notification.createdAt)}</span>
                     </span>
                     {!notification.read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-indigo-600" />}
                   </button>

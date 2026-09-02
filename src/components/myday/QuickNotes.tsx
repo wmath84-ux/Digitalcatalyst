@@ -14,11 +14,11 @@ interface QuickNotesProps {
 }
 
 const colorStyles: Record<NoteColor, { card: string; editBg: string; highlight: string }> = {
-  amber: { card: "bg-white/76 border-amber-300/70 text-amber-900 shadow-sm shadow-amber-100/60 backdrop-blur-xl", editBg: "bg-amber-50/90", highlight: "bg-amber-300" },
-  sky: { card: "bg-white/76 border-sky-300/70 text-sky-900 shadow-sm shadow-sky-100/60 backdrop-blur-xl", editBg: "bg-sky-50/90", highlight: "bg-sky-300" },
-  rose: { card: "bg-white/76 border-rose-300/70 text-rose-900 shadow-sm shadow-rose-100/60 backdrop-blur-xl", editBg: "bg-rose-50/90", highlight: "bg-rose-300" },
-  emerald: { card: "bg-white/76 border-emerald-300/70 text-emerald-900 shadow-sm shadow-emerald-100/60 backdrop-blur-xl", editBg: "bg-emerald-50/90", highlight: "bg-emerald-300" },
-  violet: { card: "bg-white/76 border-violet-300/70 text-violet-900 shadow-sm shadow-violet-100/60 backdrop-blur-xl", editBg: "bg-violet-50/90", highlight: "bg-violet-300" },
+  amber: { card: "bg-white/[0.08] border-amber-300/70 text-amber-900 backdrop-blur-xl", editBg: "bg-amber-50/90", highlight: "bg-amber-300" },
+  sky: { card: "bg-white/[0.08] border-sky-300/70 text-sky-900 shadow-sky-100/60 backdrop-blur-xl", editBg: "bg-sky-50/90", highlight: "bg-sky-300" },
+  rose: { card: "bg-white/[0.08] border-rose-300/70 text-rose-900 shadow-rose-100/60 backdrop-blur-xl", editBg: "bg-rose-50/90", highlight: "bg-rose-300" },
+  emerald: { card: "bg-white/[0.08] border-emerald-300/70 text-emerald-900 backdrop-blur-xl", editBg: "bg-emerald-50/90", highlight: "bg-emerald-300" },
+  violet: { card: "bg-white/[0.08] border-violet-300/70 text-violet-900 backdrop-blur-xl", editBg: "bg-violet-50/90", highlight: "bg-violet-300" },
 };
 
 const MAX_COLLAPSED_LENGTH = 80; // Characters before truncating
@@ -115,8 +115,8 @@ function BigNoteEditor({
           }
         }}
         className={cn(
-          "w-full resize-none rounded-xl border-0 px-3 py-2.5 text-sm text-slate-700 outline-none min-h-[200px] max-h-[55dvh] overflow-y-auto custom-scrollbar placeholder:text-slate-400 focus:ring-2 focus:ring-rose-200/70",
-          surfaceClassName ?? "bg-white/80",
+          "w-full resize-none rounded-xl border-0 px-3 py-2.5 text-sm text-white/85 outline-none min-h-[200px] max-h-[55dvh] overflow-y-auto custom-scrollbar placeholder:text-white/55 focus:ring-2 focus:ring-rose-200/70",
+          surfaceClassName ?? "bg-white/[0.08]",
         )}
       />
       {/* Wave 4: the two icon actions keep their hooks and colours, but the
@@ -131,12 +131,12 @@ function BigNoteEditor({
               onClick={onDelete}
               aria-label="Delete note"
               data-myday-note-editor-delete
-              className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/60 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
+              className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.08] text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
             >
               <Trash2 className="h-4 w-4" />
             </TooltipTrigger>
             <TooltipContent side="top" tint={0.85}>
-              <span className="text-slate-800">Delete note</span>
+              <span className="text-white/85">Delete note</span>
             </TooltipContent>
           </Tooltip>
         ) : null}
@@ -145,12 +145,12 @@ function BigNoteEditor({
             onClick={onCancel}
             aria-label="Cancel editing"
             data-myday-note-editor-cancel
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/60 text-slate-500 transition hover:bg-white"
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.08] text-white/55 transition hover:bg-white"
           >
             <X className="h-4 w-4" />
           </TooltipTrigger>
           <TooltipContent side="top" tint={0.85}>
-            <span className="text-slate-800">Close without saving</span>
+            <span className="text-white/85">Close without saving</span>
           </TooltipContent>
         </Tooltip>
         {/* Checkbox-style Save: one click saves the note AND closes the
@@ -305,8 +305,8 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
           <NotebookPen className="h-5 w-5" />
         </div>
         <div className="flex-1">
-          <h2 className="text-base font-extrabold text-slate-900 sm:text-lg">Quick Notes</h2>
-          <p className="text-xs font-medium text-slate-500">
+          <h2 className="text-base font-extrabold text-white sm:text-lg">Quick Notes</h2>
+          <p className="text-xs font-medium text-white/55">
             {notes.length} note{notes.length !== 1 ? "s" : ""} • Click to edit
           </p>
         </div>
@@ -320,15 +320,15 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
             ? "ring-2 ring-rose-100/80"
             : "focus-within:ring-2 focus-within:ring-rose-100/80"
         )}>
-          <Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-rose-500" : "text-slate-400")} />
+          <Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-rose-500" : "text-white/55")} />
           <input
             value={globalSearch || localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             placeholder="Search notes..."
             disabled={!!globalSearch}
             className={cn(
-              "w-full bg-transparent text-sm outline-none placeholder:text-slate-400",
-              globalSearch ? "text-rose-700" : "text-slate-700"
+              "w-full bg-transparent text-sm outline-none placeholder:text-white/55",
+              globalSearch ? "text-rose-700" : "text-white/85"
             )}
           />
           {isSearchActive && (
@@ -373,7 +373,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
               onFocus={() => setComposerExpanded(true)}
               placeholder="Type a quick thought or reminder..."
               rows={1}
-              className="min-h-[40px] flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              className="min-h-[40px] flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-white/85 outline-none placeholder:text-white/55"
             />
             <button
               onClick={submit}
@@ -413,15 +413,15 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
               <div className="dc-glass flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-rose-200/70 bg-white/45 py-10 text-center">
                 {isSearchActive ? (
                   <>
-                    <Search className="h-8 w-8 text-slate-300" />
-                    <p className="text-sm font-bold text-slate-500">
+                    <Search className="h-8 w-8 text-white/40" />
+                    <p className="text-sm font-bold text-white/55">
                       No notes match "{searchQuery}"
                     </p>
                   </>
                 ) : (
                   <>
-                    <NotebookPen className="h-8 w-8 text-slate-300" />
-                    <p className="text-sm font-bold text-slate-500">No notes yet. Start jotting!</p>
+                    <NotebookPen className="h-8 w-8 text-white/40" />
+                    <p className="text-sm font-bold text-white/55">No notes yet. Start jotting!</p>
                   </>
                 )}
               </div>
@@ -490,24 +490,24 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
                               <TooltipTrigger
                                 onClick={() => startEdit(note)}
                                 aria-label="Edit note"
-                                className="flex h-7 w-7 items-center justify-center rounded-lg opacity-50 transition hover:bg-white/60 hover:opacity-100"
+                                className="flex h-7 w-7 items-center justify-center rounded-lg opacity-50 transition hover:bg-white/[0.08] hover:opacity-100"
                               >
                                 <Pencil className="h-3 w-3" />
                               </TooltipTrigger>
                               <TooltipContent side="top" tint={0.85}>
-                                <span className="text-slate-800">Edit note</span>
+                                <span className="text-white/85">Edit note</span>
                               </TooltipContent>
                             </Tooltip>
                             <Tooltip>
                               <TooltipTrigger
                                 onClick={() => onDelete(note.id)}
                                 aria-label="Delete note"
-                                className="flex h-7 w-7 items-center justify-center rounded-lg opacity-50 transition hover:bg-white/60 hover:opacity-100"
+                                className="flex h-7 w-7 items-center justify-center rounded-lg opacity-50 transition hover:bg-white/[0.08] hover:opacity-100"
                               >
                                 <Trash2 className="h-3 w-3" />
                               </TooltipTrigger>
                               <TooltipContent side="top" tint={0.85}>
-                                <span className="text-slate-800">Delete note</span>
+                                <span className="text-white/85">Delete note</span>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>

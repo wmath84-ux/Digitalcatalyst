@@ -62,19 +62,19 @@ function SourceOption({
     >
       <span
         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-          selected ? "border-indigo-600 bg-indigo-600" : "border-slate-300 bg-white"
+          selected ? "border-indigo-600 bg-indigo-600" : "border-white/10 bg-white"
         }`}
       >
         {selected && <span className="h-2 w-2 rounded-full bg-white" />}
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[13px] font-bold text-slate-900">{title}</span>
+          <span className="text-[13px] font-bold text-white">{title}</span>
           {badge && (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{badge}</span>
           )}
         </span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-slate-600">{description}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-white/75">{description}</span>
       </span>
     </button>
   );
@@ -179,7 +179,7 @@ export default function AiSettingsPage({ uid, route }: Props) {
       <div data-rev-layout="aisettings" className="animate-fade-in space-y-4 px-4 py-4 pb-10 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
         <Card>
           <div className="flex items-center justify-between">
-            <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">Current setup</h3>
+            <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">Current setup</h3>
             {savedFlash && (
               <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600">
                 <CheckIcon className="h-3.5 w-3.5" /> Saved automatically
@@ -197,8 +197,8 @@ export default function AiSettingsPage({ uid, route }: Props) {
               {userCfg.source === "default" && schoolProvider ? schoolProvider.mark : (effProvider?.mark ?? "▦")}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-bold text-slate-900">{currentTitle}</p>
-              <p className="text-xs text-slate-600">{currentLabel}</p>
+              <p className="truncate text-[13px] font-bold text-white">{currentTitle}</p>
+              <p className="text-xs text-white/75">{currentLabel}</p>
             </div>
             <span
               className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${
@@ -211,7 +211,7 @@ export default function AiSettingsPage({ uid, route }: Props) {
         </Card>
 
         <Card>
-          <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">1 · Where should AI come from?</h3>
+          <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">1 · Where should AI come from?</h3>
           <div className="mt-3 space-y-2">
             <SourceOption
               value="default"
@@ -241,8 +241,8 @@ export default function AiSettingsPage({ uid, route }: Props) {
 
         {userCfg.source === "default" && schoolReady && adminSettings && schoolProvider && (
           <Card data-school-ai-preview>
-            <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">2 · School AI</h3>
-            <p className="mt-1 text-xs text-slate-600">
+            <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">2 · School AI</h3>
+            <p className="mt-1 text-xs text-white/75">
               This is the configuration published from the admin panel. You don't need an API key.
             </p>
             <div className="mt-3 flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
@@ -252,8 +252,8 @@ export default function AiSettingsPage({ uid, route }: Props) {
                 {schoolProvider.mark}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-bold text-slate-900">{schoolProvider.name}</p>
-                <p className="truncate font-mono text-xs text-slate-600">{adminSettings.model}</p>
+                <p className="truncate text-[13px] font-bold text-white">{schoolProvider.name}</p>
+                <p className="truncate font-mono text-xs text-white/75">{adminSettings.model}</p>
               </div>
               <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
                 Shared key
@@ -264,8 +264,8 @@ export default function AiSettingsPage({ uid, route }: Props) {
 
         {userCfg.source === "own" && (
           <Card>
-            <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">2 · Connect your provider</h3>
-            <p className="mt-1 text-xs text-slate-600">
+            <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">2 · Connect your provider</h3>
+            <p className="mt-1 text-xs text-white/75">
               Pick a provider → paste your API key → models appear after the key loads. The API box starts empty.
             </p>
             <div className="mt-3">

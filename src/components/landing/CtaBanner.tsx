@@ -22,7 +22,7 @@ export default function CtaBanner() {
         <h2 className="mx-auto mt-4 max-w-2xl text-[clamp(1.8rem,4vw,2.75rem)] font-black leading-tight text-white">
           Step into your <span className="gradient-text">personalized learning universe</span>
         </h2>
-        <p className="mx-auto mt-4 max-w-xl text-slate-400">
+        <p className="mx-auto mt-4 max-w-xl text-white/55">
           One click takes you to your dashboard — libraries, lectures, and your
           daily study planner, all in one place.
         </p>

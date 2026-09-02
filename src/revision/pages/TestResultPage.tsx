@@ -67,13 +67,13 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
           <div data-rev-result-grid className="grid grid-cols-3 gap-3">
             <ResultChip icon={<CheckIcon className="h-5 w-5 text-emerald-600" />} label="Correct" value={data.correctCount} tone="bg-emerald-100" />
             <ResultChip icon={<XIcon className="h-5 w-5 text-rose-600" />} label="Wrong" value={data.wrongCount} tone="bg-rose-100" />
-            <ResultChip icon={<SparklesIcon className="h-5 w-5 text-slate-500" />} label="Skipped" value={data.skippedCount} tone="bg-slate-100" />
+            <ResultChip icon={<SparklesIcon className="h-5 w-5 text-white/55" />} label="Skipped" value={data.skippedCount} tone="bg-white/[0.06]" />
           </div>
 
           {data.planDetails && (
             <Card>
-              <h2 className="mb-3 text-[15px] font-bold text-slate-900">Saved Test Plan</h2>
-              <div className="space-y-1.5 rounded-2xl bg-slate-100/70 p-3 text-xs text-slate-700">
+              <h2 className="mb-3 text-[15px] font-bold text-white">Saved Test Plan</h2>
+              <div className="space-y-1.5 rounded-2xl bg-white/[0.06]/70 p-3 text-xs text-white/85">
                 {data.planDetails.classNames.length > 0 && <PlanDetail label="Class" value={displayList(data.planDetails.classNames, "")} />}
                 <PlanDetail label="Subject" value={displayList(data.planDetails.subjectNames, "Subject not labelled")} />
                 <PlanDetail label="Chapter" value={displayList(data.planDetails.chapterNames, "Chapter not labelled")} />
@@ -88,17 +88,17 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
 
           <Card>
             <div className="flex items-center justify-between">
-              <h2 className="text-[15px] font-bold text-slate-900">Accuracy</h2>
+              <h2 className="text-[15px] font-bold text-white">Accuracy</h2>
               <span className="text-sm font-bold text-indigo-600">{data.accuracy}%</span>
             </div>
             <ProgressBar value={data.accuracy} className="mt-2" />
-            <p className="mt-2 text-xs font-medium text-slate-500">
+            <p className="mt-2 text-xs font-medium text-white/55">
               {data.correctCount} correct out of {data.totalQuestions} questions
             </p>
           </Card>
 
           <Card>
-            <h2 className="mb-3 text-[15px] font-bold text-slate-900">Topic Breakdown</h2>
+            <h2 className="mb-3 text-[15px] font-bold text-white">Topic Breakdown</h2>
             <div className="space-y-3">
               {data.topicBreakdown
                 .sort((a, b) => a.accuracy - b.accuracy)
@@ -109,8 +109,8 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <p className="truncate text-sm font-medium text-slate-800">{t.topicName}</p>
-                        <span className="ml-2 text-xs font-semibold text-slate-600">
+                        <p className="truncate text-sm font-medium text-white/85">{t.topicName}</p>
+                        <span className="ml-2 text-xs font-semibold text-white/75">
                           {t.correct}/{t.total} · {t.accuracy}%
                         </span>
                       </div>
@@ -145,15 +145,15 @@ function displayList(items: string[], fallback: string) {
 }
 
 function PlanDetail({ label, value }: { label: string; value: string }) {
-  return <p className="line-clamp-1"><span className="font-bold text-slate-600">{label}:</span> <span>{value}</span></p>;
+  return <p className="line-clamp-1"><span className="font-bold text-white/75">{label}:</span> <span>{value}</span></p>;
 }
 
 function ResultChip({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: number; tone: string }) {
   return (
     <div className={`flex flex-col items-center gap-1 rounded-2xl py-3 ${tone}`}>
       {icon}
-      <span className="text-lg font-bold text-slate-900">{value}</span>
-      <span className="text-[10px] font-medium text-slate-500">{label}</span>
+      <span className="text-lg font-bold text-white">{value}</span>
+      <span className="text-[10px] font-medium text-white/55">{label}</span>
     </div>
   );
 }

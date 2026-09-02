@@ -25,7 +25,7 @@ export default function Header() {
           <BrandMark className="h-9 w-9 rounded-xl shadow-lg shadow-fuchsia-500/30" fallbackLetter />
           <span className="hidden text-lg font-bold tracking-tight text-white sm:block">
             {appName}
-            {tagline ? <span className="text-slate-400 font-medium"> | {tagline}</span> : null}
+            {tagline ? <span className="text-white/55 font-medium"> | {tagline}</span> : null}
           </span>
         </a>
 

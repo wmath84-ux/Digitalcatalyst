@@ -30,8 +30,8 @@ export default function EmptyState({
           <div className="text-white">{icon}</div>
         </div>
       </div>
-      <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-      <p className="mt-2 max-w-[240px] text-sm leading-relaxed text-slate-500">
+      <h2 className="text-xl font-bold text-white">{title}</h2>
+      <p className="mt-2 max-w-[240px] text-sm leading-relaxed text-white/55">
         {subtitle}
       </p>
       <button

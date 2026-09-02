@@ -76,7 +76,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Title */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
             Task Title <span className="text-rose-400">*</span>
           </label>
           <input
@@ -91,7 +91,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
         {/* Subject & Time row */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
               Subject
             </label>
             <input
@@ -104,7 +104,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
           <div>
             <label
               htmlFor="myday-task-time"
-              className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500"
+              className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55"
             >
               Time
             </label>
@@ -112,7 +112,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
               onClick={openTimePicker}
               className="flex w-full cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-all focus-within:border-indigo-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100"
             >
-              <Clock3 className="h-4 w-4 shrink-0 text-slate-400" />
+              <Clock3 className="h-4 w-4 shrink-0 text-white/55" />
               <input
                 id="myday-task-time"
                 ref={timeInputRef}
@@ -121,29 +121,29 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
                 value={task.time ?? ""}
                 onChange={(e) => setTask({ ...task, time: e.target.value })}
                 aria-label="Task time"
-                className="w-full bg-transparent text-sm text-slate-800 outline-none"
+                className="w-full bg-transparent text-sm text-white/85 outline-none"
               />
             </div>
             {task.time ? (
               <div className="mt-1.5 flex items-center justify-between">
-                <span className="text-[11px] font-medium text-slate-400">{formatTime12(task.time)}</span>
+                <span className="text-[11px] font-medium text-white/55">{formatTime12(task.time)}</span>
                 <button
                   type="button"
                   onClick={() => setTask({ ...task, time: "" })}
-                  className="text-[11px] font-semibold text-slate-400 transition hover:text-rose-500"
+                  className="text-[11px] font-semibold text-white/55 transition hover:text-rose-500"
                 >
                   Clear
                 </button>
               </div>
             ) : (
-              <p className="mt-1.5 text-[11px] font-medium text-slate-400">Optional — tap to pick a time</p>
+              <p className="mt-1.5 text-[11px] font-medium text-white/55">Optional — tap to pick a time</p>
             )}
           </div>
         </div>
 
         {/* Priority */}
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-white/55">
             Priority
           </label>
           <div className="flex gap-2">
@@ -155,8 +155,8 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
                 className={cn(
                   "flex flex-1 items-center justify-center gap-2 rounded-xl border-2 px-3 py-2.5 text-xs font-semibold transition-all",
                   task.priority === p.key
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
-                    : "border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50",
+                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                    : "border-white/10 text-white/55 hover:border-white/10 hover:bg-white/[0.06]",
                 )}
               >
                 <span className={cn("h-2 w-2 rounded-full", p.dot)} />
@@ -168,7 +168,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
 
         {/* Status */}
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-white/55">
             Status
           </label>
           <div className="flex gap-2">
@@ -180,8 +180,8 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
                 className={cn(
                   "flex-1 rounded-xl border-2 px-2 py-2.5 text-[11px] font-semibold transition-all sm:text-xs",
                   task.status === s.key
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
-                    : "border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50",
+                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                    : "border-white/10 text-white/55 hover:border-white/10 hover:bg-white/[0.06]",
                 )}
               >
                 {s.label}
@@ -195,14 +195,14 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+            className="flex-1 rounded-xl border border-white/10 py-3 text-sm font-semibold text-white/75 transition hover:bg-white/[0.06]"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={!task.title.trim()}
-            className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200/50 transition hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {initialTask ? "Save Changes" : "Add Task"}
           </button>

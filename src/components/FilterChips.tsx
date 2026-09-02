@@ -45,7 +45,7 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
           type="button"
           onClick={() => setShowFilters((prev) => !prev)}
           aria-expanded={showFilters}
-          className="relative flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold text-slate-700 transition"
+          className="relative flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold text-white/85 transition"
         >
           <GlassSurface
             tint={showFilters ? 0.72 : 0.55}
@@ -87,19 +87,19 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
           blur={18}
           saturation={1.5}
           radius={24}
-          className="absolute left-4 right-4 top-full z-30 mt-2 overflow-hidden text-sm text-slate-700"
+          className="absolute left-4 right-4 top-full z-30 mt-2 overflow-hidden text-sm text-white/85"
           contentClassName="p-4"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-extrabold text-slate-900">Refine your search</p>
-              <p className="mt-0.5 text-xs text-slate-600">Pick a filter to narrow the catalog.</p>
+              <p className="font-extrabold text-white">Refine your search</p>
+              <p className="mt-0.5 text-xs text-white/75">Pick a filter to narrow the catalog.</p>
             </div>
             <button
               type="button"
               aria-label="Close filters"
               onClick={() => setShowFilters(false)}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900/5 text-slate-500 transition hover:bg-slate-900/10 hover:text-slate-800"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900/5 text-white/55 transition hover:bg-slate-900/10 hover:text-white/85"
             >
               <XIcon className="h-4 w-4" />
             </button>
@@ -107,7 +107,7 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
 
           <div className="mt-3 max-h-64 space-y-3 overflow-y-auto pr-1">
             {grouped.length === 0 ? (
-              <p className="text-xs text-slate-500">No filters configured yet.</p>
+              <p className="text-xs text-white/55">No filters configured yet.</p>
             ) : (
               grouped.map(([group, items]) => (
                 <div key={group}>
@@ -122,8 +122,8 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
                           onClick={() => { onSelect(filter.id); setShowFilters(false); }}
                           className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                             isActive
-                              ? "border-transparent bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-300"
-                              : "border-slate-200 bg-white/70 text-slate-700 hover:border-indigo-300 hover:text-indigo-700"
+                              ? "border-transparent bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                              : "border-white/10 bg-white/[0.08] text-white/85 hover:border-indigo-300 hover:text-indigo-700"
                           }`}
                         >
                           {filter.label}

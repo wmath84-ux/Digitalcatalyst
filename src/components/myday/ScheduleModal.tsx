@@ -48,7 +48,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Title */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
             Event Title <span className="text-rose-400">*</span>
           </label>
           <input
@@ -62,7 +62,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
 
         {/* Detail */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
             Details (optional)
           </label>
           <input
@@ -76,7 +76,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
         {/* Time row */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
               Start Time
             </label>
             <input
@@ -87,7 +87,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
               End Time
             </label>
             <input
@@ -101,7 +101,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
 
         {/* Type picker */}
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-white/55">
             Event Type
           </label>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
@@ -116,8 +116,8 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
                   className={cn(
                     "flex flex-col items-center gap-1.5 rounded-xl border-2 px-2 py-3 text-xs font-semibold transition-all",
                     active
-                      ? et.color + " shadow-sm"
-                      : "border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50",
+                      ? et.color + ""
+                      : "border-white/10 text-white/55 hover:border-white/10 hover:bg-white/[0.06]",
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -133,14 +133,14 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+            className="flex-1 rounded-xl border border-white/10 py-3 text-sm font-semibold text-white/75 transition hover:bg-white/[0.06]"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={!event.title.trim()}
-            className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200/50 transition hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {initialEvent ? "Save Changes" : "Add Event"}
           </button>

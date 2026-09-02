@@ -364,3 +364,13 @@ Owner refinement before the wave: **pack components at their defaults** (no `.dc
 - `ProfilePreview` (dev): two white cards → `GlassCard`; sticky frost toolbar → plain strip.
 - Tests re-pinned: `profilePlanGlowContract` (gradient → pack components), `liquidGlassWaveFiveContract` (BaseModal = Dialog). A3 contract appended.
 - Coverage: gradients 137→126, `in oklab` 521→522 (±, ceiling 530 holds), render-sites 248→270. Note: the `rounded-* bg-white` metric's `\bbg-white\b` also counts translucent `bg-white/[0.06]` soft panels; re-baseline in A9.
+
+### A3.5 — owner complaint fix (white ink · home header/side panel frost · white buttons · switch)
+
+- `src/glass.css`: Parts 1 / 1e / 1f / 2 / 2b and the 55 % `.dc-card` frost are **gone**. No blanket `bg-white` remap remains — only the Phase A body ink rule (`rgb(var(--dc-paper-on-ink)/.92)`) and the `display:none` list for the old decorative glows.
+- Home header (`src/home/components/Header.tsx`): outer `<header data-home-header>` carries only data hooks; the material is the pack **GlassSurface at defaults** (tint 0.5 · blur 14 · sat 1.6). Sheen/orb divs removed. Leaderboard / Notifications / Favourites pills are **GlassButton**; the profile trigger is soft glass. GlassSwitch "Dark mode" → `setGlassScheme` → `html.dark|light` → pack `readDark()` MutationObserver → every component re-reads its material.
+- Desktop chrome (`src/components/DesktopShell.tsx` + `src/index.css` §rail/topbar): rail + topbar paint nothing of their own; `--dc-chrome-glass` is now numerically the pack's GlassSurface dark material (`rgba(60,62,68,.21)`, `blur(9.8px) saturate(1.3)`, dark rim) with an `html.light` swap to the light material. Rail hover/active: white/6 % and solid `#4f46e5` (no gradient).
+- Shared/store header (`src/components/Header.tsx`): discs are GlassSurface at pack defaults (no per-state `tintColor`), title/subtitle/tooltips white.
+- Home cards: `ContinueLearning` → **GlassCard**, home `ProductCard` → **GlassSurface**, hero CTA → **GlassButton capsule**.
+- Ink pass (64 files, `/tmp/inkmap_safe.py`): `text-slate-900…400` → `text-white…white/55`, `bg-slate-50/100/200`, `bg-white/60–95` → `bg-white/[0.06–0.12]`, light borders → `border-white/10`, page-assuming shadows dropped. Coloured semantics (badges, coupons, `text-rose-*`, `bg-emerald-*`, brand fills) untouched. Course player + FlowPath deferred to A8 (own theme).
+- Re-pinned tests: WaveTwo l.57 (`doesNotMatch tintColor`) + l.133 (`hover:bg-white/[0.08]`), homeHeaderGlassCollapse l.75–77 (chrome token values), revisionTestBankCardContentHeight l.61.

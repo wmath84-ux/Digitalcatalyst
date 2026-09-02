@@ -56,7 +56,7 @@ export default function Features() {
           <h2 className="mt-4 text-[clamp(2rem,4.5vw,3.25rem)] font-black leading-tight text-white">
             Everything you need to <span className="gradient-text">learn faster</span>
           </h2>
-          <p className="mt-4 text-slate-400">
+          <p className="mt-4 text-white/55">
             {appName} blends immersive design with real utility — built to keep
             you engaged and always progressing.
           </p>
@@ -83,7 +83,7 @@ export default function Features() {
                 {f.icon}
               </div>
               <h3 className="mt-5 text-xl font-bold text-white">{f.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-slate-400">{f.desc}</p>
+              <p className="mt-3 text-sm leading-relaxed text-white/55">{f.desc}</p>
             </motion.div>
           ))}
         </div>

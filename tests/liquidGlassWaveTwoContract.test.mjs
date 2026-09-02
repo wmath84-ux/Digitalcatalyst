@@ -54,7 +54,7 @@ test("header actions become registry tooltips, not native title text", () => {
 test("every header disc is a real glass lens with a light-mode tint", () => {
   assert.match(headerIconButton, /<GlassSurface\b/);
   assert.match(headerIconButton, /radius=\{999\}/, "a disc, not a rounded square");
-  assert.match(headerIconButton, /tintColor=/, "the pack defaults to the page's theme; the light bar pins its own");
+  assert.doesNotMatch(headerIconButton, /tintColor=/, "Phase A: pack defaults only — the disc follows the page scheme");
   assert.match(headerIconButton, /pointer-events-none absolute inset-0/);
   assert.match(headerIconButton, /dc-chrome-disc/, "the rim override in glass.css hooks on this class");
 });
@@ -130,7 +130,7 @@ test("top-bar actions keep their data hook and gain disc + tooltip", () => {
   assert.match(topBarButton, /<GlassSurface\b/);
   assert.match(topBarButton, /dc-chrome-disc/);
   // the old hover/active classes stay, so `data-glass="off"` is pixel-familiar
-  assert.match(topBarButton, /hover:bg-slate-100/);
+  assert.match(topBarButton, /hover:bg-white\/\[0\.08\]/);
   assert.match(topBarButton, /badge > 99 \? "99\+"/);
 });
 
@@ -247,5 +247,5 @@ test("the preview shows the wave, and the home header stays out of it", () => {
   const homeHeader = read("src/home/components/Header.tsx");
   assert.match(homeHeader, /dc-home-pill/, "Wave 6 adopted the hero pills");
   assert.match(homeHeader, /glass-tooltip/, "Wave 6 replaced the hero's last native title");
-  assert.doesNotMatch(homeHeader, /GlassSurface/, "the hero header still paints no glass surface of its own");
+  assert.match(homeHeader, /<GlassSurface/, "Phase A: the hero header IS the pack GlassSurface at defaults");
 });
