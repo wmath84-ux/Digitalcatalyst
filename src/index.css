@@ -300,6 +300,55 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   100% { background-position: -130% 0; }
 }
 
+/* ── Sheet ⇄ dock: ONE continuous piece of glass ───────────────────────────
+   The overlay sheet is anchored so it slides UNDER the dock (see
+   `sheetAnchor` in src/course/CourseOverlay.tsx). These rules finish the
+   illusion: while a sheet is open the dock drops its top border and top
+   rounding, the sheet drops its bottom border/rounding, and a soft gradient
+   bridges the two — no hairline, no seam, no strip of the lesson showing
+   between them. Closed, the dock goes back to its free-floating home-page
+   capsule. */
+[data-course-dock][data-sheet-open="true"] [data-course-dock-panel] {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top-color: transparent;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+}
+[data-course-dock][data-sheet-open="true"][data-orientation="landscape"] [data-course-dock-panel] {
+  border-radius: 0 1.5rem 1.5rem 0;
+  border-left-color: transparent;
+}
+[data-course-dock][data-sheet-open="true"] [data-course-dock-panel]::before {
+  /* The bridge: continues the sheet's surface into the dock so the join
+     reads as one material rather than two stacked panels. */
+  content: "";
+  position: absolute;
+  inset: -26px 0 auto 0;
+  height: 34px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.06) 100%);
+}
+[data-course-dock][data-sheet-open="true"][data-orientation="landscape"] [data-course-dock-panel]::before {
+  inset: 0 auto 0 -26px;
+  width: 34px;
+  height: auto;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.06) 100%);
+}
+[data-course-overlay][data-open="true"] {
+  border-bottom: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+[data-course-overlay][data-open="true"][data-orientation="portrait"] {
+  /* The last 22 px of the sheet sit behind the dock — keep content clear of
+     that overlap instead of letting the dock cover it. */
+  padding-bottom: 22px;
+}
+[data-course-overlay][data-open="true"][data-orientation="landscape"] {
+  border-right: 0 !important;
+  padding-right: 22px;
+}
+
 /* While the indicator is being dragged, the active pill glows a little harder
    so it feels "alive" as it travels between tabs. */
 [data-course-dock-indicator][data-dragging="true"] > span {

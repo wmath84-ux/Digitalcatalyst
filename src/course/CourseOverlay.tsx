@@ -34,6 +34,13 @@ import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileTe
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 import { GlassSurface } from "../components/ui/glass";
+import { ICON_SIZE, MAG_RANGE, MAG_SCALE } from "../components/glass-dock/GlassDock";
+import {
+  DOCK_PANEL_BG,
+  DOCK_PANEL_BLUR,
+  DOCK_PANEL_BORDER,
+  DOCK_PANEL_SHADOW,
+} from "../components/glass-dock/GlassMaterial";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassTile } from "../components/ui/glass-tile";
 
@@ -84,20 +91,25 @@ const isPaidLocked = (module: CourseModule, ownedUpdateIds: Set<string>) =>
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-// ── Home-footer touch behaviour, ported to the course dock ────────────────
-// The same magnify-under-the-finger interaction as the app footer
-// (src/components/glass-dock/GlassDock.tsx): icons near the pointer/finger
-// swell and lift as it moves across the dock. Look is untouched — only the
-// motion is added.
-const DOCK_MAG_RANGE = 110;
-const DOCK_MAG_SCALE = 1.28;
+// ── Home footer dock, ported 1:1 to the course player ────────────────────
+// This is the SAME dock the home page uses (src/components/glass-dock/
+// GlassDock.tsx): identical geometry (ICON_SIZE 44), identical distance
+// magnification (MAG_RANGE 120 / MAG_SCALE 1.55 with the spring 300/22/0.5),
+// identical −12 px lift, identical staggered entrance, identical tinted
+// icon plates + frosted tooltips. Only the tab set and the landscape
+// (vertical rail) axis are course-specific.
+const DOCK_ICON_SIZE = ICON_SIZE;
+const DOCK_MAG_RANGE = MAG_RANGE;
+const DOCK_MAG_SCALE = MAG_SCALE;
 
 function DockTabButton({
   tabKey,
   label,
   icon,
+  color,
   active,
   landscape,
+  index,
   pointerPos,
   onSelect,
   skipSelectRef,
@@ -105,49 +117,82 @@ function DockTabButton({
   tabKey: DockTab;
   label: string;
   icon: ReactNode;
+  color: string;
   active: boolean;
   landscape: boolean;
+  index: number;
   pointerPos: MotionValue<number>;
   onSelect: () => void;
   skipSelectRef: { current: boolean };
 }) {
-  const ref = useRef<HTMLButtonElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const distance = useTransform(pointerPos, (p: number) => {
     const el = ref.current;
-    if (!el || p < -5000) return 999;
+    if (!el || p < -5000) return 200;
     const rect = el.getBoundingClientRect();
     const center = landscape ? rect.top + rect.height / 2 : rect.left + rect.width / 2;
     return Math.abs(p - center);
   });
-  const rawScale = useTransform(distance, [0, DOCK_MAG_RANGE], [DOCK_MAG_SCALE, 1]);
-  const scale = useSpring(rawScale, { stiffness: 300, damping: 22, mass: 0.5 });
-  const lift = useTransform(scale, [1, DOCK_MAG_SCALE], [0, landscape ? -4 : -5]);
+  const rawSize = useTransform(distance, [0, DOCK_MAG_RANGE], [DOCK_ICON_SIZE * DOCK_MAG_SCALE, DOCK_ICON_SIZE]);
+  const size = useSpring(rawSize, { stiffness: 300, damping: 22, mass: 0.5 });
+  const shift = useTransform(size, [DOCK_ICON_SIZE, DOCK_ICON_SIZE * DOCK_MAG_SCALE], [0, -12]);
+
   return (
-    <button
+    <motion.div
       ref={ref}
-      type="button"
-      onClick={() => {
-        // A finger-slide selection already happened on pointerup — the
-        // synthetic click that follows must not re-toggle the tab.
-        if (skipSelectRef.current) return;
-        onSelect();
-      }}
-      aria-pressed={active}
-      className={`relative z-10 flex flex-1 flex-col items-center justify-center text-[10px] font-black transition-colors ${
-        active ? "text-white" : "text-white/55 hover:text-white/80"
-      }`}
-      data-course-dock-tab
-      data-tab={tabKey}
-      data-active={active ? "true" : "false"}
+      data-glass-dock-item={tabKey}
+      data-course-dock-item={tabKey}
+      className={`group relative z-10 flex cursor-pointer items-center ${landscape ? "flex-row" : "flex-col"}`}
+      initial={{ opacity: 0, ...(landscape ? { x: 20 } : { y: 20 }) }}
+      animate={{ opacity: 1, ...(landscape ? { x: 0 } : { y: 0 }) }}
+      transition={{ type: "spring", stiffness: 200, damping: 18, delay: index * 0.04 }}
     >
-      <motion.span
-        className="flex flex-col items-center justify-center gap-0.5"
-        style={landscape ? { scale, x: lift } : { scale, y: lift }}
+      {/* Frosted tooltip — pinned open for the active tab, exactly like home. */}
+      <motion.div
+        className={`pointer-events-none absolute whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium text-white/90 ${
+          landscape ? "right-[calc(100%+8px)]" : "-top-10"
+        } ${active ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+        style={{
+          background: "rgba(255, 255, 255, 0.1)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          transition: "opacity 0.15s",
+        }}
       >
-        {icon}
-        <span className="truncate px-1">{label}</span>
-      </motion.span>
-    </button>
+        {label}
+      </motion.div>
+
+      <motion.button
+        type="button"
+        aria-label={label}
+        aria-pressed={active}
+        onClick={() => {
+          // A finger-slide selection already happened on pointerup — the
+          // synthetic click that follows must not re-toggle the tab.
+          if (skipSelectRef.current) return;
+          onSelect();
+        }}
+        style={{
+          width: size,
+          height: size,
+          ...(landscape ? { x: shift } : { y: shift }),
+          background: active ? `${color}30` : `${color}18`,
+          border: active ? `1px solid ${color}55` : `1px solid ${color}22`,
+          borderRadius: 12,
+          boxShadow: active ? `0 0 16px ${color}44` : "none",
+        }}
+        whileTap={{ scale: 0.82 }}
+        className="relative flex select-none items-center justify-center"
+        data-course-dock-tab
+        data-tab={tabKey}
+        data-active={active ? "true" : "false"}
+      >
+        <span className="flex items-center justify-center" style={{ color }}>
+          {icon}
+        </span>
+      </motion.button>
+    </motion.div>
   );
 }
 
@@ -235,20 +280,15 @@ interface CourseOverlayProps {
   onSplitRatioChange?: (percent: number | null) => void;
 }
 
-const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; icon: (active: boolean) => ReactNode }> = [
-  { key: "modules", label: "Module", heading: "Modules", hint: "Lessons on a connected path", icon: () => <BookOpen size={18} /> },
-  { key: "resources", label: "Resource", heading: "Resources", hint: "Course files (paid modules live in Paid)", icon: () => <FileText size={18} /> },
-  { key: "notes", label: "Note", heading: "Notes", hint: "Your private writing pad", icon: () => <NotebookPen size={18} /> },
+const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; color: string; icon: (active: boolean) => ReactNode }> = [
+  { key: "modules", label: "Module", heading: "Modules", hint: "Lessons on a connected path", color: "#FFBE0B", icon: () => <BookOpen size={22} className="h-[22px] w-[22px] shrink-0" /> },
+  { key: "resources", label: "Resource", heading: "Resources", hint: "Course files (paid modules live in Paid)", color: "#06D6A0", icon: () => <FileText size={22} className="h-[22px] w-[22px] shrink-0" /> },
+  { key: "notes", label: "Note", heading: "Notes", hint: "Your private writing pad", color: "#3A86FF", icon: () => <NotebookPen size={22} className="h-[22px] w-[22px] shrink-0" /> },
   // Mind Map sits immediately after Note, so the two private-study tools are
   // neighbours in the dock. It opens the same way — a sheet over the lesson —
-  // but claims HALF the screen instead of the notes' 40%, because a diagram
-  // needs both width and height to stay readable. In landscape the entire
-  // header row is hidden for this tab so the canvas renders flush against
-  // the top of the split sheet; in portrait the standard header (title +
-  // close) stays visible — see the `tab === "mindmap"` branch in the render
-  // below.
-  { key: "mindmap", label: "Mind map", heading: "Mind map", hint: "Is module ka apna diagram banayein", icon: () => <Network size={18} /> },
-  { key: "paid", label: "Paid", heading: "Paid content", hint: "Upgrades still locked", icon: () => <ShoppingBag size={18} /> },
+  // but claims HALF the screen instead of the notes' 40%.
+  { key: "mindmap", label: "Mind map", heading: "Mind map", hint: "Is module ka apna diagram banayein", color: "#B388FF", icon: () => <Network size={22} className="h-[22px] w-[22px] shrink-0" /> },
+  { key: "paid", label: "Paid", heading: "Paid content", hint: "Upgrades still locked", color: "#C9A96E", icon: () => <ShoppingBag size={22} className="h-[22px] w-[22px] shrink-0" /> },
 ];
 
 export default function CourseOverlay(props: CourseOverlayProps) {
@@ -287,6 +327,35 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // only ever covers the ACTIVE slot, so the other three tab buttons stay
   // fully clickable.
   const pillRef = useRef<HTMLDivElement>(null);
+  // The dock's REAL measured size (pill + its margins + safe-area inset).
+  // The sheet anchors to this instead of the old hard-coded `4rem` /
+  // `bottom-16` guesses, which no longer match the home-style dock — and a
+  // guess is exactly what left a visible seam (or a gap of page showing
+  // through) between the sheet and the dock.
+  const dockShellRef = useRef<HTMLDivElement>(null);
+  const [dockSize, setDockSize] = useState(72);
+  useEffect(() => {
+    const el = dockShellRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const read = () => {
+      const rect = el.getBoundingClientRect();
+      const next = Math.round(landscape ? rect.width : rect.height);
+      if (next > 0) setDockSize((current) => (Math.abs(current - next) < 1 ? current : next));
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    window.addEventListener("resize", read);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", read);
+    };
+  }, [landscape]);
+  // The sheet slides UNDER the dock by this much (the dock is z-50, the sheet
+  // z-40) so the two glass surfaces merge into one continuous piece — no
+  // hairline, no border, no strip of page between them.
+  const DOCK_MERGE = 22;
+  const sheetAnchor = `${Math.max(0, dockSize - DOCK_MERGE)}px`;
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const dragRef = useRef<{ id: number; start: number; index: number; slot: number; moved: boolean } | null>(null);
   const dragging = dragIndex != null;
@@ -521,7 +590,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
    * visible at the left edge in every state.
    */
   const splitWidthCss = (percent: number) =>
-    `min(${percent}%, calc(100% - 4rem - env(safe-area-inset-right, 0px)))`;
+    `min(${percent}%, calc(100% - ${sheetAnchor}))`;
   const splitEditorWidth = splitWidthCss(notesSplitPercent);
   const mindMapSplitWidth = splitWidthCss(mindMapSplitPercent);
 
@@ -678,7 +747,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           aria-label="Panel kholne ke liye centre ki taraf drag karein"
           title="Drag inward to reopen the panel"
           className="absolute bottom-0 top-0 z-50 flex w-4 cursor-col-resize touch-none items-center justify-center"
-          style={{ right: `calc(4rem + env(safe-area-inset-right, 0px) + ${edgeDragging ? splitPercent : 0}%)` }}
+          style={{ right: `calc(${sheetAnchor} + ${edgeDragging ? splitPercent : 0}%)` }}
           onPointerDown={onEdgePointerDown}
           onPointerMove={onSplitPointerMove}
           onPointerUp={onSplitPointerUp}
@@ -704,9 +773,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           onClick={props.onClose}
           aria-hidden={!open}
           className={`absolute z-30 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 ${
-            landscape ? "bottom-0 left-0 top-0" : "inset-x-0 bottom-16 top-0"
+            landscape ? "bottom-0 left-0 top-0" : "inset-x-0 top-0"
           } ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
-          style={landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : undefined}
+          style={landscape ? { right: sheetAnchor } : { bottom: sheetAnchor }}
           data-course-overlay-scrim
         />
       ) : null}
@@ -717,7 +786,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         className={`absolute z-40 overflow-hidden border-[var(--course-border)] transition-[transform,opacity] duration-300 ease-out ${
           landscape
             ? "bottom-0 top-0 border-l"
-            : "inset-x-0 bottom-16 rounded-t-[1.75rem] border-t"
+            : "inset-x-0 rounded-t-[1.75rem]"
         } ${sheetVisible
           ? "pointer-events-auto translate-x-0 translate-y-0 opacity-100"
           : `pointer-events-none invisible opacity-0 ${landscape ? "translate-x-full" : "translate-y-full"}`
@@ -730,7 +799,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           // right safe-area inset in fullscreen, so the sheet must too.
           // In split mode the editor takes the right 40% of the section
           // (minus the 4rem dock) so the lesson keeps the left 60%.
-          ...(landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : null),
+          // Anchored to the dock's MEASURED size, minus a small overlap so
+          // the sheet tucks under the dock and the two glass panes fuse.
+          ...(landscape ? { right: sheetAnchor } : { bottom: sheetAnchor }),
           // Landscape → width (split editor / mind map / default). While the
           // closed sheet is being dragged open from its edge, the sheet
           // previews live at the dragged ratio. Portrait → normally a height,
@@ -751,13 +822,13 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           ...(landscape
             ? { width: edgeDragging ? splitWidthCss(splitPercent) : mindMapSplit ? mindMapSplitWidth : splitMode ? splitEditorWidth : sheetHeight }
             : portraitFullHeight
-              ? { top: 0, height: "auto", bottom: "calc(4rem + max(env(safe-area-inset-bottom, 0px), 10px))" }
+              ? { top: 0, height: "auto", bottom: sheetAnchor }
               : { height: sheetHeight }),
           // When the soft keyboard is up over the notes editor, lift the sheet
           // above it so the editor + Save buttons stay visible. The lesson on
           // the left is untouched. Portrait keeps its 4rem dock clearance too.
           ...(keyboardActive
-            ? { bottom: landscape ? `${keyboardInset}px` : `${Math.max(64, keyboardInset)}px` }
+            ? { bottom: landscape ? `${keyboardInset}px` : `${Math.max(dockSize, keyboardInset)}px` }
             : null),
         }}
         data-course-overlay
@@ -879,52 +950,72 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       </GlassSurface>
 
       {/* ── Dock: always the top-most interactive layer ─────────────────
-          Same floating magic pill as the app footer (src/components/
-          BottomNav.tsx): capsule rounding on all four sides, light-black
-          border, bottom-right shadow, and the outside-only blue glow
-          that swells with scroll energy. Icons/labels are crisp black
-          (white while sitting on the accent pill); the sliding accent
-          indicator keeps its original color exactly. */}
+          EXACTLY the home page footer navigation (src/components/glass-dock/
+          GlassDock.tsx): the same frosted AI-Canvas panel (translucent pane,
+          hairline border, deep shadow + inset top-light, separate
+          non-animating blur layer), the same y:50 → 0 spring entrance
+          (180/20), the same per-item staggered entrance, the same
+          distance-based magnification wave with tinted icon plates and
+          frosted tooltips. The course-only extras — the draggable magnetic
+          indicator and the finger-slide tab select — ride on top of it.
+
+          The dock is also the BOTTOM EDGE of the open sheet: the sheet is
+          anchored to the dock (no gap) and, while open, the dock's top
+          corners flatten and its top border disappears, so the sheet and the
+          dock read as ONE continuous piece of glass with no seam between
+          them. */}
       <div
         className="relative z-50 shrink-0"
         data-course-dock
         data-orientation={orientation}
+        data-sheet-open={sheetVisible ? "true" : "false"}
       >
         <div
           className={
             landscape
               // In fullscreen the navigation-bar / cutout inset becomes
               // non-zero; growing the rail's right margin by that inset
-              // (instead of padding the fixed 4rem pill) keeps the four
-              // tab buttons fully visible and tappable.
+              // (instead of padding the fixed pill) keeps the tab buttons
+              // fully visible and tappable.
               ? "dc-footer-shell my-3 ml-2 mr-[max(env(safe-area-inset-right),8px)] h-full w-16"
               : "dc-footer-shell mx-3 mb-[max(env(safe-area-inset-bottom),10px)] mt-2"
           }
+          ref={dockShellRef}
         >
           <div className="dc-footer-glow" aria-hidden="true" />
-          <GlassSurface
+          <motion.div
             ref={pillRef}
-            radius={999}
-            className={`dc-footer-pill text-white ${landscape ? "h-full w-full" : "w-full"}`}
-            contentClassName={`flex ${landscape ? "h-full w-full flex-col" : "h-16 w-full"}`}
-            style={{ touchAction: "none" }}
+            initial={landscape ? { x: 50 } : { y: 50 }}
+            animate={landscape ? { x: 0 } : { y: 0 }}
+            transition={{ type: "spring", stiffness: 180, damping: 20 }}
+            className={`dc-course-dock-panel relative isolate flex shrink-0 items-center rounded-3xl ${
+              landscape ? "h-full w-full flex-col justify-between px-3 py-4" : "w-full justify-between gap-2 px-4 pb-3 pt-3"
+            }`}
+            style={{
+              touchAction: "none",
+              background: DOCK_PANEL_BG,
+              border: DOCK_PANEL_BORDER,
+              boxShadow: DOCK_PANEL_SHADOW,
+            }}
             onPointerDown={onDockPointerDown}
             onPointerMove={onDockPointerMove}
             onPointerUp={onDockPointerEnd}
             onPointerCancel={onDockPointerEnd}
             onPointerLeave={() => pointerPos.set(-10000)}
+            data-glass-dock=""
+            data-course-dock-panel
           >
-            {/* Fluid sheen — a slow liquid highlight that drifts across the
-                capsule, echoing the home footer's "magic" feel. Painted
-                behind the indicator + buttons so it never washes out an icon. */}
-            <span className="dc-dock-fluid" aria-hidden="true" />
+            {/* Separate non-animating blur layer (home dock): the frosted
+                backdrop never re-blurs while the magnification wave runs. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-[-1] rounded-3xl"
+              style={{ backdropFilter: DOCK_PANEL_BLUR, WebkitBackdropFilter: DOCK_PANEL_BLUR }}
+            />
             {/* The accent pill and the grab handle both occupy exactly one
                 dock slot. `20%` is `1 / TABS.length` for the current five
-                tabs (Module · Resource · Note · Mind map · Paid) — it is
-                written as a literal so Tailwind's scanner can see it; a
-                template literal would silently generate no class. The drag
-                maths below derives its slot size from `TABS.length` at
-                runtime, so the two stay in step. */}
+                tabs (Module · Resource · Note · Mind map · Paid) — written as
+                a literal so Tailwind's scanner can see it. */}
             <span
               className={`pointer-events-none absolute ${dragging ? "" : "transition-transform duration-300 ease-out"} ${landscape ? "left-1.5 right-1.5 top-0 h-[20%]" : "bottom-1.5 left-0 top-1.5 w-[20%]"}`}
               style={{ transform: landscape ? `translateY(${displayedIndex * 100}%)` : `translateX(${displayedIndex * 100}%)` }}
@@ -933,23 +1024,25 @@ export default function CourseOverlay(props: CourseOverlayProps) {
               data-display-index={displayedIndex.toFixed(3)}
               data-dragging={dragging ? "true" : "false"}
             >
-              <span className={`block h-full rounded-full bg-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_2px_10px_rgba(0,0,0,0.18)] ${landscape ? "my-1.5" : "mx-1.5"}`} />
+              <span className={`block h-full rounded-full bg-white/10 ${landscape ? "my-1.5" : "mx-1.5"}`} />
             </span>
-            {TABS.map(({ key, label, icon }) => (
+            {TABS.map(({ key, label, icon, color }, index) => (
               <DockTabButton
                 key={key}
                 tabKey={key}
                 label={label}
                 icon={icon(key === tab)}
+                color={color}
                 active={key === tab}
                 landscape={landscape}
+                index={index}
                 pointerPos={pointerPos}
                 skipSelectRef={skipSelectRef}
                 onSelect={() => props.onTabChange(key)}
               />
             ))}
             {/* Draggable grab handle that overlays ONLY the active slot, so the
-                other three tab buttons stay fully clickable. A tap (no move)
+                other tab buttons stay fully clickable. A tap (no move)
                 forwards to the active-tab toggle; a drag slides the indicator
                 between tabs with a magnetic snap on release. */}
             <span
@@ -964,7 +1057,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
               data-course-dock-handle
               data-dragging={dragging ? "true" : "false"}
             />
-          </GlassSurface>
+          </motion.div>
         </div>
       </div>
     </>
