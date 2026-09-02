@@ -1,0 +1,273 @@
+# Liquid Glass — Full Site Audit & Replacement Plan (2026-09-02)
+
+> Source pack: https://websiteglass.com/docs — **22 components** (`glass`, `glass-button`, `glass-switch`, `glass-slider`, `glass-tabs`, `glass-tooltip`, `glass-input`, `glass-popover`, `glass-dialog`, `glass-dock`, `glass-tile`, `glass-swatch`, `glass-card`, `glass-checkbox`, `glass-radio`, `glass-toggle-group`, `glass-accordion`, `glass-dropdown-menu`, `glass-select`, `glass-sheet`, `glass-toast`, `glass-command`).
+>
+> Repo state: **all 22 files already vendored** under `src/components/ui/glass*.tsx` (Waves 0–6, PR #527/#528). This audit is about *where they are still NOT used* and what old UI must be removed.
+
+---
+
+## 1. Website check — what each of the 22 components is for
+
+| # | Component | Kya hai | Best fit in our app |
+|---|---|---|---|
+| 1 | `glass` (`Glass`, `GlassLens`, `GlassSurface`) | Lens engine. `GlassSurface` = frosted panel for popovers / dialogs / cards | Every panel, overlay backdrop, card |
+| 2 | `glass-button` | Icon disc / text capsule with gel press | **All icon buttons** (course toolbar, header, viewer), CTAs |
+| 3 | `glass-switch` | iOS toggle | Settings toggles, on/off preferences, theme / snow / view toggles |
+| 4 | `glass-slider` | Range slider, thumb becomes lens | Audio seek, volume, zoom, FlowPath curves |
+| 5 | `glass-tabs` | Tab list with spring indicator | Page tabs (Revision), course dock tabs, PDP detail tabs |
+| 6 | `glass-tooltip` | Frosted tooltip capsule | Every `title=""` icon button |
+| 7 | `glass-input` | Search capsule | Store / Search / Home search, notes search |
+| 8 | `glass-popover` | Frosted context menu | Mind-map Save / Align menus, My Day create menu |
+| 9 | `glass-dialog` | Modal that scales in | Confirm dialogs, rename dialogs, module lock dialog |
+| 10 | `glass-dock` | macOS dock with magnification | Course player bottom dock (Module / Resource / Note / Mind map / Paid) — *desktop only per D4* |
+| 11 | `glass-tile` | Selectable grid cell | Category tiles, question-mode picker, module grid |
+| 12 | `glass-swatch` | Colour swatch | Mind-map node colour, notes highlight colour, theme accent |
+| 13 | `glass-card` | Card with header/content/footer | Product cards, plan cards, leaderboard rows, notes cards |
+| 14 | `glass-checkbox` | Checkbox with accent fill | Filters, "mark complete", terms accept |
+| 15 | `glass-radio` | Radio group | Sort options, plan pick, payment method |
+| 16 | `glass-toggle-group` | Segmented control | Store filter chips, PDP tabs, revision view switch |
+| 17 | `glass-accordion` | Collapsible sections | **PDP curriculum + FAQ**, course sidebar module groups, checkout review |
+| 18 | `glass-dropdown-menu` | Portaled dropdown, keyboard nav | Sort menu, "more" (⋯) menus, mind-map menus |
+| 19 | `glass-select` | Frosted select + listbox | Store / Search sort, every form select |
+| 20 | `glass-sheet` | Drawer from any edge | Course overlay (bottom sheet on mobile), cart drawer, filters drawer |
+| 21 | `glass-toast` | Toast system | Already global via `ToastViewport` in `main.tsx` |
+| 22 | `glass-command` | ⌘K palette | Global `GlassCommandPalette` (already) + **search page** command mode |
+
+---
+
+## 2. App structure — pages, sub-pages, routes
+
+Hash router lives in `src/main.tsx`. **19 user routes + 4 dev routes + 2 admin routes.**
+
+| Route | Entry file | Sub-pages / tabs / modes |
+|---|---|---|
+| `#/landing` | `src/LandingApp.tsx` + `components/landing/*` (8 files) | hero, features, CTA |
+| `#/auth` | `src/AuthApp.tsx` + `components/auth/*` | sign-in, sign-up, forgot |
+| `#/home` | `src/home/App.tsx` + `home/components/*` (7 files) | header, hero, category strip, sections |
+| `#/store` | `src/App.tsx` → `components/StorePage.tsx`, `Hero`, `FilterChips`, `ProductCard`, `SearchBar`, `CategoryStrip` | filter chips, sort, grid |
+| `#/search` | `components/SearchPage.tsx` | query, filter, sort |
+| `#/product/:id` | `src/PdpApp.tsx` + `components/pdp/*` (4 files, 2111 lines) | tabs: Description / Curriculum / Instructor; module rows (expand); buy sheet |
+| `#/cart`, `#/favorites` | `src/CartWishlistApp.tsx` + `cartWishlist/**` (8 files) | tabs Cart / Wishlist |
+| `#/checkout` | `components/checkout/*` + `checkout/*` (5 files, 2204 lines) | steps: review → payment → success |
+| `#/course/:id` | `src/CoursePlayerApp.tsx` + `course/*` (12 files, **7822 lines**) | see §3 — biggest surface |
+| `#/my-day` | `src/MyDayApp.tsx` + `components/myday/*` (13 files) | Tasks / Schedule / Reminders overlays, quick notes, create menu |
+| `#/leaderboard` | `src/LeaderboardApp.tsx` | single page |
+| `#/revision` | `revision/**` (23 files, 5777 lines) | pages: Bank, AI Generate, Test, Results, Progress |
+| `#/flowpath` | `FlowPathApp.tsx` + `components/flowpath/*` + `flowpath/**` (16 files) | canvas, Create modal, Curve settings modal, Activity editor, Bulk creator |
+| `#/profile` | `profile/*` (4 files) | layout, preference rows, edit modal |
+| `#/profile/subscriber-experience` | `profile/SubscriberExperiencePage.tsx` | — |
+| `#/settings` | `settings/SettingsPage.tsx` | notification & privacy toggles, push help modal |
+| `#/subscription` | `subscription/**` + `components/subscription/*` (24 files, 5254 lines) | plans, compare, renewal, banner |
+| `#/notifications` | `components/NotificationsPage.tsx` | list + filters |
+| Global shell | `components/Header.tsx`, `DesktopShell.tsx`, `AppShell.tsx`, `GlassCommandPalette.tsx` | header actions, desktop rail, top-bar search, ⌘K |
+| `#/dev/*` (4) | glass-preview, profile-preview, mindmap-preview, subscription-preview | sandboxes |
+| `#/admin`, `#/admin-login` | `src/admin/**` (27 files, 11 221 lines) | **FROZEN — out of scope** |
+| Footer nav | `components/BottomNav.tsx` + `components/glass-dock/*` | **FROZEN — out of scope** |
+
+---
+
+## 3. Inventory — counts per page (raw grep of the source)
+
+| Page | Files | Lines | `<button>` | inputs | textarea | native select | dialogs/menus | `title=` tooltips | fixed overlays | glass imports today |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Landing | 8 | 613 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | **0** |
+| Auth | 2 | 409 | 7 | 4 | 0 | 0 | 0 | 0 | 0 | **0** |
+| Home | 7 | 1109 | 12 | 1 | 0 | 0 | 0 | 0 | 0 | 1 |
+| Store | 7 | 982 | 9 | 1 | 0 | 0 | 0 | 0 | 0 | 5 |
+| Search | 1 | 396 | 5 | 1 | 0 | 0 | 0 | 1 | 0 | 1 |
+| PDP | 4 | 2111 | 30 | 1 | 1 | 0 | 0 | 0 | 1 | 1 |
+| Cart + Favorites | 8 | 536 | 9 | 0 | 0 | 0 | 0 | 6 | 0 | **0** |
+| Checkout | 5 | 2204 | 16 | 1 | 0 | 0 | 0 | 4 | 0 | **0** |
+| **Course player** | **12** | **7822** | **70** | 2 | 1 | 0 | 2 | **18** | 5 | 2 |
+| My Day | 13 | 2976 | 36 | 13 | 2 | 0 | 1 | 0 | 0 | 1 |
+| Leaderboard | 1 | 275 | 4 | 0 | 0 | 0 | 0 | 1 | 0 | **0** |
+| Revision | 23 | 5777 | 63 | 9 | 2 | 1* | 1 | 25 | 5 | 4 |
+| FlowPath | 16 | 4066 | 35 | 25 | 2 | 1* | 3 | 3 | 8 | 5 |
+| Profile | 4 | 1402 | 17 | 4 | 2 | 0 | 0 | 2 | 1 | 2 |
+| Settings | 1 | 234 | 3 | 0 | 0 | 0 | 0 | 2 | 0 | 0 (via Profile) |
+| Subscription | 24 | 5254 | 46 | 2 | 0 | 0 | 2 | 4 | 5 | 3 |
+| Notifications | 1 | 350 | 4 | 0 | 0 | 0 | 0 | 2 | 0 | **0** |
+| Shell (Header/DesktopShell) | 4 | 1415 | 6 | 0 | 0 | 0 | 0 | 1 | 0 | 6 |
+| Footer nav (frozen) | 4 | 882 | 0 | — | — | — | — | — | 2 | 0 |
+| Admin (frozen) | 27 | 11 221 | 94 | 157 | 20 | 27 | 4 | 61 | 4 | 0 |
+
+\* the two "native select" hits are the `GlassSelect` word matched by the grep, not real `<select>` — Wave 5 already removed all native selects/ranges/checkboxes outside admin.
+
+**Totals (in scope, non-admin, non-footer): ~380 buttons, ~64 inputs, ~10 textareas, ~9 dialogs/menus, ~69 title-tooltips, ~26 fixed overlays.**
+
+### 3a. Course player deep-dive (`#/course/:id`) — user's #1 priority
+
+| File | Lines | Buttons | title tips | Menus / dialogs | What is there | Current glass |
+|---|---|---|---|---|---|---|
+| `CoursePlayerApp.tsx` | 1378 | 10 | 10 | 0 | header (logo/back, title, subscription badge, progress bar), **8 toolbar toggles**: file-bars, player-chrome, fullscreen, viewport (desktop/mobile), theme (sun/moon), snow, secondary-strip, chrome-restore pill; mark-complete button; portrait + landscape shells | none |
+| `course/CourseOverlay.tsx` | 1060 | 11 | 2 | 0 | bottom **dock with 5 tabs** (Module / Resource / Note / Mind map / Paid), drag handle, split handle, module list with wire rail, resource list, buy-module / buy-update CTAs, close, scrim | none |
+| `course/CourseSidebar.tsx` | 247 | 6 | 0 | 0 | desktop sidebar: module groups, lock rows, file rows, buy CTAs | none |
+| `course/ResourceViewer.tsx` | 980 | 7 | 14 | 0 | viewer toolbar: personal-copy toggle, edit toggle, fullscreen, download, external, retry; zoom in/out/pct; empty / missing / error states | none |
+| `course/AudioPlayer.tsx` | 265 | 4 | 2 | 0 | play, mute, loop, restart + seek slider | `glass-slider` ✔ |
+| `course/ImageViewer.tsx` | 219 | 0 | 0 | 0 | zoom in / out / fit / reset / download (rendered via parent) | none |
+| `course/MindMapPanel.tsx` | 2279 | 19 | 14 | 1 (`role=menu` portal) | toolbar: new, add-child, auto-arrange, **Align menu** (arrangement ×3 + text-fit ×2 radio items), fit, theme, delete, **Save menu** (save-now / label), library overlay (map grid, rename input, rename-save, delete-map, open-map), close, stats/status | none |
+| `course/NotesPanel.tsx` | 342 | 4 | 2 | 0 | composer, list/grid mode toggle, save/cancel, edit/delete per note | none |
+| `course/RichTextEditor.tsx` | 342 | 4 | 2 | 0 | rich toolbar actions, zoom in/out/pct, heading input | none |
+| `course/ConfirmDeleteDialog.tsx` | 159 | 2 | 0 | 1 (`alertdialog`) | delete confirm | `GlassSurface` ✔ |
+| `course/SnowOverlay.tsx` | 397 | 0 | 0 | 0 | canvas — no UI controls | n/a |
+| `course/MindMapPreview.tsx` | 154 | 3 | 0 | 0 | dev-only sandbox | — |
+
+**Course player summary: 70 buttons, 18 tooltips, 2 drop-up menus, 1 confirm dialog, 5-tab dock, 1 slider, 4 zoom controls, 8 settings-style toggles — only 2 of 12 files touched by glass so far.**
+
+---
+
+## 4. Replacement plan — page by page (what → which glass component)
+
+Legend: **NEW** = not glass yet, replace old markup. **KEEP** = already on the pack. **REMOVE** = old hand-styled class / element to delete.
+
+### 4.1 Course player `#/course/:id` (Wave 7 — first)
+
+| Old element | New component | Notes |
+|---|---|---|
+| 8 header toggles (`course-icon-button` divs) | `GlassButton` (icon disc) + `GlassTooltip` | drop all `title=`; active state via `tint`/`tintColor`; keep every `data-course-*` + `aria-pressed` |
+| Theme / snow / viewport / file-bars / chrome toggles as *settings* | also expose in a **Settings popover** (`GlassPopover` from a ⚙ `GlassButton`) with `GlassSwitch` rows | one place for all player settings; header keeps quick toggles |
+| chrome-restore pill | `GlassButton` capsule | — |
+| mark-complete bar | `GlassCheckbox` + `GlassButton` | — |
+| progress bar | `GlassSurface` track | — |
+| CourseOverlay 5-tab dock | **mobile:** `GlassTabs` inside a `GlassSheet` (bottom); **desktop:** `GlassDock` (D4 allows desktop) | keep `data-course-dock*`, drag handle stays |
+| CourseOverlay scrim + panel | `GlassSheet` | replaces `fixed inset-0` custom scrim |
+| Module groups (overlay + sidebar) | `GlassAccordion` | each module = accordion item; lock row inside |
+| Module / file rows | `GlassTile` (selected = current file) | — |
+| Buy-module / buy-update CTAs | `GlassButton` capsule | — |
+| ResourceViewer toolbar (7 btns, 14 titles) | `GlassButton` + `GlassTooltip` | zoom ±/pct → `GlassSlider` compact |
+| ImageViewer zoom | `GlassSlider` + `GlassButton` | — |
+| MindMap 19 toolbar btns | `GlassButton` icon disc + `GlassTooltip` | `mm-tool` classes removed |
+| MindMap **Align menu** (portal `role=menu`) | `GlassDropdownMenu` with radio items | keeps `data-course-mindmap-arrangement` / `-text-fit-option` |
+| MindMap **Save menu** | `GlassPopover` | — |
+| MindMap library overlay | `GlassDialog` (map grid = `GlassTile`, rename = `GlassInput`, delete = `ConfirmDialog`) | — |
+| MindMap node colour | `GlassSwatch` | new affordance |
+| NotesPanel mode toggle | `GlassToggleGroup` | list / grid |
+| NotesPanel note cards | `GlassCard` | — |
+| RichTextEditor toolbar | `GlassButton` + `GlassTooltip`; zoom → `GlassSlider` | — |
+| AudioPlayer transport | `GlassButton`; seek already `GlassSlider` | add volume `GlassSlider` |
+| ConfirmDeleteDialog | KEEP (`GlassSurface`) → upgrade to `GlassDialog` for scale-in | — |
+
+### 4.2 Store `#/store` + Search `#/search`
+
+| Old | New |
+|---|---|
+| `SearchBar` sort (via `GlassSelect`) | KEEP; also offer `GlassDropdownMenu` on the ⋯ |
+| Search input | `GlassInput` (store SearchBar is `GlassSurface` trigger → make it `GlassInput`) |
+| `FilterChips` | KEEP `GlassToggleGroup` |
+| Category strip | `GlassTile` row |
+| `ProductCard` | `GlassCard` (header = image, content = title/price, footer = CTA `GlassButton`) |
+| Hero CTAs | `GlassButton` |
+| Search page: query box | `GlassInput` + `GlassCommand` mode (⌘K style live-filter list) |
+| Search page sort | KEEP `GlassSelect` |
+| Search page filter | `GlassToggleGroup` / `GlassRadio` |
+| Empty states | `GlassCard` |
+
+### 4.3 PDP `#/product/:id`
+
+| Old | New |
+|---|---|
+| Detail tabs | KEEP `GlassToggleGroup` → or `GlassTabs` (spring indicator) |
+| `CurriculumModuleRow` (expandedModule + ChevronDown) | **`GlassAccordion`** (nested for child modules) |
+| FAQ / highlights | `GlassAccordion` |
+| Buy sheet (fixed overlay) | `GlassSheet` bottom |
+| 30 buttons (add-cart, wishlist, share, buy, module buy…) | `GlassButton` + `GlassTooltip` on icon ones |
+| Related product cards | `GlassCard` |
+| Coupon input | `GlassInput` |
+| Rating / review textarea | `.dc-field` (pack has no textarea) |
+
+### 4.4 Cart / Favorites / Checkout
+
+| Old | New |
+|---|---|
+| Cart ↔ Wishlist tabs | `GlassTabs` |
+| Line-item cards | `GlassCard` |
+| 6 `title=` icon buttons | `GlassButton` + `GlassTooltip` |
+| Remove confirm | `GlassDialog` |
+| Checkout steps | `GlassTabs` (read-only indicator) |
+| Review sections (Modules / Resources / Add-ons) | `GlassAccordion` |
+| Payment method pick | `GlassRadio` |
+| Coupon | `GlassInput` |
+| Terms | `GlassCheckbox` |
+| Pay CTA | `GlassButton` |
+
+### 4.5 Home / Landing / Auth
+
+| Old | New |
+|---|---|
+| Home search | `GlassInput` |
+| Home section cards | `GlassCard` |
+| Home category tiles | `GlassTile` |
+| Landing CTAs | `GlassButton` |
+| Landing feature cards | `GlassCard` |
+| Auth inputs | `.dc-field` (email/password) — pack has no text field |
+| Auth submit / social buttons | `GlassButton` |
+| Auth mode switch (sign-in / sign-up) | `GlassToggleGroup` |
+
+### 4.6 My Day / Revision / FlowPath / Leaderboard / Notifications
+
+| Page | Replace |
+|---|---|
+| My Day | 36 buttons → `GlassButton`; task cards → `GlassCard`; task done → `GlassCheckbox`; overlays (`Modal`) → `GlassDialog`/`GlassSheet`; create menu stays (pinned by test) |
+| Revision | 63 buttons → `GlassButton`; 25 titles → `GlassTooltip`; answer options → `GlassRadio`; multi-select → `GlassCheckbox`; page tabs KEEP; results cards → `GlassCard` (NOT `.rev-card` — pinned) |
+| FlowPath | 35 buttons; 3 modals → `GlassDialog`; 25 inputs → `.dc-field`; sliders KEEP; activity type → `GlassSelect` KEEP |
+| Leaderboard | rows → `GlassCard`; period switch → `GlassToggleGroup`; 1 title → tooltip |
+| Notifications | filter chips → `GlassToggleGroup`; items → `GlassCard`; mark-read → `GlassButton`; 2 titles → tooltip |
+
+### 4.7 Profile / Settings / Subscription
+
+| Page | Replace |
+|---|---|
+| Settings | `PreferenceRow` KEEP (`GlassSwitch`); section cards → `GlassCard`; push help → `GlassDialog`; add a `GlassSelect` for language/theme if present |
+| Profile | edit modal → `GlassDialog`; avatar actions → `GlassButton`; 2 titles → tooltip |
+| Subscription | plan cards → `GlassCard`; plan pick → `GlassRadio`; compare → `GlassAccordion`; 46 buttons → `GlassButton`; renewal banner → `GlassSurface` KEEP; 2 dialogs → `GlassDialog` |
+
+### 4.8 Global shell
+
+| Old | New |
+|---|---|
+| Header action discs | KEEP (`GlassSurface` + tooltip) → collapse into `GlassButton` |
+| Desktop rail | KEEP; optional `GlassDock` for the rail icons (D4) |
+| Desktop top-bar search | KEEP `GlassInput` |
+| ⌘K palette | KEEP `GlassCommand` |
+| Toasts | KEEP `glass-toast` |
+
+---
+
+## 5. What gets REMOVED (old system)
+
+- `course-icon-button`, `mm-tool*`, `mm-menu*` CSS classes + the `ToolbarMenu` portal in `MindMapPanel.tsx`
+- Hand-painted `bg-white/60 border-white/70 shadow-lg` pills in store/home/pdp
+- All `title=""` on icon buttons in scope (→ `GlassTooltip`)
+- Custom `fixed inset-0` scrims where `GlassSheet` / `GlassDialog` takes over (course overlay, PDP buy sheet, subscription dialogs)
+- `ui/GlassCard.tsx` (repo's old one, 0 call-sites) → delete; use `glass-card.tsx`
+- `ui/MacWindowModal.tsx` (0 call-sites) → delete
+- `ui/GlassBackdrop.tsx`, `ui/HoldRing.tsx`, `ui/TrafficLights.tsx` → review; delete if unused after migration
+
+**Never touched:** `src/admin/**`, `src/components/admin/**`, `src/components/BottomNav.tsx`, `src/components/glass-dock/**` (frozen by decision D4 — mobile footer nav).
+
+---
+
+## 6. Delivery order (one commit per wave, gates after each)
+
+| Wave | Scope | Files | Est. components |
+|---|---|---|---|
+| **7** | Course player — header toolbar + settings popover + overlay sheet/tabs/accordion | `CoursePlayerApp`, `CourseOverlay`, `CourseSidebar` | button, tooltip, popover, switch, sheet, tabs, dock (desktop), accordion, tile, checkbox |
+| **8** | Course player — viewers & panels | `ResourceViewer`, `ImageViewer`, `AudioPlayer`, `NotesPanel`, `RichTextEditor` | button, tooltip, slider, toggle-group, card |
+| **9** | Course player — mind map | `MindMapPanel` | button, tooltip, dropdown-menu, popover, dialog, tile, input, swatch |
+| **10** | Store + Search + PDP | `StorePage`, `SearchBar`, `SearchPage`, `ProductCard`, `PdpApp`, `pdp/*` | input, command, card, tile, accordion, sheet, radio, dropdown-menu |
+| **11** | Cart / Checkout / Subscription | `cartWishlist/**`, `checkout/**`, `subscription/**` | tabs, card, accordion, radio, checkbox, dialog |
+| **12** | Home / Landing / Auth / Leaderboard / Notifications | — | input, card, tile, button, toggle-group |
+| **13** | My Day / Revision / FlowPath / Profile / Settings | — | button, tooltip, dialog, radio, checkbox, card |
+| **14** | Cleanup — delete dead old UI files/classes, update `GlassPreview`, contract tests, README | — | — |
+
+Gates per wave: `npx tsc --noEmit` (baseline 7 errors, 0 new) · `bash run_tests.sh` (baseline 8 fails, 0 new) · `npm run build` · live preview · frozen-path diff empty.
+
+---
+
+## 7. Owner decisions (2026-09-02)
+
+| # | Question | Decision |
+|---|---|---|
+| D5 | Footer nav (`BottomNav` + `components/glass-dock/**`) and admin (`src/admin/**`, `src/components/admin/**`) | **Stay frozen** — D4 stands |
+| D6 | Course player ⚙ Settings popover | **Add it** — `GlassPopover` from a `GlassButton` in the header; rows are `GlassSwitch` for theme, snow, desktop/mobile view, file bars, player chrome, toolbar strip. Header quick-toggles remain as `GlassButton` |
+| D7 | Start | Owner reviews this plan first; implementation waits for sign-off |
