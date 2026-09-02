@@ -615,7 +615,7 @@ function SmartRevisionView({ bankData, summary, search, statusTab, activeFilterC
       ) : (
         <div className="space-y-3 px-4 py-4">{bankData.map((item) => <Card key={item.id}><div className="mb-2 flex flex-wrap items-center gap-1.5"><Badge tone={item.status}>{item.status}</Badge><Badge tone={item.difficulty}>{item.difficulty}</Badge><span className="ml-auto text-[11px] text-white/55">{relativeDate(item.lastRevisedAt)}</span></div><p className="line-clamp-2 text-[15px] font-semibold leading-snug text-white">{item.prompt}</p><div className="mt-2 flex justify-between text-xs text-white/75"><span>{item.subjectIcon} {item.subjectName} · {item.topicName}</span><span>Missed {item.timesWrong}×</span></div></Card>)}</div>
       )}
-      {bankData.length > 0 && <div className="dc-glass-toolbar fixed inset-x-0 bottom-[56px] z-20 mx-auto w-full max-w-[480px] border-t border-white/10 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"><PrimaryButton onClick={onStart} disabled={startingSession}><SparklesIcon className="h-4 w-4" />{startingSession ? "Starting…" : `Start Smart Revision (${bankData.length})`}</PrimaryButton></div>}
+      {bankData.length > 0 && <div className="dc-glass-toolbar fixed inset-x-0 bottom-[var(--dc-footer-nav-h,56px)] z-20 mx-auto w-full max-w-[480px] border-t border-white/10 px-4 py-3"><PrimaryButton onClick={onStart} disabled={startingSession}><SparklesIcon className="h-4 w-4" />{startingSession ? "Starting…" : `Start Smart Revision (${bankData.length})`}</PrimaryButton></div>}
     </div>
   );
 }

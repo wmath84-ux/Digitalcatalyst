@@ -173,7 +173,7 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
           </div>
         </div>
 
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-8">
+        <div ref={scrollRef} data-footer-nav-space className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-8">
           {step === 1 ? (
             <CheckoutReviewStep onProceed={handleProceedToPayment} onEdit={handleEditSelection} />
           ) : null}

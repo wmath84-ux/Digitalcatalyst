@@ -44,7 +44,7 @@ export default function FavoritesPage({
           favoriteProducts.length > 1 ? "s" : ""
         }`}
       />
-      <div data-favorites-row className="flex-1 overflow-y-auto px-4 pb-6 pt-3">
+      <div data-favorites-row data-footer-nav-space className="flex-1 overflow-y-auto px-4 pb-6 pt-3">
         <div data-store-grid className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
           {favoriteProducts.map((product) => (
             <FavoriteCard

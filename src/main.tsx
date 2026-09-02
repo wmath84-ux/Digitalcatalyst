@@ -48,6 +48,7 @@ import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
 import { initFooterGlow } from "./utils/footerGlow";
+import { initFooterNavSpace } from "./utils/footerNavSpace";
 import { CheckoutProvider } from "./checkout/CheckoutContext";
 import { clearAdminSession, hasAdminSession } from "./utils/adminSession";
 import { useOwnedUpdateIds } from "./hooks/useOwnedUpdates";
@@ -1279,6 +1280,9 @@ function RootPage(): ReactNode {
 // Drive the footer's outside magic glow with the page's scroll energy
 // (see src/utils/footerGlow.ts). Runs once for the whole app shell.
 initFooterGlow();
+// Publish the real footer-dock height so page areas can GROW by exactly that
+// amount instead of guessing with extra padding (see utils/footerNavSpace.ts).
+initFooterNavSpace();
 // HARD RULE: Ensure portrait lock is active on app start (mobile only)
 if (typeof window !== "undefined") {
   // Double-init for safety (initOrientationLock is idempotent)

@@ -5184,14 +5184,41 @@ html[data-course-player-active="true"] {
 [data-revision-content]:has(> [data-site-footer-nav]) {
   position: relative;
 }
+/* Real clearance, not a padding guess: `--dc-footer-nav-h` is the MEASURED
+   dock height (src/utils/footerNavSpace.ts, 0px when the footer is hidden).
+   The scroller's content area GROWS by exactly that much through a trailing
+   ::after block, so the last card ends above the dock and the dock can never
+   overlap a tappable element. */
+:root {
+  --dc-footer-nav-h: 0px;
+}
+
 @media (max-width: 959px) {
-  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-footer-nav]) > main {
-    padding-bottom: 4.5rem;
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-footer-nav]) > main::after,
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-footer-nav-space]::after {
+    content: "";
+    display: block;
+    flex: 0 0 auto;
+    width: 100%;
+    height: var(--dc-footer-nav-h, 0px);
+    pointer-events: none;
   }
 }
+/* Notifications: the filter strip moved out of the header and now floats just
+   above the footer dock, so the list needs that strip's height on top of the
+   dock clearance. */
+[data-notifications-content]::after {
+  height: calc(var(--dc-footer-nav-h, 0px) + 3.25rem) !important;
+}
+
 @media (max-width: 767px) {
-  [data-app-frame]:has(> [data-site-footer-nav]) [data-myday-content] > main {
-    padding-bottom: 4.5rem;
+  [data-app-frame]:has(> [data-site-footer-nav]) [data-myday-content] > main::after {
+    content: "";
+    display: block;
+    flex: 0 0 auto;
+    width: 100%;
+    height: var(--dc-footer-nav-h, 0px);
+    pointer-events: none;
   }
 }
 

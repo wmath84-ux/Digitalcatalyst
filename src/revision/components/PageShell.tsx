@@ -37,6 +37,7 @@ export default function PageShell({
       <main
         data-revision-page-main
         data-responsive-layout
+        data-footer-nav-space
         className="no-scrollbar min-h-0 w-full min-w-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
       >
         {children}
