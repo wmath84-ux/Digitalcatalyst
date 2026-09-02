@@ -657,3 +657,16 @@ html[data-glass="on"] [data-home-header] {
 html[data-glass="on"] [data-home-header] :where(h1, p, span, a, button, svg):not([class*="bg-"]) {
   color: rgb(var(--dc-paper-on-ink) / 0.95);
 }
+
+/* ── Part 1b · kill the shell's blue page gradient (the real culprit) ────────
+ * The blue gradient "behind the components" is NOT a Tailwind bg-gradient-to-*
+ * class — it's `.dc-app-shell`'s background, painted in src/index.css with
+ * radial-gradient(purple/blue) + linear-gradient(#f6f8ff…) across several media
+ * queries. The class-based Part 1 rule can't reach a CSS-file background, so the
+ * shell is neutralised directly here: under glass its background goes transparent
+ * and the single Black Ice backdrop shows. !important is required to beat the
+ * media-query declarations in index.css. Scoped to .dc-app-shell + gated on
+ * data-glass="on"; ?glass=off restores the gradient. */
+html[data-glass="on"] .dc-app-shell {
+  background: transparent !important;
+}
