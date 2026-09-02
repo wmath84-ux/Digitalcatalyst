@@ -595,7 +595,7 @@ export default function App() {
     {/* Black Ice backdrop — one fixed layer behind the My Day shell. */}
     <GlassBackdrop />
     <div className="dc-app-shell min-h-screen">
-      <div data-app-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0 lg:max-w-7xl lg:rounded-[2rem] lg:bg-white lg:shadow-xl lg:border lg:border-slate-200">
+      <div data-app-frame data-myday-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0 lg:max-w-7xl lg:rounded-[2rem] lg:bg-white lg:shadow-xl lg:border lg:border-slate-200">
         <StoreHeader
           cartCount={cartIds.size}
           notifCount={1}

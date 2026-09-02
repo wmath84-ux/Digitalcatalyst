@@ -598,3 +598,18 @@ html[data-glass="on"] :where([data-pdp-root]) {
 html[data-glass="on"] :where([data-pdp-loose]) :where(h1, h2, p, span, a, button):not([class*="bg-"]) {
   color: rgb(var(--dc-paper-on-ink) / 0.92);
 }
+
+/* ── Wave 4 · My Day desktop canvas over the backdrop ────────────────────────
+ * MyDayApp already mounts <GlassBackdrop/> and its frame is transparent below
+ * `lg` (so a phone already floats on Black Ice). Only the desktop "app card"
+ * (lg:bg-white) covered it. Under glass that canvas becomes a translucent veil
+ * at lg+ ONLY — the backdrop glows through while the dark ink stays readable —
+ * and mobile/tablet keep their full float (no veil added where the frame was
+ * already transparent). Scoped to MyDay's own `data-myday-frame` hook so the
+ * shared `data-app-frame`/`dc-app-frame` (Revision, cart, home) is untouched.
+ * `?glass=off` keeps the solid white card. */
+@media (min-width: 1024px) {
+  html[data-glass="on"] :where([data-myday-frame]) {
+    background-color: rgb(var(--dc-paper-on-ink) / 0.55);
+  }
+}
