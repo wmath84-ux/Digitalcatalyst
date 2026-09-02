@@ -23,7 +23,7 @@ const css = read("src/glass.css");
 const tooltip = read("src/components/ui/glass-tooltip.tsx");
 const input = read("src/components/ui/glass-input.tsx");
 
-const headerIconButton = header.slice(header.indexOf("function HeaderIconButton"));
+const expandingTabs = read("src/components/ui/ExpandingTabs.tsx");
 
 // ── the frozen shell of the site header ──────────────────────────────────────
 
@@ -42,21 +42,21 @@ test("the site header keeps every class/attribute the other chrome tests pin", (
 });
 
 test("header actions become registry tooltips, not native title text", () => {
-  assert.match(header, /<TooltipProvider delayMs=\{320\}>/, "the action row shares one tooltip provider");
-  assert.match(headerIconButton, /<TooltipTrigger/, "the disc itself is the trigger, so it stays the button");
-  assert.match(headerIconButton, /<TooltipContent side="bottom"/);
-  assert.doesNotMatch(headerIconButton, /title=/, "the native tooltip is replaced, not doubled up");
-  // The vendored tooltip is uncontrolled here; a controlled trigger would mean
-  // the chrome owns open state the pack already animates.
+  // The action cluster is the aicanvas.me Expanding Tabs bar: every item
+  // names itself (aria-label + title from the same literal), so the header
+  // no longer wires a tooltip provider of its own.
+  assert.match(header, /<ExpandingTabs/);
+  assert.match(expandingTabs, /aria-label=\{item\.ariaLabel \?\? item\.label\}/);
+  assert.match(expandingTabs, /title=\{item\.ariaLabel \?\? item\.label\}/);
   assert.doesNotMatch(header, /onOpenChange/, "no controlled tooltip state in the header");
 });
 
 test("every header disc is a real glass lens with a light-mode tint", () => {
-  assert.match(headerIconButton, /<GlassSurface\b/);
-  assert.match(headerIconButton, /radius=\{999\}/, "a disc, not a rounded square");
-  assert.doesNotMatch(headerIconButton, /tintColor=/, "Phase A: pack defaults only — the disc follows the page scheme");
-  assert.match(headerIconButton, /pointer-events-none absolute inset-0/);
-  assert.match(headerIconButton, /dc-chrome-disc/, "the rim override in glass.css hooks on this class");
+  // The Expanding Tabs rail is the disc row now: frosted capsule with the
+  // reference's inset top-light, icon circles that morph into the pill.
+  assert.match(expandingTabs, /rounded-full border border-white\/\[0\.08\] bg-white\/\[0\.05\]/);
+  assert.match(expandingTabs, /shadow-\[inset_0_1px_0_rgba\(255,255,255,0\.16\)\]/);
+  assert.match(expandingTabs, /backdrop-blur-md/);
 });
 
 test("the header still exposes its badges and its aria labels", () => {
@@ -64,12 +64,12 @@ test("the header still exposes its badges and its aria labels", () => {
   // the same pill, and the accessible name stays on the trigger.
   // The frozen `Help & FAQ` name must stay a literal in the file: a call site
   // that hides it behind a variable breaks tests/subscriptionDowngradeGuard.
-  assert.match(header, /aria-label="Help & FAQ"/);
-  assert.match(header, /aria-label="Notifications"/);
-  assert.match(headerIconButton, /aria-label=\{ariaLabel\}/);
-  assert.match(headerIconButton, /aria-label=\{badgeAriaLabel\}/, "the count gets its own accessible name");
+  assert.match(header, /ariaLabel: "Help & FAQ"/);
+  assert.match(header, /ariaLabel: "Notifications"/);
+  assert.match(expandingTabs, /aria-label=\{item\.ariaLabel \?\? item\.label\}/);
+  assert.match(expandingTabs, /aria-label=\{item\.badgeAriaLabel\}/, "the count gets its own accessible name");
   assert.match(header, /"99\+"/, "big counts stay capped, as they were before the swap");
-  assert.match(header, /badge=\{/, "badges are still passed in from the live counters");
+  assert.match(header, /badge:/, "badges are still passed in from the live counters");
 });
 
 // ── desktop rail ─────────────────────────────────────────────────────────────
@@ -121,17 +121,16 @@ test("the top-bar search is the registry input, still wired to the shell", () =>
   assert.match(shell, /data-desktop-topbar-row/, "the row the actions contract reads is untouched");
 });
 
-test("top-bar actions keep their data hook and gain disc + tooltip", () => {
-  const topBarButton = shell.slice(shell.indexOf("function TopBarButton"));
-  assert.match(topBarButton, /data-desktop-topbar-button=\{ariaLabel\.toLowerCase\(\)\}/);
-  assert.match(topBarButton, /aria-label=\{ariaLabel\}/);
-  assert.match(topBarButton, /<TooltipProvider delayMs=\{320\}>/);
-  assert.match(topBarButton, /<TooltipTrigger/);
-  assert.match(topBarButton, /<GlassSurface\b/);
-  assert.match(topBarButton, /dc-chrome-disc/);
-  // the old hover/active classes stay, so `data-glass="off"` is pixel-familiar
-  assert.match(topBarButton, /hover:bg-white\/\[0\.08\]/);
-  assert.match(topBarButton, /badge > 99 \? "99\+"/);
+test("top-bar actions keep their data hook and gain the expanding-tabs rail", () => {
+  // The four discs became one aicanvas.me Expanding Tabs bar; the wrapper
+  // keeps the `data-desktop-topbar-actions` hook the desktop contracts read.
+  assert.match(shell, /data-desktop-topbar-actions/);
+  const actions = shell.slice(shell.indexOf("data-desktop-topbar-actions"));
+  assert.match(actions, /<ExpandingTabs/);
+  for (const name of ["Notifications", "Favorites", "Cart", "Subscription"]) {
+    assert.ok(actions.includes(`ariaLabel: "${name}"`), `top bar keeps the ${name} action`);
+  }
+  assert.match(actions, /notifications > 99 \? "99\+"/);
 });
 
 test("⌘K is owned by exactly one component — the registry palette", () => {
@@ -250,7 +249,6 @@ test("the preview shows the wave, and the home header stays out of it", () => {
   // additive, pinned-by-name changes below, never by pulling Wave 2's chrome
   // components in. See tests/liquidGlassWaveSixContract.test.mjs.
   const homeHeader = read("src/home/components/Header.tsx");
-  assert.match(homeHeader, /dc-home-pill/, "Wave 6 adopted the hero pills");
-  assert.match(homeHeader, /glass-tooltip/, "Wave 6 replaced the hero's last native title");
+  assert.match(homeHeader, /<ExpandingTabs/, "the hero actions are the Expanding Tabs bar");
   assert.match(homeHeader, /<GlassSurface/, "Phase A: the hero header IS the pack GlassSurface at defaults");
 });

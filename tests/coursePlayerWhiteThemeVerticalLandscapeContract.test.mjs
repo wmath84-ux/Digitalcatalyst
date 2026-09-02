@@ -23,7 +23,7 @@ test("Google Form answering and confirmation remain in the framed player", () =>
   assert.match(resourceViewer, /sandbox=\{editMode \? undefined : "allow-scripts allow-forms/);
   assert.doesNotMatch(resourceViewer, /allow-top-navigation/);
   assert.match(coursePlayer, /data-course-header/);
-  assert.match(coursePlayer, /data-course-mark-complete-bar/);
+  assert.match(coursePlayer, /markCompleteButton\(false\)/);
 });
 
 test("rotated mobile landscape maps a visible vertical swipe to scrollTop", () => {
@@ -41,8 +41,8 @@ test("physical mobile landscape explicitly opts scrollable content into vertical
 
 test("theme button simply toggles dark and light with no extra state", () => {
   assert.ok(coursePlayer.includes('type CoursePlayerTheme = "dark" | "light";'), "theme type has only dark + light");
-  assert.ok(coursePlayer.includes('const nextTheme: CoursePlayerTheme = theme === "dark" ? "light" : "dark";'), "next theme is a simple flip");
-  assert.ok(coursePlayer.includes("data-next-theme={nextTheme}"), "theme toggle exposes the next theme");
+  // The settings row flips the same two-state preference directly.
+  assert.ok(coursePlayer.includes('setTheme(next ? "light" : "dark")'), "next theme is a simple flip");
   assert.ok(!coursePlayer.includes('theme === "light" ? "white"'), "no white step remains in the cycle");
   // Anyone who previously picked the removed white theme keeps light, and a
   // third tap cycles straight back to the first state (dark ⇄ light ⇄ dark).

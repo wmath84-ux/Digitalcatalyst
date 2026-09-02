@@ -9,12 +9,12 @@ const courseEmbed = fs.readFileSync("src/utils/courseEmbed.ts", "utf8");
 const styles = fs.readFileSync("src/index.css", "utf8");
 
 test("Course Player header exposes a persisted light/dark theme toggle", () => {
-  assert.match(coursePlayer, /data-course-theme-toggle/);
+  // The toggle is the "Light theme" Glass Switch row of the ⚙ Player
+  // settings popover (the header quick-button was removed on purpose).
+  assert.match(coursePlayer, /settingsRow\("Light theme", theme === "light", \(next\) => setTheme\(next \? "light" : "dark"\), "theme"\)/);
   assert.match(coursePlayer, /data-course-theme=\{theme\}/);
   assert.match(coursePlayer, /dc\.coursePlayerTheme/);
   assert.match(coursePlayer, /localStorage\.setItem\(courseThemeStorageKey, theme\)/);
-  assert.match(coursePlayer, /theme === "dark" \? <Sun/);
-  assert.match(coursePlayer, /<Moon/);
 });
 
 test("Course Player theme is scoped and supplies both palette variants", () => {

@@ -36,8 +36,12 @@ test("dark ink follows the route's own theme signal, not a forced class", () => 
     assert.doesNotMatch(code(read(f)), /dc-slider-on-dark/, `${f} forces a palette`);
     assert.match(read(f), /<GlassSlider/);
   }
+  // The course audio player became the aicanvas.me Upload Progress card —
+  // an always-light widget whose bottom shimmer bar is the seek control, so
+  // it no longer forces a slider palette class.
   const audio = read("src/course/AudioPlayer.tsx");
-  assert.match(audio, /dc-slider-on-dark dc-slider-violet/);
+  assert.doesNotMatch(audio, /dc-slider-on-dark/);
+  assert.match(audio, /role="slider"/);
 
   const css = read("src/glass.css");
   assert.match(css, /html\[data-glass="on"\] \.dc-slider-on-dark > span:first-child/);
@@ -46,13 +50,15 @@ test("dark ink follows the route's own theme signal, not a forced class", () => 
 });
 
 test("the hero's action pills and shortcut use the pack material", () => {
+  // The hero's action cluster is the aicanvas.me Expanding Tabs bar now —
+  // one morphing pill rail instead of four separate discs. The accessible
+  // names stay written literally at the call site.
   const h = read("src/home/components/Header.tsx");
-  assert.equal(h.match(/dc-home-pill/g)?.length, 4, "expected four pills");
   assert.match(h, /data-home-actions/); // the row a home contract reads
-  assert.match(h, /from "\.\.\/\.\.\/components\/ui\/glass-tooltip"/);
-  assert.match(h, /<TooltipTrigger/);
+  assert.match(h, /<ExpandingTabs/);
+  assert.match(h, /from "\.\.\/\.\.\/components\/ui\/ExpandingTabs"/);
   assert.doesNotMatch(code(h), /title="/, "a native title bubble is still in the hero");
-  assert.match(h, /aria-label="Open profile"/);
+  assert.match(h, /ariaLabel: "Open profile"/);
 
   const learn = read("src/home/components/ContinueLearning.tsx");
   assert.match(learn, /className="dc-card/);
@@ -125,8 +131,10 @@ test("every glass surface has a keyboard path and a motion opt-out", () => {
     assert.match(s, /ariaLabel=\{label\}|ariaLabel="Progress"/);
   }
   const audio = read("src/course/AudioPlayer.tsx");
-  assert.match(audio, /aria-label=\{playing \? "Pause" : "Play"\}/);
-  assert.match(audio, /aria-label="Toggle mute"/);
+  // CircleButton forwards `label` to both aria-label and the tooltip title.
+  assert.match(audio, /aria-label=\{label\}/);
+  assert.match(audio, /label=\{playing \? "Pause" : "Play"\}/);
+  assert.match(audio, /label="Toggle mute"/);
 });
 
 test("the dock keeps its own material: the plan's cleanup item was declined", () => {

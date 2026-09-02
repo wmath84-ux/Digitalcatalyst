@@ -29,6 +29,7 @@
 //     sheet slides in from the right.
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { motion, useMotionValue, useSpring, useTransform, type MotionValue } from "framer-motion";
 import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Plus, ShoppingBag, Sparkles, X } from "lucide-react";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
@@ -82,6 +83,73 @@ const isPaidLocked = (module: CourseModule, ownedUpdateIds: Set<string>) =>
   module.accessLevel === "paidUpdate" && Boolean(module.paidUpdateId) && !ownedUpdateIds.has(String(module.paidUpdateId));
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+// ── Home-footer touch behaviour, ported to the course dock ────────────────
+// The same magnify-under-the-finger interaction as the app footer
+// (src/components/glass-dock/GlassDock.tsx): icons near the pointer/finger
+// swell and lift as it moves across the dock. Look is untouched — only the
+// motion is added.
+const DOCK_MAG_RANGE = 110;
+const DOCK_MAG_SCALE = 1.28;
+
+function DockTabButton({
+  tabKey,
+  label,
+  icon,
+  active,
+  landscape,
+  pointerPos,
+  onSelect,
+  skipSelectRef,
+}: {
+  tabKey: DockTab;
+  label: string;
+  icon: ReactNode;
+  active: boolean;
+  landscape: boolean;
+  pointerPos: MotionValue<number>;
+  onSelect: () => void;
+  skipSelectRef: { current: boolean };
+}) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const distance = useTransform(pointerPos, (p: number) => {
+    const el = ref.current;
+    if (!el || p < -5000) return 999;
+    const rect = el.getBoundingClientRect();
+    const center = landscape ? rect.top + rect.height / 2 : rect.left + rect.width / 2;
+    return Math.abs(p - center);
+  });
+  const rawScale = useTransform(distance, [0, DOCK_MAG_RANGE], [DOCK_MAG_SCALE, 1]);
+  const scale = useSpring(rawScale, { stiffness: 300, damping: 22, mass: 0.5 });
+  const lift = useTransform(scale, [1, DOCK_MAG_SCALE], [0, landscape ? -4 : -5]);
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={() => {
+        // A finger-slide selection already happened on pointerup — the
+        // synthetic click that follows must not re-toggle the tab.
+        if (skipSelectRef.current) return;
+        onSelect();
+      }}
+      aria-pressed={active}
+      className={`relative z-10 flex flex-1 flex-col items-center justify-center text-[10px] font-black transition-colors ${
+        active ? "text-white" : "text-white/55 hover:text-white/80"
+      }`}
+      data-course-dock-tab
+      data-tab={tabKey}
+      data-active={active ? "true" : "false"}
+    >
+      <motion.span
+        className="flex flex-col items-center justify-center gap-0.5"
+        style={landscape ? { scale, x: lift } : { scale, y: lift }}
+      >
+        {icon}
+        <span className="truncate px-1">{label}</span>
+      </motion.span>
+    </button>
+  );
+}
 
 /**
  * Magnetic easing for the dock indicator while it is being dragged. Within
@@ -273,6 +341,71 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
       return null;
     });
+  };
+
+  // ── Whole-dock touch behaviour ──────────────────────────────────────────
+  // Two things, exactly like the home footer:
+  //   1. `pointerPos` drives the magnify — icons swell near the finger or
+  //      mouse as it travels across the dock.
+  //   2. A finger placed ANYWHERE on the dock and slid along it drags the
+  //      accent indicator with it (live content swap included) and selects
+  //      the tab it is released over. A plain tap still just taps the button.
+  const pointerPos = useMotionValue(-10000);
+  const surfRef = useRef<{ id: number; start: number; moved: boolean } | null>(null);
+  const skipSelectRef = useRef(false);
+  const dockCoord = (event: ReactPointerEvent) => (landscape ? event.clientY : event.clientX);
+
+  const onDockPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    pointerPos.set(dockCoord(event));
+    if (event.pointerType === "mouse") return;
+    // The dedicated grab handle has its own (magnetic) drag — don't run a
+    // second drag for the same gesture.
+    if ((event.target as Element | null)?.closest?.("[data-course-dock-handle]")) return;
+    surfRef.current = { id: event.pointerId, start: dockCoord(event), moved: false };
+  };
+  const onDockPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    pointerPos.set(dockCoord(event));
+    const st = surfRef.current;
+    if (!st || st.id !== event.pointerId) return;
+    const coord = dockCoord(event);
+    if (!st.moved) {
+      if (Math.abs(coord - st.start) <= 10) return;
+      st.moved = true;
+      // From here the gesture is a slide, not a tap — capture the pointer so
+      // the indicator keeps following even outside the pill, and swallow the
+      // click that would otherwise fire on release.
+      try { (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); } catch { /* capture unsupported */ }
+      skipSelectRef.current = true;
+    }
+    const pill = pillRef.current;
+    if (!pill) return;
+    const rect = pill.getBoundingClientRect();
+    const slot = (landscape ? rect.height : rect.width) / TABS.length;
+    if (slot <= 0) return;
+    const raw = clamp((coord - (landscape ? rect.top : rect.left)) / slot - 0.5, 0, TABS.length - 1);
+    setDragIndex(raw);
+    const nearest = Math.round(raw);
+    const key = TABS[nearest]?.key;
+    if (key && nearest !== activeIndex) props.onTabChange(key);
+  };
+  const onDockPointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    pointerPos.set(-10000);
+    const st = surfRef.current;
+    if (!st || st.id !== event.pointerId) return;
+    surfRef.current = null;
+    try { (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
+    if (!st.moved) {
+      skipSelectRef.current = false;
+      return;
+    }
+    setDragIndex((current) => {
+      const snapped = current == null ? activeIndex : Math.round(current);
+      const key = TABS[snapped]?.key;
+      if (key && snapped !== activeIndex) props.onTabChange(key);
+      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
+      return null;
+    });
+    window.setTimeout(() => { skipSelectRef.current = false; }, 400);
   };
 
   // ── Soft-keyboard awareness (landscape notes split) ─────────────────────
@@ -629,6 +762,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         }}
         data-course-overlay
         data-open={sheetVisible ? "true" : "false"}
+        data-solid-panel={tab === "notes" || tab === "mindmap" ? "true" : "false"}
         data-orientation={orientation}
         data-split-mode={splitMode || mindMapSplit ? "true" : "false"}
         data-split-kind={mindMapSplit ? "mindmap" : splitMode ? "notes" : "none"}
@@ -773,6 +907,12 @@ export default function CourseOverlay(props: CourseOverlayProps) {
             radius={999}
             className={`dc-footer-pill text-white ${landscape ? "h-full w-full" : "w-full"}`}
             contentClassName={`flex ${landscape ? "h-full w-full flex-col" : "h-16 w-full"}`}
+            style={{ touchAction: "none" }}
+            onPointerDown={onDockPointerDown}
+            onPointerMove={onDockPointerMove}
+            onPointerUp={onDockPointerEnd}
+            onPointerCancel={onDockPointerEnd}
+            onPointerLeave={() => pointerPos.set(-10000)}
           >
             {/* Fluid sheen — a slow liquid highlight that drifts across the
                 capsule, echoing the home footer's "magic" feel. Painted
@@ -795,26 +935,19 @@ export default function CourseOverlay(props: CourseOverlayProps) {
             >
               <span className={`block h-full rounded-full bg-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_2px_10px_rgba(0,0,0,0.18)] ${landscape ? "my-1.5" : "mx-1.5"}`} />
             </span>
-            {TABS.map(({ key, label, icon }) => {
-              const active = key === tab;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => props.onTabChange(key)}
-                  aria-pressed={active}
-                  className={`relative z-10 flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-black transition-colors ${
-                    active ? "text-white" : "text-white/55 hover:text-white/80"
-                  }`}
-                  data-course-dock-tab
-                  data-tab={key}
-                  data-active={active ? "true" : "false"}
-                >
-                  {icon(active)}
-                  <span className="truncate px-1">{label}</span>
-                </button>
-              );
-            })}
+            {TABS.map(({ key, label, icon }) => (
+              <DockTabButton
+                key={key}
+                tabKey={key}
+                label={label}
+                icon={icon(key === tab)}
+                active={key === tab}
+                landscape={landscape}
+                pointerPos={pointerPos}
+                skipSelectRef={skipSelectRef}
+                onSelect={() => props.onTabChange(key)}
+              />
+            ))}
             {/* Draggable grab handle that overlays ONLY the active slot, so the
                 other three tab buttons stay fully clickable. A tap (no move)
                 forwards to the active-tab toggle; a drag slides the indicator

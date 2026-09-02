@@ -5,8 +5,7 @@ import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount"
 import BrandMark from "./BrandMark";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { useBranding } from "@/context/BrandingContext";
-import { GlassSurface } from "./ui/glass";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/glass-tooltip";
+import ExpandingTabs, { type ExpandingTabItem } from "./ui/ExpandingTabs";
 
 type HeaderProps = {
   cartCount: number;
@@ -59,6 +58,16 @@ type HeaderProps = {
   onHelpClick?: () => void;
 };
 
+/**
+ * App header (mobile + tablet). The action cluster is the aicanvas.me
+ * "Expanding Tabs" bar (https://aicanvas.me/components/expanding-tabs): a
+ * monochrome row of icon circles where the contextually active action
+ * expands into an icon-and-label pill (the notifications page expands the
+ * bell, the subscription page the crown, an open search the magnifier) while
+ * the rest stay plain circles. Accessible names are written literally at the
+ * call sites — they stay greppable ("Help & FAQ" is pinned by
+ * tests/subscriptionDowngradeGuard.test.mjs).
+ */
 export default function Header({
   cartCount,
   onNavigateToSubscription,
@@ -80,6 +89,85 @@ export default function Header({
   const { logoUrl, appName, hideFrameBorders } = useBranding();
   const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
   const headerTitle = title ?? appName;
+
+  const tabItems: ExpandingTabItem[] = [
+    ...(onToggleSearch
+      ? [{
+          id: "search",
+          label: "Search",
+          ariaLabel: "Search",
+          icon: <SearchIcon className="h-5 w-5" />,
+        }]
+      : []),
+    onDownloadReport
+      ? {
+          id: "download",
+          label: "Report",
+          ariaLabel: "Download report",
+          icon: <DownloadIcon className="h-5 w-5" />,
+        }
+      : {
+          id: "cart",
+          label: "Cart",
+          ariaLabel: "Cart",
+          icon: <CartIcon className="h-5 w-5" />,
+          badge: cartCount > 0 ? String(cartCount) : undefined,
+          badgeTone: "rose" as const,
+        },
+    {
+      id: "notifications",
+      label: "Alerts",
+      ariaLabel: "Notifications",
+      icon: <BellIcon className="h-5 w-5" />,
+      badge:
+        displayedNotificationCount > 0
+          ? displayedNotificationCount > 99
+            ? "99+"
+            : String(displayedNotificationCount)
+          : undefined,
+      badgeAriaLabel:
+        displayedNotificationCount > 0
+          ? `${displayedNotificationCount} unread notifications`
+          : undefined,
+    },
+    {
+      id: "subscription",
+      label: "Plans",
+      ariaLabel: "Subscription",
+      icon: <CrownIcon className="h-5 w-5" />,
+    },
+    ...(onHelpClick
+      ? [{
+          id: "help",
+          label: "Help",
+          ariaLabel: "Help & FAQ",
+          icon: <HelpCircle className="h-5 w-5" />,
+        }]
+      : []),
+  ];
+
+  // The expanded pill follows context: an open search wins, otherwise the
+  // route the header currently sits on (notifications / cart / subscription).
+  const hash = typeof window !== "undefined" ? window.location.hash : "";
+  const activeId = searchActive
+    ? "search"
+    : hash.startsWith("#/notifications")
+      ? "notifications"
+      : hash.startsWith("#/cart")
+        ? "cart"
+        : hash.startsWith("#/subscription")
+          ? "subscription"
+          : null;
+
+  const handleSelect = (id: string) => {
+    if (id === "search") onToggleSearch?.();
+    else if (id === "download") onDownloadReport?.();
+    else if (id === "cart") onNavigateToCart();
+    else if (id === "notifications") onNavigateToNotifications();
+    else if (id === "subscription") onNavigateToSubscription();
+    else if (id === "help") onHelpClick?.();
+  };
+
   return (
     <header
       data-site-header
@@ -98,157 +186,17 @@ export default function Header({
           </div>
         </div>
 
-        <TooltipProvider delayMs={320}>
-          <div className="flex shrink-0 items-center gap-2">
-            {onToggleSearch ? (
-              <HeaderIconButton
-                aria-label="Search"
-                hint={searchActive ? "Close search" : "Search the store"}
-                onClick={onToggleSearch}
-                active={searchActive}
-                icon={<SearchIcon className="h-5 w-5" />}
-              />
-            ) : null}
-            {onDownloadReport ? (
-              <HeaderIconButton
-                aria-label="Download report"
-                hint="Download My Day report"
-                onClick={onDownloadReport}
-                icon={<DownloadIcon className="h-5 w-5" />}
-              />
-            ) : (
-              <HeaderIconButton
-                aria-label="Cart"
-                hint="View cart"
-                onClick={onNavigateToCart}
-                badge={cartCount > 0 ? String(cartCount) : undefined}
-                badgeTone="rose"
-                icon={<CartIcon className="h-5 w-5" />}
-              />
-            )}
-            <HeaderIconButton
-              aria-label="Notifications"
-              hint={
-                displayedNotificationCount > 0
-                  ? `${displayedNotificationCount} unread`
-                  : "No unread notifications"
-              }
-              onClick={onNavigateToNotifications}
-              badge={
-                displayedNotificationCount > 0
-                  ? displayedNotificationCount > 99
-                    ? "99+"
-                    : String(displayedNotificationCount)
-                  : undefined
-              }
-              badgeAriaLabel={
-                displayedNotificationCount > 0
-                  ? `${displayedNotificationCount} unread notifications`
-                  : undefined
-              }
-              icon={<BellIcon className="h-5 w-5" />}
-            />
-            <HeaderIconButton
-              aria-label="Subscription"
-              hint="EduVora plans"
-              onClick={onNavigateToSubscription}
-              tone="accent"
-              icon={<CrownIcon className="h-5 w-5" />}
-            />
-            {onHelpClick ? (
-              <HeaderIconButton
-                aria-label="Help & FAQ"
-                onClick={onHelpClick}
-                icon={<HelpCircle className="h-5 w-5" />}
-              />
-            ) : null}
-            {action}
-          </div>
-        </TooltipProvider>
+        <div className="flex shrink-0 items-center gap-2">
+          <ExpandingTabs
+            items={tabItems}
+            activeId={activeId}
+            onSelect={handleSelect}
+            ariaLabel="Header actions"
+          />
+          {action}
+        </div>
       </div>
       {children}
     </header>
-  );
-}
-
-/**
- * HeaderIconButton — one header action.
- *
- * Wave 2 (liquid glass): the disc is the pack's `GlassSurface` (frost +
- * specular rim) rather than a hand-painted `bg-white/60 border` pill, and the
- * hover text that used to live in `title=` is now a real `glass-tooltip` chip,
- * and each action's `aria-label` is written literally at its call site — the
- * accessible names of the header must stay greppable (`Help & FAQ` in
- * particular is pinned by tests/subscriptionDowngradeGuard.test.mjs).
- * so it is keyboard-reachable (the trigger focuses → the chip opens) and
- * legible over any background. Sizing, hit area and the badge geometry are
- * deliberately identical to the old buttons — the mobile header must not grow.
- */
-type HeaderIconTone = "neutral" | "accent" | "active";
-
-function HeaderIconButton({
-  "aria-label": ariaLabel,
-  hint,
-  onClick,
-  icon,
-  badge,
-  badgeAriaLabel,
-  badgeTone = "indigo",
-  tone = "neutral",
-  active = false,
-}: {
-  /** Both the accessible name and, unless `hint` overrides it, the tooltip. */
-  "aria-label": string;
-  /** Tooltip copy; falls back to the aria-label. */
-  hint?: string;
-  onClick: () => void;
-  icon: ReactNode;
-  badge?: string;
-  badgeAriaLabel?: string;
-  badgeTone?: "indigo" | "rose";
-  tone?: HeaderIconTone;
-  active?: boolean;
-}) {
-  const resolved: HeaderIconTone = active ? "active" : tone;
-  const surface =
-    resolved === "accent"
-      ? { label: "text-violet-200 hover:text-violet-100" }
-      : resolved === "active"
-        ? { label: "text-indigo-200" }
-        : { label: "text-white/85 hover:text-white" };
-
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        aria-label={ariaLabel}
-        onClick={onClick}
-        className={`relative grid size-10 place-items-center rounded-full outline-none transition-all active:scale-95 ${surface.label}`}
-      >
-        {/* the material sits under the glyph; pointer-events-none so the button
-            keeps owning every click and the 40px hit area */}
-        <GlassSurface
-          radius={999}
-          className="dc-chrome-disc pointer-events-none absolute inset-0"
-          aria-hidden="true"
-        />
-        <span className="relative">{icon}</span>
-        {badge ? (
-          <span
-            aria-label={badgeAriaLabel}
-            className={`absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white ring-2 ring-[#0a0c12] ${
-              badgeTone === "rose" ? "bg-rose-500" : "bg-indigo-600"
-            }`}
-          >
-            {badge}
-          </span>
-        ) : null}
-      </TooltipTrigger>
-      {/* The chip is a *light* panel over the light header, so the label colour
-          is set on the child span: `text-white` lives on the surface root and
-          would win on that element, not on ours. */}
-      <TooltipContent side="bottom" tint={0.85}>
-        <span>{hint ?? ariaLabel}</span>
-      </TooltipContent>
-    </Tooltip>
   );
 }

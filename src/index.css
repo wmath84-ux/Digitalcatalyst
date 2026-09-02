@@ -5781,3 +5781,35 @@ html.light {
 .dc-desktop-shell [data-fp-dock] {
   left: var(--desktop-rail-width, 260px);
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   COURSE PLAYER — light-mode scoping + solid study panels (owner request)
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Light theme must touch ONLY the buttons and the overlay — never the
+   player's own chrome. While the Course Player syncs `html.light`, the
+   site-wide `--dc-chrome-glass` token flips to the white material and the
+   header/rail used to turn white with it. Re-pinning the token ON the header
+   elements keeps them on the dark chrome in both themes, while every
+   GlassButton / GlassSurface / overlay inside the player still follows the
+   learner's light/dark pick. */
+.course-player-shell[data-course-theme="light"] [data-course-header],
+.course-player-shell[data-course-theme="light"] [data-course-landscape-header] {
+  --dc-chrome-glass: rgba(60, 62, 68, 0.30);
+  --dc-chrome-glass-rim:
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+/* Notes library + Mind map sheets: the glass sheet was translucent enough
+   that the lesson (and a previously drawn map / written notes) stayed
+   visible THROUGH the panel — both layers read at once. These two study
+   surfaces now sit on a near-opaque plate in BOTH themes; the ink inside
+   them is white in both course themes, so the plate stays dark. */
+.course-player-shell [data-course-overlay][data-solid-panel="true"] {
+  background: rgba(13, 15, 24, 0.96) !important;
+}
+.course-player-shell[data-course-theme="light"] [data-course-overlay][data-solid-panel="true"] {
+  background: rgba(36, 39, 52, 0.97) !important;
+}
