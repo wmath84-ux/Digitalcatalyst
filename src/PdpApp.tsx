@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { EmojiBurstLayer, useEmojiBurst } from "./components/ui/EmojiBurst";
 import {
   GlassToggleGroup,
   GlassToggleItem,
@@ -265,6 +266,7 @@ function PremiumProductContent({
     ? ""
     : `${window.location.origin}${window.location.pathname}#/product/${encodeURIComponent(product.id)}`;
   const favorite = favoriteIds.has(product.id);
+  const { particles: likeParticles, burst: likeBurst } = useEmojiBurst();
   const inCart = cartIds.has(product.id);
   const unavailable = product.availableForSale === false && !isProductOwned;
 
@@ -533,9 +535,12 @@ function PremiumProductContent({
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
               </div>
               <div className="absolute right-3 top-3 flex gap-2">
-                <GlassButton type="button" onClick={() => onToggleFavorite?.(product.id)} aria-label="Save product" className="[&_.size-12]:size-9">
+                <span className="relative inline-flex">
+                  <EmojiBurstLayer particles={likeParticles} />
+                <GlassButton type="button" onClick={() => { if (!favorite) likeBurst(); onToggleFavorite?.(product.id); }} aria-label="Save product" className="[&_.size-12]:size-9">
                   <Heart className={`h-4 w-4 ${favorite ? "fill-rose-500 text-rose-500" : ""}`} />
                 </GlassButton>
+                </span>
                 <GlassButton type="button" onClick={() => window.open(selectedImage, "_blank", "noopener,noreferrer")} aria-label="Open image" className="[&_.size-12]:size-9">
                   <Expand className="h-4 w-4" />
                 </GlassButton>

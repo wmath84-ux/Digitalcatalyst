@@ -1,4 +1,5 @@
 import { Heart, ShoppingCart, Star } from "lucide-react";
+import { EmojiBurstLayer, useEmojiBurst } from "../../components/ui/EmojiBurst";
 import { Product } from "../types";
 import { formatINR } from "../utils/format";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -20,6 +21,7 @@ export default function FavoriteCard({
   onAddToCart,
   onOpen,
 }: FavoriteCardProps) {
+  const { particles: likeParticles, burst: likeBurst } = useEmojiBurst();
   const discount = Math.round(
     ((product.originalPrice - product.price) / product.originalPrice) * 100
   );
@@ -42,8 +44,9 @@ export default function FavoriteCard({
             className="h-full w-full object-cover"
           />
         </button>
+        <EmojiBurstLayer particles={likeParticles} />
         <GlassButton
-          onClick={() => onRemove(product.id)}
+          onClick={() => { likeBurst(); onRemove(product.id); }}
           className="absolute right-2 top-2 [&_.size-12]:size-8"
           aria-label="Remove from favorites"
         >

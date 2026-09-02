@@ -5904,3 +5904,25 @@ html.light {
   /* Expanded rail paints over the page instead of reflowing it. */
   overflow: visible;
 }
+
+
+/* Queries page: the status filter floats above the footer dock, so the list
+   needs the strip's height on top of the measured dock clearance. */
+[data-user-queries-content]::after {
+  height: calc(var(--dc-footer-nav-h, 0px) + 3.25rem) !important;
+}
+
+/* Home feedback wall (AI Canvas Sticker Wall). The canvas owns its own
+   pointer handling; keep the tablet `* { max-width: 100% }` pass and the page
+   scroll from fighting the matter.js drag surface. */
+[data-home-sticker-wall] canvas {
+  touch-action: none;
+}
+@media (max-width: 639px) {
+  /* Phone: a shorter wall, tighter gutters — the section is a fitted card,
+     not a full-bleed desktop canvas. */
+  [data-home-sticker-wall] {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
