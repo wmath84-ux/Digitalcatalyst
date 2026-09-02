@@ -405,3 +405,33 @@ Owner refinement before the wave: **pack components at their defaults** (no `.dc
 - `src/glass.css`: Wave-3 PDP veil + `data-pdp-loose` re-ink removed (ink is white at source). `src/index.css`: `[data-store-view-options] > div > button` no-shrink companion.
 - Tests re-pinned: `storeFiltersAdminProductContract` (pack glass, no white/gradient plates, no drop shadow), `storeViewDropdownResponsiveContract` (GlassSurface row), `pdpCurriculumVisibilityContract` (amber tone, no gradient).
 - Still hand-rolled (Phase B): PurchaseBuilder module/resource rows + checkboxes (`bg-white/[0.08]`), Timeline-style curriculum rows, review articles, related-product rows, share menu items, cart line items' inner panels.
+
+---
+
+## Phase B · Wave 7 — Course player header + ⚙ Settings (D6) + CourseOverlay / CourseSidebar (+ A8 background removal for these files)
+
+**Files:** `src/CoursePlayerApp.tsx`, `src/course/CourseOverlay.tsx`, `src/course/CourseSidebar.tsx`, `src/index.css` (course palette), `src/glass.css` (dock pill), `src/main.tsx` (scheme hand-off).
+
+| Old | New (pack component, defaults) |
+|---|---|
+| 8 header toggles (`course-icon-button` 40 px squares, violet/sky/emerald fills) | `GlassButton` icon disc (tint 0.4) sized `[&_.size-12]:size-10`; active state = icon ink only (`[&_svg]:text-violet-300` / sky / emerald) — no painted fills |
+| logo back button, mark-complete (icon + capsule), "Show bars" restore pill | `GlassButton` icon / capsule |
+| — | **⚙ Settings** (`data-course-settings-trigger`): pack `Popover` + `PopoverContent` (tint 0.55) with `GlassSwitch` rows — Light theme · Snowfall · Desktop view · File bars · Toolbar strip · Player bars. Mounted in portrait header actions (`side="bottom" align="end"`) and landscape rail (`side="right"`). Header quick-toggles stay (D6). |
+| portrait header `bg-[var(--course-surface)]` + violet→cyan wash + hairline gradient + drop shadow; landscape rail plate | `--dc-chrome-glass` + `--dc-chrome-glass-blur` (= pack GlassSurface material), no gradients, no shadow |
+| progress fills `bg-gradient-to-r/t violet→fuchsia→cyan` | solid `bg-violet-400` |
+| `.course-player-shell` opaque `#090912` / `#f1f5f9` plates | **transparent** — the player sits on the one Black Ice backdrop like every other route; `--course-surface/panel` = `--dc-chrome-glass` (dark) / `rgba(255,255,255,0.21)` (light) = the pack's two materials; `--course-text` white in both |
+| player theme separate from pack scheme | player theme → `applyGlassScheme(theme)` while mounted (vendored components flip too), stored site preference restored on unmount; `main.tsx` route effect skips `#/course/` so it does not fight it |
+| CourseOverlay sheet (`bg-[var(--course-panel)]` + shadow + violet top wash) | `GlassSurface` (tint 0.5 default) with the same absolute positioning / split / keyboard maths; scrim = pack sheet scrim (`bg-black/50 backdrop-blur-[2px]`) |
+| overlay header + / × buttons | `GlassButton` `[&_.size-12]:size-8` |
+| dock pill `.dc-footer-pill` (solid white, black border, black ink) + violet gradient indicator | `GlassSurface radius={999}` (ref forwarded — React 19), indicator = pack TabsList pill values (`bg-white/15` + inset highlight), inactive ink `text-white/55`; `.dc-dock-fluid` hidden under glass; `.dc-footer-pill` paint zeroed for `[data-course-dock]` only (footer nav untouched) |
+| module rows / file rows (overlay + sidebar) | `GlassTile` (`selected` = holds current file / is current file), `aspect-auto` + `[&>span]:w-full [&>span]:justify-start` for a row layout |
+| paid CTAs (`bg-amber-400 text-slate-950`) | `GlassButton` capsule, amber ink (meaning colour) |
+| paid cards (amber gradient / ring plates) | `GlassSurface radius={20}` + `border-amber-400/25` |
+| wire rail gradient lines | solid `bg-violet-400/40` / `bg-amber-400/40` |
+| CourseSidebar `bg-[#11111d]`, updates banner gradient, `bg-white/5` panels | transparent root, `GlassTile` banner, `GlassSurface` cards |
+
+Kept (pinned by tests): every `data-course-*` attribute, `aria-pressed` expressions, `title=` strings on the toggles, `dc-footer-pill` / `dc-footer-glow` / `dc-dock-fluid` class names, `function WireRail`, `.course-player-shell[data-course-theme="light"]` block, `--course-*` variable names, `<Eye size={13} className="text-sky-300"`.
+
+**Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 313 → 290, gradients 49 → 39, render-sites 394 → 430 · backdrop OK · frozen diff empty.
+
+**Wave 8 next:** ResourceViewer toolbar + ImageViewer + NotesPanel + RichTextEditor + AudioPlayer transport + ConfirmDeleteDialog (`tint={0.9}` → default).

@@ -32,6 +32,9 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Plus, ShoppingBag, Sparkles, X } from "lucide-react";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
+import { GlassSurface } from "../components/ui/glass";
+import { GlassButton } from "../components/ui/glass-button";
+import { GlassTile } from "../components/ui/glass-tile";
 
 export type DockTab = "modules" | "resources" | "notes" | "mindmap" | "paid";
 export type DockOrientation = "portrait" | "landscape";
@@ -567,7 +570,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         <div
           onClick={props.onClose}
           aria-hidden={!open}
-          className={`absolute z-30 bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${
+          className={`absolute z-30 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 ${
             landscape ? "bottom-0 left-0 top-0" : "inset-x-0 bottom-16 top-0"
           } ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
           style={landscape ? { right: "calc(4rem + env(safe-area-inset-right, 0px))" } : undefined}
@@ -576,8 +579,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       ) : null}
 
       {/* ── Overlay sheet ─────────────────────────────────────────────── */}
-      <div
-        className={`absolute z-40 flex flex-col overflow-hidden border-[var(--course-border)] bg-[var(--course-panel)] shadow-[0_-18px_50px_rgba(0,0,0,0.55)] transition-[transform,opacity] duration-300 ease-out ${
+      <GlassSurface
+        contentClassName="flex min-h-0 flex-col overflow-hidden"
+        className={`absolute z-40 overflow-hidden border-[var(--course-border)] transition-[transform,opacity] duration-300 ease-out ${
           landscape
             ? "bottom-0 top-0 border-l"
             : "inset-x-0 bottom-16 rounded-t-[1.75rem] border-t"
@@ -586,6 +590,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           : `pointer-events-none invisible opacity-0 ${landscape ? "translate-x-full" : "translate-y-full"}`
         }`}
         style={{
+          // The pack surface's own `radius` is a uniform value; the portrait
+          // sheet only rounds its top edge and the landscape sheet none.
+          borderRadius: landscape ? 0 : "1.75rem 1.75rem 0 0",
           // Sits flush against the dock's left edge — the dock grows by the
           // right safe-area inset in fullscreen, so the sheet must too.
           // In split mode the editor takes the right 40% of the section
@@ -643,8 +650,6 @@ export default function CourseOverlay(props: CourseOverlayProps) {
             <span className={`block h-16 w-1.5 rounded-full ${splitDragging ? "bg-violet-400" : "bg-violet-400/70"} shadow-[0_0_10px_rgba(167,139,250,0.7)]`} />
           </button>
         ) : null}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-violet-500/10 to-transparent" />
-
         {/* Grab handle (portrait only, hidden while the writing box is open
             so the editor gets every pixel, and hidden for the mind map
             because its portrait header now carries the title + close). */}
@@ -690,24 +695,23 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {tab === "notes" ? (
-              <button
-                type="button"
+              <GlassButton
                 onClick={() => setComposerSignal((signal) => signal + 1)}
-                className="grid h-8 w-8 place-items-center rounded-lg bg-violet-500 text-white transition hover:bg-violet-400"
+                className="[&_.size-12]:size-8"
                 aria-label="Add note"
                 data-course-notes-add
               >
                 <Plus size={16} />
-              </button>
+              </GlassButton>
             ) : null}
-            <button
+            <GlassButton
               onClick={props.onClose}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+              className="shrink-0 [&_.size-12]:size-8"
               aria-label="Close overlay"
               data-course-overlay-close
             >
               <X size={15} />
-            </button>
+            </GlassButton>
           </div>
         </div>
         )}
@@ -738,7 +742,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
             <ContentList {...props} flatModules={flatModules} mode={tab as "modules" | "resources"} />
           )}
         </div>
-      </div>
+      </GlassSurface>
 
       {/* ── Dock: always the top-most interactive layer ─────────────────
           Same floating magic pill as the app footer (src/components/
@@ -764,9 +768,11 @@ export default function CourseOverlay(props: CourseOverlayProps) {
           }
         >
           <div className="dc-footer-glow" aria-hidden="true" />
-          <div
+          <GlassSurface
             ref={pillRef}
-            className={`dc-footer-pill flex ${landscape ? "h-full w-full flex-col" : "h-16 w-full"}`}
+            radius={999}
+            className={`dc-footer-pill text-white ${landscape ? "h-full w-full" : "w-full"}`}
+            contentClassName={`flex ${landscape ? "h-full w-full flex-col" : "h-16 w-full"}`}
           >
             {/* Fluid sheen — a slow liquid highlight that drifts across the
                 capsule, echoing the home footer's "magic" feel. Painted
@@ -787,7 +793,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
               data-display-index={displayedIndex.toFixed(3)}
               data-dragging={dragging ? "true" : "false"}
             >
-              <span className={`block h-full rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 shadow-lg shadow-violet-600/30 ${landscape ? "my-1.5" : "mx-1.5"}`} />
+              <span className={`block h-full rounded-full bg-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_2px_10px_rgba(0,0,0,0.18)] ${landscape ? "my-1.5" : "mx-1.5"}`} />
             </span>
             {TABS.map(({ key, label, icon }) => {
               const active = key === tab;
@@ -798,7 +804,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
                   onClick={() => props.onTabChange(key)}
                   aria-pressed={active}
                   className={`relative z-10 flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-black transition-colors ${
-                    active ? "text-white" : "text-black hover:opacity-70"
+                    active ? "text-white" : "text-white/55 hover:text-white/80"
                   }`}
                   data-course-dock-tab
                   data-tab={key}
@@ -825,7 +831,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
               data-course-dock-handle
               data-dragging={dragging ? "true" : "false"}
             />
-          </div>
+          </GlassSurface>
         </div>
       </div>
     </>
@@ -886,18 +892,14 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
             <div key={moduleId} className="relative flex gap-3" style={{ marginLeft: depth ? depth * 12 : 0 }} data-course-wire-node>
               <WireRail last={last && showFiles.length === 0} tone={paidNotOwned ? "paid" : holdsSelected ? "active" : "default"} />
               <div className="min-w-0 flex-1 pb-3">
-                <button
-                  type="button"
+                <GlassTile
                   onClick={() => {
                     if (mode === "modules") setExpanded((current) => { const next = new Set(current); if (next.has(moduleId)) next.delete(moduleId); else next.add(moduleId); return next; });
                   }}
                   disabled={mode === "resources"}
-                  className={`flex w-full items-center gap-2.5 rounded-2xl px-3 py-3 text-left transition ${mode === "resources" ? "cursor-default" : ""} ${
-                    locked
-                      ? "bg-amber-400/[0.08] ring-1 ring-inset ring-amber-400/20"
-                      : holdsSelected
-                        ? "bg-violet-500/12 ring-1 ring-inset ring-violet-400/30 shadow-[0_8px_24px_-16px_rgba(139,92,246,0.8)]"
-                        : "bg-[var(--course-soft)] hover:bg-[var(--course-soft-hover)]"
+                  selected={holdsSelected}
+                  className={`aspect-auto w-full px-3 py-3 text-left text-white [&>span]:w-full [&>span]:justify-start [&>span]:gap-2.5 ${mode === "resources" ? "cursor-default" : ""} ${
+                    locked ? "border-amber-400/30" : ""
                   }`}
                   data-course-overlay-module
                   data-module-id={moduleId}
@@ -905,7 +907,7 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
                   data-preview={preview ? "true" : "false"}
                 >
                   <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-xl text-[10px] font-black ${
-                    paidNotOwned ? "bg-amber-400/20 text-amber-200" : holdsSelected ? "bg-violet-500 text-white" : "bg-[var(--course-soft-hover)] text-[var(--course-muted)]"
+                    paidNotOwned ? "bg-amber-400/20 text-amber-200" : holdsSelected ? "bg-violet-500/30 text-white" : "bg-white/10 text-white/70"
                   }`}>{depth + 1}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-black">{module.title}</span>
@@ -918,21 +920,21 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
                   {mode === "modules" && files.length > 0 ? (
                     open ? <ChevronDown size={15} className="shrink-0 text-[var(--course-muted)]" /> : <ChevronRight size={15} className="shrink-0 text-[var(--course-muted)]" />
                   ) : null}
-                </button>
+                </GlassTile>
 
                 {/* Locked paid module buy CTA */}
                 {locked && paidNotOwned ? (
-                  <div className="mt-1.5 flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 p-2 ring-1 ring-amber-400/20">
+                  <GlassSurface radius={16} className="mt-1.5 border border-amber-400/30 text-white" contentClassName="flex items-center justify-between gap-2 p-2">
                     <p className="text-[10px] font-bold text-amber-200">Paid module</p>
-                    <button
-                      type="button"
+                    <GlassButton
+                      variant="capsule"
                       onClick={() => props.onBuyModule({ id: moduleId, paidUpdateId: module.paidUpdateId, paidUpdateTitle: module.paidUpdateTitle, paidUpdatePrice: module.paidUpdatePrice })}
-                      className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-400 px-2.5 py-1 text-[10px] font-black text-slate-950"
+                      className="shrink-0 text-[10px] font-black [&>span>div]:h-8 [&>span>div]:px-2.5 [&>span>div]:text-amber-200"
                       data-course-overlay-buy-module={moduleId}
                     >
-                      <ShoppingBag size={11} /> {module.paidUpdateTitle || "Buy"}
-                    </button>
-                  </div>
+                      <span className="flex items-center gap-1"><ShoppingBag size={11} /> {module.paidUpdateTitle || "Buy"}</span>
+                    </GlassButton>
+                  </GlassSurface>
                 ) : null}
 
                 {showFiles.length > 0 && (
@@ -949,11 +951,12 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
                             <span className={`relative z-10 h-1.5 w-1.5 rounded-full ${selected ? "bg-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.9)]" : fileLocked ? "bg-amber-400/70" : "bg-[var(--course-strong)]"}`} />
                             <span className={`w-px flex-1 ${lastFile ? "bg-transparent" : "bg-[var(--course-border)]"}`} />
                           </div>
-                          <button
+                          <GlassTile
                             disabled={fileLocked}
                             onClick={() => props.onSelectFile(file)}
-                            className={`mb-0.5 flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[11px] font-bold transition ${
-                              selected ? "bg-violet-500 text-white shadow-lg shadow-violet-600/25" : fileLocked ? "cursor-not-allowed bg-amber-400/5 text-[var(--course-muted)]" : "text-[var(--course-muted)] hover:bg-[var(--course-soft)] hover:text-[var(--course-text)]"
+                            selected={selected}
+                            className={`mb-0.5 aspect-auto min-w-0 flex-1 rounded-xl px-3 py-2.5 text-left text-[11px] font-bold [&>span]:w-full [&>span]:justify-start [&>span]:gap-2.5 ${
+                              selected ? "text-white" : fileLocked ? "cursor-not-allowed border-amber-400/20 text-white/45" : "text-white/75 hover:text-white"
                             }`}
                             data-course-overlay-file
                             data-file-id={file.id}
@@ -961,9 +964,9 @@ function ContentList(props: CourseOverlayProps & { flatModules: FlatModule[]; mo
                           >
                             <Icon size={15} className="shrink-0" />
                             <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                            <span className="shrink-0 rounded-md bg-[var(--course-soft-hover)] px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider opacity-70">{file.type}</span>
+                            <span className="shrink-0 rounded-md bg-white/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider opacity-70">{file.type}</span>
                             {fileLocked ? <LockKeyhole size={12} className="shrink-0 text-amber-400" /> : null}
-                          </button>
+                          </GlassTile>
                         </div>
                       );
                     })}
@@ -983,11 +986,11 @@ function WireRail({ last, tone }: { last: boolean; tone: "default" | "active" | 
     ? "border-amber-400 bg-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.65)]"
     : tone === "active"
       ? "border-violet-300 bg-violet-400 shadow-[0_0_14px_rgba(167,139,250,0.8)]"
-      : "border-violet-400/80 bg-[var(--course-panel)] shadow-[0_0_10px_rgba(139,92,246,0.35)]";
-  const line = tone === "paid" ? "from-amber-400/70 via-amber-400/25 to-transparent" : "from-violet-400/80 via-violet-400/25 to-violet-400/0";
+      : "border-violet-400/80 bg-white/15 shadow-[0_0_10px_rgba(139,92,246,0.35)]";
+  const line = tone === "paid" ? "bg-amber-400/40" : "bg-violet-400/40";
   return (
     <div className="relative flex w-5 shrink-0 flex-col items-center" data-course-wire-rail data-tone={tone}>
-      <span className={`absolute top-4 bottom-0 w-px bg-gradient-to-b ${line} ${last ? "opacity-0" : ""}`} />
+      <span className={`absolute top-4 bottom-0 w-px ${line} ${last ? "opacity-0" : ""}`} />
       <span className={`relative z-10 mt-[18px] h-3 w-3 rounded-full border-2 ${node}`} />
     </div>
   );
@@ -1014,7 +1017,7 @@ function PaidList(props: CourseOverlayProps) {
             <div key={update.id} className="relative flex gap-3">
               <WireRail last={index === props.updates.length - 1 && lockedModules.length === 0} tone="paid" />
               <div className="min-w-0 flex-1 pb-3">
-                <div className="rounded-2xl border border-amber-400/20 bg-gradient-to-br from-amber-400/12 via-[var(--course-soft)] to-transparent p-3">
+                <GlassSurface radius={20} className="border border-amber-400/25 text-white" contentClassName="p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="flex items-center gap-1.5 text-xs font-black">
@@ -1024,10 +1027,10 @@ function PaidList(props: CourseOverlayProps) {
                     </div>
                     <span className="shrink-0 text-xs font-black text-amber-300">₹{update.price.toLocaleString("en-IN")}</span>
                   </div>
-                  <button onClick={() => props.onBuyUpdate(update)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-amber-400 py-2.5 text-[11px] font-black text-slate-950" data-course-overlay-buy-update={update.id}>
-                    <ShoppingBag size={13} /> Buy this update
-                  </button>
-                </div>
+                  <GlassButton variant="capsule" onClick={() => props.onBuyUpdate(update)} className="mt-3 w-full text-[11px] font-black [&>span>div]:h-10 [&>span>div]:w-full [&>span>div]:px-4 [&>span>div]:text-amber-200" data-course-overlay-buy-update={update.id}>
+                    <span className="flex items-center justify-center gap-1.5"><ShoppingBag size={13} /> Buy this update</span>
+                  </GlassButton>
+                </GlassSurface>
               </div>
             </div>
           ))}
@@ -1037,18 +1040,18 @@ function PaidList(props: CourseOverlayProps) {
               <div key={moduleId} className="relative flex gap-3" style={{ marginLeft: depth ? depth * 12 : 0 }}>
                 <WireRail last={index === lockedModules.length - 1} tone="paid" />
                 <div className="min-w-0 flex-1 pb-3">
-                  <div className="rounded-2xl bg-amber-400/[0.07] p-3 ring-1 ring-inset ring-amber-400/15">
+                  <GlassSurface radius={20} className="border border-amber-400/20 text-white" contentClassName="p-3">
                     <p className="truncate text-xs font-black">{module.title}</p>
                     <p className="mt-0.5 text-[10px] font-bold text-amber-200/80">Paid module</p>
-                    <button
-                      type="button"
+                    <GlassButton
+                      variant="capsule"
                       onClick={() => props.onBuyModule({ id: moduleId, paidUpdateId: module.paidUpdateId, paidUpdateTitle: module.paidUpdateTitle, paidUpdatePrice: module.paidUpdatePrice })}
-                      className="mt-2 flex items-center gap-1 rounded-lg bg-amber-400 px-2.5 py-1.5 text-[10px] font-black text-slate-950"
+                      className="mt-2 text-[10px] font-black [&>span>div]:h-8 [&>span>div]:px-2.5 [&>span>div]:text-amber-200"
                       data-course-overlay-buy-module={moduleId}
                     >
-                      <ShoppingBag size={11} /> {module.paidUpdateTitle || "Buy"}
-                    </button>
-                  </div>
+                      <span className="flex items-center gap-1"><ShoppingBag size={11} /> {module.paidUpdateTitle || "Buy"}</span>
+                    </GlassButton>
+                  </GlassSurface>
                 </div>
               </div>
             );

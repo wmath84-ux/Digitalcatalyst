@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Maximize2, Minimize, Minimize2, Monitor, Moon, PanelBottomClose, PanelBottomOpen, Smartphone, Snowflake, Sun } from "lucide-react";
+import { CheckCircle2, ChevronsDownUp, ChevronsUpDown, Circle, Maximize, Maximize2, Minimize, Minimize2, Monitor, Moon, PanelBottomClose, PanelBottomOpen, Settings2, Smartphone, Snowflake, Sun } from "lucide-react";
+import { GlassButton } from "./components/ui/glass-button";
+import { applyGlassScheme } from "./lib/glassScheme";
+import { GlassSurface } from "./components/ui/glass";
+import { GlassSwitch } from "./components/ui/glass-switch";
+import { Popover, PopoverContent, PopoverSeparator, PopoverTrigger } from "./components/ui/glass-popover";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer from "./course/ResourceViewer";
@@ -401,7 +406,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // "Hide status bar" rail button (Android only). Whatever the learner did,
   // the chrome is restored the moment the player leaves landscape or
   // unmounts.
-  const courseBackgroundForStatusBar = theme === "dark" ? "#090912" : "#f1f5f9";
+  // Wave 7: the shell paints nothing of its own any more — both course themes
+  // sit on the one Black Ice backdrop (--dc-bd-base), so the status bar
+  // matches that base instead of an opaque per-theme plate.
+  const courseBackgroundForStatusBar = "#0a0c12";
   useEffect(() => {
     if (isLandscape) {
       return () => restoreStatusBarFromCoursePlayer();
@@ -430,6 +438,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   // The preference is scoped to the Course Player and restored on the next
   // visit without changing the theme of the rest of the application.
+  //
+  // Wave 7: while the player is mounted its theme also drives the pack's
+  // own light / dark material (websiteglass.com reads `html.dark|light`), so
+  // every GlassSurface / GlassButton / GlassTile inside the player flips with
+  // the sun/moon button. The site-wide preference is NOT overwritten — the
+  // stored scheme is re-applied the moment the player unmounts.
+  useEffect(() => {
+    applyGlassScheme(theme);
+    return () => applyGlassScheme();
+  }, [theme]);
   useEffect(() => {
     try {
       localStorage.setItem(courseThemeStorageKey, theme);
@@ -833,31 +851,26 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // While the player's own header + dock are hidden there has to be a way
   // back, so a small floating pill sits over the content.
   const chromeRestoreButton = playerChromeHidden ? (
-    <button
-      type="button"
+    <GlassButton
+      variant="capsule"
       onClick={() => setPlayerChromeHidden(false)}
-      className="absolute right-3 top-3 z-40 flex items-center gap-1.5 rounded-full border border-[var(--course-border)] bg-[var(--course-surface-translucent)] px-3 py-2 text-[10px] font-black text-[var(--course-text)] shadow-2xl backdrop-blur transition hover:bg-[var(--course-soft-hover)]"
+      className="absolute right-3 top-3 z-40 text-[10px] font-black [&>span>div]:h-9 [&>span>div]:px-3"
       style={{ top: "calc(0.75rem + env(safe-area-inset-top, 0px))" }}
       aria-label="Show player bars"
       title="Show player bars"
       data-course-chrome-restore
     >
-      <Minimize size={13} /> Show bars
-    </button>
+      <span className="flex items-center gap-1.5"><Minimize size={13} /> Show bars</span>
+    </GlassButton>
   ) : null;
 
   // ── Direct chrome toggles ───────────────────────────────────────────────
   // These behave like the light/dark button: one tap flips the state and the
   // icon immediately reflects what the next tap will do.
   const fileBarsToggle = (
-    <button
-      type="button"
+    <GlassButton
       onClick={() => setFileBarsHidden((hidden) => !hidden)}
-      className={`course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl transition ${
-        fileBarsHidden
-          ? "bg-violet-500 text-white"
-          : "bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
-      }`}
+      className={`shrink-0 [&_.size-12]:size-10 ${fileBarsHidden ? "[&_svg]:text-violet-300" : ""}`}
       aria-label={fileBarsHidden ? "Show file bars" : "Hide file bars"}
       title={fileBarsHidden ? "Show file bars" : "Hide file bars"}
       aria-pressed={fileBarsHidden}
@@ -865,18 +878,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       data-hidden={fileBarsHidden ? "true" : "false"}
     >
       {fileBarsHidden ? <ChevronsUpDown size={17} /> : <ChevronsDownUp size={17} />}
-    </button>
+    </GlassButton>
   );
 
   const playerChromeToggle = (
-    <button
-      type="button"
+    <GlassButton
       onClick={() => setPlayerChromeHidden((hidden) => !hidden)}
-      className={`course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl transition ${
-        playerChromeHidden
-          ? "bg-violet-500 text-white"
-          : "bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
-      }`}
+      className={`shrink-0 [&_.size-12]:size-10 ${playerChromeHidden ? "[&_svg]:text-violet-300" : ""}`}
       aria-label={playerChromeHidden ? "Show player bars" : "Hide player bars"}
       title={playerChromeHidden ? "Show player bars" : "Hide player bars"}
       aria-pressed={playerChromeHidden}
@@ -884,24 +892,19 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       data-hidden={playerChromeHidden ? "true" : "false"}
     >
       {playerChromeHidden ? <Maximize size={17} /> : <Minimize size={17} />}
-    </button>
+    </GlassButton>
   );
 
   // Android-only: the one reliable way to hide the phone's status bar is the
   // Fullscreen API called from a real tap. This lives in the landscape rail
   // so a physical rotation can always be followed by one tap to hide it.
   const fullscreenToggle = canFullscreen ? (
-    <button
-      type="button"
+    <GlassButton
       onClick={() => {
         if (isCoursePlayerFullscreen()) exitCoursePlayerFullscreen();
         else enterCoursePlayerFullscreen();
       }}
-      className={`course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl transition ${
-        courseFullscreen
-          ? "bg-emerald-500 text-white"
-          : "bg-violet-500/15 text-violet-200 ring-1 ring-inset ring-violet-400/40 hover:bg-violet-500/25"
-      }`}
+      className={`shrink-0 [&_.size-12]:size-10 ${courseFullscreen ? "[&_svg]:text-emerald-300" : ""}`}
       aria-label={courseFullscreen ? "Show status bar" : "Hide status bar"}
       title={courseFullscreen ? "Show status bar (exit fullscreen)" : "Hide status bar (fullscreen)"}
       aria-pressed={courseFullscreen}
@@ -909,19 +912,14 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       data-active={courseFullscreen ? "true" : "false"}
     >
       {courseFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
-    </button>
+    </GlassButton>
   ) : null;
 
   // Flip an embedded document between its desktop and mobile rendering.
   const viewportToggle = (
-    <button
-      type="button"
+    <GlassButton
       onClick={() => setDesktopView((value) => !value)}
-      className={`course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl transition ${
-        desktopView
-          ? "bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
-          : "bg-violet-500 text-white"
-      }`}
+      className={`shrink-0 [&_.size-12]:size-10 ${!desktopView ? "[&_svg]:text-violet-300" : ""}`}
       aria-label={desktopView ? "Switch document to mobile view" : "Switch document to desktop view"}
       title={desktopView ? "Switch to mobile view" : "Switch to desktop view"}
       aria-pressed={!desktopView}
@@ -932,14 +930,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           aria-label/title: a phone means "switch to the mobile rendering", a
           monitor means "switch to the desktop rendering". */}
       {desktopView ? <Smartphone size={17} /> : <Monitor size={17} />}
-    </button>
+    </GlassButton>
   );
 
   const themeToggle = (
-    <button
-      type="button"
+    <GlassButton
       onClick={() => setTheme(nextTheme)}
-      className="course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+      className="shrink-0 [&_.size-12]:size-10"
       aria-label={`Switch to ${nextTheme} theme`}
       title={`Switch to ${nextTheme} theme`}
       aria-pressed={theme !== "dark"}
@@ -948,21 +945,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       data-next-theme={nextTheme}
     >
       {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-    </button>
+    </GlassButton>
   );
 
   // Snow mode — one tap starts a continuous, interactive snowfall over the
   // whole player (SnowOverlay). The button lights up sky-blue while it
   // snows so the learner can always find the switch again.
   const snowToggle = (
-    <button
-      type="button"
+    <GlassButton
       onClick={() => setSnowMode((on) => !on)}
-      className={`course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl transition ${
-        snowMode
-          ? "bg-sky-500 text-white shadow-lg shadow-sky-500/30"
-          : "bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
-      }`}
+      className={`shrink-0 [&_.size-12]:size-10 ${snowMode ? "[&_svg]:text-sky-300" : ""}`}
       aria-label={snowMode ? "Stop snowfall" : "Start snowfall"}
       title={snowMode ? "Stop snowfall" : "Start snowfall"}
       aria-pressed={snowMode}
@@ -970,7 +962,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       data-snow={snowMode ? "on" : "off"}
     >
       <Snowflake size={18} />
-    </button>
+    </GlassButton>
   );
 
   // The toggle that hides / shows the secondary header strip. The icon always
@@ -978,14 +970,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // ring lights up in its active state so the learner can find it again from
   // a busy header.
   const secondaryStripToggle = (
-    <button
-      type="button"
+    <GlassButton
       onClick={() => setSecondaryStripHidden((hidden) => !hidden)}
-      className={`course-icon-button grid h-10 w-10 shrink-0 place-items-center rounded-xl transition ${
-        secondaryStripHidden
-          ? "bg-violet-500 text-white shadow-lg shadow-violet-500/30"
-          : "bg-[var(--course-soft)] text-[var(--course-muted)] ring-1 ring-inset ring-violet-400/40 hover:bg-violet-500/20 hover:text-violet-200"
-      }`}
+      className={`shrink-0 [&_.size-12]:size-10 ${secondaryStripHidden ? "[&_svg]:text-violet-300" : ""}`}
       aria-label={secondaryStripHidden ? "Show toolbar strip" : "Hide toolbar strip"}
       title={secondaryStripHidden ? "Show toolbar strip" : "Hide toolbar strip"}
       aria-pressed={secondaryStripHidden}
@@ -993,21 +980,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       data-hidden={secondaryStripHidden ? "true" : "false"}
     >
       {secondaryStripHidden ? <PanelBottomOpen size={17} /> : <PanelBottomClose size={17} />}
-    </button>
+    </GlassButton>
   );
 
   // Website logo sits in the old back-button slot and reuses the same
   // `onBack` handler so a tap still returns the learner to Purchases.
   const logoBackButton = (
-    <button
-      type="button"
+    <GlassButton
       {...logoHold.handlers}
       onClick={() => {
         // A completed long-press already opened Home; don't also go to Purchases.
         if (logoHold.consumeSuppressedClick()) return;
         onBack();
       }}
-      className={`course-icon-button grid h-10 w-10 shrink-0 select-none place-items-center overflow-hidden rounded-xl bg-transparent transition hover:opacity-90 ${
+      className={`shrink-0 select-none [&_.size-12]:size-10 [&_.size-12]:overflow-hidden ${
         logoHold.holding ? "[touch-action:none]" : ""
       }`}
       aria-label="Back to purchases"
@@ -1015,8 +1001,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       data-course-back
       data-course-logo-back
     >
-      <img src={logoUrl} alt={appName} className="h-10 w-10 object-cover select-none" draggable={false} data-course-logo />
-    </button>
+      <img src={logoUrl} alt={appName} className="h-10 w-10 rounded-full object-cover select-none" draggable={false} data-course-logo />
+    </GlassButton>
   );
 
   // ── Header action: mark complete ────────────────────────────────────────
@@ -1024,25 +1010,23 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // so the tracked progress always matches reality. `compact` renders the
   // square icon variant used by the 56px landscape rail.
   const markCompleteButton = (compact: boolean) => (selectedFile ? (
-    <button
-      type="button"
+    <GlassButton
+      variant={compact ? "icon" : "capsule"}
       onClick={() => void toggleComplete()}
       aria-pressed={isDone}
       aria-label={isDone ? "Mark this lesson as not complete" : "Mark this lesson complete"}
       title={isDone ? "Tap to mark as not complete" : "Mark this lesson complete"}
-      className={`course-icon-button flex shrink-0 items-center justify-center gap-1.5 rounded-xl font-black transition ${
-        compact ? "h-10 w-10 p-0" : "h-10 px-3 text-[11px]"
-      } ${
-        isDone
-          ? "bg-emerald-500/15 text-emerald-400 ring-1 ring-inset ring-emerald-400/40 hover:bg-emerald-500/25"
-          : "bg-gradient-to-br from-emerald-400 to-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 hover:from-emerald-300 hover:to-emerald-400"
-      }`}
+      className={`shrink-0 font-black ${
+        compact ? "[&_.size-12]:size-10" : "text-[11px] [&>span>div]:h-10 [&>span>div]:px-3"
+      } ${isDone ? "[&_svg]:text-emerald-300" : ""}`}
       data-course-mark-complete
       data-completed={isDone ? "true" : "false"}
     >
-      {isDone ? <CheckCircle2 size={compact ? 18 : 15} /> : <Circle size={compact ? 18 : 15} />}
-      {compact ? null : <span className="hidden whitespace-nowrap sm:inline">{isDone ? "Completed" : "Mark complete"}</span>}
-    </button>
+      <span className="flex items-center gap-1.5">
+        {isDone ? <CheckCircle2 size={compact ? 18 : 15} /> : <Circle size={compact ? 18 : 15} />}
+        {compact ? null : <span className="hidden whitespace-nowrap sm:inline">{isDone ? "Completed" : "Mark complete"}</span>}
+      </span>
+    </GlassButton>
   ) : null);
 
   // The old footer is now a slim lesson strip inside the header: it names the
@@ -1055,12 +1039,47 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isDone ? "bg-emerald-400" : "bg-violet-400"}`} aria-hidden="true" />
       <p className="min-w-0 flex-1 truncate text-[11px] font-black text-[var(--course-text)]" data-course-selected-name>{selectedFile.name}</p>
       <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-        isDone ? "bg-emerald-500/15 text-emerald-400" : "bg-[var(--course-soft)] text-[var(--course-muted)]"
+        isDone ? "bg-emerald-500/15 text-emerald-300" : "bg-[var(--course-soft)] text-[var(--course-muted)]"
       }`}>
         {isDone ? "Completed" : "In progress"}
       </span>
     </div>
   ) : null;
+
+  // ── ⚙ Settings popover (D6) ────────────────────────────────────────────
+  // Every player preference in one place, as the pack's Glass Popover with a
+  // Glass Switch per row. The header quick-toggles above stay — this is the
+  // discoverable home for the same state, not a replacement.
+  const settingsRow = (label: string, checked: boolean, onChange: (next: boolean) => void, attr: string) => (
+    <div className="flex items-center justify-between gap-4 px-4 py-2.5 text-sm text-white/80" data-course-setting={attr}>
+      <span className="font-semibold">{label}</span>
+      <GlassSwitch checked={checked} onCheckedChange={onChange} ariaLabel={label} />
+    </div>
+  );
+  const settingsPopover = (side: "bottom" | "right") => (
+    <Popover>
+      <PopoverTrigger
+        className="shrink-0 rounded-full"
+        aria-label="Player settings"
+        title="Player settings"
+        data-course-settings-trigger
+      >
+        <GlassSurface radius={999} className="size-10 text-white" contentClassName="grid place-items-center">
+          <Settings2 size={17} />
+        </GlassSurface>
+      </PopoverTrigger>
+      <PopoverContent side={side} align={side === "bottom" ? "end" : "start"} className="min-w-[240px]" data-course-settings-menu>
+        <p className="px-4 pb-1 pt-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/55">Player settings</p>
+        {settingsRow("Light theme", theme === "light", (next) => setTheme(next ? "light" : "dark"), "theme")}
+        {settingsRow("Snowfall", snowMode, (next) => setSnowMode(next), "snow")}
+        {showViewportToggle ? settingsRow("Desktop view", desktopView, (next) => setDesktopView(next), "viewport") : null}
+        <PopoverSeparator />
+        {settingsRow("File bars", !fileBarsHidden, (next) => setFileBarsHidden(!next), "file-bars")}
+        {settingsRow("Toolbar strip", !secondaryStripHidden, (next) => setSecondaryStripHidden(!next), "secondary-strip")}
+        {settingsRow("Player bars", !playerChromeHidden, (next) => setPlayerChromeHidden(!next), "player-chrome")}
+      </PopoverContent>
+    </Popover>
+  );
 
   // ── Viewer stack ───────────────────────────────────────────────────────
   // Every file the learner has opened stays mounted. Only the selected one is
@@ -1184,7 +1203,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     <>
       {playerChromeHidden ? null : (
       <header
-        className="sticky left-0 top-0 z-50 flex h-full min-h-0 w-14 shrink-0 flex-col items-center gap-2 overflow-y-auto no-scrollbar overscroll-contain border-r border-[var(--course-border)] bg-[var(--course-surface)] py-2"
+        className="sticky left-0 top-0 z-50 flex h-full min-h-0 w-14 shrink-0 flex-col items-center gap-2 overflow-y-auto no-scrollbar overscroll-contain border-r border-[var(--course-border)] bg-[var(--dc-chrome-glass)] py-2 [backdrop-filter:var(--dc-chrome-glass-blur)]"
         style={{
           // Fullscreen (status bar / navigation bar hidden) exposes the
           // display cutout, and Chrome starts reporting a non-zero
@@ -1215,6 +1234,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             does not have a separate "Row 2" so the rail itself is the only
             home this control can live in. */}
         {secondaryStripToggle}
+        {settingsPopover("right")}
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
           <span className="line-clamp-1 max-h-full text-xs font-black [writing-mode:vertical-rl] rotate-180" data-course-product-title>{product.title}</span>
         </div>
@@ -1226,7 +1246,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         ) : null}
         <div className="flex shrink-0 flex-col items-center gap-1.5" data-course-progress-summary>
           <div className="relative w-1.5 h-24 overflow-hidden rounded-full bg-[var(--course-soft-hover)]" data-course-progress-bar>
-            <div className="absolute bottom-0 w-full bg-gradient-to-t from-violet-500 to-cyan-400" style={{ height: `${progress}%` }} data-course-progress-fill data-progress-value={progress} />
+            <div className="absolute bottom-0 w-full rounded-full bg-violet-400" style={{ height: `${progress}%` }} data-course-progress-fill data-progress-value={progress} />
           </div>
           <span className="text-[9px] font-bold text-[var(--course-muted)]" data-course-progress-label>{progress}%</span>
         </div>
@@ -1291,7 +1311,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // ── Landscape: header rail left, content centre, toggle rail right ──
   if (isLandscape) {
     return (
-      <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" data-course-statusbar-hidden={courseFullscreen ? "true" : "false"} style={{ colorScheme: browserColorScheme }}>
+      <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" data-course-statusbar-hidden={courseFullscreen ? "true" : "false"} style={{ colorScheme: browserColorScheme }}>
         {landscapeLayout()}
         {snowMode ? <SnowOverlay theme={theme} /> : null}
       </div>
@@ -1300,29 +1320,22 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   // ── Portrait: sticky header top, content full-bleed, sticky dock bottom ──
   return (
-    <div className="course-player-shell fixed inset-0 flex h-[100dvh] flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="portrait" style={{ colorScheme: browserColorScheme }}>
+    <div className="course-player-shell fixed inset-0 flex h-[100dvh] flex-col overflow-hidden text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="portrait" style={{ colorScheme: browserColorScheme }}>
       {playerChromeHidden ? null : (
       <header
-        className="sticky top-0 z-50 flex shrink-0 flex-col overflow-hidden border-b border-[var(--course-border)] bg-[var(--course-surface)] shadow-[0_10px_30px_-24px_rgba(0,0,0,0.9)]"
+        className="sticky top-0 z-50 flex shrink-0 flex-col overflow-hidden border-b border-[var(--course-border)] bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
         data-course-header
       >
-        {/* Brand glow — a soft violet→cyan wash that lifts the bar off the
-            viewer without ever competing with the content itself. */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-violet-500/12 via-transparent to-cyan-400/10" aria-hidden="true" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-400/40 to-transparent" aria-hidden="true" />
-
         {/* Row 1 — identity, live progress and the primary lesson actions. */}
         <div className="relative flex items-center gap-2.5 px-3 py-2.5 sm:gap-3 sm:px-5">
-          <div className="relative shrink-0 rounded-xl ring-1 ring-inset ring-[var(--course-border)]">
-            {logoBackButton}
-          </div>
+          {logoBackButton}
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-sm font-black leading-tight tracking-tight sm:text-base" data-course-product-title>{product.title}</h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1" data-course-progress-summary>
               <div className="relative h-1.5 w-20 overflow-hidden rounded-full bg-[var(--course-soft-hover)] sm:w-28" data-course-progress-bar>
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-violet-500 via-fuchsia-400 to-cyan-400 shadow-[0_0_10px_-2px_rgba(139,92,246,0.9)] transition-[width] duration-500"
+                  className="h-full rounded-full bg-violet-400 transition-[width] duration-500"
                   style={{ width: `${progress}%` }}
                   data-course-progress-fill
                   data-progress-value={progress}
@@ -1344,6 +1357,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
                 so the learner can always bring the toolbar back without
                 hunting for it. */}
             {secondaryStripHidden ? secondaryStripToggle : null}
+            {settingsPopover("bottom")}
           </div>
         </div>
 
@@ -1351,7 +1365,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             When this row is hidden the toggle above keeps the controls one tap
             away, so a learner never has to remember a long-press gesture. */}
         {secondaryStripHidden ? null : (
-        <div className="relative flex items-center gap-2 border-t border-[var(--course-border)] bg-[var(--course-soft)]/40 px-3 py-1.5 sm:px-5" data-course-secondary-strip>
+        <div className="relative flex items-center gap-2 border-t border-[var(--course-border)] px-3 py-1.5 sm:px-5" data-course-secondary-strip>
           {markCompleteBar || <div className="min-w-0 flex-1" />}
           <div className="flex shrink-0 items-center gap-1">
             {fileBarsToggle}

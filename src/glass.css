@@ -555,6 +555,16 @@ html[data-glass="on"] .fp-bg-grid,
 html[data-glass="on"] .mobile-header-glow::before,
 html[data-glass="on"] .mobile-header-glow::after,
 html[data-glass="on"] .dc-footer-glow::before,
-html[data-glass="on"] .dc-premium-cta::after {
+html[data-glass="on"] .dc-premium-cta::after,
+html[data-glass="on"] [data-course-dock] .dc-dock-fluid {
   display: none !important;
+}
+
+/* Wave 7 · the course dock pill IS a pack GlassSurface now
+ * (src/course/CourseOverlay.tsx); the shared `.dc-footer-pill` paint (solid
+ * white, dark border, drop shadow) belongs to the frozen footer nav only. */
+html[data-glass="on"] [data-course-dock] .dc-footer-pill {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }

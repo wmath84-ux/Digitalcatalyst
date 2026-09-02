@@ -728,7 +728,11 @@ function RootPage(): ReactNode {
     const adminRoute = hash.startsWith(ADMIN_HASH) || hash.startsWith(ADMIN_LOGIN_HASH);
     applyGlassTier(adminRoute ? "off" : detectGlassTier());
     // The pack's own light/dark material, chosen by the user (header switch).
-    if (!adminRoute) applyGlassScheme();
+    // The course player drives the scheme itself while it is mounted (its own
+    // sun/moon theme, Wave 7) and restores the stored preference on unmount,
+    // so the route-level re-apply must not fight it. (Child effects run before
+    // parent effects, so this would otherwise override the player's choice.)
+    if (!adminRoute && !hash.startsWith("#/course/")) applyGlassScheme();
   }, [hash]);
 
   useEffect(() => {

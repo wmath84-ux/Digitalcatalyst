@@ -1701,36 +1701,42 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 /* Course Player — scoped dark / light palette. The variables inherit through
    the viewer, overlay, notes and media tools without changing the site theme. */
 .course-player-shell {
-  --course-bg: #090912;
-  --course-surface: #10101a;
-  --course-surface-translucent: rgb(16 16 26 / 0.95);
-  --course-panel: #11111d;
+  /* Wave 7 (Phase B / A8): the player paints NO plate of its own any more.
+     It sits on the one Black Ice backdrop like every other route, and every
+     surface inside it is the pack's GlassSurface material (websiteglass.com
+     GlassSurface dark: rgba(60,62,68,0.21) · blur 9.8px · saturate 1.3 — the
+     same `--dc-chrome-glass` token the store header uses). Ink is white. */
+  --course-bg: transparent;
+  --course-surface: var(--dc-chrome-glass);
+  --course-surface-translucent: var(--dc-chrome-glass);
+  --course-panel: var(--dc-chrome-glass);
   --course-text: #ffffff;
-  --course-muted: rgb(255 255 255 / 0.52);
-  --course-border: rgb(255 255 255 / 0.1);
-  --course-soft: rgb(255 255 255 / 0.055);
-  --course-soft-hover: rgb(255 255 255 / 0.11);
+  --course-muted: rgb(255 255 255 / 0.62);
+  --course-border: rgb(255 255 255 / 0.12);
+  --course-soft: rgb(255 255 255 / 0.06);
+  --course-soft-hover: rgb(255 255 255 / 0.12);
   --course-strong: rgb(255 255 255 / 0.24);
-  --course-loading: rgb(2 6 23 / 0.74);
-  background-color: var(--course-bg);
+  --course-loading: rgb(10 12 18 / 0.6);
   color: var(--course-text);
-  transition: background-color 180ms ease, color 180ms ease;
+  transition: color 180ms ease;
 }
 
-/* The light palette keeps the viewer surfaces slightly grey so white
-   documents (Forms, Docs, Sheets) stay visible against the canvas. */
+/* The light theme is the pack's LIGHT material (rgba(255,255,255,0.21) on the
+   same backdrop — exactly what the site-wide Dark-mode switch renders); the
+   player syncs `html.light` while it is active so every vendored component
+   inside it flips too. Ink stays white on both materials. */
 .course-player-shell[data-course-theme="light"] {
-  --course-bg: #f1f5f9;
-  --course-surface: #ffffff;
-  --course-surface-translucent: rgb(255 255 255 / 0.94);
-  --course-panel: #ffffff;
-  --course-text: #0f172a;
-  --course-muted: #64748b;
-  --course-border: rgb(15 23 42 / 0.12);
-  --course-soft: rgb(15 23 42 / 0.055);
-  --course-soft-hover: rgb(15 23 42 / 0.1);
-  --course-strong: rgb(15 23 42 / 0.2);
-  --course-loading: rgb(248 250 252 / 0.82);
+  --course-bg: transparent;
+  --course-surface: rgba(255, 255, 255, 0.21);
+  --course-surface-translucent: rgba(255, 255, 255, 0.21);
+  --course-panel: rgba(255, 255, 255, 0.21);
+  --course-text: #ffffff;
+  --course-muted: rgb(255 255 255 / 0.7);
+  --course-border: rgb(255 255 255 / 0.22);
+  --course-soft: rgb(255 255 255 / 0.1);
+  --course-soft-hover: rgb(255 255 255 / 0.18);
+  --course-strong: rgb(255 255 255 / 0.32);
+  --course-loading: rgb(10 12 18 / 0.5);
 }
 
 .course-viewer-empty-surface,
