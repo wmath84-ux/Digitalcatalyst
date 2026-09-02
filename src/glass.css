@@ -683,3 +683,20 @@ html[data-glass="on"] [data-profile-page] {
   background: transparent !important;
   background-image: none !important;
 }
+
+/* ── Part 1d · kill the aurora orbs (the real mobile/tablet culprit) ─────────
+ * `.dc-app-shell::before/::after` are decorative aurora orbs — purple/sky/pink
+ * radial-gradient blobs that bleed past the shell edges. The Part 1c
+ * `background: transparent` only hit the shell element itself, NOT its pseudo
+ * elements, so the orbs kept painting on mobile/tablet (index.css only hides
+ * them at one breakpoint). Under glass they are removed on every device, along
+ * with any frame/profile pseudo washes, so only the Black Ice backdrop shows.
+ * Gated on data-glass="on"; ?glass=off restores the orbs. */
+html[data-glass="on"] .dc-app-shell::before,
+html[data-glass="on"] .dc-app-shell::after,
+html[data-glass="on"] .dc-app-frame::before,
+html[data-glass="on"] .dc-app-frame::after,
+html[data-glass="on"] [data-profile-page]::before,
+html[data-glass="on"] [data-profile-page]::after {
+  display: none !important;
+}
