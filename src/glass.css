@@ -719,3 +719,17 @@ html[data-glass="on"] .dc-glass-hero--pro {
   background: transparent !important;
   background-image: none !important;
 }
+
+/* ── Part 1f · every solid white panel -> frosted glass (no white pages) ─────
+ * The owner wants no opaque white pages anywhere — checkout, course-player
+ * overlays (module/notes), subscription, profile, all of it — so the single
+ * backdrop shows on every device. Every SOLID `bg-white` (but not the already
+ * translucent `bg-white/60` glass) becomes a 55%-white frosted panel with blur:
+ * the backdrop glows through, the dark ink stays readable on the frost, and no
+ * page reads as a flat white sheet. Gated on data-glass="on"; ?glass=off keeps
+ * the opaque white. */
+html[data-glass="on"] [class*="bg-white"]:not([class*="bg-white/"]) {
+  background-color: rgb(var(--dc-paper-on-ink) / 0.55);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+}
