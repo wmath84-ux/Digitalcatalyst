@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/glass-command";
 import { ALL_RAIL } from "@/components/DesktopShell";
 import { useCatalog } from "@/context/CatalogContext";
+import { COMMAND_PALETTE_OPEN_EVENT } from "@/lib/commandPalette";
 
 const go = (hash: string) => {
   window.location.hash = hash;
@@ -62,21 +63,35 @@ export default function GlassCommandPalette() {
       event.preventDefault();
       setOpen(true);
     };
+    // The store / home search boxes open the same palette on tap (owner: the
+    // search box IS the glass command component) — see src/lib/commandPalette.ts.
+    const onOpenRequest = () => {
+      if (!glassEnabled()) return;
+      setOpen(true);
+    };
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    window.addEventListener(COMMAND_PALETTE_OPEN_EVENT, onOpenRequest);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener(COMMAND_PALETTE_OPEN_EVENT, onOpenRequest);
+    };
   }, []);
 
-  // The catalogue is unbounded; the palette is a jump list, not a search engine.
-  // 24 titles keep the filtered DOM small (every hidden item is still mounted).
+  // The palette doubles as the store / home search box now, so it lists the
+  // live catalogue (capped at 200). The pack's item filter returns null for a
+  // non-matching row, so the DOM only ever holds the visible matches.
   const catalogue = useMemo(
     () =>
       products
         .filter((product) => product.availableForSale !== false)
-        .slice(0, 24)
+        .slice(0, 200)
         .map((product) => ({
           id: product.id,
           title: product.title,
           instructor: product.instructor,
+          subject: product.subject,
+          category: product.category,
+          tags: (product.tags || []).join(" "),
           price: product.price,
         })),
     [products],
@@ -117,7 +132,7 @@ export default function GlassCommandPalette() {
           {catalogue.map((product) => (
             <GlassCommandItem
               key={product.id}
-              keywords={`${product.instructor} ${product.price} product course`}
+              keywords={`${product.title} ${product.instructor} ${product.subject} ${product.category} ${product.tags} ${product.price} product course`}
               onSelect={() => go(`#/product/${product.id}`)}
             >
               <span className="min-w-0 flex-1 truncate">{product.title}</span>

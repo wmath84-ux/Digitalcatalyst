@@ -150,7 +150,12 @@ test("⌘K is owned by exactly one component — the registry palette", () => {
   assert.ok(palette.includes('startsWith("#/admin")'), "admin routes keep the browser's ⌘K");
   assert.match(palette, /isTyping\(event\.target\)/, "⌘K inside a field selects its text, as users expect");
   assert.match(palette, /GlassCommandEmpty/, "a filter with no matches says so");
-  assert.match(palette, /slice\(0, 24\)/, "the catalogue list is capped: hidden items are still mounted DOM");
+  // Wave 11 (owner): the palette IS the store / home search box now, so it
+  // lists the live catalogue (capped at 200; the pack item returns null for a
+  // non-match, so only visible rows are mounted) and opens on tap via the
+  // `dc:command-palette-open` bridge.
+  assert.match(palette, /slice\(0, 200\)/, "the catalogue list is capped");
+  assert.match(palette, /COMMAND_PALETTE_OPEN_EVENT/, "the search boxes open the palette on tap");
   assert.match(read("src/main.tsx"), /<GlassCommandPalette \/>/, "one instance, mounted next to the banner host");
 });
 

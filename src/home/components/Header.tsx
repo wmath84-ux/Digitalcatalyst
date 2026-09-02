@@ -4,6 +4,7 @@ import { GlassSwitch } from "../../components/ui/glass-switch";
 import { GlassSurface } from "../../components/ui/glass";
 import { GlassButton } from "../../components/ui/glass-button";
 import { useGlassScheme } from "../../lib/glassScheme";
+import { openCommandPalette } from "../../lib/commandPalette";
 import type { Product } from "../types";
 import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/glass-tooltip";
@@ -56,6 +57,17 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
 ) {
   const [scheme, setScheme] = useGlassScheme();
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
+  // Tap on the search box → the pack's GlassCommand palette (the ⌘K component),
+  // exactly as the store's search box does. A pre-filled draft still deep-links
+  // to the full results page so `#/search?q=` keeps working for shared links.
+  const openSearch = () => {
+    const trimmed = query.trim();
+    if (trimmed) {
+      window.location.hash = `#/search?q=${encodeURIComponent(trimmed)}`;
+      return;
+    }
+    openCommandPalette();
+  };
   // The header gradient follows the app brand: by default it is the web app
   // icon's own indigo → violet blend, and the admin can re-theme both stops
   // from the branding page. Inline style (not Tailwind classes) so the live
@@ -211,17 +223,13 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       <div data-home-search-slot className="relative mt-5">
         <div
           className="dc-glass-toolbar flex cursor-pointer items-center gap-2 rounded-2xl px-4 py-3 transition active:scale-[0.99]"
-          onClick={() => {
-            const trimmed = query.trim();
-            window.location.hash = trimmed ? `#/search?q=${encodeURIComponent(trimmed)}` : "#/search";
-          }}
+          onClick={openSearch}
           role="button"
           tabIndex={0}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
-              const trimmed = query.trim();
-              window.location.hash = trimmed ? `#/search?q=${encodeURIComponent(trimmed)}` : "#/search";
+              openSearch();
             }
           }}
         >
@@ -230,10 +238,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             ref={ref}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            onFocus={() => {
-              const trimmed = query.trim();
-              window.location.hash = trimmed ? `#/search?q=${encodeURIComponent(trimmed)}` : "#/search";
-            }}
+            onFocus={openSearch}
             type="text"
             inputMode="search"
             placeholder="Search courses, PDFs, e-books..."
@@ -248,12 +253,12 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                 onQueryChange("");
               }}
               aria-label="Clear search"
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-slate-500 transition active:scale-90"
+              className="flex h-5 w-5 items-center justify-center rounded-full bg-white/15 text-white/85 transition active:scale-90"
             >
               <X size={13} strokeWidth={2.6} />
             </button>
           ) : (
-            <span className="hidden shrink-0 rounded-md bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 sm:inline">
+            <span className="hidden shrink-0 rounded-md border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/85 sm:inline">
               Tap to search
             </span>
           )}
@@ -271,7 +276,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                   key={item.id}
                   type="button"
                   onClick={() => onSelectSuggestion(item)}
-                  className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-slate-100 active:scale-[0.99]"
+                  className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white/10 active:scale-[0.99]"
                 >
                   <img
                     src={item.image}

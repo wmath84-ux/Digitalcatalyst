@@ -1,5 +1,6 @@
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassButton } from "@/components/ui/glass-button";
+import { openCommandPalette } from "@/lib/commandPalette";
 import {
   GlassSelect,
   GlassSelectContent,
@@ -23,9 +24,16 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
   // search experience with live filtering, sort, and category chips.
   // The current `value` is passed across as a `?q=` deep link so the
   // search page opens with the same query already typed.
+  // Tap → the pack's GlassCommand palette (owner: the search box IS the glass
+  // command component). A pre-filled draft still deep-links to the full results
+  // page, so the `#/search?q=` contract other screens rely on is unchanged.
   const openSearchPage = () => {
     const trimmed = value.trim();
-    window.location.hash = trimmed ? `#/search?q=${encodeURIComponent(trimmed)}` : "#/search";
+    if (trimmed) {
+      window.location.hash = `#/search?q=${encodeURIComponent(trimmed)}`;
+      return;
+    }
+    openCommandPalette();
   };
 
   return (
