@@ -148,23 +148,26 @@ export default function OwnedPlanCard({
           Only the new items are ever charged — the plan price is not charged
           again and the expiry does not move. */}
       {onAddMore ? (
-        <button
+        <GlassButton
           type="button"
+          variant="capsule"
           onClick={onAddMore}
           data-subscription-owned-add-more
-          className="flex items-start gap-3 rounded-3xl border border-violet-400/30 bg-violet-500/15 p-4 text-left transition active:scale-[0.99] hover:bg-violet-500/15"
+          className="w-full text-left ring-1 ring-violet-400/30 [&>span>div]:h-auto [&>span>div]:w-full [&>span>div]:rounded-2xl [&>span>div]:px-4 [&>span>div]:py-4 [&>span>div>span]:w-full"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-violet-500/20 text-violet-300">
-            <PlusCircle className="h-4.5 w-4.5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-black text-white">Add features or courses to this plan</span>
-            <span className="mt-0.5 block text-[11px] leading-4 text-white/55">
-              Unlock more without changing your plan — you only pay for the new items, at the
-              price set for this plan.
+          <span className="flex w-full items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-violet-500/20 text-violet-300">
+              <PlusCircle className="h-4.5 w-4.5" />
+            </span>
+            <span className="min-w-0 whitespace-normal">
+              <span className="block text-sm font-black text-white">Add features or courses to this plan</span>
+              <span className="mt-0.5 block text-[11px] font-normal leading-4 text-white/55">
+                Unlock more without changing your plan — you only pay for the new items, at the
+                price set for this plan.
+              </span>
             </span>
           </span>
-        </button>
+        </GlassButton>
       ) : null}
 
       {/* Forward path 2: a different plan or a different cycle. */}

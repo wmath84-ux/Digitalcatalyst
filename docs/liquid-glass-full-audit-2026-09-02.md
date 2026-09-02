@@ -645,3 +645,26 @@ Kept (pinned): `contentClassName="flex gap-3 p-2.5"`, `aria-label="Remove item"`
 **Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 175 → 139, `bg-white panels` 95 → 46, gradients 21 → 14, `native title=` 126 → 125, render-sites 623 → 675 · backdrop OK · frozen diff empty.
 
 **Wave 14 next:** cleanup (`landing.css` `.glass-panel` / `.pulse-glow` / `.bg-grid`, `.fp-*` ambience CSS, remaining `dc-glass-toolbar` consumers, coverage baseline re-record), then A7 banner gradients.
+
+### Phase B · Wave 14 — Cleanup + missed spots + A7 hero banners (2026-09-02)
+
+Owner call-outs: the subscription gate must be the pack sheet from the bottom with GlassButton actions; toasts were still hand-rolled; "look carefully at everything that was missed".
+
+| Old | New |
+|---|---|
+| Toasts: app-ported `glass-toast.tsx` (`GlassToastCard` / `ToastViewport`), `cartWishlist/components/Toast.tsx` gradient pills, App / CartWishlistApp `showShoppingToast` pills, FlowPathView toast, `glass.css` toast keyframe | **upstream `glass-toast.tsx` verbatim** (`toast()`, `dismissToast`, `GlassToaster`) — one `<GlassToaster position="bottom-right" />` in `main.tsx`; every caller goes through `toast({ title, description, variant, duration })`; `Toast.tsx` is a forwarder; `tw-animate-css` imported so the pack's `animate-in` runs; cart Toast deleted |
+| `PremiumGate` centred `dc-premium-modal` card, indigo scrim `rgba(49,46,129,.28)` + `.dc-premium-modal-in`, painted perk / offer / CTA plates, `::after` CTA flare | **`GlassSheet` + `GlassSheetContent side="bottom"`** (`h-auto max-h-[85vh]`, `mx-auto [width:min(100vw,640px)]`), pack scrim; perks outlined; offer = **`GlassCard`**; close / CTA / dismiss = **`GlassButton`**; dead `.dc-premium-modal*` entrance, CTA flare, close glow removed (class hooks kept for the contract) |
+| `ModuleSelectModal` scrim `bg-indigo-950/30 backdrop-blur-md` + CSS indigo wash | the pack sheet scrim (`bg-black/50 backdrop-blur-[2px]`) |
+| `AiQuotaCard` painted card + `<button>` | app **`GlassCard`** + **`GlassButton`** |
+| `DesktopShell` rail active gradient, indigo GlassSurface tints (`tint/blur/sat` props), topbar tab gradient underline, `TooltipContent tint`, `GlassInput tint/radius`, logout / Sign-in `<button>`s | pack **`GlassSurface` at defaults** + `ring-1 ring-indigo-400/50`, `bg-indigo-500` underline, defaults everywhere, **`GlassButton`** (icon + capsule) |
+| checkout `StepIndicator` shadows / slate ink, `MacWindowModal` custom tint + blurred scrim, `PortraitOnlyGuard` glow plate, `PageTabs` white/70 nav + tinted TabsList (+ `glass.css` indigo droplet override) | shadowless white ink; **`GlassSurface radius={24}`** + `bg-black/55`; plain; `border-b border-white/10` + **`TabsList` at defaults** |
+| `MindMapPreview` frame / status `<button>` pills, theme `<button>`, `bg-slate-950` | **`GlassToggleGroup`** (`dc-segment`) + capsule **`GlassButton`** |
+| home `Header` search pill `dc-glass-toolbar` | **`GlassInput`** (pack defaults, same as the store search bar) |
+| `CartPage` / `FavoritesPage` `dc-glass-toolbar` bars | chrome-glass tokens (`--dc-chrome-glass*`), no legacy hook |
+| `OwnedPlanCard` add-more `<button>` plate, `CheckoutReviewStep` "Return to source" amber `<button>` | **`GlassButton variant="capsule"`** rows |
+| **A7** `HeroCarousel` `dc-glass` frame, `bg-gradient-to-br ${banner.gradient}` slides + white/cyan glow orbs + `from-white/30` sheen; `BANNER_GRADIENTS` three-stop gradients | pack **`GlassSurface radius={28}`** frame; presets = one translucent accent (`bg-violet-500/30` …); legacy gradient strings mapped via `resolveBannerGradient` so saved banners keep their colour |
+| CSS: `landing.css` `.glass-panel/.pulse-glow/.bg-grid`, `index.css` `.fp-bg-grid/.fp-orb/.fp-particle` + keyframes, `[data-fp-ambient]`, `.flowpath-app .glass-panel*`, `glass.css` PageTabs droplet / fp-bg-grid / premium-cta lines | removed |
+
+Contracts updated: `flowpathRoutingContract`, `liquidGlassPhaseABackdropContract`, `premiumGateResponsiveContract`, `pdpCourseModuleSelectContract`, `homeHeroBannersStoreDefaultViewContract`, Wave One/Three/Four/Six toast pins.
+
+**Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 139 → 128, `bg-white panels` 46 → 36, gradients 14 → 10 (left: word-marks `bg-clip-text`, `BrandMark` logo tile, `StackedCards` image scrim, `GlassPreview` demo page), `native title=` 125 → 124, render-sites 675 → 691 (baseline re-recorded) · backdrop OK · frozen diff: only `glass-toast.tsx` (now byte-identical to upstream).

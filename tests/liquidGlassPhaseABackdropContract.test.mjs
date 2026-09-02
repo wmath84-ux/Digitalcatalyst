@@ -195,9 +195,10 @@ test("A2: checkout sections and subscription cards are GlassCard / GlassSurface,
     assert.match(src, /<GlassCard/, `${file}: uses GlassCard`);
     assert.doesNotMatch(src, /rounded-3xl border border-slate-200 bg-white/, `${file}: painted card left`);
   }
-  for (const file of ["src/components/subscription/PremiumGate.tsx", "src/components/subscription/UnlockCelebration.tsx"]) {
-    assert.match(read(file), /<GlassSurface/, `${file}: modal body is a GlassSurface`);
-  }
+  // Wave 14: the premium gate became the pack GlassSheet (bottom) — its body
+  // is the sheet's own GlassSurface, so the file references GlassSheetContent.
+  assert.match(read("src/components/subscription/PremiumGate.tsx"), /<GlassSheetContent/, "PremiumGate: bottom sheet");
+  assert.match(read("src/components/subscription/UnlockCelebration.tsx"), /<GlassSurface/, "UnlockCelebration: modal body is a GlassSurface");
 });
 
 test("the pack's own light/dark material is user-switchable via the docs' GlassSwitch example — no app-side scheme logic in the vendored files", () => {

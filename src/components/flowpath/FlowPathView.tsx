@@ -1,4 +1,11 @@
-import { toast } from "../ui/glass-toast";
+import { toast as glassToast } from "../ui/glass-toast";
+
+// pack `toast(input)` (websiteglass.com glass-toast) under the two verbs this
+// view uses
+const toast = {
+  success: (title: string) => glassToast({ title, variant: "success" }),
+  info: (title: string) => glassToast({ title }),
+};
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Trash2, BookOpen } from "lucide-react";

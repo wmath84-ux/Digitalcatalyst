@@ -187,15 +187,6 @@ html[data-glass="on"] :where(.glass-dialog-in) {
   }
 }
 
-@keyframes glass-toast-in {
-  from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.96); }
-  to   { opacity: 1; transform: none; }
-}
-
-html[data-glass="on"] :where(.glass-toast-in) {
-  animation: glass-toast-in 0.22s cubic-bezier(0.22, 1.15, 0.36, 1.06) both;
-}
-
 /* The legacy gradient button becomes a lens. `.liquid-metal-button` keeps its
  * layout, focus-visible and disabled rules from liquidMetalButton.css; only the
  * opaque paint is removed, so `data-glass="off"` restores the exact old look. */
@@ -206,16 +197,8 @@ html[data-glass="on"] :where(.liquid-metal-button) {
   isolation: auto;
 }
 
-/* PageTabs sits on a white strip, so the upstream droplet (white-on-dark) gets
- * an indigo wash; it targets the pill element inside the list we tag from
- * src/components/ui/PageTabs.tsx. */
-html[data-glass="on"] :where(.dc-page-tabs-list) div[aria-hidden] {
-  background: rgba(255, 255, 255, 0.14) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  html[data-glass="on"] :where(.glass-dialog-in, .glass-toast-in) {
+  html[data-glass="on"] :where(.glass-dialog-in) {
     animation: none !important;
   }
 }
@@ -551,11 +534,9 @@ html[data-glass="on"] body {
 }
 
 /* ── Part 1g (kept) · decorative glows / grid that only CSS files paint ───── */
-html[data-glass="on"] .fp-bg-grid,
 html[data-glass="on"] .mobile-header-glow::before,
 html[data-glass="on"] .mobile-header-glow::after,
 html[data-glass="on"] .dc-footer-glow::before,
-html[data-glass="on"] .dc-premium-cta::after,
 html[data-glass="on"] [data-course-dock] .dc-dock-fluid {
   display: none !important;
 }

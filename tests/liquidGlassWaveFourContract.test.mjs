@@ -98,7 +98,7 @@ test("FlowPath's inline toast became the shared glass toast host", () => {
   assert.match(v, /from "\.\.\/ui\/glass-toast"/);
   // one host for every route, mounted next to the palette in the same provider tree
   const main = read("src/main.tsx");
-  assert.match(main, /<ToastViewport \/>/);
+  assert.match(main, /<GlassToaster position="bottom-right" \/>/);
   assert.match(main, /<GlassCommandPalette \/>/);
 });
 

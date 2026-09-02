@@ -46,7 +46,7 @@ export default function CartPage({ cartProducts, onRemove, onClearAll, onCheckou
           <p className="mt-3 text-[11px] leading-5 text-white/55">Final amount is recalculated from Firestore by the payment server.</p>
         </GlassSurface>
       </div>
-      <div className="dc-glass-toolbar border-t border-white/10 p-4 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+      <div className="border-t border-white/10 bg-[var(--dc-chrome-glass)] p-4 pb-[calc(env(safe-area-inset-bottom)+12px)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
         <button onClick={handleCheckout} className="flex w-full items-center justify-between rounded-full bg-indigo-600 px-5 py-4 text-white transition hover:bg-indigo-500 active:scale-[0.98]"><span className="text-left"><span className="block text-[11px] text-indigo-100">Total payable</span><span className="text-base font-extrabold">{formatINR(finalTotal)}</span></span><span className="rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold">Secure checkout</span></button>
       </div>
     </div>
@@ -54,5 +54,5 @@ export default function CartPage({ cartProducts, onRemove, onClearAll, onCheckou
 }
 
 function PageHeader({ title, subtitle, right }: { title: string; subtitle: string; right?: React.ReactNode }) {
-  return <div className="dc-glass-toolbar flex items-center justify-between border-b border-white/10 px-4 py-4"><div><h1 className="text-lg font-extrabold text-white">{title}</h1><p className="text-[11px] font-medium text-white/55">{subtitle}</p></div>{right}</div>;
+  return <div className="flex items-center justify-between border-b border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-4 [backdrop-filter:var(--dc-chrome-glass-blur)]"><div><h1 className="text-lg font-extrabold text-white">{title}</h1><p className="text-[11px] font-medium text-white/55">{subtitle}</p></div>{right}</div>;
 }

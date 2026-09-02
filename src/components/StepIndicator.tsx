@@ -20,10 +20,10 @@ export default function StepIndicator({ currentStep, steps }: StepIndicatorProps
                   w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold
                   transition-all duration-300 border-2
                   ${isCompleted
-                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200'
+                    ? 'bg-emerald-500 border-emerald-500 text-white'
                     : isActive
-                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200 scale-110'
-                      : 'bg-gray-100 border-gray-300 text-gray-400'
+                      ? 'bg-indigo-600 border-indigo-600 text-white scale-110'
+                      : 'border-white/20 text-white/55'
                   }
                 `}
               >
@@ -32,7 +32,7 @@ export default function StepIndicator({ currentStep, steps }: StepIndicatorProps
               <span
                 className={`
                   text-[11px] mt-1.5 font-medium text-center leading-tight
-                  ${isActive ? 'text-indigo-700' : isCompleted ? 'text-emerald-600' : 'text-gray-400'}
+                  ${isActive ? 'text-indigo-200' : isCompleted ? 'text-emerald-300' : 'text-white/55'}
                 `}
               >
                 {step.label}
@@ -44,7 +44,7 @@ export default function StepIndicator({ currentStep, steps }: StepIndicatorProps
               <div
                 className={`
                   h-0.5 flex-1 mx-1 -mt-5 rounded-full transition-all duration-500
-                  ${stepNum < currentStep ? 'bg-emerald-400' : 'bg-gray-200'}
+                  ${stepNum < currentStep ? 'bg-emerald-400' : 'bg-white/15'}
                 `}
               />
             )}

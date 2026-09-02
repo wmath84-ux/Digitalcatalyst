@@ -66,6 +66,7 @@ import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";
 // refraction layer and `LiquidMetalButton` our wrapper around `glass-button`.
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassInput } from "@/components/ui/glass-input";
+import { GlassButton } from "@/components/ui/glass-button";
 import {
   Tooltip,
   TooltipContent,
@@ -408,9 +409,6 @@ export default function DesktopShell({
               indicator. */}
           <div className="relative mx-2 mt-3 overflow-hidden rounded-2xl border border-white/10 p-3">
             <GlassSurface
-              tint={0.5}
-              blur={14}
-              saturation={1.3}
               radius={18}
               className="pointer-events-none absolute inset-0"
             />
@@ -461,24 +459,22 @@ export default function DesktopShell({
                 <p className="truncate text-[12px] font-black text-white">{user.name}</p>
                 <p className="truncate text-[10px] font-semibold text-white/55">{user.email}</p>
               </div>
-              <button
-                type="button"
+              <GlassButton
                 onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })}
                 aria-label="Log out"
-                title="Log out"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white/55 transition hover:bg-rose-500/15 hover:text-rose-300"
+                className="shrink-0 [&_.size-12]:size-8 [&_svg]:text-white/70 hover:[&_svg]:text-rose-300"
               >
                 <LogOut size={14} />
-              </button>
+              </GlassButton>
             </div>
           ) : (
-            <button
-              type="button"
+            <GlassButton
+              variant="capsule"
               onClick={() => handleNavigate("#/auth?mode=login")}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white/[0.1] px-3 py-2.5 text-xs font-black text-white transition hover:bg-white/[0.14]"
+              className="w-full [&>span]:w-full [&>span>div]:h-10 [&>span>div]:w-full [&>span>div]:rounded-xl [&>span>div]:px-3 [&>span>div>span]:text-xs [&>span>div>span]:font-black"
             >
-              <Crown size={13} /> Sign in
-            </button>
+              <span className="inline-flex items-center gap-2"><Crown size={13} /> Sign in</span>
+            </GlassButton>
           )}
         </div>
       </aside>
@@ -522,8 +518,6 @@ export default function DesktopShell({
                 <GlassInput
                   type="search"
                   className="dc-glass-input w-full"
-                  tint={0.55}
-                  radius={14}
                   icon={<Search className="h-4 w-4" aria-hidden="true" />}
                   value={query}
                   data-desktop-search
@@ -665,7 +659,7 @@ function RailItem({
       data-active={active ? "true" : "false"}
       className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2 text-left transition ${
         active
-          ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/30"
+          ? "text-white ring-1 ring-indigo-400/50"
           : "text-white/75 hover:bg-white/[0.08] hover:text-white"
       }`}
       title={entry.description}
@@ -676,9 +670,6 @@ function RailItem({
           stacked lenses is exactly the perf trap the rollout plan warns about. */}
       {active ? (
         <GlassSurface
-          tint={0.22}
-          blur={10}
-          saturation={1.3}
           radius={14}
           className="pointer-events-none absolute inset-0"
         />
@@ -686,8 +677,8 @@ function RailItem({
       <span
         className={`relative grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${
           active
-            ? "bg-white/20 text-white"
-            : "bg-white/[0.08] text-white/55 group-hover:bg-white/[0.14] group-hover:text-white"
+            ? "bg-indigo-500/25 text-white ring-1 ring-indigo-400/40"
+            : "border border-white/10 text-white/55 group-hover:text-white"
         }`}
       >
         <Icon size={15} />
@@ -705,7 +696,7 @@ function RailItem({
       {entry.badge && entry.badge > 0 ? (
         <span
           className={`relative grid h-5 min-w-[20px] place-items-center rounded-full px-1.5 text-[10px] font-black ${
-            active ? "bg-white text-indigo-700" : "bg-indigo-100 text-indigo-700"
+            active ? "bg-indigo-500 text-white" : "bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-400/30"
           }`}
         >
           {entry.badge > 99 ? "99+" : entry.badge}
@@ -717,9 +708,9 @@ function RailItem({
 
 function RailStat({ label, value, highlight = false }: { label: string; value: number; highlight?: boolean }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.06] px-2 py-1.5">
+    <div className="rounded-xl border border-white/10 px-2 py-1.5">
       <dt className="text-[9px] font-black uppercase tracking-wider text-white/55">{label}</dt>
-      <dd className={`mt-0.5 text-base font-black ${highlight ? "text-indigo-600" : "text-white"}`}>
+      <dd className={`mt-0.5 text-base font-black ${highlight ? "text-indigo-300" : "text-white"}`}>
         {value > 99 ? "99+" : value}
       </dd>
     </div>
@@ -757,7 +748,7 @@ function TopBarTabRow({ config }: { config: TopBarTabsConfig }) {
               className={cn(
                 "relative shrink-0 rounded-t-xl px-3 py-2.5 text-[13px] font-bold outline-none transition-colors duration-200",
                 "focus-visible:ring-2 focus-visible:ring-indigo-300/70",
-                isActive ? "text-indigo-600" : "text-white/55 hover:bg-white/[0.06] hover:text-white",
+                isActive ? "text-white" : "text-white/55 hover:bg-white/[0.06] hover:text-white",
               )}
             >
               {item.label}
@@ -765,7 +756,7 @@ function TopBarTabRow({ config }: { config: TopBarTabsConfig }) {
                 aria-hidden="true"
                 className={cn(
                   "absolute inset-x-2 bottom-0 h-[3px] rounded-full transition-opacity duration-200",
-                  isActive ? "bg-gradient-to-r from-indigo-500 to-violet-500 opacity-100" : "opacity-0",
+                  isActive ? "bg-indigo-500 opacity-100" : "opacity-0",
                 )}
               />
             </button>
@@ -814,14 +805,11 @@ function TopBarButton({
           data-desktop-topbar-button={ariaLabel.toLowerCase()}
           className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-xl transition ${
             active
-              ? "bg-indigo-50 text-indigo-600"
+              ? "text-indigo-200"
               : "text-white/55 hover:bg-white/[0.08] hover:text-white"
           }`}
         >
           <GlassSurface
-            tint={active ? 0.7 : 0.55}
-            blur={12}
-            saturation={1.35}
             radius={12}
             className="dc-chrome-disc pointer-events-none absolute inset-0"
           />
@@ -832,7 +820,7 @@ function TopBarButton({
             </span>
           ) : null}
         </TooltipTrigger>
-        <TooltipContent side="bottom" tint={0.85}>
+        <TooltipContent side="bottom">
           <span className="text-white">{ariaLabel}</span>
         </TooltipContent>
       </Tooltip>

@@ -822,13 +822,14 @@ function SafeRecoveryUI({
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <button
+        <GlassButton
           type="button"
+          variant="capsule"
           onClick={onGoBack}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-amber-600 py-3 text-sm font-bold text-white hover:bg-amber-500"
+          className="flex-1 [&>span]:w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:rounded-full [&>span>div]:px-4"
         >
-          <ArrowLeft size={14} /> Return to source
-        </button>
+          <span className="flex items-center justify-center gap-1.5 text-sm font-bold"><ArrowLeft size={14} /> Return to source</span>
+        </GlassButton>
         {kind !== "empty" ? (
           <GlassButton
             variant="capsule"

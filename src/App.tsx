@@ -76,11 +76,10 @@ export default function App({
           )}
         </main>
 
-        {toast && (
-          <div className="pointer-events-none absolute bottom-20 left-1/2 z-40 w-max -translate-x-1/2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white">
-            {toast}
-          </div>
-        )}
+        {/* Wave 14: the store toast is rendered by the pack's GlassToaster
+            (src/main.tsx); the `toast` prop stays for the contract but paints
+            nothing here. */}
+        {toast ? <span className="sr-only" role="status">{toast}</span> : null}
 
         <BottomNav
           active={activeTab === "purchases" ? "purchases" : "store"}

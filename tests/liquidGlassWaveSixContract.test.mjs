@@ -93,15 +93,17 @@ test("no scrolling grid mounts a per-card lens (the budget rule)", () => {
   assert.match(lib, /GLASS_LENS_BUDGET_PHONE = 12/);
 });
 
-test("announce once: the toast host defers to the card's own live role", () => {
+test("the toast host is the pack viewport, mounted once, portalled above everything", () => {
+  // Wave 14: `glass-toast.tsx` is the vendored registry item (no app-side
+  // roles/tones layered on top). The viewport portals to <body> at z-[1000]
+  // and each card carries the pack's own × button.
   const host = read("src/components/ui/glass-toast.tsx");
-  const card = host.slice(host.indexOf("export function GlassToastCard"));
-  assert.match(card, /role=\{tone === "error" \? "alert" : "status"\}/);
-  const viewport = host.slice(host.indexOf("export function ToastViewport"));
-  assert.doesNotMatch(code(viewport), /aria-live/, "the wrapper would double-announce");
+  const viewport = host.slice(host.indexOf("export function GlassToaster"));
   assert.match(viewport, /createPortal\(/);
-  assert.match(viewport, /z-\[120\]/);
-  assert.match(card, /aria-label="Dismiss notification"/);
+  assert.match(viewport, /z-\[1000\]/);
+  assert.match(host, /aria-label="Dismiss"/);
+  const main = read("src/main.tsx");
+  assert.equal(main.match(/<GlassToaster /g)?.length, 1, "exactly one toaster");
 });
 
 test("every glass surface has a keyboard path and a motion opt-out", () => {

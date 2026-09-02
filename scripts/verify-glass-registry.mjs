@@ -30,7 +30,7 @@ const BANNER_MARK = "[digitalcatalyst]";
  * as PORTED (not DRIFT) until `npx shadcn add` replaces them; remove the entry
  * once it is a real vendored copy.
  */
-const PORTED = new Set(["glass-toast.tsx"]);
+const PORTED = new Set([]);
 
 /** registry item -> files it installs (mirrors what `shadcn add` would write) */
 const ITEMS = [

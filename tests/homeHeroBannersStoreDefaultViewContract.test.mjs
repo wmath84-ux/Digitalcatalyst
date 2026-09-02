@@ -57,13 +57,18 @@ test("banner type carries admin link target (product / module)", () => {
   assert.match(bannerTypes, /moduleId\?: string/);
 });
 
-test("gradient presets live as literal class strings (Tailwind-compiled)", () => {
+test("banner accent presets live as literal class strings (Tailwind-compiled)", () => {
   assert.match(bannerGradients, /export const BANNER_GRADIENTS/);
-  // The three built-in banner gradients stay available as presets so the
-  // admin can restore the exact original look.
-  assert.match(bannerGradients, /from-violet-600 via-fuchsia-500 to-pink-500/);
-  assert.match(bannerGradients, /from-orange-500 via-rose-500 to-red-500/);
-  assert.match(bannerGradients, /from-cyan-500 via-sky-500 to-blue-600/);
+  // Phase A7: the three built-in presets are single translucent accents over
+  // the pack GlassSurface — the old three-stop gradients only survive as a
+  // legacy map so previously saved banners keep their colour.
+  assert.match(bannerGradients, /classes: "bg-violet-500\/30"/);
+  assert.match(bannerGradients, /classes: "bg-orange-500\/30"/);
+  assert.match(bannerGradients, /classes: "bg-sky-500\/30"/);
+  assert.match(bannerGradients, /"from-violet-600 via-fuchsia-500 to-pink-500": "bg-violet-500\/30"/);
+  assert.doesNotMatch(bannerGradients, /classes: "from-/);
+  assert.match(heroCarousel, /<GlassSurface\s+ref=\{trackRef\}/);
+  assert.doesNotMatch(heroCarousel, /bg-gradient-to-|blur-3xl|dc-glass\b/);
 });
 
 test("normalizeBanner degrades broken links to none", () => {

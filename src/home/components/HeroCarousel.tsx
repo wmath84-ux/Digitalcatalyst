@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Banner } from "../types";
 import { GlassButton } from "../../components/ui/glass-button";
+import { GlassSurface } from "../../components/ui/glass";
 
 interface HeroCarouselProps {
   banners: Banner[];
@@ -92,9 +93,13 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
 
   return (
     <div className="px-5 pt-4 md:px-8">
-      <div
+      {/* A7: the carousel frame is the pack GlassSurface at its defaults; each
+          slide paints one translucent accent (the admin preset) over it — no
+          gradient plate, no glow orbs, no white wash. */}
+      <GlassSurface
         ref={trackRef}
-        className="dc-glass relative select-none overflow-hidden rounded-[28px] touch-pan-y md:rounded-[36px]"
+        radius={28}
+        className="select-none overflow-hidden touch-pan-y"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={endDrag}
@@ -125,15 +130,12 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
                   aria-label={linked ? `Open: ${banner.title}` : undefined}
                   data-banner-id={banner.id}
                   data-banner-linked={linked ? "true" : "false"}
-                  className={`relative flex h-44 w-full items-center overflow-hidden bg-gradient-to-br px-5 md:h-56 md:px-8 ${
+                  className={`relative flex h-44 w-full items-center overflow-hidden px-5 md:h-56 md:px-8 ${
                     linked ? "cursor-pointer active:brightness-95" : ""
                   } ${banner.gradient}`}
                 >
-                  <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-black/10" />
-                  <div aria-hidden className="pointer-events-none absolute -right-10 top-0 h-36 w-36 rounded-full bg-white/12 blur-3xl" />
-                  <div aria-hidden className="pointer-events-none absolute -left-8 bottom-0 h-28 w-28 rounded-full bg-cyan-200/12 blur-3xl" />
                   <div className="relative z-10 max-w-[62%] text-white md:max-w-[58%]">
-                    <span className="inline-block rounded-full bg-[var(--dc-chrome-glass)] px-2.5 py-1 text-[10px] font-bold tracking-wider [backdrop-filter:var(--dc-chrome-glass-blur)] md:text-xs">
+                    <span className="inline-block rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-bold tracking-wider md:text-xs">
                       {banner.eyebrow}
                     </span>
                     <h3 className="mt-2 text-lg font-bold leading-tight drop-shadow-sm md:text-2xl">
@@ -161,7 +163,7 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
             );
           })}
         </div>
-      </div>
+      </GlassSurface>
 
       <div className="mt-3 flex items-center justify-center gap-1.5">
         {banners.map((banner, index) => (

@@ -40,7 +40,7 @@ import SearchPage from "./components/SearchPage";
 import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import GlassCommandPalette from "./components/GlassCommandPalette";
-import { ToastViewport } from "./components/ui/glass-toast";
+import { GlassToaster, toast as glassToast } from "./components/ui/glass-toast";
 import { GlassBackdrop } from "./components/ui/GlassBackdrop";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BrandingProvider, useBranding } from "./context/BrandingContext";
@@ -479,6 +479,10 @@ function RootPage(): ReactNode {
   }, [hash]);
 
   const showShoppingToast = (message: string) => {
+    // Wave 14: the store / cart / favourites toasts go through the pack's
+    // glass-toast store (rendered by <GlassToaster/> below); the local state
+    // is kept only for the legacy `toast` prop contract on App / CartWishlistApp.
+    glassToast({ title: message, duration: 2000 });
     setShoppingToast(message);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setShoppingToast(null), 2000);
@@ -1297,7 +1301,8 @@ createRoot(document.getElementById("root")!).render(
             {/* Wave 4: the glass toast host moved up here so any route can
                 raise `toast.*()` without prop plumbing — FlowPath's old
                 top-centre div was the last one carrying its own copy. */}
-            <ToastViewport />
+            {/* Wave 14: the pack's toast viewport (websiteglass.com glass-toast), mounted once. */}
+            <GlassToaster position="bottom-right" />
             <PortraitOnlyGuard />
           </CommerceProvider>
         </CatalogProvider>

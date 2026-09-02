@@ -19,12 +19,18 @@ const flowPathApp = fs.readFileSync("src/FlowPathApp.tsx", "utf8");
 const bottomDock = fs.readFileSync("src/components/flowpath/BottomDock.tsx", "utf8");
 const homeHeader = fs.readFileSync("src/home/components/Header.tsx", "utf8");
 
-test("FlowPath glass is scoped under .flowpath-app so light mode shows a light header", () => {
+test("FlowPath surfaces are the pack GlassSurface; no hand-painted .glass-panel remains", () => {
   assert.match(flowPathApp, /flowpath-app relative min-h-screen/);
-  // The theme-aware glass beats landing.css's fixed dark .glass-panel.
-  assert.match(indexCss, /\.flowpath-app \.glass-panel\s*\{/);
-  assert.match(indexCss, /\.flowpath-app \.glass-panel-strong\s*\{/);
-  assert.match(indexCss, /\.flowpath-app \.glass-panel[\s\S]*background: var\(--fp-panel\)/);
+  // Wave 14: landing.css no longer defines `.glass-panel` and index.css no
+  // longer scopes a theme-aware copy under `.flowpath-app` — FlowPath's
+  // cards / sheets / radial items render the registry GlassSurface in JSX.
+  assert.doesNotMatch(indexCss, /\.flowpath-app \.glass-panel\s*\{/);
+  assert.doesNotMatch(fs.readFileSync("src/landing.css", "utf8"), /\.glass-panel\s*\{/);
+  for (const f of ["ActivityCard", "CreateModal", "CurveSettingsModal", "RadialMenu"]) {
+    const src = fs.readFileSync(`src/components/flowpath/${f}.tsx`, "utf8");
+    assert.match(src, /<GlassSurface/, `${f} renders the pack surface`);
+    assert.doesNotMatch(src, /className="[^"]*glass-panel/, `${f} still paints .glass-panel`);
+  }
 });
 
 test("FlowPath theme blocks set color-scheme and the display font", () => {

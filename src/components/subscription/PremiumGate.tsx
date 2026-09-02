@@ -49,8 +49,9 @@
 //     keyboard users can reach them.
 
 import { useEffect } from "react";
-import { GlassSurface } from "../ui/glass";
-import { createPortal } from "react-dom";
+import { GlassSheet, GlassSheetContent } from "../ui/glass-sheet";
+import { GlassButton } from "../ui/glass-button";
+import { GlassCard } from "../ui/GlassCard";
 import { X, Check, Sparkles, Crown, Zap } from "lucide-react";
 import {
   BankIcon,
@@ -182,16 +183,18 @@ function GateContent({
           : "dc-premium-sheet relative min-h-0 w-full flex-1 overflow-y-auto overscroll-contain rounded-t-[1.75rem] sm:rounded-[1.75rem]"
       }
     >
-      {/* Blurred background blobs. They are inside the card and scale with
-          the card so they never feel oversized on a phone or lost on a
-          desktop — the card itself is fluid (see `dc-premium-shell`). */}
-      <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-indigo-500/20 blur-3xl sm:h-56 sm:w-56" />
-      <div className="pointer-events-none absolute -left-16 top-32 h-44 w-44 rounded-full bg-violet-500/20 blur-3xl sm:h-56 sm:w-56" />
-
-      {/* All internal padding / spacing uses CSS clamp() so the same JSX
-          looks correct on a 360 px phone, a 768 px tablet and a 1440 px
-          desktop. No `sm:` / `md:` overrides for the inner card. */}
-      <div className="dc-premium-shell relative px-[clamp(1rem,4vw,1.75rem)] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[clamp(1.25rem,3.5vw,2rem)]">
+      {/* Wave 14: no decorative blur blobs — the pack sheet's own material is
+          the only surface. All internal spacing uses CSS clamp() so the same
+          JSX looks correct on a 360 px phone, a 768 px tablet and a 1440 px
+          desktop. Inside the sheet the pack already pads by 24 px, so the
+          shell only adds the safe-area inset. */}
+      <div
+        className={
+          asPage
+            ? "dc-premium-shell relative px-[clamp(1rem,4vw,1.75rem)] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[clamp(1.25rem,3.5vw,2rem)]"
+            : "dc-premium-shell relative pb-[env(safe-area-inset-bottom)]"
+        }
+      >
         {/* Header row — close (X) is INSIDE the card, top-right, on its
             own line so it never collides with the title. The card reserves
             enough top space for it on every screen. */}
@@ -236,18 +239,17 @@ function GateContent({
             </p>
           </div>
 
-          {/* Cross (X) is INSIDE the card, sized so it is tappable on a
-              phone (44 px target) yet not overwhelming on a desktop
-              (32 px). Same gradient family as the offer block. */}
-          <button
-            type="button"
+          {/* Cross (X) is INSIDE the card — the pack Glass Button disc,
+              sized so it is tappable on a phone yet not overwhelming on a
+              desktop. */}
+          <GlassButton
             onClick={onClose}
             aria-label="Close subscription gate"
             data-premium-gate-close
-            className="dc-premium-close shrink-0 rounded-full bg-indigo-600 p-[clamp(6px,1vw,8px)] text-white shadow-[0_8px_20px_-6px_rgba(99,102,241,0.55)] ring-1 ring-white/40 transition hover:scale-110 active:scale-95"
+            className="dc-premium-close shrink-0 transition hover:scale-110 active:scale-95 [&_.size-12]:size-[clamp(2.25rem,5vw,2.75rem)]"
           >
             <X className="h-[clamp(14px,2.4vw,18px)] w-[clamp(14px,2.4vw,18px)]" strokeWidth={2.75} />
-          </button>
+          </GlassButton>
         </div>
 
         {/* Perks — each row scales its icon and text together. Gap
@@ -284,17 +286,20 @@ function GateContent({
               unlock.
             - A single full-width primary CTA (Subscribe).
             - A subtle "Maybe later / Go back" link below the CTA. */}
-        <div className="dc-premium-offer relative mt-[clamp(1.5rem,4vw,2rem)] overflow-hidden rounded-[clamp(1rem,2.5vw,1.5rem)] bg-indigo-600 p-[clamp(1rem,3vw,1.5rem)] text-white shadow-[0_18px_40px_-12px_rgba(79,70,229,0.55)]">
-          {/* Subtle grid pattern for a premium feel */}
-          <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.18)_1px,transparent_1px)] [background-size:24px_24px]" />
+        <GlassCard
+          className="dc-premium-offer relative mt-[clamp(1.5rem,4vw,2rem)] text-white ring-1 ring-indigo-400/30"
+          contentClassName="p-[clamp(1rem,3vw,1.5rem)]"
+        >
+          {/* Wave 14: the offer is the pack Glass Card (no indigo plate, no
+              grid pattern, no drop shadow); indigo stays as the accent ring. */}
 
           <div className="relative">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[clamp(10px,1.7vw,11px)] font-black uppercase tracking-wider text-white ring-1 ring-white/25">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/15 px-2.5 py-1 text-[clamp(10px,1.7vw,11px)] font-black uppercase tracking-wider text-indigo-200 ring-1 ring-indigo-400/30">
                 <Crown className="h-3 w-3" />
                 {appName} Plus+
               </span>
-              <span className="inline-flex items-center gap-1 text-[clamp(10px,1.7vw,11px)] font-semibold text-indigo-100/95">
+              <span className="inline-flex items-center gap-1 text-[clamp(10px,1.7vw,11px)] font-semibold text-white/75">
                 <Zap className="h-3 w-3" />
                 7-day free trial · cancel anytime
               </span>
@@ -305,7 +310,7 @@ function GateContent({
                 ? "My Day + Revision + premium content, ek hi plan me"
                 : "Revision + My Day + premium content, ek hi plan me"}
             </h2>
-            <p className="mt-1.5 text-[clamp(11px,2vw,13px)] leading-relaxed text-indigo-100/95">
+            <p className="mt-1.5 text-[clamp(11px,2vw,13px)] leading-relaxed text-white/75">
               {isMyDay
                 ? "Subscribe karte hi My Day fully unlock — unlimited tasks, smart schedule, reminders aur notes ka cloud save. Plus Revision Studio ka full access."
                 : "Subscribe karte hi Revision Studio fully unlock — daily tests, smart sessions, weak-topic analytics, plus My Day ka full access."}
@@ -316,31 +321,31 @@ function GateContent({
               {TIER_ROWS.map((tier) => (
                 <div
                   key={tier.id}
-                  className={`relative rounded-[clamp(0.75rem,1.8vw,1rem)] border p-[clamp(0.75rem,2vw,1rem)] backdrop-blur transition ${
+                  className={`relative rounded-[clamp(0.75rem,1.8vw,1rem)] border p-[clamp(0.75rem,2vw,1rem)] transition ${
                     tier.highlight
-                      ? "border-white/70 bg-white/15 shadow-[0_8px_24px_-8px_rgba(255,255,255,0.4)] ring-1 ring-amber-400/30"
-                      : "border-white/20 bg-white/10"
+                      ? "border-amber-400/40 ring-1 ring-amber-400/30"
+                      : "border-white/15"
                   }`}
                 >
                   {tier.badge && (
-                    <span className="absolute -top-2 right-2 rounded-full bg-amber-500 px-2 py-0.5 text-[clamp(9px,1.5vw,10px)] font-black uppercase tracking-wider text-amber-950 shadow-md">
+                    <span className="absolute -top-2 right-2 rounded-full bg-amber-500 px-2 py-0.5 text-[clamp(9px,1.5vw,10px)] font-black uppercase tracking-wider text-amber-950">
                       {tier.badge}
                     </span>
                   )}
                   {tier.highlight && (
-                    <span className="absolute -top-2 left-2 inline-flex items-center gap-1 rounded-full bg-indigo-950/70 px-2 py-0.5 text-[clamp(9px,1.5vw,10px)] font-black uppercase tracking-wider text-violet-200">
+                    <span className="absolute -top-2 left-2 inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-2 py-0.5 text-[clamp(9px,1.5vw,10px)] font-black uppercase tracking-wider text-indigo-200 ring-1 ring-indigo-400/30">
                       <Crown className="h-2.5 w-2.5" />
                       Best value
                     </span>
                   )}
-                  <p className="text-[clamp(10px,1.7vw,11px)] font-semibold uppercase tracking-wider text-indigo-100">
+                  <p className="text-[clamp(10px,1.7vw,11px)] font-semibold uppercase tracking-wider text-white/75">
                     {tier.id === "monthly" ? "Monthly" : "Yearly"}
                   </p>
                   <p className="mt-1 leading-none">
                     <span className="text-[clamp(1.4rem,4.5vw,1.85rem)] font-black">{tier.price}</span>
-                    <span className="ml-0.5 text-[clamp(10px,1.7vw,12px)] font-semibold text-indigo-100">{tier.suffix}</span>
+                    <span className="ml-0.5 text-[clamp(10px,1.7vw,12px)] font-semibold text-white/75">{tier.suffix}</span>
                   </p>
-                  <p className="mt-1 text-[clamp(10px,1.5vw,11px)] text-indigo-100/85">{tier.period}</p>
+                  <p className="mt-1 text-[clamp(10px,1.5vw,11px)] text-white/55">{tier.period}</p>
                 </div>
               ))}
             </div>
@@ -352,7 +357,7 @@ function GateContent({
                   key={line}
                   className="flex items-start gap-2 text-[clamp(11px,1.9vw,13px)] font-medium text-white/95"
                 >
-                  <span className="mt-0.5 grid h-[clamp(14px,2.2vw,16px)] w-[clamp(14px,2.2vw,16px)] shrink-0 place-items-center rounded-full bg-white/20 text-white">
+                  <span className="mt-0.5 grid h-[clamp(14px,2.2vw,16px)] w-[clamp(14px,2.2vw,16px)] shrink-0 place-items-center rounded-full border border-white/25 text-white">
                     <Check className="h-[clamp(8px,1.5vw,10px)] w-[clamp(8px,1.5vw,10px)]" strokeWidth={3} />
                   </span>
                   <span className="leading-snug">{line}</span>
@@ -360,26 +365,26 @@ function GateContent({
               ))}
             </ul>
 
-            {/* Primary CTA */}
-            <button
-              type="button"
+            {/* Primary CTA — the pack Glass Button (capsule), full width. */}
+            <GlassButton
+              variant="capsule"
               onClick={onViewSubscription}
               data-premium-gate-cta
-              className="dc-premium-cta mt-5 w-full rounded-[clamp(0.75rem,2vw,1rem)] bg-white py-[clamp(0.75rem,2.2vw,0.95rem)] text-[clamp(13px,2.4vw,15px)] font-black text-indigo-700 shadow-[0_10px_24px_-6px_rgba(255,255,255,0.35)] transition hover:bg-indigo-50 active:scale-[0.99]"
+              className="dc-premium-cta mt-5 w-full rounded-full active:scale-[0.99] [&>span]:w-full [&>span>div]:h-[clamp(2.75rem,7vw,3.25rem)] [&>span>div]:w-full [&>span>div]:rounded-full [&>span>div]:px-6 [&>span>div>span]:text-[clamp(13px,2.4vw,15px)] [&>span>div>span]:font-black"
             >
               View subscription →
-            </button>
+            </GlassButton>
 
-            {/* Secondary dismiss */}
-            <button
-              type="button"
+            {/* Secondary dismiss — a quieter pack capsule. */}
+            <GlassButton
+              variant="capsule"
               onClick={onClose}
-              className="mt-2.5 w-full rounded-2xl py-1.5 text-[clamp(11px,1.9vw,12px)] font-bold text-indigo-100/85 transition hover:text-white"
+              className="mt-2.5 w-full rounded-full [&>span]:w-full [&>span>div]:h-9 [&>span>div]:w-full [&>span>div]:rounded-full [&>span>div]:px-4 [&>span>div>span]:text-[clamp(11px,1.9vw,12px)] [&>span>div>span]:font-bold [&>span>div>span]:text-white/75"
             >
               {asPage ? "Go back to Home" : "Maybe later"}
-            </button>
+            </GlassButton>
           </div>
-        </div>
+        </GlassCard>
       </div>
     </div>
   );
@@ -394,8 +399,9 @@ export default function PremiumGate({
   asPage = false,
   subtitle,
 }: Props) {
-  // Modal overlay only: lock the page behind the gate so a finger on
-  // the card cannot also scroll the Revision / My Day scroller.
+  // Modal only: lock the page behind the gate so a finger on the card
+  // cannot also scroll the Revision / My Day scroller. (The pack sheet
+  // locks body scroll too; this keeps the app's own counter in sync.)
   useEffect(() => {
     if (!open || asPage) return;
     lockBodyScroll();
@@ -417,41 +423,29 @@ export default function PremiumGate({
     );
   }
 
-  // Portal to document.body so a parent `overflow: hidden` /
-  // `backdrop-filter` frame (phone app card, Revision studio) cannot
-  // clip the overlay or become its containing block. The card is then
-  // viewport-capped with an inner scroller so the close (X) and CTA
-  // stay reachable on every phone / tablet / desktop size.
-  const overlay = (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={variant === "myday" ? "My Day Premium" : "Revision Studio subscription"}
-      data-premium-gate-modal
-      className="dc-premium-modal fixed inset-0 z-[90] flex items-end justify-center bg-indigo-950/30 p-3 backdrop-blur-md sm:items-center sm:p-6"
-      onClick={onClose}
-    >
-      {/* Fluid container: on mobile it is full-width bottom sheet; on
-          tablet/desktop it is a centred card that maxes out at 640 px
-          so it never feels oversized on a 27" monitor. */}
-      <div
-        className="dc-premium-modal-inner flex min-h-0 w-full [width:min(100vw,640px)] flex-col"
-        onClick={(e) => e.stopPropagation()}
+  // Wave 14: the modal is the pack Glass Sheet from the bottom edge
+  // (websiteglass.com glass-sheet: portal to document.body, blurred scrim,
+  // scroll lock, Escape / scrim dismissal, slide-in from the edge). The
+  // sheet column is fluid — full width on a phone, capped at 640 px and
+  // centred on tablet / desktop — and scrolls internally when the offer
+  // is taller than the viewport.
+  return (
+    <GlassSheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <GlassSheetContent
+        side="bottom"
+        aria-label={variant === "myday" ? "My Day Premium" : "Revision Studio subscription"}
+        data-premium-gate-modal
+        className="dc-premium-modal-inner right-0 mx-auto flex h-auto min-h-0 w-full [width:min(100vw,640px)] flex-col text-white"
       >
-        <GlassSurface radius={28} className="flex min-h-0 max-h-full flex-col overflow-hidden text-white" contentClassName="flex min-h-0 max-h-full flex-col overflow-hidden">
-          <GateContent
-            variant={variant}
-            userName={userName}
-            onClose={onClose}
-            onViewSubscription={onViewSubscription}
-            asPage={false}
-            subtitle={subtitle}
-          />
-        </GlassSurface>
-      </div>
-    </div>
+        <GateContent
+          variant={variant}
+          userName={userName}
+          onClose={onClose}
+          onViewSubscription={onViewSubscription}
+          asPage={false}
+          subtitle={subtitle}
+        />
+      </GlassSheetContent>
+    </GlassSheet>
   );
-
-  if (typeof document === "undefined" || !document.body) return overlay;
-  return createPortal(overlay, document.body);
 }

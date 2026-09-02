@@ -55,8 +55,8 @@ test("every Wave 3 registry item is vendored with its provenance banner", () => 
     assert.match(source, /^"use client";$/m, `${item} keeps the registry's client directive`);
   }
 
-  // 22 items in the pack: 18 vendored + `glass-toast` hand-ported, 3 left
-  // (switch, slider, popover) and `glass-dock` (the repo's own dock stays).
+  // 22 items in the pack: all vendored (Wave 14 replaced the hand-ported
+  // `glass-toast` with the registry copy); `glass-dock` stays the repo's own.
   const checker = read("scripts/verify-glass-registry.mjs");
   const ported = checker.match(/const PORTED = new Set\(\[([^\]]*)\]\)/)[1];
   for (const item of VENDORED_WAVE3) {

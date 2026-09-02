@@ -3,6 +3,7 @@ import { Bell, Heart, Search, Trophy, UserRound, X } from "lucide-react";
 import { GlassSwitch } from "../../components/ui/glass-switch";
 import { GlassSurface } from "../../components/ui/glass";
 import { GlassButton } from "../../components/ui/glass-button";
+import { GlassInput } from "../../components/ui/glass-input";
 import { PopoverItem } from "../../components/ui/glass-popover";
 import { useGlassScheme } from "../../lib/glassScheme";
 import { openCommandPalette } from "../../lib/commandPalette";
@@ -226,8 +227,11 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       </div>
 
       <div data-home-search-slot className="relative mt-5">
+        {/* Wave 14: the search pill is the pack Glass Input (websiteglass.com
+            defaults — tint 0.4, radius 9999), the same component the store
+            page's search bar renders; `dc-glass-toolbar` is gone from here. */}
         <div
-          className="dc-glass-toolbar flex cursor-pointer items-center gap-2 rounded-2xl px-4 py-3 transition active:scale-[0.99]"
+          className="relative cursor-pointer transition active:scale-[0.99]"
           onClick={openSearch}
           role="button"
           tabIndex={0}
@@ -238,16 +242,16 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             }
           }}
         >
-          <Search size={18} className="shrink-0 text-white/55" strokeWidth={2.4} />
-          <input
+          <GlassInput
             ref={ref}
+            icon={<Search size={18} strokeWidth={2.4} />}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             onFocus={openSearch}
             type="text"
             inputMode="search"
             placeholder="Search courses, PDFs, e-books..."
-            className="w-full cursor-pointer bg-transparent text-sm text-white/85 placeholder:text-white/55 focus:outline-none"
+            className="w-full [&_input]:cursor-pointer [&_input]:pr-24"
             readOnly
           />
           {query ? (
@@ -258,12 +262,12 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                 onQueryChange("");
               }}
               aria-label="Clear search"
-              className="[&_.size-12]:size-6"
+              className="absolute right-2 top-1/2 -translate-y-1/2 [&_.size-12]:size-6"
             >
               <X size={13} strokeWidth={2.6} />
             </GlassButton>
           ) : (
-            <span className="hidden shrink-0 rounded-md border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/85 sm:inline">
+            <span className="absolute right-3 top-1/2 hidden -translate-y-1/2 shrink-0 rounded-md border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/85 sm:inline">
               Tap to search
             </span>
           )}

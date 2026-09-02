@@ -79,11 +79,12 @@ test("the close (X) button is inside the card frame, not outside", () => {
 });
 
 test("the X button has an aria-label and is a real <button>", () => {
-  // A real button is required so keyboard users can reach it.
+  // A real button is required so keyboard users can reach it. Wave 14: the
+  // pack GlassButton renders a native <button type="button"> (icon disc).
   assert.match(
     src,
-    /<button[\s\S]{0,400}data-premium-gate-close[\s\S]{0,400}<\/button>/,
-    "the X must be a real <button> element",
+    /<GlassButton[\s\S]{0,400}data-premium-gate-close[\s\S]{0,400}<\/GlassButton>/,
+    "the X must be the pack Glass Button (a real <button>)",
   );
   assert.match(
     src,
@@ -141,19 +142,16 @@ test("the gate never uses the old fixed h-10 w-10 perk icon size", () => {
 });
 
 test("the gate keeps the responsive data-premium-gate-modal hook for modal mode", () => {
-  // Modal mode needs its own hook so the contract can pin that:
-  //  - the modal mounts a centred card (sm:items-center)
-  //  - mobile uses items-end (bottom-sheet)
-  //  - the inner card width is fluid (width: min(100vw, 640px))
+  // Wave 14: modal mode is the pack Glass Sheet from the bottom edge on every
+  // breakpoint (websiteglass.com glass-sheet); the column stays fluid
+  // (width: min(100vw, 640px), centred with mx-auto).
   assert.match(src, /data-premium-gate-modal/);
-  assert.match(
-    src,
-    /sm:items-center/,
-    "the modal must switch from bottom sheet (mobile) to centred card (>= sm)",
-  );
+  assert.match(src, /<GlassSheetContent[\s\S]{0,200}side="bottom"/);
+  assert.match(src, /from "\.\.\/ui\/glass-sheet"/);
+  assert.match(src, /mx-auto[^"]*\[width:min\(100vw,640px\)\]/);
 });
 
-test("the gate renders a single dominant gradient CTA (not a flat coupon)", () => {
+test("the gate renders a single dominant CTA (not a flat coupon)", () => {
   // Top-tier design requires: ONE primary CTA that fills the width,
   // tier comparison, social-proof / value-prop block, and a single
   // gradient headline.
@@ -167,6 +165,9 @@ test("the gate renders a single dominant gradient CTA (not a flat coupon)", () =
     /className="dc-premium-cta[^"]*"/,
     "the CTA must use the .dc-premium-cta class",
   );
+  // Wave 14: the CTA and the dismiss are the pack Glass Button (capsule).
+  assert.match(src, /<GlassButton\s+variant="capsule"\s+onClick=\{onViewSubscription\}/);
+  assert.match(src, /<GlassButton\s+variant="capsule"\s+onClick=\{onClose\}/);
   // Tier rows
   assert.match(
     src,
@@ -316,20 +317,20 @@ test("premium gate animations respect prefers-reduced-motion", () => {
 // ---------------------------------------------------------------------------
 
 test("modal overlay portals to document.body so a parent frame cannot clip it", () => {
-  assert.match(src, /createPortal/);
-  assert.match(src, /document\.body/);
+  // Wave 14: the pack sheet owns the portal (createPortal → document.body),
+  // the scrim, Escape / scrim dismissal and the body scroll lock.
+  const sheet = fs.readFileSync("src/components/ui/glass-sheet.tsx", "utf8");
+  assert.match(sheet, /createPortal\(/);
+  assert.match(sheet, /document\.body/);
+  assert.match(src, /<GlassSheet open=\{open\} onOpenChange=/);
   assert.match(src, /lockBodyScroll/);
 });
 
-test("modal overlay uses a light indigo scrim, not a solid black backdrop", () => {
-  assert.match(src, /bg-indigo-950\/30/);
+test("modal overlay uses the pack sheet's own scrim, not a hand-painted backdrop", () => {
   assert.doesNotMatch(src, /bg-slate-950\/60/);
   assert.doesNotMatch(src, /bg-black\/55/);
-  assert.match(
-    css,
-    /rgba\(49,\s*46,\s*129,\s*0\.28\)/,
-    "CSS must pin a translucent indigo scrim so the page stays visible behind the card",
-  );
+  assert.doesNotMatch(src, /bg-indigo-950\/30/);
+  assert.doesNotMatch(src, /backdrop-blur/);
 });
 
 test("modal card is a flex column with min-h-0 so overflow scrolls inside, not off-screen", () => {

@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Wave 14: the pack's sheet / dialog / command / toast use tw-animate-css
+   utilities (`animate-in fade-in-0 slide-in-from-bottom-2 …`). */
+@import "tw-animate-css";
 
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
@@ -2252,66 +2255,19 @@ html.light .dc-glass-dark {
 }
 
 /* ---------- FlowPath glass surfaces ----------
-   Scoped under `.flowpath-app` so the theme-aware surface always wins over the
-   dark `.glass-panel` defined in landing.css (which loads after index.css and
-   would otherwise pin the FlowPath header to a black background even in light
-   mode). The provided design zip ships a single index.css, so this conflict
-   did not exist there; scoping reproduces the same result in this app. */
-.flowpath-app .glass-panel {
-  background: var(--fp-panel);
-  backdrop-filter: blur(22px) saturate(140%);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  border: 1px solid var(--fp-border);
-  box-shadow:
-    0 1px 0 var(--fp-border) inset,
-    var(--fp-card-shadow);
-  transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
-}
-
-.flowpath-app .glass-panel-strong {
-  background: var(--fp-surface-strong);
-  backdrop-filter: blur(28px) saturate(150%);
-  -webkit-backdrop-filter: blur(28px) saturate(150%);
-  border: 1px solid var(--fp-border);
-  box-shadow:
-    0 1px 0 var(--fp-border) inset,
-    var(--fp-strong-shadow);
-  transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
-}
+   Wave 14: `.flowpath-app .glass-panel` / `.glass-panel-strong` are gone —
+   every FlowPath card / sheet / radial item renders the pack GlassSurface
+   (websiteglass.com values) directly in JSX, so there is no theme-aware
+   hand-painted plate left to scope. `.flowpath-app` stays as the theme
+   scope for the `--fp-*` ink tokens. */
 
 .fp-overlay {
   background: var(--fp-overlay);
   backdrop-filter: blur(2px);
 }
 
-/* ---------- FlowPath background ambience ---------- */
-.fp-bg-grid {
-  background-image:
-    linear-gradient(to right, var(--fp-grid-line) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--fp-grid-line) 1px, transparent 1px);
-  background-size: 46px 46px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 40%, transparent 100%);
-}
-
-@keyframes fp-drift {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(2%, -3%, 0) scale(1.05); }
-  100% { transform: translate3d(0, 0, 0) scale(1); }
-}
-
-.fp-orb {
-  animation: fp-drift 22s ease-in-out infinite;
-  will-change: transform;
-}
-
-@keyframes fp-particle-float {
-  0%, 100% { transform: translateY(0) translateX(0); opacity: var(--op, 0.5); }
-  50% { transform: translateY(-18px) translateX(6px); opacity: calc(var(--op, 0.5) * 1.4); }
-}
-
-.fp-particle {
-  animation: fp-particle-float linear infinite;
-}
+/* ---------- FlowPath background ambience: removed in Wave 14 (A8) — the
+   canvas sits on the app backdrop; no grid / orbs / particles. ---------- */
 
 /* ---------- FlowPath node pulse ---------- */
 @keyframes fp-pulse-ring {
@@ -2427,7 +2383,7 @@ html.light .dc-glass-dark {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fp-orb, .fp-particle, .fp-pulse::before, .fp-floaty, .fp-shimmer {
+  .fp-pulse::before, .fp-floaty, .fp-shimmer {
     animation: none !important;
   }
 }
@@ -5110,22 +5066,8 @@ html[data-course-player-active="true"] {
   }
 }
 
-/* The modal mounts after the page body so its animation runs after the
-   parent flex resolves — the entry happens at the card's real position. */
-.dc-premium-modal .dc-premium-modal-inner {
-  animation: dc-premium-modal-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes dc-premium-modal-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
+/* Wave 14: the modal mode is the pack GlassSheet (bottom) — its slide-in
+   is the sheet's own, so the old `.dc-premium-modal` entrance is gone. */
 
 /* Mobile bottom-sheet only: the sheet is a flex child that fills the
    available height of the backdrop (which is `flex items-end` for
@@ -5148,49 +5090,25 @@ html[data-course-player-active="true"] {
 .dc-premium-perk:hover {
   transform: translateY(-1px);
   border-color: rgb(165 180 252 / 0.6);
-  box-shadow: 0 6px 18px -10px rgba(79, 70, 229, 0.35),
-    0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
-/* CTA press feedback — an extra-satisfying tap. */
+/* CTA — a pack GlassButton (capsule); no extra highlight is painted over
+   the registry material. The class only remains as the contract hook. */
 .dc-premium-cta {
   position: relative;
-  overflow: hidden;
-}
-
-.dc-premium-cta::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    circle at var(--dc-cta-x, 50%) var(--dc-cta-y, 50%),
-    rgba(255, 255, 255, 0.6),
-    transparent 55%
-  );
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  pointer-events: none;
-}
-
-.dc-premium-cta:hover::after {
-  opacity: 1;
 }
 
 /* Close button focus ring + reduce-motion support. */
 .dc-premium-close:focus-visible {
   outline: 3px solid rgb(255 255 255);
   outline-offset: 2px;
-  box-shadow:
-    0 0 0 5px rgb(99 102 241 / 0.55),
-    0 8px 20px -6px rgba(99, 102, 241, 0.55);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .dc-premium-page,
   .dc-premium-sheet,
   .dc-premium-modal-inner,
-  .dc-premium-perk,
-  .dc-premium-cta::after {
+  .dc-premium-perk {
     animation: none !important;
     transition: none !important;
   }
@@ -5679,14 +5597,12 @@ html.light {
    desktop: lighter indigo scrim, width cap, 100vh→100dvh height cap,
    inner scroll. */
 
-.dc-premium-modal,
+/* Wave 14: the premium gate's scrim is the pack GlassSheet's own
+   (`bg-black/50`); only the PDP module-select overlay keeps this rule. */
 [data-pdp-module-select-overlay] {
   /* Beat tablet `* { max-width: 100% }` so a portalled overlay is not
      squeezed to a parent width of 0 / stretched to 100vw of a padded box. */
   max-width: none !important;
-  background: rgba(49, 46, 129, 0.28) !important;
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -5869,9 +5785,6 @@ html.light {
        shell pages and clips its own decorations;
      • the fixed bottom dock centers over the CONTENT column, not the
        whole viewport (which would offset it by half the rail width). */
-.dc-desktop-shell [data-fp-ambient] {
-  position: absolute;
-}
 .dc-desktop-shell .flowpath-app {
   border-radius: 24px;
   overflow: clip;

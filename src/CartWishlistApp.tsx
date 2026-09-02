@@ -1,6 +1,5 @@
 import Header from "./components/Header";
 import BottomNav from "./cartWishlist/components/BottomNav";
-import Toast from "./cartWishlist/components/Toast";
 import CartPage from "./cartWishlist/pages/CartPage";
 import FavoritesPage from "./cartWishlist/pages/FavoritesPage";
 import type { Product, TabKey } from "./cartWishlist/types";
@@ -54,7 +53,8 @@ export default function CartWishlistApp({
         />
 
         <div className="relative flex flex-1 flex-col overflow-hidden bg-transparent">
-          <Toast message={toast} />
+          {/* Wave 14: toasts render through the pack GlassToaster (src/main.tsx). */}
+          {toast ? <span className="sr-only" role="status">{toast}</span> : null}
           {activeTab === "favorites" && (
             <FavoritesPage
               favoriteProducts={favoriteProducts}

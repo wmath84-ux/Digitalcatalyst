@@ -102,11 +102,11 @@ export default function PortraitOnlyGuard() {
       }}
     >
       <div className="app-portrait-card">
-        <div className="mx-auto grid h-20 w-20 place-items-center rounded-full border border-white/10 bg-white/5 shadow-[0_0_50px_-10px_rgba(129,140,248,0.35)]">
+        <div className="mx-auto grid h-20 w-20 place-items-center rounded-full border border-white/10">
           <RotateCcw className="app-rotate-hint h-9 w-9 text-violet-300 animate-pulse" />
         </div>
         <h2 className="mt-6 text-xl font-black tracking-tight">Rotate your phone</h2>
-        <p className="mx-auto mt-2 max-w-[280px] text-sm leading-relaxed text-slate-300">
+        <p className="mx-auto mt-2 max-w-[280px] text-sm leading-relaxed text-white/75">
           {appName} is designed for portrait mode. Please rotate your device to continue.
           <br />
           <span className="mt-2 inline-block text-xs text-violet-300">
