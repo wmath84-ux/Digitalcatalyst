@@ -67,7 +67,7 @@ test("checkout keeps its identity colours and gains only the gloss", () => {
   assert.doesNotMatch(pg, /from-indigo-600 to-violet-700/);
   // pay button: emerald paint kept, pack gloss added *behind* the content
   assert.match(pg, /bg-emerald-600/);
-  assert.match(pg, /<GlassSurface tint=\{0\.7\} radius=\{16\} className="pointer-events-none absolute inset-0" \/>/);
+  assert.match(pg, /<GlassSurface className="pointer-events-none absolute inset-0" \/>/); // pack defaults (websiteglass.com): tint 0.5, blur 14, radius 16
   assert.match(pg, /<span className="relative z-10 flex items-center justify-center gap-2">/);
   assert.match(pg, /disabled=\{busy\}/);
   assert.match(pg, /disabled:cursor-wait/);

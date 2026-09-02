@@ -377,7 +377,7 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
           {/* Checkout's money button keeps its emerald identity (it is the one
               colour a user is told to trust) and wears the pack's specular
               layer over it — frost + rim + sheen, content above the gloss. */}
-          <GlassSurface tint={0.7} radius={16} className="pointer-events-none absolute inset-0" />
+          <GlassSurface className="pointer-events-none absolute inset-0" />
           <span className="relative z-10 flex items-center justify-center gap-2">
             {busy ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <CreditCard className="h-5 w-5" />}
             {finalPrice === 0 ? "Unlock free access" : busy ? "Please wait…" : `Pay securely — ${currency}${finalPrice.toLocaleString("en-IN")}`}
