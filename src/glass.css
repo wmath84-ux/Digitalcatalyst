@@ -733,3 +733,31 @@ html[data-glass="on"] [class*="bg-white"]:not([class*="bg-white/"]) {
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   backdrop-filter: blur(14px) saturate(140%);
 }
+
+/* ── Part 1g · the last CSS-file surfaces: course, flowpath, chrome, revision ─
+ * These paint their backgrounds in src/index.css (not via bg-white/bg-gradient
+ * classes), so the earlier rules couldn't reach them. Under glass the course
+ * cards/surfaces, revision cards and the desktop topbar/rail become the same
+ * 55%-white frost; the FlowPath background grid and the mobile-header / footer
+ * glow gradients are removed; the premium CTA's gradient overlay goes solid.
+ * The .dc-glass* material sheens are intentionally kept (that IS the glass).
+ * Gated on data-glass="on"; ?glass=off restores everything. */
+html[data-glass="on"] [data-course-mindmap-map-card],
+html[data-glass="on"] [data-course-notes-grid] [data-course-note],
+html[data-glass="on"] .course-audio-surface,
+html[data-glass="on"] .course-image-surface,
+html[data-glass="on"] .rev-card,
+html[data-glass="on"] .dc-desktop-shell [data-desktop-topbar],
+html[data-glass="on"] .dc-desktop-shell [data-desktop-rail] {
+  background: rgb(var(--dc-paper-on-ink) / 0.55) !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+html[data-glass="on"] .fp-bg-grid,
+html[data-glass="on"] .mobile-header-glow::before,
+html[data-glass="on"] .mobile-header-glow::after,
+html[data-glass="on"] .dc-footer-glow::before,
+html[data-glass="on"] .dc-premium-cta::after {
+  display: none !important;
+}
