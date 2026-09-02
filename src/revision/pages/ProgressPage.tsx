@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import PageShell from "../components/PageShell";
 import { Card, EmptyState } from "../components/ui";
+import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 import { ChartIcon, CheckIcon, FlameIcon, SparklesIcon, TrophyIcon, XIcon } from "../components/icons";
 import { getProgressData } from "../engine/statsService";
 
@@ -31,7 +32,7 @@ function BarChart({ data }: { data: { label: string; accuracy: number; attempted
           <div key={`${d.label}-${i}`} className="flex flex-1 flex-col items-center gap-1.5">
             <div className="flex h-32 w-full items-end">
               <div
-                className={`w-full rounded-t-md transition-[height] duration-300 ease-out ${d.attempted === 0 ? "bg-white/[0.12]" : "bg-gradient-to-t from-indigo-500 to-violet-400"}`}
+                className={`w-full rounded-t-md transition-[height] duration-300 ease-out ${d.attempted === 0 ? "bg-white/[0.12]" : "bg-indigo-600"}`}
                 style={{ height: `${heightPct}%` }}
                 title={`${d.attempted} attempted · ${d.accuracy}% accuracy`}
               />
@@ -90,32 +91,25 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
     <PageShell route={route} title="Progress" subtitle="Your learning journey" mergeIntoMainHeader>
       <div data-rev-layout="progress" className="animate-fade-in space-y-4 px-4 py-4 pb-8 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-3 lg:px-0 lg:py-0 lg:pb-0 lg:max-w-[1200px] lg:mx-auto">
         <div data-rev-panel="primary" className="lg:col-span-4 lg:space-y-3"><div data-rev-total-grid className="grid grid-cols-2 gap-2.5 lg:gap-2">
-          <TotalCard icon={<CheckIcon className="h-5 w-5 text-indigo-600" />} label="Tests Completed" value={data.totals.testsCompleted} />
-          <TotalCard icon={<ChartIcon className="h-5 w-5 text-emerald-600" />} label="Overall Accuracy" value={`${data.totals.overallAccuracy}%`} />
-          <TotalCard icon={<SparklesIcon className="h-5 w-5 text-sky-600" />} label="Questions Attempted" value={data.totals.questionsAttempted} />
-          <TotalCard icon={<XIcon className="h-5 w-5 text-rose-600" />} label="Incorrect Answers" value={data.totals.questionsIncorrect} />
-          <TotalCard icon={<TrophyIcon className="h-5 w-5 text-amber-600" />} label="Mastered" value={data.totals.masteredCount} />
-          <TotalCard icon={<FlameIcon className="h-5 w-5 text-orange-600" />} label="Current Streak" value={`${data.totals.currentStreak}d`} />
+          <TotalCard icon={<CheckIcon className="h-5 w-5 text-indigo-300" />} label="Tests Completed" value={data.totals.testsCompleted} />
+          <TotalCard icon={<ChartIcon className="h-5 w-5 text-emerald-300" />} label="Overall Accuracy" value={`${data.totals.overallAccuracy}%`} />
+          <TotalCard icon={<SparklesIcon className="h-5 w-5 text-sky-300" />} label="Questions Attempted" value={data.totals.questionsAttempted} />
+          <TotalCard icon={<XIcon className="h-5 w-5 text-rose-300" />} label="Incorrect Answers" value={data.totals.questionsIncorrect} />
+          <TotalCard icon={<TrophyIcon className="h-5 w-5 text-amber-300" />} label="Mastered" value={data.totals.masteredCount} />
+          <TotalCard icon={<FlameIcon className="h-5 w-5 text-orange-300" />} label="Current Streak" value={`${data.totals.currentStreak}d`} />
         </div></div>
 
         <div data-rev-panel="secondary" className="space-y-4 lg:col-span-8 lg:space-y-3">
         <Card>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-[15px] font-bold text-white lg:text-[14px]">Activity</h2>
-            <div className="flex rounded-full bg-slate-100 p-0.5 text-xs font-semibold">
+            <GlassToggleGroup value={range} onValueChange={(next) => setRange(next as RangeTab)} aria-label="Activity range" className="text-xs font-semibold">
               {RANGE_TABS.map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  onClick={() => setRange(r.value)}
-                  className={`min-h-[30px] rounded-full px-3 transition ${
-                    range === r.value ? "bg-white text-indigo-600 shadow-sm" : "text-white/75"
-                  }`}
-                >
+                <GlassToggleItem key={r.value} value={r.value} className="min-h-[30px] px-3">
                   {r.label}
-                </button>
+                </GlassToggleItem>
               ))}
-            </div>
+            </GlassToggleGroup>
           </div>
           {/* `key={range}` remounts the chart on tab change so the exit/enter
               of swapped bars can't flicker on mobile compositing. */}
@@ -138,8 +132,8 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
               {data.activityHistory.map((a, idx) => (
                 <div key={`${a.type}-${a.refId}-${idx}`} className="flex items-start gap-3">
                   <div
-                    className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-sm ${
-                      a.type === "test" ? "bg-indigo-100 text-indigo-700" : "bg-emerald-100 text-emerald-700"
+                    className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl  ${
+                      a.type === "test" ? "bg-indigo-500/20 text-indigo-200" : "bg-emerald-500/20 text-emerald-200"
                     }`}
                   >
                     {a.type === "test" ? <ChartIcon className="h-4.5 w-4.5" /> : <SparklesIcon className="h-4.5 w-4.5" />}

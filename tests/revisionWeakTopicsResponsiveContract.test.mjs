@@ -84,7 +84,7 @@ test("tablet landscape uses the same 7-5 split as desktop, compacted", () => {
 
 test("error banner spans the full grid row on desktop", () => {
   assert.match(page, /data-rev-banner/);
-  assert.match(page, /order-first flex items-center gap-2 rounded-2xl bg-rose-100\/70[^"]*lg:col-span-12/);
+  assert.match(page, /order-first flex items-center gap-2 rounded-2xl bg-rose-500\/20[^"]*lg:col-span-12/);
 });
 
 test("phone ergonomics are untouched", () => {

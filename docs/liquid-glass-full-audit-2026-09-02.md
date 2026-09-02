@@ -374,3 +374,14 @@ Owner refinement before the wave: **pack components at their defaults** (no `.dc
 - Home cards: `ContinueLearning` → **GlassCard**, home `ProductCard` → **GlassSurface**, hero CTA → **GlassButton capsule**.
 - Ink pass (64 files, `/tmp/inkmap_safe.py`): `text-slate-900…400` → `text-white…white/55`, `bg-slate-50/100/200`, `bg-white/60–95` → `bg-white/[0.06–0.12]`, light borders → `border-white/10`, page-assuming shadows dropped. Coloured semantics (badges, coupons, `text-rose-*`, `bg-emerald-*`, brand fills) untouched. Course player + FlowPath deferred to A8 (own theme).
 - Re-pinned tests: WaveTwo l.57 (`doesNotMatch tintColor`) + l.133 (`hover:bg-white/[0.08]`), homeHeaderGlassCollapse l.75–77 (chrome token values), revisionTestBankCardContentHeight l.61.
+
+### A4 — Revision (bank · AI config · AI generate · test player · results · progress · profile) ✅
+
+- `src/revision/components/ui.tsx`: `Card` → pack **GlassSurface** at Glass Card values (tint 0.4 · radius 20); `.rev-card` is now a transparent sizing hook. `SecondaryButton` → **GlassButton capsule** (`size="sm"` for Test Bank rows). `PrimaryButton` solid indigo (meaning-carrying, no gradient). Badges/ProgressBar re-inked to translucent tones; ErrorState retry → GlassButton.
+- Modals: ExitGuard, TestBankLimitGate, DeleteConfirmation → pack **Dialog**; FilterSheet → **GlassSheet side="bottom"**; Test player submit dialog → GlassSurface at Dialog values (its frame-scoped positioning is contract-pinned).
+- Headers/toolbars: `AppHeader` → GlassSurface radius 0 + GlassButton back; `[data-revision-app-header]` no longer paints. Test Bank toolbars keep their `dc-glass-toolbar` hooks (tests) — the hook now resolves to the pack material (`src/index.css` §Legacy hooks: rgba(60,62,68,.21) · blur 9.8px · sat 1.3 · pack rim, light material under `html.light`).
+- Search → **GlassInput**; filter/nav/close discs → **GlassButton**; range + preset chips → **GlassToggleGroup**; text inputs → `.dc-field` (now Glass Input's material, white ink).
+- Dashboard hero cards, StatChip, Profile hero/Configure/Import/Quick-tips → GlassSurface/GlassCard. Provider brand tiles (`aiConfig.ts`) solid colours (no gradient).
+- `src/glass.css`: all light-page re-inks (slate ink on inputs/segments/selects/tiles/fields/choice, white chrome frost 78–82 %, gradient droplets) replaced with the pack's own dark states; rail uses `--dc-chrome-glass`.
+- Fixed invalid classes the earlier inkmap produced (`border-white/10/70` → `border-white/10`) across src.
+- Tests re-pinned: WaveFour/ProgressStableCards (Card = GlassSurface), ProfileCards, WaveFive (solid switch accent), WeakTopics banner tone, DashboardVerticalScale (`[data-rev-plan-cta] button`).

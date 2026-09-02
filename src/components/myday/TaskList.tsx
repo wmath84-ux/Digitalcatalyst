@@ -165,7 +165,7 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
             {f.label}
             <span className={cn(
               "ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold",
-              filter === f.key ? "bg-white/20 text-white" : "bg-white/[0.12]/60 text-white/55",
+              filter === f.key ? "bg-white/20 text-white" : "bg-white/[0.12] text-white/55",
             )}>
               {counts[f.key]}
             </span>

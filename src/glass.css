@@ -210,8 +210,8 @@ html[data-glass="on"] :where(.liquid-metal-button) {
  * an indigo wash; it targets the pill element inside the list we tag from
  * src/components/ui/PageTabs.tsx. */
 html[data-glass="on"] :where(.dc-page-tabs-list) div[aria-hidden] {
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.2), rgba(56, 189, 248, 0.24)) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 6px 16px -8px rgba(79, 70, 229, 0.5) !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -231,17 +231,17 @@ html[data-glass="on"] :where(.dc-page-tabs-list) div[aria-hidden] {
  * The right padding leaves room for the clear chip, which stays an absolutely
  * positioned sibling in the shell (the registry item has no slot for it). */
 html[data-glass="on"] .dc-glass-input input {
-  color: rgb(30 41 59); /* slate-800 */
-  caret-color: rgb(79 70 229);
+  /* Phase A: the pack's own white ink; only the clear-chip padding is app-side. */
+  color: #fff;
   padding-right: 2rem;
 }
 
 html[data-glass="on"] .dc-glass-input input::placeholder {
-  color: rgb(148 163 184); /* slate-400 */
+  color: rgb(255 255 255 / 0.45);
 }
 
 html[data-glass="on"] .dc-glass-input span.shrink-0 {
-  color: rgb(100 116 139); /* slate-500 — the search glyph */
+  color: rgb(255 255 255 / 0.6);
 }
 
 /* The focus ring: the pack paints a white inset hairline, which disappears on
@@ -249,8 +249,8 @@ html[data-glass="on"] .dc-glass-input span.shrink-0 {
  * glow layer carries an inline box-shadow (set once by the vendored item). */
 html[data-glass="on"] .dc-glass-input > div > div[aria-hidden] {
   box-shadow:
-    inset 0 0 0 1.5px rgba(99, 102, 241, 0.45),
-    0 0 18px -4px rgba(99, 102, 241, 0.35) !important;
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.35),
+    0 0 18px -4px rgba(255, 255, 255, 0.2) !important;
 }
 
 /* Header + top-bar action discs: on a light background the white frost needs a
@@ -258,11 +258,12 @@ html[data-glass="on"] .dc-glass-input > div > div[aria-hidden] {
  * stacks its layers in a fixed order — backdrop, tint, sheen, rim, content —
  * so the 4th `aria-hidden` div is the rim layer this rule re-inks. */
 html[data-glass="on"] :where(.dc-chrome-disc) > div[aria-hidden]:nth-of-type(4) {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(148, 163, 184, 0.28);
+  /* Phase A: the pack's own rim — nothing re-inked. */
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 html[data-glass="on"] :where(.dc-chrome-disc):hover > div[aria-hidden]:nth-of-type(4) {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1px rgba(99, 102, 241, 0.4);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -280,10 +281,8 @@ html[data-glass="on"] :where(.dc-chrome-disc):hover > div[aria-hidden]:nth-of-ty
  * `GlassCard` (src/components/ui/GlassCard.tsx) carries the hook class and
  * re-inks the label colours with tailwind-merge, so only the rim is done here. */
 html[data-glass="on"] :where(.dc-glass-card) > div[aria-hidden]:nth-of-type(4) {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 0 0 1px rgba(148, 163, 184, 0.22),
-    0 18px 42px -24px rgba(79, 70, 229, 0.42);
+  /* Phase A: the pack's own rim. */
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 /* `glass-toggle-group` used as a LIGHT segmented control (the store filter row
@@ -293,18 +292,16 @@ html[data-glass="on"] :where(.dc-glass-card) > div[aria-hidden]:nth-of-type(4) {
  * indicator lives inside it, which is why it still tracks a horizontally
  * scrolled row. */
 html[data-glass="on"] .dc-segment > div:last-child > div[aria-hidden] {
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.92), rgba(124, 58, 237, 0.92)) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 6px 16px -8px rgba(79, 70, 229, 0.55) !important;
+  background: rgba(79, 70, 229, 0.92) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
 }
 
 html[data-glass="on"] .dc-segment [data-toggle] {
-  color: rgb(71 85 105); /* slate-600 */
+  color: rgb(255 255 255 / 0.65);
 }
 
 html[data-glass="on"] .dc-segment [data-toggle]:hover {
-  color: rgb(15 23 42);
+  color: #fff;
 }
 
 html[data-glass="on"] .dc-segment [data-toggle][aria-pressed="true"] {
@@ -316,36 +313,38 @@ html[data-glass="on"] .dc-segment [data-toggle][aria-pressed="true"] {
  * are re-inked against that. Both blocks are unlayered, which is what lets them
  * beat the pack's utility classes without editing the vendored file. */
 html[data-glass="on"] .dc-glass-select {
-  border-color: rgba(226, 232, 240, 1);
-  background: rgba(255, 255, 255, 0.7);
-  color: rgb(30 41 59);
-  backdrop-filter: blur(10px) saturate(1.3);
+  /* Phase A: the pack's GlassSurface dark material (tint 0.5 defaults). */
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(60, 62, 68, 0.21);
+  color: #fff;
+  backdrop-filter: blur(9.8px) saturate(1.3);
+  -webkit-backdrop-filter: blur(9.8px) saturate(1.3);
 }
 
 html[data-glass="on"] .dc-glass-select:hover {
-  border-color: rgba(165, 180, 252, 1);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 html[data-glass="on"] .dc-glass-select svg {
-  color: rgb(100 116 139);
+  color: rgb(255 255 255 / 0.6);
 }
 
 html[data-glass="on"] .dc-glass-select-pop [role="option"] {
-  color: rgb(51 65 85);
+  color: rgb(255 255 255 / 0.85);
 }
 
 html[data-glass="on"] .dc-glass-select-pop [role="option"]:hover,
 html[data-glass="on"] .dc-glass-select-pop [role="option"]:focus {
-  background: rgba(99, 102, 241, 0.12);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 html[data-glass="on"] .dc-glass-select-pop [role="option"][aria-selected="true"] {
-  color: rgb(67 56 202);
+  color: #fff;
   font-weight: 700;
 }
 
 html[data-glass="on"] .dc-glass-select-pop [role="option"] svg {
-  color: rgb(79 70 229);
+  color: rgb(165 180 252);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -360,35 +359,24 @@ html[data-glass="on"] .dc-glass-select-pop [role="option"] svg {
  * hairline, i.e. invisible on `bg-white`. Re-inked here — `:not([aria-checked])`
  * so the pack's own accent-filled *checked* state (a utility class, and correct
  * on light) is left completely alone. */
+/* Phase A: these hooks no longer re-ink anything — the pack's own dark-page
+   states are exactly what the dark backdrop needs. The selectors stay so the
+   focus ring + reduced-motion rules below keep finding the controls. */
 html[data-glass="on"] :where(.dc-choice):not([aria-checked="true"]) {
-  border-color: rgb(203 213 225);
-  background-color: rgba(255, 255, 255, 0.72);
-}
-
-html[data-glass="on"] :where(.dc-choice):not([aria-checked="true"]):hover {
-  border-color: rgb(129 140 248);
+  border-color: rgb(255 255 255 / 0.2);
 }
 
 html[data-glass="on"] :where(.dc-tile):not([data-selected]) {
-  border-color: rgb(226 232 240);
-  background-color: rgba(255, 255, 255, 0.55);
+  border-color: rgb(255 255 255 / 0.12);
 }
 
-html[data-glass="on"] :where(.dc-tile):not([data-selected]):hover {
-  border-color: rgb(165 180 252);
-  background-color: rgba(255, 255, 255, 0.8);
-}
-
-/* Selected swatches get the pack's white ring, which vanishes on a white page. */
 html[data-glass="on"] :where(.dc-swatch[aria-checked="true"]) {
-  --tw-ring-color: rgb(99 102 241);
-  --tw-ring-offset-color: #fff;
+  --tw-ring-color: rgb(255 255 255);
+  --tw-ring-offset-color: #0a0c12;
 }
 
-/* Accordions / sheets / menus used as light panels: the chevron and the label
-   hierarchy are re-inked, the frost + rim stay the pack's. */
 html[data-glass="on"] :where(.dc-panel) svg {
-  color: rgb(100 116 139);
+  color: rgb(255 255 255 / 0.6);
 }
 
 /* ── Wave 4 · learning surfaces ───────────────────────────────────────────
@@ -401,13 +389,9 @@ html[data-glass="on"] :where(.dc-panel) svg {
    press gel and the sheen stay the pack's, and the unselected state keeps its
    `:not([data-selected])` guard above so the pack's own hover still shows. */
 html[data-glass="on"] :where(.dc-tile)[data-selected] {
-  border-color: rgb(99 102 241);
-  background-color: rgba(255, 255, 255, 0.94);
-  --tw-ring-color: rgb(99 102 241 / 0.3);
-  --tw-ring-offset-color: #fff;
-}
-html[data-glass="on"] :where(.dc-tile)[data-selected]:hover {
-  background-color: #fff;
+  /* Phase A: the pack's own selected state (accent ring + tint); only the ring
+     offset follows the dark page. */
+  --tw-ring-offset-color: #0a0c12;
 }
 
 /* A segment control used as a toolbar row (revision's Saved-Tests / Smart-
@@ -439,18 +423,24 @@ html[data-glass="on"] .dc-slider-on-dark > span:nth-child(3) {
    on the registry switch (its default is iOS green); `.dc-slider-violet` is the
    course player's seek bar, whose accent is violet everywhere in that surface. */
 html[data-glass="on"] :where(.dc-field) {
-  border-color: rgb(226 232 240 / 0.9);
-  background-color: rgba(255, 255, 255, 0.66);
-  backdrop-filter: blur(10px) saturate(1.5);
-  -webkit-backdrop-filter: blur(10px) saturate(1.5);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 1px 2px rgba(15, 23, 42, 0.05);
+  /* Phase A: Glass Input's material (tint 0.4 → rgba(60,62,68,0.168), blur
+     14·(0.4+0.4·0.6)=8.96px, saturate 1+0.6·0.4=1.24) on a real form field. */
+  color: #fff;
+  border-color: rgb(255 255 255 / 0.12);
+  background-color: rgba(60, 62, 68, 0.168);
+  backdrop-filter: blur(8.96px) saturate(1.24);
+  -webkit-backdrop-filter: blur(8.96px) saturate(1.24);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+html[data-glass="on"] :where(.dc-field)::placeholder {
+  color: rgb(255 255 255 / 0.45);
 }
 html[data-glass="on"] :where(.dc-field):focus {
-  background-color: rgba(255, 255, 255, 0.9);
-  border-color: rgb(129 140 248);
+  background-color: rgba(60, 62, 68, 0.21);
+  border-color: rgb(255 255 255 / 0.35);
 }
 html[data-glass="on"] .dc-switch[aria-checked="true"] > span:first-child {
-  background: linear-gradient(90deg, #4f46e5, #7c3aed);
+  background: #4f46e5;
 }
 html[data-glass="on"] .dc-slider-violet > span:nth-child(2) {
   background: #a78bfa !important;
@@ -467,16 +457,9 @@ html[data-glass="on"] :where(.dc-card) {
 /* The hero's action pills sit on a saturated gradient, so their frost has to
    read as a lens edge rather than as a grey box: top highlight, faint bottom
    inset, and the drop shadow pushed deep into the indigo behind them. */
+/* Phase A: the hero pills are GlassButtons now — the hook paints nothing. */
 html[data-glass="on"] :where(.dc-home-pill) {
-  border-color: rgba(255, 255, 255, 0.28);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
-    0 10px 24px -12px rgba(30, 27, 75, 0.55);
-}
-html[data-glass="on"] :where(.dc-home-pill):hover {
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.12));
+  background-image: none;
 }
 
 /* The amount card on checkout is brand paint, not glass — it only gets the
@@ -510,48 +493,17 @@ html[data-glass="on"] :where(.dc-field, .dc-glass-select, .dc-segment, .dc-tile,
   }
 }
 
-/* ── Wave 2 (v2) · fixed chrome surface over the Black Ice backdrop ──────────
- * The header and footer keep their position, their markup and every animation
- * (hide-on-scroll, collapse, dock behaviour) untouched; only their *surface*
- * changes, and only in CSS — the chrome TSX is not edited here, and
- * src/components/BottomNav.tsx + src/components/glass-dock/** are frozen, so
- * they get nothing at all (the mobile footer already sits fine on the backdrop).
- *
- * The frost is a translucent *white* over the dark backdrop on purpose: the
- * chrome's ink is dark slate (`text-slate-900`), so a light frost keeps it
- * ≥4.5:1 without touching a single label. The rim is an inset hairline drawn
- * with box-shadow (never `border`) so no fixed bar shifts by a pixel and the
- * hide-on-scroll / collapse geometry is bit-identical.
- * `?glass=off` drops every rule below and restores the pre-rollout paint.
- * --------------------------------------------------------------------------- */
-
-html[data-glass="on"] :where([data-site-header]) {
-  background-color: rgb(var(--dc-paper-on-ink) / 0.78);
-  box-shadow:
-    inset 0 -1px 0 rgb(var(--dc-paper-on-ink) / 0.28),
-    0 10px 28px -20px rgb(0 0 0 / 0.7);
-}
-
-/* The home header paints its own brand gradient + blur inline
-   (src/home/components/Header.tsx, pinned by homeHeaderGlassCollapse), so it
-   gets only the rim — its background is left alone. */
-html[data-glass="on"] :where([data-home-header]) {
-  box-shadow:
-    inset 0 -1px 0 rgb(var(--dc-paper-on-ink) / 0.28),
-    0 10px 28px -20px rgb(0 0 0 / 0.7);
-}
-
-/* Desktop rail + top bar are the fixed chrome on tablet-landscape / desktop. */
+/* ── Chrome surfaces ─────────────────────────────────────────────────────────
+ * Phase A: no paint here any more. The home header IS a GlassSurface, the
+ * shared/store header + desktop top bar take `--dc-chrome-glass` (index.css,
+ * numerically the pack's GlassSurface dark material) and the desktop rail
+ * shares that same token below. The old 78–82 % white frost is gone.
+ * (src/components/BottomNav.tsx + src/components/glass-dock/** stay frozen.) */
 html[data-glass="on"] :where([data-desktop-rail]) {
-  background-color: rgb(var(--dc-paper-on-ink) / 0.82);
-  box-shadow: inset -1px 0 0 rgb(var(--dc-paper-on-ink) / 0.28);
-}
-
-html[data-glass="on"] :where([data-desktop-topbar]) {
-  background-color: rgb(var(--dc-paper-on-ink) / 0.82);
-  box-shadow:
-    inset 0 -1px 0 rgb(var(--dc-paper-on-ink) / 0.28),
-    0 10px 28px -20px rgb(0 0 0 / 0.7);
+  background: var(--dc-chrome-glass);
+  backdrop-filter: var(--dc-chrome-glass-blur);
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur);
+  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.1);
 }
 
 /* ── Wave 3 · let the store float on the Black Ice backdrop ──────────────────

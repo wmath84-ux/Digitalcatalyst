@@ -210,7 +210,7 @@ export default function ModuleSelectModal({
 
 function PackageOpenIcon() {
   return (
-    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/[0.12]/70 text-white/55">
+    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/[0.12] text-white/55">
       <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8">
         <path d="M3 9.5 12 4l9 5.5" />
         <path d="M3 9.5v6L12 21l9-5.5v-6" />

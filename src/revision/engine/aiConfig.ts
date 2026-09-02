@@ -97,6 +97,7 @@ export type AIProviderMeta = {
   /** Short brand mark shown inside the provider tile. */
   mark: string;
   /** Gradient used for the brand tile. */
+  /** Solid brand tile colour (Phase A: no gradients anywhere). */
   gradient: string;
   /** Selected-card ring colour. */
   ring: string;
@@ -119,7 +120,7 @@ export const AI_PROVIDERS: AIProviderMeta[] = [
     name: "Google Gemini",
     tagline: "Google's fast Flash models",
     mark: "✦",
-    gradient: "from-sky-400 via-blue-500 to-indigo-600",
+    gradient: "bg-blue-500",
     ring: "ring-blue-500",
     accentText: "text-blue-600",
     accentBg: "bg-blue-50",
@@ -134,7 +135,7 @@ export const AI_PROVIDERS: AIProviderMeta[] = [
     name: "OpenAI",
     tagline: "GPT models — ChatGPT's maker",
     mark: "◐",
-    gradient: "from-emerald-400 via-teal-500 to-emerald-600",
+    gradient: "bg-teal-500",
     ring: "ring-emerald-500",
     accentText: "text-emerald-600",
     accentBg: "bg-emerald-50",
@@ -149,7 +150,7 @@ export const AI_PROVIDERS: AIProviderMeta[] = [
     name: "Anthropic",
     tagline: "Claude — best-in-class reasoning",
     mark: "✳",
-    gradient: "from-orange-400 via-amber-500 to-orange-600",
+    gradient: "bg-amber-500",
     ring: "ring-orange-500",
     accentText: "text-orange-600",
     accentBg: "bg-orange-50",
@@ -164,7 +165,7 @@ export const AI_PROVIDERS: AIProviderMeta[] = [
     name: "OpenRouter",
     tagline: "One key for 300+ models",
     mark: "◈",
-    gradient: "from-fuchsia-400 via-purple-500 to-violet-600",
+    gradient: "bg-purple-500",
     ring: "ring-purple-500",
     accentText: "text-purple-600",
     accentBg: "bg-purple-50",
@@ -179,7 +180,7 @@ export const AI_PROVIDERS: AIProviderMeta[] = [
     name: "Groq",
     tagline: "Blazing-fast open models",
     mark: "⚡",
-    gradient: "from-amber-400 via-orange-500 to-red-500",
+    gradient: "bg-orange-500",
     ring: "ring-orange-500",
     accentText: "text-orange-600",
     accentBg: "bg-orange-50",
@@ -194,7 +195,7 @@ export const AI_PROVIDERS: AIProviderMeta[] = [
     name: "Custom API",
     tagline: "Any OpenAI-compatible endpoint",
     mark: "⚙",
-    gradient: "from-slate-500 via-slate-600 to-slate-800",
+    gradient: "bg-slate-600",
     ring: "ring-slate-500",
     accentText: "text-slate-700",
     accentBg: "bg-slate-100",

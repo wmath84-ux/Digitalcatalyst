@@ -75,7 +75,7 @@ export default function RenewalStatusCard({
       {/* Remaining-window bar. Hidden once expired — nothing left to show. */}
       {!view.expired ? (
         <div className="mt-3">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.12]/70">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.12]">
             <div
               data-renewal-progress
               className={`h-full rounded-full transition-all ${tone.bar}`}

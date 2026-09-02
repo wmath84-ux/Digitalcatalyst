@@ -149,7 +149,7 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
                           : isNext
                             ? "border-slate-200 bg-white shadow-md shadow-slate-200/60 hover:border-sky-200"
                             : isPast
-                              ? "border-white/10/60 bg-white/[0.08] opacity-60"
+                              ? "border-white/10 bg-white/[0.08] opacity-60"
                               : "border-slate-200 bg-white shadow-sm shadow-slate-100/60 hover:border-sky-200",
                         isHighlighted && isPast && "opacity-100",
                       )}

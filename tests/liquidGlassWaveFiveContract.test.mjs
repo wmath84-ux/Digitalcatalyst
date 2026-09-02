@@ -74,7 +74,7 @@ test("profile + settings preference rows use the registry switch", () => {
   // brand identity lives in CSS, not in a forked component
   const css = read("src/glass.css");
   assert.match(css, /\.dc-switch\[aria-checked="true"\] > span:first-child/);
-  assert.match(css, /linear-gradient\(90deg, #4f46e5, #7c3aed\)/);
+  assert.match(css, /\.dc-switch\[aria-checked="true"\] > span:first-child \{\s*background: #4f46e5;/, "Phase A: solid accent, no gradient");
 });
 
 test("profile dialogs and fields take the pack surface and field ink", () => {

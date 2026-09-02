@@ -18,18 +18,14 @@ const ui = fs.readFileSync("src/revision/components/ui.tsx", "utf8");
 const progressPage = fs.readFileSync("src/revision/pages/ProgressPage.tsx", "utf8");
 const css = fs.readFileSync("src/index.css", "utf8");
 
-test("revision Card uses the stable .rev-card surface, not the blurred .dc-glass", () => {
-  assert.match(ui, /rev-card rounded-3xl p-4/);
-  // The Card function itself no longer renders a blurred glass surface.
-  // Confirm the Card function's own block is the stable surface (not the
-  // blurred glass); extract just the Card function and inspect it.
+test("revision Card is the pack GlassSurface; .rev-card is a sizing hook that paints nothing", () => {
   const cardFn = ui.slice(ui.indexOf("export function Card"), ui.indexOf("export function PrimaryButton"));
-  assert.match(cardFn, /rev-card rounded-3xl p-4/);
+  assert.match(cardFn, /<GlassSurface tint=\{0\.4\} radius=\{20\} className=\{`rev-card p-4 text-white/);
   assert.doesNotMatch(cardFn, /dc-glass/);
-  // The stable surface exists in CSS and carries no backdrop-filter.
+  // The hook exists in CSS, is transparent and carries no backdrop-filter of its own.
   assert.match(css, /\.rev-card\s*\{/);
-  assert.match(css, /\.rev-card[^}]*background:/);
-  assert.doesNotMatch(css, /\.rev-card[^}]*backdrop-filter/);
+  assert.match(css, /\.rev-card\s*\{[^}]*background:\s*transparent/);
+  assert.doesNotMatch(css, /\.rev-card\s*\{[^}]*backdrop-filter/);
 });
 
 test("Progress page animates once with the standard class and smooths chart swaps", () => {

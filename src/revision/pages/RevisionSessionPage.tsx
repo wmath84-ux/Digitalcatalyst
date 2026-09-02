@@ -150,7 +150,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
             <div key={question.id} className="animate-fade-in">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge tone={question.difficulty}>{question.difficulty}</Badge>
-                <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[11px] font-semibold text-white/85">
                   {question.subjectIcon} {question.subjectName} · {question.topicName}
                 </span>
               </div>
@@ -166,13 +166,13 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
                       onClick={() => selectOption(idx)}
                       className={`flex min-h-[56px] w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-[15px] font-medium transition active:scale-[0.99] ${
                         selected
-                          ? "border-indigo-600 bg-indigo-50 text-indigo-900"
-                          : "border-slate-300 bg-white text-slate-800 active:bg-slate-100"
+                          ? "border-indigo-600 bg-indigo-500/15 text-indigo-200"
+                          : "border-white/10 bg-white/[0.06] text-white/85 active:bg-white/[0.1]"
                       }`}
                     >
                       <span
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          selected ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-600"
+                          selected ? "bg-indigo-600 text-white" : "bg-white/[0.12] text-white/75"
                         }`}
                       >
                         {OPTION_LETTERS[idx]}
@@ -192,7 +192,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
             </div>
           )}
         </div>
-        <div className="flex gap-3 border-t border-slate-200 bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+        <div className="dc-glass-toolbar flex gap-3 border-t border-white/10 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
           <SecondaryButton onClick={goPrev} disabled={currentIndex === 0} className="flex-[1]">
             Previous
           </SecondaryButton>

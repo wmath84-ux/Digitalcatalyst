@@ -1,3 +1,4 @@
+import { GlassSurface } from "../../components/ui/glass";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from "react";
 import PageShell from "../components/PageShell";
 import { useExitGuard } from "../components/ExitGuardContext";
@@ -238,7 +239,7 @@ export default function TestPlayerPage({
             <div key={question.id} className="animate-fade-in">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge tone={question.difficulty}>{question.difficulty}</Badge>
-                <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[11px] font-semibold text-white/85">
                   {question.subjectIcon} {question.subjectName} · {question.topicName}
                 </span>
               </div>
@@ -254,13 +255,13 @@ export default function TestPlayerPage({
                       onClick={() => selectOption(idx)}
                       className={`flex min-h-[56px] w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-[15px] font-medium transition active:scale-[0.99] ${
                         selected
-                          ? "border-indigo-600 bg-indigo-50 text-indigo-900"
-                          : "border-slate-300 bg-white text-slate-800 active:bg-slate-100"
+                          ? "border-indigo-600 bg-indigo-500/15 text-indigo-200"
+                          : "border-white/10 bg-white/[0.06] text-white/85 active:bg-white/[0.1]"
                       }`}
                     >
                       <span
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          selected ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-600"
+                          selected ? "bg-indigo-600 text-white" : "bg-white/[0.12] text-white/75"
                         }`}
                       >
                         {OPTION_LETTERS[idx]}
@@ -282,7 +283,7 @@ export default function TestPlayerPage({
           )}
         </div>
 
-        <div className="flex gap-3 border-t border-slate-200 bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+        <div className="dc-glass-toolbar flex gap-3 border-t border-white/10 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
           <SecondaryButton onClick={goPrev} disabled={currentIndex === 0} className="flex-[1]">
             Previous
           </SecondaryButton>
@@ -325,8 +326,8 @@ function ReviewBeforeSubmit({
                 onClick={() => onJump(idx)}
                 className={`flex h-12 flex-col items-center justify-center rounded-xl border text-sm font-bold transition active:scale-95 ${
                   answered
-                    ? "border-indigo-300 bg-indigo-50 text-indigo-700"
-                    : "border-amber-300 bg-amber-50 text-amber-800"
+                    ? "border-indigo-400/30 bg-indigo-500/15 text-indigo-200"
+                    : "border-amber-400/30 bg-amber-500/15 text-amber-200"
                 }`}
               >
                 {idx + 1}
@@ -343,7 +344,7 @@ function ReviewBeforeSubmit({
           </span>
         </div>
       </div>
-      <div className="flex gap-3 border-t border-slate-200 bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+      <div className="dc-glass-toolbar flex gap-3 border-t border-white/10 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
         <SecondaryButton onClick={onBack} className="flex-1">
           Back
         </SecondaryButton>
@@ -426,29 +427,32 @@ function SubmitConfirmModal({
       }
     >
       <div
-        className={`absolute inset-0 bg-slate-950/50 backdrop-blur-sm ${isScoped ? "rounded-[1.5rem]" : ""}`}
+        className={`absolute inset-0 bg-black/50 backdrop-blur-[2px] ${isScoped ? "rounded-[1.5rem]" : ""}`}
         onClick={submitting ? undefined : onCancel}
         aria-hidden="true"
       />
-      <div
+      <GlassSurface
         role="dialog"
         aria-modal="true"
         aria-labelledby="rev-submit-title"
         data-rev-submit-dialog
-        className="custom-scrollbar relative flex w-full max-w-[min(100%,26rem)] flex-col overflow-hidden rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6"
+        tint={0.5}
+        radius={24}
+        className="custom-scrollbar relative w-full max-w-[min(100%,26rem)] overflow-hidden text-white"
+        contentClassName="flex flex-col p-5 sm:p-6"
         style={{
           maxHeight: isScoped && box ? "100%" : undefined,
           paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",
         }}
       >
-        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200 sm:hidden" />
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-white/[0.12] sm:hidden" />
+        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500/15 text-indigo-300">
           <CheckIcon className="h-7 w-7" />
         </div>
         <h3 id="rev-submit-title" className="text-center text-base font-semibold text-white sm:text-lg">Submit your test?</h3>
         {unansweredCount > 0 ? (
           <p className="mt-2 text-center text-sm leading-relaxed text-white/75">
-            You have <span className="font-semibold text-amber-600">{unansweredCount} unanswered question{unansweredCount === 1 ? "" : "s"}</span>{" "}
+            You have <span className="font-semibold text-amber-300">{unansweredCount} unanswered question{unansweredCount === 1 ? "" : "s"}</span>{" "}
             that will be marked as skipped. This can&apos;t be undone.
           </p>
         ) : (
@@ -457,7 +461,7 @@ function SubmitConfirmModal({
           </p>
         )}
         {errorMessage && (
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs font-medium text-rose-600">
+          <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs font-medium text-rose-300">
             <XIcon className="h-3.5 w-3.5" /> {errorMessage}
           </p>
         )}
@@ -469,7 +473,7 @@ function SubmitConfirmModal({
             {submitting ? "Submitting…" : "Submit"}
           </PrimaryButton>
         </div>
-      </div>
+      </GlassSurface>
     </div>
   );
 }

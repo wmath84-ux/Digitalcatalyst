@@ -136,7 +136,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
     <PageShell route={route} title="Bulk Import" subtitle="Paste a full revision plan" backHref="#/revision/profile">
       <div data-rev-layout="bulkimport" className="animate-fade-in space-y-4 px-4 py-4 pb-10 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
         {ready ? (
-          <Card className="overflow-hidden border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+          <Card className="overflow-hidden border-emerald-400/30">
             <div className="flex flex-col items-center gap-3 py-4 text-center">
               <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg">
                 <CheckIcon className="h-8 w-8" />
@@ -145,7 +145,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                 <h2 className="text-lg font-bold text-white">Test created! 🎉</h2>
                 <p className="mt-1 text-xs text-white/75">{ready.count} questions imported — saved to your Test Bank and live on your dashboard.</p>
                 {ready.pendingSync && (
-                  <p className="mt-1 text-[11px] font-semibold text-amber-700">
+                  <p className="mt-1 text-[11px] font-semibold text-amber-200">
                     Saved on this device. Cloud sync will finish automatically when you are online.
                   </p>
                 )}
@@ -153,17 +153,13 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
               <button
                 type="button"
                 onClick={() => navigate("#/revision")}
-                className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-[15px] font-bold text-white shadow-lg transition active:scale-[0.98]"
+                className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-[15px] font-bold text-white transition active:scale-[0.98]"
               >
                 Click & submit your score <ChevronRightIcon className="h-5 w-5" />
               </button>
-              <button
-                type="button"
-                onClick={() => navigate("#/revision/bank")}
-                className="flex min-h-[44px] w-full items-center justify-center rounded-2xl bg-white text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
-              >
-                Open Test Bank
-              </button>
+              <SecondaryButton onClick={() => navigate("#/revision/bank")}>
+                <span className="text-xs text-emerald-200">Open Test Bank</span>
+              </SecondaryButton>
               <button
                 type="button"
                 onClick={() => setReady(null)}
@@ -177,7 +173,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
           <>
             <Card>
               <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white">
                   <BookOpenIcon className="h-6 w-6" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -191,14 +187,14 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
 
               <div className="mt-4 space-y-3">
                 <input
-                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 outline-none focus:border-indigo-500"
+                  className="dc-field h-11 w-full rounded-xl border px-3 text-sm font-medium outline-none"
                   placeholder="Test name (optional)"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
                 <textarea
                   rows={9}
-                  className="w-full rounded-xl border border-slate-300 bg-white p-3 font-mono text-xs leading-relaxed text-slate-800 outline-none focus:border-indigo-500"
+                  className="dc-field w-full rounded-xl border p-3 font-mono text-xs leading-relaxed outline-none"
                   placeholder={SAMPLE}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
@@ -221,7 +217,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
               {notice && (
                 <div
                   className={`mt-3 rounded-xl px-3 py-2.5 text-xs font-medium leading-relaxed ${
-                    noticeTone === "err" ? "bg-rose-50 text-rose-700" : "bg-sky-50 text-sky-700"
+                    noticeTone === "err" ? "bg-rose-500/15 text-rose-200" : "bg-sky-500/15 text-sky-200"
                   }`}
                 >
                   {notice}
@@ -239,7 +235,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                   {preview.map((q, qi) => (
                     <div key={q.key} className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
                       <div className="flex items-start gap-2">
-                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.12] text-[11px] font-bold text-white">
                           {qi + 1}
                         </span>
                         <textarea
@@ -270,8 +266,8 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                             <input
                               className={`w-full rounded-lg border px-2 py-1 text-sm outline-none ${
                                 i === q.correctIndex
-                                  ? "border-emerald-300 bg-emerald-50 text-emerald-900"
-                                  : "border-slate-300 bg-white text-slate-800 focus:border-slate-500"
+                                  ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-200"
+                                  : "dc-field"
                               }`}
                               value={opt}
                               onChange={(e) => {
@@ -284,7 +280,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                         ))}
                       </div>
                       {q.correctIndex < 0 && (
-                        <p className="mt-1.5 text-[11px] font-semibold text-amber-600">
+                        <p className="mt-1.5 text-[11px] font-semibold text-amber-300">
                           Correct answer not detected — tap it above.
                         </p>
                       )}

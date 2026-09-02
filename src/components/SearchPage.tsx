@@ -202,7 +202,7 @@ export default function SearchPage({
 
         <div
           data-search-bar
-          className="sticky top-[68px] z-20 border-b border-white/10/60 bg-white/[0.08] px-4 pb-3 pt-3 shadow-[0_4px_18px_-12px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:top-[72px] sm:px-5 sm:pt-3 md:top-[80px] md:px-8 md:pt-4"
+          className="sticky top-[68px] z-20 border-b border-white/10 bg-white/[0.08] px-4 pb-3 pt-3 shadow-[0_4px_18px_-12px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:top-[72px] sm:px-5 sm:pt-3 md:top-[80px] md:px-8 md:pt-4"
         >
           <div className="flex items-center gap-2">
             <button
@@ -308,7 +308,7 @@ export default function SearchPage({
                     className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                       active
                         ? "border-indigo-500 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md"
-                        : "border-white/10/70 bg-white/[0.08] text-white/75 hover:border-indigo-300 hover:text-indigo-600"
+                        : "border-white/10 bg-white/[0.08] text-white/75 hover:border-indigo-300 hover:text-indigo-600"
                     }`}
                   >
                     {chip.label}
@@ -335,7 +335,7 @@ export default function SearchPage({
               {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
                 <div
                   key={index}
-                  className="h-64 animate-pulse rounded-2xl border border-white/10/60 bg-white/[0.08]"
+                  className="h-64 animate-pulse rounded-2xl border border-white/10 bg-white/[0.08]"
                 />
               ))}
             </div>

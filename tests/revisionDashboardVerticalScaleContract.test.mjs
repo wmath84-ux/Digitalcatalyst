@@ -156,7 +156,7 @@ test("the fill chain grows from the content, never from a zero basis", () => {
     assert.doesNotMatch(snippet, /flex-1(?!\S)/, `zero flex basis in: ${snippet}`);
   }
   // The compact phone band still reaches the plan card button.
-  assert.match(clean, /\[data-revision-app\] \[data-revision-page-main\] \[data-rev-plan-cta\] \{\s*min-height: 38px !important/);
+  assert.match(clean, /\[data-revision-app\] \[data-revision-page-main\] \[data-rev-plan-cta\] button \{\s*min-height: 38px !important/);
   // A flex column spaces its children with `gap`, not `space-y`: without it the
   // hero card and the stat row would touch on the phone band.
   assert.match(dashboard, /data-rev-panel="primary" className="flex flex-col gap-4/);

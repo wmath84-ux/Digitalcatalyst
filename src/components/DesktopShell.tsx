@@ -757,7 +757,7 @@ function TopBarTabRow({ config }: { config: TopBarTabsConfig }) {
               className={cn(
                 "relative shrink-0 rounded-t-xl px-3 py-2.5 text-[13px] font-bold outline-none transition-colors duration-200",
                 "focus-visible:ring-2 focus-visible:ring-indigo-300/70",
-                isActive ? "text-indigo-600" : "text-white/55 hover:bg-white/[0.06]/70 hover:text-white",
+                isActive ? "text-indigo-600" : "text-white/55 hover:bg-white/[0.06] hover:text-white",
               )}
             >
               {item.label}

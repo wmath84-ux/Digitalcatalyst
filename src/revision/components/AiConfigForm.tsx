@@ -20,7 +20,7 @@ import {
   type AIProviderId,
   type ProviderModel,
 } from "../engine/aiConfig";
-import { Spinner } from "./ui";
+import { Spinner, SecondaryButton } from "./ui";
 
 export type AiConfigFormProps = {
   value: AiConfig;
@@ -62,7 +62,7 @@ function ProviderTile({
         </span>
       )}
       <span
-        className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br text-lg font-black text-white shadow-sm ${meta.gradient}`}
+        className={`flex h-10 w-10 items-center justify-center rounded-xl text-lg font-black text-white  ${meta.gradient}`}
       >
         {meta.mark}
       </span>
@@ -175,7 +175,7 @@ export default function AiConfigForm({
   };
 
   return (
-    <div className={`space-y-4 ${card ? "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" : ""}`}>
+    <div className={`space-y-4 ${card ? "rounded-2xl border border-white/10 bg-white/[0.08] p-4 " : ""}`}>
       {/* Provider picker */}
       <div>
         {title && <p className="text-[13px] font-bold text-white">{title}</p>}
@@ -227,7 +227,7 @@ export default function AiConfigForm({
         <div className="relative mt-1.5">
           <input
             type={showKey ? "text" : "password"}
-            className={`w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 pr-11 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:ring-2 ${provider.accentText.replace("text-", "focus:ring-")}`}
+            className="dc-field w-full rounded-xl border px-3 py-2.5 pr-11 text-sm outline-none transition"
             placeholder={provider.keyPlaceholder}
             value={value.apiKey}
             autoComplete="off"
@@ -277,7 +277,7 @@ export default function AiConfigForm({
         <div>
           <label className="text-xs font-semibold text-white/85">Base URL</label>
           <input
-            className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono text-xs text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            className="dc-field mt-1.5 w-full rounded-xl border px-3 py-2.5 font-mono text-xs outline-none transition"
             placeholder={provider.id === "custom" ? "https://your-endpoint.example.com/v1" : provider.baseUrl || "https://…"}
             value={value.baseUrl}
             spellCheck={false}
@@ -300,21 +300,16 @@ export default function AiConfigForm({
           className={`flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border text-[13px] font-bold transition active:scale-[0.98] disabled:opacity-50 ${
             hasKey
               ? `${provider.accentBg} ${provider.accentText} border-transparent`
-              : "border-slate-300 bg-slate-50 text-slate-500"
+              : "border-white/10 bg-white/[0.06] text-white/55"
           }`}
         >
           {loadingModels ? <Spinner className="h-4 w-4" /> : "⟳"}
           {loadingModels ? "Loading models…" : "Load available models"}
         </button>
-        <button
-          type="button"
-          onClick={() => void runTest()}
-          disabled={!hasKey || !hasCustomEndpoint || testing}
-          className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-[13px] font-bold text-slate-800 transition active:scale-[0.98] disabled:opacity-50"
-        >
+        <SecondaryButton size="sm" className="flex-1 [&>span>div]:h-10 [&>span>div]:rounded-xl text-[13px]" onClick={() => void runTest()} disabled={!hasKey || !hasCustomEndpoint || testing}>
           {testing ? <Spinner className="h-4 w-4" /> : "✓"}
           {testing ? "Testing…" : "Test connection"}
-        </button>
+        </SecondaryButton>
       </div>
 
       {/* Model dropdown — every available model appears here */}
@@ -322,7 +317,7 @@ export default function AiConfigForm({
         <div className="flex items-center justify-between">
           <label className="text-xs font-semibold text-white/85">Model</label>
           {didAutoFetch && !loadingModels && (
-            <span className={`text-[11px] font-medium ${allModels.length > 0 ? "text-emerald-600" : "text-white/55"}`}>
+            <span className={`text-[11px] font-medium ${allModels.length > 0 ? "text-emerald-300" : "text-white/55"}`}>
               {allModels.length} available
             </span>
           )}
@@ -367,10 +362,10 @@ export default function AiConfigForm({
         <div
           className={`rounded-xl px-3 py-2 text-xs font-medium leading-relaxed ${
             status.tone === "ok"
-              ? "bg-emerald-50 text-emerald-700"
+              ? "bg-emerald-500/15 text-emerald-200"
               : status.tone === "err"
-                ? "bg-rose-50 text-rose-700"
-                : "bg-slate-100 text-slate-600"
+                ? "bg-rose-500/15 text-rose-200"
+                : "bg-white/[0.06] text-white/75"
           }`}
         >
           {status.text}

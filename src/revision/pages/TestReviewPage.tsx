@@ -28,16 +28,16 @@ export default function TestReviewPage({ uid, route, attemptId }: { uid: string;
             const status = q.isSkipped ? "skipped" : q.isCorrect ? "correct" : "wrong";
             const statusStyles =
               status === "correct"
-                ? "border-emerald-300 bg-emerald-50"
+                ? "border-emerald-400/30 bg-emerald-500/15"
                 : status === "wrong"
-                  ? "border-rose-300 bg-rose-50"
+                  ? "border-rose-400/30 bg-rose-500/15"
                   : "border-white/10 bg-white/[0.06]";
             return (
               <Card key={q.id} className={`border-2 ${statusStyles}`}>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <span className="text-xs font-bold text-white/55">Q{idx + 1}</span>
                   <Badge tone={q.difficulty}>{q.difficulty}</Badge>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.08] px-2.5 py-1 text-[11px] font-semibold text-white/85">
                     {q.subjectIcon} {q.subjectName} · {q.topicName}
                   </span>
                   <StatusPill status={status} />
@@ -48,17 +48,17 @@ export default function TestReviewPage({ uid, route, attemptId }: { uid: string;
                   {q.options.map((opt, optIdx) => {
                     const isCorrectOpt = optIdx === q.correctIndex;
                     const isUserOpt = optIdx === q.selectedIndex;
-                    let cls = "border-slate-300 bg-white text-slate-700";
-                    if (isCorrectOpt) cls = "border-emerald-300 bg-emerald-100 text-emerald-800";
-                    else if (isUserOpt && !isCorrectOpt) cls = "border-rose-300 bg-rose-100 text-rose-800";
+                    let cls = "border-white/10 bg-white/[0.08] text-white/85";
+                    if (isCorrectOpt) cls = "border-emerald-400/30 bg-emerald-500/20 text-emerald-200";
+                    else if (isUserOpt && !isCorrectOpt) cls = "border-rose-400/30 bg-rose-500/20 text-rose-200";
                     return (
                       <div key={optIdx} className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm font-medium ${cls}`}>
                         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-bold">
                           {OPTION_LETTERS[optIdx]}
                         </span>
                         <span className="flex-1">{opt}</span>
-                        {isCorrectOpt && <CheckIcon className="h-4 w-4 shrink-0 text-emerald-600" />}
-                        {isUserOpt && !isCorrectOpt && <XIcon className="h-4 w-4 shrink-0 text-rose-600" />}
+                        {isCorrectOpt && <CheckIcon className="h-4 w-4 shrink-0 text-emerald-300" />}
+                        {isUserOpt && !isCorrectOpt && <XIcon className="h-4 w-4 shrink-0 text-rose-300" />}
                       </div>
                     );
                   })}

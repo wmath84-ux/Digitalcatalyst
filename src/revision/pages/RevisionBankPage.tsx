@@ -1,3 +1,7 @@
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from "../../components/ui/glass-dialog";
+import { GlassSheet, GlassSheetContent, GlassSheetTitle, GlassSheetClose } from "../../components/ui/glass-sheet";
+import { GlassInput } from "../../components/ui/glass-input";
+import { GlassButton } from "../../components/ui/glass-button";
 import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -216,7 +220,7 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
           main header, and `sticky top-0` inside the scroller means "the very
           top", not "the top plus padding". The row keeps its own `py-3`, so
           the breathing room lives inside the glass bar instead of above it. */}
-      <div data-rev-bank-header className="dc-glass-toolbar border-b border-white/60 px-4 py-3 lg:px-0 lg:max-w-[1200px] lg:mx-auto lg:rounded-2xl">
+      <div data-rev-bank-header className="dc-glass-toolbar border-b border-white/10 px-4 py-3 lg:px-0 lg:max-w-[1200px] lg:mx-auto lg:rounded-2xl">
         {/* Wave 4: the two hand-rolled boxes became the registry
             `glass-toggle-group`. One droplet slides between the views instead
             of two backgrounds flickering, and the active state is now the same
@@ -285,7 +289,7 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
 
       {actionError && (
         <div className="fixed inset-x-0 bottom-20 z-50 mx-auto w-full max-w-[440px] px-4">
-          <div className="flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm text-white shadow-xl">
+          <div className="flex items-center gap-2 rounded-2xl bg-white/[0.12] px-4 py-3 text-sm text-white shadow-xl">
             <span className="flex-1">{actionError}</span>
             <button type="button" onClick={() => setActionError(null)} aria-label="Dismiss"><XIcon className="h-4 w-4" /></button>
           </div>
@@ -366,22 +370,21 @@ function SavedTestsView({
        px under the main header instead of flush (`index.css` zeroes it for the
        Test Bank). */
     <div className="animate-fade-in pb-24">
-      <div className="dc-glass-toolbar sticky top-0 z-10 space-y-3 border-b border-white/60 px-4 py-3">
-        <div className="dc-glass-input flex min-h-[44px] items-center gap-2 rounded-2xl px-3">
-          <SearchIcon className="h-4 w-4 text-white/55" />
-          <input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search saved tests" className="min-w-0 flex-1 bg-transparent py-2 text-sm text-white/85 outline-none placeholder:text-white/55" />
-          {search && <button type="button" onClick={() => onSearch("")} aria-label="Clear search"><XIcon className="h-4 w-4 text-white/55" /></button>}
+      <div className="dc-glass-toolbar sticky top-0 z-10 space-y-3 border-b border-white/10 px-4 py-3">
+        <div className="relative">
+          <GlassInput icon={<SearchIcon className="h-4 w-4" />} value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search saved tests" className="w-full" />
+          {search && <button type="button" onClick={() => onSearch("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2"><XIcon className="h-4 w-4 text-white/55" /></button>}
         </div>
         {bankStatus && limit !== -1 && (
-          <div className="rounded-xl bg-indigo-100/70 px-3 py-2.5">
-            <div className="flex items-center justify-between text-[11px] font-bold text-indigo-800">
+          <div className="rounded-xl bg-indigo-500/20 px-3 py-2.5">
+            <div className="flex items-center justify-between text-[11px] font-bold text-indigo-200">
               <span>{bankStatus.planName} Test Bank</span><span>{used}/{limit}</span>
             </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${percentage}%` }} /></div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.08]"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${percentage}%` }} /></div>
           </div>
         )}
         {bankStatus && allCount > bankStatus.used && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] font-semibold leading-relaxed text-amber-800">
+          <div className="rounded-xl border border-amber-400/30 bg-amber-500/15 px-3 py-2.5 text-[11px] font-semibold leading-relaxed text-amber-200">
             {allCount - bankStatus.used} older test{allCount - bankStatus.used === 1 ? " is" : "s are"} pending cloud sync. They remain safely available on this device while automatic migration retries when eligible.
           </div>
         )}
@@ -395,9 +398,9 @@ function SavedTestsView({
           action={allCount === 0 ? (
             <div className="mt-2 flex flex-col gap-2">
               <PrimaryButton className="w-auto px-6" onClick={onCreateAi}><SparklesIcon className="h-4 w-4" /> Generate a Test</PrimaryButton>
-              <SecondaryButton className="w-auto px-6" onClick={onImport}>Import Questions</SecondaryButton>
+              <SecondaryButton className="w-auto" onClick={onImport}>Import Questions</SecondaryButton>
             </div>
-          ) : <SecondaryButton className="mt-2 w-auto px-6" onClick={() => onSearch("")}>Clear search</SecondaryButton>}
+          ) : <SecondaryButton className="mt-2 w-auto" onClick={() => onSearch("")}>Clear search</SecondaryButton>}
         />
       ) : (
         /* `items-start` matters as much as the column count: with the grid's
@@ -474,7 +477,7 @@ function SavedTestCard({
     <Card className="relative overflow-hidden p-0" data-saved-test-card>
       <div className="flex h-full flex-col p-3.5">
         <div className="flex items-start gap-2.5">
-          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${test.source === "bulk" ? "bg-amber-50 text-amber-600" : "bg-violet-50 text-violet-600"}`}>
+          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${test.source === "bulk" ? "bg-amber-500/15 text-amber-300" : "bg-violet-500/15 text-violet-300"}`}>
             {test.source === "bulk" ? <BookOpenCheck className="h-4.5 w-4.5" /> : <SparklesIcon className="h-4.5 w-4.5" />}
           </span>
           <div className="min-w-0 flex-1">
@@ -484,24 +487,24 @@ function SavedTestCard({
         </div>
 
         <div className="mt-2 flex flex-wrap gap-1">
-          {labels.map((label) => <span key={label} className="rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-bold text-slate-600">{label}</span>)}
-          <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-bold text-indigo-600">{questionModeLabel(test.planDetails.questionMode)}</span>
-          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-bold capitalize text-slate-600">{test.planDetails.difficulty}</span>
+          {labels.map((label) => <span key={label} className="rounded-full bg-white/[0.12] px-2 py-0.5 text-[9px] font-bold text-white/75">{label}</span>)}
+          <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[9px] font-bold text-indigo-300">{questionModeLabel(test.planDetails.questionMode)}</span>
+          <span className="rounded-full bg-white/[0.12] px-2 py-0.5 text-[9px] font-bold capitalize text-white/75">{test.planDetails.difficulty}</span>
         </div>
 
         {test.status === "in_progress" && (
-          <div className="mt-2 rounded-xl bg-indigo-100/70 px-2.5 py-2">
-            <div className="flex justify-between text-[10px] font-bold text-indigo-700"><span>Attempt in progress</span><span>{Math.min(test.currentIndex + 1, test.totalQuestions)}/{test.totalQuestions}</span></div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${progress}%` }} /></div>
+          <div className="mt-2 rounded-xl bg-indigo-500/20 px-2.5 py-2">
+            <div className="flex justify-between text-[10px] font-bold text-indigo-200"><span>Attempt in progress</span><span>{Math.min(test.currentIndex + 1, test.totalQuestions)}/{test.totalQuestions}</span></div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.08]"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${progress}%` }} /></div>
           </div>
         )}
 
         {test.status === "completed" && (
-          <div data-rev-result-metrics className="mt-2 grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-2 text-center">
+          <div data-rev-result-metrics className="mt-2 grid grid-cols-4 gap-1 rounded-xl bg-white/[0.06] p-2 text-center">
             <ResultMetric value={`${test.score ?? 0}%`} label="Score" />
-            <ResultMetric value={String(test.correctCount)} label="Correct" tone="text-emerald-600" />
-            <ResultMetric value={String(test.wrongCount)} label="Wrong" tone="text-rose-600" />
-            <ResultMetric value={String(test.skippedCount)} label="Skipped" tone="text-amber-600" />
+            <ResultMetric value={String(test.correctCount)} label="Correct" tone="text-emerald-300" />
+            <ResultMetric value={String(test.wrongCount)} label="Wrong" tone="text-rose-300" />
+            <ResultMetric value={String(test.skippedCount)} label="Skipped" tone="text-amber-300" />
           </div>
         )}
 
@@ -523,9 +526,9 @@ function SavedTestCard({
             <>
               <PrimaryButton className="w-full min-h-[38px] rounded-xl text-xs" onClick={onReviseAgain}><RotateCcw className="h-3.5 w-3.5" /> Revise Again</PrimaryButton>
               <div className="grid grid-cols-2 gap-1.5">
-                <SecondaryButton className="min-h-[32px] rounded-lg text-[10px]" disabled={test.skippedCount === 0} onClick={onReviseSkipped}><ListRestart className="h-3 w-3" /> Revise Skipped</SecondaryButton>
+                <SecondaryButton size="sm" className="w-full" disabled={test.skippedCount === 0} onClick={onReviseSkipped}><ListRestart className="h-3 w-3" /> Revise Skipped</SecondaryButton>
                 {test.attemptId ? (
-                  <SecondaryButton className="min-h-[32px] rounded-lg text-[10px]" onClick={() => onOpenResult(test.attemptId!)}><BarChart3 className="h-3 w-3" /> Result</SecondaryButton>
+                  <SecondaryButton size="sm" className="w-full" onClick={() => onOpenResult(test.attemptId!)}><BarChart3 className="h-3 w-3" /> Result</SecondaryButton>
                 ) : null}
               </div>
             </>
@@ -536,15 +539,15 @@ function SavedTestCard({
           <button type="button" onClick={onExpand} className="flex min-h-[30px] flex-1 items-center justify-center gap-1.5 rounded-lg text-[10px] font-bold text-white/75 active:bg-white/[0.06]">
             <History className="h-3.5 w-3.5" /> Attempt history {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </button>
-          <button type="button" onClick={onDelete} className="grid h-8 w-9 place-items-center rounded-lg text-rose-500 active:bg-rose-50" aria-label={`Delete ${test.title}`}><Trash2 className="h-4 w-4" /></button>
+          <button type="button" onClick={onDelete} className="grid h-8 w-9 place-items-center rounded-lg text-rose-500 active:bg-rose-500/15" aria-label={`Delete ${test.title}`}><Trash2 className="h-4 w-4" /></button>
         </div>
       </div>
 
       {expanded && (
-        <div className="absolute inset-0 z-20 flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl" data-saved-test-attempts>
+        <div className="absolute inset-0 z-20 flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.08] shadow-xl" data-saved-test-attempts>
           <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-3 py-2.5">
             <p className="text-xs font-black text-white/85">Attempt history</p>
-            <button type="button" onClick={onExpand} className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200" aria-label="Close attempt history"><ChevronUp className="h-4 w-4" /></button>
+            <button type="button" onClick={onExpand} className="grid h-7 w-7 place-items-center rounded-lg bg-white/[0.06] text-white/75 transition hover:bg-white/[0.12]" aria-label="Close attempt history"><ChevronUp className="h-4 w-4" /></button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5">
             {attempts.length === 0 ? <p className="py-2 text-center text-xs text-white/55">No attempts yet.</p> : (
@@ -554,9 +557,9 @@ function SavedTestCard({
                     key={attempt.id}
                     type="button"
                     onClick={() => attempt.status === "completed" ? onOpenResult(attempt.id) : onOpenAttempt(attempt.id)}
-                    className="flex min-h-[50px] w-full items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-2.5 text-left shadow-sm"
+                    className="flex min-h-[50px] w-full items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.08] px-2.5 text-left"
                   >
-                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-black ${attempt.status === "completed" ? "bg-emerald-50 text-emerald-700" : "bg-indigo-50 text-indigo-700"}`}>{attempts.length - index}</span>
+                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-black ${attempt.status === "completed" ? "bg-emerald-500/15 text-emerald-200" : "bg-indigo-500/15 text-indigo-200"}`}>{attempts.length - index}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[11px] font-black text-white/85">{attempt.attemptKind === "skipped" ? "Skipped questions" : "Full test"} · {attempt.questionCount} questions</span>
                       <span className="mt-0.5 block text-[9px] text-white/55">{relativeDate(attempt.completedAt ?? attempt.startedAt)}</span>
@@ -594,34 +597,33 @@ function SmartRevisionView({ bankData, summary, search, statusTab, activeFilterC
     /* Same seat as the Saved Tests view: a sticky row directly under a wrapper
        with no top padding, so `top-0` really is the top of the page. */
     <div className="animate-fade-in pb-28">
-      <div className="dc-glass-toolbar sticky top-0 z-10 space-y-3 border-b border-white/60 px-4 py-3">
+      <div className="dc-glass-toolbar sticky top-0 z-10 space-y-3 border-b border-white/10 px-4 py-3">
         <div className="flex gap-2">
-          <div className="dc-glass-input flex min-h-[44px] flex-1 items-center gap-2 rounded-2xl px-3"><SearchIcon className="h-4 w-4 text-white/55" /><input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search weak questions or topics" className="min-w-0 flex-1 bg-transparent py-2 text-sm text-white/85 outline-none placeholder:text-white/55" />{search && <button type="button" onClick={() => onSearch("")}><XIcon className="h-4 w-4 text-white/55" /></button>}</div>
-          <button type="button" onClick={onFilters} className="dc-glass-input relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-white/85"><FilterIcon className="h-5 w-5" />{activeFilterCount > 0 && <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-indigo-600 text-[9px] font-bold text-white">{activeFilterCount}</span>}</button>
+          <div className="relative min-w-0 flex-1"><GlassInput icon={<SearchIcon className="h-4 w-4" />} value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search weak questions or topics" className="w-full" />{search && <button type="button" onClick={() => onSearch("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2"><XIcon className="h-4 w-4 text-white/55" /></button>}</div>
+          <GlassButton onClick={onFilters} aria-label="Filter and sort" className="relative shrink-0 [&_.size-12]:size-11"><FilterIcon className="h-5 w-5" />{activeFilterCount > 0 && <span className="absolute -right-1 -top-1 z-10 grid h-4 w-4 place-items-center rounded-full bg-indigo-600 text-[9px] font-bold text-white">{activeFilterCount}</span>}</GlassButton>
         </div>
-        <div className="no-scrollbar flex gap-2 overflow-x-auto">{STATUS_TABS.map((tab) => <button key={tab.key} type="button" onClick={() => onStatus(tab.key)} className={`min-h-[36px] shrink-0 rounded-full border px-3.5 text-xs font-semibold ${statusTab === tab.key ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 bg-white text-slate-700"}`}>{tab.label}{tab.key === "active" ? ` (${summary.due})` : ""}</button>)}</div>
+        <div className="no-scrollbar flex gap-2 overflow-x-auto">{STATUS_TABS.map((tab) => <button key={tab.key} type="button" onClick={() => onStatus(tab.key)} className={`min-h-[36px] shrink-0 rounded-full border px-3.5 text-xs font-semibold transition ${statusTab === tab.key ? "border-indigo-500 bg-indigo-600 text-white" : "border-white/10 bg-white/[0.06] text-white/75 hover:bg-white/[0.1]"}`}>{tab.label}{tab.key === "active" ? ` (${summary.due})` : ""}</button>)}</div>
       </div>
       {bankData.length === 0 ? (
-        <EmptyState icon={<BankIcon className="h-8 w-8" />} title={summary.total === 0 ? "No weak questions yet" : "No matching questions"} description={summary.total === 0 ? "Questions you answer incorrectly or skip are automatically organized here for focused revision." : "Adjust the search or filters to see more questions."} action={summary.total > 0 ? <SecondaryButton className="mt-2 w-auto px-6" onClick={onClear}>Clear filters</SecondaryButton> : undefined} />
+        <EmptyState icon={<BankIcon className="h-8 w-8" />} title={summary.total === 0 ? "No weak questions yet" : "No matching questions"} description={summary.total === 0 ? "Questions you answer incorrectly or skip are automatically organized here for focused revision." : "Adjust the search or filters to see more questions."} action={summary.total > 0 ? <SecondaryButton className="mt-2 w-auto" onClick={onClear}>Clear filters</SecondaryButton> : undefined} />
       ) : (
         <div className="space-y-3 px-4 py-4">{bankData.map((item) => <Card key={item.id}><div className="mb-2 flex flex-wrap items-center gap-1.5"><Badge tone={item.status}>{item.status}</Badge><Badge tone={item.difficulty}>{item.difficulty}</Badge><span className="ml-auto text-[11px] text-white/55">{relativeDate(item.lastRevisedAt)}</span></div><p className="line-clamp-2 text-[15px] font-semibold leading-snug text-white">{item.prompt}</p><div className="mt-2 flex justify-between text-xs text-white/75"><span>{item.subjectIcon} {item.subjectName} · {item.topicName}</span><span>Missed {item.timesWrong}×</span></div></Card>)}</div>
       )}
-      {bankData.length > 0 && <div className="dc-glass-toolbar fixed inset-x-0 bottom-[56px] z-20 mx-auto w-full max-w-[480px] border-t border-white/60 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"><PrimaryButton onClick={onStart} disabled={startingSession}><SparklesIcon className="h-4 w-4" />{startingSession ? "Starting…" : `Start Smart Revision (${bankData.length})`}</PrimaryButton></div>}
+      {bankData.length > 0 && <div className="dc-glass-toolbar fixed inset-x-0 bottom-[56px] z-20 mx-auto w-full max-w-[480px] border-t border-white/10 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"><PrimaryButton onClick={onStart} disabled={startingSession}><SparklesIcon className="h-4 w-4" />{startingSession ? "Starting…" : `Start Smart Revision (${bankData.length})`}</PrimaryButton></div>}
     </div>
   );
 }
 
 function DeleteConfirmation({ test, busy, onClose, onConfirm }: { test: CustomTestListItem; busy: boolean; onClose: () => void; onConfirm: () => void }) {
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/55 backdrop-blur-sm sm:items-center sm:p-5">
-      <button type="button" aria-label="Cancel deletion" className="absolute inset-0" onClick={onClose} />
-      <div className="dc-modal-glass relative w-full max-w-md rounded-t-[2rem] p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-[2rem]">
-        <span className="grid h-14 w-14 place-items-center rounded-2xl bg-rose-50 text-rose-600"><Trash2 className="h-7 w-7" /></span>
-        <h3 className="mt-4 text-xl font-black text-white">Permanently delete this test?</h3>
-        <p className="mt-2 text-sm leading-relaxed text-white/75"><strong className="text-white/85">{test.title}</strong>, all {test.attemptCount} completed attempt{test.attemptCount === 1 ? "" : "s"}, answers and historical results will be removed from every device. This cannot be undone.</p>
-        <div className="mt-5 grid grid-cols-2 gap-2"><SecondaryButton disabled={busy} onClick={onClose}>Keep Test</SecondaryButton><button type="button" disabled={busy} onClick={onConfirm} className="min-h-[48px] rounded-2xl bg-rose-600 px-4 text-sm font-black text-white disabled:opacity-60">{busy ? "Deleting…" : "Delete Permanently"}</button></div>
-      </div>
-    </div>
+    <Dialog open onOpenChange={(v) => { if (!v && !busy) onClose(); }}>
+      <DialogContent aria-label="Delete test">
+        <span className="grid h-14 w-14 place-items-center rounded-2xl bg-rose-500/15 text-rose-300"><Trash2 className="h-7 w-7" /></span>
+        <DialogTitle className="mt-4 text-xl font-black">Permanently delete this test?</DialogTitle>
+        <DialogDescription className="leading-relaxed text-white/75"><strong className="text-white/85">{test.title}</strong>, all {test.attemptCount} completed attempt{test.attemptCount === 1 ? "" : "s"}, answers and historical results will be removed from every device. This cannot be undone.</DialogDescription>
+        <DialogFooter className="mt-5 grid grid-cols-2 gap-2"><SecondaryButton disabled={busy} onClick={onClose}>Keep Test</SecondaryButton><button type="button" disabled={busy} onClick={onConfirm} className="min-h-[48px] rounded-2xl bg-rose-600 px-4 text-sm font-black text-white disabled:opacity-60">{busy ? "Deleting…" : "Delete Permanently"}</button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -638,15 +640,15 @@ function FilterSheet({ subjects, subjectId, difficulty, sort, onApply, onClose }
   const [localSort, setLocalSort] = useState(sort);
   const sorts = [{ key: "recent", label: "Recently added" }, { key: "oldest", label: "Oldest first" }, { key: "most_wrong", label: "Most missed" }, { key: "difficulty", label: "Hardest first" }, { key: "alphabetical", label: "Topic A–Z" }];
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/50 backdrop-blur-sm sm:items-center">
-      <div className="dc-modal-glass max-h-[85vh] w-full max-w-[480px] overflow-y-auto rounded-t-3xl p-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] shadow-2xl sm:rounded-3xl">
-        <div className="mb-4 flex items-center justify-between"><h3 className="text-lg font-semibold text-white">Filter & Sort</h3><button type="button" onClick={onClose}><XIcon className="h-5 w-5 text-white/55" /></button></div>
+    <GlassSheet open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <GlassSheetContent side="bottom" aria-label="Filter and sort" className="h-auto max-h-[85vh] pb-[env(safe-area-inset-bottom)] sm:left-1/2 sm:w-[480px] sm:-translate-x-1/2">
+        <div className="mb-4 flex items-center justify-between"><GlassSheetTitle>Filter & Sort</GlassSheetTitle><GlassSheetClose aria-label="Close filters" className="grid h-9 w-9 place-items-center rounded-full"><XIcon className="h-5 w-5 text-white/55" /></GlassSheetClose></div>
         <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/55">Subject</p><div className="mb-4 flex flex-wrap gap-2"><FilterChoice active={localSubject === undefined} label="All Subjects" onClick={() => setLocalSubject(undefined)} />{subjects.map((subject) => <FilterChoice key={subject.id} active={localSubject === subject.id} label={`${subject.icon} ${subject.name}`} onClick={() => setLocalSubject(subject.id)} />)}</div>
         <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/55">Difficulty</p><div className="mb-4 flex flex-wrap gap-2"><FilterChoice active={localDifficulty === undefined} label="Any" onClick={() => setLocalDifficulty(undefined)} />{["easy", "medium", "hard"].map((item) => <FilterChoice key={item} active={localDifficulty === item} label={item} onClick={() => setLocalDifficulty(item)} />)}</div>
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/55">Sort by</p><div className="mb-6 space-y-2">{sorts.map((item) => <button key={item.key} type="button" onClick={() => setLocalSort(item.key)} className={`flex min-h-[44px] w-full items-center rounded-xl border px-3 text-sm font-medium ${localSort === item.key ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-white/10 text-white/85"}`}>{item.label}</button>)}</div>
+        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/55">Sort by</p><div className="mb-6 space-y-2">{sorts.map((item) => <button key={item.key} type="button" onClick={() => setLocalSort(item.key)} className={`flex min-h-[44px] w-full items-center rounded-xl border px-3 text-sm font-medium ${localSort === item.key ? "border-indigo-600 bg-indigo-500/15 text-indigo-200" : "border-white/10 text-white/85"}`}>{item.label}</button>)}</div>
         <PrimaryButton onClick={() => onApply({ subjectId: localSubject, difficulty: localDifficulty, sort: localSort })}>Apply Filters</PrimaryButton>
-      </div>
-    </div>
+      </GlassSheetContent>
+    </GlassSheet>
   );
 }
 

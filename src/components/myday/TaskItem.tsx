@@ -32,9 +32,9 @@ const statusConfig: Record<Task["status"], { border: string; bg: string; badge: 
     badgeText: "In Progress",
   },
   pending: {
-    border: "border-white/10/80",
+    border: "border-white/10",
     bg: "bg-white/[0.08] backdrop-blur-xl",
-    badge: "border border-white/10/80 bg-white/[0.08] text-white/75",
+    badge: "border border-white/10 bg-white/[0.08] text-white/75",
     badgeText: "Pending",
   },
 };

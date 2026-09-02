@@ -59,7 +59,7 @@ export function PurchasesTab({
           <img
             src={item.image}
             alt={item.title}
-            className="relative h-16 w-24 shrink-0 rounded-xl object-cover ring-1 ring-inset ring-white/10/70"
+            className="relative h-16 w-24 shrink-0 rounded-xl object-cover ring-1 ring-inset ring-white/10"
           />
           <div className="relative min-w-0 flex-1">
             <p className="truncate text-sm font-bold text-white">{item.title}</p>
