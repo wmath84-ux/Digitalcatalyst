@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import Header from "./Header";
 import { GlassButton } from "./ui/glass-button";
@@ -351,13 +351,44 @@ export default function NotificationsPage({
 
   // Swipe (or ×) dismiss: drop the card locally — the spring layout reflow
   // closes the gap — and delete the mirrored cloud doc so it never returns
-  // on the next snapshot or on another device.
+  // on the next snapshot or on another device. The dismissed card is kept in
+  // a session stash so the header's Reset control (AI Canvas
+  // glass-notification) can bring everything back.
+  const [dismissedStash, setDismissedStash] = useState<SiteNotification[]>([]);
   const dismissNotification = (notification: SiteNotification) => {
     setItems((current) => current.filter((item) => item.id !== notification.id));
+    setDismissedStash((current) => [...current, notification]);
     if (user && notification.remoteNotificationId) {
       void deleteDoc(doc(db, "users", user.id, "notifications", notification.remoteNotificationId)).catch(() => undefined);
     }
     toast({ title: "Notification dismissed", duration: 2200 });
+  };
+
+  // Reset (spec): restores every card dismissed this session — locally for
+  // the spring re-entrance, and in the cloud so other devices agree.
+  const resetDismissed = () => {
+    if (dismissedStash.length === 0) return;
+    const restored = [...dismissedStash];
+    setDismissedStash([]);
+    setItems((current) => {
+      const existing = new Set(current.map((item) => item.id));
+      return [...restored.filter((item) => !existing.has(item.id)), ...current];
+    });
+    if (user) {
+      restored.forEach((item) => {
+        if (!item.remoteNotificationId) return;
+        void setDoc(doc(db, "users", user.id, "notifications", item.remoteNotificationId), {
+          title: item.title,
+          body: item.body,
+          category: item.category,
+          target: item.target || { type: "subscription" },
+          createdAt: item.createdAt,
+          read: Boolean(item.read),
+          expired: item.expired === true,
+        }).catch(() => undefined);
+      });
+    }
+    toast({ title: "Notifications restored", variant: "success", duration: 2200 });
   };
 
   return (
@@ -459,7 +490,24 @@ export default function NotificationsPage({
                   {visibleItems.length}
                 </motion.span>
               </div>
-              <span className="px-1 text-[11px] font-medium text-white/30">Swipe to dismiss</span>
+              {/* Reset (spec): appears only after something was dismissed,
+                  scales in, and restores the stack. */}
+              <AnimatePresence>
+                {dismissedStash.length > 0 && (
+                  <motion.button
+                    type="button"
+                    onClick={resetDismissed}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="cursor-pointer text-xs font-medium text-white/30 transition-colors hover:text-white/50"
+                  >
+                    Reset
+                  </motion.button>
+                )}
+              </AnimatePresence>
             </div>
 
             <AnimatePresence mode="popLayout">
@@ -479,19 +527,17 @@ export default function NotificationsPage({
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="flex flex-col items-center gap-3 px-6 py-12 text-center"
+                  className="flex flex-col items-center gap-3 py-12 text-center"
                 >
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/15 text-indigo-200">
-                    <BellIcon className="h-7 w-7" />
-                  </div>
-                  <h3 className="text-xl font-extrabold text-white">
+                  <Bell size={28} className="text-white/20" aria-hidden />
+                  <span className="text-sm text-white/60">
                     {activeFilter === "all" ? "All caught up" : `No ${FILTER_META[activeFilter as Exclude<NotificationFilterKey, "all">].label} notifications`}
-                  </h3>
-                  <p className="max-w-xs text-sm text-white/55">
+                  </span>
+                  <span className="max-w-xs px-6 text-xs text-white/30">
                     {activeFilter === "all"
                       ? "Store updates, course unlocks, and study reminders will show up here."
                       : FILTER_META[activeFilter as Exclude<NotificationFilterKey, "all">].hint}
-                  </p>
+                  </span>
                 </motion.div>
               )}
             </AnimatePresence>
