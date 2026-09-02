@@ -237,13 +237,17 @@
    Scoped to the simulator wrapper. `@theme inline` and `@custom-variant dark`
    live in src/index.css, next to the `@import "tailwindcss"` that Tailwind
    actually processes; only the variable values belong here. */
+@layer base {
 .macos-sim-root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  /* EMBED: upstream is a dark full-page app, so its Vite boilerplate sets
+     `color-scheme: light dark` plus a white-on-#242424 default here. Both are
+     dropped: the simulator's own screens paint themselves, `color-scheme`
+     would additionally repaint form controls and scrollbars, and the
+     white default is what made the Create Account fields render white text on
+     a white card. The real defaults are the shadcn tokens further down. */
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -281,7 +285,9 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 }
+}
 
+@layer base {
 .macos-sim-root.dark,
 .dark .macos-sim-root {
   --background: oklch(0.145 0 0);
@@ -316,7 +322,9 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
+}
 
+@layer base {
 .macos-sim-root a {
   font-weight: 500;
   color: #646cff;
@@ -331,11 +339,12 @@
   line-height: 1.1;
 }
 
+/* EMBED: upstream's `@media (prefers-color-scheme: light)` also repainted the
+   whole page (`color: #213547; background: #fff`). Dropped for the same reason
+   as the block above — the simulator's dark mode is driven by the `.dark`
+   class on its wrapper, never by the OS preference, and honouring the OS here
+   flipped text colours underneath screens that paint their own background. */
 @media (prefers-color-scheme: light) {
-  .macos-sim-root {
-    color: #213547;
-    background-color: #ffffff;
-  }
   .macos-sim-root a:hover {
     color: #747bff;
   }
@@ -354,4 +363,5 @@
 .macos-sim-root {
   background-color: var(--background);
   color: var(--foreground);
+}
 }
