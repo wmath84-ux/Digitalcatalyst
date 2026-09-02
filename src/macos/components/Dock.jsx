@@ -19,6 +19,7 @@ import RemindersApp from "../app/Reminders";
 
 import { GlassSurface } from "./ui/glass-surface";
 import { macStorage } from "../lib/macStorage";
+import AppIcon from "./AppIcon";
 
 const getWindowTitle = (win) => {
   if (win.appId === "TextEdit") {
@@ -462,12 +463,15 @@ export default function Dock() {
                 transition: "all 0.15s cubic-bezier(0.4, 0, 0.2, 1)"
               }}
             >
-              <img
-                src={app.icon}
-                alt={app.label}
-                className="w-full h-full object-cover rounded-xl"
-                draggable={false}
-              />
+              {/* EMBED: upstream renders a bare <img> pointing at a third-party
+                  icon CDN (macosicons.com / wikimedia). Those are hotlinks we do
+                  not control: if they are slow, blocked by a network/extension,
+                  or offline, every icon collapses to a 0x0 broken image. The
+                  dock's own background is transparent glass, so the whole dock
+                  then looks like it has vanished — even though it is still
+                  there and still clickable. `onError` swaps in a lettered tile
+                  so the dock stays usable and legible no matter what. */}
+              <AppIcon src={app.icon} label={app.label} id={app.id} />
             </div>
             
             {/* Dot indicator for open apps */}

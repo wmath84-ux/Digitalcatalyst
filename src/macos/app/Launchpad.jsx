@@ -13,6 +13,7 @@ import PhoneApp from "./Phone";
 import CalendarApp from "./Calendar";
 import ContactsApp from "./Contacts";
 import RemindersApp from "./Reminders";
+import AppIcon from "../components/AppIcon";
 
 // Traffic lights component
 const TrafficLights = ({ windowId }) => {
@@ -336,12 +337,7 @@ export default function Launchpad({ windowId }) {
                     className="flex flex-col items-center gap-1.5 cursor-pointer group text-center"
                   >
                     <div className="relative w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
-                      <img 
-                        src={app.icon} 
-                        alt={app.label} 
-                        className="w-full h-full object-cover rounded-xl"
-                        draggable={false}
-                      />
+                      <AppIcon src={app.icon} label={app.label} id={app.id} />
                     </div>
                     <span className={`text-[11px] font-medium truncate max-w-full leading-tight transition ${
                       isDarkMode ? "text-white/80 group-hover:text-white" : "text-gray-800 group-hover:text-black"
