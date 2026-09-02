@@ -300,6 +300,55 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   100% { background-position: -130% 0; }
 }
 
+/* ── Sheet ⇄ dock: ONE continuous piece of glass ───────────────────────────
+   The overlay sheet is anchored so it slides UNDER the dock (see
+   `sheetAnchor` in src/course/CourseOverlay.tsx). These rules finish the
+   illusion: while a sheet is open the dock drops its top border and top
+   rounding, the sheet drops its bottom border/rounding, and a soft gradient
+   bridges the two — no hairline, no seam, no strip of the lesson showing
+   between them. Closed, the dock goes back to its free-floating home-page
+   capsule. */
+[data-course-dock][data-sheet-open="true"] [data-course-dock-panel] {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top-color: transparent;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+}
+[data-course-dock][data-sheet-open="true"][data-orientation="landscape"] [data-course-dock-panel] {
+  border-radius: 0 1.5rem 1.5rem 0;
+  border-left-color: transparent;
+}
+[data-course-dock][data-sheet-open="true"] [data-course-dock-panel]::before {
+  /* The bridge: continues the sheet's surface into the dock so the join
+     reads as one material rather than two stacked panels. */
+  content: "";
+  position: absolute;
+  inset: -26px 0 auto 0;
+  height: 34px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.06) 100%);
+}
+[data-course-dock][data-sheet-open="true"][data-orientation="landscape"] [data-course-dock-panel]::before {
+  inset: 0 auto 0 -26px;
+  width: 34px;
+  height: auto;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.06) 100%);
+}
+[data-course-overlay][data-open="true"] {
+  border-bottom: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+[data-course-overlay][data-open="true"][data-orientation="portrait"] {
+  /* The last 22 px of the sheet sit behind the dock — keep content clear of
+     that overlap instead of letting the dock cover it. */
+  padding-bottom: 22px;
+}
+[data-course-overlay][data-open="true"][data-orientation="landscape"] {
+  border-right: 0 !important;
+  padding-right: 22px;
+}
+
 /* While the indicator is being dragged, the active pill glows a little harder
    so it feels "alive" as it travels between tabs. */
 [data-course-dock-indicator][data-dragging="true"] > span {
@@ -5184,14 +5233,41 @@ html[data-course-player-active="true"] {
 [data-revision-content]:has(> [data-site-footer-nav]) {
   position: relative;
 }
+/* Real clearance, not a padding guess: `--dc-footer-nav-h` is the MEASURED
+   dock height (src/utils/footerNavSpace.ts, 0px when the footer is hidden).
+   The scroller's content area GROWS by exactly that much through a trailing
+   ::after block, so the last card ends above the dock and the dock can never
+   overlap a tappable element. */
+:root {
+  --dc-footer-nav-h: 0px;
+}
+
 @media (max-width: 959px) {
-  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-footer-nav]) > main {
-    padding-bottom: 4.5rem;
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-app-frame]:has(> [data-site-footer-nav]) > main::after,
+  html:not([data-tablet-landscape-desktop="true"]) body:not(:has(.dc-desktop-shell)) [data-footer-nav-space]::after {
+    content: "";
+    display: block;
+    flex: 0 0 auto;
+    width: 100%;
+    height: var(--dc-footer-nav-h, 0px);
+    pointer-events: none;
   }
 }
+/* Notifications: the filter strip moved out of the header and now floats just
+   above the footer dock, so the list needs that strip's height on top of the
+   dock clearance. */
+[data-notifications-content]::after {
+  height: calc(var(--dc-footer-nav-h, 0px) + 3.25rem) !important;
+}
+
 @media (max-width: 767px) {
-  [data-app-frame]:has(> [data-site-footer-nav]) [data-myday-content] > main {
-    padding-bottom: 4.5rem;
+  [data-app-frame]:has(> [data-site-footer-nav]) [data-myday-content] > main::after {
+    content: "";
+    display: block;
+    flex: 0 0 auto;
+    width: 100%;
+    height: var(--dc-footer-nav-h, 0px);
+    pointer-events: none;
   }
 }
 
@@ -5812,4 +5888,41 @@ html.light {
 }
 .course-player-shell[data-course-theme="light"] [data-course-overlay][data-solid-panel="true"] {
   background: rgba(36, 39, 52, 0.97) !important;
+}
+
+
+/* ── Compact side-panel band (<=1023px): AI Canvas Glass Sidebar ──────────
+   The wide 260 px rail is swapped for the 64 px glass rail (it springs open
+   to 220 px over the content, so the layout width stays 64 px + gutters).
+   Any rule that positioned things against `--desktop-rail-width` follows. */
+@media (max-width: 1023px) {
+  .dc-desktop-shell:has([data-desktop-rail-variant="glass-sidebar"]) {
+    --desktop-rail-width: 88px;
+  }
+}
+[data-desktop-rail-variant="glass-sidebar"] {
+  /* Expanded rail paints over the page instead of reflowing it. */
+  overflow: visible;
+}
+
+
+/* Queries page: the status filter floats above the footer dock, so the list
+   needs the strip's height on top of the measured dock clearance. */
+[data-user-queries-content]::after {
+  height: calc(var(--dc-footer-nav-h, 0px) + 3.25rem) !important;
+}
+
+/* Home feedback wall (AI Canvas Sticker Wall). The canvas owns its own
+   pointer handling; keep the tablet `* { max-width: 100% }` pass and the page
+   scroll from fighting the matter.js drag surface. */
+[data-home-sticker-wall] canvas {
+  touch-action: none;
+}
+@media (max-width: 639px) {
+  /* Phone: a shorter wall, tighter gutters — the section is a fitted card,
+     not a full-bleed desktop canvas. */
+  [data-home-sticker-wall] {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
 }

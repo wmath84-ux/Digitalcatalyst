@@ -3,6 +3,7 @@ import { GlassCard } from "./ui/GlassCard";
 import { LiquidMetalButton } from "./ui/LiquidMetalButton";
 import { GlassButton } from "./ui/glass-button";
 import { HeartIcon, StarIcon } from "./icons";
+import { EmojiBurstLayer, useEmojiBurst } from "./ui/EmojiBurst";
 
 type ProductCardProps = {
   product: Product;
@@ -27,6 +28,7 @@ export default function ProductCard({
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
   const unavailable = product.availableForSale === false && !purchased;
+  const { particles: likeParticles, burst: likeBurst } = useEmojiBurst();
 
   return (
     /* Wave 3 (commerce): the card is `glass-card`, so the material, the rim and
@@ -67,11 +69,14 @@ export default function ProductCard({
 
         {/* Wave 10: the pack GlassButton icon disc — the same save control the
             store header and the list card use. */}
+        <EmojiBurstLayer particles={likeParticles} />
         <GlassButton
           type="button"
           aria-label="Toggle wishlist"
           onClick={(event) => {
             event.stopPropagation();
+            // Owner's direction: every like fires the AI Canvas heart burst.
+            if (!wishlisted) likeBurst();
             onToggleWishlist(product.id);
           }}
           className="absolute right-2 top-2 z-20 [&_.size-12]:size-8"

@@ -61,6 +61,7 @@ import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { cn } from "../utils/cn";
 import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";
 import ExpandingTabs from "./ui/ExpandingTabs";
+import GlassSidebar, { type GlassSidebarItem } from "./glass-dock/GlassSidebar";
 
 // Wave 2 (global chrome) — the website-glass pack. `glass-tooltip` and
 // `glass-input` are vendored registry items; `GlassSurface` is the shared
@@ -156,6 +157,44 @@ const WORKSPACE_RAIL: RailEntry[] = [
 ];
 
 const ALL_RAIL: RailEntry[] = [...PRIMARY_RAIL, ...WORKSPACE_RAIL];
+
+/** Per-entry accent for the compact Glass Sidebar's tinted icon tiles —
+ *  the AI Canvas palette (https://aicanvas.me/components/glass-sidebar). */
+const RAIL_COLORS: Record<DesktopRailKey, string> = {
+  home: "#3A86FF",
+  store: "#FFBE0B",
+  purchases: "#C9A96E",
+  myday: "#06D6A0",
+  revision: "#B388FF",
+  favorites: "#FF5C8A",
+  profile: "#FF7B54",
+  settings: "#9AA5B1",
+};
+
+/**
+ * The SMALLEST band that still gets the desktop side panel (tablet /
+ * narrow-desktop, <= 1023 px). On that band the 260 px rail eats most of the
+ * width, so it is replaced by the AI Canvas Glass Sidebar: a 64 px icon rail
+ * that springs open to 220 px on demand.
+ */
+function useCompactRail(): boolean {
+  const [compact, setCompact] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 1023px)").matches : false,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const read = () => setCompact(mq.matches);
+    read();
+    mq.addEventListener?.("change", read);
+    window.addEventListener("resize", read);
+    return () => {
+      mq.removeEventListener?.("change", read);
+      window.removeEventListener("resize", read);
+    };
+  }, []);
+  return compact;
+}
 
 /** Resolve a hash to a rail key so the active entry lights up. */
 function resolveActiveFromHash(hash: string): DesktopRailKey {
@@ -337,6 +376,18 @@ export default function DesktopShell({
 
   const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
 
+  // Smallest side-panel band → AI Canvas Glass Sidebar instead of the wide rail.
+  const compactRail = useCompactRail();
+  const [compactRailOpen, setCompactRailOpen] = useState(false);
+  const sidebarItems: GlassSidebarItem[] = railEntries.map((entry) => ({
+    id: entry.hash,
+    label: entry.label,
+    color: RAIL_COLORS[entry.key] ?? "#3A86FF",
+    Icon: entry.Icon as GlassSidebarItem["Icon"],
+    active: active === entry.key,
+    badge: entry.badge,
+  }));
+
   return (
     <div
       className="dc-desktop-shell flex min-h-[100dvh] w-full text-white"
@@ -346,6 +397,53 @@ export default function DesktopShell({
       {/* ── Persistent left rail ─────────────────────────────────────
           Tablet landscape: width scales with clamp() so it fits tablet screens
       */}
+      {compactRail ? (
+        <div
+          className="sticky top-0 z-40 h-[100dvh] shrink-0 py-3 pl-3"
+          data-desktop-rail
+          data-desktop-rail-variant="glass-sidebar"
+        >
+          <GlassSidebar
+            items={sidebarItems}
+            open={compactRailOpen}
+            onOpenChange={setCompactRailOpen}
+            onSelect={(hash) => handleNavigate(hash)}
+            header={
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl bg-indigo-600 text-white ring-1 ring-white/20">
+                  {customLogo ? <BrandMark className="h-9 w-9" /> : <Sparkles className="h-4 w-4" />}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-black tracking-tight text-white">{appName}</p>
+                  <p className="truncate text-[10px] font-semibold text-white/55">Learning workspace</p>
+                </div>
+              </div>
+            }
+            footer={
+              user ? (
+                <div className="flex items-center gap-2">
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
+                  ) : (
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-indigo-600 text-[10px] font-black text-white">
+                      {initials}
+                    </div>
+                  )}
+                  <p className="min-w-0 flex-1 truncate text-[11px] font-black text-white">{user.name}</p>
+                  <button
+                    type="button"
+                    onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })}
+                    aria-label="Log out"
+                    className="shrink-0 rounded-lg p-1.5 text-white/60 transition hover:text-rose-300"
+                  >
+                    <LogOut size={14} />
+                  </button>
+                </div>
+              ) : null
+            }
+          />
+        </div>
+      ) : (
       <aside
         data-desktop-rail
         className="sticky top-0 z-40 flex h-[100dvh] w-[260px] shrink-0 flex-col border-r border-white/10 max-[1023px]:w-[clamp(200px,22vw,260px)] landscape:max-[1023px]:w-[clamp(200px,22vw,240px)]"
@@ -473,6 +571,7 @@ export default function DesktopShell({
           )}
         </div>
       </aside>
+      )}
 
       {/* ── Main column (top bar overlays the scroller so MAG frost
           samples page content; clearance padding lives on

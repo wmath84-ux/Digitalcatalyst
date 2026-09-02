@@ -415,42 +415,10 @@ export default function NotificationsPage({
               </GlassButton>
             ) : null
           }
-        >
-          {items.length > 0 && (
-            <div className="mt-3 flex overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {/* Wave 12: the filter strip is the pack GlassToggleGroup. */}
-              <GlassToggleGroup
-                className="dc-segment shrink-0"
-                value={activeFilter}
-                onValueChange={(next) => setActiveFilter(next as NotificationFilterKey)}
-                aria-label="Filter notifications"
-              >
-              {NOTIFICATION_FILTER_ORDER.map((key) => {
-                const isActive = activeFilter === key;
-                const label = key === "all" ? "All" : FILTER_META[key].label;
-                return (
-                  <GlassToggleItem
-                    key={key}
-                    value={key}
-                    className="whitespace-nowrap px-3.5 py-1.5 text-sm font-semibold"
-                  >
-                    {label}
-                    <span
-                      className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full border px-1.5 text-[11px] font-bold ${
-                        isActive ? "border-white/30 text-white" : "border-white/15 text-white/70"
-                      }`}
-                    >
-                      {filterCounts[key]}
-                    </span>
-                  </GlassToggleItem>
-                );
-              })}
-              </GlassToggleGroup>
-            </div>
-          )}
-        </Header>
+        />
 
-        <main data-notifications-content className="flex-1 overflow-y-auto md:px-8">
+
+        <main data-notifications-content data-footer-nav-space className="flex-1 overflow-y-auto md:px-8">
 
           {pushPermission === "default" && (
             <GlassCard className="mx-4 mt-1" contentClassName="flex items-center justify-between gap-3 p-4">
@@ -543,6 +511,43 @@ export default function NotificationsPage({
             </AnimatePresence>
           </div>
         </main>
+
+        {items.length > 0 && (
+          <div
+            data-notifications-filterbar
+            className="pointer-events-none absolute inset-x-0 bottom-[var(--dc-footer-nav-h,0px)] z-20 flex justify-center px-3 pb-2 md:bottom-6"
+          >
+            <div className="pointer-events-auto flex max-w-full overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <GlassToggleGroup
+                className="dc-segment shrink-0"
+                value={activeFilter}
+                onValueChange={(next) => setActiveFilter(next as NotificationFilterKey)}
+                aria-label="Filter notifications"
+              >
+                {NOTIFICATION_FILTER_ORDER.map((key) => {
+                  const isActive = activeFilter === key;
+                  const label = key === "all" ? "All" : FILTER_META[key].label;
+                  return (
+                    <GlassToggleItem
+                      key={key}
+                      value={key}
+                      className="whitespace-nowrap px-3.5 py-1.5 text-sm font-semibold"
+                    >
+                      {label}
+                      <span
+                        className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full border px-1.5 text-[11px] font-bold ${
+                          isActive ? "border-white/30 text-white" : "border-white/15 text-white/70"
+                        }`}
+                      >
+                        {filterCounts[key]}
+                      </span>
+                    </GlassToggleItem>
+                  );
+                })}
+              </GlassToggleGroup>
+            </div>
+          </div>
+        )}
 
         <BottomNav active={null} onChange={onNavigateFooter} purchasesBadge={purchasesBadge} />
       </div>

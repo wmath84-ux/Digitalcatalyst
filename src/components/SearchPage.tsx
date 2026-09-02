@@ -312,6 +312,7 @@ export default function SearchPage({
 
         <main
           data-search-content
+          data-footer-nav-space
           className="flex-1 overflow-y-auto px-4 pb-4 pt-3 sm:px-5 md:px-8 md:pb-8"
         >
           {error ? (

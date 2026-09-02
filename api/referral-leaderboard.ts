@@ -9,6 +9,7 @@ import { handleManifest } from "./_lib/manifest.js";
 import { handleBrandIcon } from "./_lib/brandIcon.js";
 import { handleSubscriptionGate } from "./_lib/subscriptionGateServer.js";
 import { applyCors } from "./_lib/cors.js";
+import { handleCreateQuery, handleListQueries, handleReplyQuery } from "./_lib/userQueries.js";
 
 type SubscriberRow = {
   uid: string;
@@ -156,6 +157,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action.startsWith("flowpath.")) {
       return handleFlowPathControl(req, res);
     }
+    // Sticker-wall user queries + the owner's emailed replies. Shares this
+    // deployed function to stay within the Hobby 12-function cap.
+    if (action === "queries.create") return handleCreateQuery(req, res);
+    if (action === "queries.list") return handleListQueries(req, res);
+    if (action === "queries.reply") return handleReplyQuery(req, res);
     // AI generation can run tens of seconds; if anything ever rejects above
     // the handler's own try/catch (e.g. an unexpected Firestore fault), still
     // answer JSON so the client can show a real message instead of parsing a

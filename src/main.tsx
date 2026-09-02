@@ -36,6 +36,7 @@ import AdminApp from "./admin/AdminApp";
 import FlowPathApp from "./FlowPathApp";
 import { FlowPathErrorBoundary } from "./components/flowpath/FlowPathErrorBoundary";
 import NotificationsPage from "./components/NotificationsPage";
+import UserQueriesPage from "./components/UserQueriesPage";
 import SearchPage from "./components/SearchPage";
 import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
@@ -48,6 +49,7 @@ import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
 import { initFooterGlow } from "./utils/footerGlow";
+import { initFooterNavSpace } from "./utils/footerNavSpace";
 import { CheckoutProvider } from "./checkout/CheckoutContext";
 import { clearAdminSession, hasAdminSession } from "./utils/adminSession";
 import { useOwnedUpdateIds } from "./hooks/useOwnedUpdates";
@@ -132,6 +134,7 @@ const CART_HASH = "#/cart";
 const FAVORITES_HASH = "#/favorites";
 const SUBSCRIPTION_HASH = "#/subscription";
 const NOTIFICATIONS_HASH = "#/notifications";
+const QUERIES_HASH = "#/queries";
 const SEARCH_HASH = "#/search";
 // Developer sandbox for the expiry / renewal messaging. Pure preview:
 // it synthesises a subscription document and never touches Firestore.
@@ -1089,6 +1092,30 @@ function RootPage(): ReactNode {
       </PageEnter>
     );
   }
+  if (hash.startsWith(QUERIES_HASH)) {
+    return (
+      <UserQueriesPage
+        cartCount={cartIds.size}
+        purchasesBadge={purchasedIds.size}
+        onNavigateToCart={() => {
+          window.location.hash = CART_HASH;
+        }}
+        onNavigateToNotifications={() => {
+          window.location.hash = NOTIFICATIONS_HASH;
+        }}
+        onNavigateToSubscription={() => {
+          window.location.hash = SUBSCRIPTION_HASH;
+        }}
+        onNavigateFooter={(tab) => {
+          if (tab === "home") window.location.hash = HOME_HASH;
+          else if (tab === "myday") window.location.hash = MY_DAY_HASH;
+          else if (tab === "store") window.location.hash = STORE_HASH;
+          else if (tab === "purchases") window.location.hash = `${STORE_HASH}/purchases`;
+          else if (tab === "profile") window.location.hash = PROFILE_HASH;
+        }}
+      />
+    );
+  }
   if (hash.startsWith(NOTIFICATIONS_HASH)) {
     return (
       <NotificationsPage
@@ -1279,6 +1306,9 @@ function RootPage(): ReactNode {
 // Drive the footer's outside magic glow with the page's scroll energy
 // (see src/utils/footerGlow.ts). Runs once for the whole app shell.
 initFooterGlow();
+// Publish the real footer-dock height so page areas can GROW by exactly that
+// amount instead of guessing with extra padding (see utils/footerNavSpace.ts).
+initFooterNavSpace();
 // HARD RULE: Ensure portrait lock is active on app start (mobile only)
 if (typeof window !== "undefined") {
   // Double-init for safety (initOrientationLock is idempotent)
