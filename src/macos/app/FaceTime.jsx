@@ -95,6 +95,16 @@ export default function FaceTime({ windowId }) {
     let activeStream = null;
     let isMounted = true;
 
+    // EMBED: upstream calls `navigator.mediaDevices` directly. That object is
+    // undefined outside a secure context (any plain-HTTP origin that is not
+    // localhost) and in some embedded webviews, so the bare call throws during
+    // the effect rather than rejecting — which would take all of Mac mode down
+    // instead of just showing FaceTime's "no webcam" state.
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setHasWebcam(false);
+      return undefined;
+    }
+
     navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       .then((stream) => {
         if (!isMounted) {
