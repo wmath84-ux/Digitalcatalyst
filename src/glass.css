@@ -587,9 +587,14 @@ html[data-glass="on"] :where([data-search-frame]) {
   background-color: transparent;
 }
 html[data-glass="on"] :where([data-pdp-root]) {
-  background-image: linear-gradient(
-    to bottom,
-    rgb(var(--dc-paper-on-ink) / 0.66),
-    rgb(var(--dc-paper-on-ink) / 0.54)
-  );
+  background-image: none;            /* drop the wash -> the backdrop shows */
+  color: rgb(var(--dc-paper-on-ink) / 0.92);  /* base ink goes light */
+}
+/* Loose text that sits straight on the backdrop (breadcrumb, title, description,
+   meta) is re-inked light. Badges/pills are protected by :not([class*="bg-"])
+   so a `bg-zinc-900 text-white` chip or `bg-orange-50 text-orange-600` tag keeps
+   its own colours. Text inside the frosted cards keeps its explicit dark ink
+   (a direct utility beats this inherited rule), so cards stay dark-on-frost. */
+html[data-glass="on"] :where([data-pdp-loose]) :where(h1, h2, p, span, a, button):not([class*="bg-"]) {
+  color: rgb(var(--dc-paper-on-ink) / 0.92);
 }
