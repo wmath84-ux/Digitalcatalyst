@@ -150,7 +150,7 @@ export default function LeaderboardApp() {
         <main className="flex-1 overflow-y-auto px-4 py-5">
           <GlassCard>
             <div className="flex items-center gap-3">
-              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/15"><Trophy /></span>
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-500/15 text-amber-300"><Trophy /></span>
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-white/70">Community</p>
                 <h1 className="text-xl font-black">Leaderboard</h1>

@@ -9,6 +9,8 @@ import {
   promptInstall,
 } from "@/utils/pwaInstall";
 import BrandMark from "@/components/BrandMark";
+import { GlassSurface } from "@/components/ui/glass";
+import { GlassButton } from "@/components/ui/glass-button";
 import { useBranding } from "@/context/BrandingContext";
 
 export default function LandingOverlays() {
@@ -67,8 +69,8 @@ export default function LandingOverlays() {
           transition={{ type: "spring", stiffness: 320, damping: 30 }}
           className="fixed inset-x-3 top-3 z-[100] mx-auto max-w-md"
         >
-          <div className="glass-panel overflow-hidden rounded-3xl border border-emerald-300/20 shadow-2xl shadow-black/50">
-            <div className="bg-gradient-to-r from-emerald-500/20 via-cyan-500/15 to-violet-500/20 p-5">
+          <GlassSurface radius={24} className="text-white ring-1 ring-emerald-300/20" contentClassName="p-5">
+            <div>
               <div className="flex items-start gap-3">
                 <BrandMark className="h-12 w-12 shrink-0 rounded-2xl" fallbackLetter />
                 <div className="min-w-0 flex-1">
@@ -77,7 +79,7 @@ export default function LandingOverlays() {
                     Add the secure PWA to your home screen for fullscreen access, faster loading, and offline support.
                   </p>
                 </div>
-                <button type="button" onClick={() => setInstallOpen(false)} className="text-white/55">✕</button>
+                <GlassButton type="button" onClick={() => setInstallOpen(false)} aria-label="Close install panel" className="[&_.size-12]:size-8 [&_svg]:text-white/70"><span className="text-white/70">✕</span></GlassButton>
               </div>
 
               {manualHelp && (
@@ -87,24 +89,25 @@ export default function LandingOverlays() {
               )}
 
               <div className="mt-5 flex gap-2">
-                <button
+                <GlassButton
+                  variant="capsule"
                   type="button"
                   onClick={() => setInstallOpen(false)}
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-bold text-white/40"
+                  className="flex-1 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold"
                 >
                   Not now
-                </button>
+                </GlassButton>
                 <button
                   type="button"
                   disabled={installing}
                   onClick={() => void handleInstall()}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 py-3 text-sm font-black text-white disabled:opacity-60"
+                  className="flex-1 rounded-full bg-emerald-600 py-3 text-sm font-black text-white transition hover:bg-emerald-500 disabled:opacity-60"
                 >
                   {installed ? "Installed ✓" : installing ? "Opening…" : "Install"}
                 </button>
               </div>
             </div>
-          </div>
+          </GlassSurface>
         </motion.div>
       )}
     </AnimatePresence>

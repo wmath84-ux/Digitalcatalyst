@@ -1,5 +1,6 @@
 import type { Product } from "../types";
 import { GlassSurface } from "../../components/ui/glass";
+import { GlassButton } from "../../components/ui/glass-button";
 
 interface ProductCardProps {
   product: Product;
@@ -32,7 +33,7 @@ export default function ProductCard({
       className={`group relative overflow-hidden text-white transition-transform duration-200 active:scale-[0.98] ${className}`}
       contentClassName="flex flex-col"
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-white/[0.06]">
+      <div className="relative aspect-[4/3] w-full overflow-hidden">
         <img
           src={product.image}
           alt={product.title}
@@ -44,23 +45,23 @@ export default function ProductCard({
           {meta.label}
         </span>
         {product.trending && (
-          <span className="absolute left-2 bottom-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+          <span className="absolute left-2 bottom-2 rounded-md bg-[var(--dc-chrome-glass)] px-1.5 py-0.5 text-[10px] font-semibold text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
             🔥 Trending
           </span>
         )}
-        <button
+        <GlassButton
           type="button"
           aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
           onClick={(event) => {
             event.stopPropagation();
             onToggleFavorite(product.id);
           }}
-          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.08] backdrop-blur-sm transition active:scale-90"
+          className="absolute right-2 top-2 [&_.size-12]:size-7"
         >
           <span className={isFavorite ? "text-rose-500" : "text-white/55"}>
             {isFavorite ? "❤️" : "🤍"}
           </span>
-        </button>
+        </GlassButton>
       </div>
 
       <div className="flex flex-1 flex-col gap-1 p-3">

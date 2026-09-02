@@ -94,7 +94,7 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
     <div className="px-5 pt-4 md:px-8">
       <div
         ref={trackRef}
-        className="dc-glass relative select-none overflow-hidden rounded-[28px] shadow-[0_22px_52px_-24px_rgba(79,70,229,0.55)] touch-pan-y md:rounded-[36px]"
+        className="dc-glass relative select-none overflow-hidden rounded-[28px] touch-pan-y md:rounded-[36px]"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={endDrag}
@@ -133,7 +133,7 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
                   <div aria-hidden className="pointer-events-none absolute -right-10 top-0 h-36 w-36 rounded-full bg-white/12 blur-3xl" />
                   <div aria-hidden className="pointer-events-none absolute -left-8 bottom-0 h-28 w-28 rounded-full bg-cyan-200/12 blur-3xl" />
                   <div className="relative z-10 max-w-[62%] text-white md:max-w-[58%]">
-                    <span className="inline-block rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-bold tracking-wider backdrop-blur-sm md:text-xs">
+                    <span className="inline-block rounded-full bg-[var(--dc-chrome-glass)] px-2.5 py-1 text-[10px] font-bold tracking-wider [backdrop-filter:var(--dc-chrome-glass-blur)] md:text-xs">
                       {banner.eyebrow}
                     </span>
                     <h3 className="mt-2 text-lg font-bold leading-tight drop-shadow-sm md:text-2xl">
@@ -171,7 +171,7 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
             aria-label={`Go to slide ${index + 1}`}
             onClick={() => goTo(index)}
             className={`h-1.5 rounded-full transition-all duration-300 ${
-              index === activeIndex ? "w-6 bg-indigo-600" : "w-1.5 bg-slate-300"
+              index === activeIndex ? "w-6 bg-white" : "w-1.5 bg-white/40"
             }`}
           />
         ))}

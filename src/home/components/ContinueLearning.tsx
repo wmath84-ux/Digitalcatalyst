@@ -62,7 +62,7 @@ function ContinueLearningCard({ item, showProgressLabel }: { item: ContinueLearn
       onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") open(); }}
       className="dc-card w-full cursor-pointer text-left transition active:scale-[0.98] [&>div:last-child]:flex [&>div:last-child]:items-center [&>div:last-child]:gap-3"
     >
-      <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-white/[0.06] ring-1 ring-white/10">
+      <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl ring-1 ring-white/10">
         <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
       </div>
 
@@ -74,9 +74,9 @@ function ContinueLearningCard({ item, showProgressLabel }: { item: ContinueLearn
             <span className="flex-shrink-0 text-[11px] font-semibold text-indigo-300">{Math.round(progress)}% done</span>
           )}
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full border border-white/15">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-500 transition-all duration-500 ease-out"
+            className="h-full rounded-full bg-indigo-500 transition-all duration-500 ease-out"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -86,10 +86,10 @@ function ContinueLearningCard({ item, showProgressLabel }: { item: ContinueLearn
         type="button"
         onClick={(e) => { e.stopPropagation(); item.onResume(); }}
         disabled={isComplete}
-        className={`flex-shrink-0 rounded-full px-4 py-2 text-xs font-bold shadow-sm transition active:scale-95 ${
+        className={`flex-shrink-0 rounded-full px-4 py-2 text-xs font-bold transition active:scale-95 ${
           isComplete
-            ? "bg-emerald-100 text-emerald-600"
-            : "bg-slate-900 text-white hover:bg-slate-800"
+            ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30"
+            : "bg-indigo-600 text-white hover:bg-indigo-500"
         }`}
       >
         {isComplete ? "Completed ✓" : "Resume ▶"}

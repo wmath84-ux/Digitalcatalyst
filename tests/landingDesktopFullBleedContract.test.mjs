@@ -34,7 +34,8 @@ test("non-landing desktop routes still get the AppShell", () => {
 });
 
 test("landing header content is centred on the shared content column, not stretched edge-to-edge", () => {
-  assert.match(header, /glass-panel w-full rounded-b-2xl/, "glass strip keeps its full-bleed background");
+  // Wave 12: the strip is the pack GlassSurface inside a full-width clip.
+  assert.match(header, /<div className="w-full overflow-hidden rounded-b-2xl">\s*<GlassSurface radius=\{0\} className="w-full text-white"/, "glass strip keeps its full-bleed background");
   assert.match(header, /mx-auto flex w-full max-w-7xl items-center justify-between/, "inner content capped at the content width");
 });
 

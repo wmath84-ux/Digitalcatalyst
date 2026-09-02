@@ -553,3 +553,30 @@ Kept (pinned): `contentClassName="flex gap-3 p-2.5"`, `aria-label="Remove item"`
 **Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 250 → 218, `rounded-* bg-white panels` → 177, render-sites 497 → 543 (`native title=` 127 unchanged since Wave 8) · backdrop OK · frozen diff empty.
 
 **Wave 12 next:** Home / Landing / Auth / Leaderboard / Notifications (must update `liquidGlassWaveThreeContract` l.228 import guard for `src/home/components/{ProductCard,Header,Reviews}.tsx`).
+
+### Phase B · Wave 12 — Home / Landing / Auth / Leaderboard / Notifications (2026-09-02)
+
+| Old | New |
+|---|---|
+| Home `CategoryNav` pills (`border-white/70 bg-white/[0.08] backdrop-blur-xl` + `text-indigo-700` active) | pack **`GlassToggleGroup`** (`dc-segment`) |
+| Home `ContinueLearning` image well `bg-white/[0.06]`, progress track, bar `from-indigo-500 to-fuchsia-500`, Resume `bg-slate-900` / `bg-emerald-100 text-emerald-600` | no plate · outlined track · solid `bg-indigo-500` bar · solid indigo `rounded-full` / emerald meaning plate |
+| Home `Reviews` rail `<button class="dc-glass … shadow-[…]">` | **`GlassCard`** (`role="button"`, Enter/Space; `onOpenReview(review.productId)` pin kept); stars amber-300 / white-25 |
+| Home `ProductCard` image well, Trending chip `bg-black/60`, heart disc `bg-white/[0.08] backdrop-blur-sm` | no plate · `--dc-chrome-glass` chip · `GlassButton` size-7 |
+| Home `HeroCarousel` shadow `shadow-[0_22px_52px…]`, eyebrow chip `bg-white/20`, dots `bg-indigo-600` / `bg-slate-300` | shadow dropped · `--dc-chrome-glass` chip · white dots (banner presets `bannerGradients.ts` untouched — pinned) |
+| Home `App` aurora blobs (`bg-violet-200/20`, `bg-sky-200/20 blur-3xl`), "Clear" `text-indigo-600` | removed · `text-indigo-300` |
+| Home `Header` brand well `bg-white/15`, Profile `TooltipTrigger` plate (`bg-white/[0.08]`), clear `×` `bg-white/15`, suggestion dropdown `dc-glass-toolbar … shadow-2xl` + `hover:bg-white/10` rows | no plate · `GlassSurface radius={999}` disc inside the trigger · `GlassButton` size-6 · `GlassSurface radius={20}` + pack **`PopoverItem`** rows |
+| `NotificationsPage` filter chips (**`bg-white text-slate-600`** / `bg-indigo-600`), Mark-all `bg-indigo-600` disc + native `title`, push cards **`bg-indigo-50`** / **`bg-amber-50`**, empty icon **`bg-indigo-100`**, rows **`bg-white` / `bg-indigo-50/70`**, icon wells `bg-*-50 text-*-600 ring-slate-200` | **`GlassToggleGroup`** (`dc-segment`) · `GlassButton` size-10 (no `title`) · `GlassCard` / amber meaning plate · indigo tint · **`GlassCard role="button"`** rows (unread = indigo ring, `data-notification-read`) · `bg-*-500/15 text-*-300` wells (`data-notification-icon` kept) |
+| `LeaderboardApp` trophy well `bg-white/15` | amber tint |
+| `AuthForm` card `.glass-panel shadow-2xl`, mode tabs `bg-white/5` + **gradient active**, Google **`bg-white text-slate-800`**, inputs `bg-white/5`, eye toggle `hover:bg-white/10`, submit **`pulse-glow bg-gradient-to-r … shadow-lg`** | `GlassSurface radius={24}` · `GlassToggleGroup data-stretch` · `GlassButton` capsule · `.dc-field rounded-full` (Glass Input material) · `GlassButton` size-8 · solid indigo `rounded-full` |
+| `AuthApp` `bg-grid` wash + aurora blobs, top bar `bg-[#0a0c12]/60 backdrop-blur-xl`, Back link | removed · `--dc-chrome-glass` bar · `GlassButton` capsule (`data-auth-back` kept) |
+| Landing `Header` `.glass-panel` strip, brand `shadow-lg`, Open App **gradient** `pulse-glow` | `GlassSurface radius={0}` in a `rounded-b-2xl` clip · no shadow · solid indigo `rounded-full` (`landingDesktopFullBleedContract` re-pinned) |
+| Landing `Hero` `bg-grid`, `.glass-panel` eyebrow, gradient CTA, install `bg-emerald-400/10 backdrop-blur` | removed · `GlassSurface radius={999}` · solid indigo · `GlassButton` capsule (emerald ink); `HeroScene` + legibility scrim kept |
+| Landing `Features` `bg-grid`, `.glass-panel shadow-2xl` cards, gradient blob + gradient icon tile | removed · `GlassSurface radius={24}` · `bg-*-500/15` icon tint (`gradient:` keys → `tint:`) |
+| Landing `CtaBanner` `.glass-panel shadow-2xl` + blobs, gradient CTA, install plate | `GlassSurface radius={40}` · solid indigo · `GlassButton` capsule |
+| Landing `LandingOverlays` install sheet `.glass-panel shadow-2xl` + gradient header, ✕ text button, Not-now `bg-white/5`, Install **gradient** | `GlassSurface radius={24}` (emerald ring) · `GlassButton` size-8 · `GlassButton` capsule · solid emerald `rounded-full` |
+
+`landing.css` `.glass-panel` / `.pulse-glow` / `.bg-grid` now have no non-FlowPath consumers (FlowPath keeps its own `fp-*` shell — Wave 13). `liquidGlassWaveThreeContract` "deferred commerce files" guard flipped to assert the Wave 12 imports. `notificationFiltersDeepLinksContract` re-pinned to the toggle group's `onValueChange`.
+
+**Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 218 → 204, `bg-white panels` 177 → 160, gradients 31 → 21, `native title=` 127 → 126, render-sites 543 → 571 · backdrop OK · frozen diff empty.
+
+**Wave 13 next:** My Day / Revision / FlowPath / Profile / Settings.

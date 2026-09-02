@@ -3,6 +3,7 @@ import { Bell, Heart, Search, Trophy, UserRound, X } from "lucide-react";
 import { GlassSwitch } from "../../components/ui/glass-switch";
 import { GlassSurface } from "../../components/ui/glass";
 import { GlassButton } from "../../components/ui/glass-button";
+import { PopoverItem } from "../../components/ui/glass-popover";
 import { useGlassScheme } from "../../lib/glassScheme";
 import { openCommandPalette } from "../../lib/commandPalette";
 import type { Product } from "../types";
@@ -156,7 +157,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       <div data-home-chrome className="relative flex min-w-0 items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 min-[390px]:gap-3">
           <span data-home-brand className="shrink-0">
-            <BrandMark className="h-10 w-10 rounded-2xl bg-white/15 ring-1 ring-white/25 min-[390px]:h-11 min-[390px]:w-11" />
+            <BrandMark className="h-10 w-10 rounded-2xl ring-1 ring-white/25 min-[390px]:h-11 min-[390px]:w-11" />
           </span>
           <div className="min-w-0 flex-1 overflow-hidden">
             <p data-home-welcome className="truncate whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-white/70 min-[390px]:text-xs">
@@ -186,9 +187,13 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
               type="button"
               aria-label="Open profile"
               onClick={() => { window.location.hash = "#/profile"; }}
-              className="dc-home-pill grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-white/[0.08] transition hover:bg-white/[0.12] active:scale-90"
+              className="dc-home-pill rounded-full transition active:scale-90"
             >
-              <UserRound size={18} strokeWidth={2.4} />
+              {/* Wave 12: the trigger wears the pack GlassSurface disc (the same
+                  material GlassButton renders) instead of a hand-frosted plate. */}
+              <GlassSurface radius={999} className="size-10 text-white" contentClassName="grid h-full place-items-center">
+                <UserRound size={18} strokeWidth={2.4} />
+              </GlassSurface>
             </TooltipTrigger>
             <TooltipContent side="bottom">
               <span>Profile</span>
@@ -246,17 +251,17 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             readOnly
           />
           {query ? (
-            <button
+            <GlassButton
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onQueryChange("");
               }}
               aria-label="Clear search"
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-white/15 text-white/85 transition active:scale-90"
+              className="[&_.size-12]:size-6"
             >
               <X size={13} strokeWidth={2.6} />
-            </button>
+            </GlassButton>
           ) : (
             <span className="hidden shrink-0 rounded-md border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/85 sm:inline">
               Tap to search
@@ -265,18 +270,17 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         </div>
 
         {query.trim().length > 0 && (
-          <div className="dc-glass-toolbar absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-80 overflow-y-auto rounded-2xl p-2 text-white/85 shadow-2xl shadow-indigo-950/20">
+          <GlassSurface radius={20} className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-80 overflow-y-auto text-white/85" contentClassName="p-1">
             {suggestions.length === 0 ? (
               <p className="px-3 py-4 text-center text-sm text-white/55">
                 No matches for “{query}”. Try a different keyword.
               </p>
             ) : (
               suggestions.map((item) => (
-                <button
+                <PopoverItem
                   key={item.id}
-                  type="button"
                   onClick={() => onSelectSuggestion(item)}
-                  className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white/10 active:scale-[0.99]"
+                  className="rounded-xl px-2 py-2 text-left active:scale-[0.99]"
                 >
                   <img
                     src={item.image}
@@ -289,11 +293,11 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                       {typeLabel[item.type]} · ₹{item.price}
                     </span>
                   </span>
-                  <span className="flex-shrink-0 text-xs text-indigo-500">↗</span>
-                </button>
+                  <span className="flex-shrink-0 text-xs text-indigo-300">↗</span>
+                </PopoverItem>
               ))
             )}
-          </div>
+          </GlassSurface>
         )}
       </div>
     </GlassSurface>

@@ -6,6 +6,9 @@ import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
 import BrandMark from "@/components/BrandMark";
+import { GlassSurface } from "@/components/ui/glass";
+import { GlassButton } from "@/components/ui/glass-button";
+import { GlassToggleGroup, GlassToggleItem } from "@/components/ui/glass-toggle-group";
 
 type Mode = "login" | "signup";
 
@@ -134,8 +137,11 @@ export default function AuthForm() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="glass-panel mx-auto w-full max-w-md rounded-3xl p-6 shadow-2xl shadow-black/40 sm:p-8"
+      className="mx-auto w-full max-w-md"
     >
+      {/* Wave 12: the auth card is the pack GlassSurface (no landing.css
+          `.glass-panel` paint, no drop shadow). */}
+      <GlassSurface radius={24} className="text-white" contentClassName="p-6 sm:p-8">
       <div className="mb-6 flex items-center gap-3">
         <BrandMark className="h-10 w-10 rounded-xl" fallbackLetter />
         <div>
@@ -146,23 +152,24 @@ export default function AuthForm() {
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 rounded-2xl bg-white/5 p-1">
+      <GlassToggleGroup
+        className="dc-segment mb-6 flex w-full"
+        data-stretch
+        value={mode}
+        onValueChange={(next) => { if (!busy) changeMode(next as Mode); }}
+        aria-label="Log in or sign up"
+      >
         {(["login", "signup"] as Mode[]).map((item) => (
-          <button
+          <GlassToggleItem
             key={item}
-            type="button"
-            onClick={() => changeMode(item)}
+            value={item}
             disabled={busy}
-            className={`rounded-xl py-2 text-sm font-semibold capitalize transition ${
-              mode === item
-                ? "bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-lg"
-                : "text-white/55 hover:text-white"
-            } disabled:cursor-not-allowed disabled:opacity-60`}
+            className="flex-1 justify-center py-2 text-sm font-semibold capitalize disabled:cursor-not-allowed disabled:opacity-60"
           >
             {item === "signup" ? "Sign Up" : item}
-          </button>
+          </GlassToggleItem>
         ))}
-      </div>
+      </GlassToggleGroup>
 
       <h1 className="text-2xl font-black text-white">
         {mode === "login" ? "Welcome back" : "Create your account"}
@@ -173,14 +180,16 @@ export default function AuthForm() {
           : "Create your Firebase-secured learner account."}
       </p>
 
-      <button
+      <GlassButton
+        variant="capsule"
         type="button"
         onClick={handleGoogleLogin}
         disabled={busy}
-        className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white px-4 py-3 font-bold text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-6 w-full [&>span>div]:h-12 [&>span>div]:w-full [&>span>div]:font-bold disabled:cursor-not-allowed disabled:opacity-60"
       >
+        <span className="flex items-center justify-center gap-3">
         {googleSubmitting ? (
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/10 border-t-violet-600" />
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white" />
         ) : (
           <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.31v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.09Z" />
@@ -190,7 +199,8 @@ export default function AuthForm() {
           </svg>
         )}
         {googleSubmitting ? "Google से connect हो रहा है…" : "Continue with Google"}
-      </button>
+        </span>
+      </GlassButton>
 
       <div className="my-5 flex items-center gap-3">
         <span className="h-px flex-1 bg-white/10" />
@@ -216,12 +226,12 @@ export default function AuthForm() {
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   placeholder="Your full name"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-slate-500 outline-none focus:border-violet-400"
+                  className="dc-field w-full rounded-full px-4 py-3 text-white placeholder:text-white/45 outline-none"
                 />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-white/55">Mobile Number</label>
-                <div className="flex overflow-hidden rounded-xl border border-white/10 bg-white/5 focus-within:border-violet-400">
+                <div className="dc-field flex overflow-hidden rounded-full">
                   <span className="grid place-items-center border-r border-white/10 px-3 text-sm font-semibold text-white/55">+91</span>
                   <input
                     required
@@ -230,7 +240,7 @@ export default function AuthForm() {
                     value={mobile}
                     onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 10))}
                     placeholder="10 digit number"
-                    className="min-w-0 flex-1 bg-transparent px-4 py-3 text-white placeholder-slate-500 outline-none"
+                    className="min-w-0 flex-1 bg-transparent px-4 py-3 text-white placeholder:text-white/45 outline-none"
                   />
                 </div>
               </div>
@@ -247,7 +257,7 @@ export default function AuthForm() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@example.com"
-            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-slate-500 outline-none focus:border-violet-400"
+            className="dc-field w-full rounded-full px-4 py-3 text-white placeholder:text-white/45 outline-none"
           />
         </div>
 
@@ -262,16 +272,16 @@ export default function AuthForm() {
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Minimum 6 characters"
               minLength={6}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white placeholder-slate-500 outline-none focus:border-violet-400"
+              className="dc-field w-full rounded-full px-4 py-3 pr-14 text-white placeholder:text-white/45 outline-none"
             />
-            <button
+            <GlassButton
               type="button"
               onClick={() => setShowPassword((visible) => !visible)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-white/55 hover:bg-white/10 hover:text-white"
+              className="absolute right-2 top-1/2 -translate-y-1/2 [&_.size-12]:size-8 [&_svg]:text-white/70"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
+            </GlassButton>
           </div>
         </div>
 
@@ -312,7 +322,7 @@ export default function AuthForm() {
           whileTap={{ scale: busy ? 1 : 0.98 }}
           type="submit"
           disabled={busy}
-          className="pulse-glow w-full rounded-xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 py-3.5 text-base font-bold text-white shadow-lg shadow-fuchsia-500/30 transition disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-full bg-indigo-600 py-3.5 text-base font-bold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? "Please wait…" : mode === "login" ? "Log In" : "Create Account"}
         </motion.button>
@@ -333,6 +343,7 @@ export default function AuthForm() {
         </a>
         .
       </p>
+      </GlassSurface>
     </motion.div>
   );
 }

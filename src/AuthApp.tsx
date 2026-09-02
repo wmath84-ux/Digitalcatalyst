@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from "react";
+import { GlassButton } from "./components/ui/glass-button";
 import AuthForm from "./components/auth/AuthForm";
 import { resolveBackDestination } from "./utils/routeHistory";
 
@@ -41,22 +42,21 @@ export default function AuthApp() {
 
   return (
     <main className="relative flex min-h-[100dvh] w-full flex-col overflow-hidden text-white">
-      <div className="pointer-events-none absolute inset-0 bg-grid opacity-20" />
-      <div className="pointer-events-none absolute -left-32 top-10 h-80 w-80 rounded-full bg-violet-600/30 blur-3xl float-anim" />
-      <div className="pointer-events-none absolute -right-24 bottom-10 h-96 w-96 rounded-full bg-cyan-500/20 blur-3xl float-anim" />
-
-      <header className="relative z-20 shrink-0 border-b border-white/10 bg-[#0a0c12]/60 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-xl sm:px-6">
+      {/* Wave 12: no grid wash / aurora blobs — only the shared backdrop shows
+          through; the top bar is the chrome-glass material (pack GlassSurface
+          dark at tint 0.5) and Back is a pack GlassButton capsule. */}
+      <header className="relative z-20 shrink-0 border-b border-white/10 bg-[var(--dc-chrome-glass)] px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)] sm:px-6">
         <div className="mx-auto flex w-full max-w-md items-center">
-          <button
+          <GlassButton
+            variant="capsule"
             type="button"
             onClick={leaveAuthSafely}
             data-auth-back
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-bold text-slate-200 transition hover:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+            className="[&>span>div]:h-10 [&>span>div]:px-3 [&>span>div]:font-bold"
             aria-label="Go back to the previous page"
           >
-            <span aria-hidden className="text-lg">←</span>
-            <span>Back</span>
-          </button>
+            <span className="inline-flex items-center gap-2"><span aria-hidden className="text-lg">←</span><span>Back</span></span>
+          </GlassButton>
         </div>
       </header>
 

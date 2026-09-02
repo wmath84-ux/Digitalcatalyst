@@ -60,7 +60,10 @@ test("the bell page renders the five filter chips with per-filter counts", () =>
   // mayday, subscription, updates) so page and helper cannot drift.
   assert.match(page, /NOTIFICATION_FILTER_ORDER\.map\(\(key\) =>/);
   assert.match(siteNotifications, /NOTIFICATION_FILTER_ORDER: NotificationFilterKey\[\] = \['all', 'product', 'mayday', 'subscription', 'updates'\]/);
-  assert.match(page, /setActiveFilter\(key\)/);
+  // Wave 12: the strip is the pack GlassToggleGroup; the group's onValueChange
+  // sets the filter (each item carries the key as its value).
+  assert.match(page, /onValueChange=\{\(next\) => setActiveFilter\(next as NotificationFilterKey\)\}/);
+  assert.match(page, /<GlassToggleItem[\s\S]{0,80}value=\{key\}/);
   assert.match(page, /filterCounts\[key\]/);
   // Filter chips only appear once there is something to filter.
   assert.match(page, /items\.length > 0 && \(/);

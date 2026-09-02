@@ -1,5 +1,6 @@
 import { BadgeCheck } from "lucide-react";
 import type { PublishedProductReview } from "../../hooks/useProductReviews";
+import { GlassCard } from "../../components/ui/glass-card";
 
 interface ReviewsProps {
   reviews: PublishedProductReview[];
@@ -22,12 +23,19 @@ export default function Reviews({ reviews, onOpenReview }: ReviewsProps) {
 
       <div className="mt-3 flex gap-3 overflow-x-auto px-5 pb-2 no-scrollbar snap-x-mandatory">
         {reviews.map((review) => (
-          <button
-            type="button"
+          <GlassCard
+            role="button"
+            tabIndex={0}
             key={review.id}
             onClick={() => onOpenReview(review.productId)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpenReview(review.productId);
+              }
+            }}
             aria-label={`Open reviews for ${review.productTitle}`}
-            className="dc-glass w-64 flex-shrink-0 snap-center-item rounded-[1.6rem] p-4 text-left shadow-[0_18px_42px_-24px_rgba(79,70,229,0.42)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_50px_-22px_rgba(79,70,229,0.5)] active:scale-[0.99]"
+            className="w-64 flex-shrink-0 cursor-pointer snap-center-item text-left transition hover:-translate-y-0.5 active:scale-[0.99] [&>div:last-child]:p-4"
           >
             <div className="flex items-center gap-2.5">
               <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>
@@ -36,20 +44,20 @@ export default function Reviews({ reviews, onOpenReview }: ReviewsProps) {
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1 truncate text-sm font-semibold text-white/85">
                   <span className="truncate">{review.name}</span>
-                  {review.verifiedPurchase && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}
+                  {review.verifiedPurchase && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-300" />}
                 </p>
                 <p className="text-[11px] text-white/55">{review.date}</p>
               </div>
             </div>
 
-            <div className="mt-2 text-xs text-amber-500">
+            <div className="mt-2 text-xs text-amber-300">
               {"★".repeat(review.rating)}
-              <span className="text-slate-200">{"★".repeat(5 - review.rating)}</span>
+              <span className="text-white/25">{"★".repeat(5 - review.rating)}</span>
             </div>
 
             <p className="mt-2 line-clamp-4 text-[12.5px] leading-relaxed text-white/75">“{review.comment}”</p>
-            <p className="mt-2 truncate text-[11px] font-semibold text-indigo-500">{review.productTitle}</p>
-          </button>
+            <p className="mt-2 truncate text-[11px] font-semibold text-indigo-300">{review.productTitle}</p>
+          </GlassCard>
         ))}
       </div>
     </section>

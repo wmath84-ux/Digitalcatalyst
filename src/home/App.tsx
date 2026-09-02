@@ -232,8 +232,6 @@ export default function App({
         />
 
         <main className="flex-1 overflow-y-auto pb-2">
-          <div aria-hidden className="pointer-events-none absolute left-4 top-44 h-32 w-32 rounded-full bg-violet-200/20 blur-3xl" />
-          <div aria-hidden className="pointer-events-none absolute right-0 top-72 h-40 w-40 rounded-full bg-sky-200/20 blur-3xl" />
           {isSearching ? (
             <section data-home-grid className="px-5 pt-6 md:px-8">
               <div className="flex items-center justify-between">
@@ -243,7 +241,7 @@ export default function App({
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="text-xs font-semibold text-indigo-600"
+                  className="text-xs font-semibold text-indigo-300 hover:text-indigo-200"
                 >
                   Clear
                 </button>
@@ -314,7 +312,7 @@ export default function App({
                   <button
                     type="button"
                     onClick={() => onNavigateToStore()}
-                    className="text-xs font-semibold text-white/55"
+                    className="text-xs font-semibold text-white/55 hover:text-white/85"
                   >
                     View All
                   </button>
