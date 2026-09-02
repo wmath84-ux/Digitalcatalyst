@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { AlarmClock, Bell, Check, Pencil, Plus, Trash2 } from "lucide-react";
+import { AlarmClock, Bell, Pencil, Plus, Trash2 } from "lucide-react";
 import type { Reminder } from "../../types";
 import { cn } from "../../utils/cn";
 import { formatTime12, toMinutes } from "../../../utils/timeOfDay";
 import Modal from "../ui/Modal";
 import { GlassButton } from "../ui/glass-button";
 import { GlassSurface } from "../ui/glass";
+import { GlassCard } from "../ui/GlassCard";
+import { GlassCheckbox } from "../ui/glass-checkbox";
 
 interface RemindersProps {
   reminders: Reminder[];
@@ -102,21 +104,21 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
         {/* List */}
         <div className="px-4 pb-5 sm:px-6">
           {sorted.length === 0 ? (
-            <div className="dc-glass flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-amber-400/30 bg-white/[0.04] py-10 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.08]">
+            <GlassCard contentClassName="flex flex-col items-center justify-center gap-3 py-10 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/15">
                 <AlarmClock className="h-6 w-6 text-white/55" />
               </div>
               <p className="text-sm font-bold text-white/55">No reminders set</p>
               <button onClick={openAdd} className="text-sm font-bold text-orange-300 hover:underline">
                 + Set a reminder
               </button>
-            </div>
+            </GlassCard>
           ) : (
             <div ref={listRef} className="space-y-2.5 max-h-72 overflow-y-auto custom-scrollbar">
               {sorted.map((rem) => {
                 const status = getTimeStatus(rem.time, rem.done);
                 return (
-                  <div
+                  <GlassCard
                     key={rem.id}
                     data-highlight={rem.id}
                     onClick={() => openEdit(rem)}
@@ -129,30 +131,29 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
                       }
                     }}
                     aria-label={`Edit reminder: ${rem.text}`}
+                    /* Wave 13: pack GlassCard row; status = ring colour only. */
                     className={cn(
-                      "group flex items-center gap-3 rounded-xl border p-3 transition-all cursor-pointer hover:border-amber-300/70",
-                      rem.id === highlightId && "ring-2 ring-amber-400 ring-offset-2 ring-offset-white",
-                      status === "done"
-                        ? "border-emerald-400/30 bg-white/[0.08]"
-                        : status === "overdue"
-                          ? "border-rose-400/30 bg-white/[0.08]"
-                          : status === "soon"
-                            ? "border-amber-400/30 bg-white/[0.08]"
-                            : "border-white/10 bg-white/[0.08]",
+                      "group cursor-pointer transition-all",
+                      rem.id === highlightId
+                        ? "ring-2 ring-amber-400"
+                        : status === "done"
+                          ? "ring-1 ring-emerald-400/40"
+                          : status === "overdue"
+                            ? "ring-1 ring-rose-400/40"
+                            : status === "soon"
+                              ? "ring-1 ring-amber-400/40"
+                              : "",
                     )}
+                    contentClassName="flex items-center gap-3 p-3"
                   >
                     {/* Toggle */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onToggle(rem.id); }}
-                      className={cn(
-                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
-                        rem.done
-                          ? "border-emerald-500 bg-emerald-500 text-white"
-                          : "border-white/10 text-transparent hover:border-amber-400",
-                      )}
-                    >
-                      <Check className="h-3 w-3" strokeWidth={3} />
-                    </button>
+                    <span className="flex shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <GlassCheckbox
+                        checked={rem.done}
+                        onCheckedChange={() => onToggle(rem.id)}
+                        ariaLabel={rem.done ? "Mark reminder as pending" : "Mark reminder as done"}
+                      />
+                    </span>
 
                     {/* Content */}
                     <div className="min-w-0 flex-1">
@@ -178,22 +179,22 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
                       onClick={(e) => e.stopPropagation()}
                       className="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     >
-                      <button
+                      <GlassButton
                         onClick={(e) => { e.stopPropagation(); openEdit(rem); }}
                         aria-label="Edit reminder"
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-white/55 transition hover:bg-white/[0.08] hover:text-amber-300"
+                        className="[&_.size-12]:size-7 [&_svg]:text-white/70 hover:[&_svg]:text-amber-300"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
+                      </GlassButton>
+                      <GlassButton
                         onClick={(e) => { e.stopPropagation(); onDelete(rem.id); }}
                         aria-label="Delete reminder"
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-white/55 transition hover:bg-white/[0.08] hover:text-rose-300"
+                        className="[&_.size-12]:size-7 [&_svg]:text-white/70 hover:[&_svg]:text-rose-300"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      </GlassButton>
                     </div>
-                  </div>
+                  </GlassCard>
                 );
               })}
             </div>
@@ -217,7 +218,7 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
               value={form.text}
               onChange={(e) => setForm({ ...form, text: e.target.value })}
               placeholder="e.g., Submit assignment before 5 PM"
-              className="dc-field w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all"
+              className="dc-field w-full rounded-full border px-4 py-3 text-sm outline-none transition-all"
             />
           </div>
           <div>
@@ -228,7 +229,7 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
               type="time"
               value={form.time}
               onChange={(e) => setForm({ ...form, time: e.target.value })}
-              className="dc-field w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all"
+              className="dc-field w-full rounded-full border px-4 py-3 text-sm outline-none transition-all"
             />
           </div>
           <div className="flex gap-3 pt-2">

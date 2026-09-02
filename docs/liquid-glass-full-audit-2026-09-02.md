@@ -580,3 +580,23 @@ Kept (pinned): `contentClassName="flex gap-3 p-2.5"`, `aria-label="Remove item"`
 **Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 218 → 204, `bg-white panels` 177 → 160, gradients 31 → 21, `native title=` 127 → 126, render-sites 543 → 571 · backdrop OK · frozen diff empty.
 
 **Wave 13 next:** My Day / Revision / FlowPath / Profile / Settings.
+
+### Phase B · Wave 13a — My Day (2026-09-02)
+
+| Old | New |
+|---|---|
+| `TaskItem` row `border … bg-white/[0.08] backdrop-blur-xl` per status, hand-drawn check circle, subject chip `bg-white/[0.08] backdrop-blur`, Edit/Delete `rounded-xl hover:bg-*` buttons | pack **`GlassCard role="button"`** (status = emerald/sky **ring** only), pack **`GlassCheckbox`**, outlined chip, `GlassButton` size-8 |
+| `TaskList` search `dc-glass-input` pill + `hover:bg-white/[0.12]` clear, filter chips (`dc-glass-chip` / `bg-white/20` counts), dashed empty `dc-glass … bg-white/[0.04]`, highlight `ring-offset-white` | pack **`GlassInput`** (icon slot) + `GlassButton` size-8, **`GlassToggleGroup`** (`dc-segment`, outlined counts), `GlassCard` empty state, plain indigo ring |
+| `Timeline` dashed empty `bg-white/[0.06]`, dot `ring-white`, event card `border-* bg-white/[0.08]` + `ring-offset-white`, Edit/Delete buttons | `GlassCard`, dot ring `var(--dc-bd-base)`, **`GlassCard role="button"`** (live = indigo ring, highlight = sky ring, past = dimmed), `GlassButton` size-8 |
+| `GreetingHeader` date/stat chips `bg-white/[0.12] backdrop-blur-sm ring-white/15`, progress track `bg-white/15` + bar `bg-white/80` | outlined chips, outlined track + solid `bg-indigo-500` bar |
+| `QuickNotes` note colours as `bg-white/[0.08] border-*-300/70 backdrop-blur-xl` cards, search `dc-glass-input`, composer strips `dc-glass-input rounded-2xl`, editor textarea `bg-white/[0.08]`, delete/cancel `bg-white/[0.08]` discs, dashed empty `dc-glass`, pencil/trash `hover:bg-white/[0.08]` | **`GlassCard`** (colour = ring + ink only), pack **`GlassInput`** + `GlassButton` clear, **`GlassSurface radius={20}`** composers, outlined textarea, outlined discs (tooltip pins kept), `GlassCard` empty, plain hover |
+| `Reminders` dashed empty, rows `border-* bg-white/[0.08]` + hand-drawn toggle + `ring-offset-white`, Edit/Delete buttons, modal inputs `rounded-xl` | `GlassCard`, **`GlassCard role="button"`** (status ring) + pack **`GlassCheckbox`**, `GlassButton` size-7, `.dc-field rounded-full` |
+| `ScheduleModal` / `TaskModal` `.dc-field rounded-xl` | `.dc-field rounded-full` (Glass Input pill) |
+| `CreateMenu` drop-up `dc-create-menu dc-glass rounded-2xl` + hand-drawn tail `bg-[rgba(60,62,68,0.21)]`, rows `hover:bg-white/[0.08]` | pack **`GlassSurface radius={20}`** (dropdown material; `dc-create-menu` keeps only the pop keyframe, `dc-create-menu-anchor` pin kept), tail removed, `hover:bg-white/10` |
+| `SideNav` items `rounded-xl hover:bg-white/[0.06]` / `bg-indigo-500/15` | **`GlassButton variant="capsule"`** rows (`aria-current`, indigo ink when active) |
+| `MyDayApp` mobile search bar `dc-glass-toolbar` | `--dc-chrome-glass` tokens (pack GlassSurface dark values) |
+| `MyDayAllowanceCard` badge/skeleton/track/Stat tiles `bg-white/[0.06–0.12]` | outlined (`border-white/15`, `ring-white/15`), indigo skeleton |
+
+**Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 204 → 192, `bg-white panels` 160 → 137, gradients 21 (=), `native title=` 126 (=), render-sites 571 → 598 · backdrop OK · frozen diff empty.
+
+**Wave 13b next:** Revision pages/components. **13c:** FlowPath + Profile + Settings.

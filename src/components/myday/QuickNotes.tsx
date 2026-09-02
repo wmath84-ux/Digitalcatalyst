@@ -5,6 +5,8 @@ import type { NoteColor, QuickNote } from "../../types";
 import { cn } from "../../utils/cn";
 import { GlassSurface } from "../ui/glass";
 import { GlassButton } from "../ui/glass-button";
+import { GlassInput } from "../ui/glass-input";
+import { GlassCard } from "../ui/GlassCard";
 
 interface QuickNotesProps {
   notes: QuickNote[];
@@ -15,12 +17,14 @@ interface QuickNotesProps {
   onRequireAccess?: () => boolean;
 }
 
-const colorStyles: Record<NoteColor, { card: string; editBg: string; highlight: string }> = {
-  amber: { card: "bg-white/[0.08] border-amber-300/70 text-amber-200 backdrop-blur-xl", editBg: "bg-amber-500/15", highlight: "bg-amber-300" },
-  sky: { card: "bg-white/[0.08] border-sky-300/70 text-sky-200 backdrop-blur-xl", editBg: "bg-sky-500/15", highlight: "bg-sky-300" },
-  rose: { card: "bg-white/[0.08] border-rose-300/70 text-rose-200 backdrop-blur-xl", editBg: "bg-rose-500/15", highlight: "bg-rose-300" },
-  emerald: { card: "bg-white/[0.08] border-emerald-300/70 text-emerald-200 backdrop-blur-xl", editBg: "bg-emerald-500/15", highlight: "bg-emerald-300" },
-  violet: { card: "bg-white/[0.08] border-violet-300/70 text-violet-200 backdrop-blur-xl", editBg: "bg-violet-500/15", highlight: "bg-violet-300" },
+// Wave 13: every note is the pack GlassCard; the note colour lives only in the
+// ring + ink (meaning colour), never in the material.
+const colorStyles: Record<NoteColor, { ring: string; ink: string; editBg: string; highlight: string }> = {
+  amber: { ring: "ring-1 ring-amber-300/50", ink: "text-amber-200", editBg: "bg-amber-500/15", highlight: "bg-amber-300" },
+  sky: { ring: "ring-1 ring-sky-300/50", ink: "text-sky-200", editBg: "bg-sky-500/15", highlight: "bg-sky-300" },
+  rose: { ring: "ring-1 ring-rose-300/50", ink: "text-rose-200", editBg: "bg-rose-500/15", highlight: "bg-rose-300" },
+  emerald: { ring: "ring-1 ring-emerald-300/50", ink: "text-emerald-200", editBg: "bg-emerald-500/15", highlight: "bg-emerald-300" },
+  violet: { ring: "ring-1 ring-violet-300/50", ink: "text-violet-200", editBg: "bg-violet-500/15", highlight: "bg-violet-300" },
 };
 
 const MAX_COLLAPSED_LENGTH = 80; // Characters before truncating
@@ -118,7 +122,7 @@ function BigNoteEditor({
         }}
         className={cn(
           "w-full resize-none rounded-xl border-0 px-3 py-2.5 text-sm text-white/85 outline-none min-h-[200px] max-h-[55dvh] overflow-y-auto custom-scrollbar placeholder:text-white/55 focus:ring-2 focus:ring-rose-400/30",
-          surfaceClassName ?? "bg-white/[0.08]",
+          surfaceClassName ?? "border border-white/10 bg-transparent",
         )}
       />
       {/* Wave 4: the two icon actions keep their hooks and colours, but the
@@ -133,7 +137,7 @@ function BigNoteEditor({
               onClick={onDelete}
               aria-label="Delete note"
               data-myday-note-editor-delete
-              className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.08] text-rose-500 transition hover:bg-rose-500/15 hover:text-rose-300"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 text-rose-300 transition hover:bg-rose-500/15"
             >
               <Trash2 className="h-4 w-4" />
             </TooltipTrigger>
@@ -147,7 +151,7 @@ function BigNoteEditor({
             onClick={onCancel}
             aria-label="Cancel editing"
             data-myday-note-editor-cancel
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.08] text-white/55 transition hover:bg-white/[0.08]"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 text-white/70 transition hover:text-white"
           >
             <X className="h-4 w-4" />
           </TooltipTrigger>
@@ -316,35 +320,28 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
 
       <div className="px-4 pb-5 sm:px-6">
         {/* Search bar */}
-        <div className={cn(
-          "dc-glass-input mb-3 flex items-center gap-2 rounded-xl px-3 py-2 transition-all",
-          isSearchActive
-            ? "ring-2 ring-rose-400/30"
-            : "focus-within:ring-2 focus-within:ring-rose-400/30"
-        )}>
-          <Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-rose-500" : "text-white/55")} />
-          <input
+        <div className="mb-3 flex items-center gap-2">
+          <GlassInput
+            icon={<Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-rose-300" : "text-white/55")} />}
             value={globalSearch || localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             placeholder="Search notes..."
             disabled={!!globalSearch}
-            className={cn(
-              "w-full bg-transparent text-sm outline-none placeholder:text-white/55",
-              globalSearch ? "text-rose-200" : "text-white/85"
-            )}
+            className={cn("min-w-0 flex-1", isSearchActive && "rounded-full ring-2 ring-rose-400/30")}
           />
           {isSearchActive && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1.5">
               <span className="rounded-md bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-300">
                 {filtered.length}
               </span>
               {!globalSearch && (
-                <button
+                <GlassButton
                   onClick={() => setLocalSearch("")}
-                  className="shrink-0 rounded-lg p-1 text-white/55 hover:bg-white/[0.12] hover:text-white/85"
+                  aria-label="Clear search"
+                  className="[&_.size-12]:size-8 [&_svg]:text-white/70"
                 >
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </GlassButton>
               )}
             </div>
           )}
@@ -355,7 +352,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
             comfortable surface as edits. Cancel collapses it back without
             losing the draft. */}
         {composerExpanded ? (
-          <div className="dc-glass-input mb-4 rounded-2xl p-2.5 transition-all focus-within:ring-2 focus-within:ring-rose-400/30">
+          <GlassSurface radius={20} className="mb-4 transition-all focus-within:ring-2 focus-within:ring-rose-400/30" contentClassName="p-2.5">
             <BigNoteEditor
               kind="compose"
               value={draft}
@@ -366,9 +363,9 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
               saveAriaLabel="Add note"
               surfaceClassName="bg-transparent"
             />
-          </div>
+          </GlassSurface>
         ) : (
-          <div className="dc-glass-input mb-4 flex items-start gap-2 rounded-2xl p-2 transition-all focus-within:ring-2 focus-within:ring-rose-400/30">
+          <GlassSurface radius={20} className="mb-4 transition-all focus-within:ring-2 focus-within:ring-rose-400/30" contentClassName="flex items-start gap-2 p-2">
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -386,7 +383,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
             >
               <Plus className="h-4 w-4" />
             </GlassButton>
-          </div>
+          </GlassSurface>
         )}
 
         {/* Notes area — the big editor REPLACES the list while a note is open,
@@ -394,8 +391,9 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
             the list's own scroll box. Saving / cancelling / deleting brings
             the list straight back. */}
         {editingNote && editingColor ? (
-          <div
-            className={cn("rounded-xl border p-3.5 transition-all duration-200", editingColor.card)}
+          <GlassCard
+            className={cn("transition-all duration-200", editingColor.ring, editingColor.ink)}
+            contentClassName="p-3.5"
             data-myday-note-edit-card
           >
             <BigNoteEditor
@@ -409,11 +407,11 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
               saveAriaLabel="Save note"
               surfaceClassName={editingColor.editBg}
             />
-          </div>
+          </GlassCard>
         ) : (
           <div className="max-h-80 space-y-2.5 overflow-y-auto pr-0.5 custom-scrollbar">
             {filtered.length === 0 ? (
-              <div className="dc-glass flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-rose-400/30 bg-white/[0.04] py-10 text-center">
+              <GlassCard contentClassName="flex flex-col items-center justify-center gap-2 py-10 text-center">
                 {isSearchActive ? (
                   <>
                     <Search className="h-8 w-8 text-white/40" />
@@ -427,7 +425,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
                     <p className="text-sm font-bold text-white/55">No notes yet. Start jotting!</p>
                   </>
                 )}
-              </div>
+              </GlassCard>
             ) : (
               filtered.map((note, idx) => {
                 const isExpanded = expandedIds.has(note.id);
@@ -439,13 +437,14 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
                   : note.text;
 
                 return (
-                  <div
+                  <GlassCard
                     key={note.id}
                     className={cn(
-                      "group rounded-xl border transition-all duration-200",
-                      cs.card,
-                      isSearchActive && "ring-2 ring-amber-400/30",
+                      "group transition-all duration-200",
+                      cs.ink,
+                      isSearchActive ? "ring-2 ring-amber-400/30" : cs.ring,
                     )}
+                    contentClassName="p-0"
                     style={{ animationDelay: `${idx * 30}ms` }}
                   >
                     <div className="px-3.5 py-3">
@@ -493,7 +492,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
                               <TooltipTrigger
                                 onClick={() => startEdit(note)}
                                 aria-label="Edit note"
-                                className="flex h-7 w-7 items-center justify-center rounded-lg opacity-50 transition hover:bg-white/[0.08] hover:opacity-100"
+                                className="flex h-7 w-7 items-center justify-center rounded-lg opacity-50 transition hover:opacity-100"
                               >
                                 <Pencil className="h-3 w-3" />
                               </TooltipTrigger>
@@ -505,7 +504,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
                               <TooltipTrigger
                                 onClick={() => onDelete(note.id)}
                                 aria-label="Delete note"
-                                className="flex h-7 w-7 items-center justify-center rounded-lg opacity-50 transition hover:bg-white/[0.08] hover:opacity-100"
+                                className="flex h-7 w-7 items-center justify-center rounded-lg opacity-50 transition hover:opacity-100"
                               >
                                 <Trash2 className="h-3 w-3" />
                               </TooltipTrigger>
@@ -517,7 +516,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </GlassCard>
                 );
               })
             )}

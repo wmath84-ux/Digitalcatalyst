@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Plus, type LucideIcon } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { GlassSurface } from "../ui/glass";
 
 export interface CreateMenuOption {
   id: string;
@@ -103,11 +104,16 @@ export default function CreateMenu({ options, onSelect }: CreateMenuProps) {
             className="dc-create-menu-anchor absolute left-1/2 z-20 w-56 -translate-x-1/2 sm:w-64"
             style={{ bottom: "calc(100% + 0.9rem)" }}
           >
-            <div
+            {/* Wave 13: the drop-up panel is the pack GlassSurface (dropdown
+                material, radius 20); `dc-create-menu` only carries the pop
+                keyframe, no material. */}
+            <GlassSurface
+              radius={20}
               data-myday-create-menu
               role="menu"
               aria-label="Create"
-              className="dc-create-menu dc-glass relative mx-auto w-full max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
+              className="dc-create-menu relative mx-auto w-full max-w-[calc(100vw-2rem)]"
+              contentClassName="p-1.5"
             >
               {options.map((option, index) => {
                 const Icon = option.icon;
@@ -120,7 +126,7 @@ export default function CreateMenu({ options, onSelect }: CreateMenuProps) {
                       setOpen(false);
                       onSelect(option.id);
                     }}
-                    className="dc-create-item group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-white/[0.08] active:bg-white/[0.08]"
+                    className="dc-create-item group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-white/10 active:bg-white/10"
                     style={{ animationDelay: `${40 + index * 35}ms` }}
                   >
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-300 transition-colors group-hover:bg-indigo-500/20">
@@ -133,12 +139,7 @@ export default function CreateMenu({ options, onSelect }: CreateMenuProps) {
                   </button>
                 );
               })}
-              {/* Little tail that ties the drop-up to the + button. */}
-              <span
-                aria-hidden="true"
-                className="absolute -bottom-1 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 rounded-[3px] bg-[rgba(60,62,68,0.21)]"
-              />
-            </div>
+            </GlassSurface>
           </div>
         )}
       </div>

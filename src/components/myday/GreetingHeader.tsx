@@ -43,7 +43,7 @@ export default function GreetingHeader({ name, completed, total, streak }: Greet
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           {/* Left content */}
           <div className="min-w-0 flex-1">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/[0.12] px-3.5 py-1.5 text-xs font-medium text-white/90 backdrop-blur-sm ring-1 ring-inset ring-white/10">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 px-3.5 py-1.5 text-xs font-medium text-white/90">
               <CalendarDays className="h-3.5 w-3.5" />
               {formattedDate}
             </div>
@@ -58,7 +58,7 @@ export default function GreetingHeader({ name, completed, total, streak }: Greet
 
             {/* Stat pills */}
             <div className="mt-5 flex flex-wrap items-center gap-2.5">
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.12] px-3 py-1.5 text-xs font-semibold text-white ring-1 ring-inset ring-white/15 backdrop-blur-sm">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-semibold text-white">
                 <Target className="h-3.5 w-3.5 text-sky-300" />
                 <span className="text-white/90">{completed}</span>
                 <span className="text-white/50">/</span>
@@ -84,9 +84,9 @@ export default function GreetingHeader({ name, completed, total, streak }: Greet
             <span>Daily Progress</span>
             <span className="font-semibold text-white/80">{completed} of {total} completed</span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-white/15">
+          <div className="h-2 w-full overflow-hidden rounded-full border border-white/15">
             <div
-              className="h-full rounded-full bg-white/80"
+              className="h-full rounded-full bg-indigo-500"
               style={{
                 width: `${percent}%`,
                 transition: "width 0.8s cubic-bezier(.4,0,.2,1)",

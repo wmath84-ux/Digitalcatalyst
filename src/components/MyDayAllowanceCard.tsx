@@ -88,11 +88,11 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
   const exhausted = !unlimited && !canCreate && freeLimit > 0;
 
   const badge = !resolved
-    ? { label: loading ? "Syncing" : "Unavailable", tone: loading ? "bg-white/[0.08] text-white/55" : "bg-amber-500/20 text-amber-200" }
+    ? { label: loading ? "Syncing" : "Unavailable", tone: loading ? "border border-white/15 text-white/55" : "bg-amber-500/20 text-amber-200" }
     : unlimited
       ? { label: "Unlimited", tone: "bg-violet-500/20 text-violet-200" }
       : browseOnlyPlan
-        ? { label: "Browse only", tone: "bg-white/[0.08] text-white/85" }
+        ? { label: "Browse only", tone: "border border-white/15 text-white/85" }
         : exhausted
           ? { label: "Used up", tone: "bg-amber-500/20 text-amber-200" }
           : { label: "Available", tone: "bg-emerald-500/20 text-emerald-200" };
@@ -151,11 +151,11 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
         </div>
 
         {!resolved ? (
-          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.06] p-4" role="status">
+          <div className="mt-5 rounded-2xl border border-white/10 p-4" role="status">
             {loading ? (
               <div className="space-y-3">
                 <div className="h-3 w-3/4 animate-pulse rounded-full bg-indigo-500/20" />
-                <div className="h-2.5 animate-pulse rounded-full bg-white/[0.12]" />
+                <div className="h-2.5 animate-pulse rounded-full bg-indigo-500/10" />
                 <p className="text-xs font-semibold text-white/55">Loading used, remaining and reset information from the server…</p>
               </div>
             ) : (
@@ -184,7 +184,7 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
                   {browseOnlyPlan ? "Subscribers only" : `${freeRemaining} left`}
                 </span>
               </div>
-              <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/[0.08] ring-1 ring-white/10">
+              <div className="mt-2 h-2.5 overflow-hidden rounded-full border border-white/15">
                 <div
                   data-myday-allowance-bar
                   className={`h-full rounded-full transition-all duration-500 ${browseOnlyPlan ? "bg-white/40" : exhausted ? "bg-amber-500" : "bg-indigo-600"}`}
@@ -198,9 +198,9 @@ export default function MyDayAllowanceCard({ onOpenMyDay, onSubscribe }: Props) 
             {browseOnlyPlan ? null : (
               <>
                 <div className="mt-4 grid grid-cols-3 gap-2">
-                  <Stat label="Used" value={`${freeUsed}`} tone="bg-white/[0.06] ring-white/10" />
-                  <Stat label="Left" value={`${freeRemaining}`} tone="bg-white/[0.06] ring-white/10" />
-                  <Stat label="Resets" value={resetAt ? formatResetClock(resetAt) : "Daily"} tone="bg-white/[0.06] ring-white/10" />
+                  <Stat label="Used" value={`${freeUsed}`} tone="ring-white/15" />
+                  <Stat label="Left" value={`${freeRemaining}`} tone="ring-white/15" />
+                  <Stat label="Resets" value={resetAt ? formatResetClock(resetAt) : "Daily"} tone="ring-white/15" />
                 </div>
 
                 <p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-white/55">

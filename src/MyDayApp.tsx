@@ -609,7 +609,7 @@ export default function App() {
         />
 
         {showMobileSearch && (
-          <div className="animate-slideUp dc-glass-toolbar border-b border-white/10 px-4 pb-3 pt-2">
+          <div className="animate-slideUp border-b border-white/10 bg-[var(--dc-chrome-glass)] px-4 pb-3 pt-2 [backdrop-filter:var(--dc-chrome-glass-blur)]">
             <div className="flex items-center gap-2">
               <GlassInput
                 type="search"

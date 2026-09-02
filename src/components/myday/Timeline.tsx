@@ -5,6 +5,7 @@ import { cn } from "../../utils/cn";
 import { formatTime12, toMinutes } from "../../../utils/timeOfDay";
 import { GlassSurface } from "../ui/glass";
 import { GlassButton } from "../ui/glass-button";
+import { GlassCard } from "../ui/GlassCard";
 
 interface TimelineProps {
   events: ScheduleEvent[];
@@ -89,8 +90,8 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
       {/* Timeline */}
       <div className="px-4 pb-5 sm:px-6">
         {sorted.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.06] py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.08]">
+          <GlassCard contentClassName="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-500/15">
               <CalendarClock className="h-6 w-6 text-white/55" />
             </div>
             <p className="text-sm font-bold text-white/55">No events scheduled</p>
@@ -100,7 +101,7 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
             >
               + Add your first event
             </button>
-          </div>
+          </GlassCard>
         ) : (
           <div className="relative pl-7">
             <div className="absolute left-[11px] top-2 bottom-2 w-px bg-white/15" />
@@ -118,7 +119,7 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
                     {/* Dot */}
                     <div
                       className={cn(
-                        "absolute -left-7 top-4 flex h-[22px] w-[22px] items-center justify-center rounded-full ring-[3px] ring-white transition-all",
+                        "absolute -left-7 top-4 flex h-[22px] w-[22px] items-center justify-center rounded-full ring-[3px] ring-[var(--dc-bd-base)] transition-all",
                         isActive ? `${meta.dot} ` : meta.dot,
                         isPast && "opacity-50",
                       )}
@@ -129,7 +130,9 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
                     </div>
 
                     {/* Card */}
-                    <div
+                    {/* Wave 13: the event card is the pack GlassCard; live =
+                        indigo ring, highlighted = sky ring, past = dimmed. */}
+                    <GlassCard
                       onClick={() => onEdit(event)}
                       role="button"
                       tabIndex={0}
@@ -141,17 +144,11 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
                       }}
                       aria-label={`Edit event: ${event.title}`}
                       className={cn(
-                        "rounded-2xl border p-3.5 transition-all duration-200 cursor-pointer",
-                        isHighlighted && "ring-2 ring-sky-400 ring-offset-2 ring-offset-white",
-                        isActive
-                          ? "border-indigo-300 bg-white/[0.08]"
-                          : isNext
-                            ? "border-white/10 bg-white/[0.08] hover:border-sky-400/30"
-                            : isPast
-                              ? "border-white/10 bg-white/[0.08] opacity-60"
-                              : "border-white/10 bg-white/[0.08] hover:border-sky-400/30",
-                        isHighlighted && isPast && "opacity-100",
+                        "cursor-pointer transition-all duration-200",
+                        isHighlighted ? "ring-2 ring-sky-400" : isActive ? "ring-1 ring-indigo-400/50" : "",
+                        isPast && !isHighlighted && "opacity-60",
                       )}
+                      contentClassName="p-3.5"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -196,23 +193,23 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
                           onClick={(e) => e.stopPropagation()}
                           className="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                         >
-                          <button
+                          <GlassButton
                             onClick={(e) => { e.stopPropagation(); onEdit(event); }}
                             aria-label="Edit event"
-                            className="flex h-8 w-8 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-sky-500/15 hover:text-sky-300"
+                            className="[&_.size-12]:size-8 [&_svg]:text-white/70 hover:[&_svg]:text-sky-300"
                           >
                             <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
+                          </GlassButton>
+                          <GlassButton
                             onClick={(e) => { e.stopPropagation(); onDelete(event.id); }}
                             aria-label="Delete event"
-                            className="flex h-8 w-8 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-rose-500/15 hover:text-rose-300"
+                            className="[&_.size-12]:size-8 [&_svg]:text-white/70 hover:[&_svg]:text-rose-300"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          </GlassButton>
                         </div>
                       </div>
-                    </div>
+                    </GlassCard>
                   </div>
                 );
               })}

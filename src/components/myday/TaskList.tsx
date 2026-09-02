@@ -5,6 +5,9 @@ import TaskItem from "./TaskItem";
 import { cn } from "../../utils/cn";
 import { GlassSurface } from "../ui/glass";
 import { GlassButton } from "../ui/glass-button";
+import { GlassInput } from "../ui/glass-input";
+import { GlassCard } from "../ui/GlassCard";
+import { GlassToggleGroup, GlassToggleItem } from "../ui/glass-toggle-group";
 
 interface TaskListProps {
   tasks: Task[];
@@ -110,35 +113,30 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
 
       {/* Search bar - show when global search active or local search toggled */}
       <div className={cn("px-4 pt-3 sm:px-6", (showSearch || isSearchActive) ? "block" : "hidden sm:block")}>
-        <div className={cn(
-          "dc-glass-input flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all",
-          isSearchActive
-            ? "ring-2 ring-indigo-400/30"
-            : "focus-within:ring-2 focus-within:ring-indigo-400/30"
-        )}>
-          <Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-indigo-500" : "text-white/55")} />
-          <input
+        {/* Wave 13: the search field is the pack GlassInput (icon slot); the
+            "n found" chip and the clear disc sit beside it. */}
+        <div className="flex items-center gap-2">
+          <GlassInput
+            icon={<Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-indigo-300" : "text-white/55")} />}
             value={globalSearch || localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             placeholder="Search tasks by title or subject..."
             disabled={!!globalSearch}
-            className={cn(
-              "w-full bg-transparent text-sm outline-none placeholder:text-white/55",
-              globalSearch ? "text-indigo-200" : "text-white/85"
-            )}
+            className={cn("min-w-0 flex-1", isSearchActive && "ring-2 ring-indigo-400/30 rounded-full")}
           />
           {isSearchActive && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1.5">
               <span className="rounded-md bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-bold text-indigo-300">
                 {filtered.length} found
               </span>
               {!globalSearch && (
-                <button
+                <GlassButton
                   onClick={() => setLocalSearch("")}
-                  className="shrink-0 rounded-lg p-1 text-white/55 hover:bg-white/[0.12] hover:text-white/85"
+                  aria-label="Clear search"
+                  className="[&_.size-12]:size-8 [&_svg]:text-white/70"
                 >
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </GlassButton>
               )}
             </div>
           )}
@@ -148,35 +146,36 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
       {/* Filter tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto px-4 pt-3.5 pb-1 sm:px-6 hide-scrollbar">
         <ListFilter className="h-4 w-4 shrink-0 text-white/55 mr-1" />
+        <GlassToggleGroup
+          className={cn("dc-segment shrink-0", globalSearch && "opacity-50")}
+          value={filter}
+          onValueChange={(next) => { if (!globalSearch) setFilter(next as typeof filter); }}
+          aria-label="Filter tasks"
+        >
         {filters.map((f) => (
-          <button
+          <GlassToggleItem
             key={f.key}
-            onClick={() => setFilter(f.key)}
+            value={f.key}
             disabled={!!globalSearch}
-            className={cn(
-              "relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all",
-              filter === f.key
-                ? "border border-indigo-300/70 bg-indigo-500/15 text-indigo-200 backdrop-blur-xl"
-                : "dc-glass-chip text-white/55 hover:bg-white/[0.08] hover:text-white/85",
-              globalSearch && "opacity-50 cursor-not-allowed"
-            )}
+            className={cn("whitespace-nowrap px-3.5 py-1.5 text-xs font-semibold", globalSearch && "cursor-not-allowed")}
           >
             {f.label}
             <span className={cn(
-              "ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold",
-              filter === f.key ? "bg-white/20 text-white" : "bg-white/[0.12] text-white/55",
+              "ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full border px-1 text-[10px] font-bold",
+              filter === f.key ? "border-white/30 text-white" : "border-white/15 text-white/55",
             )}>
               {counts[f.key]}
             </span>
-          </button>
+          </GlassToggleItem>
         ))}
+        </GlassToggleGroup>
       </div>
 
       {/* Task list */}
       <div ref={listRef} className="space-y-2 p-4 sm:p-6 sm:pt-4">
         {filtered.length === 0 ? (
-          <div className="dc-glass flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-indigo-400/30 bg-white/[0.04] py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.08]">
+          <GlassCard contentClassName="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-500/15">
               {isSearchActive ? (
                 <Search className="h-6 w-6 text-white/55" />
               ) : (
@@ -198,13 +197,13 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
                 </button>
               )}
             </div>
-          </div>
+          </GlassCard>
         ) : (
           filtered.map((task, idx) => (
             <div
               key={task.id}
               data-highlight={task.id}
-              className={cn("animate-slideUp", task.id === highlightId && "rounded-2xl ring-2 ring-indigo-400 ring-offset-2 ring-offset-white")}
+              className={cn("animate-slideUp", task.id === highlightId && "rounded-[20px] ring-2 ring-indigo-400")}
               style={{ animationDelay: `${idx * 30}ms` }}
             >
               <TaskItem

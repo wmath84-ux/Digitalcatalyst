@@ -58,7 +58,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
             value={event.title}
             onChange={(e) => setEvent({ ...event, title: e.target.value })}
             placeholder="e.g., Live Class: Physics"
-            className="dc-field w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all"
+            className="dc-field w-full rounded-full border px-4 py-3 text-sm outline-none transition-all"
           />
         </div>
 
@@ -71,7 +71,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
             value={event.detail ?? ""}
             onChange={(e) => setEvent({ ...event, detail: e.target.value })}
             placeholder="e.g., Thermodynamics with Dr. Gupta"
-            className="dc-field w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all"
+            className="dc-field w-full rounded-full border px-4 py-3 text-sm outline-none transition-all"
           />
         </div>
 
@@ -85,7 +85,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
               type="time"
               value={event.startTime}
               onChange={(e) => setEvent({ ...event, startTime: e.target.value })}
-              className="dc-field w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all"
+              className="dc-field w-full rounded-full border px-4 py-3 text-sm outline-none transition-all"
             />
           </div>
           <div>
@@ -96,7 +96,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
               type="time"
               value={event.endTime}
               onChange={(e) => setEvent({ ...event, endTime: e.target.value })}
-              className="dc-field w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all"
+              className="dc-field w-full rounded-full border px-4 py-3 text-sm outline-none transition-all"
             />
           </div>
         </div>

@@ -86,7 +86,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
             value={task.title}
             onChange={(e) => setTask({ ...task, title: e.target.value })}
             placeholder="e.g., Complete algebra worksheet"
-            className="dc-field w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all"
+            className="dc-field w-full rounded-full border px-4 py-3 text-sm outline-none transition-all"
           />
         </div>
 
@@ -100,7 +100,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
               value={task.subject}
               onChange={(e) => setTask({ ...task, subject: e.target.value })}
               placeholder="e.g., Physics"
-              className="dc-field w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all"
+              className="dc-field w-full rounded-full border px-4 py-3 text-sm outline-none transition-all"
             />
           </div>
           <div>
@@ -112,7 +112,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
             </label>
             <div
               onClick={openTimePicker}
-              className="dc-field flex w-full cursor-pointer items-center gap-2 rounded-xl border px-4 py-3 transition-all focus-within:border-white/35"
+              className="dc-field flex w-full cursor-pointer items-center gap-2 rounded-full border px-4 py-3 transition-all focus-within:border-white/35"
             >
               <Clock3 className="h-4 w-4 shrink-0 text-white/55" />
               <input

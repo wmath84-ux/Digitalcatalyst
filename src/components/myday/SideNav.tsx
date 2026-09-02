@@ -7,6 +7,7 @@ import {
   NotebookPen,
 } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { GlassButton } from "../ui/glass-button";
 import BrandMark from "../BrandMark";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { useBranding } from "@/context/BrandingContext";
@@ -57,19 +58,21 @@ export default function SideNav({ active, onNavigate }: SideNavProps) {
             const Icon = item.icon;
             const isActive = active === item.id;
             return (
-              <button
+              <GlassButton
                 key={item.id}
+                variant="capsule"
                 onClick={() => onNavigate(item.id)}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-200",
-                  isActive
-                    ? "bg-indigo-500/15 text-indigo-300"
-                    : "text-white/55 hover:bg-white/[0.06] hover:text-white",
+                  "w-full text-left [&>span>div]:h-auto [&>span>div]:w-full [&>span>div]:rounded-xl [&>span>div]:px-3.5 [&>span>div]:py-2.5 [&>span>div]:text-sm [&>span>div]:font-semibold [&>span>div>span]:w-full",
+                  isActive ? "text-indigo-300 [&>span>div>span]:text-indigo-300" : "text-white/70",
                 )}
               >
-                <Icon className="h-[18px] w-[18px]" />
-                {item.label}
-              </button>
+                <span className="flex w-full items-center gap-3">
+                  <Icon className="h-[18px] w-[18px]" />
+                  {item.label}
+                </span>
+              </GlassButton>
             );
           })}
         </nav>
