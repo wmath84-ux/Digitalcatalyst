@@ -1,23 +1,31 @@
 'use client'
 
 /**
- * Renders a glass dock of labeled icons in the original footer slot.
- * Nearby icons magnify and lift as the pointer or finger moves across.
- * Lifting a finger on an icon selects it.
+ * The footer navigation dock — the AI Canvas Glass Dock
+ * (https://aicanvas.me/components/glass-dock), look/animation exact:
+ *   · frosted panel (rgba-white pane + hairline border + inset top-light)
+ *     with a SEPARATE non-animating blur layer (blur 24 / saturate 1.8),
+ *   · dock entrance spring (y:50 → 0, stiffness 180 / damping 20),
+ *   · per-item staggered entrance (opacity/y, delay index*0.04),
+ *   · distance-based magnification with spring physics (ICON_SIZE 44,
+ *     MAG_RANGE 120, MAG_SCALE 1.55, lift −12px),
+ *   · notification-style tinted icon badges (`${color}18` fill,
+ *     `${color}22` border, radius 12) and frosted tooltips.
  *
- * MAG constants match the GlassDock spec. The capsule hugs its icons —
- * no full-width strip. Bar finish is WebsiteGlass refraction / frost /
- * tint / blur (strength 0.28, frost 0.3, radius 20, accent #38bdf8).
+ * KEPT on the owner's direction: the finger-swipe behaviour — touch
+ * tracking drives the same magnification wave as the cursor, and lifting
+ * the finger on an icon selects it (see onPointerUp + idFromPoint).
  *
  * Old footer implementations: src/components/glass-dock/stored/
  */
 
 import { useRef, type CSSProperties, type ComponentType, type ReactNode, type Ref } from 'react'
 import { motion, useMotionValue, useSpring, useTransform, type MotionValue } from 'framer-motion'
-import GlassMaterial, {
-  GLASS_ACCENT,
-  GLASS_PILL_RADIUS,
-  GLASS_RADIUS,
+import {
+  DOCK_PANEL_BG,
+  DOCK_PANEL_BLUR,
+  DOCK_PANEL_BORDER,
+  DOCK_PANEL_SHADOW,
 } from './GlassMaterial'
 
 export const ICON_SIZE = 44
@@ -106,20 +114,21 @@ function DockItem({
       ref={ref}
       data-glass-dock-item={id}
       className="group relative z-10 flex cursor-pointer flex-col items-center"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 200, damping: 18, delay: index * 0.04 }}
     >
+      {/* Frosted tooltip (AI Canvas): visible on hover, pinned open for the
+          active tab so the current page keeps its label on touch devices. */}
       <motion.div
-        className={`pointer-events-none absolute -top-10 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-800/90 ${
+        className={`pointer-events-none absolute -top-10 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium text-white/90 ${
           active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         }`}
         style={{
-          background: 'rgba(255, 255, 255, 0.22)',
-          backdropFilter: 'blur(16px) saturate(1.6)',
-          WebkitBackdropFilter: 'blur(16px) saturate(1.6)',
-          border: '1px solid rgba(255, 255, 255, 0.4)',
-          boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.9), 0 8px 20px -10px rgba(0,0,0,0.22)',
+          background: 'rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
           transition: 'opacity 0.15s',
         }}
       >
@@ -150,16 +159,19 @@ function DockItem({
           width: size,
           height: size,
           y,
-          background: active ? `${GLASS_ACCENT}28` : 'transparent',
-          border: active ? `1px solid ${GLASS_ACCENT}66` : '1px solid transparent',
-          borderRadius: GLASS_PILL_RADIUS,
-          boxShadow: active ? `0 0 16px ${GLASS_ACCENT}55` : 'none',
+          // Notification-style tinted badge (AI Canvas): every icon sits on
+          // its own colour-tinted plate; the active tab deepens the same
+          // tint and gains a soft glow instead of switching palettes.
+          background: active ? `${color}30` : `${color}18`,
+          border: active ? `1px solid ${color}55` : `1px solid ${color}22`,
+          borderRadius: 12,
+          boxShadow: active ? `0 0 16px ${color}44` : 'none',
         }}
         whileTap={{ scale: 0.82 }}
         className={`relative flex items-center justify-center select-none ${buttonProps?.className ?? ''}`}
       >
-        <span className="flex items-center justify-center" style={{ color: active ? GLASS_ACCENT : color }}>
-          <Icon size={22} className="h-[22px] w-[22px] shrink-0" style={{ color: active ? GLASS_ACCENT : color }} />
+        <span className="flex items-center justify-center" style={{ color }}>
+          <Icon size={22} className="h-[22px] w-[22px] shrink-0" style={{ color }} />
         </span>
         {extra}
         {!!badge && badge > 0 && (
@@ -202,6 +214,9 @@ export default function GlassDock({
 
   return (
     <motion.div
+      initial={{ y: 50 }}
+      animate={{ y: 0 }}
+      transition={{ type: 'spring', stiffness: 180, damping: 20 }}
       onPointerDown={(event) => {
         if (event.pointerType !== 'mouse') trackPointer(event.clientX)
       }}
@@ -219,17 +234,23 @@ export default function GlassDock({
         onSelect(id)
       }}
       onPointerCancel={resetPointer}
-      className="relative mx-auto flex w-max max-w-full shrink-0 items-end gap-2 px-3 py-2"
+      className="relative isolate mx-auto flex w-max max-w-full shrink-0 items-end gap-2 rounded-3xl px-4 pb-3 pt-3"
       style={{
         touchAction: 'none',
-        borderRadius: GLASS_RADIUS,
-        background: 'transparent',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35), 0 10px 28px -12px rgba(0,0,0,0.18)',
+        background: DOCK_PANEL_BG,
+        border: DOCK_PANEL_BORDER,
+        boxShadow: DOCK_PANEL_SHADOW,
       }}
       data-glass-dock=""
       data-site-footer={siteFooter ? '' : undefined}
     >
-      <GlassMaterial />
+      {/* Separate non-animating blur layer (AI Canvas): the frosted backdrop
+          never re-blurs while the magnification wave animates the icons. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-[-1] rounded-3xl"
+        style={{ backdropFilter: DOCK_PANEL_BLUR, WebkitBackdropFilter: DOCK_PANEL_BLUR }}
+      />
       {leading}
       {items.map((item, i) => (
         <DockItem

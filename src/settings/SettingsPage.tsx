@@ -21,13 +21,15 @@
 
 import { useEffect, useState } from "react";
 import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { ArrowLeft, Bell, Lock, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { ArrowLeft, Bell, Lock, Moon, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { db } from "../../firebase";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
 import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
+import { useGlassScheme } from "../lib/glassScheme";
+import { toast } from "../components/ui/glass-toast";
 import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
 import { BaseModal, PreferenceRow } from "../profile/ProfileLayout";
 import { GlassCard } from "../components/ui/glass-card";
@@ -38,6 +40,10 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const { cartIds } = useCommerce();
   const { purchasedIds } = useCatalog();
+  // Appearance is a device preference (localStorage via useGlassScheme), not a
+  // Firestore field — the switch used to live on the home header and moved
+  // here with the rest of the settings.
+  const [scheme, setScheme] = useGlassScheme();
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -169,6 +175,24 @@ export default function SettingsPage() {
                 {message}
               </div>
             ) : null}
+
+            <GlassCard>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Appearance</p>
+              <h2 className="mt-1 text-lg font-black text-white">Theme</h2>
+              <div className="mt-4 space-y-2">
+                {/* Moved from the home header: the pack's light/dark material
+                    switch now lives with the rest of the preferences. */}
+                <PreferenceRow
+                  icon={<Moon />}
+                  label="Dark mode"
+                  checked={scheme === "dark"}
+                  onChange={(checked) => {
+                    setScheme(checked ? "dark" : "light");
+                    toast({ title: `Dark mode ${checked ? "on" : "off"}`, variant: checked ? "success" : "info", duration: 2200 });
+                  }}
+                />
+              </div>
+            </GlassCard>
 
             <GlassCard>
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Preferences</p>

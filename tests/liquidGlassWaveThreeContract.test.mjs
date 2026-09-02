@@ -227,6 +227,10 @@ test("the deferred commerce files landed in Wave 12; admin stays out", () => {
   assert.match(read("src/home/components/ProductCard.tsx"), /from "\.\.\/\.\.\/components\/ui\/glass-button"/);
   const admin = fs.readdirSync("src/components/admin").filter((f) => f.endsWith(".tsx"));
   for (const file of admin) {
-    assert.doesNotMatch(read(`src/components/admin/${file}`), /@\/components\/ui\/glass-/, "admin stays out of the pack");
+    // One sanctioned exception: `glass-toast` is the app-wide feedback BUS —
+    // admin's notify() pushes into the same singleton store, while the glass
+    // viewport itself (GlassToaster) stays mounted in src/main.tsx. No glass
+    // surface renders inside the admin tree.
+    assert.doesNotMatch(read(`src/components/admin/${file}`), /@\/components\/ui\/glass-(?!toast)/, "admin stays out of the pack");
   }
 });

@@ -5,6 +5,7 @@ import Hero from "./Hero";
 import SearchBar from "./SearchBar";
 import FilterChips from "./FilterChips";
 import ProductCard from "./ProductCard";
+import TiltedCoverflow from "./TiltedCoverflow";
 import { GlassCard } from "./ui/GlassCard";
 import { GlassSurface } from "./ui/glass";
 import { GlassButton } from "./ui/glass-button";
@@ -252,16 +253,29 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
 
       <Hero resourceCount={filtered.length} />
 
+      {/* AI Canvas Tilted Coverflow — the store's top-rated rail. Slides are
+          ranked by a Bayesian weighted rating (see topRatedSlides) and update
+          automatically whenever the catalog snapshot changes; the source
+          demo's default cards fill the fan until seven products exist. */}
+      <section aria-label="Top rated" className="pt-1">
+        <p className="px-4 text-[10px] font-black uppercase tracking-widest text-indigo-300">Top rated</p>
+        <TiltedCoverflow products={products} onOpenProduct={onView} />
+      </section>
+
       <div className="space-y-4">
         <SearchBar value={search} onChange={setSearch} sort={sort} onSortChange={setSort} />
         <div data-store-filter-bar className="sticky top-0 z-20 border-b border-white/10 bg-[var(--dc-chrome-glass)] py-2.5 [backdrop-filter:var(--dc-chrome-glass-blur)]">
-          <div className="relative flex items-center">
-            <div className="flex-1 overflow-hidden pr-14">
+          {/* Mobile overlap fix: the view-mode toggle is a normal flex
+              sibling (shrink-0) instead of an absolutely-positioned overlay,
+              so the scrolling chip row and the button can never paint on top
+              of each other at any viewport width. */}
+          <div className="flex items-center gap-1 pr-3">
+            <div className="min-w-0 flex-1 overflow-hidden">
               <FilterChips filters={chips} activeId={activeFilter.id} onSelect={setActiveFilterId} />
             </div>
 
-            {/* View mode toggle — positioned at the right edge */}
-            <div ref={dropdownRef} className="absolute right-4 top-1/2 z-10 -translate-y-1/2">
+            {/* View mode toggle — anchored at the right edge of the bar */}
+            <div ref={dropdownRef} className="relative z-10 shrink-0">
               <GlassButton
                 type="button"
                 aria-label="Change view layout"

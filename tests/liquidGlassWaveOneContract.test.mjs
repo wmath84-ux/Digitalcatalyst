@@ -64,7 +64,11 @@ test("the admin panel never picks up the glass material", () => {
   for (const file of files) {
     assert.doesNotMatch(
       read(file),
-      /from "[^"]*(components\/ui\/glass|ui\/GlassCard|ui\/LiquidMetalButton|ui\/MacWindowModal)/,
+      // One sanctioned exception: `glass-toast` is the app-wide feedback BUS —
+      // admin's notify() pushes into the singleton store while the viewport
+      // (GlassToaster) stays mounted in src/main.tsx; no glass surface
+      // renders inside the admin tree.
+      /from "[^"]*(components\/ui\/glass(?!-toast)|ui\/GlassCard|ui\/LiquidMetalButton|ui\/MacWindowModal)/,
       `${file} must not import the glass rollout primitives`,
     );
   }
@@ -147,12 +151,16 @@ test("toasts: one material, two entry points (Wave 14: the vendored pack glass-t
   // …but it forwards into the pack store instead of painting its own card.
   assert.match(wrapper, /pushGlassToast\(\{ title: t\.text, variant: variantOf\[t\.type\] \}\)/);
   // The singleton + viewport are the registry item's own exports.
-  assert.match(card, /^\/\/ Vendored from the website-glass shadcn registry:/m);
+  // (2026-09-02: the card renderer is the AI Canvas glass-toast design —
+  // variants, rAF progress bar, spring stacking — behind the same store API.)
+  assert.match(card, /^\/\/ Glass Toast — AI Canvas design/m);
   assert.match(card, /export function toast\(input: string \| Omit<ToastData, "id">\): number/);
   assert.match(card, /export function GlassToaster\(/);
-  // Pack material, untouched: tint 0.6, radius 16, white ink, accent dot.
-  assert.match(card, /<GlassSurface tint=\{0\.6\} radius=\{16\} className="w-full" contentClassName="flex items-start gap-3 p-3\.5">/);
-  assert.match(card, /data\.variant === "success" \? "#30d158" : data\.variant === "error" \? "#ff453a" : null/);
+  // AI Canvas material: variant palette, draining rAF progress bar, popLayout stacking.
+  assert.match(card, /success: \{ color: "#06D6A0", Icon: CheckCircle2, label: "Success" \}/);
+  assert.match(card, /warning: \{ color: "#FFBE0B", Icon: AlertTriangle, label: "Warning" \}/);
+  assert.match(card, /requestAnimationFrame\(tick\)/);
+  assert.match(card, /<AnimatePresence mode="popLayout" initial=\{false\}>/);
 });
 
 test("the primary button keeps its hooks while the material becomes glass", () => {

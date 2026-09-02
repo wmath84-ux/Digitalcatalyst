@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
   BellRing,
@@ -12,13 +12,16 @@ import {
   Sparkles,
   Unlock,
   Users,
+  X,
 } from "lucide-react";
-import { collection, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
+import { AnimatePresence, motion } from "framer-motion";
+import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import Header from "./Header";
 import { GlassButton } from "./ui/glass-button";
 import { GlassCard } from "./ui/GlassCard";
 import { GlassToggleGroup, GlassToggleItem } from "./ui/glass-toggle-group";
+import { toast } from "./ui/glass-toast";
 import BottomNav, { type TabKey } from "./BottomNav";
 import {
   filterNotifications,
@@ -56,12 +59,12 @@ function timeAgo(ts: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Per-notification icon. Each notification carries a `category` and a `target`
-// (see utils/siteNotifications), so the list shows an icon that matches what
-// the alert is about — a product unlock, a My Day task/reminder, a renewal,
-// etc. — instead of reusing the app/PWA logo on every row.
+// Per-notification icon + accent colour. Each notification carries a
+// `category` and a `target` (see utils/siteNotifications), so every glass
+// card shows a tinted icon tile and accent line that match what the alert is
+// about — exactly the AI Canvas glass-notification treatment.
 // ---------------------------------------------------------------------------
-type IconStyle = { Icon: typeof Bell; bg: string; color: string };
+type IconStyle = { Icon: typeof Bell; color: string };
 
 function notificationIcon(notification: SiteNotification): IconStyle {
   const target = notification.target?.type;
@@ -70,28 +73,28 @@ function notificationIcon(notification: SiteNotification): IconStyle {
   // My Day reminders carry the section on the target — show the matching icon.
   if (target === "mayday" || category === "mayday") {
     const section = notification.target && notification.target.type === "mayday" ? notification.target.section : undefined;
-    if (section === "schedule") return { Icon: CalendarClock, bg: "bg-cyan-500/15", color: "text-cyan-300" };
-    if (section === "reminders") return { Icon: BellRing, bg: "bg-amber-500/15", color: "text-amber-300" };
-    return { Icon: CheckSquare, bg: "bg-teal-500/15", color: "text-teal-300" };
+    if (section === "schedule") return { Icon: CalendarClock, color: "#22D3EE" };
+    if (section === "reminders") return { Icon: BellRing, color: "#FFBE0B" };
+    return { Icon: CheckSquare, color: "#2DD4BF" };
   }
 
   switch (category) {
     case "store":
-      return { Icon: ShoppingBag, bg: "bg-indigo-500/15", color: "text-indigo-300" };
+      return { Icon: ShoppingBag, color: "#6C8CFF" };
     case "unlock":
-      return { Icon: Unlock, bg: "bg-emerald-500/15", color: "text-emerald-300" };
+      return { Icon: Unlock, color: "#06D6A0" };
     case "course":
-      return { Icon: BookOpen, bg: "bg-sky-500/15", color: "text-sky-300" };
+      return { Icon: BookOpen, color: "#38BDF8" };
     case "reading":
-      return { Icon: Newspaper, bg: "bg-blue-500/15", color: "text-blue-300" };
+      return { Icon: Newspaper, color: "#3A86FF" };
     case "community":
-      return { Icon: Users, bg: "bg-fuchsia-500/15", color: "text-fuchsia-300" };
+      return { Icon: Users, color: "#FF6BF5" };
     case "announcement":
-      return { Icon: Megaphone, bg: "bg-violet-500/15", color: "text-violet-300" };
+      return { Icon: Megaphone, color: "#B388FF" };
     case "subscription":
-      return { Icon: CreditCard, bg: "bg-purple-500/15", color: "text-purple-300" };
+      return { Icon: CreditCard, color: "#A78BFA" };
     default:
-      return { Icon: Sparkles, bg: "bg-indigo-500/15", color: "text-indigo-200" };
+      return { Icon: Sparkles, color: "#818CF8" };
   }
 }
 
@@ -123,6 +126,128 @@ const FILTER_META: Record<Exclude<NotificationFilterKey, "all">, { label: string
     hint: "Announcements and community activity.",
   },
 };
+
+// ---------------------------------------------------------------------------
+// NotificationCard — the AI Canvas glass-notification card
+// (https://aicanvas.me/components/glass-notification): swipe-to-dismiss glass
+// card with spring-animated layout transitions, tinted icon tile, close
+// button + timestamp column, and a colour-matched bottom accent line.
+// ---------------------------------------------------------------------------
+function NotificationCard({
+  notification,
+  index,
+  onOpen,
+  onDismiss,
+}: {
+  notification: SiteNotification;
+  index: number;
+  onOpen: (n: SiteNotification) => void;
+  onDismiss: (n: SiteNotification) => void;
+}) {
+  const { Icon, color } = notificationIcon(notification);
+  const draggingRef = useRef(false);
+
+  return (
+    <motion.div
+      layout
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.3}
+      onDragStart={() => {
+        draggingRef.current = true;
+      }}
+      onDragEnd={(_, info) => {
+        window.setTimeout(() => {
+          draggingRef.current = false;
+        }, 0);
+        if (Math.abs(info.offset.x) > 80) onDismiss(notification);
+      }}
+      initial={{ x: 60, scale: 0.9, opacity: 0 }}
+      animate={{
+        x: 0,
+        scale: 1,
+        opacity: 1,
+        transition: { type: "spring", stiffness: 280, damping: 24, delay: Math.min(index, 8) * 0.05 },
+      }}
+      exit={{ opacity: 0, x: -60, scale: 0.9, filter: "blur(4px)", transition: { duration: 0.2, ease: "easeIn" } }}
+      whileHover={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+      role="button"
+      tabIndex={0}
+      onClick={() => {
+        if (!draggingRef.current) onOpen(notification);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(notification);
+        }
+      }}
+      data-notification-read={notification.read ? "true" : "false"}
+      className={`group relative isolate w-full cursor-grab overflow-hidden rounded-2xl transition-colors duration-200 active:cursor-grabbing ${
+        notification.read ? "" : "ring-1 ring-indigo-400/40"
+      }`}
+      style={{
+        background: "rgba(255,255,255,0.06)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06)",
+      }}
+    >
+      {/* Separate blur layer so the frosted backdrop never re-rasterises
+          while the card is dragged or reflows. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-[-1] rounded-2xl"
+        style={{ backdropFilter: "blur(20px) saturate(1.6)", WebkitBackdropFilter: "blur(20px) saturate(1.6)" }}
+      />
+
+      <div className="flex items-start gap-3.5 px-4 py-3.5 pr-12">
+        <motion.div
+          data-notification-icon
+          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+          style={{ background: `${color}18`, border: `1px solid ${color}22` }}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 400, damping: 18, delay: 0.1 + Math.min(index, 8) * 0.05 }}
+        >
+          <Icon size={18} style={{ color }} aria-hidden />
+        </motion.div>
+        <div className="min-w-0 flex-1">
+          <h4 className="text-sm font-semibold text-white/85">{notification.title}</h4>
+          <p className="mt-0.5 text-[13px] leading-5 text-white/40">{notification.body}</p>
+        </div>
+      </div>
+
+      {/* Top-right column: dismiss × above the timestamp (+ unread dot) */}
+      <div className="absolute right-3 top-3 flex flex-col items-end gap-1.5">
+        <motion.button
+          type="button"
+          aria-label="Dismiss notification"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDismiss(notification);
+          }}
+          className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full"
+          style={{ background: "rgba(255,255,255,0.06)" }}
+          whileHover={{ scale: 1.2, backgroundColor: "rgba(255,255,255,0.15)" }}
+          whileTap={{ scale: 0.85 }}
+        >
+          <X size={11} className="text-white/30" aria-hidden />
+        </motion.button>
+        <span className="flex items-center gap-1 text-[10px] text-white/25">
+          {!notification.read && <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" aria-hidden />}
+          {timeAgo(notification.createdAt)}
+        </span>
+      </div>
+
+      {/* Bottom accent line in the notification's colour */}
+      <div
+        aria-hidden
+        className="absolute bottom-0 left-4 right-4 h-[1px]"
+        style={{ background: `linear-gradient(90deg, transparent, ${color}22, transparent)` }}
+      />
+    </motion.div>
+  );
+}
 
 export default function NotificationsPage({
   cartCount,
@@ -163,7 +288,15 @@ export default function NotificationsPage({
   const enableNotifications = async () => {
     if (!user) return;
     await ensureSavedWebPushSubscription(user.id);
-    if (typeof window !== "undefined" && isWebPushSupported()) setPushPermission(window.Notification.permission);
+    if (typeof window !== "undefined" && isWebPushSupported()) {
+      const permission = window.Notification.permission;
+      setPushPermission(permission);
+      if (permission === "granted") {
+        toast({ title: "Notifications enabled", description: "You'll now receive alerts on this device.", variant: "success" });
+      } else if (permission === "denied") {
+        toast({ title: "Notifications blocked", description: "Enable them in your browser's site settings.", variant: "warning" });
+      }
+    }
   };
 
   // Every notification is generated on the SERVER by the real-time push
@@ -204,6 +337,7 @@ export default function NotificationsPage({
     const remoteIds = items.filter((item) => !item.read && item.remoteNotificationId).map((item) => item.remoteNotificationId!);
     setItems((current) => current.map((item) => ({ ...item, read: true })));
     if (user) remoteIds.forEach((id) => void updateDoc(doc(db, "users", user.id, "notifications", id), { read: true, readAt: serverTimestamp() }));
+    toast({ title: "All caught up", description: "Every notification is marked as read.", variant: "success" });
   };
 
   const openNotification = (notification: SiteNotification) => {
@@ -213,6 +347,48 @@ export default function NotificationsPage({
     // product/course page, the My Day tab with the item highlighted, or the
     // subscription page (with renew intent when expired).
     window.location.hash = getNotificationDeepLink(notification);
+  };
+
+  // Swipe (or ×) dismiss: drop the card locally — the spring layout reflow
+  // closes the gap — and delete the mirrored cloud doc so it never returns
+  // on the next snapshot or on another device. The dismissed card is kept in
+  // a session stash so the header's Reset control (AI Canvas
+  // glass-notification) can bring everything back.
+  const [dismissedStash, setDismissedStash] = useState<SiteNotification[]>([]);
+  const dismissNotification = (notification: SiteNotification) => {
+    setItems((current) => current.filter((item) => item.id !== notification.id));
+    setDismissedStash((current) => [...current, notification]);
+    if (user && notification.remoteNotificationId) {
+      void deleteDoc(doc(db, "users", user.id, "notifications", notification.remoteNotificationId)).catch(() => undefined);
+    }
+    toast({ title: "Notification dismissed", duration: 2200 });
+  };
+
+  // Reset (spec): restores every card dismissed this session — locally for
+  // the spring re-entrance, and in the cloud so other devices agree.
+  const resetDismissed = () => {
+    if (dismissedStash.length === 0) return;
+    const restored = [...dismissedStash];
+    setDismissedStash([]);
+    setItems((current) => {
+      const existing = new Set(current.map((item) => item.id));
+      return [...restored.filter((item) => !existing.has(item.id)), ...current];
+    });
+    if (user) {
+      restored.forEach((item) => {
+        if (!item.remoteNotificationId) return;
+        void setDoc(doc(db, "users", user.id, "notifications", item.remoteNotificationId), {
+          title: item.title,
+          body: item.body,
+          category: item.category,
+          target: item.target || { type: "subscription" },
+          createdAt: item.createdAt,
+          read: Boolean(item.read),
+          expired: item.expired === true,
+        }).catch(() => undefined);
+      });
+    }
+    toast({ title: "Notifications restored", variant: "success", duration: 2200 });
   };
 
   return (
@@ -298,63 +474,74 @@ export default function NotificationsPage({
             </div>
           )}
 
-          {visibleItems.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 px-6 pb-10 pt-14 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/15 text-indigo-200">
-                <BellIcon className="h-7 w-7" />
+          {/* AI Canvas glass-notification stack: header row with counter
+              badge, then swipe-to-dismiss glass cards with spring-animated
+              layout reflow, then the "All caught up" empty state. */}
+          <div className="flex flex-col gap-2.5 px-4 pb-6 pt-2">
+            <div className="mb-1 flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <Bell size={20} className="text-white/40" aria-hidden />
+                <span className="text-sm font-semibold text-white/60">Notifications</span>
+                <motion.span
+                  layout
+                  className="flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-semibold text-white"
+                  style={{ background: "rgba(255,107,245,0.4)", border: "1px solid rgba(255,107,245,0.3)" }}
+                >
+                  {visibleItems.length}
+                </motion.span>
               </div>
-              <h3 className="text-xl font-extrabold text-white">
-                {activeFilter === "all" ? "No notifications yet" : `No ${FILTER_META[activeFilter as Exclude<NotificationFilterKey, "all">].label} notifications`}
-              </h3>
-              <p className="max-w-xs text-sm text-white/55">
-                {activeFilter === "all"
-                  ? "Store updates, course unlocks, and study reminders will show up here."
-                  : FILTER_META[activeFilter as Exclude<NotificationFilterKey, "all">].hint}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2 px-4 pb-6">
-              {visibleItems.map((notification) => {
-                return (
-                  <GlassCard
-                    key={notification.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => openNotification(notification)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        openNotification(notification);
-                      }
-                    }}
-                    data-notification-read={notification.read ? "true" : "false"}
-                    className={`w-full cursor-pointer text-left transition active:scale-[0.99] ${
-                      notification.read ? "" : "ring-1 ring-indigo-400/40"
-                    }`}
-                    contentClassName="flex items-start gap-3 px-3 py-3"
+              {/* Reset (spec): appears only after something was dismissed,
+                  scales in, and restores the stack. */}
+              <AnimatePresence>
+                {dismissedStash.length > 0 && (
+                  <motion.button
+                    type="button"
+                    onClick={resetDismissed}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="cursor-pointer text-xs font-medium text-white/30 transition-colors hover:text-white/50"
                   >
-                    {(() => {
-                      const { Icon, bg, color } = notificationIcon(notification);
-                      return (
-                        <span
-                          data-notification-icon
-                          className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bg} ${color}`}
-                        >
-                          <Icon className="h-5 w-5" />
-                        </span>
-                      );
-                    })()}
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-bold text-white">{notification.title}</span>
-                      <span className="mt-0.5 block text-xs leading-5 text-white/55">{notification.body}</span>
-                      <span className="mt-1 block text-[11px] font-semibold text-white/55">{timeAgo(notification.createdAt)}</span>
-                    </span>
-                    {!notification.read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-indigo-400" />}
-                  </GlassCard>
-                );
-              })}
+                    Reset
+                  </motion.button>
+                )}
+              </AnimatePresence>
             </div>
-          )}
+
+            <AnimatePresence mode="popLayout">
+              {visibleItems.map((notification, index) => (
+                <NotificationCard
+                  key={notification.id}
+                  notification={notification}
+                  index={index}
+                  onOpen={openNotification}
+                  onDismiss={dismissNotification}
+                />
+              ))}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {visibleItems.length === 0 && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center gap-3 py-12 text-center"
+                >
+                  <Bell size={28} className="text-white/20" aria-hidden />
+                  <span className="text-sm text-white/60">
+                    {activeFilter === "all" ? "All caught up" : `No ${FILTER_META[activeFilter as Exclude<NotificationFilterKey, "all">].label} notifications`}
+                  </span>
+                  <span className="max-w-xs px-6 text-xs text-white/30">
+                    {activeFilter === "all"
+                      ? "Store updates, course unlocks, and study reminders will show up here."
+                      : FILTER_META[activeFilter as Exclude<NotificationFilterKey, "all">].hint}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </main>
 
         <BottomNav active={null} onChange={onNavigateFooter} purchasesBadge={purchasesBadge} />

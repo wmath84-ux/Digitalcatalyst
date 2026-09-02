@@ -23,6 +23,15 @@ export const GLASS_ACCENT = '#38bdf8'
 export const GLASS_PILL_RADIUS = Math.max(4, GLASS_RADIUS - 7)
 export const GLASS_TINT_RGB = '255,255,255'
 
+// ── AI Canvas glass-dock panel tokens ────────────────────────────────────────
+// (https://aicanvas.me/components/glass-dock) — the dock bar's frosted panel:
+// translucent white pane, hairline border, deep drop + inset top-light, and a
+// SEPARATE non-animating blur layer so magnification frames never re-blur.
+export const DOCK_PANEL_BG = 'rgba(255,255,255,0.06)'
+export const DOCK_PANEL_BORDER = '1px solid rgba(255,255,255,0.1)'
+export const DOCK_PANEL_SHADOW = '0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)'
+export const DOCK_PANEL_BLUR = 'blur(24px) saturate(1.8)'
+
 const MAP_CACHE = new Map<string, string>()
 
 function clampByte(v: number) {

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { Minimize, Settings2 } from "lucide-react";
+import { Minimize } from "lucide-react";
 import { GlassButton } from "./components/ui/glass-button";
 import { applyGlassScheme } from "./lib/glassScheme";
-import { GlassSurface } from "./components/ui/glass";
-import { GlassSwitch } from "./components/ui/glass-switch";
+import { TagaToggle } from "./components/ui/taga-toggle";
+import { GlassPrefToggle } from "./components/ui/glass-pref-toggle";
+import { toast } from "./components/ui/glass-toast";
 import { Popover, PopoverContent, PopoverSeparator, PopoverTrigger } from "./components/ui/glass-popover";
 import ShimmerProgress from "./components/ui/ShimmerProgress";
 import ChargingCompleteButton from "./course/ChargingCompleteButton";
@@ -326,6 +327,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // flips the state back at any time.
   const [fileBarsHidden, setFileBarsHidden] = useState<boolean>(() => isMobileDevice());
   const [playerChromeHidden, setPlayerChromeHidden] = useState(false);
+  // ⚙ Player settings popover open state — controlled so the Taga Toggle
+  // trigger (glass pill with the expressive face) mirrors it: dead face when
+  // closed, happy face when open.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // The old secondary header strip (file-bars / viewport / theme / snow quick
   // toggles) is gone — every one of those preferences now lives in the ⚙
   // Player settings popover, so the header stays a single clean row.
@@ -928,30 +933,55 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   );
 
   // ── ⚙ Settings popover ──────────────────────────────────────────────────
-  // The ONE home for every player preference. The popover follows the
-  // player's own light/dark pick, so its labels stay legible on the light
-  // material too (they used to be white-on-white).
-  const settingsInk = theme === "light" ? "text-slate-900/85" : "text-white/85";
+  // The ONE home for every player preference. The trigger is the AI Canvas
+  // Taga Toggle (glass edition) — dead face while the panel is closed, happy
+  // face once it opens. The rows inside are AI Canvas Glass Toggles: one
+  // spring-driven progress value animates track colour, border, thumb and
+  // glow, with a staggered entrance on every open. Accent colour, stagger
+  // delay and the thin divider are looked up per row key so every call site
+  // keeps the original 4-argument shape.
   const settingsInkSoft = theme === "light" ? "text-slate-900/55" : "text-white/55";
-  const settingsRow = (label: string, checked: boolean, onChange: (next: boolean) => void, attr: string) => (
-    <div className={`flex items-center justify-between gap-4 px-4 py-2.5 text-sm ${settingsInk}`} data-course-setting={attr}>
-      <span className="font-semibold">{label}</span>
-      <GlassSwitch checked={checked} onCheckedChange={onChange} ariaLabel={label} />
-    </div>
-  );
+  const SETTING_ACCENTS: Record<string, { color: string; delay: number; divider: boolean }> = {
+    theme: { color: "#FF6BF5", delay: 0.1, divider: false },
+    snow: { color: "#3A86FF", delay: 0.15, divider: true },
+    viewport: { color: "#06D6A0", delay: 0.2, divider: true },
+    "file-bars": { color: "#FFBE0B", delay: 0.25, divider: false },
+    "player-chrome": { color: "#FF7B54", delay: 0.3, divider: true },
+    fullscreen: { color: "#B388FF", delay: 0.35, divider: true },
+  };
+  const notifySetting = (label: string, next: boolean) => {
+    toast({ title: `${label} ${next ? "on" : "off"}`, variant: next ? "success" : "info", duration: 2200 });
+  };
+  const settingsRow = (label: string, checked: boolean, onChange: (next: boolean) => void, attr: string) => {
+    const accent = SETTING_ACCENTS[attr] ?? { color: "#3A86FF", delay: 0.1, divider: true };
+    return (
+      <GlassPrefToggle
+        label={label}
+        on={checked}
+        onChange={(next) => {
+          onChange(next);
+          notifySetting(label, next);
+        }}
+        color={accent.color}
+        delay={accent.delay}
+        divider={accent.divider}
+        open={settingsOpen}
+        light={theme === "light"}
+        data-course-setting={attr}
+      />
+    );
+  };
   const settingsPopover = (side: "bottom" | "right") => (
-    <Popover>
+    <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
       <PopoverTrigger
         className="shrink-0 rounded-full"
         aria-label="Player settings"
         title="Player settings"
         data-course-settings-trigger
       >
-        <GlassSurface radius={999} className="size-10 text-white" contentClassName="grid place-items-center">
-          <Settings2 size={17} />
-        </GlassSurface>
+        <TagaToggle on={settingsOpen} width={side === "right" ? 48 : 60} />
       </PopoverTrigger>
-      <PopoverContent side={side} align={side === "bottom" ? "end" : "start"} className="min-w-[240px]" data-course-settings-menu data-course-theme={theme}>
+      <PopoverContent side={side} align={side === "bottom" ? "end" : "start"} className="min-w-[260px]" data-course-settings-menu data-course-theme={theme}>
         <p className={`px-4 pb-1 pt-1 text-[10px] font-black uppercase tracking-[0.14em] ${settingsInkSoft}`}>Player settings</p>
         {settingsRow("Light theme", theme === "light", (next) => setTheme(next ? "light" : "dark"), "theme")}
         {settingsRow("Snowfall", snowMode, (next) => setSnowMode(next), "snow")}

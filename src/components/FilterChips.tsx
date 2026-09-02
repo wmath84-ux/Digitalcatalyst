@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import { CheckIcon, SlidersIcon, XIcon } from "./icons";
 import type { StoreFilter } from "../data/storeFilters";
 import { GlassSurface } from "./ui/glass";
 import { GlassButton } from "./ui/glass-button";
 import { GlassToggleGroup, GlassToggleItem } from "./ui/glass-toggle-group";
+import { GlassTag, glassTagColor } from "./ui/glass-tags";
 import { LiquidMetalButton } from "./ui/LiquidMetalButton";
 
 type FilterChipsProps = {
@@ -16,11 +19,17 @@ type FilterChipsProps = {
 /**
  * Store filter row. The chips come from the admin panel
  * (`settings/storeFilters`), so a filter added in Products → Store filters
- * appears here for everyone without a deploy. The "Filters" button opens a
- * grouped sheet listing every chip, which keeps long lists usable on mobile.
+ * appears here for everyone without a deploy.
+ *
+ * The "Filters" button opens a full-screen glass overlay (portalled to
+ * <body>, so no ancestor's overflow can clip it) where EVERY filter renders
+ * as an AI Canvas Glass Tag (https://aicanvas.me/components/glass-tags):
+ * frosted pills with per-tag colour accents, staggered spring entrance, and
+ * a colour dot that swaps for a spring-drawn check mark on selection.
  */
 export default function FilterChips({ filters, activeId, onSelect }: FilterChipsProps) {
   const [showFilters, setShowFilters] = useState(false);
+  const closeTimer = useRef<number | null>(null);
 
   const grouped = useMemo(() => {
     const map = new Map<string, StoreFilter[]>();
@@ -31,6 +40,148 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
     });
     return Array.from(map.entries());
   }, [filters]);
+
+  const allFilter = useMemo(() => filters.find((filter) => filter.id === "all") ?? null, [filters]);
+
+  // Escape closes the overlay; the page behind must not scroll while open.
+  useEffect(() => {
+    if (!showFilters) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowFilters(false);
+    };
+    window.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showFilters]);
+
+  useEffect(() => () => {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+  }, []);
+
+  // Pick a tag, let its check mark draw, then close the overlay.
+  const pickFilter = (id: string) => {
+    onSelect(id);
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    closeTimer.current = window.setTimeout(() => setShowFilters(false), 450);
+  };
+
+  // A single running index across "All" + every group keeps the entrance
+  // stagger and the colour cycle continuous, exactly like the source demo.
+  let tagIndex = 0;
+
+  const overlay = (
+    <AnimatePresence>
+      {showFilters && (
+        <motion.div
+          key="store-filter-overlay"
+          data-store-filter-overlay
+          className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          {/* Backdrop */}
+          <button
+            type="button"
+            aria-label="Close filters"
+            className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-sm"
+            onClick={() => setShowFilters(false)}
+          />
+
+          <motion.div
+            className="relative w-full max-w-md px-4 pb-[calc(env(safe-area-inset-bottom)+16px)] sm:px-0 sm:pb-0"
+            initial={{ y: 24, scale: 0.96, opacity: 0 }}
+            animate={{ y: 0, scale: 1, opacity: 1 }}
+            exit={{ y: 24, scale: 0.96, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 200, damping: 22 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Store filters"
+          >
+            <GlassSurface
+              radius={24}
+              className="w-full overflow-hidden text-sm text-white/85"
+              contentClassName="p-5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-extrabold text-white">Refine your search</p>
+                  <p className="mt-0.5 text-xs text-white/75">Pick a filter to narrow the catalog.</p>
+                </div>
+                <GlassButton
+                  type="button"
+                  aria-label="Close filters"
+                  onClick={() => setShowFilters(false)}
+                  className="shrink-0 [&_.size-12]:size-8"
+                >
+                  <XIcon className="h-4 w-4" />
+                </GlassButton>
+              </div>
+
+              <div className="mt-4 max-h-[55vh] space-y-4 overflow-y-auto pr-1">
+                {allFilter && (
+                  <div className="flex flex-wrap gap-2 sm:gap-3">
+                    <GlassTag
+                      label={allFilter.label}
+                      title={allFilter.description || allFilter.label}
+                      color={glassTagColor(tagIndex)}
+                      selected={activeId === allFilter.id}
+                      index={tagIndex++}
+                      onClick={() => pickFilter(allFilter.id)}
+                    />
+                  </div>
+                )}
+
+                {grouped.length === 0 && !allFilter ? (
+                  <p className="text-xs text-white/55">No filters configured yet.</p>
+                ) : (
+                  grouped.map(([group, items]) => (
+                    <div key={group}>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-300">{group}</p>
+                      <div className="mt-2 flex flex-wrap gap-2 sm:gap-3">
+                        {items.map((filter) => {
+                          const i = tagIndex++;
+                          return (
+                            <GlassTag
+                              key={filter.id}
+                              label={filter.label}
+                              title={filter.description || filter.label}
+                              color={glassTagColor(i)}
+                              selected={activeId === filter.id}
+                              index={i}
+                              onClick={() => pickFilter(filter.id)}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="mt-4 flex gap-2">
+                <LiquidMetalButton
+                  tone="silver"
+                  className="flex-1"
+                  onClick={() => { onSelect("all"); setShowFilters(false); }}
+                >
+                  <span className="text-xs font-bold">Clear filters</span>
+                </LiquidMetalButton>
+                <LiquidMetalButton tone="primary" className="flex-1" onClick={() => setShowFilters(false)}>
+                  <span className="text-xs font-bold">Done</span>
+                </LiquidMetalButton>
+              </div>
+            </GlassSurface>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 
   return (
     <div className="relative px-4">
@@ -73,72 +224,9 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
         </GlassToggleGroup>
       </div>
 
-      {showFilters && (
-        <GlassSurface
-          radius={24}
-          className="absolute left-4 right-4 top-full z-30 mt-2 overflow-hidden text-sm text-white/85"
-          contentClassName="p-4"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="font-extrabold text-white">Refine your search</p>
-              <p className="mt-0.5 text-xs text-white/75">Pick a filter to narrow the catalog.</p>
-            </div>
-            <GlassButton
-              type="button"
-              aria-label="Close filters"
-              onClick={() => setShowFilters(false)}
-              className="shrink-0 [&_.size-12]:size-8"
-            >
-              <XIcon className="h-4 w-4" />
-            </GlassButton>
-          </div>
-
-          <div className="mt-3 max-h-64 space-y-3 overflow-y-auto pr-1">
-            {grouped.length === 0 ? (
-              <p className="text-xs text-white/55">No filters configured yet.</p>
-            ) : (
-              grouped.map(([group, items]) => (
-                <div key={group}>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-indigo-300">{group}</p>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {items.map((filter) => {
-                      const isActive = activeId === filter.id;
-                      return (
-                        <GlassButton
-                          key={filter.id}
-                          variant="capsule"
-                          type="button"
-                          aria-pressed={isActive}
-                          onClick={() => { onSelect(filter.id); setShowFilters(false); }}
-                          className={`[&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-xs [&>span>div]:font-semibold ${
-                            isActive ? "[&>span>div]:bg-indigo-600" : ""
-                          }`}
-                        >
-                          {filter.label}
-                        </GlassButton>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="mt-3 flex gap-2">
-            <LiquidMetalButton
-              tone="silver"
-              className="flex-1"
-              onClick={() => { onSelect("all"); setShowFilters(false); }}
-            >
-              <span className="text-xs font-bold">Clear filters</span>
-            </LiquidMetalButton>
-            <LiquidMetalButton tone="primary" className="flex-1" onClick={() => setShowFilters(false)}>
-              <span className="text-xs font-bold">Done</span>
-            </LiquidMetalButton>
-          </div>
-        </GlassSurface>
-      )}
+      {/* Portalled to <body>: the sticky filter bar's `overflow-hidden`
+          ancestors can never clip the overlay again. */}
+      {typeof document !== "undefined" ? createPortal(overlay, document.body) : null}
     </div>
   );
 }
