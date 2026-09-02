@@ -700,3 +700,22 @@ html[data-glass="on"] [data-profile-page]::before,
 html[data-glass="on"] [data-profile-page]::after {
   display: none !important;
 }
+
+/* ── Part 1e · CTA/button gradients -> solid brand, subscription heroes clear ─
+ * Part 1 deliberately skipped <button>/<a> so CTAs wouldn't go invisible. Now
+ * their gradient is replaced with a SOLID brand indigo (no gradient anywhere),
+ * keeping them visible until Part 3 swaps them for glass buttons. Banners are
+ * excluded. The subscription/profile `.dc-glass-hero` cards painted their own
+ * radial-gradient in index.css — under glass they go transparent so the backdrop
+ * shows. Gated on data-glass="on"; ?glass=off restores gradients. */
+html[data-glass="on"] :where(button, a):not([data-banner-id])[class*="bg-gradient-to"] {
+  background-image: none;
+  background-color: #4f46e5;
+}
+html[data-glass="on"] .dc-glass-hero,
+html[data-glass="on"] .dc-glass-hero--basic,
+html[data-glass="on"] .dc-glass-hero--premium,
+html[data-glass="on"] .dc-glass-hero--pro {
+  background: transparent !important;
+  background-image: none !important;
+}
