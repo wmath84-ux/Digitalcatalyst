@@ -40,12 +40,12 @@ export default function AuthApp() {
   }, [leaveAuthSafely]);
 
   return (
-    <main className="relative flex min-h-[100dvh] w-full flex-col overflow-hidden bg-[#05060f] text-white">
+    <main className="relative flex min-h-[100dvh] w-full flex-col overflow-hidden text-white">
       <div className="pointer-events-none absolute inset-0 bg-grid opacity-20" />
       <div className="pointer-events-none absolute -left-32 top-10 h-80 w-80 rounded-full bg-violet-600/30 blur-3xl float-anim" />
       <div className="pointer-events-none absolute -right-24 bottom-10 h-96 w-96 rounded-full bg-cyan-500/20 blur-3xl float-anim" />
 
-      <header className="relative z-20 shrink-0 border-b border-white/10 bg-[#05060f]/90 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-xl sm:px-6">
+      <header className="relative z-20 shrink-0 border-b border-white/10 bg-[#0a0c12]/60 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-xl sm:px-6">
         <div className="mx-auto flex w-full max-w-md items-center">
           <button
             type="button"

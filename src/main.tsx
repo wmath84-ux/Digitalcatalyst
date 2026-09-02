@@ -41,6 +41,7 @@ import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import GlassCommandPalette from "./components/GlassCommandPalette";
 import { ToastViewport } from "./components/ui/glass-toast";
+import { GlassBackdrop } from "./components/ui/GlassBackdrop";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BrandingProvider, useBranding } from "./context/BrandingContext";
 import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
@@ -154,7 +155,7 @@ type NavigableProduct = {
 };
 
 function InvalidCheckout({ onBack }: { onBack: () => void }) {
-  return <main className="grid min-h-[100dvh] place-items-center bg-slate-50 px-6 text-center"><div><p className="text-4xl">🛒</p><h1 className="mt-4 text-2xl font-black text-slate-900">Checkout session not found</h1><p className="mt-2 text-sm text-slate-500">Choose a live product before starting secure checkout.</p><button onClick={onBack} className="mt-6 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white">Back to store</button></div></main>;
+  return <main className="grid min-h-[100dvh] place-items-center px-6 text-center"><div><p className="text-4xl">🛒</p><h1 className="mt-4 text-2xl font-black text-white">Checkout session not found</h1><p className="mt-2 text-sm text-white/70">Choose a live product before starting secure checkout.</p><button onClick={onBack} className="mt-6 rounded-xl bg-white/15 px-5 py-3 text-sm font-black text-white ring-1 ring-inset ring-white/25">Back to store</button></div></main>;
 }
 
 /**
@@ -295,10 +296,38 @@ function Root() {
   // rendered inside each app — the desktop CSS hides it on >= 1024 px.
   // The shell (left rail + top bar) takes over from there.
   return (
-    <DesktopAppHost>
-      <RootPage />
-    </DesktopAppHost>
+    <>
+      <RouteBackdrop />
+      <DesktopAppHost>
+        <RootPage />
+      </DesktopAppHost>
+    </>
   );
+}
+
+/**
+ * The ONE Black Ice backdrop for the whole app (Phase A, wave A1).
+ *
+ * Before this it was mounted inside AppShell / DesktopShell / MyDayApp /
+ * FlowPathApp, which left every route that bypasses the shell — checkout,
+ * auth, landing, the course player, the loading and guard screens — sitting
+ * on a white or hand-painted canvas. Mounting it once at the routing level
+ * means every non-admin route, every breakpoint and every guard state sits
+ * on the same fixed gradient, and no route can accidentally stack two.
+ *
+ * Admin keeps its own background logic: main.tsx forces the glass tier to
+ * `off` there and `.dc-backdrop` is display:none under `data-glass="off"`,
+ * but the layer is skipped outright on admin routes so it never even mounts.
+ */
+function RouteBackdrop() {
+  const [hash, setHash] = useState<string>(() => (typeof window !== "undefined" ? window.location.hash : ""));
+  useEffect(() => {
+    const onChange = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+  if (hash.startsWith(ADMIN_HASH) || hash.startsWith(ADMIN_LOGIN_HASH)) return null;
+  return <GlassBackdrop />;
 }
 
 /**
@@ -924,12 +953,12 @@ function RootPage(): ReactNode {
     return <AppLaunchSplash label={skipLandingForInstalledMobilePwa ? "Opening your dashboard…" : "Preparing your learning space…"} />;
   }
   if (launchPending && skipLandingForInstalledMobilePwa) {
-    return <main className="min-h-[100dvh] bg-white" aria-busy="true" aria-label="Opening app" />;
+    return <main className="min-h-[100dvh]" aria-busy="true" aria-label="Opening app" />;
   }
 
   if (protectedRoutePending) {
     return (
-      <main className="grid min-h-[100dvh] place-items-center bg-[#05060f] px-6 text-center text-white">
+      <main className="grid min-h-[100dvh] place-items-center px-6 text-center text-white">
         <div>
           <span className="mx-auto block h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-violet-400" />
           <p className="mt-4 text-sm font-semibold text-slate-300">

@@ -9,7 +9,7 @@ export default function Footer() {
   return (
     // The landing no longer lives inside the desktop shell, so the footer
     // (privacy / terms links) shows on every viewport size again.
-    <footer className="border-t border-white/10 bg-[#05060f] px-6 py-10 text-slate-500 sm:px-8">
+    <footer className="border-t border-white/10 px-6 py-10 text-slate-500 sm:px-8">
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
         <div className="flex items-center gap-2">
           <BrandMark className="h-8 w-8 rounded-lg" fallbackLetter />

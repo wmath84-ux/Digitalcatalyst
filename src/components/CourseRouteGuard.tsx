@@ -43,7 +43,7 @@ export default function CourseRouteGuard({ product, onCheckout, onBack, onPurcha
 
   if (loading) {
     return (
-      <div className="grid min-h-[100dvh] place-items-center bg-slate-50 text-sm text-slate-500">
+      <div className="grid min-h-[100dvh] place-items-center text-sm text-white/70">
         <div className="flex flex-col items-center gap-2">
           <span className="h-3 w-3 animate-pulse rounded-full bg-violet-300" />
           <p>Verifying course access…</p>

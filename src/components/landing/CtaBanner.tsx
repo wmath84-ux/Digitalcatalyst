@@ -5,7 +5,7 @@ import { openApp, openInstallPanel } from "@/utils/pwaInstall";
 
 export default function CtaBanner() {
   return (
-    <section className="relative bg-[#05060f] px-6 pb-28 sm:px-8">
+    <section className="relative px-6 pb-28 sm:px-8">
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
         whileInView={{ opacity: 1, scale: 1 }}

@@ -121,10 +121,17 @@ body,
   height: 100%;
   width: 100%;
   margin: 0;
-  background-color: #ffffff;
+  /* Phase A: the canvas is the Black Ice base ink, never white. The fixed
+     .dc-backdrop paints the gradient; body/#root stay transparent so it
+     shows through on every route (iOS overscroll shows this ink, not white). */
+  background-color: #0a0c12;
   touch-action: pan-x pan-y;
   overscroll-behavior: none;
   -ms-touch-action: pan-x pan-y;
+}
+body,
+#root {
+  background-color: transparent;
 }
 
 body {
@@ -390,11 +397,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
      page background, comfortable horizontal padding, and a wider
      max-width so the content reads at tablet scale. */
   .dc-app-shell {
-    background:
-      radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.18), transparent 48%),
-      radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.16), transparent 42%),
-      radial-gradient(88% 62% at 50% 100%, rgba(244, 114, 182, 0.10), transparent 48%),
-      linear-gradient(180deg, #f6f8ff 0%, #eef3ff 46%, #f8fafc 100%);
+    background: transparent;
     /* `sm:py-6` exists to float the phone card inside the window. Once
        the card is gone it only leaves a 24 px band of dead background
        above and below the page (plus 48 px of extra scroll), so the
@@ -581,10 +584,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   }
 
   .dc-app-shell {
-    background:
-      radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.10), transparent 50%),
-      radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.08), transparent 44%),
-      linear-gradient(180deg, #f7f8fc 0%, #eef1f8 48%, #f6f7fb 100%);
+    background: transparent;
     padding: 0;
   }
 
@@ -767,10 +767,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   }
   .dc-app-shell {
     padding: 0;
-    background:
-      radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.10), transparent 50%),
-      radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.08), transparent 44%),
-      linear-gradient(180deg, #f7f8fc 0%, #eef1f8 48%, #f6f7fb 100%);
+    background: transparent;
   }
   .dc-desktop-shell [data-desktop-side-panel] {
     display: block !important;
@@ -852,10 +849,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   /* The shell: a soft surface that supports the rail + top bar
      without competing with them. */
   .dc-app-shell {
-    background:
-      radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.10), transparent 50%),
-      radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.08), transparent 44%),
-      linear-gradient(180deg, #f7f8fc 0%, #eef1f8 48%, #f6f7fb 100%);
+    background: transparent;
   }
 
   /* The mobile + tablet per-page chrome is hidden on desktop. The
@@ -2059,8 +2053,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 [data-profile-page] {
   --profile-ink: #0f172a;
   --profile-muted: #64748b;
-  background-color: #eef2ff;
-  background-image: linear-gradient(180deg, #eef2ff 0%, #f8fafc 55%, #ffffff 100%);
+  /* Phase A: no page wash — the Black Ice backdrop is the page. */
+  background: transparent;
 }
 
 .dc-app-shell {
@@ -2077,49 +2071,18 @@ body.eduvora-razorpay-open .razorpay-container iframe {
      NOT create a scroll container, so body scrolling and sticky headers
      inside the shell keep working exactly as before. */
   overflow: clip;
-  background:
-    radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.22), transparent 48%),
-    radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.18), transparent 42%),
-    radial-gradient(88% 62% at 50% 100%, rgba(244, 114, 182, 0.12), transparent 48%),
-    linear-gradient(180deg, #f6f8ff 0%, #eef3ff 46%, #f8fafc 100%);
-}
-
-.dc-app-shell::before,
-.dc-app-shell::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  pointer-events: none;
-  border-radius: 9999px;
-  filter: blur(56px);
-}
-
-.dc-app-shell::before {
-  top: 4rem;
-  left: -5rem;
-  width: 15rem;
-  height: 15rem;
-  background: rgba(167, 139, 250, 0.32);
-}
-
-.dc-app-shell::after {
-  right: -4rem;
-  top: 12rem;
-  width: 16rem;
-  height: 16rem;
-  background: rgba(125, 211, 252, 0.26);
+  /* Phase A: the shell paints nothing. The single fixed Black Ice backdrop
+     (src/glass-theme.css) is the page background on every breakpoint; the
+     old indigo/sky wash and the two aurora orbs are gone at the source. */
+  background: transparent;
 }
 
 .dc-app-frame {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(248, 250, 252, 0.58));
-  backdrop-filter: blur(30px) saturate(165%);
-  -webkit-backdrop-filter: blur(30px) saturate(165%);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  box-shadow:
-    0 24px 60px -26px rgba(79, 70, 229, 0.42),
-    0 14px 30px -20px rgba(15, 23, 42, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  /* Phase A: the mobile/tablet "phone card" no longer paints a white wash,
+     border or shadow — the page body scrolls directly over the backdrop. */
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .dc-glass {
@@ -2237,53 +2200,24 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 .dc-glass-hero {
   position: relative;
   isolation: isolate;
-  /* Match the app brand: the home header / icon blend is indigo → violet
-     (#4f46e5 → #7c3aed). The profile hero now uses the same gradient so the
-     card reads as the website's own colour instead of the old dark navy. */
-  background:
-    radial-gradient(120% 90% at 100% 0%, rgba(255, 255, 255, 0.16), transparent 46%),
-    radial-gradient(90% 80% at 0% 110%, rgba(34, 211, 238, 0.2), transparent 48%),
-    linear-gradient(160deg, #4f46e5 0%, #7c3aed 55%, #a21caf 100%);
-  backdrop-filter: blur(26px) saturate(150%);
-  -webkit-backdrop-filter: blur(26px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  /* Phase A: no identity gradient. The hero is the same frosted material as
+     the pack's GlassSurface (dark-scheme tint 0.5, blur 14, saturate 1.6,
+     specular rim) so it reads as a glass card over the Black Ice backdrop. */
+  background-color: rgba(60, 62, 68, 0.21);
+  backdrop-filter: blur(14px) saturate(1.6);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow:
-    0 28px 56px -20px rgba(109, 40, 217, 0.6),
-    0 0 0 1px rgba(167, 139, 250, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 18px 40px -24px rgba(0, 0, 0, 0.55);
 }
 
-.dc-glass-hero--basic {
-  background:
-    radial-gradient(120% 90% at 100% 0%, rgba(34, 211, 238, 0.38), transparent 46%),
-    radial-gradient(90% 80% at 0% 110%, rgba(56, 189, 248, 0.24), transparent 48%),
-    linear-gradient(165deg, rgba(10, 22, 38, 0.9), rgba(7, 10, 22, 0.88));
-  box-shadow:
-    0 28px 56px -20px rgba(14, 165, 233, 0.5),
-    0 0 0 1px rgba(103, 232, 249, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
-}
-
-.dc-glass-hero--premium {
-  background:
-    radial-gradient(120% 90% at 100% 0%, rgba(232, 121, 249, 0.42), transparent 46%),
-    radial-gradient(90% 80% at 0% 110%, rgba(167, 139, 250, 0.24), transparent 48%),
-    linear-gradient(165deg, rgba(32, 12, 38, 0.9), rgba(10, 7, 20, 0.88));
-  box-shadow:
-    0 28px 56px -20px rgba(192, 38, 211, 0.52),
-    0 0 0 1px rgba(240, 171, 252, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
-}
-
+.dc-glass-hero--basic,
+.dc-glass-hero--premium,
 .dc-glass-hero--pro {
-  background:
-    radial-gradient(120% 90% at 100% 0%, rgba(139, 92, 246, 0.5), transparent 44%),
-    radial-gradient(90% 80% at 0% 110%, rgba(244, 114, 182, 0.22), transparent 48%),
-    linear-gradient(165deg, rgba(24, 14, 52, 0.92), rgba(8, 6, 20, 0.9));
-  box-shadow:
-    0 28px 56px -18px rgba(109, 40, 217, 0.68),
-    0 0 0 1px rgba(196, 181, 253, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  /* Tier variants no longer carry their own colour wash — the plan's identity
+     is the copy, badge and CTA, not a painted background. */
+  background-color: rgba(60, 62, 68, 0.21);
 }
 
 /* ==================== FlowPath 3D Dashboard Styles ==================== */
@@ -3003,8 +2937,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   [data-profile-page] [data-profile-content] { min-height: 0; padding-inline: clamp(24px, 5vw, 48px); }
 }
 @media (max-width: 1023px) and (prefers-reduced-motion: reduce), (max-width: 767px) and (update: slow) {
-  .dc-app-shell, [data-profile-page] { background: #f4f6fb !important; background-image: none !important; }
-  .dc-app-shell::before, .dc-app-shell::after, .dc-glass::before, [data-profile-page] .dc-glass-hero > div { display: none !important; }
+  .dc-app-shell, [data-profile-page] { background: transparent !important; background-image: none !important; }
+  .dc-glass::before, [data-profile-page] .dc-glass-hero > div { display: none !important; }
   .dc-glass, .dc-glass-soft, .dc-glass-toolbar, .dc-glass-chip, .dc-glass-input, .dc-modal-glass, .dc-glass-hero { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 }
 @media (max-width: 767px) { [data-app-frame] { overscroll-behavior: none; } [data-revision-content] { overflow: hidden; } }
@@ -3547,7 +3481,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 @media (min-width: 960px) {
   [data-profile-page] {
     min-height: 100dvh;
-    background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 40%, #ffffff 100%);
+    background: transparent;
   }
   [data-profile-page] [data-app-frame] {
     max-width: 100% !important;

@@ -40,7 +40,7 @@ export default function Features() {
   const { appName } = useBranding();
   const features = buildFeatures(appName);
   return (
-    <section id="features" className="relative bg-[#05060f] px-6 py-28 sm:px-8">
+    <section id="features" className="relative px-6 py-28 sm:px-8">
       <div className="pointer-events-none absolute inset-0 bg-grid opacity-20" />
       <div className="relative mx-auto max-w-7xl">
         <motion.div

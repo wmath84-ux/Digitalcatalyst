@@ -92,7 +92,7 @@ export default function PortraitOnlyGuard() {
       data-app-portrait-overlay
       role="alert"
       aria-label="Rotate your phone to portrait"
-      className="fixed inset-0 z-[500] grid place-items-center bg-[#05060f] px-8 text-center text-white"
+      className="fixed inset-0 z-[500] grid place-items-center bg-[#0a0c12]/92 px-8 text-center text-white"
       style={{
         // Ensure overlay covers everything including safe areas
         paddingTop: "env(safe-area-inset-top, 0px)",

@@ -73,7 +73,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/glass-tooltip";
 import { LiquidMetalButton } from "@/components/ui/LiquidMetalButton";
-import { GlassBackdrop } from "@/components/ui/GlassBackdrop";
 
 /** The hash-prefixed routes the rail can drive. Each one navigates by
  *  setting `window.location.hash` so the change is persistent + the
@@ -344,14 +343,10 @@ export default function DesktopShell({
 
   return (
     <div
-      className="dc-desktop-shell flex min-h-[100dvh] w-full bg-[#f6f7fb] text-slate-900"
+      className="dc-desktop-shell flex min-h-[100dvh] w-full text-slate-900"
       data-desktop-shell
       data-tablet-responsive
     >
-      {/* Black Ice backdrop — one fixed layer behind the whole shell. The
-          shell's own `bg-[#f6f7fb]` wash is made transparent by
-          src/glass-theme.css while glass is on, so this shows through. */}
-      <GlassBackdrop />
       {/* ── Persistent left rail ─────────────────────────────────────
           Tablet landscape: width scales with clamp() so it fits tablet screens
       */}

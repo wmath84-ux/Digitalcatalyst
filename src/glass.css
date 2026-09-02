@@ -658,48 +658,9 @@ html[data-glass="on"] [data-home-header] :where(h1, p, span, a, button, svg):not
   color: rgb(var(--dc-paper-on-ink) / 0.95);
 }
 
-/* ── Part 1b · kill the shell's blue page gradient (the real culprit) ────────
- * The blue gradient "behind the components" is NOT a Tailwind bg-gradient-to-*
- * class — it's `.dc-app-shell`'s background, painted in src/index.css with
- * radial-gradient(purple/blue) + linear-gradient(#f6f8ff…) across several media
- * queries. The class-based Part 1 rule can't reach a CSS-file background, so the
- * shell is neutralised directly here: under glass its background goes transparent
- * and the single Black Ice backdrop shows. !important is required to beat the
- * media-query declarations in index.css. Scoped to .dc-app-shell + gated on
- * data-glass="on"; ?glass=off restores the gradient. */
-html[data-glass="on"] .dc-app-shell {
-  background: transparent !important;
-}
-
-/* ── Part 1c · kill the remaining page-canvas gradients (mobile/tablet/profile)
- * `.dc-app-frame` paints a translucent white linear-gradient (the mobile/tablet
- * canvas) and `[data-profile-page]` a soft indigo wash — both are CSS-file
- * backgrounds in src/index.css that the class-based strip can't reach. Under
- * glass they go transparent so the single backdrop shows on EVERY device. The
- * glass components (.dc-glass*) and chrome are left alone. !important beats the
- * index.css declarations; gated on data-glass="on"; ?glass=off restores them. */
-html[data-glass="on"] .dc-app-frame,
-html[data-glass="on"] [data-profile-page] {
-  background: transparent !important;
-  background-image: none !important;
-}
-
-/* ── Part 1d · kill the aurora orbs (the real mobile/tablet culprit) ─────────
- * `.dc-app-shell::before/::after` are decorative aurora orbs — purple/sky/pink
- * radial-gradient blobs that bleed past the shell edges. The Part 1c
- * `background: transparent` only hit the shell element itself, NOT its pseudo
- * elements, so the orbs kept painting on mobile/tablet (index.css only hides
- * them at one breakpoint). Under glass they are removed on every device, along
- * with any frame/profile pseudo washes, so only the Black Ice backdrop shows.
- * Gated on data-glass="on"; ?glass=off restores the orbs. */
-html[data-glass="on"] .dc-app-shell::before,
-html[data-glass="on"] .dc-app-shell::after,
-html[data-glass="on"] .dc-app-frame::before,
-html[data-glass="on"] .dc-app-frame::after,
-html[data-glass="on"] [data-profile-page]::before,
-html[data-glass="on"] [data-profile-page]::after {
-  display: none !important;
-}
+/* Phase A (2026-09-02): the former Part 1b/1c/1d overrides (shell gradient,
+ * frame wash, aurora orbs, profile wash) are gone — that paint no longer exists
+ * in src/index.css or the page JSX, so there is nothing left to neutralise. */
 
 /* ── Part 1e · CTA/button gradients -> solid brand, subscription heroes clear ─
  * Part 1 deliberately skipped <button>/<a> so CTAs wouldn't go invisible. Now
@@ -712,13 +673,8 @@ html[data-glass="on"] :where(button, a):not([data-banner-id])[class*="bg-gradien
   background-image: none;
   background-color: #4f46e5;
 }
-html[data-glass="on"] .dc-glass-hero,
-html[data-glass="on"] .dc-glass-hero--basic,
-html[data-glass="on"] .dc-glass-hero--premium,
-html[data-glass="on"] .dc-glass-hero--pro {
-  background: transparent !important;
-  background-image: none !important;
-}
+/* Phase A: `.dc-glass-hero*` is now the GlassSurface material at the source
+ * (src/index.css) — no override needed. */
 
 /* ── Part 1f · every solid white panel -> frosted glass (no white pages) ─────
  * The owner wants no opaque white pages anywhere — checkout, course-player

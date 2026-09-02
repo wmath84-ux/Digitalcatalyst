@@ -267,7 +267,7 @@ export default function ProfileApp() {
   };
 
   return (
-    <div data-profile-page className="min-h-screen bg-gradient-to-b from-indigo-50 via-slate-50 to-white text-slate-900 sm:py-0 lg:py-0">
+    <div data-profile-page className="min-h-screen text-slate-900 sm:py-0 lg:py-0">
       <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 lg:max-w-full lg:rounded-none lg:border-0">
         <Header
           cartCount={cartIds.size}

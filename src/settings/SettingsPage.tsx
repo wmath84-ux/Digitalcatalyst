@@ -67,7 +67,7 @@ export default function SettingsPage() {
 
   if (!user) {
     return (
-      <div data-settings-page className="min-h-screen bg-gradient-to-b from-indigo-50 via-slate-50 to-white text-slate-900">
+      <div data-settings-page className="min-h-screen text-slate-900">
         <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col">
           <main data-settings-content className="flex flex-1 flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-12 text-center">
             <span className="grid h-14 w-14 place-items-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
@@ -134,7 +134,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div data-settings-page className="min-h-screen bg-gradient-to-b from-indigo-50 via-slate-50 to-white text-slate-900">
+    <div data-settings-page className="min-h-screen text-slate-900">
       <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 lg:max-w-full">
         <Header
           cartCount={cartIds.size}

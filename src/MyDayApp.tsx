@@ -31,7 +31,6 @@ import { useAuth } from "./context/AuthContext";
 import { useMyDayAccess } from "./hooks/useMyDayAccess";
 import { usePublishFeatureVisibility } from "./context/FeatureVisibilityContext";
 import PremiumGate from "./components/subscription/PremiumGate";
-import { GlassBackdrop } from "./components/ui/GlassBackdrop";
 import { playSfxAdd, playSfxComplete, playSfxRemove, playSfxSuccess, playSfxToggle } from "./utils/sfx";
 
 const NOTE_COLORS: NoteColor[] = ["amber", "sky", "rose", "emerald", "violet"];
@@ -592,10 +591,8 @@ export default function App() {
 
   return (
     <OverlayBoundsProvider value={contentColumnRef}>
-    {/* Black Ice backdrop — one fixed layer behind the My Day shell. */}
-    <GlassBackdrop />
     <div className="dc-app-shell min-h-screen">
-      <div data-app-frame data-myday-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0 lg:max-w-7xl lg:rounded-[2rem] lg:bg-white lg:shadow-xl lg:border lg:border-slate-200">
+      <div data-app-frame data-myday-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0 lg:max-w-7xl">
         <StoreHeader
           cartCount={cartIds.size}
           notifCount={1}

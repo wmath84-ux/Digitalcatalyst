@@ -197,14 +197,18 @@ test("store surfaces use frosted glass, colour and depth", () => {
     assert.match(source, /bg-white\/\d|tint=\{/, `${name} should use translucent surfaces`);
     assert.match(source, /shadow-|<GlassSurface|<GlassCard/, `${name} should carry shadows (or the pack's rim)`);
   }
-  // Ambient colour behind the frosted layers.
-  assert.match(storePage, /blur-3xl/);
+  // Phase A (2026-09-02): the page paints NO ambient wash or orbs of its own —
+  // the single fixed Black Ice backdrop is the only page background.
+  assert.doesNotMatch(storePage, /data-glass-ambient[^>]*blur-3xl/, "store must not paint its own ambient orbs");
+  assert.doesNotMatch(storePage, /from-indigo-50 via-slate-50 to-white/, "store must not paint a page wash");
   assert.match(hero, /from-indigo-600 via-violet-600 to-fuchsia-600/);
 });
 
 test("product detail uses the same glass treatment", () => {
   assert.match(pdp, /backdrop-blur-xl/);
   assert.match(pdp, /backdrop-blur-2xl/);
-  assert.match(pdp, /bg-gradient-to-b from-indigo-50 via-slate-50 to-white/);
+  // Phase A: no page wash on the PDP root either — the backdrop is the page.
+  assert.doesNotMatch(pdp, /min-h-screen bg-white/);
+  assert.doesNotMatch(pdp, /data-pdp-root className="[^"]*bg-gradient-to-b from-indigo-50/);
   assert.match(pdp, /shadow-\[0_16px_45px_-20px_rgba\(49,46,129,0\.55\)\]/);
 });

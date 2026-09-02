@@ -8,10 +8,10 @@ import { useBranding } from "@/context/BrandingContext";
 export default function Hero() {
   const { appName, tagline } = useBranding();
   return (
-    <section className="relative flex min-h-screen items-center overflow-hidden bg-[#05060f] pt-24">
+    <section className="relative flex min-h-screen items-center overflow-hidden pt-24">
       <HeroScene />
       <div className="pointer-events-none absolute inset-0 bg-grid opacity-30" />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-[#05060f]/40 to-[#05060f]" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-[#0a0c12]/30 to-[#0a0c12]/70" />
 
       <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-10 px-6 py-16 sm:px-8">
         <motion.div

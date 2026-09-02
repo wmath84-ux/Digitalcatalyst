@@ -66,7 +66,7 @@ export default function ProfilePreview() {
   const planLabel = tier === "normal" ? "Free plan" : "Premium Plan";
 
   return (
-    <div data-profile-page className="min-h-screen bg-gradient-to-b from-indigo-50 via-slate-50 to-white text-slate-900">
+    <div data-profile-page className="min-h-screen text-slate-900">
       {/* Dev toolbar */}
       <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
