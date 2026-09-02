@@ -613,3 +613,16 @@ html[data-glass="on"] :where([data-pdp-loose]) :where(h1, h2, p, span, a, button
     background-color: rgb(var(--dc-paper-on-ink) / 0.55);
   }
 }
+
+/* ── Part 1 · strip decorative gradient backgrounds (owner direction) ────────
+ * One background only: the blurred Black Ice backdrop. Every decorative
+ * `bg-gradient-to-*` wash / sheen / glow loses its background-image under glass
+ * so the single backdrop shows through. Excluded:
+ *   • [data-banner-id] — home hero banners stay (owner: "banner rahega")
+ *   • <button> / <a>   — CTAs keep their paint for now; they become glass
+ *                        components in the next part, not a blind strip.
+ * Source classes are untouched, so every source-string contract still matches.
+ * ?glass=off restores every gradient. */
+html[data-glass="on"] [class*="bg-gradient-to"]:not([data-banner-id]):not(button):not(a) {
+  background-image: none;
+}
