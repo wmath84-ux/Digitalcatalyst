@@ -29,7 +29,7 @@ function CardBody({ activity }: { activity: Activity }) {
   switch (activity.type) {
     case "task":
       return (
-        <div className="mt-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-fp-text-45">
+        <div className="mt-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-white/70">
           <span
             className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
               activity.priority === "high"
@@ -50,38 +50,38 @@ function CardBody({ activity }: { activity: Activity }) {
       const start = activity.startLabel ?? (activity as { startTime?: string }).startTime;
       const end = activity.endLabel ?? (activity as { endTime?: string }).endTime;
       return start || end ? (
-        <p className="mt-1 text-[12px] text-fp-text-55">
+        <p className="mt-1 text-[12px] text-white/75">
           {start ?? "—"} — {end ?? "—"}
         </p>
       ) : null;
     }
     case "note":
       return (
-        <p className="mt-1 line-clamp-2 text-[12px] text-fp-text-50">
+        <p className="mt-1 line-clamp-2 text-[12px] text-white/75">
           {activity.preview || activity.description}
         </p>
       );
     case "revision":
       return (
         <div className="mt-2">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-fp-text-10">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/15">
             <div
               className="h-full rounded-full bg-cyan-400"
               style={{ width: `${activity.progress ?? 0}%` }}
             />
           </div>
-          <p className="mt-1 text-[11px] text-fp-text-45">Progress {activity.progress ?? 0}%</p>
+          <p className="mt-1 text-[11px] text-white/70">Progress {activity.progress ?? 0}%</p>
         </div>
       );
     case "mcq":
       return (
-        <p className="mt-1 text-[12px] text-fp-text-50">
+        <p className="mt-1 text-[12px] text-white/75">
           {activity.totalQuestions ?? 0} Questions · {activity.completedQuestions ?? 0} Completed
         </p>
       );
     case "reminder":
       return (
-        <p className="mt-1 flex items-center gap-1 text-[12px] text-fp-text-50">
+        <p className="mt-1 flex items-center gap-1 text-[12px] text-white/75">
           <Clock3 className="h-3 w-3" /> {activity.timeLabel.split("· ")[1] ?? activity.timeLabel}
         </p>
       );
@@ -96,9 +96,9 @@ function CardBody({ activity }: { activity: Activity }) {
         return (
           <div className="mt-1 space-y-0.5">
             {moduleTitle ? (
-              <p className="truncate text-[12px] text-fp-text-50">Module · {moduleTitle}</p>
+              <p className="truncate text-[12px] text-white/75">Module · {moduleTitle}</p>
             ) : null}
-            <p className="text-[11px] text-fp-text-45">
+            <p className="text-[11px] text-white/70">
               {minutes ? `${minutes} min` : "Lecture"}
               {previewOnly ? " · Preview (not purchased)" : ""}
             </p>
@@ -106,7 +106,7 @@ function CardBody({ activity }: { activity: Activity }) {
         );
       }
       return activity.description ? (
-        <p className="mt-1 line-clamp-2 text-[12px] text-fp-text-50">{activity.description}</p>
+        <p className="mt-1 line-clamp-2 text-[12px] text-white/75">{activity.description}</p>
       ) : null;
   }
 }
@@ -152,7 +152,9 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
     >
       {/* Wave 13c: the card is the pack GlassSurface — `.glass-panel` /
           `.glass-panel-strong` gradient plates + glow shadow removed. State
-          (now / overdue) is a ring, because colour carries meaning there. */}
+          (now / overdue) is a ring, because colour carries meaning there.
+          Owner (post Wave 14): the card ink is plain white (title) / white
+          alpha (meta) in both FlowPath themes so it reads on the glass. */}
       <GlassSurface
         radius={16}
         className={`rounded-2xl ${isCurrent ? "ring-1 ring-violet-400/50" : ""} ${isOverdue ? "ring-1 ring-rose-400/40" : ""}`}
@@ -190,13 +192,13 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
           <h3
             className={`font-display mt-0.5 truncate text-[13.5px] font-semibold sm:text-sm ${
               isCompleted
-                ? "text-fp-text-55 line-through decoration-fp-text-30"
-                : "text-fp-text"
+                ? "text-white/60 line-through decoration-white/40"
+                : "text-white"
             }`}
           >
             {activity.title}
           </h3>
-          <p className="mt-0.5 truncate text-[11px] text-fp-text-40">{activity.timeLabel}</p>
+          <p className="mt-0.5 truncate text-[11px] text-white/70">{activity.timeLabel}</p>
           <CardBody activity={activity} />
         </div>
 
@@ -227,7 +229,7 @@ export function ActivityCard({ activity, status, onComplete, completing, onEdit,
                 />
               </motion.svg>
             ) : (
-              <Circle className="h-3 w-3 text-fp-text-30 group-hover:fp-text-emerald" />
+              <Circle className="h-3 w-3 text-white/55 group-hover:fp-text-emerald" />
             )}
           </GlassButton>
         )}

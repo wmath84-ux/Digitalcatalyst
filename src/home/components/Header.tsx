@@ -97,11 +97,18 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
     // the collapse animation then behaves exactly like it does on Home.
     const useWindowScroll = scrollers.length === 0;
 
+    // The seat (the header's un-collapsed height) is written onto the app
+    // frame, or — for pages that mount this header outside a frame (FlowPath)
+    // — onto the nearest `[data-home-header-host]`, whose CSS height is pinned
+    // to it. That keeps the scroll container's content height constant while
+    // the header shrinks; otherwise the collapse feeds back into scrollY and
+    // the header flickers as the page is scrolled slowly.
+    const seatHost = header.closest("[data-app-frame], [data-home-header-host]");
     const measureSeat = () => {
-      if (!(frame instanceof HTMLElement)) return;
+      if (!(seatHost instanceof HTMLElement)) return;
       const collapse = header.style.getPropertyValue("--home-collapse");
       header.style.setProperty("--home-collapse", "0");
-      frame.style.setProperty("--dc-home-header-seat", `${header.offsetHeight}px`);
+      seatHost.style.setProperty("--dc-home-header-seat", `${header.offsetHeight}px`);
       if (collapse) header.style.setProperty("--home-collapse", collapse);
       else header.style.removeProperty("--home-collapse");
     };
@@ -231,7 +238,8 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             defaults — tint 0.4, radius 9999), the same component the store
             page's search bar renders; `dc-glass-toolbar` is gone from here. */}
         <div
-          className="relative cursor-pointer transition active:scale-[0.99]"
+          data-search-launcher
+          className="relative cursor-pointer outline-none transition active:scale-[0.99]"
           onClick={openSearch}
           role="button"
           tabIndex={0}
@@ -251,7 +259,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             type="text"
             inputMode="search"
             placeholder="Search courses, PDFs, e-books..."
-            className="w-full [&_input]:cursor-pointer [&_input]:pr-24"
+            className="w-full [&_input]:cursor-pointer [&_input]:pr-24 [&_input]:outline-none"
             readOnly
           />
           {query ? (

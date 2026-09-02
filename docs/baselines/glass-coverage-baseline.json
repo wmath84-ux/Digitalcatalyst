@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-09-02T10:21:28.977Z",
+  "generatedAt": "2026-09-02T11:23:59.787Z",
   "files": {
-    "nonAdmin": 297,
+    "nonAdmin": 296,
     "appCode": 264
   },
   "bare": {
     "button": 128,
     "input": 57,
     "textarea": 9,
-    "paintedPanel": 36,
+    "paintedPanel": 37,
     "nativeTitle": 124
   },
   "blur": {
@@ -20,7 +20,7 @@
     "unpairedVh": 0
   },
   "layout": {
-    "fixedInset0": 18,
+    "fixedInset0": 16,
     "bgGradientTo": 10,
     "minWidthBreakpoint": 10
   },
@@ -32,7 +32,7 @@
   "build": {
     "distPresent": true,
     "oklchInDist": 0,
-    "inOklabInDist": 288
+    "inOklabInDist": 292
   },
   "pack": {
     "directImports": 605,

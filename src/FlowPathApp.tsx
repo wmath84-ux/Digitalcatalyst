@@ -17,7 +17,8 @@ interface FlowPathAppProps {
  * (brand gradient, search, leaderboard / profile / notifications /
  * favorites actions). The header is sticky so it stays seated while the
  * flow ribbon scrolls underneath, and its collapse animation is driven by
- * the window scroller (see Header's window fallback).
+ * the window scroller (see Header's window fallback). The sticky host is
+ * sized to the header's seat so collapsing cannot move the scroll position.
  *
  * The footer dock's Home button navigates back to the main home page
  * on a single click.
@@ -38,8 +39,11 @@ export default function FlowPathApp({
           (radial gradients, grid, orbs, particles) are gone — FlowPath sits on
           the app's single blurred backdrop like every other page. */}
 
-      {/* Home-style greeting header, pinned above the flow ribbon. */}
-      <div className="sticky top-0 z-40">
+      {/* Home-style greeting header, pinned above the flow ribbon. The sticky
+          host keeps a constant height (`--dc-home-header-seat`, measured by
+          the header) so the collapse animation never changes the document
+          height — that feedback loop was the flicker on slow scrolls. */}
+      <div data-home-header-host className="sticky top-0 z-40">
         <Header
           userName={userName}
           query={searchQuery}

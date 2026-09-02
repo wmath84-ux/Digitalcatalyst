@@ -668,3 +668,14 @@ Owner call-outs: the subscription gate must be the pack sheet from the bottom wi
 Contracts updated: `flowpathRoutingContract`, `liquidGlassPhaseABackdropContract`, `premiumGateResponsiveContract`, `pdpCourseModuleSelectContract`, `homeHeroBannersStoreDefaultViewContract`, Wave One/Three/Four/Six toast pins.
 
 **Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 139 → 128, `bg-white panels` 46 → 36, gradients 14 → 10 (left: word-marks `bg-clip-text`, `BrandMark` logo tile, `StackedCards` image scrim, `GlassPreview` demo page), `native title=` 125 → 124, render-sites 675 → 691 (baseline re-recorded) · backdrop OK · frozen diff: only `glass-toast.tsx` (now byte-identical to upstream).
+
+### Post-Wave 14 owner fixes (2026-09-02)
+
+| Owner report | Fix |
+|---|---|
+| Blue rectangular focus strip on the home / store / PDP search boxes | `glass.css` global accent ring now respects a component's own `outline-none` (the pack Glass Input paints its own focus glow); search launchers carry `data-search-launcher` and get no ring at all |
+| Store search box should open the search page | `SearchBar` tap → `#/search` (draft as `?q=`) — no palette detour; `searchPageContract` updated. The search page itself was already on the pack (GlassInput / GlassButton / GlassSelect / GlassToggleGroup / GlassCard — Wave 10) |
+| FlowPath header flickers when scrolling slowly | root cause: header collapse changed the document height → scrollY fed back into the collapse. `FlowPathApp` sticky host `[data-home-header-host]` is pinned to the measured `--dc-home-header-seat` (Header writes the seat onto the frame *or* the host) |
+| Home long-press → FlowPath everywhere | removed: `BottomNav`, `DesktopPeekDock` (hold ring, pulse dot, liquid-expand overlay + `.fp-liquid-expand` CSS), My Day / cart / revision docks, `home/App` `onLongPressHome`; `HoldRing.tsx` deleted. `useHomeHold` stays only for the course-player logo → Home hold |
+| FlowPath activity card text should be white | `ActivityCard` ink → `text-white` / `text-white/75|70|60|55` (both FlowPath themes) |
+| Footer: FlowPath right-most, Revision in its old slot | `BottomNav` + `DesktopPeekDock` tab order `… Purchases · Revision · FlowPath` |

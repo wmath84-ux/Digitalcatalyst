@@ -2357,30 +2357,7 @@ html.light .dc-glass-dark {
   to { stroke-dashoffset: 0; }
 }
 
-@keyframes fp-liquid-expand {
-  0% {
-    transform: scale(0);
-    border-radius: 50%;
-    opacity: 1;
-  }
-  40% {
-    border-radius: 50%;
-    opacity: 1;
-  }
-  70% {
-    border-radius: 28%;
-    opacity: 1;
-  }
-  100% {
-    transform: scale(60);
-    border-radius: 0%;
-    opacity: 1;
-  }
-}
-
-.fp-liquid-expand {
-  animation: fp-liquid-expand 0.85s cubic-bezier(0.23, 1, 0.32, 1) forwards;
-}
+/* `.fp-liquid-expand` (Home long-press → FlowPath) removed with the gesture. */
 
 @media (prefers-reduced-motion: reduce) {
   .fp-pulse::before, .fp-floaty, .fp-shimmer {
@@ -5374,6 +5351,18 @@ html.light {
 
 [data-home-header][data-collapsed] [data-home-search-slot] {
   pointer-events: none;
+}
+
+/* Sticky host for the home header on pages without an app frame (FlowPath):
+   fixed to the measured seat so the header's collapse cannot change the
+   scroll height (no scroll ↔ collapse feedback = no flicker). The host is
+   transparent and lets taps through the gap under the collapsed header. */
+[data-home-header-host] {
+  height: var(--dc-home-header-seat, auto);
+  pointer-events: none;
+}
+[data-home-header-host] > [data-home-header] {
+  pointer-events: auto;
 }
 
 [data-home-header] [data-home-brand] {

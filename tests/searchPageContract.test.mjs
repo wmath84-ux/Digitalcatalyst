@@ -110,10 +110,10 @@ test("Store search bar is now a launcher — not a live filter", () => {
   // to the dedicated search page so the experience is consistent
   // with the home page's search bar.
   assert.match(searchBar, /openSearchPage/);
-  // Wave 11 (owner): an empty tap opens the pack's GlassCommand palette; a
-  // pre-filled draft still deep-links to the results page.
-  assert.match(searchBar, /openCommandPalette\(\)/);
-  assert.match(searchBar, /window\.location\.hash = `#\/search\?q=/);
+  // Owner (post Wave 14): every tap on the store box opens the dedicated
+  // search page — no palette detour; a draft deep-links as `?q=`.
+  assert.doesNotMatch(searchBar, /openCommandPalette/);
+  assert.match(searchBar, /window\.location\.hash = trimmed \? `#\/search\?q=\$\{encodeURIComponent\(trimmed\)\}` : "#\/search"/);
   // The bar is now a click-through, not a live filter — the input
   // is readOnly to make the affordance explicit.
   assert.match(searchBar, /readOnly/);

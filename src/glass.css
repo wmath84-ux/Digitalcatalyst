@@ -109,6 +109,16 @@ html[data-glass="on"] :where(button, a, input, select, textarea, [tabindex]):foc
   outline-offset: 2px;
   border-radius: inherit;
 }
+/* Respect a component's own `outline-none`: the pack Glass Input (and every
+   search box built on it — home header, store bar, search page) paints its
+   own soft focus glow on the pill, so the accent ring only drew a stray blue
+   rectangle around the inner <input>. Owner: remove it. Controls that do not
+   opt out keep the ring. */
+html[data-glass="on"] :where(button, a, input, select, textarea, [tabindex]):is(.outline-none, .focus\:outline-none, .focus-visible\:outline-none):focus-visible,
+html[data-glass="on"] :where([data-search-launcher], [data-search-launcher] *):focus-visible,
+html[data-glass="on"] :where([data-search-launcher], [data-search-launcher] *):focus {
+  outline: none;
+}
 
 /* ── no backdrop-filter support at all (very old WebView / FF <103): the frost
  *    disappears, so panels fall back to the app's opaque surface instead of

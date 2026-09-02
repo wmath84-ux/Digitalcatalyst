@@ -1,6 +1,5 @@
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassButton } from "@/components/ui/glass-button";
-import { openCommandPalette } from "@/lib/commandPalette";
 import {
   GlassSelect,
   GlassSelectContent,
@@ -24,16 +23,13 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
   // search experience with live filtering, sort, and category chips.
   // The current `value` is passed across as a `?q=` deep link so the
   // search page opens with the same query already typed.
-  // Tap → the pack's GlassCommand palette (owner: the search box IS the glass
-  // command component). A pre-filled draft still deep-links to the full results
-  // page, so the `#/search?q=` contract other screens rely on is unchanged.
+  // Owner (post Wave 14): a tap on the store's search box always opens the
+  // dedicated `#/search` page (the full glass search experience), carrying
+  // any draft across as `?q=`. The ⌘K palette stays reachable from the
+  // keyboard shortcut and the home header.
   const openSearchPage = () => {
     const trimmed = value.trim();
-    if (trimmed) {
-      window.location.hash = `#/search?q=${encodeURIComponent(trimmed)}`;
-      return;
-    }
-    openCommandPalette();
+    window.location.hash = trimmed ? `#/search?q=${encodeURIComponent(trimmed)}` : "#/search";
   };
 
   return (
@@ -47,7 +43,8 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
           that hands its draft query to `#/search?q=`, still keyboard-operable,
           still clearable. */}
       <div
-        className="group relative block w-full cursor-pointer overflow-hidden rounded-2xl text-left outline-none transition focus-visible:ring-2 focus-visible:ring-indigo-400/70 active:scale-[0.99]"
+        data-search-launcher
+        className="group relative block w-full cursor-pointer overflow-hidden rounded-2xl text-left outline-none transition active:scale-[0.99]"
         onClick={openSearchPage}
         role="button"
         tabIndex={0}
