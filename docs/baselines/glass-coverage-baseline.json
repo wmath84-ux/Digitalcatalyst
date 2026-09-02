@@ -1,0 +1,132 @@
+{
+  "generatedAt": "2026-09-01T17:32:22.334Z",
+  "files": {
+    "nonAdmin": 295,
+    "appCode": 263
+  },
+  "bare": {
+    "button": 393,
+    "input": 69,
+    "textarea": 9,
+    "paintedPanel": 301,
+    "nativeTitle": 126
+  },
+  "blur": {
+    "content": 78,
+    "chrome": 12
+  },
+  "viewport": {
+    "bareVh": 14,
+    "unpairedVh": 0
+  },
+  "layout": {
+    "fixedInset0": 28,
+    "bgGradientTo": 162,
+    "minWidthBreakpoint": 19
+  },
+  "fixedLayer": {
+    "backdropRulesSeen": 0,
+    "backdropViolations": 0,
+    "backgroundAttachmentFixed": 0
+  },
+  "build": {
+    "distPresent": true,
+    "oklchInDist": 0,
+    "inOklabInDist": 530
+  },
+  "pack": {
+    "directImports": 156,
+    "viaWrapper": 34,
+    "renderSites": 190,
+    "perItem": {
+      "glass": {
+        "direct": 21,
+        "viaWrapper": 20
+      },
+      "glass-button": {
+        "direct": 2,
+        "viaWrapper": 0
+      },
+      "glass-switch": {
+        "direct": 3,
+        "viaWrapper": 0
+      },
+      "glass-slider": {
+        "direct": 7,
+        "viaWrapper": 0
+      },
+      "glass-tabs": {
+        "direct": 0,
+        "viaWrapper": 2
+      },
+      "glass-tooltip": {
+        "direct": 29,
+        "viaWrapper": 0
+      },
+      "glass-input": {
+        "direct": 2,
+        "viaWrapper": 0
+      },
+      "glass-popover": {
+        "direct": 7,
+        "viaWrapper": 0
+      },
+      "glass-dialog": {
+        "direct": 0,
+        "viaWrapper": 0
+      },
+      "glass-dock": {
+        "direct": 0,
+        "viaWrapper": 0
+      },
+      "glass-tile": {
+        "direct": 4,
+        "viaWrapper": 0
+      },
+      "glass-swatch": {
+        "direct": 2,
+        "viaWrapper": 0
+      },
+      "glass-card": {
+        "direct": 0,
+        "viaWrapper": 9
+      },
+      "glass-checkbox": {
+        "direct": 2,
+        "viaWrapper": 0
+      },
+      "glass-radio": {
+        "direct": 2,
+        "viaWrapper": 0
+      },
+      "glass-toggle-group": {
+        "direct": 9,
+        "viaWrapper": 0
+      },
+      "glass-accordion": {
+        "direct": 4,
+        "viaWrapper": 0
+      },
+      "glass-dropdown-menu": {
+        "direct": 6,
+        "viaWrapper": 0
+      },
+      "glass-select": {
+        "direct": 38,
+        "viaWrapper": 0
+      },
+      "glass-sheet": {
+        "direct": 6,
+        "viaWrapper": 0
+      },
+      "glass-toast": {
+        "direct": 1,
+        "viaWrapper": 3
+      },
+      "glass-command": {
+        "direct": 11,
+        "viaWrapper": 0
+      }
+    }
+  }
+}

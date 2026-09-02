@@ -39,6 +39,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import DesktopShell, { type DesktopRailKey, resolveActiveFromHash } from "./DesktopShell";
 import { useResponsiveCategory } from "../utils/responsive";
 import { FeatureVisibilityProvider } from "../context/FeatureVisibilityContext";
+import { GlassBackdrop } from "./ui/GlassBackdrop";
 
 interface AppShellProps {
   children: ReactNode;
@@ -161,6 +162,10 @@ export default function AppShell({
   // stays exactly as it was.
   return (
     <FeatureVisibilityProvider>
+      {/* Black Ice backdrop. Mounted here for the mobile/tablet-portrait
+          branch; the desktop branch gets it from DesktopShell. Exactly one
+          layer per route either way. */}
+      <GlassBackdrop />
       {children}
     </FeatureVisibilityProvider>
   );

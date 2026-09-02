@@ -117,7 +117,7 @@ export const getRelatedProducts = (product: Product, catalog: Product[], limit =
 export default function ProductDetail(props: ProductDetailProps) {
   return (
     <div className="min-h-screen bg-white sm:py-6">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200 md:max-w-none md:rounded-none md:border-0 md:shadow-none md:bg-transparent">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200 md:max-w-none md:rounded-none md:border-0 md:shadow-none md:bg-transparent">
         <Header
           cartCount={props.cartIds?.size || 0}
           notifCount={1}
@@ -510,15 +510,15 @@ function PremiumProductContent({
   const highlights = product.features?.length ? product.features : autoHighlights;
 
   return (
-    <div className="relative bg-gradient-to-b from-indigo-50 via-slate-50 to-white pb-5 text-zinc-900">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div data-pdp-root className="relative bg-gradient-to-b from-indigo-50 via-slate-50 to-white pb-5 text-zinc-900">
+      <div data-glass-ambient className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-24 left-1/4 h-64 w-64 rounded-full bg-gradient-to-br from-violet-300/40 to-transparent blur-3xl" />
         <div className="absolute top-1/3 -right-24 h-64 w-64 rounded-full bg-gradient-to-bl from-sky-300/35 to-transparent blur-3xl" />
         <div className="absolute bottom-24 -left-20 h-64 w-64 rounded-full bg-gradient-to-tr from-fuchsia-200/35 to-transparent blur-3xl" />
       </div>
 
       <div className="relative">
-        <nav className="flex flex-wrap items-center gap-1.5 px-4 pt-4 text-[11px] text-zinc-500">
+        <nav data-pdp-loose className="flex flex-wrap items-center gap-1.5 px-4 pt-4 text-[11px] text-zinc-500">
           <button onClick={onBack} className="transition hover:text-zinc-900">Store</button>
           <ChevronRight className="h-3 w-3 text-zinc-300" />
           <span>{product.category}</span>
@@ -555,7 +555,7 @@ function PremiumProductContent({
           </section>
 
           <section className="flex flex-col gap-5">
-            <div className="space-y-3">
+            <div data-pdp-loose className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">{product.category}</span>
                 {product.tags.slice(0, 2).map((tag) => <span key={tag} className="rounded-full bg-orange-50 px-2.5 py-1 text-[10px] font-semibold text-orange-600">{tag}</span>)}

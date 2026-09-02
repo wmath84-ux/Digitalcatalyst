@@ -8,9 +8,9 @@ export default function Hero({ resourceCount }: HeroProps) {
   return (
     <section className="relative overflow-hidden px-4 pb-6 pt-6">
       {/* Colour wash + soft light blobs behind the frosted content */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-indigo-100/80 via-violet-50/60 to-transparent" />
-      <div aria-hidden className="pointer-events-none absolute -top-16 right-0 h-48 w-48 rounded-full bg-fuchsia-300/30 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-20 -left-10 h-52 w-52 rounded-full bg-sky-300/30 blur-3xl" />
+      <div aria-hidden data-glass-ambient className="pointer-events-none absolute inset-0 bg-gradient-to-br from-indigo-100/80 via-violet-50/60 to-transparent" />
+      <div aria-hidden data-glass-ambient className="pointer-events-none absolute -top-16 right-0 h-48 w-48 rounded-full bg-fuchsia-300/30 blur-3xl" />
+      <div aria-hidden data-glass-ambient className="pointer-events-none absolute -bottom-20 -left-10 h-52 w-52 rounded-full bg-sky-300/30 blur-3xl" />
 
       <div className="relative">
         <p className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/60 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-indigo-700 shadow-sm shadow-indigo-200/60 backdrop-blur-md">

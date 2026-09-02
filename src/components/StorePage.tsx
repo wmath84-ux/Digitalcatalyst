@@ -155,7 +155,7 @@ function ProductCardList({
               ? "cursor-default border border-amber-200/70 bg-amber-100/70 text-amber-800 backdrop-blur"
               : purchased || inCart
                 ? "cursor-default border border-emerald-200/70 bg-emerald-100/70 text-emerald-700 backdrop-blur"
-                : "bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-[0.98]"
+                : "dc-cta-brand text-white shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-[0.98]"
           }`}
         >
           {purchased ? "Purchased" : unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to Cart"}
@@ -240,10 +240,10 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
   return (
     <div className="relative overflow-hidden pb-6">
       {/* Ambient colour wash behind the frosted surfaces */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-indigo-50 via-slate-50 to-white" />
-      <div aria-hidden className="pointer-events-none absolute -left-24 top-10 -z-10 h-64 w-64 rounded-full bg-violet-300/35 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute -right-24 top-52 -z-10 h-72 w-72 rounded-full bg-sky-300/30 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute bottom-24 left-1/3 -z-10 h-72 w-72 rounded-full bg-fuchsia-200/30 blur-3xl" />
+      <div aria-hidden data-glass-ambient className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-indigo-50 via-slate-50 to-white" />
+      <div aria-hidden data-glass-ambient className="pointer-events-none absolute -left-24 top-10 -z-10 h-64 w-64 rounded-full bg-violet-300/35 blur-3xl" />
+      <div aria-hidden data-glass-ambient className="pointer-events-none absolute -right-24 top-52 -z-10 h-72 w-72 rounded-full bg-sky-300/30 blur-3xl" />
+      <div aria-hidden data-glass-ambient className="pointer-events-none absolute bottom-24 left-1/3 -z-10 h-72 w-72 rounded-full bg-fuchsia-200/30 blur-3xl" />
 
       <Hero resourceCount={filtered.length} />
 

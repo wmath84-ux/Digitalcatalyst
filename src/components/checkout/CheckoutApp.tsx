@@ -138,7 +138,7 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
       <div
         data-checkout-shell
         data-app-frame
-        className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200"
+        className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200"
       >
         <Header
           cartCount={cartIds.size}

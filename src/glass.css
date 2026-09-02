@@ -63,6 +63,44 @@ html[data-glass="lite"] {
   --glass-strength-panel: 0.1;
 }
 
+/* ── flat tier (Liquid Glass v2): zero live blur ANYWHERE ────────────────────
+   `flat` keeps every shape, tint and rim but strips backdrop-filter from the
+   whole document — pack surfaces, the app's own `backdrop-blur-*` utilities,
+   everything. It is what `?glass=flat` and `prefers-reduced-transparency:
+   reduce` resolve to.
+
+   Document-wide rather than limited to `[data-glass-surface]` on purpose: most
+   of the live blur in this app today is hand-written Tailwind, not pack
+   surfaces, so a tier that only silenced the pack would not honour the
+   request. The Black Ice backdrop is unaffected — it carries no blur by
+   design — so `flat` still gets the full v2 background.
+
+   Universal selector + !important is deliberate: a kill switch has to beat
+   every utility, and it only ever matches while flat is active. ──────────── */
+html[data-glass-tier="flat"] :where(*) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ── z-index scale (Liquid Glass v2, brief §4) ───────────────────────────────
+   One documented ladder. The tokens live in src/glass-theme.css next to the
+   palette they belong to:
+
+     --dc-z-backdrop  -1   the fixed Black Ice layer. Never 0, and never its
+                           own isolation context — it has to sit behind the
+                           page, not merely behind its siblings.
+     --dc-z-content    0   ordinary page content
+     --dc-z-sticky    20   in-flow sticky headers inside a scroller
+     --dc-z-chrome    40   the fixed header / footer / dock
+     --dc-z-overlay   60   sheets, popovers, command palette
+     --dc-z-dialog    80   modal dialogs and their scrim
+     --dc-z-toast     90   above a dialog that triggered it
+
+   Reuse these instead of inventing a number. The 28 existing `fixed inset-0`
+   overlays still carry their scattered `z-[50]`…`z-[9999]` values; they move
+   onto this ladder as each surface is reworked in Waves 2–6. Nothing inside
+   src/components/BottomNav.tsx is renumbered — that file is frozen. ──────── */
+
 /* ── focus: a lens has no border of its own, so the ring is the only reliable
  *    keyboard affordance. Applied to whatever the component renders as the
  *    focusable node. ───────────────────────────────────────────────────────── */
@@ -479,4 +517,247 @@ html[data-glass="on"] :where(.dc-field, .dc-glass-select, .dc-segment, .dc-tile,
     transition-duration: 1ms !important;
     animation: none !important;
   }
+}
+
+/* ── Wave 2 (v2) · fixed chrome surface over the Black Ice backdrop ──────────
+ * The header and footer keep their position, their markup and every animation
+ * (hide-on-scroll, collapse, dock behaviour) untouched; only their *surface*
+ * changes, and only in CSS — the chrome TSX is not edited here, and
+ * src/components/BottomNav.tsx + src/components/glass-dock/** are frozen, so
+ * they get nothing at all (the mobile footer already sits fine on the backdrop).
+ *
+ * The frost is a translucent *white* over the dark backdrop on purpose: the
+ * chrome's ink is dark slate (`text-slate-900`), so a light frost keeps it
+ * ≥4.5:1 without touching a single label. The rim is an inset hairline drawn
+ * with box-shadow (never `border`) so no fixed bar shifts by a pixel and the
+ * hide-on-scroll / collapse geometry is bit-identical.
+ * `?glass=off` drops every rule below and restores the pre-rollout paint.
+ * --------------------------------------------------------------------------- */
+
+html[data-glass="on"] :where([data-site-header]) {
+  background-color: rgb(var(--dc-paper-on-ink) / 0.78);
+  box-shadow:
+    inset 0 -1px 0 rgb(var(--dc-paper-on-ink) / 0.28),
+    0 10px 28px -20px rgb(0 0 0 / 0.7);
+}
+
+/* The home header paints its own brand gradient + blur inline
+   (src/home/components/Header.tsx, pinned by homeHeaderGlassCollapse), so it
+   gets only the rim — its background is left alone. */
+html[data-glass="on"] :where([data-home-header]) {
+  box-shadow:
+    inset 0 -1px 0 rgb(var(--dc-paper-on-ink) / 0.28),
+    0 10px 28px -20px rgb(0 0 0 / 0.7);
+}
+
+/* Desktop rail + top bar are the fixed chrome on tablet-landscape / desktop. */
+html[data-glass="on"] :where([data-desktop-rail]) {
+  background-color: rgb(var(--dc-paper-on-ink) / 0.82);
+  box-shadow: inset -1px 0 0 rgb(var(--dc-paper-on-ink) / 0.28);
+}
+
+html[data-glass="on"] :where([data-desktop-topbar]) {
+  background-color: rgb(var(--dc-paper-on-ink) / 0.82);
+  box-shadow:
+    inset 0 -1px 0 rgb(var(--dc-paper-on-ink) / 0.28),
+    0 10px 28px -20px rgb(0 0 0 / 0.7);
+}
+
+/* ── Wave 3 · let the store float on the Black Ice backdrop ──────────────────
+ * The store painted its own opaque light wash + pastel glow blobs behind the
+ * frosted cards (src/components/StorePage.tsx, tagged `data-glass-ambient`).
+ * Under glass those are dropped so the page backdrop shows through the gaps
+ * between the frosted surfaces; the cards and filter bar keep their own frost,
+ * so their dark ink stays readable. `?glass=off` keeps the old wash.          */
+html[data-glass="on"] :where([data-glass-ambient]) {
+  display: none;
+}
+
+/* ── Wave 3 · SearchPage + PDP over the Black Ice backdrop ───────────────────
+ * SearchPage's canvas (its own `data-search-frame`) goes fully transparent: its
+ * search bar (bg-white/85 + backdrop-blur-xl) and every result card already sit
+ * on frost, so the backdrop shows behind them and their dark ink stays put.
+ *
+ * The PDP root paints `text-zinc-900` straight onto its wash and has ~36 dark
+ * text sites that are not all carded, so hiding the wash outright would strand
+ * dark-on-dark text. Instead it gets a translucent white *veil*: the backdrop
+ * glows through, the dark ink stays readable, and `?glass=off` keeps the old
+ * opaque wash. A full re-ink to light-on-dark is a separate, visually-QA'd pass. */
+html[data-glass="on"] :where([data-search-frame]) {
+  background-color: transparent;
+}
+html[data-glass="on"] :where([data-pdp-root]) {
+  background-image: none;            /* drop the wash -> the backdrop shows */
+  color: rgb(var(--dc-paper-on-ink) / 0.92);  /* base ink goes light */
+}
+/* Loose text that sits straight on the backdrop (breadcrumb, title, description,
+   meta) is re-inked light. Badges/pills are protected by :not([class*="bg-"])
+   so a `bg-zinc-900 text-white` chip or `bg-orange-50 text-orange-600` tag keeps
+   its own colours. Text inside the frosted cards keeps its explicit dark ink
+   (a direct utility beats this inherited rule), so cards stay dark-on-frost. */
+html[data-glass="on"] :where([data-pdp-loose]) :where(h1, h2, p, span, a, button):not([class*="bg-"]) {
+  color: rgb(var(--dc-paper-on-ink) / 0.92);
+}
+
+/* ── Wave 4 · My Day desktop canvas over the backdrop ────────────────────────
+ * MyDayApp already mounts <GlassBackdrop/> and its frame is transparent below
+ * `lg` (so a phone already floats on Black Ice). Only the desktop "app card"
+ * (lg:bg-white) covered it. Under glass that canvas becomes a translucent veil
+ * at lg+ ONLY — the backdrop glows through while the dark ink stays readable —
+ * and mobile/tablet keep their full float (no veil added where the frame was
+ * already transparent). Scoped to MyDay's own `data-myday-frame` hook so the
+ * shared `data-app-frame`/`dc-app-frame` (Revision, cart, home) is untouched.
+ * `?glass=off` keeps the solid white card. */
+@media (min-width: 1024px) {
+  html[data-glass="on"] :where([data-myday-frame]) {
+    background-color: rgb(var(--dc-paper-on-ink) / 0.55);
+  }
+}
+
+/* ── Part 1 · strip decorative gradient backgrounds (owner direction) ────────
+ * One background only: the blurred Black Ice backdrop. Every decorative
+ * `bg-gradient-to-*` wash / sheen / glow loses its background-image under glass
+ * so the single backdrop shows through. Excluded:
+ *   • [data-banner-id] — home hero banners stay (owner: "banner rahega")
+ *   • <button> / <a>   — CTAs keep their paint for now; they become glass
+ *                        components in the next part, not a blind strip.
+ * Source classes are untouched, so every source-string contract still matches.
+ * ?glass=off restores every gradient. */
+html[data-glass="on"] [class*="bg-gradient-to"]:not([data-banner-id]):not(button):not(a) {
+  background-image: none;
+}
+
+/* ── Part 2 · white ink on the backdrop (owner direction) ────────────────────
+ * After Part 1 the page background is the dark backdrop, so the base text ink
+ * goes light. Dark ink is preserved inside any white / frosted card
+ * ([class*="bg-white"] covers bg-white, bg-white/60, bg-white/80 …) so card
+ * text stays readable on its frost. A child with its own explicit text-* utility
+ * still wins, so already-coloured text is untouched. Admin is data-glass="off",
+ * so it is unaffected. ?glass=off restores the dark ink. */
+html[data-glass="on"] body {
+  color: rgb(var(--dc-paper-on-ink) / 0.92);
+}
+html[data-glass="on"] [class*="bg-white"] {
+  color: rgb(15 23 42); /* slate-900 — dark ink inside white/frosted cards */
+}
+
+/* ── Part 2b · home header inline gradient (owner: no gradient anywhere) ─────
+ * The home header paints its brand gradient with an INLINE style
+ * (Header.tsx: `backgroundImage: brandGlassGradient(...)`), which a class-based
+ * rule can't reach — inline styles only yield to !important. Under glass the
+ * gradient is dropped (the header keeps its inline backdrop-filter, so it becomes
+ * a frosted bar over the backdrop) and its ink goes white. Scoped to
+ * [data-home-header] + background-image only — this is NOT the FlowPath dark-ink
+ * !important the owner vetoed. Source untouched, so homeHeaderGlassCollapse's
+ * source assertions still match. ?glass=off restores the gradient + dark ink. */
+html[data-glass="on"] [data-home-header] {
+  background-image: none !important;
+  color: rgb(var(--dc-paper-on-ink) / 0.95);
+}
+html[data-glass="on"] [data-home-header] :where(h1, p, span, a, button, svg):not([class*="bg-"]) {
+  color: rgb(var(--dc-paper-on-ink) / 0.95);
+}
+
+/* ── Part 1b · kill the shell's blue page gradient (the real culprit) ────────
+ * The blue gradient "behind the components" is NOT a Tailwind bg-gradient-to-*
+ * class — it's `.dc-app-shell`'s background, painted in src/index.css with
+ * radial-gradient(purple/blue) + linear-gradient(#f6f8ff…) across several media
+ * queries. The class-based Part 1 rule can't reach a CSS-file background, so the
+ * shell is neutralised directly here: under glass its background goes transparent
+ * and the single Black Ice backdrop shows. !important is required to beat the
+ * media-query declarations in index.css. Scoped to .dc-app-shell + gated on
+ * data-glass="on"; ?glass=off restores the gradient. */
+html[data-glass="on"] .dc-app-shell {
+  background: transparent !important;
+}
+
+/* ── Part 1c · kill the remaining page-canvas gradients (mobile/tablet/profile)
+ * `.dc-app-frame` paints a translucent white linear-gradient (the mobile/tablet
+ * canvas) and `[data-profile-page]` a soft indigo wash — both are CSS-file
+ * backgrounds in src/index.css that the class-based strip can't reach. Under
+ * glass they go transparent so the single backdrop shows on EVERY device. The
+ * glass components (.dc-glass*) and chrome are left alone. !important beats the
+ * index.css declarations; gated on data-glass="on"; ?glass=off restores them. */
+html[data-glass="on"] .dc-app-frame,
+html[data-glass="on"] [data-profile-page] {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+/* ── Part 1d · kill the aurora orbs (the real mobile/tablet culprit) ─────────
+ * `.dc-app-shell::before/::after` are decorative aurora orbs — purple/sky/pink
+ * radial-gradient blobs that bleed past the shell edges. The Part 1c
+ * `background: transparent` only hit the shell element itself, NOT its pseudo
+ * elements, so the orbs kept painting on mobile/tablet (index.css only hides
+ * them at one breakpoint). Under glass they are removed on every device, along
+ * with any frame/profile pseudo washes, so only the Black Ice backdrop shows.
+ * Gated on data-glass="on"; ?glass=off restores the orbs. */
+html[data-glass="on"] .dc-app-shell::before,
+html[data-glass="on"] .dc-app-shell::after,
+html[data-glass="on"] .dc-app-frame::before,
+html[data-glass="on"] .dc-app-frame::after,
+html[data-glass="on"] [data-profile-page]::before,
+html[data-glass="on"] [data-profile-page]::after {
+  display: none !important;
+}
+
+/* ── Part 1e · CTA/button gradients -> solid brand, subscription heroes clear ─
+ * Part 1 deliberately skipped <button>/<a> so CTAs wouldn't go invisible. Now
+ * their gradient is replaced with a SOLID brand indigo (no gradient anywhere),
+ * keeping them visible until Part 3 swaps them for glass buttons. Banners are
+ * excluded. The subscription/profile `.dc-glass-hero` cards painted their own
+ * radial-gradient in index.css — under glass they go transparent so the backdrop
+ * shows. Gated on data-glass="on"; ?glass=off restores gradients. */
+html[data-glass="on"] :where(button, a):not([data-banner-id])[class*="bg-gradient-to"] {
+  background-image: none;
+  background-color: #4f46e5;
+}
+html[data-glass="on"] .dc-glass-hero,
+html[data-glass="on"] .dc-glass-hero--basic,
+html[data-glass="on"] .dc-glass-hero--premium,
+html[data-glass="on"] .dc-glass-hero--pro {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+/* ── Part 1f · every solid white panel -> frosted glass (no white pages) ─────
+ * The owner wants no opaque white pages anywhere — checkout, course-player
+ * overlays (module/notes), subscription, profile, all of it — so the single
+ * backdrop shows on every device. Every SOLID `bg-white` (but not the already
+ * translucent `bg-white/60` glass) becomes a 55%-white frosted panel with blur:
+ * the backdrop glows through, the dark ink stays readable on the frost, and no
+ * page reads as a flat white sheet. Gated on data-glass="on"; ?glass=off keeps
+ * the opaque white. */
+html[data-glass="on"] [class*="bg-white"]:not([class*="bg-white/"]) {
+  background-color: rgb(var(--dc-paper-on-ink) / 0.55);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+
+/* ── Part 1g · the last CSS-file surfaces: course, flowpath, chrome, revision ─
+ * These paint their backgrounds in src/index.css (not via bg-white/bg-gradient
+ * classes), so the earlier rules couldn't reach them. Under glass the course
+ * cards/surfaces, revision cards and the desktop topbar/rail become the same
+ * 55%-white frost; the FlowPath background grid and the mobile-header / footer
+ * glow gradients are removed; the premium CTA's gradient overlay goes solid.
+ * The .dc-glass* material sheens are intentionally kept (that IS the glass).
+ * Gated on data-glass="on"; ?glass=off restores everything. */
+html[data-glass="on"] [data-course-mindmap-map-card],
+html[data-glass="on"] [data-course-notes-grid] [data-course-note],
+html[data-glass="on"] .course-audio-surface,
+html[data-glass="on"] .course-image-surface,
+html[data-glass="on"] .rev-card,
+html[data-glass="on"] .dc-desktop-shell [data-desktop-topbar],
+html[data-glass="on"] .dc-desktop-shell [data-desktop-rail] {
+  background: rgb(var(--dc-paper-on-ink) / 0.55) !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+html[data-glass="on"] .fp-bg-grid,
+html[data-glass="on"] .mobile-header-glow::before,
+html[data-glass="on"] .mobile-header-glow::after,
+html[data-glass="on"] .dc-footer-glow::before,
+html[data-glass="on"] .dc-premium-cta::after {
+  display: none !important;
 }
