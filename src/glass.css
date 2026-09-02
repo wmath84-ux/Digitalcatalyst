@@ -572,3 +572,24 @@ html[data-glass="on"] :where([data-desktop-topbar]) {
 html[data-glass="on"] :where([data-glass-ambient]) {
   display: none;
 }
+
+/* ── Wave 3 · SearchPage + PDP over the Black Ice backdrop ───────────────────
+ * SearchPage's canvas (its own `data-search-frame`) goes fully transparent: its
+ * search bar (bg-white/85 + backdrop-blur-xl) and every result card already sit
+ * on frost, so the backdrop shows behind them and their dark ink stays put.
+ *
+ * The PDP root paints `text-zinc-900` straight onto its wash and has ~36 dark
+ * text sites that are not all carded, so hiding the wash outright would strand
+ * dark-on-dark text. Instead it gets a translucent white *veil*: the backdrop
+ * glows through, the dark ink stays readable, and `?glass=off` keeps the old
+ * opaque wash. A full re-ink to light-on-dark is a separate, visually-QA'd pass. */
+html[data-glass="on"] :where([data-search-frame]) {
+  background-color: transparent;
+}
+html[data-glass="on"] :where([data-pdp-root]) {
+  background-image: linear-gradient(
+    to bottom,
+    rgb(var(--dc-paper-on-ink) / 0.66),
+    rgb(var(--dc-paper-on-ink) / 0.54)
+  );
+}

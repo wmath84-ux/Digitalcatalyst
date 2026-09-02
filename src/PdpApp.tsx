@@ -510,7 +510,7 @@ function PremiumProductContent({
   const highlights = product.features?.length ? product.features : autoHighlights;
 
   return (
-    <div className="relative bg-gradient-to-b from-indigo-50 via-slate-50 to-white pb-5 text-zinc-900">
+    <div data-pdp-root className="relative bg-gradient-to-b from-indigo-50 via-slate-50 to-white pb-5 text-zinc-900">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-24 left-1/4 h-64 w-64 rounded-full bg-gradient-to-br from-violet-300/40 to-transparent blur-3xl" />
         <div className="absolute top-1/3 -right-24 h-64 w-64 rounded-full bg-gradient-to-bl from-sky-300/35 to-transparent blur-3xl" />
