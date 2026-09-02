@@ -1588,24 +1588,20 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    shell hands the card white text, and a light/white card would swallow it. */
 [data-course-notes-grid] [data-course-note] {
   color: var(--course-text);
-  background:
-    linear-gradient(165deg, rgb(125 211 252 / 0.22), rgb(37 99 235 / 0.08) 46%, rgb(29 78 216 / 0.04)),
-    var(--course-soft);
-  border: 1px solid rgb(96 165 250 / 0.38);
-  box-shadow:
-    0 16px 28px -12px rgb(37 99 235 / 0.62),
-    0 8px 18px -8px rgb(14 165 233 / 0.48),
-    0 0 0 1px rgb(59 130 246 / 0.22);
+  /* Wave 8: the card IS the pack GlassCard (tint 0.4, radius 20) — no painted
+     blue-gradient plate, border or drop shadow any more. The theme's soft
+     tone only tints the action row's hover; the focus ring stays blue. */
+  --course-note-hover: var(--course-soft);
+  outline-color: rgb(37 99 235 / 0.6);
+}
+
+[data-course-notes-grid] [data-course-note]:focus-within {
+  outline: 2px solid;
+  outline-offset: 2px;
 }
 
 .course-player-shell[data-course-theme="light"] [data-course-notes-grid] [data-course-note] {
-  background:
-    linear-gradient(165deg, rgb(219 234 254 / 0.95), rgb(191 219 254 / 0.55) 48%, #ffffff);
-  border-color: rgb(59 130 246 / 0.28);
-  box-shadow:
-    0 16px 26px -12px rgb(37 99 235 / 0.42),
-    0 8px 16px -8px rgb(14 165 233 / 0.32),
-    0 0 0 1px rgb(59 130 246 / 0.16);
+  outline-color: rgb(37 99 235 / 0.6);
 }
 
 /* Course Player — a saved note card shows ONLY the note's first heading or
@@ -1739,11 +1735,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   --course-loading: rgb(10 12 18 / 0.5);
 }
 
-.course-viewer-empty-surface,
-.course-audio-surface {
-  background-image: radial-gradient(circle at 50% 25%, rgb(124 58 237 / 0.2), transparent 44%);
-}
-
 /* Course audio card: never clip on tablet `* { max-width: 100% }` or short
    landscape stages. The player measures its stage and switches layout; these
    rules keep every control inside the visible box on phone / tablet / desktop. */
@@ -1761,24 +1752,11 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   max-width: 100%;
 }
 
-.course-player-shell[data-course-theme="light"] .course-viewer-empty-surface,
-.course-player-shell[data-course-theme="light"] .course-audio-surface {
-  background-image: radial-gradient(circle at 50% 25%, rgb(124 58 237 / 0.13), transparent 48%);
-}
-
 /* Strict containment prevents a mobile YouTube iframe's intrinsic size from
    extending below the short landscape viewport or under either side rail. */
 .course-youtube-stage {
   contain: size layout paint;
   isolation: isolate;
-}
-
-.course-image-surface {
-  background-image: radial-gradient(circle at center, #1e293b, #020617);
-}
-
-.course-player-shell[data-course-theme="light"] .course-image-surface {
-  background-image: radial-gradient(circle at center, #ffffff, #dbe4f0);
 }
 
 .course-player-shell[data-course-theme="light"] [data-course-subscription-badge] {

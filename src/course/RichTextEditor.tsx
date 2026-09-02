@@ -15,6 +15,10 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type CSSProperties, type ReactNode } from "react";
 import { Bold, Code, Italic, List, ListOrdered, Quote, Strikethrough, Underline, Eraser, Palette, Type, ChevronDown, SeparatorHorizontal } from "lucide-react";
 import { plainToRichText, richTextToPlain, sanitizeRichText } from "../utils/richText";
+import { GlassButton } from "../components/ui/glass-button";
+import { GlassSurface } from "../components/ui/glass";
+import { GlassSwatch } from "../components/ui/glass-swatch";
+import { PopoverItem } from "../components/ui/glass-popover";
 
 interface RichTextEditorProps {
   value: string;
@@ -49,13 +53,13 @@ const exec = (command: string, value?: string) => {
 };
 
 function MenuItem({ label, onClick, style }: { label: string; onClick: () => void; style?: CSSProperties }) {
-  return <button type="button" style={style} onMouseDown={e => e.preventDefault()} onClick={onClick} className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100">{label}</button>;
+  return <PopoverItem style={style} onMouseDown={e => e.preventDefault()} onClick={onClick} className="rounded-md px-3 py-2">{label}</PopoverItem>;
 }
 
 function FormatMenu({ label, icon, open, onToggle, children }: { label: string; icon: ReactNode; open: boolean; onToggle: () => void; children: ReactNode }) {
   return <div className="relative">
-    <button type="button" aria-label={label} title={label} onMouseDown={e => e.preventDefault()} onClick={onToggle} className="flex h-8 items-center gap-1 rounded-lg px-2 text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"><span>{icon}</span><span className="hidden text-xs sm:inline">{label}</span><ChevronDown size={11} /></button>
-    {open && <div className="absolute left-0 top-9 z-20 min-w-[145px] rounded-lg border border-slate-200 bg-white p-1 shadow-xl">{children}</div>}
+    <GlassButton variant="capsule" aria-label={label} title={label} aria-expanded={open} onMouseDown={e => e.preventDefault()} onClick={onToggle} className="[&>span>div]:h-8 [&>span>div]:px-2"><span className="flex items-center gap-1"><span>{icon}</span><span className="hidden text-xs sm:inline">{label}</span><ChevronDown size={11} /></span></GlassButton>
+    {open && <GlassSurface radius={20} className="absolute left-0 top-9 z-20 min-w-[145px] text-white" contentClassName="p-1">{children}</GlassSurface>}
   </div>;
 }
 
@@ -279,21 +283,21 @@ export default function RichTextEditor({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-course-rich-editor>
-      <div ref={toolbarRef} className="flex shrink-0 flex-wrap items-center gap-1 rounded-t-xl border border-b-0 border-[var(--course-border)] bg-[var(--course-soft)] px-1.5 py-1.5" data-course-rich-toolbar>
+      <div ref={toolbarRef} className="flex shrink-0 flex-wrap items-center gap-1 rounded-t-xl border border-b-0 border-[var(--course-border)] bg-[var(--dc-chrome-glass)] px-1.5 py-1.5 [backdrop-filter:var(--dc-chrome-glass-blur)]" data-course-rich-toolbar>
         <FormatMenu label="Heading" icon={<Type size={14} />} open={openMenu === "heading"} onToggle={() => setOpenMenu(openMenu === "heading" ? null : "heading")}>
           {[1, 2, 3, 4, 5].map(level => <MenuItem key={level} label={`Heading ${level}`} onClick={() => { exec("formatBlock", `h${level}`); emit(); setOpenMenu(null); }} />)}
         </FormatMenu>
         <FormatMenu label="Text color" icon={<Palette size={14} />} open={openMenu === "color"} onToggle={() => setOpenMenu(openMenu === "color" ? null : "color")}>
           <div className="grid grid-cols-6 gap-2 p-2">
-            {["#202124", "#d93025", "#e37400", "#fbbc04", "#34a853", "#1a73e8", "#9334e8", "#e91e63", "#795548", "#607d8b", "#ffffff", "#eeeeee"].map(color => <button key={color} type="button" aria-label={color} className="h-6 w-6 rounded-full border border-black/15 shadow-sm" style={{ backgroundColor: color }} onMouseDown={e => e.preventDefault()} onClick={() => { surfaceRef.current?.focus(); exec("foreColor", color); emit(); setOpenMenu(null); }} />)}
-            <label className="col-span-6 flex cursor-pointer items-center gap-2 border-t border-slate-100 pt-2 text-xs text-slate-600"><span className="h-5 w-5 rounded-full border" style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }} />Custom color<input type="color" className="sr-only" onChange={e => { surfaceRef.current?.focus(); exec("foreColor", e.target.value); emit(); setOpenMenu(null); }} /></label>
+            {["#202124", "#d93025", "#e37400", "#fbbc04", "#34a853", "#1a73e8", "#9334e8", "#e91e63", "#795548", "#607d8b", "#ffffff", "#eeeeee"].map(color => <GlassSwatch key={color} color={color} title={color} size={24} onMouseDown={e => e.preventDefault()} onClick={() => { surfaceRef.current?.focus(); exec("foreColor", color); emit(); setOpenMenu(null); }} />)}
+            <label className="col-span-6 flex cursor-pointer items-center gap-2 border-t border-white/10 pt-2 text-xs text-white/70"><span className="h-5 w-5 rounded-full border" style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }} />Custom color<input type="color" className="sr-only" onChange={e => { surfaceRef.current?.focus(); exec("foreColor", e.target.value); emit(); setOpenMenu(null); }} /></label>
           </div>
         </FormatMenu>
         <FormatMenu label="Font" icon={<span className="text-xs font-bold">Aa</span>} open={openMenu === "font"} onToggle={() => setOpenMenu(openMenu === "font" ? null : "font")}>
           {['Arial','Calibri','Cambria','Comic Sans MS','Courier New','Georgia','Helvetica','Roboto','Times New Roman','Trebuchet MS','Verdana'].map(font => <MenuItem key={font} label={font} style={{ fontFamily: font }} onClick={() => { exec("fontName", font); emit(); setOpenMenu(null); }} />)}
         </FormatMenu>
         {actions.map(({ key, label, icon: Icon, run }) => (
-          <button key={key} type="button" onMouseDown={(event) => { event.preventDefault(); surfaceRef.current?.focus(); run(); emit(); }} className="grid h-8 w-8 rounded-lg place-items-center text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]" aria-label={label} title={label} data-course-rich-action={key}><Icon size={14} /><span className="sr-only">{label}</span></button>
+          <GlassButton key={key} onMouseDown={(event) => { event.preventDefault(); surfaceRef.current?.focus(); run(); emit(); }} className="[&_.size-12]:size-8" aria-label={label} title={label} data-course-rich-action={key}><Icon size={14} /><span className="sr-only">{label}</span></GlassButton>
         ))}
       </div>
       {/* Heading (title) area — a default title field above the body,
@@ -302,7 +306,7 @@ export default function RichTextEditor({
           the editor chrome; the body's own <hr> button inserts dividers
           INSIDE the note. */}
       {showHeading && (
-        <div className="shrink-0 border-x border-[var(--course-border)] bg-[var(--course-soft)] px-3 pt-3" data-course-note-heading>
+        <div className="shrink-0 border-x border-[var(--course-border)] bg-[var(--dc-chrome-glass)] px-3 pt-3" data-course-note-heading>
           <div
             ref={headingRef}
             contentEditable
@@ -334,7 +338,7 @@ export default function RichTextEditor({
         onPaste={handlePaste}
         onDrop={handleDrop}
         onKeyDown={handleKeyDown}
-        className={`course-rich-surface min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-b-xl bg-[var(--course-soft)] p-3 text-sm leading-relaxed text-[var(--course-text)] outline-none focus:border-violet-400 ${showHeading ? "border-x border-b border-[var(--course-border)]" : "border border-[var(--course-border)]"} ${surfaceClassName}`}
+        className={`course-rich-surface min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-b-xl bg-[var(--dc-chrome-glass)] p-3 text-sm leading-relaxed text-[var(--course-text)] outline-none focus:border-violet-400 ${showHeading ? "border-x border-b border-[var(--course-border)]" : "border border-[var(--course-border)]"} ${surfaceClassName}`}
         {...(dataAttribute ? { [dataAttribute]: "true" } : {})}
       />
     </div>

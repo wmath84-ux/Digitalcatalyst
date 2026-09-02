@@ -8,6 +8,8 @@
 // landscape rails, desktop) so controls never clip or hide.
 
 import { GlassSlider } from "../components/ui/glass-slider";
+import { GlassButton } from "../components/ui/glass-button";
+import { GlassSurface } from "../components/ui/glass";
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw, Volume2, VolumeX, Repeat } from "lucide-react";
 
@@ -109,8 +111,9 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
   };
 
   const artSize = compact ? "h-12 w-12 sm:h-14 sm:w-14" : "h-[clamp(4.5rem,18vmin,7.5rem)] w-[clamp(4.5rem,18vmin,7.5rem)]";
-  const playSize = compact ? "h-11 w-11" : "h-[clamp(2.75rem,10vmin,3.5rem)] w-[clamp(2.75rem,10vmin,3.5rem)]";
-  const sideSize = compact ? "h-9 w-9" : "h-10 w-10";
+  // Pack GlassButton discs, resized through their inner `.size-12` surface.
+  const playSize = compact ? "[&_.size-12]:size-11" : "[&_.size-12]:size-[clamp(2.75rem,10vmin,3.5rem)]";
+  const sideSize = compact ? "[&_.size-12]:size-9" : "[&_.size-12]:size-10";
 
   const equalizer = (
     <div className="flex items-end gap-1">
@@ -148,37 +151,34 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
 
   const transport = (
     <div className={`flex shrink-0 items-center justify-center ${compact ? "gap-1.5" : "gap-2 sm:gap-3"}`} data-course-audio-transport>
-      <button
-        type="button"
+      <GlassButton
         onClick={() => setLoop((value) => !value)}
         aria-label="Toggle loop"
-        className={`grid ${sideSize} place-items-center rounded-full transition ${loop ? "bg-violet-500 text-white" : "bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"}`}
+        aria-pressed={loop}
+        className={`${sideSize} ${loop ? "[&_svg]:text-violet-300" : ""}`}
         data-course-audio-loop
         data-active={loop ? "true" : "false"}
       >
         <Repeat size={compact ? 14 : 16} />
-      </button>
-      <button
-        type="button"
+      </GlassButton>
+      <GlassButton
         onClick={restart}
         aria-label="Restart"
-        className={`grid ${sideSize} place-items-center rounded-full bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]`}
+        className={sideSize}
         data-course-audio-restart
       >
         <RotateCcw size={compact ? 14 : 16} />
-      </button>
-      <button
-        type="button"
+      </GlassButton>
+      <GlassButton
         onClick={togglePlay}
         aria-label={playing ? "Pause" : "Play"}
-        className={`grid ${playSize} place-items-center rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-lg shadow-violet-500/40 transition active:scale-95`}
+        className={`${playSize} [&_svg]:text-violet-200`}
         data-course-audio-play
         data-playing={playing ? "true" : "false"}
       >
         {playing ? <Pause size={compact ? 18 : 22} /> : <Play size={compact ? 18 : 22} className="ml-0.5" />}
-      </button>
-      <button
-        type="button"
+      </GlassButton>
+      <GlassButton
         onClick={() => {
           const audio = audioRef.current;
           if (!audio) return;
@@ -186,29 +186,31 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
           setMuted(audio.muted);
         }}
         aria-label="Toggle mute"
-        className={`grid ${sideSize} place-items-center rounded-full bg-[var(--course-soft)] text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]`}
+        className={sideSize}
         data-course-audio-mute
         data-muted={muted ? "true" : "false"}
       >
         {muted ? <VolumeX size={compact ? 14 : 16} /> : <Volume2 size={compact ? 14 : 16} />}
-      </button>
+      </GlassButton>
     </div>
   );
 
   return (
     <div
       ref={surfaceRef}
-      className="grid h-full min-h-0 w-full min-w-0 place-items-center overflow-hidden course-audio-surface bg-[var(--course-bg)] p-2 sm:p-4 md:p-6"
+      className="grid h-full min-h-0 w-full min-w-0 place-items-center overflow-hidden p-2 sm:p-4 md:p-6"
       data-course-viewer-audio
       data-orientation={compact ? "landscape" : "portrait"}
       data-compact={compact ? "true" : "false"}
     >
       {compact ? (
-        <div
-          className="flex w-full max-w-3xl min-w-0 items-center gap-2 rounded-2xl border border-[var(--course-border)] bg-[var(--course-soft)] p-2.5 shadow-2xl backdrop-blur sm:gap-3 sm:rounded-3xl sm:p-3.5"
+        <GlassSurface
+          radius={24}
+          className="w-full max-w-3xl min-w-0 text-white"
+          contentClassName="flex items-center gap-2 p-2.5 sm:gap-3 sm:p-3.5"
           data-course-audio-player
         >
-          <div className={`grid ${artSize} shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg shadow-violet-500/30`}>
+          <div className={`grid ${artSize} shrink-0 place-items-center rounded-2xl bg-violet-500/25`}>
             {equalizer}
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
@@ -216,13 +218,15 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
             <div className="mt-1">{seekBar}</div>
           </div>
           {transport}
-        </div>
+        </GlassSurface>
       ) : (
-        <div
-          className="w-full max-w-[min(28rem,100%)] min-w-0 rounded-3xl border border-[var(--course-border)] bg-[var(--course-soft)] p-[clamp(1rem,3.5vmin,1.75rem)] shadow-2xl backdrop-blur"
+        <GlassSurface
+          radius={24}
+          className="w-full max-w-[min(28rem,100%)] min-w-0 text-white"
+          contentClassName="p-[clamp(1rem,3.5vmin,1.75rem)]"
           data-course-audio-player
         >
-          <div className={`mx-auto grid ${artSize} place-items-center rounded-3xl bg-gradient-to-br from-violet-500 to-cyan-400 shadow-lg shadow-violet-500/30`}>
+          <div className={`mx-auto grid ${artSize} place-items-center rounded-3xl bg-violet-500/25`}>
             {equalizer}
           </div>
 
@@ -231,7 +235,7 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
 
           <div className="mt-4 sm:mt-5">{seekBar}</div>
           <div className="mt-3 sm:mt-4">{transport}</div>
-        </div>
+        </GlassSurface>
       )}
 
       <audio

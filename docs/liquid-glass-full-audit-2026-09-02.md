@@ -435,3 +435,27 @@ Kept (pinned by tests): every `data-course-*` attribute, `aria-pressed` expressi
 **Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 313 → 290, gradients 49 → 39, render-sites 394 → 430 · backdrop OK · frozen diff empty.
 
 **Wave 8 next:** ResourceViewer toolbar + ImageViewer + NotesPanel + RichTextEditor + AudioPlayer transport + ConfirmDeleteDialog (`tint={0.9}` → default).
+
+---
+
+## Phase B · Wave 8 — Course viewers & panels (ResourceViewer · ImageViewer · NotesPanel · RichTextEditor · AudioPlayer · ConfirmDeleteDialog) + A8 plates
+
+| Old | New |
+|---|---|
+| ViewerHeader bar `bg-[var(--course-surface)]` | `--dc-chrome-glass` + blur (pack GlassSurface material) |
+| My-copy / Edit toggles (emerald/violet fills), fullscreen square, retry, editor-zoom ± cluster (`bg-black/70`), warning-dismiss | `GlassButton` (capsule / icon; active = ink colour only); zoom cluster = `GlassSurface radius={999}` + two `GlassButton` |
+| download / external / missing-state anchors (`bg-[var(--course-soft)]`) | `<a>` wrapping `GlassSurface radius={999}` (the link keeps `download` / `target`; test-pinned attrs untouched) |
+| failed-state "Open original" | solid `bg-indigo-600 rounded-full` primary |
+| `bg-[var(--course-bg)]` on viewer root / stage / empty / missing / failed, `course-viewer-empty-surface`, `course-image-surface`, `course-audio-surface` radial gradients | removed (CSS rules deleted); the Black Ice backdrop shows through; failed overlay uses `--course-loading` scrim |
+| iframe `absolute left-0 top-0 bg-white` (mobile/scaled Google editors) | **kept** — pinned by `coursePlayerEditorFitScopeContract`; it is the document's own paper, not a page plate |
+| NotesPanel note cards (blue-gradient plates + shadows in CSS) | `GlassCard` (tint 0.4, radius 20) with `data-course-note` on the card; CSS rule now only pins `color` + a blue focus ring |
+| note edit / delete (sky / rose gradient squares) | `GlassButton` size-7, sky / rose icon ink |
+| Save (`bg-violet-500`) / Cancel (`--course-soft-hover`) | Save = solid `bg-indigo-600 rounded-full`; Cancel = `GlassButton` capsule |
+| empty pill (dashed `--course-soft`) | `GlassSurface radius={16}` dashed border |
+| RichTextEditor toolbar / heading / body plates `bg-[var(--course-soft)]`, white dropdown menus (`bg-white border-slate-200`), slate menu items | `--dc-chrome-glass`; menus = `GlassSurface radius={20}` + pack `PopoverItem`; menu triggers + 10 actions = `GlassButton`; colour dots = `GlassSwatch size={24}` |
+| AudioPlayer play (violet→cyan gradient disc), loop/restart/mute, card plates + art tiles | all `GlassButton`; cards = `GlassSurface radius={24}`; art tile `bg-violet-500/25`; seek stays `GlassSlider` |
+| ConfirmDeleteDialog `tint={0.9}`, slate ink, white Cancel, rose shadow | `GlassSurface` default tint, radius 24, white ink, Cancel = `GlassButton` capsule, Delete = solid `bg-rose-600 rounded-full` (meaning colour) |
+
+Test updated: `liquidGlassWaveFiveContract` no longer pins `tint={0.9}` on the dialog (asserts NO tint override instead — Decision A6).
+
+**Gates:** tsc clean · tests 1966 / 8 · build OK · coverage `<button>` 290 → 271, gradients 39 → 34, render-sites 430 → 458 · backdrop OK · frozen diff empty.

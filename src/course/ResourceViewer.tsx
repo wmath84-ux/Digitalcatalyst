@@ -37,6 +37,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Download, ExternalLink, Eye, FileQuestion, FileStack, Maximize2, PencilLine, RefreshCw, X } from "lucide-react";
+import { GlassButton } from "../components/ui/glass-button";
+import { GlassSurface } from "../components/ui/glass";
 import type { CourseFile } from "../types/course";
 import ImageViewer from "./ImageViewer";
 import AudioPlayer from "./AudioPlayer";
@@ -88,7 +90,7 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
   // No file selected — show the empty state.
   if (!file) {
     return (
-      <div className="grid h-full min-h-[280px] place-items-center course-viewer-empty-surface bg-[var(--course-bg)] p-8 text-center text-[var(--course-text)]">
+      <div className="grid h-full min-h-[280px] place-items-center p-8 text-center text-[var(--course-text)]">
         <div data-course-viewer-empty>
           <FileQuestion className="mx-auto h-12 w-12 text-[var(--course-muted)]" />
           <p className="mt-4 font-black">Choose a lesson or resource</p>
@@ -233,7 +235,7 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
   const mobileDocument = documentKind && !desktopView && !hasNativeMobileRendering(embed.kind) && !isEditingInline;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--course-bg)] text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-chrome-hidden={chromeHidden ? "true" : "false"} data-doc-mode={canEditInline || personalCopyEnabled ? (showPersonalCopy ? "personal-copy" : isEditingInline ? "edit" : "preview") : undefined} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-chrome-hidden={chromeHidden ? "true" : "false"} data-doc-mode={canEditInline || personalCopyEnabled ? (showPersonalCopy ? "personal-copy" : isEditingInline ? "edit" : "preview") : undefined} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>
       {chromeHidden ? null : (
         <ViewerHeader
           file={file}
@@ -250,7 +252,7 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
         />
       )}
       {personalCopyEnabled && copyState.status === "error" && copyState.errorMessage ? (
-        <div className="border-b border-amber-300/40 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-600" role="alert" data-course-personal-copy-error>
+        <div className="border-b border-amber-300/40 bg-amber-500/15 px-4 py-2 text-xs font-semibold text-amber-200" role="alert" data-course-personal-copy-error>
           {copyState.errorMessage}
         </div>
       ) : null}
@@ -261,16 +263,15 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
       {personalCopyEnabled && copyState.status !== "error" && copyState.warningMessage ? (
         <div className="flex items-center gap-2 border-b border-[var(--course-border)] bg-[var(--course-soft)] px-4 py-2 text-xs font-semibold text-[var(--course-muted)]" role="status" data-course-personal-copy-warning>
           <span className="min-w-0 flex-1">{copyState.warningMessage}</span>
-          <button
-            type="button"
+          <GlassButton
             onClick={copyState.dismissWarning}
-            className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[var(--course-muted)] transition hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+            className="shrink-0 [&_.size-12]:size-7"
             aria-label="Dismiss this message"
             title="Dismiss"
             data-course-personal-copy-warning-dismiss
           >
             <X size={13} />
-          </button>
+          </GlassButton>
         </div>
       ) : null}
       {copyBusy ? (
@@ -278,7 +279,7 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
           {copyState.status === "authorizing" ? "Waiting for Google authorization…" : "Creating your personal copy in Google Drive…"}
         </div>
       ) : null}
-      <div className={`relative min-h-0 flex-1 overflow-hidden ${isCinematic ? "bg-black p-0" : "bg-[var(--course-bg)]"}`}>
+      <div className={`relative min-h-0 flex-1 overflow-hidden ${isCinematic ? "bg-black p-0" : ""}`}>
         {isImage ? (
           <ImageViewer
             url={embed.url}
@@ -545,20 +546,18 @@ function ViewerHeader({ file, embed, externalUrl = embed.url, download, canEditI
     else void (root as HTMLElement).requestFullscreen?.();
   };
   return (
-    <div className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-[var(--course-border)] bg-[var(--course-surface)] px-3 py-2.5 text-[var(--course-text)] backdrop-blur sm:gap-3 sm:px-4">
+    <div className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-[var(--course-border)] bg-[var(--dc-chrome-glass)] px-3 py-2.5 text-[var(--course-text)] [backdrop-filter:var(--dc-chrome-glass-blur)] sm:gap-3 sm:px-4">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-black" title={file.name}>{file.name}</p>
         <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--course-muted)]" data-course-viewer-kind>{kindLabel} {personalCopyActive ? "my copy" : editMode ? "editor" : "preview"}</p>
       </div>
       {personalCopyEnabled ? (
-        <button
-          type="button"
+        <GlassButton
+          variant="capsule"
           onClick={onTogglePersonalCopy}
           disabled={personalCopyBusy}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors disabled:cursor-wait disabled:opacity-60 ${
-            personalCopyActive
-              ? "bg-emerald-600 text-white hover:bg-emerald-700"
-              : "bg-[var(--course-soft)] text-[var(--course-text)] hover:bg-[var(--course-soft-hover)]"
+          className={`text-xs font-bold disabled:cursor-wait disabled:opacity-60 [&>span>div]:h-9 [&>span>div]:px-3 ${
+            personalCopyActive ? "[&>span>div]:text-emerald-300" : ""
           }`}
           aria-pressed={personalCopyActive}
           aria-label={personalCopyActive ? "Back to the course master file" : "Open your own personal copy of this file"}
@@ -566,40 +565,39 @@ function ViewerHeader({ file, embed, externalUrl = embed.url, download, canEditI
           data-course-viewer-copy-toggle
           data-copy-active={personalCopyActive ? "true" : "false"}
         >
-          {personalCopyBusy ? <RefreshCw size={14} className="animate-spin" /> : <FileStack size={14} />}
-          <span className="hidden sm:inline">{personalCopyActive ? "Master" : "My copy"}</span>
-        </button>
+          <span className="flex items-center gap-1.5">
+            {personalCopyBusy ? <RefreshCw size={14} className="animate-spin" /> : <FileStack size={14} />}
+            <span className="hidden sm:inline">{personalCopyActive ? "Master" : "My copy"}</span>
+          </span>
+        </GlassButton>
       ) : null}
       {canEditInline ? (
-        <button
-          type="button"
+        <GlassButton
+          variant="capsule"
           onClick={onToggleEditMode}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
-            editMode
-              ? "bg-violet-600 text-white hover:bg-violet-700"
-              : "bg-[var(--course-soft)] text-[var(--course-text)] hover:bg-[var(--course-soft-hover)]"
-          }`}
+          className={`text-xs font-bold [&>span>div]:h-9 [&>span>div]:px-3 ${editMode ? "[&>span>div]:text-violet-300" : ""}`}
           aria-pressed={editMode}
           aria-label={editMode ? "Switch back to preview" : "Open the full Google editor with the complete toolbar"}
           title={editMode ? "Back to preview" : "Edit in Google Docs (full toolbar)"}
           data-course-viewer-edit-toggle
           data-doc-mode={editMode ? "edit" : "preview"}
         >
-          {editMode ? <Eye size={14} /> : <PencilLine size={14} />}
-          <span className="hidden sm:inline">{editMode ? "Preview" : "Edit"}</span>
-        </button>
+          <span className="flex items-center gap-1.5">
+            {editMode ? <Eye size={14} /> : <PencilLine size={14} />}
+            <span className="hidden sm:inline">{editMode ? "Preview" : "Edit"}</span>
+          </span>
+        </GlassButton>
       ) : null}
       {isMedia ? (
-        <button
-          type="button"
+        <GlassButton
           onClick={toggleFullscreen}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--course-soft)] text-[var(--course-muted)] hover:bg-[var(--course-soft-hover)] hover:text-[var(--course-text)]"
+          className="shrink-0 [&_.size-12]:size-9"
           aria-label="Toggle fullscreen"
           title="Fullscreen"
           data-course-viewer-fullscreen
         >
           <Maximize2 size={15} />
-        </button>
+        </GlassButton>
       ) : null}
       {download.url ? (
         <a
@@ -607,11 +605,13 @@ function ViewerHeader({ file, embed, externalUrl = embed.url, download, canEditI
           target="_blank"
           rel="noopener noreferrer"
           download={download.downloadable ? download.fileName : undefined}
-          className="flex items-center gap-1.5 rounded-lg bg-[var(--course-soft)] px-3 py-2 text-xs font-bold hover:bg-[var(--course-soft-hover)]"
+          className="block shrink-0 rounded-full text-xs font-bold outline-none focus-visible:brightness-110"
           data-course-viewer-download
         >
-          {download.downloadable ? <Download size={14} /> : <ExternalLink size={14} />}
-          <span className="hidden sm:inline">{download.label}</span>
+          <GlassSurface radius={999} className="h-9 text-white" contentClassName="flex h-full items-center gap-1.5 px-3">
+            {download.downloadable ? <Download size={14} /> : <ExternalLink size={14} />}
+            <span className="hidden sm:inline">{download.label}</span>
+          </GlassSurface>
         </a>
       ) : null}
       {embed.url ? (
@@ -619,13 +619,15 @@ function ViewerHeader({ file, embed, externalUrl = embed.url, download, canEditI
           href={externalUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--course-soft)] px-2.5 text-[11px] font-bold hover:bg-[var(--course-soft-hover)] sm:px-3 sm:text-xs"
+          className="block shrink-0 rounded-full text-[11px] font-bold outline-none focus-visible:brightness-110 sm:text-xs"
           aria-label="Open preview in new tab"
           title={isYouTube ? "Open in YouTube (use this if embedded playback is blocked)" : "Open preview in new tab"}
           data-course-viewer-external
         >
-          <ExternalLink size={15} />
-          <span className={isYouTube ? "inline" : "hidden sm:inline"}>{isYouTube ? "YouTube" : "Open"}</span>
+          <GlassSurface radius={999} className="h-9 text-white" contentClassName="flex h-full items-center gap-1.5 px-2.5 sm:px-3">
+            <ExternalLink size={15} />
+            <span className={isYouTube ? "inline" : "hidden sm:inline"}>{isYouTube ? "YouTube" : "Open"}</span>
+          </GlassSurface>
         </a>
       ) : null}
     </div>
@@ -634,7 +636,7 @@ function ViewerHeader({ file, embed, externalUrl = embed.url, download, canEditI
 
 function MissingEmbedState({ file, download }: { file: CourseFile; download: CourseDownload }) {
   return (
-    <div className="grid h-full place-items-center bg-[var(--course-bg)] p-8 text-center text-[var(--course-text)]" data-course-viewer-missing>
+    <div className="grid h-full place-items-center p-8 text-center text-[var(--course-text)]" data-course-viewer-missing>
       <div className="max-w-md">
         <FileQuestion className="mx-auto h-12 w-12 text-amber-400" />
         <p className="mt-4 font-black">Preview is unavailable</p>
@@ -646,10 +648,12 @@ function MissingEmbedState({ file, download }: { file: CourseFile; download: Cou
             href={download.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-[var(--course-soft)] px-4 py-2 text-xs font-bold hover:bg-[var(--course-soft-hover)]"
+            className="mt-5 inline-block rounded-full text-xs font-bold outline-none focus-visible:brightness-110"
           >
-            {download.downloadable ? <Download size={14} /> : <ExternalLink size={14} />}
-            {download.label}
+            <GlassSurface radius={999} className="h-10 text-white" contentClassName="flex h-full items-center gap-1.5 px-4">
+              {download.downloadable ? <Download size={14} /> : <ExternalLink size={14} />}
+              {download.label}
+            </GlassSurface>
           </a>
         ) : null}
         <p className="mt-4 text-[10px] uppercase tracking-wider text-[var(--course-muted)]">File type: {file.type}</p>
@@ -868,7 +872,7 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
         </div>
       ) : null}
       {failed ? (
-        <div className="absolute inset-0 z-20 grid place-items-center bg-[var(--course-bg)] p-8 text-center text-[var(--course-text)]">
+        <div className="absolute inset-0 z-20 grid place-items-center bg-[var(--course-loading)] p-8 text-center text-[var(--course-text)]">
           <div className="max-w-md">
             <AlertTriangle className="mx-auto h-12 w-12 text-amber-400" />
             <p className="mt-4 font-black">{editMode ? "Google editor didn’t load in-app" : "Preview didn’t load"}</p>
@@ -882,22 +886,22 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
                 href={editMode && editorOriginalUrl ? editorOriginalUrl : openOriginalHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-violet-500 px-4 py-2 text-xs font-black text-white"
+                className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-black text-white hover:bg-indigo-500"
               >
                 <ExternalLink size={14} /> {editMode ? "Edit in new tab" : "Open original"}
               </a>
-              <button
-                type="button"
+              <GlassButton
+                variant="capsule"
                 onClick={() => {
                   setFailed(false);
                   setLoading(true);
                   setReloadKey((value) => value + 1);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--course-soft)] px-4 py-2 text-xs font-bold text-[var(--course-text)] hover:bg-[var(--course-soft-hover)]"
+                className="text-xs font-bold [&>span>div]:h-9 [&>span>div]:px-4"
                 data-course-viewer-retry
               >
-                <RefreshCw size={14} /> Retry
-              </button>
+                <span className="flex items-center gap-1.5"><RefreshCw size={14} /> Retry</span>
+              </GlassButton>
             </div>
             <p className="mt-4 text-[10px] uppercase tracking-wider text-[var(--course-muted)]">Source: {sourceHost}</p>
           </div>
@@ -937,41 +941,41 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
         with text they can't read.
       */}
       {scalingEditor && !failed ? (
-        <div
-          className="absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-full bg-black/70 p-1 text-white shadow-lg backdrop-blur"
+        <GlassSurface
+          radius={999}
+          className="absolute bottom-3 right-3 z-10 text-white"
+          contentClassName="flex items-center gap-1 p-1"
           data-course-editor-zoom
         >
-          <button
-            type="button"
+          <GlassButton
             onClick={() => setEditorZoom((value) => Math.max(Number((value - 0.25).toFixed(2)), 1))}
             disabled={editorZoom <= 1}
-            className="grid h-7 w-7 place-items-center rounded-full text-sm font-black disabled:opacity-40"
+            className="text-sm font-black disabled:opacity-40 [&_.size-12]:size-7"
             aria-label="Fit the editor to the screen"
             title="Zoom out"
             data-course-editor-zoom-out
           >
             −
-          </button>
+          </GlassButton>
           <span className="min-w-[2.5rem] text-center text-[10px] font-black tabular-nums" data-course-editor-zoom-pct>
             {Math.round(editorZoom * 100)}%
           </span>
-          <button
-            type="button"
+          <GlassButton
             // Capped at 2x: past that the CSS viewport is narrow enough that
             // Google would start serving its cramped layout again.
             onClick={() => setEditorZoom((value) => Math.min(Number((value + 0.25).toFixed(2)), 2))}
             disabled={editorZoom >= 2}
-            className="grid h-7 w-7 place-items-center rounded-full text-sm font-black disabled:opacity-40"
+            className="text-sm font-black disabled:opacity-40 [&_.size-12]:size-7"
             aria-label="Magnify the editor"
             title="Zoom in"
             data-course-editor-zoom-in
           >
             +
-          </button>
-        </div>
+          </GlassButton>
+        </GlassSurface>
       ) : null}
       {!supported ? (
-        <p className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/65 px-3 py-1 text-[10px] font-bold text-[var(--course-muted)]">
+        <p className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-[10px] font-bold text-white/70">
           {kind} embed
         </p>
       ) : null}

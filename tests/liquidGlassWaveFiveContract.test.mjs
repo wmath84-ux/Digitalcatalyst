@@ -96,7 +96,9 @@ test("profile dialogs and fields take the pack surface and field ink", () => {
 test("the course delete confirmation is a pack surface with every hook", () => {
   const s = read("src/course/ConfirmDeleteDialog.tsx");
   assert.match(s, /<GlassSurface/);
-  assert.match(s, /tint=\{0\.9\}/);
+  // Phase B wave 8: the dialog renders the pack surface at its published
+  // defaults (tint 0.5) — no app-side tint override.
+  assert.doesNotMatch(s, /tint=\{/);
   for (const hook of ["data-course-confirm-dialog", "data-course-confirm-backdrop", "data-course-confirm-card", "data-course-confirm-cancel", "data-course-confirm-delete", "data-course-confirm-detail"]) {
     assert.ok(s.includes(hook), hook);
   }
