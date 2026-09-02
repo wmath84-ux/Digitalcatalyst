@@ -122,7 +122,10 @@ test("revision and My Day pickers use the pack's selectable components", () => {
 
   const notes = read("src/components/myday/QuickNotes.tsx");
   assert.match(notes, /from "\.\.\/ui\/glass-tooltip"/);
-  assert.match(notes, /<TooltipContent side="top" tint=\{0\.85\}>/);
+  // Phase A5: the tooltip runs on the pack's own default tint (0.55) — no
+  // app-side 0.85 white wash, and the label inherits the pack's white ink.
+  assert.match(notes, /<TooltipContent side="top">/);
+  assert.doesNotMatch(notes, /<TooltipContent[^>]*tint=/, "tooltip must use the pack's own tint");
   assert.doesNotMatch(notes, /title="[^"]*"/, "a native title bubble is still shipping");
   // the pinned editor hooks survive
   assert.match(notes, /data-myday-note-editor-cancel/);

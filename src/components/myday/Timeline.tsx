@@ -3,6 +3,8 @@ import { BookOpen, CalendarClock, Coffee, GraduationCap, Pencil, PenSquare, Plus
 import type { EventType, ScheduleEvent } from "../../types";
 import { cn } from "../../utils/cn";
 import { formatTime12, toMinutes } from "../../../utils/timeOfDay";
+import { GlassSurface } from "../ui/glass";
+import { GlassButton } from "../ui/glass-button";
 
 interface TimelineProps {
   events: ScheduleEvent[];
@@ -17,11 +19,11 @@ const typeMeta: Record<
   EventType,
   { icon: LucideIcon; text: string; dot: string; bg: string; ring: string }
 > = {
-  class: { icon: GraduationCap, text: "text-indigo-600", dot: "bg-indigo-500", bg: "bg-indigo-50", ring: "ring-indigo-200" },
-  study: { icon: BookOpen, text: "text-violet-600", dot: "bg-violet-500", bg: "bg-violet-50", ring: "ring-violet-200" },
-  break: { icon: Coffee, text: "text-amber-600", dot: "bg-amber-500", bg: "bg-amber-50", ring: "ring-amber-200" },
-  personal: { icon: User, text: "text-emerald-600", dot: "bg-emerald-500", bg: "bg-emerald-50", ring: "ring-emerald-200" },
-  exam: { icon: PenSquare, text: "text-rose-600", dot: "bg-rose-500", bg: "bg-rose-50", ring: "ring-rose-200" },
+  class: { icon: GraduationCap, text: "text-indigo-300", dot: "bg-indigo-500", bg: "bg-indigo-500/15", ring: "ring-indigo-400/30" },
+  study: { icon: BookOpen, text: "text-violet-300", dot: "bg-violet-500", bg: "bg-violet-500/15", ring: "ring-violet-400/30" },
+  break: { icon: Coffee, text: "text-amber-300", dot: "bg-amber-500", bg: "bg-amber-500/15", ring: "ring-amber-400/30" },
+  personal: { icon: User, text: "text-emerald-300", dot: "bg-emerald-500", bg: "bg-emerald-500/15", ring: "ring-emerald-400/30" },
+  exam: { icon: PenSquare, text: "text-rose-300", dot: "bg-rose-500", bg: "bg-rose-500/15", ring: "ring-rose-400/30" },
 };
 
 const formatTime = formatTime12;
@@ -66,11 +68,11 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
   }, [sorted, nowMinutes, activeId]);
 
   return (
-    <div className="dc-glass rounded-3xl shadow-[0_22px_48px_-28px_rgba(79,70,229,0.46)]">
+    <GlassSurface radius={24} className="text-white" contentClassName="flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-5 pb-4 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-cyan-600 text-white shadow-lg shadow-sky-300/50">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500 text-white">
             <CalendarClock className="h-5 w-5" />
           </div>
           <div>
@@ -78,33 +80,30 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
             <p className="text-xs font-medium text-white/55">{events.length} events planned</p>
           </div>
         </div>
-        <button
-          onClick={onAdd}
-          className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-600 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-sky-300/50 transition hover:shadow-xl sm:px-4 sm:text-sm"
-        >
+        <GlassButton variant="capsule" type="button" onClick={onAdd} className="[&>span>div]:h-10 [&>span>div]:gap-1.5 [&>span>div]:px-3.5 [&>span>div]:text-xs [&>span>div]:font-bold sm:[&>span>div]:px-4 sm:[&>span>div]:text-sm">
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Add Event</span>
-        </button>
+        </GlassButton>
       </div>
 
       {/* Timeline */}
       <div className="px-4 pb-5 sm:px-6">
         {sorted.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.06] py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 shadow-inner">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.08]">
               <CalendarClock className="h-6 w-6 text-white/55" />
             </div>
             <p className="text-sm font-bold text-white/55">No events scheduled</p>
             <button
               onClick={onAdd}
-              className="text-sm font-semibold text-sky-600 hover:underline"
+              className="text-sm font-semibold text-sky-300 hover:underline"
             >
               + Add your first event
             </button>
           </div>
         ) : (
           <div className="relative pl-7">
-            <div className="absolute left-[11px] top-2 bottom-2 w-px bg-gradient-to-b from-slate-200 via-slate-200 to-transparent" />
+            <div className="absolute left-[11px] top-2 bottom-2 w-px bg-white/15" />
             <div ref={listRef} className="space-y-3">
               {sorted.map((event, idx) => {
                 const meta = typeMeta[event.type];
@@ -120,7 +119,7 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
                     <div
                       className={cn(
                         "absolute -left-7 top-4 flex h-[22px] w-[22px] items-center justify-center rounded-full ring-[3px] ring-white transition-all",
-                        isActive ? `${meta.dot} shadow-md` : meta.dot,
+                        isActive ? `${meta.dot} ` : meta.dot,
                         isPast && "opacity-50",
                       )}
                     >
@@ -145,12 +144,12 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
                         "rounded-2xl border p-3.5 transition-all duration-200 cursor-pointer",
                         isHighlighted && "ring-2 ring-sky-400 ring-offset-2 ring-offset-white",
                         isActive
-                          ? "border-indigo-300 bg-white shadow-lg shadow-indigo-200/50"
+                          ? "border-indigo-300 bg-white/[0.08]"
                           : isNext
-                            ? "border-slate-200 bg-white shadow-md shadow-slate-200/60 hover:border-sky-200"
+                            ? "border-white/10 bg-white/[0.08] hover:border-sky-400/30"
                             : isPast
                               ? "border-white/10 bg-white/[0.08] opacity-60"
-                              : "border-slate-200 bg-white shadow-sm shadow-slate-100/60 hover:border-sky-200",
+                              : "border-white/10 bg-white/[0.08] hover:border-sky-400/30",
                         isHighlighted && isPast && "opacity-100",
                       )}
                     >
@@ -170,7 +169,7 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
                                 </span>
                               )}
                               {isNext && (
-                                <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sky-600">
+                                <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sky-300">
                                   Up Next
                                 </span>
                               )}
@@ -200,14 +199,14 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
                           <button
                             onClick={(e) => { e.stopPropagation(); onEdit(event); }}
                             aria-label="Edit event"
-                            className="flex h-8 w-8 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-sky-50 hover:text-sky-600"
+                            className="flex h-8 w-8 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-sky-500/15 hover:text-sky-300"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); onDelete(event.id); }}
                             aria-label="Delete event"
-                            className="flex h-8 w-8 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                            className="flex h-8 w-8 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-rose-500/15 hover:text-rose-300"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -221,6 +220,6 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
           </div>
         )}
       </div>
-    </div>
+    </GlassSurface>
   );
 }

@@ -86,7 +86,7 @@ export default function CreateMenu({ options, onSelect }: CreateMenuProps) {
           aria-haspopup="menu"
           onClick={() => setOpen((value) => !value)}
           className={cn(
-            "relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl transition active:scale-95 md:h-24 md:w-24",
+            "relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600 text-white transition active:scale-95 md:h-24 md:w-24",
             open && "rotate-45",
           )}
         >
@@ -123,7 +123,7 @@ export default function CreateMenu({ options, onSelect }: CreateMenuProps) {
                     className="dc-create-item group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-white/[0.08] active:bg-white/[0.08]"
                     style={{ animationDelay: `${40 + index * 35}ms` }}
                   >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-100">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-300 transition-colors group-hover:bg-indigo-500/20">
                       <Icon className="h-4 w-4" />
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-white/85">
@@ -136,7 +136,7 @@ export default function CreateMenu({ options, onSelect }: CreateMenuProps) {
               {/* Little tail that ties the drop-up to the + button. */}
               <span
                 aria-hidden="true"
-                className="absolute -bottom-1 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 rounded-[3px] bg-white/[0.08]"
+                className="absolute -bottom-1 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 rounded-[3px] bg-[rgba(60,62,68,0.21)]"
               />
             </div>
           </div>

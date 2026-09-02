@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { GlassSurface } from "./glass";
-import { LiquidMetalButton } from "./LiquidMetalButton";
+import { GlassButton } from "./glass-button";
 import {
   lockBodyScroll,
   unlockBodyScroll,
@@ -87,29 +87,37 @@ export default function ConfirmDialog({
         onClick={onCancel}
       />
       <GlassSurface
-        tint={0.9}
-        tintColor="255,255,255"
-        blur={26}
-        saturation={1.35}
         radius={0}
         style={{ borderRadius: "var(--glass-sheet-radius)" }}
-        className="glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden shadow-2xl"
+        className="glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"
         contentClassName="max-h-full overflow-y-auto overscroll-contain p-6 custom-scrollbar"
         role="alertdialog"
         aria-modal="true"
       >
-        <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-rose-100 text-rose-600 ring-1 ring-white/70">
+        <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-rose-500/20 text-rose-200 ring-1 ring-rose-400/30">
           <AlertTriangle className="h-6 w-6" />
         </div>
-        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
-        <p className="mt-1.5 text-sm text-slate-500">{message}</p>
+        <h3 className="text-lg font-bold text-white">{title}</h3>
+        <p className="mt-1.5 text-sm text-white/70">{message}</p>
         <div className="mt-6 flex gap-3">
-          <LiquidMetalButton tone="silver" onClick={onCancel} className="flex-1">
+          <GlassButton
+            variant="capsule"
+            type="button"
+            onClick={onCancel}
+            className="flex-1 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:px-4"
+          >
             Cancel
-          </LiquidMetalButton>
-          <LiquidMetalButton tone={tone} onClick={onConfirm} className="flex-1">
+          </GlassButton>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className={cn(
+              "h-11 flex-1 rounded-full px-4 text-sm font-bold text-white transition-colors",
+              tone === "danger" ? "bg-rose-600 hover:bg-rose-500" : "bg-indigo-600 hover:bg-indigo-500",
+            )}
+          >
             {confirmLabel}
-          </LiquidMetalButton>
+          </button>
         </div>
       </GlassSurface>
     </div>

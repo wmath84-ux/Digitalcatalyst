@@ -21,6 +21,8 @@ import Reminders from "./components/myday/Reminders";
 import SideNav from "./components/myday/SideNav";
 import BottomNav from "./components/myday/BottomNav";
 import ConfirmDialog from "./components/ui/ConfirmDialog";
+import { GlassInput } from "./components/ui/glass-input";
+import { GlassButton } from "./components/ui/glass-button";
 import Toast from "./components/ui/Toast";
 import type { ToastMessage } from "./components/ui/Toast";
 import { OverlayBoundsProvider } from "./components/ui/overlayBounds";
@@ -607,23 +609,26 @@ export default function App() {
         />
 
         {showMobileSearch && (
-          <div className="animate-slideUp dc-glass-toolbar border-b border-white/60 px-4 pb-3 pt-2">
-            <div className="dc-glass-input flex items-center gap-2 rounded-xl px-3.5 py-2.5 ring-2 ring-indigo-100/60">
-              <Search className="h-4 w-4 shrink-0 text-indigo-500" />
-              <input
+          <div className="animate-slideUp dc-glass-toolbar border-b border-white/10 px-4 pb-3 pt-2">
+            <div className="flex items-center gap-2">
+              <GlassInput
+                type="search"
                 autoFocus
+                className="w-full"
+                icon={<Search className="h-4 w-4" aria-hidden="true" />}
                 value={globalSearch}
                 onChange={(e) => setGlobalSearch(e.target.value)}
                 placeholder="Search tasks, notes..."
-                className="w-full bg-transparent text-sm text-white/85 outline-none placeholder:text-white/55"
               />
               {globalSearch && (
-                <button
+                <GlassButton
+                  type="button"
+                  aria-label="Clear search"
                   onClick={() => { setGlobalSearch(""); setShowMobileSearch(false); }}
-                  className="shrink-0 rounded-full p-1 text-white/55 transition hover:bg-white/[0.08] hover:text-white/75"
+                  className="shrink-0 [&_.size-12]:size-10"
                 >
                   <X className="h-4 w-4" />
-                </button>
+                </GlassButton>
               )}
             </div>
           </div>
@@ -646,7 +651,7 @@ export default function App() {
                 the allowance at the exact moment a creation is blocked. */}
             {(!cloudLoaded || savingMyDay || cloudSyncFailed) && (
               <div className="mb-3 text-center">
-                <p className={cloudSyncFailed ? "text-[11px] font-bold text-amber-700" : "text-[11px] font-semibold text-white/55"}>
+                <p className={cloudSyncFailed ? "text-[11px] font-bold text-amber-200" : "text-[11px] font-semibold text-white/55"}>
                   {savingMyDay
                     ? "Saving My Day…"
                     : cloudSyncFailed

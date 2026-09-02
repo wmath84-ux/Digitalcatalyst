@@ -4,6 +4,8 @@ import type { Task, TaskPriority, TaskStatus } from "../../types";
 import { cn } from "../../utils/cn";
 import { formatTime12, nowHHMM, to24h } from "../../../utils/timeOfDay";
 import Modal from "../ui/Modal";
+import { GlassButton } from "../ui/glass-button";
+import { GlassToggleGroup, GlassToggleItem } from "../ui/glass-toggle-group";
 
 interface TaskModalProps {
   open: boolean;
@@ -84,7 +86,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
             value={task.title}
             onChange={(e) => setTask({ ...task, title: e.target.value })}
             placeholder="e.g., Complete algebra worksheet"
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+            className="dc-field w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all"
           />
         </div>
 
@@ -98,7 +100,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
               value={task.subject}
               onChange={(e) => setTask({ ...task, subject: e.target.value })}
               placeholder="e.g., Physics"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+              className="dc-field w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all"
             />
           </div>
           <div>
@@ -110,7 +112,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
             </label>
             <div
               onClick={openTimePicker}
-              className="flex w-full cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-all focus-within:border-indigo-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100"
+              className="dc-field flex w-full cursor-pointer items-center gap-2 rounded-xl border px-4 py-3 transition-all focus-within:border-white/35"
             >
               <Clock3 className="h-4 w-4 shrink-0 text-white/55" />
               <input
@@ -146,24 +148,20 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
           <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-white/55">
             Priority
           </label>
-          <div className="flex gap-2">
+          <GlassToggleGroup
+            className="dc-segment flex w-full"
+            data-stretch
+            value={task.priority}
+            onValueChange={(v) => setTask({ ...task, priority: v as Task["priority"] })}
+            aria-label="Priority"
+          >
             {priorities.map((p) => (
-              <button
-                type="button"
-                key={p.key}
-                onClick={() => setTask({ ...task, priority: p.key })}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-2 rounded-xl border-2 px-3 py-2.5 text-xs font-semibold transition-all",
-                  task.priority === p.key
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                    : "border-white/10 text-white/55 hover:border-white/10 hover:bg-white/[0.06]",
-                )}
-              >
+              <GlassToggleItem key={p.key} value={p.key} className="flex-1 justify-center gap-2 py-2 text-xs font-semibold">
                 <span className={cn("h-2 w-2 rounded-full", p.dot)} />
                 {p.label}
-              </button>
+              </GlassToggleItem>
             ))}
-          </div>
+          </GlassToggleGroup>
         </div>
 
         {/* Status */}
@@ -171,38 +169,35 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
           <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-white/55">
             Status
           </label>
-          <div className="flex gap-2">
+          <GlassToggleGroup
+            className="dc-segment flex w-full"
+            data-stretch
+            value={task.status}
+            onValueChange={(v) => setTask({ ...task, status: v as Task["status"] })}
+            aria-label="Status"
+          >
             {statuses.map((s) => (
-              <button
-                type="button"
-                key={s.key}
-                onClick={() => setTask({ ...task, status: s.key })}
-                className={cn(
-                  "flex-1 rounded-xl border-2 px-2 py-2.5 text-[11px] font-semibold transition-all sm:text-xs",
-                  task.status === s.key
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                    : "border-white/10 text-white/55 hover:border-white/10 hover:bg-white/[0.06]",
-                )}
-              >
+              <GlassToggleItem key={s.key} value={s.key} className="flex-1 justify-center py-2 text-[11px] font-semibold sm:text-xs">
                 {s.label}
-              </button>
+              </GlassToggleItem>
             ))}
-          </div>
+          </GlassToggleGroup>
         </div>
 
         {/* Actions */}
         <div className="flex gap-3 pt-2">
-          <button
+          <GlassButton
+            variant="capsule"
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-xl border border-white/10 py-3 text-sm font-semibold text-white/75 transition hover:bg-white/[0.06]"
+            className="flex-1 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:px-4 [&>span>div]:text-sm [&>span>div]:font-semibold"
           >
             Cancel
-          </button>
+          </GlassButton>
           <button
             type="submit"
             disabled={!task.title.trim()}
-            className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-semibold text-white shadow-lg transition hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 rounded-full bg-indigo-600 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {initialTask ? "Save Changes" : "Add Task"}
           </button>

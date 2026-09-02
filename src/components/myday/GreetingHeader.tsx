@@ -1,5 +1,6 @@
 import { CalendarDays, Flame, Target } from "lucide-react";
 import ProgressRing from "./ProgressRing";
+import { GlassSurface } from "../ui/glass";
 
 interface GreetingHeaderProps {
   name: string;
@@ -36,11 +37,7 @@ export default function GreetingHeader({ name, completed, total, streak }: Greet
   const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 shadow-xl shadow-indigo-200/50">
-      {/* Decorative blobs */}
-      <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/[0.07] blur-2xl" />
-      <div className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-fuchsia-500/20 blur-3xl" />
-      <div className="pointer-events-none absolute right-20 bottom-0 h-40 w-40 rounded-full bg-sky-400/10 blur-2xl" />
+    <GlassSurface radius={24} className="relative overflow-hidden text-white">
 
       <div className="relative px-5 py-6 sm:px-8 sm:py-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
@@ -89,7 +86,7 @@ export default function GreetingHeader({ name, completed, total, streak }: Greet
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-white/15">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-sky-400 via-violet-300 to-fuchsia-400"
+              className="h-full rounded-full bg-white/80"
               style={{
                 width: `${percent}%`,
                 transition: "width 0.8s cubic-bezier(.4,0,.2,1)",
@@ -98,6 +95,6 @@ export default function GreetingHeader({ name, completed, total, streak }: Greet
           </div>
         </div>
       </div>
-    </div>
+    </GlassSurface>
   );
 }
