@@ -200,7 +200,19 @@ test("A2: checkout sections and subscription cards are GlassCard / GlassSurface,
   }
 });
 
-test("A2: applyGlassTier pins the dark scheme so the pack renders its dark material", () => {
+test("the pack's own light/dark material is user-switchable via the docs' GlassSwitch example — no app-side scheme logic in the vendored files", () => {
+  // Owner direction: keep websiteglass.com's components exactly as published
+  // (both materials, chosen by html.dark / html.light) and expose that choice
+  // through the pack's own switch, not by pinning a class from applyGlassTier.
   const glass = read("src/lib/glass.ts");
-  assert.match(glass, /classList\.(add|toggle)\("dark"/, "html.dark must be pinned while the tier is on");
+  assert.doesNotMatch(glass, /classList\.(add|remove|toggle)\("dark"/, "applyGlassTier must not pin the scheme");
+  const scheme = read("src/lib/glassScheme.ts");
+  assert.match(scheme, /classList\.toggle\("dark", scheme === "dark"\)/);
+  assert.match(scheme, /classList\.toggle\("light", scheme === "light"\)/);
+  assert.match(main, /applyGlassScheme\(\)/);
+  const header = read("src/home/components/Header.tsx");
+  assert.match(header, /<GlassSwitch checked=\{scheme === "dark"\} onCheckedChange=\{[^}]+\} ariaLabel="Dark mode" \/>/);
+  // The vendored engine still carries upstream's scheme reader untouched.
+  const engine = read("src/components/ui/glass.tsx");
+  assert.match(engine, /if \(root\.classList\.contains\("light"\)\) return false;/);
 });

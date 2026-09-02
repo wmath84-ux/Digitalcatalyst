@@ -64,6 +64,7 @@ import { initOrientationLock } from "./utils/appOrientation";
 import { recordRouteVisit } from "./utils/routeHistory";
 import { requiresAuthentication } from "./utils/appRoutes";
 import { applyGlassTier, detectGlassTier } from "./lib/glass";
+import { applyGlassScheme } from "./lib/glassScheme";
 import AppShell from "./components/AppShell";
 import PageEnter, { pageEnterAppKey } from "./components/PageEnter";
 import { resolveActiveFromHash } from "./components/DesktopShell";
@@ -726,6 +727,8 @@ function RootPage(): ReactNode {
   useEffect(() => {
     const adminRoute = hash.startsWith(ADMIN_HASH) || hash.startsWith(ADMIN_LOGIN_HASH);
     applyGlassTier(adminRoute ? "off" : detectGlassTier());
+    // The pack's own light/dark material, chosen by the user (header switch).
+    if (!adminRoute) applyGlassScheme();
   }, [hash]);
 
   useEffect(() => {

@@ -1,5 +1,7 @@
 import { forwardRef, useEffect, useRef } from "react";
 import { Bell, Heart, Search, Trophy, UserRound, X } from "lucide-react";
+import { GlassSwitch } from "../../components/ui/glass-switch";
+import { useGlassScheme } from "../../lib/glassScheme";
 import type { Product } from "../types";
 import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/glass-tooltip";
@@ -50,6 +52,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications },
   ref,
 ) {
+  const [scheme, setScheme] = useGlassScheme();
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
   // The header gradient follows the app brand: by default it is the web app
   // icon's own indigo → violet blend, and the admin can re-theme both stops
@@ -183,6 +186,9 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
               <span className="text-slate-800">Profile</span>
             </TooltipContent>
           </Tooltip>
+          {/* websiteglass.com Glass Switch — the docs' controlled "Dark mode"
+              example, flipping the pack between its own light and dark material. */}
+          <GlassSwitch checked={scheme === "dark"} onCheckedChange={(v) => setScheme(v ? "dark" : "light")} ariaLabel="Dark mode" />
           <button
             type="button"
             aria-label="Notifications"
