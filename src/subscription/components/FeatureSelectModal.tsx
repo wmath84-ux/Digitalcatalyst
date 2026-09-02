@@ -6,7 +6,10 @@
 // rupees for display.
 
 import { useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { GlassSheet, GlassSheetContent, GlassSheetTitle, GlassSheetDescription } from "../../components/ui/glass-sheet";
+import { GlassButton } from "../../components/ui/glass-button";
+import { GlassInput } from "../../components/ui/glass-input";
+import { GlassTile } from "../../components/ui/glass-tile";
 import {
   X,
   Search,
@@ -42,17 +45,17 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 };
 
 const ICON_BG: Record<string, string> = {
-  download: "bg-blue-50 text-blue-500",
-  award: "bg-amber-50 text-amber-500",
-  users: "bg-violet-50 text-violet-500",
-  headphones: "bg-emerald-50 text-emerald-500",
-  code: "bg-rose-50 text-rose-500",
-  "message-circle": "bg-indigo-50 text-indigo-500",
-  "bar-chart-3": "bg-cyan-50 text-cyan-600",
-  rocket: "bg-orange-50 text-orange-500",
-  calendar: "bg-violet-50 text-violet-600",
-  brain: "bg-indigo-50 text-indigo-600",
-  "refresh-cw": "bg-sky-50 text-sky-600",
+  download: "bg-blue-500/15 text-blue-300",
+  award: "bg-amber-500/15 text-amber-300",
+  users: "bg-violet-500/15 text-violet-300",
+  headphones: "bg-emerald-500/15 text-emerald-300",
+  code: "bg-rose-500/15 text-rose-300",
+  "message-circle": "bg-indigo-500/15 text-indigo-300",
+  "bar-chart-3": "bg-cyan-500/15 text-cyan-300",
+  rocket: "bg-orange-500/15 text-orange-300",
+  calendar: "bg-violet-500/15 text-violet-300",
+  brain: "bg-indigo-500/15 text-indigo-300",
+  "refresh-cw": "bg-sky-500/15 text-sky-300",
 };
 
 const formatRupee = (paise: number): string =>
@@ -145,200 +148,120 @@ export default function FeatureSelectModal({
     .filter((f) => selected.includes(f.id) && !includedSet.has(f.id) && !purchasedSet.has(f.id))
     .reduce((sum, f) => sum + featurePrice(f), 0);
 
+  // Phase A: bottom GlassSheet + GlassInput search + GlassTile rows — the
+  // website-glass pack at its defaults, no hand-painted white sheet.
   return (
-    <AnimatePresence>
-      {open ? (
-        <>
-          <motion.div
-            className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
+    <GlassSheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <GlassSheetContent side="bottom" className="flex max-h-[85vh] flex-col text-white" aria-label="Select features" data-subscription-feature-sheet>
+        <div className="flex items-center justify-between pb-3">
+          <div>
+            <GlassSheetTitle>Select features</GlassSheetTitle>
+            <GlassSheetDescription>
+              {selected.length} of {features.length} selected · +{formatRupee(selectedTotalPaise)}
+            </GlassSheetDescription>
+          </div>
+          <GlassButton onClick={onClose} aria-label="Close" className="[&_.size-12]:size-9">
+            <X className="h-4 w-4" />
+          </GlassButton>
+        </div>
+
+        {/* Search */}
+        <div className="pb-3">
+          <GlassInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search features..."
+            icon={<Search className="h-4 w-4" />}
+            aria-label="Search features"
           />
-          <motion.div
-            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-[28px] bg-white shadow-2xl"
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            drag="y"
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.4 }}
-            onDragEnd={(_e, info) => {
-              if (info.offset.y > 120) onClose();
-            }}
-          >
-            <div className="flex justify-center pb-1 pt-3">
-              <div className="h-1.5 w-12 rounded-full bg-slate-200" />
+        </div>
+
+        {/* Select all */}
+        <GlassTile
+          selected={allFilteredSelected}
+          onClick={toggleSelectAll}
+          className="mb-2 aspect-auto w-full justify-between px-4 py-3"
+          aria-label={`Select all ${query ? "(filtered)" : ""} features`}
+        >
+          <span className="text-sm font-bold">Select all {query ? "(filtered)" : ""}</span>
+          <span className="text-xs font-medium text-violet-300">{filtered.length} features</span>
+        </GlassTile>
+
+        {/* Feature list */}
+        <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-14 text-center">
+              <Sparkles className="mb-2 h-8 w-8 text-white/30" />
+              <p className="text-sm font-medium text-white/55">
+                No features match &ldquo;{query}&rdquo;
+              </p>
             </div>
-
-            <div className="flex items-center justify-between px-5 pb-3 pt-1">
-              <div>
-                <h2 className="text-lg font-extrabold text-slate-900">Select features</h2>
-                <p className="text-xs text-slate-400">
-                  {selected.length} of {features.length} selected · +{formatRupee(selectedTotalPaise)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 active:scale-90 transition-transform"
-                aria-label="Close"
-              >
-                <X className="h-4.5 w-4.5" />
-              </button>
-            </div>
-
-            {/* Search */}
-            <div className="px-5 pb-3">
-              <div className="flex items-center gap-2 rounded-2xl bg-slate-100 px-3.5 py-2.5 ring-1 ring-transparent focus-within:ring-2 focus-within:ring-violet-400">
-                <Search className="h-4 w-4 shrink-0 text-slate-400" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search features..."
-                  className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
-                />
-                {query ? (
-                  <button
-                    type="button"
-                    onClick={() => setQuery("")}
-                    className="text-slate-400 active:text-slate-600"
-                    aria-label="Clear search"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Select all */}
-            <button
-              type="button"
-              onClick={toggleSelectAll}
-              className="mx-5 mb-2 flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3 active:bg-slate-100 transition-colors"
-            >
-              <div className="flex items-center gap-2.5">
-                <span
-                  className={`flex h-5 w-5 items-center justify-center rounded-md border-2 transition-colors ${
-                    allFilteredSelected
-                      ? "border-violet-600 bg-violet-600"
-                      : "border-slate-300 bg-white"
-                  }`}
-                >
-                  {allFilteredSelected ? (
-                    <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
-                  ) : null}
-                </span>
-                <span className="text-sm font-bold text-slate-700">
-                  Select all {query ? "(filtered)" : ""}
-                </span>
-              </div>
-              <span className="text-xs font-medium text-violet-600">
-                {filtered.length} features
-              </span>
-            </button>
-
-            {/* Feature list */}
-            <div className="flex-1 overflow-y-auto px-5 pb-6">
-              {filtered.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-14 text-center">
-                  <Sparkles className="mb-2 h-8 w-8 text-slate-300" />
-                  <p className="text-sm font-medium text-slate-400">
-                    No features match &ldquo;{query}&rdquo;
-                  </p>
-                </div>
-              ) : (
-                <ul className="space-y-2.5">
-                  {filtered.map((feat) => {
-                    const isChecked = selected.includes(feat.id);
-                    const isIncluded = includedSet.has(feat.id);
-                    // Already purchased with the subscriber's active
-                    // membership: never selectable again, shown as Purchased.
-                    const isPurchased = purchasedSet.has(feat.id);
-                    return (
-                      <li key={feat.id}>
-                        <button
-                          type="button"
-                          onClick={() => toggleFeature(feat.id)}
-                          disabled={isPurchased}
-                          data-subscription-feature-pick={feat.id}
-                          data-included={isIncluded ? "true" : "false"}
-                          data-purchased={isPurchased ? "true" : "false"}
-                          aria-label={isPurchased ? `${feat.name} — Purchased` : feat.name}
-                          className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors ${
-                            isPurchased
-                              ? "cursor-not-allowed border-emerald-200 bg-emerald-50/70"
-                              : isChecked
-                                ? "border-violet-200 bg-violet-50"
-                                : "border-slate-100 bg-white"
-                          } ${isIncluded && !isPurchased ? "opacity-80" : ""}`}
-                        >
-                          <span
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                              isPurchased
-                                ? "bg-emerald-100 text-emerald-600"
-                                : ICON_BG[feat.icon] || "bg-slate-50 text-slate-500"
-                            }`}
-                          >
-                            {isPurchased
-                              ? <BadgeCheck className="h-5 w-5" strokeWidth={2.5} />
-                              : ICON_MAP[feat.icon] || <Sparkles className="h-4.5 w-4.5" />}
+          ) : (
+            <ul className="space-y-2.5">
+              {filtered.map((feat) => {
+                const isChecked = selected.includes(feat.id);
+                const isIncluded = includedSet.has(feat.id);
+                // Already purchased with the subscriber's active
+                // membership: never selectable again, shown as Purchased.
+                const isPurchased = purchasedSet.has(feat.id);
+                return (
+                  <li key={feat.id}>
+                    <GlassTile
+                      selected={isChecked || isPurchased}
+                      onClick={() => toggleFeature(feat.id)}
+                      disabled={isPurchased}
+                      data-subscription-feature-pick={feat.id}
+                      data-included={isIncluded ? "true" : "false"}
+                      data-purchased={isPurchased ? "true" : "false"}
+                      aria-label={isPurchased ? `${feat.name} — Purchased` : feat.name}
+                      className={`aspect-auto w-full justify-start gap-3 p-3 text-left ${isPurchased ? "cursor-not-allowed" : ""} ${isIncluded && !isPurchased ? "opacity-80" : ""}`}
+                    >
+                      <span
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                          isPurchased
+                            ? "bg-emerald-500/20 text-emerald-300"
+                            : ICON_BG[feat.icon] || "bg-white/[0.06] text-white/70"
+                        }`}
+                      >
+                        {isPurchased
+                          ? <BadgeCheck className="h-5 w-5" strokeWidth={2.5} />
+                          : ICON_MAP[feat.icon] || <Sparkles className="h-4.5 w-4.5" />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className={`block text-sm font-bold ${isPurchased ? "text-emerald-200" : "text-white"}`}>{feat.name}</span>
+                        <span className="mt-0.5 block text-[11px] leading-snug text-white/55">
+                          {feat.description}
+                        </span>
+                      </span>
+                      <span className="flex flex-col items-end gap-1">
+                        {isPurchased ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white">
+                            <BadgeCheck size={11} strokeWidth={3} /> Purchased
                           </span>
-                          <div className="min-w-0 flex-1">
-                            <p className={`text-sm font-bold ${isPurchased ? "text-emerald-900" : "text-slate-800"}`}>{feat.name}</p>
-                            <p className="mt-0.5 text-[11px] leading-snug text-slate-400">
-                              {feat.description}
-                            </p>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            {isPurchased ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white">
-                                <BadgeCheck size={11} strokeWidth={3} /> Purchased
-                              </span>
-                            ) : (
-                              <span className="text-sm font-extrabold text-slate-800">
-                                {isIncluded || featurePrice(feat) <= 0 ? "Free" : `+${formatRupee(featurePrice(feat))}`}
-                              </span>
-                            )}
-                            <span
-                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
-                                isPurchased
-                                  ? "border-emerald-600 bg-emerald-600 text-white"
-                                  : isChecked
-                                    ? "border-violet-600 bg-violet-600"
-                                    : "border-slate-300 bg-white"
-                              }`}
-                            >
-                              {isPurchased ? (
-                                <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
-                              ) : isChecked ? (
-                                <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
-                              ) : null}
-                            </span>
-                          </div>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
+                        ) : (
+                          <span className="text-sm font-extrabold text-white">
+                            {isIncluded || featurePrice(feat) <= 0 ? "Free" : `+${formatRupee(featurePrice(feat))}`}
+                          </span>
+                        )}
+                        {isChecked || isPurchased ? (
+                          <Check className="h-4 w-4 text-sky-300" strokeWidth={3} aria-hidden="true" />
+                        ) : null}
+                      </span>
+                    </GlassTile>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
 
-            {/* Bottom */}
-            <div className="border-t border-slate-100 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3.5 text-center text-sm font-bold text-white active:scale-[0.98] transition-transform"
-              >
-                Done · {selected.length} features · +{formatRupee(selectedTotalPaise)}
-              </button>
-            </div>
-          </motion.div>
-        </>
-      ) : null}
-    </AnimatePresence>
+        {/* Bottom */}
+        <div className="pt-3 pb-[env(safe-area-inset-bottom)]">
+          <GlassButton variant="capsule" onClick={onClose} className="w-full [&>span>div]:w-full">
+            Done · {selected.length} features · +{formatRupee(selectedTotalPaise)}
+          </GlassButton>
+        </div>
+      </GlassSheetContent>
+    </GlassSheet>
   );
 }

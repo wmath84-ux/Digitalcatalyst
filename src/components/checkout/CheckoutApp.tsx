@@ -154,25 +154,25 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
           }}
         />
 
-        <div data-checkout-toolbar className="border-b border-slate-200 bg-white/90 backdrop-blur-md">
+        <div data-checkout-toolbar className="border-b border-white/10">
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <button
               type="button"
               onClick={checkout.goBack}
-              className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-600"
+              className="grid h-9 w-9 place-items-center rounded-xl bg-white/[0.06] text-white/75"
               aria-label="Back to source"
             >
               <ArrowLeft size={16} />
             </button>
-            <h1 className="text-base font-extrabold tracking-tight text-slate-900">Checkout</h1>
-            <span className="text-[10px] font-mono text-slate-400">Step {step}/3</span>
+            <h1 className="text-base font-extrabold tracking-tight text-white">Checkout</h1>
+            <span className="text-[10px] font-mono text-white/55">Step {step}/3</span>
           </div>
           <div className="px-4 pb-2">
             <StepIndicator currentStep={step} steps={STEPS} />
           </div>
         </div>
 
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto bg-white px-4 pt-4 pb-8">
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-8">
           {step === 1 ? (
             <CheckoutReviewStep onProceed={handleProceedToPayment} onEdit={handleEditSelection} />
           ) : null}

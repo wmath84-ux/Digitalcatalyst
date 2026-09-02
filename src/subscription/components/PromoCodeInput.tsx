@@ -69,19 +69,19 @@ export default function PromoCodeInput({
         <motion.div
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 p-3"
+          className="flex items-center justify-between rounded-2xl border border-emerald-400/30 bg-emerald-500/15 p-3"
         >
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <CheckCircle2 className="h-4 w-4 text-emerald-300" />
             <div>
-              <p className="text-sm font-extrabold text-emerald-900">{appliedCode} applied</p>
-              <p className="text-[11px] text-emerald-700">{appliedMessage || "Verified savings"}</p>
+              <p className="text-sm font-extrabold text-emerald-200">{appliedCode} applied</p>
+              <p className="text-[11px] text-emerald-200">{appliedMessage || "Verified savings"}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onRemove}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-500 active:scale-90 transition-transform"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.12] text-white/70 active:scale-90 transition-transform"
             aria-label="Remove code"
           >
             <X className="h-3.5 w-3.5" />
@@ -89,15 +89,15 @@ export default function PromoCodeInput({
         </motion.div>
       ) : (
         <div>
-          <label className="mb-1.5 block text-[11px] font-bold text-slate-500">{label}</label>
+          <label className="mb-1.5 block text-[11px] font-bold text-white/55">{label}</label>
           <motion.div
             key={shake}
             animate={shake > 0 ? { x: [-4, 4, -3, 3, 0] } : undefined}
             transition={{ duration: 0.35 }}
             className="flex items-center gap-2"
           >
-            <div className="flex flex-1 items-center gap-2 rounded-2xl bg-slate-50 px-3.5 py-2.5 ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-violet-400">
-              <Icon className="h-4 w-4 shrink-0 text-slate-400" />
+            <div className="flex flex-1 items-center gap-2 rounded-2xl bg-white/[0.06] px-3.5 py-2.5 ring-1 ring-white/10 focus-within:ring-2 focus-within:ring-violet-400">
+              <Icon className="h-4 w-4 shrink-0 text-white/55" />
               <input
                 type="text"
                 value={value}
@@ -110,14 +110,14 @@ export default function PromoCodeInput({
                     void handleApply();
                   }
                 }}
-                className="w-full bg-transparent text-sm font-bold uppercase tracking-wider text-slate-800 placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400 focus:outline-none disabled:opacity-60"
+                className="w-full bg-transparent text-sm font-bold uppercase tracking-wider text-white/85 placeholder:font-normal placeholder:tracking-normal placeholder:text-white/55 focus:outline-none disabled:opacity-60"
               />
             </div>
             <button
               type="button"
               onClick={handleApply}
               disabled={!value.trim() || status === "loading" || Boolean(disabled)}
-              className="flex h-10 w-20 items-center justify-center rounded-2xl bg-slate-900 text-xs font-extrabold uppercase tracking-wider text-white shadow-sm active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-10 w-20 items-center justify-center rounded-2xl bg-slate-900 text-xs font-extrabold uppercase tracking-wider text-white active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-50"
             >
               {status === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}
             </button>
@@ -130,21 +130,21 @@ export default function PromoCodeInput({
                 data-referral-already-used
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-2 rounded-2xl border border-rose-200 bg-rose-50 p-3"
+                className="mt-2 rounded-2xl border border-rose-400/30 bg-rose-500/15 p-3"
               >
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" />
                   <div>
-                    <p className="text-sm font-extrabold text-rose-900">
+                    <p className="text-sm font-extrabold text-rose-200">
                       This referral is already used by someone
                     </p>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-rose-700">
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-rose-200">
                       Each referral ID works only once, and this one has already been redeemed. Try a different code from the leaderboard's unused IDs.
                     </p>
                     <button
                       type="button"
                       onClick={() => { window.location.hash = "#/leaderboard"; }}
-                      className="mt-2 rounded-xl bg-rose-600 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-sm active:scale-[0.98] transition-transform"
+                      className="mt-2 rounded-xl bg-rose-600 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white active:scale-[0.98] transition-transform"
                     >
                       Open Unused IDs
                     </button>
@@ -155,7 +155,7 @@ export default function PromoCodeInput({
               <div
                 role="alert"
                 data-subscription-coupon-error
-                className="mt-1.5 flex items-start gap-1.5 text-[11px] font-bold text-rose-600"
+                className="mt-1.5 flex items-start gap-1.5 text-[11px] font-bold text-rose-300"
               >
                 <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>{displayError}</span>

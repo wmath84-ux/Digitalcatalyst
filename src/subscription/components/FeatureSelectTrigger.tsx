@@ -42,22 +42,22 @@ export default function FeatureSelectTrigger({ features, selectedIds, onOpen, pu
         type="button"
         onClick={onOpen}
         data-subscription-features-trigger
-        className="flex w-full items-center justify-between rounded-2xl border border-slate-100 bg-white p-4 shadow-sm shadow-slate-200/60 active:scale-[0.99] transition-transform"
+        className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] p-4 active:scale-[0.99] transition-transform"
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/15">
             <Sparkles className="h-5 w-5 text-amber-500" />
           </div>
           <div className="text-left">
-            <p className="text-sm font-bold text-slate-800">Select features</p>
+            <p className="text-sm font-bold text-white/85">Select features</p>
             {selectedFeatures.length === 0 ? (
-              <p className="text-xs text-slate-400">Add premium features to your plan</p>
+              <p className="text-xs text-white/55">Add premium features to your plan</p>
             ) : (
-              <p className="text-xs font-medium text-amber-600">
+              <p className="text-xs font-medium text-amber-300">
                 {addableFeatures.length} feature
                 {addableFeatures.length !== 1 ? "s" : ""} · +{formatRupee(totalPaise)}
                 {purchasedCount > 0 ? (
-                  <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                  <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-200">
                     {purchasedCount} purchased
                   </span>
                 ) : null}
@@ -76,7 +76,7 @@ export default function FeatureSelectTrigger({ features, selectedIds, onOpen, pu
               {addableFeatures.length}
             </span>
           ) : null}
-          <ChevronRight className="h-4.5 w-4.5 text-slate-300" />
+          <ChevronRight className="h-4.5 w-4.5 text-white/40" />
         </div>
       </button>
     </div>

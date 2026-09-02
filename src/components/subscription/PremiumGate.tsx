@@ -49,6 +49,7 @@
 //     keyboard users can reach them.
 
 import { useEffect } from "react";
+import { GlassSurface } from "../ui/glass";
 import { createPortal } from "react-dom";
 import { X, Check, Sparkles, Crown, Zap } from "lucide-react";
 import {
@@ -177,15 +178,15 @@ function GateContent({
       data-variant={variant}
       className={
         asPage
-          ? "dc-premium-page min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-white [-webkit-overflow-scrolling:touch]"
-          : "dc-premium-sheet relative min-h-0 w-full flex-1 overflow-y-auto overscroll-contain rounded-t-[1.75rem] bg-white shadow-[0_-20px_60px_-12px_rgba(79,70,229,0.35)] sm:rounded-[1.75rem] sm:shadow-[0_25px_70px_-12px_rgba(79,70,229,0.5)]"
+          ? "dc-premium-page min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+          : "dc-premium-sheet relative min-h-0 w-full flex-1 overflow-y-auto overscroll-contain rounded-t-[1.75rem] sm:rounded-[1.75rem]"
       }
     >
       {/* Blurred background blobs. They are inside the card and scale with
           the card so they never feel oversized on a phone or lost on a
           desktop — the card itself is fluid (see `dc-premium-shell`). */}
-      <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-indigo-100/60 blur-3xl sm:h-56 sm:w-56" />
-      <div className="pointer-events-none absolute -left-16 top-32 h-44 w-44 rounded-full bg-violet-100/50 blur-3xl sm:h-56 sm:w-56" />
+      <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-indigo-500/20 blur-3xl sm:h-56 sm:w-56" />
+      <div className="pointer-events-none absolute -left-16 top-32 h-44 w-44 rounded-full bg-violet-500/20 blur-3xl sm:h-56 sm:w-56" />
 
       {/* All internal padding / spacing uses CSS clamp() so the same JSX
           looks correct on a 360 px phone, a 768 px tablet and a 1440 px
@@ -196,15 +197,15 @@ function GateContent({
             enough top space for it on every screen. */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-[clamp(10px,1.6vw,11px)] font-black uppercase tracking-wider text-indigo-600 ring-1 ring-indigo-100">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/15 px-2.5 py-1 text-[clamp(10px,1.6vw,11px)] font-black uppercase tracking-wider text-indigo-300 ring-1 ring-indigo-400/30">
               <Sparkles className="h-3 w-3" />
               {isMyDay ? "My Day Premium" : "Subscription feature"}
             </div>
-            <h1 className="mt-3 text-[clamp(1.35rem,4.5vw,1.75rem)] font-black leading-[1.15] tracking-tight text-slate-900">
+            <h1 className="mt-3 text-[clamp(1.35rem,4.5vw,1.75rem)] font-black leading-[1.15] tracking-tight text-white">
               {isMyDay ? (
                 <>
                   {userName ? `${userName}, ` : ""}apna din{" "}
-                  <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
                     My Day Premium
                   </span>{" "}
                   se supercharge karo
@@ -212,19 +213,19 @@ function GateContent({
               ) : (
                 <>
                   {userName ? `${userName}, ` : ""}aapki{" "}
-                  <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
                     Revision Studio
                   </span>{" "}
                   membership Plus+ me hai
                 </>
               )}
             </h1>
-            <p className="mt-2 text-[clamp(12px,2.2vw,14px)] leading-relaxed text-slate-500">
+            <p className="mt-2 text-[clamp(12px,2.2vw,14px)] leading-relaxed text-white/55">
               {subtitle ? (
                 subtitle
               ) : isMyDay ? (
                 <>
-                  <span className="font-semibold text-slate-700">My Day</span> me tasks, schedule, reminders aur quick notes — sab kuch cloud-synced aur premium timeline ke saath.
+                  <span className="font-semibold text-white/85">My Day</span> me tasks, schedule, reminders aur quick notes — sab kuch cloud-synced aur premium timeline ke saath.
                   Ab har din zyada organized, har goal zyada clear.
                 </>
               ) : (
@@ -243,7 +244,7 @@ function GateContent({
             onClick={onClose}
             aria-label="Close subscription gate"
             data-premium-gate-close
-            className="dc-premium-close shrink-0 rounded-full bg-gradient-to-br from-indigo-500 via-violet-600 to-fuchsia-600 p-[clamp(6px,1vw,8px)] text-white shadow-[0_8px_20px_-6px_rgba(99,102,241,0.55)] ring-1 ring-white/40 transition hover:scale-110 active:scale-95"
+            className="dc-premium-close shrink-0 rounded-full bg-indigo-600 p-[clamp(6px,1vw,8px)] text-white shadow-[0_8px_20px_-6px_rgba(99,102,241,0.55)] ring-1 ring-white/40 transition hover:scale-110 active:scale-95"
           >
             <X className="h-[clamp(14px,2.4vw,18px)] w-[clamp(14px,2.4vw,18px)]" strokeWidth={2.75} />
           </button>
@@ -255,14 +256,14 @@ function GateContent({
           {perks.map(({ icon: Icon, title, text }) => (
             <div
               key={title}
-              className="dc-premium-perk flex items-start gap-[clamp(0.6rem,1.5vw,0.9rem)] rounded-[clamp(0.85rem,2vw,1.15rem)] border border-slate-100 bg-white p-[clamp(0.75rem,2vw,1.1rem)] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_4px_12px_-6px_rgba(15,23,42,0.08)]"
+              className="dc-premium-perk flex items-start gap-[clamp(0.6rem,1.5vw,0.9rem)] rounded-[clamp(0.85rem,2vw,1.15rem)] border border-white/10 bg-white/[0.06] p-[clamp(0.75rem,2vw,1.1rem)]"
             >
-              <span className="grid h-[clamp(2.25rem,5vw,2.65rem)] w-[clamp(2.25rem,5vw,2.65rem)] shrink-0 place-items-center rounded-[clamp(0.6rem,1.5vw,0.85rem)] bg-gradient-to-br from-indigo-50 to-violet-50 text-indigo-600 ring-1 ring-indigo-100">
+              <span className="grid h-[clamp(2.25rem,5vw,2.65rem)] w-[clamp(2.25rem,5vw,2.65rem)] shrink-0 place-items-center rounded-[clamp(0.6rem,1.5vw,0.85rem)] bg-indigo-600 text-indigo-300 ring-1 ring-indigo-400/30">
                 <Icon className="h-[clamp(1rem,2.4vw,1.25rem)] w-[clamp(1rem,2.4vw,1.25rem)]" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[clamp(13px,2.4vw,15px)] font-bold leading-tight text-slate-900">{title}</p>
-                <p className="mt-1 text-[clamp(11px,1.9vw,13px)] leading-relaxed text-slate-500">{text}</p>
+                <p className="text-[clamp(13px,2.4vw,15px)] font-bold leading-tight text-white">{title}</p>
+                <p className="mt-1 text-[clamp(11px,1.9vw,13px)] leading-relaxed text-white/55">{text}</p>
               </div>
             </div>
           ))}
@@ -283,10 +284,10 @@ function GateContent({
               unlock.
             - A single full-width primary CTA (Subscribe).
             - A subtle "Maybe later / Go back" link below the CTA. */}
-        <div className="dc-premium-offer relative mt-[clamp(1.5rem,4vw,2rem)] overflow-hidden rounded-[clamp(1rem,2.5vw,1.5rem)] bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-700 p-[clamp(1rem,3vw,1.5rem)] text-white shadow-[0_18px_40px_-12px_rgba(79,70,229,0.55)]">
+        <div className="dc-premium-offer relative mt-[clamp(1.5rem,4vw,2rem)] overflow-hidden rounded-[clamp(1rem,2.5vw,1.5rem)] bg-indigo-600 p-[clamp(1rem,3vw,1.5rem)] text-white shadow-[0_18px_40px_-12px_rgba(79,70,229,0.55)]">
           {/* Subtle grid pattern for a premium feel */}
           <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.18)_1px,transparent_1px)] [background-size:24px_24px]" />
-          <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
+          <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
 
           <div className="relative">
             <div className="flex flex-wrap items-center gap-2">
@@ -318,17 +319,17 @@ function GateContent({
                   key={tier.id}
                   className={`relative rounded-[clamp(0.75rem,1.8vw,1rem)] border p-[clamp(0.75rem,2vw,1rem)] backdrop-blur transition ${
                     tier.highlight
-                      ? "border-white/70 bg-white/15 shadow-[0_8px_24px_-8px_rgba(255,255,255,0.4)] ring-1 ring-amber-200/60"
+                      ? "border-white/70 bg-white/15 shadow-[0_8px_24px_-8px_rgba(255,255,255,0.4)] ring-1 ring-amber-400/30"
                       : "border-white/20 bg-white/10"
                   }`}
                 >
                   {tier.badge && (
-                    <span className="absolute -top-2 right-2 rounded-full bg-gradient-to-r from-amber-300 to-amber-500 px-2 py-0.5 text-[clamp(9px,1.5vw,10px)] font-black uppercase tracking-wider text-amber-950 shadow-md">
+                    <span className="absolute -top-2 right-2 rounded-full bg-amber-500 px-2 py-0.5 text-[clamp(9px,1.5vw,10px)] font-black uppercase tracking-wider text-amber-950 shadow-md">
                       {tier.badge}
                     </span>
                   )}
                   {tier.highlight && (
-                    <span className="absolute -top-2 left-2 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-[clamp(9px,1.5vw,10px)] font-black uppercase tracking-wider text-violet-700 shadow-md">
+                    <span className="absolute -top-2 left-2 inline-flex items-center gap-1 rounded-full bg-white/[0.08] px-2 py-0.5 text-[clamp(9px,1.5vw,10px)] font-black uppercase tracking-wider text-violet-200 shadow-md">
                       <Crown className="h-2.5 w-2.5" />
                       Best value
                     </span>
@@ -365,7 +366,7 @@ function GateContent({
               type="button"
               onClick={onViewSubscription}
               data-premium-gate-cta
-              className="dc-premium-cta mt-5 w-full rounded-[clamp(0.75rem,2vw,1rem)] bg-white py-[clamp(0.75rem,2.2vw,0.95rem)] text-[clamp(13px,2.4vw,15px)] font-black text-indigo-700 shadow-[0_10px_24px_-6px_rgba(255,255,255,0.6)] transition hover:bg-indigo-50 active:scale-[0.99]"
+              className="dc-premium-cta mt-5 w-full rounded-[clamp(0.75rem,2vw,1rem)] bg-white py-[clamp(0.75rem,2.2vw,0.95rem)] text-[clamp(13px,2.4vw,15px)] font-black text-indigo-700 shadow-[0_10px_24px_-6px_rgba(255,255,255,0.35)] transition hover:bg-indigo-50 active:scale-[0.99]"
             >
               View subscription →
             </button>
@@ -438,7 +439,7 @@ export default function PremiumGate({
         className="dc-premium-modal-inner flex min-h-0 w-full [width:min(100vw,640px)] flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex min-h-0 max-h-full flex-col overflow-hidden rounded-t-[1.75rem] border-0 bg-white shadow-2xl sm:rounded-[1.75rem] sm:border-4 sm:border-white/80 sm:shadow-[0_25px_70px_-12px_rgba(79,70,229,0.5)] sm:ring-1 sm:ring-indigo-200">
+        <GlassSurface radius={28} className="flex min-h-0 max-h-full flex-col overflow-hidden text-white" contentClassName="flex min-h-0 max-h-full flex-col overflow-hidden">
           <GateContent
             variant={variant}
             userName={userName}
@@ -447,7 +448,7 @@ export default function PremiumGate({
             asPage={false}
             subtitle={subtitle}
           />
-        </div>
+        </GlassSurface>
       </div>
     </div>
   );

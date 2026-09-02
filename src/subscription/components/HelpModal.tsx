@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { GlassSheet, GlassSheetContent, GlassSheetTitle, GlassSheetDescription } from "../../components/ui/glass-sheet";
+import { GlassAccordion, GlassAccordionItem, GlassAccordionTrigger, GlassAccordionContent } from "../../components/ui/glass-accordion";
+import { GlassButton } from "../../components/ui/glass-button";
 import {
   X,
-  ChevronDown,
   MessageCircle,
   Mail,
   Phone,
@@ -57,174 +57,78 @@ export default function HelpModal({ open, onClose }: Props) {
   // Support contact comes from the admin-branded settings (settings/branding)
   // so the email + phone shown here are the real ones, not placeholders.
   const { supportEmail, supportPhone } = useBranding();
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
-  const toggle = (i: number) =>
-    setExpandedIdx((prev) => (prev === i ? null : i));
-
+  // Phase A: the sheet, the FAQ accordion and the CTA are the website-glass
+  // pack at its defaults — no hand-painted white sheet, no framer drag.
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
-          <motion.div
-            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[88vh] flex-col rounded-t-[28px] bg-white shadow-2xl"
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            drag="y"
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.4 }}
-            onDragEnd={(_e, info) => {
-              if (info.offset.y > 120) onClose();
-            }}
-          >
-            {/* Drag handle */}
-            <div className="flex justify-center pb-1 pt-3">
-              <div className="h-1.5 w-12 rounded-full bg-slate-200" />
-            </div>
+    <GlassSheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <GlassSheetContent side="bottom" className="max-h-[88vh] text-white" aria-label="Help & FAQ" data-subscription-help-sheet>
+        <div className="flex items-center justify-between pb-4">
+          <div>
+            <GlassSheetTitle>Help &amp; FAQ</GlassSheetTitle>
+            <GlassSheetDescription>Everything you need to know</GlassSheetDescription>
+          </div>
+          <GlassButton onClick={onClose} aria-label="Close" className="[&_.size-12]:size-9">
+            <X className="h-4 w-4" />
+          </GlassButton>
+        </div>
 
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 pb-4 pt-1">
-              <div>
-                <h2 className="text-lg font-extrabold text-slate-900">
-                  Help & FAQ
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Everything you need to know
-                </p>
+        <GlassAccordion type="single" data-subscription-help-faq>
+          {FAQS.map((faq, i) => (
+            <GlassAccordionItem key={i} value={`faq-${i}`}>
+              <GlassAccordionTrigger>
+                <span className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10">{faq.icon}</span>
+                  <span className="text-sm font-bold">{faq.q}</span>
+                </span>
+              </GlassAccordionTrigger>
+              <GlassAccordionContent>
+                <p className="text-[13px] leading-relaxed text-white/70">{faq.a}</p>
+              </GlassAccordionContent>
+            </GlassAccordionItem>
+          ))}
+        </GlassAccordion>
+
+        <div className="mt-6">
+          <h3 className="mb-3 text-sm font-bold text-white/85">Still need help?</h3>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15">
+                <MessageCircle className="h-5 w-5 text-blue-300" />
+              </span>
+              <div className="flex-1">
+                <p className="text-sm font-bold">Live Chat</p>
+                <p className="text-[11px] text-white/55">Available 24/7 — average response 2 min</p>
               </div>
-              <button
-                onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 active:scale-90 transition-transform"
-                aria-label="Close"
-              >
-                <X className="h-4.5 w-4.5" />
-              </button>
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-emerald-400/30" />
             </div>
-
-            {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto px-5 pb-6">
-              {/* FAQ Accordion */}
-              <div className="space-y-2.5">
-                {FAQS.map((faq, i) => {
-                  const isOpen = expandedIdx === i;
-                  return (
-                    <div
-                      key={i}
-                      className={`overflow-hidden rounded-2xl border transition-colors ${
-                        isOpen
-                          ? "border-violet-200 bg-violet-50/50"
-                          : "border-slate-100 bg-white"
-                      }`}
-                    >
-                      <button
-                        onClick={() => toggle(i)}
-                        className="flex w-full items-center gap-3 p-3.5 text-left"
-                      >
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-100">
-                          {faq.icon}
-                        </span>
-                        <span className="flex-1 text-sm font-bold text-slate-800">
-                          {faq.q}
-                        </span>
-                        <ChevronDown
-                          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${
-                            isOpen ? "rotate-180" : ""
-                          }`}
-                        />
-                      </button>
-                      <AnimatePresence initial={false}>
-                        {isOpen && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.25, ease: "easeInOut" }}
-                            className="overflow-hidden"
-                          >
-                            <p className="px-3.5 pb-4 text-[13px] leading-relaxed text-slate-500">
-                              {faq.a}
-                            </p>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Contact section */}
-              <div className="mt-6">
-                <h3 className="mb-3 text-sm font-bold text-slate-700">
-                  Still need help?
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-                      <MessageCircle className="h-5 w-5 text-blue-500" />
-                    </span>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-slate-800">
-                        Live Chat
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        Available 24/7 — average response 2 min
-                      </p>
-                    </div>
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-emerald-100" />
-                  </div>
-
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50">
-                      <Mail className="h-5 w-5 text-violet-500" />
-                    </span>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-slate-800">
-                        Email Support
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        {supportEmail}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
-                      <Phone className="h-5 w-5 text-amber-500" />
-                    </span>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-slate-800">
-                        Call Us
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        {supportPhone}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15">
+                <Mail className="h-5 w-5 text-violet-300" />
+              </span>
+              <div className="flex-1">
+                <p className="text-sm font-bold">Email Support</p>
+                <p className="text-[11px] text-white/55">{supportEmail}</p>
               </div>
             </div>
-
-            {/* Bottom button */}
-            <div className="border-t border-slate-100 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-              <button
-                onClick={onClose}
-                className="w-full rounded-2xl bg-slate-900 py-3.5 text-center text-sm font-bold text-white active:scale-[0.98] transition-transform"
-              >
-                Got it, thanks!
-              </button>
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15">
+                <Phone className="h-5 w-5 text-amber-300" />
+              </span>
+              <div className="flex-1">
+                <p className="text-sm font-bold">Call Us</p>
+                <p className="text-[11px] text-white/55">{supportPhone}</p>
+              </div>
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+          </div>
+        </div>
+
+        <div className="pt-5 pb-[env(safe-area-inset-bottom)]">
+          <GlassButton variant="capsule" onClick={onClose} className="w-full [&>span>div]:w-full">
+            Got it, thanks!
+          </GlassButton>
+        </div>
+      </GlassSheetContent>
+    </GlassSheet>
   );
 }

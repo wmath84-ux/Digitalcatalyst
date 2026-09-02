@@ -94,7 +94,7 @@ test("Revision is a first-class selectable feature with default selection", () =
 test("the feature picker renders the revision icons", () => {
   assert.match(featureModal, /brain: <Brain/);
   assert.match(featureModal, /"refresh-cw": <RefreshCw/);
-  assert.match(featureModal, /brain: "bg-indigo-50 text-indigo-600"/);
+  assert.match(featureModal, /brain: "bg-indigo-500\/15 text-indigo-300"/);
 });
 
 // ---------------------------------------------------------------------------

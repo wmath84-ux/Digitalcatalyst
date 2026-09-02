@@ -355,25 +355,25 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
 
   return (
     <div className="flex flex-col gap-4 animate-fadeIn">
-      <div className="dc-card rounded-2xl border border-gray-200 bg-white p-5 text-center shadow-sm">
-        <ShieldCheck className="mx-auto h-9 w-9 text-emerald-600" />
-        <p className="mt-2 text-sm font-black text-gray-800">Server-verified secure checkout</p>
-        <p className="mt-1 text-xs text-gray-400">The payable amount comes from the verified quote and is reconfirmed by Razorpay on the server.</p>
+      <div className="dc-card rounded-2xl border border-white/10 bg-white/[0.06] p-5 text-center">
+        <ShieldCheck className="mx-auto h-9 w-9 text-emerald-300" />
+        <p className="mt-2 text-sm font-black text-white">Server-verified secure checkout</p>
+        <p className="mt-1 text-xs text-white/55">The payable amount comes from the verified quote and is reconfirmed by Razorpay on the server.</p>
       </div>
 
-      <div className="dc-quote rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 p-5 text-white shadow-lg shadow-indigo-200">
+      <div className="dc-quote rounded-2xl bg-indigo-600 p-5 text-white shadow-lg ">
         <p className="text-xs font-bold uppercase tracking-wider text-indigo-200">{finalPrice === 0 ? "No payment needed" : "Amount to pay"}</p>
         <p className="mt-1 text-3xl font-extrabold">{finalPrice === 0 ? "FREE" : displayAmount}</p>
         <p className="mt-1 truncate text-xs text-indigo-200">{productName}</p>
-        <p className="mt-2 truncate text-[10px] font-mono text-indigo-200/70">quote {quoteId}</p>
+        <p className="mt-2 truncate text-[10px] font-mono text-indigo-200">quote {quoteId}</p>
       </div>
 
-      {paymentState === "success" && <StatusCard icon={<CheckCircle2 className="h-10 w-10 text-emerald-600" />} title="Payment verified" detail="Access is being added to your account…" tone="emerald" />}
-      {busy && <StatusCard icon={<LoaderCircle className="h-10 w-10 animate-spin text-indigo-600" />} title={paymentState === "verifying" ? "Verifying payment" : paymentState === "awaiting" ? "Complete payment in Razorpay" : "Creating secure order"} detail={paymentState === "verifying" ? "Do not close this page while the server confirms your payment." : "Your access will unlock only after server verification."} tone="indigo" />}
-      {error && <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold leading-6 text-rose-700"><TriangleAlert className="mb-2 h-5 w-5" />{error}</div>}
+      {paymentState === "success" && <StatusCard icon={<CheckCircle2 className="h-10 w-10 text-emerald-300" />} title="Payment verified" detail="Access is being added to your account…" tone="emerald" />}
+      {busy && <StatusCard icon={<LoaderCircle className="h-10 w-10 animate-spin text-indigo-300" />} title={paymentState === "verifying" ? "Verifying payment" : paymentState === "awaiting" ? "Complete payment in Razorpay" : "Creating secure order"} detail={paymentState === "verifying" ? "Do not close this page while the server confirms your payment." : "Your access will unlock only after server verification."} tone="indigo" />}
+      {error && <div role="alert" className="rounded-2xl border border-rose-400/30 bg-rose-500/15 p-4 text-sm font-semibold leading-6 text-rose-200"><TriangleAlert className="mb-2 h-5 w-5" />{error}</div>}
 
       {paymentState !== "success" && (
-        <button disabled={busy} onClick={startPayment} className="relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-emerald-600 py-4 text-base font-black text-white shadow-lg shadow-emerald-200 transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60">
+        <button disabled={busy} onClick={startPayment} className="relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-emerald-600 py-4 text-base font-black text-white shadow-lg transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60">
           {/* Checkout's money button keeps its emerald identity (it is the one
               colour a user is told to trust) and wears the pack's specular
               layer over it — frost + rim + sheen, content above the gloss. */}
@@ -384,12 +384,12 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
           </span>
         </button>
       )}
-      {!busy && paymentState !== "success" && <button onClick={onGoBack} className="dc-glass-soft w-full rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600">← Back to order summary</button>}
-      <p className="text-center text-[11px] font-medium text-gray-400">Razorpay handles UPI, cards, net banking and supported wallets. Card details never touch this app.</p>
+      {!busy && paymentState !== "success" && <button onClick={onGoBack} className="dc-glass-soft w-full rounded-2xl bg-white/[0.06] py-3 text-sm font-bold text-white/75">← Back to order summary</button>}
+      <p className="text-center text-[11px] font-medium text-white/55">Razorpay handles UPI, cards, net banking and supported wallets. Card details never touch this app.</p>
     </div>
   );
 }
 
 function StatusCard({ icon, title, detail, tone }: { icon: React.ReactNode; title: string; detail: string; tone: "emerald" | "indigo" }) {
-  return <div className={`dc-card rounded-2xl border p-6 text-center ${tone === "emerald" ? "border-emerald-200 bg-emerald-50" : "border-indigo-200 bg-indigo-50"}`}><div className="flex justify-center">{icon}</div><p className="mt-3 text-sm font-black text-gray-800">{title}</p><p className="mt-1 text-xs leading-5 text-gray-500">{detail}</p></div>;
+  return <div className={`dc-card rounded-2xl border p-6 text-center ${tone === "emerald" ? "border-emerald-400/30 bg-emerald-500/15" : "border-indigo-400/30 bg-indigo-500/15"}`}><div className="flex justify-center">{icon}</div><p className="mt-3 text-sm font-black text-white">{title}</p><p className="mt-1 text-xs leading-5 text-white/55">{detail}</p></div>;
 }

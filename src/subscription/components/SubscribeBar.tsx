@@ -59,7 +59,7 @@ export default function SubscribeBar({
 
   return (
     <div
-      className="sticky bottom-0 z-30 border-t border-slate-100 bg-white/90 px-5 pb-[calc(0.9rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-lg"
+      className="sticky bottom-0 z-30 border-t border-white/10 bg-[#0a0c12]/60 px-5 pb-[calc(0.9rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-lg"
       data-subscription-subscribe-bar
       data-subscription-owned={isOwned ? "true" : "false"}
     >
@@ -68,7 +68,7 @@ export default function SubscribeBar({
           {isOwned ? (
             <span
               data-subscription-owned-note
-              className="text-[13px] font-extrabold text-emerald-700"
+              className="text-[13px] font-extrabold text-emerald-200"
             >
               Active on your account
             </span>
@@ -77,19 +77,19 @@ export default function SubscribeBar({
               <span
                 data-subscription-total
                 data-subscription-free={isFreeSelection ? "true" : undefined}
-                className={`text-xl font-extrabold ${isFreeSelection ? "text-emerald-600" : "text-slate-900"}`}
+                className={`text-xl font-extrabold ${isFreeSelection ? "text-emerald-300" : "text-white"}`}
               >
                 {isFreeSelection ? "FREE" : totalRupees || formatRupee(totalPaise)}
               </span>
               {hasDiscount ? (
-                <span className="text-xs font-semibold text-slate-400 line-through">
+                <span className="text-xs font-semibold text-white/55 line-through">
                   {formatRupee(subtotalPaise)}
                 </span>
               ) : null}
             </>
           )}
         </div>
-        <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
+        <div className="flex items-center gap-1 text-[11px] font-medium text-white/55">
           {isOwned ? (
             <>
               <BadgeCheck className="h-3.5 w-3.5 text-emerald-500" /> Already subscribed
@@ -104,7 +104,7 @@ export default function SubscribeBar({
       {isDowngradeBlocked ? (
         <p
           data-subscription-downgrade-note
-          className="mb-2 rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-amber-800 ring-1 ring-amber-200"
+          className="mb-2 rounded-xl bg-amber-500/15 px-3 py-2 text-[11px] font-semibold leading-relaxed text-amber-200 ring-1 ring-amber-400/30"
         >
           {ownershipState?.reason ||
             "This change isn't available while your current membership is active."}
@@ -118,10 +118,10 @@ export default function SubscribeBar({
         data-subscription-cta-tone={cta.tone}
         className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-extrabold transition-transform active:scale-[0.98] disabled:cursor-not-allowed ${
           isOwned
-            ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-200 disabled:opacity-100"
+            ? "bg-emerald-600 text-white shadow-lg  disabled:opacity-100"
             : isDowngradeBlocked
-              ? "bg-slate-200 text-slate-500 disabled:opacity-100"
-              : "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-300 disabled:opacity-70"
+              ? "bg-white/[0.12] text-white/55 disabled:opacity-100"
+              : "bg-indigo-600 text-white shadow-lg  disabled:opacity-70"
         }`}
       >
         {loading ? (

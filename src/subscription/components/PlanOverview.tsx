@@ -7,6 +7,7 @@
 // those are gone.
 
 import { BadgeCheck, Check, Crown, Lock, X as XIcon, ChevronDown, ChevronUp } from "lucide-react";
+import { GlassCard } from "../../components/ui/glass-card";
 import SubscriberOnlyPriceBadge from "../../components/subscription/SubscriberOnlyPriceBadge";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -70,7 +71,7 @@ export default function PlanOverview({
 
   return (
     <div className="px-5 pt-6" data-subscription-plan-overview>
-      <div className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 p-5 text-white shadow-xl shadow-slate-300/40 ring-1 ring-white/10">
+      <GlassCard className="ring-1 ring-white/10">
         {/* glow effects */}
         <div className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-violet-500/30 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-16 -left-10 h-40 w-40 rounded-full bg-fuchsia-500/20 blur-3xl" />
@@ -96,14 +97,14 @@ export default function PlanOverview({
                       ? "bg-emerald-400 text-emerald-950 shadow"
                       : "bg-white text-slate-900 shadow"
                     : isOwned
-                      ? "bg-emerald-400/20 text-emerald-100 ring-1 ring-emerald-300/40 hover:bg-emerald-400/30"
+                      ? "bg-emerald-400/20 text-emerald-100 ring-1 ring-emerald-400/30 hover:bg-emerald-400/30"
                       : "bg-white/10 text-white/80 ring-1 ring-white/20 hover:bg-white/20"
                 } ${!plan.active ? "cursor-not-allowed opacity-50" : ""}`}
               >
                 {isOwned ? <BadgeCheck className="mr-1 h-3 w-3" aria-hidden="true" /> : null}
                 {plan.name}
                 {isOwned ? <span className="ml-1 text-[9px] font-black">· ACTIVE</span> : null}
-                {!isOwned && plan.badge ? <span className="ml-1 rounded bg-amber-300/90 px-1 text-[9px] text-slate-900">{plan.badge}</span> : null}
+                {!isOwned && plan.badge ? <span className="ml-1 rounded bg-amber-300/90 px-1 text-[9px] text-white">{plan.badge}</span> : null}
               </button>
             );
           })}
@@ -112,7 +113,7 @@ export default function PlanOverview({
         {/* Plan + price */}
         <div className="relative flex items-center justify-between">
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-violet-200/80">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-violet-200">
               {activePlan ? activePlan.name : "Choose a plan"}
             </p>
             {isSubscriber && subscriberPriceRupees != null && activePlan ? (
@@ -130,17 +131,17 @@ export default function PlanOverview({
                   ? "FREE"
                   : `₹${totalRupees}`
                 : "—"}
-              <span className="ml-1 text-xs font-bold text-violet-200/80">
+              <span className="ml-1 text-xs font-bold text-violet-200">
                 /{cycle === "monthly" ? "mo" : "yr"}
               </span>
             </p>
             {activePlan ? (
-              <p className="mt-1 line-clamp-2 text-[11px] text-violet-200/80">
+              <p className="mt-1 line-clamp-2 text-[11px] text-violet-200">
                 {activePlan.description}
               </p>
             ) : null}
           </div>
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-300 to-amber-500 text-slate-900 shadow-lg shadow-amber-500/40">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-500/40">
             <Crown className="h-6 w-6" />
           </span>
         </div>
@@ -185,7 +186,7 @@ export default function PlanOverview({
                 ) : isCycleDowngrade ? (
                   <Lock className="ml-1 h-3 w-3" aria-label="Locked until your yearly membership ends" />
                 ) : c === "yearly" ? (
-                  <span className="ml-1 text-[9px] text-emerald-600">Save</span>
+                  <span className="ml-1 text-[9px] text-emerald-300">Save</span>
                 ) : null}
               </button>
             );
@@ -194,7 +195,7 @@ export default function PlanOverview({
         {ownedPlanId && ownedCycle === "yearly" && selectedPlanId === ownedPlanId ? (
           <p
             data-subscription-cycle-downgrade-note
-            className="relative mt-2 text-[10px] font-semibold text-violet-200/70"
+            className="relative mt-2 text-[10px] font-semibold text-violet-200"
           >
             Monthly unlocks after your yearly membership ends — until then you can renew yearly, add features, or move up a plan.
           </p>
@@ -203,7 +204,7 @@ export default function PlanOverview({
         {activePlan ? (
           <div
             data-revision-bank-benefit
-            className="relative mt-4 flex items-center gap-2 rounded-2xl bg-indigo-400/10 px-3 py-2.5 text-[11px] font-semibold text-indigo-50 ring-1 ring-indigo-300/20"
+            className="relative mt-4 flex items-center gap-2 rounded-2xl bg-indigo-400/10 px-3 py-2.5 text-[11px] font-semibold text-indigo-50 ring-1 ring-indigo-400/30"
           >
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white/10 text-sm">🧠</span>
             <span>
@@ -215,7 +216,7 @@ export default function PlanOverview({
         ) : null}
 
         {activePlan ? (
-          <div data-school-ai-benefit className="relative mt-2 flex items-center gap-2 rounded-2xl bg-violet-400/10 px-3 py-2.5 text-[11px] font-semibold text-violet-50 ring-1 ring-violet-300/20">
+          <div data-school-ai-benefit className="relative mt-2 flex items-center gap-2 rounded-2xl bg-violet-400/10 px-3 py-2.5 text-[11px] font-semibold text-violet-50 ring-1 ring-violet-400/30">
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white/10 text-sm">✨</span>
             <span>
               School AI: {activePlan.aiAllowances?.[cycle]?.dailyGenerationLimit === 0 ? "unlimited" : `${activePlan.aiAllowances?.[cycle]?.dailyGenerationLimit ?? 20} successful tests/day`}
@@ -251,12 +252,12 @@ export default function PlanOverview({
               ))}
           </div>
         ) : null}
-      </div>
+      </GlassCard>
 
       <button
         type="button"
         onClick={() => setDetailsOpen((v) => !v)}
-        className="mt-2 flex w-full items-center justify-center gap-1 text-[11px] font-bold text-slate-500 hover:text-slate-700"
+        className="mt-2 flex w-full items-center justify-center gap-1 text-[11px] font-bold text-white/55 hover:text-white/85"
       >
         {detailsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         {detailsOpen ? "Hide" : "View"} what you get
@@ -269,36 +270,36 @@ export default function PlanOverview({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="mt-2 space-y-2 rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-700">
+            <GlassCard className="mt-2 space-y-2 text-xs text-white/85">
               {includedFeatureRecords.length === 0 ? (
-                <p className="italic text-slate-400">No features included with this plan.</p>
+                <p className="italic text-white/55">No features included with this plan.</p>
               ) : null}
               {includedFeatureRecords.map((f) => (
                 <div key={f.id} className="flex items-start gap-2">
-                  <Check size={12} className="mt-0.5 shrink-0 text-emerald-600" />
+                  <Check size={12} className="mt-0.5 shrink-0 text-emerald-300" />
                   <div>
-                    <p className="font-bold text-slate-900">{f.name}</p>
-                    <p className="text-slate-500">{f.description}</p>
+                    <p className="font-bold text-white">{f.name}</p>
+                    <p className="text-white/55">{f.description}</p>
                   </div>
                 </div>
               ))}
               {selectedFeatureRecords.length > 0 ? (
-                <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-white/55">
                   Selected add-ons
                 </p>
               ) : null}
               {selectedFeatureRecords.map((f) => (
                 <div key={`sel-${f.id}`} className="flex items-start gap-2">
-                  <XIcon size={12} className="mt-0.5 shrink-0 text-amber-600" />
+                  <XIcon size={12} className="mt-0.5 shrink-0 text-amber-300" />
                   <div>
-                    <p className="font-bold text-slate-900">{f.name}</p>
-                    <p className="text-slate-500">
+                    <p className="font-bold text-white">{f.name}</p>
+                    <p className="text-white/55">
                       ₹{(((typeof f.resolvedPricePaise === "number" ? f.resolvedPricePaise : f.pricePaise) || 0) / 100).toFixed(2)} added.
                     </p>
                   </div>
                 </div>
               ))}
-            </div>
+            </GlassCard>
           </motion.div>
         ) : null}
       </AnimatePresence>

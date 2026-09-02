@@ -342,3 +342,18 @@ Per-page paint still in source (in scope only):
 Then **Phase B** = the 22-component waves 7–14 from §6 above.
 
 Gates per wave: `tsc --noEmit` (0 new), `bash run_tests.sh` (0 new failures; pinned-paint tests updated with the surface), `npm run build`, `node scripts/glass-coverage.mjs` (gradient + white counts strictly down), frozen-path diff empty (admin, BottomNav, glass-dock).
+
+## A3. Wave log
+
+### A1 Foundation — shipped `3283e46`
+Backdrop single-mounted at routing level; page roots / `data-app-frame` / CSS page paint removed; glass.css Parts 1b/1c/1d deleted; `tests/liquidGlassPhaseABackdropContract.test.mjs` pins it.
+
+### A2 Checkout + Subscription — shipped (this commit)
+Owner refinement before the wave: **pack components at their defaults** (no `.dc-card` CSS token; the surfaces are the real `GlassCard` / `GlassSurface` / `GlassSheet` components from websiteglass.com), and the side panel is `GlassSheet`.
+
+- `src/lib/glass.ts` `applyGlassTier` now pins `html.dark` while the tier is on so `readDark()` resolves the pack's dark material everywhere.
+- Checkout: every white section in `CheckoutReviewStep` / `CheckoutSuccessStep` → `<GlassCard>`; `CheckoutApp` toolbar is a `border-b border-white/10` strip (no frost); `PaymentGateway` money card solid `bg-indigo-600`, soft buttons `bg-white/[0.06]`.
+- Subscription: `HelpModal`, `FeatureSelectModal`, `CourseSelectModal` → `GlassSheet side="bottom"` (framer sheets removed); FAQ → `GlassAccordion`; search → `GlassInput`; feature rows / select-all → `GlassTile selected`; close + CTA → `GlassButton`. `ActiveMemberView`, `OwnedPlanCard`, `PlanOverview`, `PriceSummary` cards → `GlassCard` (brand hero gradients gone). `PremiumGate` modal body and `UnlockCelebration` card → `GlassSurface`; `SubscribeBar` frost strip → ink `bg-[#0a0c12]/60`. `SubscriptionPage` body gradient removed.
+- Ink convention inside pages: sub-panels `bg-white/[0.06]` (hover `/[0.08]`), borders `border-white/10`, text `white / white/85 / white/75 / white/55`, callouts `<color>-500/15 + <color>-200 text + <color>-400/30 border`, brand fills solid (`bg-indigo-600`, `bg-emerald-600`).
+- Tests updated where they pinned the old paint: `checkoutMobileWidths`, `liquidGlassWaveSixContract`, `subscriptionRepurchaseGuard` (owned CTA colour), `revisionSubscriptionFeatureContract` (icon bg), `premiumGateResponsiveContract` (headline gradient text). A2 contract appended to `liquidGlassPhaseABackdropContract` (4 tests).
+- Gates: tsc 7 (baseline), tests 1965 pass / 8 baseline fails, build ok, coverage: `rounded-* bg-white` 301→290, `bg-gradient-to-*` 162→137, backdrop-blur-in-scrolling 78 (=), `in oklab` 530→521, render-sites 190→239; verify-backdrop OK; frozen paths untouched.

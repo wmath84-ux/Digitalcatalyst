@@ -86,6 +86,13 @@ export function applyGlassTier(tier: GlassTier, persist = false): void {
   const root = document.documentElement;
   root.dataset.glass = tier === "off" ? "off" : "on";
   root.dataset.glassTier = tier;
+  // Phase A (owner direction): the pack components must render exactly as on
+  // websiteglass.com — over its dark backdrop. The vendored files read their
+  // scheme from `html.dark` / `data-theme`, and our Black Ice backdrop is
+  // always dark, so the scheme is pinned to dark whenever glass is on. Off
+  // (admin, ?glass=off) restores the device preference.
+  if (tier === "off") root.classList.remove("dark");
+  else root.classList.add("dark");
   if (persist) {
     try {
       window.localStorage.setItem(STORAGE_KEY, tier);

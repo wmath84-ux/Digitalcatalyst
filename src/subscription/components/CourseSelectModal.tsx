@@ -1,4 +1,6 @@
 import { BadgeCheck, Check, X } from "lucide-react";
+import { GlassSheet, GlassSheetContent, GlassSheetTitle, GlassSheetDescription } from "../../components/ui/glass-sheet";
+import { GlassButton } from "../../components/ui/glass-button";
 import type { Product } from "../../data/products";
 
 interface Props {
@@ -26,13 +28,13 @@ const productKeys = (product: Product) =>
   Array.from(new Set([product.documentId, product.id].map((value) => String(value || "").trim()).filter(Boolean)));
 
 export default function CourseSelectModal({ open, selected, onClose, onChangeSelected, products, purchasedIds }: Props) {
-  if (!open) return null;
   const purchasedSet = purchasedIds instanceof Set ? purchasedIds : new Set(purchasedIds || []);
   const isPurchased = (product: Product) => productKeys(product).some((key) => purchasedSet.has(key));
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-6" onClick={onClose}>
-    <div onClick={(event) => event.stopPropagation()} className="w-full max-w-md overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
-      <div className="flex items-center justify-between border-b border-slate-100 p-4"><div><h2 className="text-base font-black text-slate-900">Pick bonus products</h2><p className="text-xs text-slate-400">All live products · select with real price</p></div><button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-500"><X size={14} /></button></div>
-      <div className="max-h-[65vh] overflow-y-auto p-4">{products.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">No products are currently available.</p> : <ul className="space-y-2">{products.map((product) => {
+  // Phase A: the picker is the pack's bottom GlassSheet at its defaults.
+  return <GlassSheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <GlassSheetContent side="bottom" className="max-h-[85vh] text-white" aria-label="Pick bonus products" data-subscription-product-sheet>
+      <div className="flex items-center justify-between pb-4"><div><GlassSheetTitle>Pick bonus products</GlassSheetTitle><GlassSheetDescription>All live products · select with real price</GlassSheetDescription></div><GlassButton onClick={onClose} aria-label="Close" className="[&_.size-12]:size-9"><X size={14} /></GlassButton></div>
+      <div className="max-h-[60vh] overflow-y-auto">{products.length === 0 ? <p className="rounded-2xl border border-dashed border-white/10 p-4 text-center text-xs text-white/55">No products are currently available.</p> : <ul className="space-y-2">{products.map((product) => {
         const keys = productKeys(product);
         const checkoutId = String(product.documentId || product.id);
         const checked = keys.some((key) => selected.includes(key));
@@ -44,11 +46,11 @@ export default function CourseSelectModal({ open, selected, onClose, onChangeSel
           const withoutAliases = selected.filter((id) => !keys.includes(id));
           onChangeSelected(checked ? withoutAliases : [...withoutAliases, checkoutId]);
         };
-        return <li key={checkoutId}><button type="button" onClick={toggle} disabled={purchased} data-subscription-product-pick={checkoutId} data-purchased={purchased ? "true" : "false"} className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${checked ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-white"} ${purchased ? "cursor-not-allowed border-emerald-200 bg-emerald-50/70" : ""}`}>
-          <img src={product.image} alt="" className="h-12 w-16 shrink-0 rounded-xl object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-800">{product.title}</span><span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">{purchased ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white"><BadgeCheck size={11} strokeWidth={3} /> Purchased</span> : null}<span className="text-xs text-slate-400">{product.category} · {product.instructor}</span></span></span><span className="shrink-0 text-right"><span className={`block text-sm font-black ${purchased ? "text-emerald-700" : "text-slate-900"}`}>{purchased ? "Purchased" : price(product.price)}</span><span aria-label={purchased ? "Purchased" : checked ? "Selected" : "Not selected"} className={`ml-auto mt-1 grid h-5 w-5 place-items-center rounded-md border-2 ${purchased ? "cursor-not-allowed border-emerald-600 bg-emerald-600 text-white" : checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300"}`}>{purchased ? <BadgeCheck size={12} strokeWidth={3} /> : checked ? <Check size={13} strokeWidth={3} /> : null}</span></span>
+        return <li key={checkoutId}><button type="button" onClick={toggle} disabled={purchased} data-subscription-product-pick={checkoutId} data-purchased={purchased ? "true" : "false"} className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${checked ? "border-violet-400/30 bg-violet-500/15" : "border-white/10 bg-white/[0.06]"} ${purchased ? "cursor-not-allowed border-emerald-400/30 bg-emerald-500/15" : ""}`}>
+          <img src={product.image} alt="" className="h-12 w-16 shrink-0 rounded-xl object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-white/85">{product.title}</span><span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">{purchased ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white"><BadgeCheck size={11} strokeWidth={3} /> Purchased</span> : null}<span className="text-xs text-white/55">{product.category} · {product.instructor}</span></span></span><span className="shrink-0 text-right"><span className={`block text-sm font-black ${purchased ? "text-emerald-200" : "text-white"}`}>{purchased ? "Purchased" : price(product.price)}</span><span aria-label={purchased ? "Purchased" : checked ? "Selected" : "Not selected"} className={`ml-auto mt-1 grid h-5 w-5 place-items-center rounded-md border-2 ${purchased ? "cursor-not-allowed border-emerald-600 bg-emerald-600 text-white" : checked ? "border-violet-600 bg-violet-600 text-white" : "border-white/10"}`}>{purchased ? <BadgeCheck size={12} strokeWidth={3} /> : checked ? <Check size={13} strokeWidth={3} /> : null}</span></span>
         </button></li>;
       })}</ul>}</div>
-      <div className="border-t border-slate-100 p-3"><button onClick={onClose} className="w-full rounded-2xl bg-slate-900 py-3 text-sm font-black text-white">Done · {selected.length} selected</button></div>
-    </div>
-  </div>;
+      <div className="pt-4 pb-[env(safe-area-inset-bottom)]"><GlassButton variant="capsule" onClick={onClose} className="w-full [&>span>div]:w-full">Done · {selected.length} selected</GlassButton></div>
+    </GlassSheetContent>
+  </GlassSheet>;
 }

@@ -11,6 +11,7 @@
 // and when it can next be renewed.
 
 import { BadgeCheck, CalendarClock, Check, Info, Package, PlusCircle, Sparkles } from "lucide-react";
+import { GlassCard } from "../../components/ui/glass-card";
 import type { OwnedPlanSummary } from "../../../utils/subscriptionOwnership";
 import type { SubscriptionFeatureDoc } from "../utils/subscriptionCatalog";
 
@@ -37,7 +38,7 @@ export default function OwnedPlanCard({
     <div className="flex flex-col gap-4 px-5 pt-5" data-subscription-owned-plan={summary.planId}>
       {/* Hero — the plan they already own. Emerald throughout so the colour
           alone signals "already yours", never "buy me". */}
-      <section className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 p-5 text-white shadow-xl shadow-emerald-500/20">
+      <GlassCard>
         <div className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-14 -left-8 h-32 w-32 rounded-full bg-white/5 blur-2xl" />
         <div className="relative">
@@ -69,21 +70,21 @@ export default function OwnedPlanCard({
             ) : null}
           </div>
         </div>
-      </section>
+      </GlassCard>
 
       {/* Why nothing is purchasable here. */}
       <section
-        className="flex items-start gap-3 rounded-3xl border border-emerald-200 bg-emerald-50/70 p-4"
+        className="flex items-start gap-3 rounded-3xl border border-emerald-400/30 bg-emerald-500/15 p-4"
         data-subscription-owned-explainer
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-300">
           <CalendarClock className="h-4.5 w-4.5" />
         </span>
         <div className="min-w-0">
           <p className="text-sm font-black text-emerald-950">
             This plan is already active on your account
           </p>
-          <p className="mt-0.5 text-xs leading-5 text-emerald-900/75">
+          <p className="mt-0.5 text-xs leading-5 text-emerald-200">
             {expiresAtLabel
               ? `Everything below stays unlocked until ${expiresAtLabel}. `
               : "Everything below is unlocked and ready to use. "}
@@ -97,26 +98,26 @@ export default function OwnedPlanCard({
       </section>
 
       {/* Exactly what the active plan gives them. */}
-      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <GlassCard>
         <header className="mb-3 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-emerald-500" />
-          <h3 className="text-sm font-bold text-slate-800">What your plan includes</h3>
+          <h3 className="text-sm font-bold text-white/85">What your plan includes</h3>
         </header>
         {summary.features.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
+          <p className="rounded-2xl border border-dashed border-white/10 p-4 text-center text-xs text-white/55">
             No optional features on this plan. Switch to another plan below to add more.
           </p>
         ) : (
           <ul className="space-y-2" data-subscription-owned-features>
             {summary.features.map((feature) => (
-              <li key={feature.id} className="flex items-start gap-3 rounded-2xl bg-emerald-50/60 p-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+              <li key={feature.id} className="flex items-start gap-3 rounded-2xl bg-emerald-500/15 p-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
                   <Check className="h-4 w-4" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-bold text-slate-900">{feature.name}</span>
+                  <span className="block text-sm font-bold text-white">{feature.name}</span>
                   {feature.description ? (
-                    <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">
+                    <span className="mt-0.5 block text-[11px] leading-4 text-white/55">
                       {feature.description}
                     </span>
                   ) : null}
@@ -130,11 +131,11 @@ export default function OwnedPlanCard({
           <>
             <header className="mb-2 mt-4 flex items-center gap-2">
               <Package className="h-4 w-4 text-indigo-500" />
-              <h3 className="text-sm font-bold text-slate-800">Courses included</h3>
+              <h3 className="text-sm font-bold text-white/85">Courses included</h3>
             </header>
             <ul className="space-y-1.5" data-subscription-owned-products>
               {summary.productTitles.map((title) => (
-                <li key={title} className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                <li key={title} className="flex items-center gap-2 text-xs font-semibold text-white/85">
                   <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                   {title}
                 </li>
@@ -142,7 +143,7 @@ export default function OwnedPlanCard({
             </ul>
           </>
         ) : null}
-      </section>
+      </GlassCard>
 
       {/* Forward path 1: add features / courses to THIS plan (add-on upgrade).
           Only the new items are ever charged — the plan price is not charged
@@ -152,14 +153,14 @@ export default function OwnedPlanCard({
           type="button"
           onClick={onAddMore}
           data-subscription-owned-add-more
-          className="flex items-start gap-3 rounded-3xl border border-violet-200 bg-violet-50/70 p-4 text-left shadow-sm transition active:scale-[0.99] hover:bg-violet-50"
+          className="flex items-start gap-3 rounded-3xl border border-violet-400/30 bg-violet-500/15 p-4 text-left transition active:scale-[0.99] hover:bg-violet-500/15"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-violet-500/20 text-violet-300">
             <PlusCircle className="h-4.5 w-4.5" />
           </span>
           <span className="min-w-0">
-            <span className="block text-sm font-black text-slate-900">Add features or courses to this plan</span>
-            <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">
+            <span className="block text-sm font-black text-white">Add features or courses to this plan</span>
+            <span className="mt-0.5 block text-[11px] leading-4 text-white/55">
               Unlock more without changing your plan — you only pay for the new items, at the
               price set for this plan.
             </span>
@@ -173,14 +174,14 @@ export default function OwnedPlanCard({
           type="button"
           onClick={onSeeOtherPlans}
           data-subscription-owned-switch
-          className="flex items-start gap-3 rounded-3xl border border-slate-200 bg-white p-4 text-left shadow-sm transition active:scale-[0.99] hover:bg-slate-50"
+          className="flex items-start gap-3 rounded-3xl border border-white/10 bg-white/[0.06] p-4 text-left transition active:scale-[0.99] hover:bg-white/[0.08]"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-500">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-500">
             <Info className="h-4.5 w-4.5" />
           </span>
           <span className="min-w-0">
-            <span className="block text-sm font-black text-slate-900">Want something different?</span>
-            <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">
+            <span className="block text-sm font-black text-white">Want something different?</span>
+            <span className="mt-0.5 block text-[11px] leading-4 text-white/55">
               Pick {otherPlanNames.join(", ")} above, or switch between monthly and yearly, to see a
               purchasable plan.
             </span>

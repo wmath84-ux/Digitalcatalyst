@@ -118,3 +118,89 @@ test("the blanket CSS overrides for that paint are retired (removed at source in
   assert.doesNotMatch(glassCss, /html\[data-glass="on"\] \.dc-glass-hero,/);
   assert.match(glassCss, /Phase A \(2026-09-02\)/);
 });
+
+// ---------------------------------------------------------------------------
+// Wave A2 — Checkout + Subscription: no white / frost element inside the page
+// ---------------------------------------------------------------------------
+const A2_FILES = [
+  "src/components/checkout/CheckoutApp.tsx",
+  "src/components/checkout/CheckoutReviewStep.tsx",
+  "src/components/checkout/CheckoutSuccessStep.tsx",
+  "src/components/checkout/CheckoutLineItemCard.tsx",
+  "src/components/PaymentGateway.tsx",
+  "src/subscription/components/SubscriptionPage.tsx",
+  "src/subscription/components/PlanOverview.tsx",
+  "src/subscription/components/PriceSummary.tsx",
+  "src/subscription/components/ActiveMemberView.tsx",
+  "src/subscription/components/OwnedPlanCard.tsx",
+  "src/subscription/components/SubscribeBar.tsx",
+  "src/subscription/components/StackedCards.tsx",
+  "src/subscription/components/FeaturePricingTiers.tsx",
+  "src/subscription/components/FeatureSelectTrigger.tsx",
+  "src/subscription/components/CourseSelectTrigger.tsx",
+  "src/subscription/components/PromoCodeInput.tsx",
+  "src/subscription/components/HelpModal.tsx",
+  "src/subscription/components/FeatureSelectModal.tsx",
+  "src/subscription/components/CourseSelectModal.tsx",
+  "src/components/subscription/PremiumGate.tsx",
+  "src/components/subscription/RenewalPreviewPage.tsx",
+  "src/components/subscription/UnlockCelebration.tsx",
+  "src/components/subscription/RenewalBanner.tsx",
+  "src/components/subscription/RenewalStatusCard.tsx",
+];
+
+test("A2: checkout + subscription paint no opaque white / light-wash surface and no gradient wash", () => {
+  for (const file of A2_FILES) {
+    const src = read(file);
+    // Opaque white / slate-50/100 fills — the only allowed `bg-white` is the
+    // translucent `bg-white/[0.06]`-style soft panel and the two solid CTA
+    // pills that sit on a coloured card (their text is dark, not white).
+    const opaque = src.match(/\b(bg-white|bg-slate-(?:50|100)|bg-gray-(?:50|100))(?=["'`\s])/g) || [];
+    const allowed = (src.match(/"bg-white text-(?:slate|indigo)-\d00[^"]*"|bg-white text-violet-600|"w-6 bg-white"|bg-white [^"]*text-indigo-700/g) || []).length;
+    assert.ok(opaque.length <= allowed, `${file}: ${opaque.length - allowed} opaque white/light fill(s) left`);
+    // Gradient washes on surfaces (text-clip gradients on headlines are fine).
+    const gradients = (src.match(/bg-gradient-to-[a-z]+(?![^"]*bg-clip-text)/g) || []).length;
+    const clipOnly = (src.match(/bg-gradient-to-[a-z]+[^"]*bg-clip-text/g) || []).length;
+    const overlays = (src.match(/absolute inset-0 bg-gradient-to-/g) || []).length; // image legibility scrims
+    assert.equal(gradients - overlays, 0, `${file}: gradient wash left`);
+    void clipOnly;
+    // No hand-rolled fixed white sheet — bottom sheets are the pack's GlassSheet.
+    assert.doesNotMatch(src, /fixed inset-x-0 bottom-0[^"]*bg-white/, `${file}: hand-rolled white bottom sheet`);
+  }
+});
+
+test("A2: the three subscription pickers are the pack's GlassSheet (side=bottom)", () => {
+  for (const file of [
+    "src/subscription/components/HelpModal.tsx",
+    "src/subscription/components/FeatureSelectModal.tsx",
+    "src/subscription/components/CourseSelectModal.tsx",
+  ]) {
+    const src = read(file);
+    assert.match(src, /from "\.\.\/\.\.\/components\/ui\/glass-sheet"/, `${file}: imports GlassSheet`);
+    assert.match(src, /<GlassSheetContent side="bottom"/, `${file}: renders a bottom GlassSheet`);
+    assert.doesNotMatch(src, /framer-motion/, `${file}: no framer sheet left`);
+  }
+});
+
+test("A2: checkout sections and subscription cards are GlassCard / GlassSurface, not painted panels", () => {
+  for (const file of [
+    "src/components/checkout/CheckoutReviewStep.tsx",
+    "src/components/checkout/CheckoutSuccessStep.tsx",
+    "src/subscription/components/ActiveMemberView.tsx",
+    "src/subscription/components/OwnedPlanCard.tsx",
+    "src/subscription/components/PlanOverview.tsx",
+    "src/subscription/components/PriceSummary.tsx",
+  ]) {
+    const src = read(file);
+    assert.match(src, /<GlassCard/, `${file}: uses GlassCard`);
+    assert.doesNotMatch(src, /rounded-3xl border border-slate-200 bg-white/, `${file}: painted card left`);
+  }
+  for (const file of ["src/components/subscription/PremiumGate.tsx", "src/components/subscription/UnlockCelebration.tsx"]) {
+    assert.match(read(file), /<GlassSurface/, `${file}: modal body is a GlassSurface`);
+  }
+});
+
+test("A2: applyGlassTier pins the dark scheme so the pack renders its dark material", () => {
+  const glass = read("src/lib/glass.ts");
+  assert.match(glass, /classList\.(add|toggle)\("dark"/, "html.dark must be pinned while the tier is on");
+});

@@ -10,6 +10,7 @@
 // the exact package — not just aggregate numbers — before checkout.
 
 import { Receipt } from "lucide-react";
+import { GlassCard } from "../../components/ui/glass-card";
 import type { SubscriptionPlanDoc } from "../utils/subscriptionCatalog";
 
 export interface SummaryProduct {
@@ -79,30 +80,30 @@ export default function PriceSummary({
   const cycleLabel = cycle === "monthly" ? "Monthly" : "Yearly";
   return (
     <div className="px-5 pt-5" data-subscription-price-summary>
-      <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm shadow-slate-200/50">
+      <GlassCard>
         <div className="mb-3 flex items-center gap-2">
-          <Receipt className="h-4 w-4 text-slate-400" />
-          <h3 className="text-sm font-bold text-slate-800">Order summary</h3>
+          <Receipt className="h-4 w-4 text-white/55" />
+          <h3 className="text-sm font-bold text-white/85">Order summary</h3>
         </div>
         <div className="space-y-2 text-sm">
           {/* Base plan — a ₹0 admin price means the plan itself is free. For an
               add-on upgrade the plan row was already paid with the original
               membership, so it reads "Included" and carries no charge. */}
-          <div className="flex justify-between text-slate-500" data-subscription-row="base">
+          <div className="flex justify-between text-white/55" data-subscription-row="base">
             <span>
               {plan ? plan.name : "Base plan"} ({cycleLabel})
             </span>
             {planAlreadyIncluded ? (
               <span
-                className="font-medium text-emerald-600"
+                className="font-medium text-emerald-300"
                 data-subscription-row-plan-included
               >
                 Included in your membership
               </span>
             ) : basePricePaise <= 0 ? (
-              <span className="font-medium text-emerald-600">Free</span>
+              <span className="font-medium text-emerald-300">Free</span>
             ) : (
-              <span className="font-medium text-slate-700">{formatRupee(basePricePaise)}</span>
+              <span className="font-medium text-white/85">{formatRupee(basePricePaise)}</span>
             )}
           </div>
 
@@ -110,14 +111,14 @@ export default function PriceSummary({
               which features are being paid for. */}
           {featuresCount > 0 ? (
             <div data-subscription-row="features">
-              <div className="flex justify-between text-slate-500">
+              <div className="flex justify-between text-white/55">
                 <span>Premium features ({featuresCount})</span>
-                <span className="font-medium text-slate-700">{formatRupee(featuresTotalPaise)}</span>
+                <span className="font-medium text-white/85">{formatRupee(featuresTotalPaise)}</span>
               </div>
               {featureTitles.length > 0 ? (
                 <ul className="mt-1.5 space-y-1 pl-4" data-subscription-feature-names>
                   {featureTitles.map((title) => (
-                    <li key={title} className="list-disc text-xs font-medium text-slate-600">
+                    <li key={title} className="list-disc text-xs font-medium text-white/75">
                       {title}
                     </li>
                   ))}
@@ -129,14 +130,14 @@ export default function PriceSummary({
           {/* Included features (free with the plan) */}
           {includedFeatureCount > 0 ? (
             <div data-subscription-row="included">
-              <div className="flex justify-between text-emerald-700">
+              <div className="flex justify-between text-emerald-200">
                 <span>Included features ({includedFeatureCount})</span>
                 <span className="font-medium">Free</span>
               </div>
               {includedFeatureTitles.length > 0 ? (
                 <ul className="mt-1.5 space-y-1 pl-4" data-subscription-included-feature-names>
                   {includedFeatureTitles.map((title) => (
-                    <li key={title} className="list-disc text-xs font-medium text-emerald-700/80">
+                    <li key={title} className="list-disc text-xs font-medium text-emerald-200">
                       {title}
                     </li>
                   ))}
@@ -150,13 +151,13 @@ export default function PriceSummary({
               row states "Already purchased" instead of showing a price. */}
           {alreadyOwnedFeatureTitles.length > 0 ? (
             <div data-subscription-row="owned">
-              <div className="flex justify-between text-emerald-700">
+              <div className="flex justify-between text-emerald-200">
                 <span>Already purchased features ({alreadyOwnedFeatureTitles.length})</span>
                 <span className="font-medium">₹0 — no charge</span>
               </div>
               <ul className="mt-1.5 space-y-1 pl-4" data-subscription-owned-feature-names>
                 {alreadyOwnedFeatureTitles.map((title) => (
-                  <li key={title} className="list-disc text-xs font-medium text-emerald-700/80">
+                  <li key={title} className="list-disc text-xs font-medium text-emerald-200">
                     {title}
                   </li>
                 ))}
@@ -167,13 +168,13 @@ export default function PriceSummary({
           {/* Already-purchased products — same carry-over rule. */}
           {alreadyOwnedProductTitles.length > 0 ? (
             <div data-subscription-row="owned-products">
-              <div className="flex justify-between text-emerald-700">
+              <div className="flex justify-between text-emerald-200">
                 <span>Already purchased courses ({alreadyOwnedProductTitles.length})</span>
                 <span className="font-medium">₹0 — no charge</span>
               </div>
               <ul className="mt-1.5 space-y-1 pl-4" data-subscription-owned-product-names>
                 {alreadyOwnedProductTitles.map((title) => (
-                  <li key={title} className="list-disc text-xs font-medium text-emerald-700/80">
+                  <li key={title} className="list-disc text-xs font-medium text-emerald-200">
                     {title}
                   </li>
                 ))}
@@ -185,14 +186,14 @@ export default function PriceSummary({
               products were selected and how many. */}
           {productsCount > 0 ? (
             <div data-subscription-row="products">
-              <div className="flex justify-between text-slate-500">
+              <div className="flex justify-between text-white/55">
                 <span>Bonus products ({productsCount})</span>
-                <span className="font-medium text-slate-700">{formatRupee(productsTotalPaise)}</span>
+                <span className="font-medium text-white/85">{formatRupee(productsTotalPaise)}</span>
               </div>
               {products.length > 0 ? (
                 <ul className="mt-1.5 space-y-1 pl-4" data-subscription-product-names>
                   {products.map((product) => (
-                    <li key={product.id} className="list-disc text-xs font-medium text-slate-600">
+                    <li key={product.id} className="list-disc text-xs font-medium text-white/75">
                       {product.title}
                     </li>
                   ))}
@@ -204,7 +205,7 @@ export default function PriceSummary({
           {/* Coupon */}
           {couponDiscountPaise > 0 ? (
             <div
-              className="flex justify-between font-bold text-emerald-600"
+              className="flex justify-between font-bold text-emerald-300"
               data-subscription-row="coupon"
               data-applied-coupon={couponCode || ""}
             >
@@ -215,24 +216,24 @@ export default function PriceSummary({
 
           {/* Minimum payable floor */}
           {minPayablePaise > 0 ? (
-            <div className="flex justify-between text-slate-500" data-subscription-row="min-payable">
+            <div className="flex justify-between text-white/55" data-subscription-row="min-payable">
               <span>Minimum payable</span>
-              <span className="font-medium text-slate-700">{formatRupee(minPayablePaise)}</span>
+              <span className="font-medium text-white/85">{formatRupee(minPayablePaise)}</span>
             </div>
           ) : null}
         </div>
 
-        <div className="mt-3 flex items-baseline justify-between border-t border-slate-100 pt-3">
-          <span className="text-base font-black text-slate-900">Total</span>
+        <div className="mt-3 flex items-baseline justify-between border-t border-white/10 pt-3">
+          <span className="text-base font-black text-white">Total</span>
           <span
             data-subscription-row="total"
             data-subscription-total-free={totalPaise <= 0 ? "true" : undefined}
-            className={`text-2xl font-black sm:text-3xl ${totalPaise <= 0 ? "text-emerald-600" : "text-slate-900"}`}
+            className={`text-2xl font-black sm:text-3xl ${totalPaise <= 0 ? "text-emerald-300" : "text-white"}`}
           >
             {totalPaise <= 0 ? "Free" : formatRupee(totalPaise)}
           </span>
         </div>
-      </div>
+      </GlassCard>
     </div>
   );
 }

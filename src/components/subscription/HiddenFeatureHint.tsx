@@ -23,7 +23,7 @@ function HiddenFeatureHintImpl({ featureName, onViewSubscription, className }: P
       data-hidden-feature-hint="true"
       role="status"
       className={
-        "mx-auto flex w-full max-w-md flex-col items-center gap-3 rounded-3xl border border-indigo-200/60 bg-white/90 px-6 py-6 text-center shadow-sm " +
+        "mx-auto flex w-full max-w-md flex-col items-center gap-3 rounded-3xl border border-indigo-400/30 bg-white/[0.08] px-6 py-6 text-center  " +
         (className || "")
       }
     >
@@ -36,20 +36,20 @@ function HiddenFeatureHintImpl({ featureName, onViewSubscription, className }: P
         </svg>
       </span>
       <div className="flex flex-col gap-1">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-700">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-200">
           Premium feature
         </span>
-        <span className="text-base font-semibold text-slate-900">
+        <span className="text-base font-semibold text-white">
           {featureName} is part of our subscription
         </span>
-        <span className="text-sm text-slate-600">
+        <span className="text-sm text-white/75">
           Subscribe to unlock {featureName} and the rest of the premium features.
         </span>
       </div>
       <button
         type="button"
         onClick={handleClick}
-        className="inline-flex w-full items-center justify-center rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+        className="inline-flex w-full items-center justify-center rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
       >
         View subscription plans
       </button>

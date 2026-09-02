@@ -88,7 +88,7 @@ function TopCard({ card, onSwipe, activeIndex, total }: TopCardProps) {
               {card.eyebrow}
             </span>
           </div>
-          <h3 className="text-2xl font-extrabold leading-tight text-white drop-shadow-sm">
+          <h3 className="text-2xl font-extrabold leading-tight text-white drop-">
             {card.title}
           </h3>
           <p className="mt-1 text-sm leading-snug text-white/80">
@@ -181,11 +181,11 @@ export default function StackedCards({ cards }: { cards: ShowcaseCard[] }) {
         <button
           onClick={() => rotate("left")}
           aria-label="Previous card"
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 shadow-md shadow-slate-300/60 ring-1 ring-slate-100 active:scale-90 transition-transform"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/[0.12] text-white backdrop-blur-md ring-1 ring-white/20 active:scale-90 transition-transform"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <span className="text-xs font-medium text-slate-400">
+        <span className="text-xs font-medium text-white/55">
           Swipe the cards to explore
         </span>
         <button

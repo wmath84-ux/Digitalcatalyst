@@ -182,7 +182,7 @@ test("the gate renders a single dominant gradient CTA (not a flat coupon)", () =
   // Hero gradient headline in the offer block
   assert.match(
     src,
-    /bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text/,
+    /bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text/,
     "the hero headline must use the brand gradient text treatment",
   );
 });

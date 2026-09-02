@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ArrowRight, Check, PartyPopper, Sparkles, Star } from "lucide-react";
+import { GlassSurface } from "../ui/glass";
 
 /** Deterministic-ish particle field so every burst looks hand-tuned. */
 const buildParticles = (count: number) =>
@@ -107,7 +108,7 @@ export default function UnlockCelebration({
                 initial={{ scale: 0, opacity: 0.75 }}
                 animate={{ scale: 3.4, opacity: 0 }}
                 transition={{ duration: 0.95, ease: "easeOut" }}
-                className="absolute -left-16 -top-16 block h-32 w-32 rounded-full border-2 border-violet-300"
+                className="absolute -left-16 -top-16 block h-32 w-32 rounded-full border-2 border-violet-400/30"
               />
             </div>
           ) : null}
@@ -121,10 +122,11 @@ export default function UnlockCelebration({
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ type: "spring", stiffness: 260, damping: 22 }}
                 onClick={(event) => event.stopPropagation()}
-                className="relative z-10 w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl"
+                className="relative z-10 w-full max-w-sm"
               >
+                <GlassSurface radius={24} className="overflow-hidden text-white">
                 {/* Gradient header with a pulsing seal */}
-                <div className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-fuchsia-600 to-indigo-700 px-6 pb-7 pt-8 text-center text-white">
+                <div className="relative overflow-hidden bg-violet-600/40 px-6 pb-7 pt-8 text-center text-white">
                   <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10" />
                   <div className="absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-white/10" />
 
@@ -161,7 +163,7 @@ export default function UnlockCelebration({
                 <div className="px-6 py-5">
                   {featureNames.length > 0 ? (
                     <>
-                      <p className="mb-2.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      <p className="mb-2.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white/55">
                         <Sparkles className="h-3 w-3" /> Just unlocked
                       </p>
                       <ul className="space-y-1.5" data-celebration-features>
@@ -171,27 +173,27 @@ export default function UnlockCelebration({
                             initial={reduceMotion ? undefined : { opacity: 0, x: -12 }}
                             animate={reduceMotion ? undefined : { opacity: 1, x: 0 }}
                             transition={{ delay: 0.12 + index * 0.07 }}
-                            className="flex items-center gap-2.5 rounded-xl bg-emerald-50 px-3 py-2"
+                            className="flex items-center gap-2.5 rounded-xl bg-emerald-500/15 px-3 py-2"
                           >
                             <Star className="h-3.5 w-3.5 shrink-0 fill-emerald-500 text-emerald-500" />
                             <span className="text-xs font-bold text-emerald-950">{name}</span>
                           </motion.li>
                         ))}
                         {featureNames.length > 5 ? (
-                          <li className="px-3 pt-0.5 text-[11px] font-bold text-slate-400">
+                          <li className="px-3 pt-0.5 text-[11px] font-bold text-white/55">
                             +{featureNames.length - 5} more
                           </li>
                         ) : null}
                       </ul>
                     </>
                   ) : (
-                    <p className="rounded-xl bg-slate-50 px-3 py-3 text-center text-xs font-semibold text-slate-600">
+                    <p className="rounded-xl bg-white/[0.06] px-3 py-3 text-center text-xs font-semibold text-white/75">
                       Your membership is active and ready to use.
                     </p>
                   )}
 
                   {expiresAtLabel ? (
-                    <p className="mt-3 text-center text-[11px] font-semibold text-slate-400">
+                    <p className="mt-3 text-center text-[11px] font-semibold text-white/55">
                       Access valid until {expiresAtLabel}
                     </p>
                   ) : null}
@@ -200,18 +202,19 @@ export default function UnlockCelebration({
                     type="button"
                     onClick={onPrimaryAction}
                     data-celebration-cta
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 py-3.5 text-sm font-black text-white shadow-lg shadow-violet-500/25 transition active:scale-[0.98]"
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-3.5 text-sm font-black text-white shadow-lg shadow-violet-500/25 transition active:scale-[0.98]"
                   >
                     {primaryLabel} <ArrowRight className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
                     onClick={onDismiss}
-                    className="mt-2 w-full py-2 text-xs font-bold text-slate-400 transition hover:text-slate-600"
+                    className="mt-2 w-full py-2 text-xs font-bold text-white/55 transition hover:text-white/75"
                   >
                     Maybe later
                   </button>
                 </div>
+                </GlassSurface>
               </motion.div>
             ) : null}
           </AnimatePresence>

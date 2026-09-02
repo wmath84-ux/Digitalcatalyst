@@ -20,7 +20,7 @@ function SubscriberActiveBadgeImpl({ planLabel, expiresAtLabel, className }: Pro
       data-subscriber-active-badge="true"
       role="status"
       className={
-        "relative w-full overflow-hidden rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-amber-50 px-6 py-5 shadow-sm " +
+        "relative w-full overflow-hidden rounded-3xl border border-emerald-400/30 bg-gradient-to-br from-emerald-50 via-white to-amber-50 px-6 py-5  " +
         (className || "")
       }
     >
@@ -37,10 +37,10 @@ function SubscriberActiveBadgeImpl({ planLabel, expiresAtLabel, className }: Pro
             </svg>
           </span>
           <div className="flex flex-col">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
               Member exclusive
             </span>
-            <span className="text-base font-semibold text-slate-900">
+            <span className="text-base font-semibold text-white">
               {planLabel
                 ? `You are a member — ${planLabel}`
                 : "You are a member"}
@@ -49,10 +49,10 @@ function SubscriberActiveBadgeImpl({ planLabel, expiresAtLabel, className }: Pro
         </div>
         {expiresAtLabel ? (
           <div className="flex flex-col items-end text-right">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
               Renews
             </span>
-            <span className="text-sm font-semibold text-slate-900">{expiresAtLabel}</span>
+            <span className="text-sm font-semibold text-white">{expiresAtLabel}</span>
           </div>
         ) : null}
       </div>

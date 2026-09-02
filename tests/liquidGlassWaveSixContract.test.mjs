@@ -62,15 +62,16 @@ test("the hero's action pills and shortcut use the pack material", () => {
 
 test("checkout keeps its identity colours and gains only the gloss", () => {
   const pg = read("src/components/PaymentGateway.tsx");
-  // money card: rim + highlight, never a translucent fill under the amount
-  assert.match(pg, /dc-quote rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700/);
+  // money card: Phase A removed the gradient — solid brand indigo, rim + highlight
+  assert.match(pg, /dc-quote rounded-2xl bg-indigo-600/);
+  assert.doesNotMatch(pg, /from-indigo-600 to-violet-700/);
   // pay button: emerald paint kept, pack gloss added *behind* the content
   assert.match(pg, /bg-emerald-600/);
   assert.match(pg, /<GlassSurface tint=\{0\.7\} radius=\{16\} className="pointer-events-none absolute inset-0" \/>/);
   assert.match(pg, /<span className="relative z-10 flex items-center justify-center gap-2">/);
   assert.match(pg, /disabled=\{busy\}/);
   assert.match(pg, /disabled:cursor-wait/);
-  assert.match(pg, /dc-glass-soft w-full rounded-2xl bg-gray-100/);
+  assert.match(pg, /dc-glass-soft w-full rounded-2xl bg-white\/\[0\.06\]/);
   assert.match(pg, /role="alert"/); // the error surface
   const css = read("src/glass.css");
   assert.match(css, /:where\(\.dc-card\) \{/);
