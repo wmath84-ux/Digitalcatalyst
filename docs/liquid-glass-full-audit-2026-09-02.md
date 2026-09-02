@@ -271,3 +271,74 @@ Gates per wave: `npx tsc --noEmit` (baseline 7 errors, 0 new) · `bash run_tests
 | D5 | Footer nav (`BottomNav` + `components/glass-dock/**`) and admin (`src/admin/**`, `src/components/admin/**`) | **Stay frozen** — D4 stands |
 | D6 | Course player ⚙ Settings popover | **Add it** — `GlassPopover` from a `GlassButton` in the header; rows are `GlassSwitch` for theme, snow, desktop/mobile view, file bars, player chrome, toolbar strip. Header quick-toggles remain as `GlassButton` |
 | D7 | Start | Owner reviews this plan first; implementation waits for sign-off |
+
+---
+
+# PHASE A — Backgrounds first (owner direction, 2026-09-02)
+
+> Owner: *"Jo apna blurred background hai uske alava kuch bhi sahi nahi hai. Sabhi pages se white page aur gradient background absolute remove karna hai — mobile, tablet, desktop teeno. Uske baad 22 components."*
+
+## A0. Diagnosis — why white / gradient pages are still visible
+
+The previous rollout did **not remove** the old paint. It kept every `bg-white` / `bg-gradient-to-*` / CSS-file gradient in the source and layered **blanket CSS overrides** on top (`src/glass.css` "Part 1 … 1g, 2, 2b"):
+
+| Override rule (glass.css) | What it actually does on screen |
+|---|---|
+| `[class*="bg-white"]:not([class*="bg-white/"])` → `rgb(255 255 255 / .55)` + `blur(14px)` | **Every full-page root** (`min-h-screen bg-white` on PDP, Leaderboard, Notifications, Checkout, Subscription, SubscriberExperience, RenewalPreview) and every mobile `data-app-frame bg-white shadow-xl` becomes a **55 % white frosted sheet covering the whole viewport**. Cards inside it are *another* 55 % frost → stacked = near-opaque white. **This is the "white page" the owner sees.** |
+| `[class*="bg-gradient-to"]` → `background-image:none` | Strips the image but the element keeps any `from-*` colour fallback; buttons get a forced solid indigo |
+| `.dc-app-shell`, `.dc-app-frame`, `[data-profile-page]` → `transparent !important` | Works — but `[data-settings-page]`, `[data-profile-hero]`, `.course-*-surface`, `.fp-*` and dozens of others are not covered |
+| Backdrop mount | `GlassBackdrop` is mounted only in `AppShell` / `DesktopShell` / `MyDayApp` / `FlowPathApp`. **`#/checkout`, `#/auth`, `#/landing`, `#/course/:id` bypass `AppShell` → no backdrop at all** → checkout sits on the `html` white canvas, auth/landing on solid `#05060f`. |
+
+Result: 0 pages actually *removed* their background; they were dimmed. Source still carries **161 `bg-gradient-to-*`, 301 `rounded-* bg-white` panels, ~430 `bg-white*` utilities, 15 CSS-file page gradients** (numbers from `scripts/glass-coverage.mjs`, authoritative).
+
+Per-page paint still in source (in scope only):
+
+| Page | `bg-white*` | opaque `bg-white` | light-grey plates | gradients | page-root paint | backdrop mounted |
+|---|---|---|---|---|---|---|
+| Landing | 1 | 0 | 0 | 11 | `bg-[#05060f]` ×2 | **no** |
+| Auth | 9 | 1 | 1 | 2 | `bg-[#05060f]` | **no** |
+| Home | 16 | 3 | 6 | 8 | frame | via AppShell |
+| Store | 20 | 2 | 4 | 7 | frame `bg-white shadow-xl` | via AppShell |
+| Search | 8 | 4 | 4 | 1 | frame | via AppShell |
+| PDP | 37 | 19 | 19 | 16 | `min-h-screen bg-white` + frame | via AppShell |
+| Cart / Favorites | 2 | 0 | 2 | 4 | frame | via AppShell |
+| Checkout | 23 | 21 | 11 | 4 | `min-h-screen bg-white` + frame | **no** |
+| Course player | 13 | 6 | 3 | 17 | `bg-[var(--course-bg)]` (own theme) | **no** |
+| My Day | 50 | 21 | 24 | 16 | `lg:bg-white` frame | yes (own) |
+| Leaderboard | 10 | 8 | 2 | 1 | `min-h-screen bg-white` + frame | via AppShell |
+| Revision | 63 | 49 | 45 | 27 | frame | via AppShell |
+| FlowPath | 38 | 38 | 31 | 16 | `bg-[var(--fp-bg-0)]` + `.fp-bg-grid` | yes (own) |
+| Profile | 22 | 15 | 13 | 11 | `bg-gradient-to-b from-indigo-50 … to-white` ×2 + `[data-profile-hero]` css | via AppShell |
+| Settings | 2 | 2 | 0 | 3 | `bg-gradient-to-b from-indigo-50 … to-white` ×2 | via AppShell |
+| Subscription | 80 | 47 | 22 | 19 | `min-h-screen bg-white` + frame + `.dc-glass-hero` css | via AppShell |
+| Notifications | 5 | 4 | 2 | 0 | `min-h-screen bg-white` + frame | via AppShell |
+| Shell | 8 | 2 | 7 | 5 | `bg-[#f6f7fb]` desktop page, rail `bg-white/85` | yes |
+| CSS files | 5 | 5 | 2 | 80 (index.css + landing.css) | `html,body,#root {#fff}`, `.dc-app-shell` orbs, `.dc-app-frame` wash | — |
+
+## A1. Approach — remove at the SOURCE, not by override
+
+1. **One backdrop, every route.** `GlassBackdrop` mounts for every non-admin route (including checkout / auth / landing / course player). Duplicate mounts removed so it is exactly one layer.
+2. **Page roots go transparent in the JSX.** Every `min-h-screen bg-white`, `bg-gradient-to-b from-indigo-50…`, `bg-[#05060f]`, `bg-[#f6f7fb]`, `bg-slate-50`, and every `data-app-frame … bg-white shadow-xl shadow-slate-200 sm:border sm:border-slate-200 | lg:bg-white` loses its paint. No frame "card" on tablet — the page body scrolls directly over the backdrop on all three breakpoints.
+3. **CSS-file page paint deleted** from `src/index.css` / `src/landing.css`: `body/#root` white, `.dc-app-shell` gradient + aurora orbs, `.dc-app-frame` wash, `[data-profile-page]`, `[data-profile-hero]`, `.dc-glass-hero*`, `.fp-bg-grid`, header/footer glow gradients, `.course-*-surface` gradients. `html` canvas becomes the backdrop base ink (`#0a0c12`) so iOS overscroll never flashes white.
+4. **Section / card whites become one glass material.** Every `rounded-* bg-white`, `bg-white/NN`, `bg-slate-50/100` panel and every decorative `bg-gradient-to-*` is replaced by a single `.dc-card` token (the pack's `GlassSurface` material expressed as CSS so the swap is a class change now and a component swap in Phase B). Identity gradients on CTAs go solid brand until Phase B swaps them for `GlassButton`.
+5. **Delete the blanket overrides** (glass.css Parts 1, 1b–1g, 2, 2b) once the source is clean — no more "dim it with CSS".
+6. **Ink follows the material**: body ink is paper-on-ink (white .92); inside `.dc-card` the ink matches the chosen card tint (see D8).
+7. Contract tests that pin the old paint (`storeFiltersAdminProductContract`, `profilePlanGlowContract`, `liquidGlassWaveSix .dc-quote`, revision `.rev-card` background, etc.) are updated in the same commit as the surface they pin.
+
+## A2. Waves (one commit each, preview + sign-off between)
+
+| Wave | Scope | Files (≈) |
+|---|---|---|
+| **A1 Foundation** | backdrop on 100 % routes · every page-root + `data-app-frame` paint removed · CSS-file page paint removed · `.dc-card` token defined · overrides 1b/1c/1d/1g deleted | ~28 TSX + 3 CSS |
+| **A2 Checkout + Subscription** (+ management, renewal, premium gate, unlock) | 103 `bg-white*`, 23 gradients → `.dc-card` / transparent | ~29 |
+| **A3 Profile + Settings + Subscriber experience** | 24 `bg-white*`, 14 gradients | ~5 |
+| **A4 Revision** (bank, AI config, AI generate, test, results, progress) | 63 `bg-white*`, 45 grey plates, 27 gradients | ~23 |
+| **A5 My Day** (all overlays, quick notes, schedule, reminders) | 50 `bg-white*`, 24 grey, 16 gradients | ~13 |
+| **A6 PDP + Store + Search + Cart/Favorites** | 67 `bg-white*`, 28 gradients | ~20 |
+| **A7 Home + Landing + Auth + Leaderboard + Notifications** | 41 `bg-white*`, 22 gradients, `landing.css` | ~19 |
+| **A8 Course player + FlowPath** | player shell over backdrop (theme toggle → light-glass / dark-glass, not a page colour); FlowPath canvas over backdrop | ~28 |
+| **A9 Purge** | delete glass.css Parts 1/1e/1f/2/2b; `glass-coverage` baseline re-recorded: `bg-gradient-to-*` = 0 (banners excluded), `rounded-* bg-white` = 0 in scope | ~3 |
+
+Then **Phase B** = the 22-component waves 7–14 from §6 above.
+
+Gates per wave: `tsc --noEmit` (0 new), `bash run_tests.sh` (0 new failures; pinned-paint tests updated with the surface), `npm run build`, `node scripts/glass-coverage.mjs` (gradient + white counts strictly down), frozen-path diff empty (admin, BottomNav, glass-dock).
