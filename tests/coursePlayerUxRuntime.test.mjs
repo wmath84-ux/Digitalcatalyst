@@ -27,6 +27,7 @@ const coursePlayer = readSource("src/CoursePlayerApp.tsx");
 const sidebar = readSource("src/course/CourseSidebar.tsx");
 const overlay = readSource("src/course/CourseOverlay.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
+const chargingButton = readSource("src/course/ChargingCompleteButton.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
 const notesStore = readSource("src/course/notesStore.ts");
 const resourceViewer = readSource("src/course/ResourceViewer.tsx");
@@ -47,13 +48,13 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-product-title",
     "data-course-progress-summary",
     "data-course-progress-bar",
-    "data-course-progress-fill",
     "data-course-progress-label",
     "data-course-subscription-badge",
     "data-course-preview-badge",
-    "data-course-mark-complete-bar",
-    "data-course-selected-name",
     "data-course-mark-complete",
+    // ⚙ Player settings popover (the home of every former quick-toggle)
+    "data-course-settings-trigger",
+    "data-course-setting",
     // Bottom dock + overlay
     "data-course-dock",
     "data-course-dock-tab",
@@ -114,7 +115,7 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-image-download",
   ];
   for (const hook of hooks) {
-    const allSources = [coursePlayer, sidebar, overlay, audioPlayer, notesPanel, resourceViewer, imageViewer].join("\n");
+    const allSources = [coursePlayer, sidebar, overlay, audioPlayer, chargingButton, notesPanel, resourceViewer, imageViewer].join("\n");
     assert.ok(allSources.includes(hook), `missing data attribute ${hook}`);
   }
 });

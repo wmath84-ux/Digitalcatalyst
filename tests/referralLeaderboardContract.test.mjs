@@ -34,8 +34,8 @@ test("leaderboard is reached from the home header while the footer hosts Revisio
   assert.match(nav, /key: "revision"/);
   assert.match(nav, /#\/revision/);
   assert.doesNotMatch(nav, /key: "leaderboard"/);
-  // The leaderboard entry point is the home header button.
-  assert.match(homeHeader, /aria-label="Leaderboard"/);
+  // The leaderboard entry point is the home header's Expanding Tabs bar.
+  assert.match(homeHeader, /ariaLabel: "Leaderboard"/);
   assert.match(homeHeader, /window\.location\.hash = "#\/leaderboard"/);
   // The leaderboard page renders the shared footer without a highlighted tab.
   assert.match(leaderboard, /<BottomNav active=\{null\}/);

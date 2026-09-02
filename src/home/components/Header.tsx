@@ -1,6 +1,7 @@
-import { forwardRef, useEffect, useRef } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { Bell, Heart, Search, Trophy, UserRound, X } from "lucide-react";
 import { GlassSwitch } from "../../components/ui/glass-switch";
+import ExpandingTabs from "../../components/ui/ExpandingTabs";
 import { GlassSurface } from "../../components/ui/glass";
 import { GlassButton } from "../../components/ui/glass-button";
 import { GlassInput } from "../../components/ui/glass-input";
@@ -9,7 +10,6 @@ import { useGlassScheme } from "../../lib/glassScheme";
 import { openCommandPalette } from "../../lib/commandPalette";
 import type { Product } from "../types";
 import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/glass-tooltip";
 import BrandMark from "../../components/BrandMark";
 import { useBranding } from "../../context/BrandingContext";
 import { DEFAULT_HOME_GRADIENT_FROM, DEFAULT_HOME_GRADIENT_TO } from "../../utils/branding";
@@ -59,6 +59,10 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
 ) {
   const [scheme, setScheme] = useGlassScheme();
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
+  // Which header action wears the expanded pill. On Home none of the
+  // shortcuts is "the current page", so the bar starts collapsed and the
+  // tapped action expands on its way out (route pages remount the header).
+  const [homeActiveAction, setHomeActiveAction] = useState<string | null>(null);
   // Tap on the search box → the pack's GlassCommand palette (the ⌘K component),
   // exactly as the store's search box does. A pre-filled draft still deep-links
   // to the full results page so `#/search?q=` keeps working for shared links.
@@ -177,59 +181,44 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           </div>
         </div>
         <div data-home-actions className="flex shrink-0 items-center gap-1 min-[390px]:gap-2">
-          <GlassButton
-            aria-label="Leaderboard"
-            onClick={() => { window.location.hash = "#/leaderboard"; }}
-            className="dc-home-pill [&_.size-12]:size-10 [&_.size-12]:min-[430px]:w-auto [&_.size-12]:min-[430px]:px-3"
-            >
-            <span className="inline-flex items-center gap-1.5"><Trophy size={17} strokeWidth={2.4} className="shrink-0" /><span className="hidden text-xs font-bold tracking-tight min-[430px]:inline">Leaderboard</span></span>
-          </GlassButton>
-          {/* Profile shortcut — this slot used to hold the FlowPath "+"
-              button; FlowPath moved to the footer dock (former Profile slot)
-              and Profile now lives here in the header. */}
-          {/* The hero's last native `title` bubble became the same delayed,
-              focusable glass tooltip the app-wide header uses (Wave 2), so the
-              shortcut reads identically on keyboard and touch. */}
-          <Tooltip>
-            <TooltipTrigger
-              type="button"
-              aria-label="Open profile"
-              onClick={() => { window.location.hash = "#/profile"; }}
-              className="dc-home-pill rounded-full transition active:scale-90"
-            >
-              {/* Wave 12: the trigger wears the pack GlassSurface disc (the same
-                  material GlassButton renders) instead of a hand-frosted plate. */}
-              <GlassSurface radius={999} className="size-10 text-white" contentClassName="grid h-full place-items-center">
-                <UserRound size={18} strokeWidth={2.4} />
-              </GlassSurface>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <span>Profile</span>
-            </TooltipContent>
-          </Tooltip>
+          {/* aicanvas.me Expanding Tabs — the action cluster is the same
+              monochrome icon-circle bar the app-wide header wears; the tapped
+              action expands into an icon-and-label pill on its way out. */}
+          <ExpandingTabs
+            ariaLabel="Home actions"
+            activeId={homeActiveAction}
+            onSelect={(id) => {
+              setHomeActiveAction(id);
+              if (id === "leaderboard") window.location.hash = "#/leaderboard";
+              else if (id === "profile") window.location.hash = "#/profile";
+              else if (id === "notifications") onOpenNotifications?.();
+              else if (id === "favorites") onOpenFavorites?.();
+            }}
+            items={[
+              { id: "leaderboard", label: "Leaderboard", ariaLabel: "Leaderboard", icon: <Trophy size={17} strokeWidth={2.4} /> },
+              { id: "profile", label: "Profile", ariaLabel: "Open profile", icon: <UserRound size={17} strokeWidth={2.4} /> },
+              {
+                id: "notifications",
+                label: "Alerts",
+                ariaLabel: "Notifications",
+                icon: <Bell size={17} strokeWidth={2.4} />,
+                badge: unreadNotificationCount > 0 ? (unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount)) : undefined,
+                badgeAriaLabel: unreadNotificationCount > 0 ? `${unreadNotificationCount} unread notifications` : undefined,
+                badgeTone: "rose",
+              },
+              {
+                id: "favorites",
+                label: "Favorites",
+                ariaLabel: "Favorites",
+                icon: <Heart size={17} strokeWidth={2.4} fill="currentColor" />,
+                badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
+                badgeTone: "rose",
+              },
+            ]}
+          />
           {/* websiteglass.com Glass Switch — the docs' controlled "Dark mode"
               example, flipping the pack between its own light and dark material. */}
           <GlassSwitch checked={scheme === "dark"} onCheckedChange={(v) => setScheme(v ? "dark" : "light")} ariaLabel="Dark mode" />
-          <GlassButton
-            aria-label="Notifications"
-            onClick={onOpenNotifications}
-            className="dc-home-pill relative [&_.size-12]:size-10"
-            >
-            <Bell size={18} strokeWidth={2.4} />
-            {unreadNotificationCount > 0 && <span aria-label={`${unreadNotificationCount} unread notifications`} className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold ring-2 ring-[#0a0c12]">{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}</span>}
-          </GlassButton>
-          <GlassButton
-            aria-label="Favorites"
-            onClick={onOpenFavorites}
-            className="dc-home-pill relative [&_.size-12]:size-10"
-            >
-            <Heart size={18} strokeWidth={2.4} fill="currentColor" />
-            {favoritesCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold ring-2 ring-[#0a0c12]">
-                {favoritesCount}
-              </span>
-            )}
-          </GlassButton>
         </div>
       </div>
 

@@ -29,6 +29,7 @@ const imageViewer = readSource("src/course/ImageViewer.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
 const richEditor = readSource("src/course/RichTextEditor.tsx");
 const overlay = readSource("src/course/CourseOverlay.tsx");
+const chargingButton = readSource("src/course/ChargingCompleteButton.tsx");
 const playbackState = readSource("src/course/playbackState.ts");
 const richText = readSource("src/utils/richText.ts");
 const courseTypes = readSource("src/types/course.ts");
@@ -143,10 +144,13 @@ test("Mark complete toggles both ways so an accidental tap is reversible", () =>
   // The button is never disabled once complete — that is what made it a
   // one-way door before.
   assert.doesNotMatch(coursePlayer, /disabled=\{isDone\}/);
-  assert.match(coursePlayer, /onClick=\{\(\) => void toggleComplete\(\)\}/);
-  assert.match(coursePlayer, /aria-pressed=\{isDone\}/);
-  assert.match(coursePlayer, /Tap to mark as not complete/);
-  assert.match(coursePlayer, /data-completed=\{isDone \? "true" : "false"\}/);
+  // The control is now the charging-widget button (ChargingCompleteButton):
+  // the player wires the same reversible toggle through `onToggle`, and the
+  // button itself carries the aria/data contract.
+  assert.match(coursePlayer, /onToggle=\{\(\) => void toggleComplete\(\)\}/);
+  assert.match(chargingButton, /aria-pressed=\{done\}/);
+  assert.match(chargingButton, /Tap to mark as not complete/);
+  assert.match(chargingButton, /data-completed=\{done \? "true" : "false"\}/);
 });
 
 test("Un-completing plays the remove cue and keeps progress honest", () => {

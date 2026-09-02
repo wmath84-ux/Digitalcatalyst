@@ -87,7 +87,7 @@ test("the form renders in the normal viewer stack, so the chrome stays mounted",
   // The header and the mark-complete footer are siblings of the viewer, and
   // the form is just another embed inside it — nothing about submitting can
   // unmount them.
-  assert.match(coursePlayer, /const markCompleteBar = selectedFile && !fileBarsHidden \?/);
+  assert.match(coursePlayer, /chromeHidden=\{fileBarsHidden\}/);
   assert.match(resourceViewer, /\{chromeHidden \? null : \(\s*<ViewerHeader/);
   // Popups/top-navigation are NOT granted, so the frame cannot escape.
   assert.doesNotMatch(resourceViewer, /allow-top-navigation/);
@@ -98,17 +98,16 @@ test("the form renders in the normal viewer stack, so the chrome stays mounted",
 // ---------------------------------------------------------------------------
 
 test("the two chrome toggle buttons are present in the landscape rail", () => {
-  // In landscape the header becomes a 56px rail pinned to the left edge; it
-  // must still expose both independent chrome toggles.
+  // In landscape the header becomes a 56px rail pinned to the left edge; the
+  // ⚙ Player settings popover (home of both chrome switches) still rides it.
   assert.match(coursePlayer, /data-course-landscape-header/);
-  assert.ok((coursePlayer.match(/\{fileBarsToggle\}\s*\{playerChromeToggle\}/g) || []).length >= 2, "both toggles not present in the portrait header and the landscape rail");
+  assert.match(coursePlayer, /settingsPopover\("right"\)/);
 });
 
 test("each toggle reflects its hidden state", () => {
-  // The icon swaps so the button always shows what the next tap will do.
-  assert.match(coursePlayer, /fileBarsHidden \? <ChevronsUpDown size=\{17\} \/> : <ChevronsDownUp size=\{17\} \/>/);
-  assert.match(coursePlayer, /playerChromeHidden \? <Maximize size=\{17\} \/> : <Minimize size=\{17\} \/>/);
-  assert.match(coursePlayer, /data-hidden=\{playerChromeHidden \? "true" : "false"\}/);
+  // Each chrome preference is a Glass Switch row that mirrors its state.
+  assert.match(coursePlayer, /settingsRow\("File bars", !fileBarsHidden, \(next\) => setFileBarsHidden\(!next\), "file-bars"\)/);
+  assert.match(coursePlayer, /settingsRow\("Player bars", !playerChromeHidden, \(next\) => setPlayerChromeHidden\(!next\), "player-chrome"\)/);
 });
 
 // ---------------------------------------------------------------------------

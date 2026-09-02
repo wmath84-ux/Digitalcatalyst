@@ -60,6 +60,7 @@ import DesktopPeekDock from "./glass-dock/DesktopPeekDock";
 import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { cn } from "../utils/cn";
 import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";
+import ExpandingTabs from "./ui/ExpandingTabs";
 
 // Wave 2 (global chrome) — the website-glass pack. `glass-tooltip` and
 // `glass-input` are vendored registry items; `GlassSurface` is the shared
@@ -67,12 +68,6 @@ import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassButton } from "@/components/ui/glass-button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/glass-tooltip";
 import { LiquidMetalButton } from "@/components/ui/LiquidMetalButton";
 
 /** The hash-prefixed routes the rail can drive. Each one navigates by
@@ -554,33 +549,63 @@ export default function DesktopShell({
               </div>
             ) : null}
 
-            {/* Top-bar quick actions: notifications, cart, favorites, plans. */}
+            {/* Top-bar quick actions — the aicanvas.me Expanding Tabs bar
+                (https://aicanvas.me/components/expanding-tabs): icon circles
+                that morph into an icon-and-label pill for the active route. */}
             <div className="flex items-center gap-1.5" data-desktop-topbar-actions>
               {topBarRight}
-              <TopBarButton
-                ariaLabel="Notifications"
-                icon={<Bell size={16} />}
-                badge={notifications > 0 ? notifications : undefined}
-                onClick={() => handleNavigate("#/notifications")}
-                active={active === "profile" && (window.location.hash.includes("notifications") || false)}
-              />
-              <TopBarButton
-                ariaLabel="Favorites"
-                icon={<Heart size={16} />}
-                badge={favoritesCount > 0 ? favoritesCount : undefined}
-                onClick={() => handleNavigate("#/favorites")}
-              />
-              <TopBarButton
-                ariaLabel="Cart"
-                icon={<ShoppingBag size={16} />}
-                badge={cartCount > 0 ? cartCount : undefined}
-                onClick={() => handleNavigate("#/cart")}
-              />
-              <TopBarButton
-                ariaLabel="Subscription"
-                icon={<Crown size={16} />}
-                onClick={() => handleNavigate("#/subscription")}
-                active={false}
+              <ExpandingTabs
+                ariaLabel="Quick actions"
+                itemSize={36}
+                activeId={
+                  window.location.hash.startsWith("#/notifications")
+                    ? "notifications"
+                    : window.location.hash.startsWith("#/favorites")
+                      ? "favorites"
+                      : window.location.hash.startsWith("#/cart")
+                        ? "cart"
+                        : window.location.hash.startsWith("#/subscription")
+                          ? "subscription"
+                          : null
+                }
+                onSelect={(id) => {
+                  if (id === "notifications") handleNavigate("#/notifications");
+                  else if (id === "favorites") handleNavigate("#/favorites");
+                  else if (id === "cart") handleNavigate("#/cart");
+                  else if (id === "subscription") handleNavigate("#/subscription");
+                }}
+                items={[
+                  {
+                    id: "notifications",
+                    label: "Alerts",
+                    ariaLabel: "Notifications",
+                    icon: <Bell size={16} />,
+                    badge: notifications > 0 ? (notifications > 99 ? "99+" : String(notifications)) : undefined,
+                    badgeTone: "rose",
+                  },
+                  {
+                    id: "favorites",
+                    label: "Favorites",
+                    ariaLabel: "Favorites",
+                    icon: <Heart size={16} />,
+                    badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
+                    badgeTone: "rose",
+                  },
+                  {
+                    id: "cart",
+                    label: "Cart",
+                    ariaLabel: "Cart",
+                    icon: <ShoppingBag size={16} />,
+                    badge: cartCount > 0 ? String(cartCount) : undefined,
+                    badgeTone: "rose",
+                  },
+                  {
+                    id: "subscription",
+                    label: "Plans",
+                    ariaLabel: "Subscription",
+                    icon: <Crown size={16} />,
+                  },
+                ]}
               />
             </div>
           </div>
@@ -776,55 +801,6 @@ function TopBarTabRow({ config }: { config: TopBarTabsConfig }) {
         </button>
       ) : null}
     </nav>
-  );
-}
-
-function TopBarButton({
-  ariaLabel,
-  icon,
-  badge,
-  onClick,
-  active = false,
-}: {
-  ariaLabel: string;
-  icon: ReactNode;
-  badge?: number;
-  onClick: () => void;
-  active?: boolean;
-}) {
-  // Same shape as the site header's action discs (see src/components/Header.tsx):
-  // the registry tooltip replaces the native `title`, and a `GlassSurface`
-  // disc sits *behind* the glyph so the row reads as one material. The old
-  // hover/active classes stay, so nothing is lost when `data-glass="off"`.
-  return (
-    <TooltipProvider delayMs={320}>
-      <Tooltip>
-        <TooltipTrigger
-          onClick={onClick}
-          aria-label={ariaLabel}
-          data-desktop-topbar-button={ariaLabel.toLowerCase()}
-          className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-xl transition ${
-            active
-              ? "text-indigo-200"
-              : "text-white/55 hover:bg-white/[0.08] hover:text-white"
-          }`}
-        >
-          <GlassSurface
-            radius={12}
-            className="dc-chrome-disc pointer-events-none absolute inset-0"
-          />
-          <span className="relative grid place-items-center">{icon}</span>
-          {badge && badge > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white ring-2 ring-white">
-              {badge > 99 ? "99+" : badge}
-            </span>
-          ) : null}
-        </TooltipTrigger>
-        <TooltipContent side="bottom">
-          <span className="text-white">{ariaLabel}</span>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
   );
 }
 

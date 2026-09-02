@@ -241,7 +241,9 @@ test("the removed 'Manage plan' header is gone and its help icon moved to the ma
   const header = read("src/components/Header.tsx");
   assert.match(header, /onHelpClick\?: \(\) => void/);
   assert.match(header, /HelpCircle/);
-  assert.match(header, /aria-label="Help & FAQ"/);
+  // The action cluster is the Expanding Tabs bar now; the accessible name is
+  // still written literally at the call site.
+  assert.match(header, /ariaLabel: "Help & FAQ"/);
 });
 
 test("the 'already have an active membership' banner copy is removed", () => {

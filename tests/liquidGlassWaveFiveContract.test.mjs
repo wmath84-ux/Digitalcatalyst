@@ -50,17 +50,19 @@ test("no native form control survives outside admin", () => {
   assert.deepEqual(offenders, [], `native controls still in: ${offenders.join(", ")}`);
 });
 
-test("the course player's seek bar is the registry slider, hooks intact", () => {
+test("the course player's seek bar is the shimmer bottom bar, hooks intact", () => {
+  // The audio player is now the aicanvas.me Upload Progress card; its 6px
+  // bottom shimmer bar doubles as the seek control (pointer scrub + keyboard).
   const s = read("src/course/AudioPlayer.tsx");
-  assert.match(s, /<GlassSlider/);
-  assert.match(s, /from "\.\.\/components\/ui\/glass-slider"/);
+  assert.match(s, /role="slider"/);
+  assert.match(s, /onPointerDown=\{onSeekPointerDown\}/);
   assert.doesNotMatch(code(s), /type="range"/);
   // every transport hook the player contracts use stays addressable
   for (const hook of ["data-course-audio-seek", "data-course-audio-play", "data-course-audio-mute", "data-course-audio-loop"]) {
     assert.ok(s.includes(hook), hook);
   }
-  // `max` never collapses to 0 while metadata loads (the pack normalises by range)
-  assert.match(s, /max=\{duration \|\| 1\}/);
+  // aria max never collapses to 0 while metadata loads
+  assert.match(s, /aria-valuemax=\{Math\.round\(duration\) \|\| 1\}/);
 });
 
 test("profile + settings preference rows use the registry switch", () => {

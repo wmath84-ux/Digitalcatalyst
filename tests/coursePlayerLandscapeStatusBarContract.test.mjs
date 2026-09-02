@@ -23,16 +23,16 @@ const player = fs.readFileSync("src/CoursePlayerApp.tsx", "utf8");
 const statusBar = fs.readFileSync("src/utils/courseStatusBar.ts", "utf8");
 
 test("status bar hiding is the explicit rail button because auto-hide cannot be gesture-less", () => {
-  // Android-only button: iOS can never hide the bar and desktop browsers
-  // don't need to.
+  // Android-only switch: iOS can never hide the bar and desktop browsers
+  // don't need to. The control is the "Hide status bar" Glass Switch row of
+  // the ⚙ Player settings popover — still a real user gesture per flip.
   assert.match(player, /isMobileDevice\(\) && !isIOSDevice\(\)/);
-  assert.match(player, /data-course-toggle-fullscreen/);
   assert.match(player, /Hide status bar/);
-  assert.match(player, /Show status bar/);
-  // The button toggles true fullscreen — a tap to hide, a tap to restore.
+  assert.match(player, /canFullscreen \? settingsRow\("Hide status bar", courseFullscreen/);
+  // The switch toggles true fullscreen — one flip to hide, one to restore.
   assert.match(
     player,
-    /if \(isCoursePlayerFullscreen\(\)\) exitCoursePlayerFullscreen\(\);\s*else enterCoursePlayerFullscreen\(\);/,
+    /if \(next\) enterCoursePlayerFullscreen\(\);\s*else exitCoursePlayerFullscreen\(\);/,
   );
 });
 
@@ -43,7 +43,8 @@ test("the button icon mirrors the live document fullscreen state", () => {
     /const \[courseFullscreen, setCourseFullscreen\] = useState<boolean>\(\(\) => isCoursePlayerFullscreen\(\)\)/,
   );
   assert.match(player, /onCourseFullscreenChange\(sync\)/);
-  assert.match(player, /aria-pressed=\{courseFullscreen\}/);
+  // The settings row mirrors the live state the same way the old button did.
+  assert.match(player, /settingsRow\("Hide status bar", courseFullscreen/);
 });
 
 test("no gesture-less automatic hide is left (Android rejects it anyway)", () => {

@@ -87,9 +87,12 @@ test("A pure tap on the indicator still behaves like tapping the active tab", ()
 
 test("The other three tab buttons stay fully clickable", () => {
   // The grab handle overlays ONLY the active quarter, so the remaining tabs'
-  // onClick keeps firing. The buttons keep their data hook + click wiring.
+  // select wiring keeps firing. The buttons keep their data hook + wiring
+  // (the tap now routes through DockTabButton's onSelect so a finger-slide
+  // selection can suppress the synthetic click that follows it).
   assert.match(overlay, /data-course-dock-tab/);
-  assert.match(overlay, /onClick=\{\(\) => props\.onTabChange\(key\)\}/);
+  assert.match(overlay, /onSelect=\{\(\) => props\.onTabChange\(key\)\}/);
+  assert.match(overlay, /if \(skipSelectRef\.current\) return;/);
 });
 
 // ---------------------------------------------------------------------------
