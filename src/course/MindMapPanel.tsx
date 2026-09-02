@@ -175,6 +175,9 @@ import {
 } from "../../utils/mindMapTree";
 import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
+import { GlassSurface } from "../components/ui/glass";
+import { GlassButton } from "../components/ui/glass-button";
+import { GlassCard } from "../components/ui/glass-card";
 import {
   getCoursePanelSession,
   setMindMapSessionTheme,
@@ -427,21 +430,18 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
   // each level steps down, so a wide map still reads as a hierarchy. The
   // light ("white mode") palette swaps the translucent white washes for
   // tinted cards with dark text so every level stays legible on white.
+  // Wave 9: every box is the pack's GlassSurface (its own material in BOTH
+  // map themes, white ink); the hierarchy is carried by the border colour
+  // alone. The centre is the one solid box — indigo, the same meaning colour
+  // every primary action on the site uses — so it stays the boldest thing
+  // on screen without a painted gradient.
   const tone = isRoot
-    ? theme === "light"
-      ? "border-violet-500/70 bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-900/25"
-      : "border-violet-400/60 bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-900/40"
-    : theme === "light"
-      ? depth === 1
-        ? "border-violet-400/70 bg-violet-500/15 text-violet-950"
-        : depth === 2
-          ? "border-indigo-400/60 bg-indigo-500/10 text-indigo-900"
-          : "border-slate-400/50 bg-white text-slate-800 shadow-sm shadow-slate-900/5"
-      : depth === 1
-        ? "border-violet-400/40 bg-violet-500/15 text-violet-50"
-        : depth === 2
-          ? "border-indigo-400/25 bg-indigo-500/10 text-indigo-50"
-          : "border-white/12 bg-white/6 text-slate-100";
+    ? "border-violet-300/60 bg-indigo-600 text-white"
+    : depth === 1
+      ? "border-violet-400/50 text-white"
+      : depth === 2
+        ? "border-indigo-400/35 text-white"
+        : "border-white/15 text-white";
 
   // ── Which way the box faces ────────────────────────────────────────────
   // `facing` is the GEOMETRY — which side of its parent the box actually ended
@@ -509,6 +509,65 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
     background: "transparent",
   };
 
+  const body = (
+    <>
+      {editing ? (
+        <textarea
+          ref={inputRef}
+          value={draft}
+          rows={1}
+          wrap="soft"
+          onChange={(event) => {
+            setDraft(event.target.value);
+            draftRef.current = event.target.value;
+          }}
+          onBlur={() => {
+            // A blank / whitespace-only rename is treated as "cancel" so
+            // accidentally tapping outside the field never blanks a node.
+            // `setNodeTopic` itself would silently no-op, which made the
+            // rename feel broken in the old editor.
+            settledRef.current = true;
+            const trimmed = draftRef.current.trim();
+            if (trimmed && trimmed !== topic) onCommitTopic(id, trimmed);
+            onCloseEditor(id);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              settledRef.current = true;
+              const trimmed = draftRef.current.trim();
+              if (trimmed) onCommitTopic(id, trimmed);
+              onCloseEditor(id);
+            }
+            if (event.key === "Escape") {
+              event.preventDefault();
+              // A cancel is still a settlement — the teardown safety net
+              // must not "rescue" the draft the learner just discarded.
+              settledRef.current = true;
+              onCloseEditor(id);
+            }
+            // React Flow would otherwise treat typing as a canvas shortcut.
+            event.stopPropagation();
+          }}
+          onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+          className="nodrag w-full min-w-0 resize-none overflow-x-hidden whitespace-pre-wrap break-words bg-transparent p-0 text-inherit outline-none placeholder:text-white/40"
+          placeholder="Idea likhein…"
+          aria-label="Node ka text badlein"
+          data-mind-node-input={id}
+        />
+      ) : textFit === "clip" ? (
+        // One line, tail cut with an ellipsis — the box was measured for
+        // exactly one line, so the height here matches the layout.
+        <span className="min-h-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" data-mind-node-text-fit="clip">
+          {topic}
+        </span>
+      ) : (
+        <span className="line-clamp-4 min-h-0 flex-1 break-words" data-mind-node-text-fit="wrap">{topic}</span>
+      )}
+    </>
+  );
+
   return (
     <div
       className="group relative h-full w-full cursor-grab active:cursor-grabbing"
@@ -530,69 +589,32 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
       <Handle type="source" position={Position.Left} id="src-left" isConnectable={false} style={handleStyle} />
       <Handle type="source" position={Position.Right} id="src-right" isConnectable={false} style={handleStyle} />
 
-      <div
-        className={`flex h-full w-full flex-col overflow-hidden rounded-xl border px-2.5 pt-1.5 text-[13px] font-semibold leading-[17px] transition ${tone} ${
-          selected ? "ring-2 ring-violet-400/80 ring-offset-2 ring-offset-[var(--mm-bg)]" : ""
-        }`}
-        data-mind-node-body={id}
-      >
-        {editing ? (
-          <textarea
-            ref={inputRef}
-            value={draft}
-            rows={1}
-            wrap="soft"
-            onChange={(event) => {
-              setDraft(event.target.value);
-              draftRef.current = event.target.value;
-            }}
-            onBlur={() => {
-              // A blank / whitespace-only rename is treated as "cancel" so
-              // accidentally tapping outside the field never blanks a node.
-              // `setNodeTopic` itself would silently no-op, which made the
-              // rename feel broken in the old editor.
-              settledRef.current = true;
-              const trimmed = draftRef.current.trim();
-              if (trimmed && trimmed !== topic) onCommitTopic(id, trimmed);
-              onCloseEditor(id);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                settledRef.current = true;
-                const trimmed = draftRef.current.trim();
-                if (trimmed) onCommitTopic(id, trimmed);
-                onCloseEditor(id);
-              }
-              if (event.key === "Escape") {
-                event.preventDefault();
-                // A cancel is still a settlement — the teardown safety net
-                // must not "rescue" the draft the learner just discarded.
-                settledRef.current = true;
-                onCloseEditor(id);
-              }
-              // React Flow would otherwise treat typing as a canvas shortcut.
-              event.stopPropagation();
-            }}
-            onClick={(event) => event.stopPropagation()}
-            onDoubleClick={(event) => event.stopPropagation()}
-            className={`nodrag w-full min-w-0 resize-none overflow-x-hidden whitespace-pre-wrap break-words bg-transparent p-0 text-inherit outline-none ${
-              theme === "light" ? "placeholder:text-slate-400" : "placeholder:text-white/40"
-            }`}
-            placeholder="Idea likhein…"
-            aria-label="Node ka text badlein"
-            data-mind-node-input={id}
-          />
-        ) : textFit === "clip" ? (
-          // One line, tail cut with an ellipsis — the box was measured for
-          // exactly one line, so the height here matches the layout.
-          <span className="min-h-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" data-mind-node-text-fit="clip">
-            {topic}
-          </span>
-        ) : (
-          <span className="line-clamp-4 min-h-0 flex-1 break-words" data-mind-node-text-fit="wrap">{topic}</span>
-        )}
-      </div>
+      {/* Wave 9: the centre box is the one SOLID surface (indigo, the site's
+          primary meaning colour); every other box is the pack's GlassSurface
+          on the shared backdrop, in both map themes. */}
+      {isRoot ? (
+        <div
+          className={`flex h-full w-full flex-col overflow-hidden rounded-xl border px-2.5 pt-1.5 text-[13px] font-semibold leading-[17px] transition ${tone} ${
+            selected ? "ring-2 ring-violet-400/80 ring-offset-2 ring-offset-[var(--dc-bd-base)]" : ""
+          }`}
+          data-mind-node-body={id}
+          data-mind-node-theme={theme}
+        >
+          {body}
+        </div>
+      ) : (
+        <GlassSurface
+          radius={12}
+          className={`h-full w-full overflow-hidden rounded-xl border text-[13px] font-semibold leading-[17px] transition ${tone} ${
+            selected ? "ring-2 ring-violet-400/80 ring-offset-2 ring-offset-[var(--dc-bd-base)]" : ""
+          }`}
+          contentClassName="flex h-full w-full flex-col overflow-hidden px-2.5 pt-1.5"
+          data-mind-node-body={id}
+          data-mind-node-theme={theme}
+        >
+          {body}
+        </GlassSurface>
+      )}
 
       {/* ── The anchor dot: which face this box is wired to ───────────────
           A small mark on the edge that faces the parent, i.e. exactly where
@@ -619,7 +641,7 @@ function MindNode({ id, data }: NodeProps<Node<MindNodeData>>) {
           event.stopPropagation();
           onAddChild(id);
         }}
-        className={`nodrag absolute top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-violet-300/40 bg-violet-500 text-white shadow-md transition hover:scale-110 hover:bg-violet-400 active:scale-95 ${
+        className={`nodrag absolute top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-violet-300/40 bg-indigo-600 text-white transition hover:scale-110 hover:bg-indigo-500 active:scale-95 ${
           facesLeft ? "-left-3.5" : "-right-3.5"
         }`}
         aria-label={`${isRoot ? "Central idea" : topic} ke andar nayi branch jodein`}
@@ -791,13 +813,13 @@ const EDGE_TYPES = { rope: RopeEdge };
 
 // ── Save-status pill ──────────────────────────────────────────────────────
 
-const SAVE_COPY: Record<MindMapSaveStatus, { label: string; dark: string; light: string }> = {
-  idle: { label: "Sign in karke save hoga", dark: "text-slate-400", light: "text-slate-500" },
-  loading: { label: "Loading…", dark: "text-slate-400", light: "text-slate-500" },
-  ready: { label: "Ready", dark: "text-slate-400", light: "text-slate-500" },
-  saving: { label: "Saving…", dark: "text-amber-300", light: "text-amber-600" },
-  saved: { label: "Cloud par saved", dark: "text-emerald-300", light: "text-emerald-600" },
-  error: { label: "Save retry ho raha hai", dark: "text-rose-300", light: "text-rose-600" },
+const SAVE_COPY: Record<MindMapSaveStatus, { label: string; tone: string }> = {
+  idle: { label: "Sign in karke save hoga", tone: "text-white/60" },
+  loading: { label: "Loading…", tone: "text-white/60" },
+  ready: { label: "Ready", tone: "text-white/60" },
+  saving: { label: "Saving…", tone: "text-amber-300" },
+  saved: { label: "Cloud par saved", tone: "text-emerald-300" },
+  error: { label: "Save retry ho raha hai", tone: "text-rose-300" },
 };
 
 // ── Toolbar drop-down ─────────────────────────────────────────────────────
@@ -1583,20 +1605,16 @@ function MindMapCanvas(props: MindMapPanelProps) {
   const levels = maxDepth(mind);
   const totalNodes = countNodes(mind);
 
-  // Shared toolbar button chrome — soft tile that reads the shell palette.
-  const toolButton =
-    "grid h-7 w-7 place-items-center rounded-lg bg-[var(--mm-soft)] text-[var(--mm-text)] transition hover:bg-[var(--mm-soft-hover)]";
-
   return (
     <div
-      className="course-mindmap-shell relative flex h-full w-full flex-col overflow-hidden bg-[var(--mm-bg)]"
+      className="course-mindmap-shell relative flex h-full w-full flex-col overflow-hidden"
       data-course-mindmap
       data-mindmap-theme={mindTheme}
     >
       {/* ── Canvas ────────────────────────────────────────────────────────
           `touch-action: none` is required, not cosmetic: without it the
           browser claims the pinch for page zoom and React Flow never sees it. */}
-      <div ref={canvasRef} className="relative min-h-0 flex-1" style={{ touchAction: "none" }} data-course-mindmap-canvas>
+      <div ref={canvasRef} className="relative min-h-0 flex-1" style={{ touchAction: "none" }} data-course-mindmap-canvas data-library-open={libraryOpen ? "true" : "false"}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -1713,7 +1731,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
             variant={BackgroundVariant.Dots}
             gap={22}
             size={1}
-            color={mindTheme === "light" ? "rgba(15,23,42,0.16)" : "rgba(255,255,255,0.07)"}
+            color={mindTheme === "light" ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.07)"}
           />
         </ReactFlow>
 
@@ -1723,26 +1741,18 @@ function MindMapCanvas(props: MindMapPanelProps) {
             `+` on any node, so the toolbar isn't needed. */}
         {mind.nodes.length === 0 ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
-            <div
-              className={`flex items-center gap-2 rounded-full px-3 py-1.5 ring-1 ${
-                mindTheme === "light" ? "bg-white/90 ring-slate-900/10" : "bg-black/80 ring-white/10"
-              }`}
-            >
-              <p className={`text-center text-[11px] font-semibold ${mindTheme === "light" ? "text-slate-600" : "text-slate-300"}`}>
-                Kisi bhi node par <span className="font-black text-violet-500">+</span> dabayein — branch wahin jud jayegi
+            <GlassSurface radius={999} className="text-white" contentClassName="flex items-center gap-2 px-3 py-1.5">
+              <p className="text-center text-[11px] font-semibold text-white/80">
+                Kisi bhi node par <span className="font-black text-violet-300">+</span> dabayein — branch wahin jud jayegi
               </p>
-            </div>
+            </GlassSurface>
           </div>
         ) : doubleTapDelete ? (
           // The armed-state reminder: destructive mode is on, so the learner
           // can always see why a second quick tap removed a branch.
           <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
             <div
-              className={`flex items-center gap-2 rounded-full px-3 py-1.5 ring-1 ${
-                mindTheme === "light"
-                  ? "bg-rose-50/95 text-rose-700 ring-rose-400/40"
-                  : "bg-rose-950/85 text-rose-200 ring-rose-400/30"
-              }`}
+              className="flex items-center gap-2 rounded-full bg-rose-500/15 px-3 py-1.5 text-rose-200 ring-1 ring-rose-400/30"
               data-course-mindmap-dbl-delete-hint
             >
               <Trash2 size={11} />
@@ -1760,7 +1770,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
             completely clean when the library is closed. Each card opens its
             map on tap, and carries its own rename / delete actions. */}
         {libraryOpen ? (
-          <div className="absolute inset-0 z-20 flex flex-col bg-[var(--mm-bg)]/97 backdrop-blur-sm" data-course-mindmap-library>
+          <div className="absolute inset-0 z-20 flex flex-col bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]" data-course-mindmap-library>
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--mm-border)] px-3 py-2">
               <div className="min-w-0">
                 <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-[var(--mm-text)]">
@@ -1780,22 +1790,21 @@ function MindMapCanvas(props: MindMapPanelProps) {
                     setEditingId(null);
                   }}
                   disabled={atMapLimit || !onCreateMap}
-                  className="flex items-center gap-1 rounded-lg bg-violet-500 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-violet-400 disabled:opacity-40"
+                  className="flex items-center gap-1 rounded-full bg-indigo-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-indigo-500 disabled:opacity-40"
                   aria-label="Naya mind map banayein"
                   title={atMapLimit ? "Is module me maps ki limit poori ho gayi" : "New map — naya khaali mind map"}
                   data-course-mindmap-new
                 >
                   <Plus size={13} strokeWidth={3} /> New map
                 </button>
-                <button
-                  type="button"
+                <GlassButton
                   onClick={() => { setLibraryOpen(false); setRenamingKey(null); }}
-                  className={toolButton}
+                  className="shrink-0 [&_.size-12]:size-7"
                   aria-label="Map list band karein"
                   data-course-mindmap-library-close
                 >
                   <X size={13} />
-                </button>
+                </GlassButton>
               </div>
             </div>
 
@@ -1818,11 +1827,9 @@ function MindMapCanvas(props: MindMapPanelProps) {
                   const active = entry.mapKey === activeMapKey;
                   const renaming = renamingKey === entry.mapKey;
                   return (
-                    <li
-                      key={entry.mapKey}
-                      className={`relative flex aspect-square min-h-[104px] flex-col overflow-hidden rounded-2xl border p-2.5 transition ${
-                        active ? "border-violet-400/70" : "border-[var(--mm-border)]"
-                      }`}
+                    <li key={entry.mapKey} className="relative aspect-square min-h-[104px]">
+                    <GlassCard
+                      className="h-full w-full [&>div:last-child]:flex [&>div:last-child]:h-full [&>div:last-child]:flex-col [&>div:last-child]:p-2.5"
                       data-course-mindmap-map-card
                       data-map-key={entry.mapKey}
                       data-active={active ? "true" : "false"}
@@ -1838,7 +1845,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
                           onBlur={commitRename}
                           autoFocus
                           maxLength={120}
-                          className="w-full rounded-lg bg-[var(--mm-bg)] px-2 py-1 text-[11px] font-bold text-[var(--mm-text)] outline-none ring-1 ring-violet-400/60"
+                          className="dc-field w-full rounded-full px-2.5 py-1 text-[11px] font-bold text-white outline-none ring-1 ring-violet-400/60"
                           aria-label="Map ka naam"
                           data-course-mindmap-rename-input
                         />
@@ -1860,38 +1867,36 @@ function MindMapCanvas(props: MindMapPanelProps) {
                       )}
                       <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1.5">
                         {renaming ? (
-                          <button
-                            type="button"
+                          <GlassButton
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={commitRename}
-                            className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-500 text-white"
+                            className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-emerald-300"
                             aria-label="Naam save karein"
                             data-course-mindmap-rename-save
                           >
                             <Check size={13} />
-                          </button>
+                          </GlassButton>
                         ) : (
-                          <button
-                            type="button"
+                          <GlassButton
                             onClick={() => startRename(entry)}
-                            className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500/90 text-white transition hover:brightness-110"
+                            className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-sky-300"
                             aria-label="Map rename karein"
                             data-course-mindmap-rename
                           >
                             <Pencil size={12} />
-                          </button>
+                          </GlassButton>
                         )}
-                        <button
-                          type="button"
+                        <GlassButton
                           onClick={() => requestMapDelete(entry.mapKey)}
-                          className="grid h-7 w-7 place-items-center rounded-lg bg-rose-500/90 text-white transition hover:brightness-110"
+                          className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-rose-300"
                           aria-label="Map delete karein"
                           title="Yeh mind map delete karein"
                           data-course-mindmap-delete-map
                         >
                           <Trash2 size={12} />
-                        </button>
+                        </GlassButton>
                       </div>
+                    </GlassCard>
                     </li>
                   );
                 })}
@@ -1963,7 +1968,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
           >
             <p className="mm-menu-head">Cloud save</p>
             <p
-              className={`mm-menu-note flex items-center gap-1.5 ${mindTheme === "light" ? save.light : save.dark}`}
+              className={`mm-menu-note flex items-center gap-1.5 ${save.tone}`}
               data-course-mindmap-save-label
             >
               {status === "error" ? <TriangleAlert size={11} /> : null}
@@ -2212,9 +2217,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
 
       {errorMessage ? (
         <p
-          className={`shrink-0 bg-rose-500/10 px-3 py-1.5 text-[10px] font-semibold ${
-            mindTheme === "light" ? "text-rose-700" : "text-rose-200"
-          }`}
+          className="shrink-0 bg-rose-500/15 px-3 py-1.5 text-[10px] font-semibold text-rose-200"
           data-course-mindmap-error
         >
           {errorMessage}

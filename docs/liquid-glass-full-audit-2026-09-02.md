@@ -459,3 +459,31 @@ Kept (pinned by tests): every `data-course-*` attribute, `aria-pressed` expressi
 Test updated: `liquidGlassWaveFiveContract` no longer pins `tint={0.9}` on the dialog (asserts NO tint override instead — Decision A6).
 
 **Gates:** tsc clean · tests 1966 / 8 · build OK · coverage `<button>` 290 → 271, gradients 39 → 34, render-sites 430 → 458 · backdrop OK · frozen diff empty.
+
+---
+
+## Phase B · Wave 9 — Mind map (`src/course/MindMapPanel.tsx` + `.course-mindmap-shell` / `.mm-*` in `src/index.css`)
+
+| Old | New |
+|---|---|
+| Shell plate `--mm-bg: #0b0b16` (dark) / `#f8fafc` paper (light), `bg-[var(--mm-bg)]` on the shell | `--mm-bg: transparent`; the map sits on the shared Black Ice backdrop in BOTH map themes |
+| `--mm-soft`/`--mm-surface` (flat rgba / `#11111d` / `#ffffff`) behind every `.mm-tool` tile, `.mm-pill`, skeletons | pack GlassSurface material: `--dc-chrome-glass` + `--dc-chrome-glass-blur` + rim (dark), `rgba(255,255,255,0.21)` (light); `.mm-tool` / `.mm-pill` class hooks kept (test-pinned), re-materialled in CSS |
+| `.mm-menu` portalled drop-downs `#14141f` / `#ffffff` + 60px drop shadow, slate ink | pack PopoverContent material read from `:root` token, white ink, no drop shadow; `data-menu-theme="light"` = light material |
+| Dark/light per-tile ink overrides (`#5b21b6`, `#b45309`, …), `SAVE_COPY.light` slate/amber-600 inks | removed — white ink + one meaning tone per state (`text-amber-300` / `emerald-300` / `rose-300`) in both themes |
+| Node boxes: depth tones (`bg-violet-500/15`, `bg-white` leaf on light, gradient root `from-violet-600 to-indigo-600` + shadow) | non-root boxes = `GlassSurface radius={12}` (pack material, white ink, border colour carries the depth); root = solid `bg-indigo-600` (meaning colour, no gradient/shadow); ring-offset uses `--dc-bd-base` |
+| Node `+` disc `bg-violet-500 shadow-md` | solid `bg-indigo-600`, no shadow (pinned `nodrag absolute top-1/2` / `-left-3.5` facing classes untouched) |
+| First-run hint pill `bg-black/80` / `bg-white/90` | `GlassSurface radius={999}` white ink |
+| Double-tap armed hint `bg-rose-950/85` / `bg-rose-50/95` | `bg-rose-500/15 text-rose-200 ring-rose-400/30` (meaning colour, both themes) |
+| Library sheet `bg-[var(--mm-bg)]/97 backdrop-blur-sm` | `--dc-chrome-glass` + blur (pack material); canvas under it hidden via `[data-library-open="true"] > .react-flow { visibility: hidden }` |
+| Library "New map" `bg-violet-500 rounded-lg` | solid `bg-indigo-600 rounded-full` primary |
+| Library close (`toolButton` soft tile) · rename `bg-sky-500/90` · rename-save `bg-emerald-500` · delete-map `bg-rose-500/90` | `GlassButton` size-7 with sky / emerald / rose icon ink |
+| Map cards `<li … rounded-2xl border>` + CSS `linear-gradient(165deg …)` plates + drop shadows (dark + light) | `<li>` wraps a `GlassCard` (tint 0.4, radius 20) carrying `data-course-mindmap-map-card`; CSS rule now only `background: transparent` + active violet ring (selectors kept for the pins) |
+| Rename input `bg-[var(--mm-bg)] rounded-lg` | `.dc-field` (Glass Input material) `rounded-full` white ink |
+| Error strip `text-rose-700` / `text-rose-200` split | `bg-rose-500/15 text-rose-200` |
+| Anchor-dot / blink halos `var(--mm-bg)` | `var(--dc-bd-base)` |
+
+Kept (pinned by tests): `className="mm-tool` literal + every `data-course-mindmap-*` attribute, `overflow-hidden` strip, `data-mm-map-name` span, `ToolbarMenu` + `createPortal` + `MENU_WIDTH_PX`, `role="menuitemradio"`, `aspect-square min-h-[104px]`, `data-mindmap-theme={mindTheme}`, `.course-mindmap-shell[data-mindmap-theme="light"]` block, `--mm-tool-size` steps, `.mm-tool > svg { width: 58%`, `.mm-menu { … max-width }`, `[data-course-mindmap-map-card] { background: … box-shadow: … }` (now transparent / none).
+
+**Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 271 → 265, gradients 34 → 33, render-sites 458 → 465 (`native title=` 127 is unchanged from Wave 8, not a Wave 9 regression) · backdrop OK · frozen diff empty.
+
+**Wave 10 next:** store / search / PDP (PurchaseBuilder module rows + checkboxes, curriculum rows, review/related rows, share-menu items).

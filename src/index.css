@@ -1531,54 +1531,29 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 
-/* Mind map library cards: the same raised-surface treatment the note squares
-   get, so a card reads as a card (tinted, lifted, edged) at any grid width
-   instead of a flat grey tile — and the map that is open right now stays
-   clearly violet. Unlayered, so these win over the Tailwind state classes on
-   the same element; the border colour still comes from JSX. */
-[data-course-mindmap-map-card] {
-  background:
-    linear-gradient(165deg, rgb(167 139 250 / 0.18), rgb(99 102 241 / 0.07) 46%, rgb(2 6 23 / 0.28)),
-    var(--mm-surface);
-  box-shadow:
-    0 16px 28px -14px rgb(76 29 149 / 0.6),
-    0 8px 16px -10px rgb(2 6 23 / 0.55);
+/* While the library is open the diagram underneath is hidden (kept in the
+   layout so React Flow's measurements survive), so the pack cards never read
+   through to node text behind the sheet. */
+[data-course-mindmap-canvas][data-library-open="true"] > .react-flow {
+  visibility: hidden;
 }
 
-[data-course-mindmap-map-card]:hover {
-  background:
-    linear-gradient(165deg, rgb(167 139 250 / 0.26), rgb(99 102 241 / 0.1) 46%, rgb(2 6 23 / 0.24)),
-    var(--mm-surface);
+/* Mind map library cards (Wave 9): the card IS the pack GlassCard (tint 0.4,
+   radius 20) — no painted gradient plate or drop shadow in either map theme.
+   The only thing the stylesheet adds is the violet ring on the map that is
+   open right now; the `background` here is transparent so nothing can paint
+   under the component's own layers. */
+[data-course-mindmap-map-card] {
+  background: transparent;
+  box-shadow: none;
 }
 
 [data-course-mindmap-map-card][data-active="true"] {
-  background:
-    linear-gradient(165deg, rgb(139 92 246 / 0.42), rgb(99 102 241 / 0.24) 52%, rgb(139 92 246 / 0.16)),
-    var(--mm-surface);
-  box-shadow:
-    0 16px 30px -12px rgb(124 58 237 / 0.65),
-    0 0 0 1px rgb(167 139 250 / 0.5);
+  box-shadow: 0 0 0 1px rgb(167 139 250 / 0.6);
 }
 
 .course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-map-card] {
-  background:
-    linear-gradient(165deg, rgb(237 233 254 / 0.95), rgb(224 231 255 / 0.6) 48%, #ffffff);
-  box-shadow:
-    0 14px 26px -14px rgb(76 29 149 / 0.3),
-    0 6px 14px -10px rgb(15 23 42 / 0.18);
-}
-
-.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-map-card]:hover {
-  background:
-    linear-gradient(165deg, rgb(221 214 254 / 1), rgb(212 222 255 / 0.75) 48%, #ffffff);
-}
-
-.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-map-card][data-active="true"] {
-  background:
-    linear-gradient(165deg, rgb(196 181 253 / 0.9), rgb(199 210 254 / 0.6) 52%, #ffffff);
-  box-shadow:
-    0 14px 26px -12px rgb(109 40 217 / 0.35),
-    0 0 0 1px rgb(139 92 246 / 0.45);
+  background: transparent;
 }
 
 /* Course Player — square note cards lift off the panel with a mixed
@@ -1772,34 +1747,41 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    through the canvas dots, node borders, toolbar tiles and the SVG edge
    strokes without touching the site or player theme. */
 .course-mindmap-shell {
-  --mm-bg: #0b0b16;
-  --mm-surface: #11111d;
-  --mm-border: rgb(255 255 255 / 0.1);
-  --mm-text: #e2e8f0;
-  --mm-muted: #94a3b8;
-  --mm-soft: rgb(255 255 255 / 0.08);
-  --mm-soft-hover: rgb(255 255 255 / 0.15);
+  /* Wave 9: the map paints NO canvas plate. It sits on the shared Black Ice
+     backdrop like the rest of the player, and every tile / pill / menu is the
+     pack's GlassSurface material (websiteglass.com GlassSurface dark at tint
+     0.5 — the same `--dc-chrome-glass` token the store header and the course
+     toolbar use). Ink is white. */
+  --mm-bg: transparent;
+  --mm-surface: var(--dc-chrome-glass);
+  --mm-surface-blur: var(--dc-chrome-glass-blur);
+  --mm-surface-rim: var(--dc-chrome-glass-rim);
+  --mm-border: rgb(255 255 255 / 0.12);
+  --mm-text: #ffffff;
+  --mm-muted: rgb(255 255 255 / 0.62);
+  --mm-soft: var(--dc-chrome-glass);
+  --mm-soft-hover: rgb(255 255 255 / 0.14);
   --mm-dot: rgb(255 255 255 / 0.07);
   --mm-edge-left: rgb(167 139 250 / 0.55);
   --mm-edge-right: rgb(129 140 248 / 0.55);
-  background-color: var(--mm-bg);
   color: var(--mm-text);
-  transition: background-color 180ms ease, color 180ms ease;
+  transition: color 180ms ease;
 }
 
-/* White mode: an off-white canvas keeps the white leaf cards visible, and
-   the wire colours deepen so the diagram reads on paper-white. */
+/* White mode: the pack's LIGHT material (rgba(255,255,255,0.21) on the same
+   backdrop — exactly what the site-wide Dark-mode switch renders). No paper
+   plate; ink stays white on both materials. */
 .course-mindmap-shell[data-mindmap-theme="light"] {
-  --mm-bg: #f8fafc;
-  --mm-surface: #ffffff;
-  --mm-border: rgb(15 23 42 / 0.12);
-  --mm-text: #0f172a;
-  --mm-muted: #64748b;
-  --mm-soft: rgb(15 23 42 / 0.06);
-  --mm-soft-hover: rgb(15 23 42 / 0.12);
-  --mm-dot: rgb(15 23 42 / 0.16);
-  --mm-edge-left: rgb(124 58 237 / 0.6);
-  --mm-edge-right: rgb(79 70 229 / 0.6);
+  --mm-bg: transparent;
+  --mm-surface: rgba(255, 255, 255, 0.21);
+  --mm-border: rgb(255 255 255 / 0.22);
+  --mm-text: #ffffff;
+  --mm-muted: rgb(255 255 255 / 0.7);
+  --mm-soft: rgba(255, 255, 255, 0.21);
+  --mm-soft-hover: rgb(255 255 255 / 0.3);
+  --mm-dot: rgb(255 255 255 / 0.14);
+  --mm-edge-left: rgb(196 181 253 / 0.7);
+  --mm-edge-right: rgb(165 180 252 / 0.7);
 }
 
 .course-player-shell[data-course-theme="light"] [data-course-preview-badge] {
@@ -2508,15 +2490,15 @@ html.light .dc-glass-dark {
   /* The first spread is the halo that separates the bead from the box border
      it straddles (a ring would do this too, but this rule owns box-shadow). */
   box-shadow:
-    0 0 0 2px var(--mm-bg),
+    0 0 0 2px var(--dc-bd-base),
     0 0 8px rgb(139 92 246 / 0.55);
 }
 
 .course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-anchor] {
-  background: #7c3aed;
+  background: #a78bfa;
   box-shadow:
-    0 0 0 2px var(--mm-bg),
-    0 0 8px rgb(124 58 237 / 0.3);
+    0 0 0 2px var(--dc-bd-base),
+    0 0 8px rgb(167 139 250 / 0.45);
 }
 
 /* ── Mind map toolbar — one icon per control, sized per screen ───────────
@@ -2584,7 +2566,11 @@ html.light .dc-glass-dark {
   width: var(--mm-tool-size);
   height: var(--mm-tool-size);
   border-radius: var(--mm-tool-radius);
+  /* Wave 9: the tile is the pack GlassSurface material (tint, blur, rim). */
   background: var(--mm-soft);
+  -webkit-backdrop-filter: var(--mm-surface-blur);
+  backdrop-filter: var(--mm-surface-blur);
+  box-shadow: var(--mm-surface-rim);
   color: var(--mm-text);
   transition:
     background-color 140ms ease,
@@ -2621,13 +2607,6 @@ html.light .dc-glass-dark {
 .mm-tool-danger:hover:not(:disabled) {
   color: #fb7185;
 }
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool-violet,
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-mm-active="true"] {
-  color: #5b21b6;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool-emerald {
-  color: #065f46;
-}
 
 /* The cloud-save tile is tinted by the save state — the text label it
    replaced is now a tooltip + menu, so the colour is the status. A quiet
@@ -2647,15 +2626,6 @@ html.light .dc-glass-dark {
 .mm-tool[data-save-status="error"] {
   color: #fda4af;
 }
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="saving"] {
-  color: #b45309;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="saved"] {
-  color: #047857;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="error"] {
-  color: #be123c;
-}
 
 /* ── The blinking save beacon ───────────────────────────────────────────
    Sits on the TOP-RIGHT corner of the cloud tile and inherits that tile's
@@ -2670,7 +2640,7 @@ html.light .dc-glass-dark {
   height: 8px;
   border-radius: 999px;
   background: currentColor;
-  box-shadow: 0 0 0 2px var(--mm-bg);
+  box-shadow: 0 0 0 2px var(--dc-bd-base);
   pointer-events: none;
   animation: mm-blink 1.05s ease-in-out infinite;
 }
@@ -2725,6 +2695,9 @@ html.light .dc-glass-dark {
   padding-right: 0.45rem;
   border-radius: var(--mm-tool-radius);
   background: var(--mm-soft);
+  -webkit-backdrop-filter: var(--mm-surface-blur);
+  backdrop-filter: var(--mm-surface-blur);
+  box-shadow: var(--mm-surface-rim);
   color: var(--mm-text);
   font-size: 10px;
   font-weight: 800;
@@ -2768,20 +2741,22 @@ html.light .dc-glass-dark {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0.4rem;
-  border: 1px solid rgb(255 255 255 / 0.12);
   border-radius: 18px;
-  background: #14141f;
-  color: #e2e8f0;
-  box-shadow: 0 24px 60px rgb(0 0 0 / 0.55);
+  /* Wave 9: the pack PopoverContent material (GlassSurface, white ink) —
+     read from the :root token because the menu is portalled outside the
+     shell. No drop shadow; the rim is the component's own. */
+  background: var(--dc-chrome-glass);
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur);
+  backdrop-filter: var(--dc-chrome-glass-blur);
+  box-shadow: var(--dc-chrome-glass-rim);
+  color: #ffffff;
   /* Opens upward out of its trigger, so the growth starts at the bar. */
   transform-origin: bottom right;
   animation: mm-menu-in 0.16s ease both;
 }
 .mm-menu[data-menu-theme="light"] {
-  border-color: rgb(15 23 42 / 0.14);
-  background: #ffffff;
-  color: #0f172a;
-  box-shadow: 0 24px 60px rgb(15 23 42 / 0.22);
+  background: rgba(255, 255, 255, 0.21);
+  color: #ffffff;
 }
 @keyframes mm-menu-in {
   from {
@@ -2832,7 +2807,7 @@ html.light .dc-glass-dark {
   background: rgb(255 255 255 / 0.08);
 }
 .mm-menu[data-menu-theme="light"] .mm-menu-item:hover {
-  background: rgb(15 23 42 / 0.07);
+  background: rgb(255 255 255 / 0.14);
 }
 .mm-menu-item[aria-checked="true"] {
   background: rgb(139 92 246 / 0.3);
