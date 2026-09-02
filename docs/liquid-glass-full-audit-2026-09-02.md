@@ -484,6 +484,6 @@ Test updated: `liquidGlassWaveFiveContract` no longer pins `tint={0.9}` on the d
 
 Kept (pinned by tests): `className="mm-tool` literal + every `data-course-mindmap-*` attribute, `overflow-hidden` strip, `data-mm-map-name` span, `ToolbarMenu` + `createPortal` + `MENU_WIDTH_PX`, `role="menuitemradio"`, `aspect-square min-h-[104px]`, `data-mindmap-theme={mindTheme}`, `.course-mindmap-shell[data-mindmap-theme="light"]` block, `--mm-tool-size` steps, `.mm-tool > svg { width: 58%`, `.mm-menu { … max-width }`, `[data-course-mindmap-map-card] { background: … box-shadow: … }` (now transparent / none).
 
-**Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 271 → 265, gradients 34 → 33, render-sites 458 → 465 (`native title=` 127 is unchanged from Wave 8, not a Wave 9 regression) · backdrop OK · frozen diff empty.
+**Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 271 → 267, gradients 34 → 32, render-sites 458 → 465 (`native title=` 127 is unchanged from Wave 8, not a Wave 9 regression) · backdrop OK · frozen diff empty.
 
 **Wave 10 next:** store / search / PDP (PurchaseBuilder module rows + checkboxes, curriculum rows, review/related rows, share-menu items).
