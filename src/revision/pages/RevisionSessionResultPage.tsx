@@ -30,7 +30,7 @@ export default function RevisionSessionResultPage({ uid, route, sessionId }: { u
               {data.correctCount} of {data.totalQuestions} correct
             </p>
             {data.mastered > 0 && (
-              <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-xs font-bold">
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/25 px-3 py-1.5 text-xs font-bold">
                 <TrophyIcon className="h-4 w-4" /> {data.mastered} question{data.mastered === 1 ? "" : "s"} mastered!
               </div>
             )}
@@ -39,7 +39,7 @@ export default function RevisionSessionResultPage({ uid, route, sessionId }: { u
           <div data-rev-result-grid className="grid grid-cols-3 gap-3">
             <ResultChip icon={<CheckIcon className="h-5 w-5 text-emerald-300" />} label="Correct" value={data.correctCount} tone="bg-emerald-500/20" />
             <ResultChip icon={<XIcon className="h-5 w-5 text-rose-300" />} label="Wrong" value={data.wrongCount} tone="bg-rose-500/20" />
-            <ResultChip icon={<MinusIcon className="h-5 w-5 text-white/55" />} label="Skipped" value={data.skippedCount} tone="bg-white/[0.06]" />
+            <ResultChip icon={<MinusIcon className="h-5 w-5 text-white/55" />} label="Skipped" value={data.skippedCount} tone="border border-white/15" />
           </div>
 
           <Card>

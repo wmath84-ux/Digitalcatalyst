@@ -71,7 +71,7 @@ export function ExitGuardProvider({
                   setPendingHref(null);
                   if (href) onNavigateRef.current(href);
                 }}
-                className="min-h-[48px] flex-1 rounded-2xl bg-rose-600 text-sm font-bold text-white active:bg-rose-700"
+                className="min-h-[48px] flex-1 rounded-full bg-rose-600 text-sm font-bold text-white hover:bg-rose-500 active:bg-rose-700"
               >
                 {guard.confirmLabel}
               </button>

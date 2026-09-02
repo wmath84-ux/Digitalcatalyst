@@ -1,6 +1,9 @@
 import { GlassButton } from "../../components/ui/glass-button";
 import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 import { GlassTile } from "../../components/ui/glass-tile";
+import { GlassSurface } from "../../components/ui/glass";
+import { GlassCheckbox } from "../../components/ui/glass-checkbox";
+import { GlassCard } from "../../components/ui/GlassCard";
 // Student-facing AI test generator.
 //
 // The learner picks Class → Subject → Chapter → Topic from four cascading
@@ -135,35 +138,32 @@ function PickerButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    /* Wave 13: pack GlassTile — `open` is the pack's selected state; a
+       non-empty pick keeps an indigo meaning ring. */
+    <GlassTile
       disabled={disabled}
       onClick={onClick}
-      className={`flex min-h-[54px] flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-1.5 text-center transition ${
-        open
-          ? "border-indigo-500 bg-indigo-500/15 ring-2 ring-indigo-400/30"
-          : count > 0
-            ? "border-indigo-400/30 bg-indigo-500/15"
-            : "border-white/10 bg-white/[0.08]"
-      } ${disabled ? "opacity-40" : "active:scale-[0.97]"}`}
+      selected={open}
+      aria-expanded={open}
+      className={`dc-tile aspect-auto min-h-[54px] rounded-xl px-1 py-1.5 text-center [&>span]:flex-col [&>span]:gap-0.5 ${
+        !open && count > 0 ? "ring-1 ring-indigo-400/40" : ""
+      } ${disabled ? "opacity-40" : ""}`}
     >
       <span className="text-[11px] font-bold text-white/85">{label}</span>
       <span className={`text-[10px] font-semibold ${count > 0 ? "text-indigo-200" : "text-white/55"}`}>
         {count > 0 ? `${count}/${total}` : "Select ▾"}
       </span>
-    </button>
+    </GlassTile>
   );
 }
 
 function CheckBox({ checked, partial }: { checked: boolean; partial?: boolean }) {
+  /* Wave 13: the pack GlassCheckbox, purely presentational inside the row
+     button (the row itself toggles), so it is inert for pointer + a11y. */
   return (
-    <span
-      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition ${
-        checked || partial ? "border-indigo-600 bg-indigo-600" : "border-white/10 bg-white/[0.08]"
-      }`}
-    >
-      {checked && <CheckIcon className="h-3.5 w-3.5 text-white" />}
-      {!checked && partial && <span className="h-0.5 w-2.5 rounded bg-white/[0.08]" />}
+    <span className="relative flex shrink-0 items-center" aria-hidden>
+      <GlassCheckbox checked={checked || Boolean(partial)} tabIndex={-1} className="pointer-events-none" />
+      {!checked && partial && <span className="pointer-events-none absolute left-1/2 top-1/2 h-0.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded bg-white" />}
     </span>
   );
 }
@@ -188,10 +188,10 @@ function PickerPanel({
   const allSelected = options.length > 0 && options.every((o) => selected.has(o.key));
   const someSelected = options.some((o) => selected.has(o.key));
   return (
-    <div className="animate-fade-in mt-2 overflow-hidden rounded-2xl border border-indigo-400/30 bg-white/[0.08] shadow-lg">
-      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.06] px-3 py-2.5">
+    <GlassSurface radius={20} className="animate-fade-in mt-2 ring-1 ring-indigo-400/30" contentClassName="overflow-hidden p-0">
+      <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
         <span className="text-xs font-bold uppercase tracking-wide text-white/75">{title}</span>
-        <button type="button" onClick={onDone} className="rounded-lg bg-indigo-600 px-3 py-1 text-[11px] font-bold text-white active:scale-95">
+        <button type="button" onClick={onDone} className="rounded-full bg-indigo-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-indigo-500 active:scale-95">
           Done
         </button>
       </div>
@@ -203,7 +203,7 @@ function PickerPanel({
           <button
             type="button"
             onClick={onToggleAll}
-            className="flex w-full items-center gap-2.5 border-b border-white/10 bg-indigo-500/15 px-3 py-2.5 text-left active:bg-indigo-500/15"
+            className="flex w-full items-center gap-2.5 border-b border-white/10 bg-indigo-500/15 px-3 py-2.5 text-left hover:bg-indigo-500/20"
           >
             <CheckBox checked={allSelected} partial={!allSelected && someSelected} />
             <span className="text-[13px] font-bold text-indigo-200">
@@ -215,7 +215,7 @@ function PickerPanel({
               key={o.key}
               type="button"
               onClick={() => onToggle(o.key)}
-              className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left active:bg-white/[0.06]"
+              className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-white/10"
             >
               <CheckBox checked={selected.has(o.key)} />
               <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white/85">
@@ -226,7 +226,7 @@ function PickerPanel({
           ))}
         </div>
       )}
-    </div>
+    </GlassSurface>
   );
 }
 
@@ -630,7 +630,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
     <PageShell route={route} title="AI Revision Generator" subtitle="Build a focused revision plan" backHref="#/revision/profile">
       <div data-rev-layout="aigenerate" className="animate-fade-in space-y-4 px-4 py-4 pb-10 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
         {/* Provider strip */}
-        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.08] p-3">
+        <GlassCard contentClassName="flex items-center gap-3 p-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white">
             <SparklesIcon className="h-5 w-5" />
           </span>
@@ -646,14 +646,14 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   : "Questions will use the built-in engine — connect AI for better results"}
             </p>
           </div>
-          <button
-            type="button"
+          <GlassButton
+            variant="capsule"
             onClick={() => navigate("#/revision/ai-settings")}
-            className="shrink-0 rounded-full bg-white/[0.12] px-3 py-1.5 text-[11px] font-bold text-white/85 active:bg-white/25"
+            className="shrink-0 [&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-[11px] [&>span>div]:font-bold"
           >
             Configure
-          </button>
-        </div>
+          </GlassButton>
+        </GlassCard>
 
         {phase !== "ready" && (
           <>
@@ -688,7 +688,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   <button
                     type="button"
                     onClick={() => navigate("#/revision/ai-settings")}
-                    className="flex min-h-[56px] flex-col items-start justify-center gap-0.5 rounded-2xl bg-indigo-600 px-4 py-2 text-left text-white shadow-md active:scale-[0.98]"
+                    className="flex min-h-[56px] flex-col items-start justify-center gap-0.5 rounded-2xl bg-indigo-600 px-4 py-2 text-left text-white hover:bg-indigo-500 active:scale-[0.98]"
                   >
                     <span className="text-[13px] font-bold">Configure AI →</span>
                     <span className="text-[10px] font-medium opacity-90">
@@ -787,17 +787,13 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
               </p>
               <div data-rev-choice-grid className="mt-3 grid grid-cols-4 gap-1.5">
                 {DIFFICULTY_OPTIONS.map((d) => (
-                  <button
+                  <GlassTile
                     key={d.value}
-                    type="button"
                     disabled={phase === "generating"}
                     onClick={() => setDifficulty(d.value)}
-                    className={`flex min-h-[58px] flex-col items-center justify-center gap-0.5 rounded-xl border px-1 text-center transition active:scale-[0.97] ${
+                    selected={difficulty === d.value}
+                    className={`dc-tile aspect-auto min-h-[58px] rounded-xl px-1 text-center [&>span]:flex-col [&>span]:gap-0.5 ${
                       phase === "generating" ? "opacity-40" : ""
-                    } ${
-                      difficulty === d.value
-                        ? "border-indigo-500 bg-indigo-500/15 ring-2 ring-indigo-400/30"
-                        : "border-white/10 bg-white/[0.08]"
                     }`}
                   >
                     <span className="text-sm">{d.emoji}</span>
@@ -805,11 +801,11 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                       {d.label}
                     </span>
                     <span className="line-clamp-1 text-[9px] font-medium text-white/55">{d.desc}</span>
-                  </button>
+                  </GlassTile>
                 ))}
               </div>
 
-              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+              <div className="mt-4 rounded-2xl border border-white/10 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-[12px] font-bold uppercase tracking-wide text-white/75">Question type</h4>
@@ -817,7 +813,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                       Default is Mixed. The AI tags every question by type and the server re-checks each one — wrong-type questions are regenerated automatically. (Offline built-in questions are not dynamically transformed.)
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-white/[0.08] px-2.5 py-1 text-[10px] font-bold text-indigo-300">
+                  <span className="shrink-0 rounded-full border border-indigo-400/30 px-2.5 py-1 text-[10px] font-bold text-indigo-300">
                     {modeOption.label}
                   </span>
                 </div>
@@ -972,7 +968,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
               <button
                 type="button"
                 onClick={() => navigate("#/revision")}
-                className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-[15px] font-bold text-white transition active:scale-[0.98]"
+                className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[15px] font-bold text-white transition hover:bg-emerald-500 active:scale-[0.98]"
               >
                 Go to Revision Dashboard <ChevronRightIcon className="h-5 w-5" />
               </button>

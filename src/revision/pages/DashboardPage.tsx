@@ -135,7 +135,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
             <div className="space-y-3">
               {data.weakTopicSummary.map((topic) => (
                 <div key={topic.topicId} className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-lg">{topic.subjectIcon}</div>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-lg">{topic.subjectIcon}</div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="truncate text-sm font-medium text-white/85">{topic.topicName}</p>
@@ -188,7 +188,7 @@ function FirstRevisionCard({ onGenerate }: { onGenerate: () => void }) {
        into whatever the row gives the column. */
     <GlassSurface className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden text-white lg:min-h-[220px]" contentClassName="flex min-h-0 flex-1 flex-col p-5 lg:p-4">
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur lg:h-10 lg:w-10 lg:rounded-xl">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/20 text-violet-100 lg:h-10 lg:w-10 lg:rounded-xl">
           <SparklesIcon className="h-6 w-6" />
         </span>
         <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-violet-100">Your first revision plan</p>
@@ -283,7 +283,7 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-200">Start Revision</p>
             <h2 className="mt-1 line-clamp-2 text-xl font-extrabold leading-tight">{subjects}</h2>
           </div>
-          <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-indigo-100">{position}</span>
+          <span className="shrink-0 rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-bold text-indigo-100">{position}</span>
         </div>
 
         {/* The slack lands HERE, not under the copy: when the row is taller than the
@@ -291,7 +291,7 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
             rows. That keeps the card filled instead of opening an empty band between
             the text and the button — which is what an `mt-auto` button would do (auto
             margins take free space before `flex-grow` can). */}
-        <div data-rev-plan-details className="mt-3 flex min-h-0 flex-auto flex-col justify-center space-y-1.5 rounded-2xl bg-white/10 p-3 text-xs">
+        <div data-rev-plan-details className="mt-3 flex min-h-0 flex-auto flex-col justify-center space-y-1.5 rounded-2xl border border-white/10 p-3 text-xs">
           {details.classNames.length > 0 && <PlanRow label="Class" value={displayList(details.classNames, "")} />}
           <PlanRow label="Chapter" value={chapters} />
           <PlanRow label="Topics" value={topics} />
@@ -300,8 +300,8 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
         <div className="mt-3 flex shrink-0 flex-wrap items-center gap-2 text-xs font-semibold text-indigo-100">
           <span className="flex items-center gap-1"><BankIcon className="h-4 w-4" /> {plan.totalQuestions} questions</span>
           <span className="flex items-center gap-1"><ClockIcon className="h-4 w-4" /> {plan.estimatedMinutes} min</span>
-          <span className="rounded-full bg-white/10 px-2 py-1 capitalize">{details.difficulty} difficulty</span>
-          <span className="rounded-full bg-white/10 px-2 py-1">{questionModeLabel(details.questionMode)}</span>
+          <span className="rounded-full border border-white/15 px-2 py-1 capitalize">{details.difficulty} difficulty</span>
+          <span className="rounded-full border border-white/15 px-2 py-1">{questionModeLabel(details.questionMode)}</span>
         </div>
 
         <div data-rev-plan-cta className="mt-3 min-h-[48px] w-full shrink-0">

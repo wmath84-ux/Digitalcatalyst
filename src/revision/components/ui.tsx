@@ -22,7 +22,7 @@ export function FullScreenLoader({ label = "Loading…" }: { label?: string }) {
 }
 
 export function Shimmer({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-2xl bg-white/[0.12] ${className}`} />;
+  return <div className={`animate-pulse rounded-2xl border border-white/10 bg-indigo-500/10 ${className}`} />;
 }
 
 export function DashboardSkeleton() {
@@ -95,7 +95,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 export function ProgressBar({ value, className = "" }: { value: number; className?: string }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <div className={`h-2 w-full overflow-hidden rounded-full bg-white/[0.12] ${className}`}>
+    <div className={`h-2 w-full overflow-hidden rounded-full border border-white/15 ${className}`}>
       <div
         className="h-full rounded-full bg-indigo-600 transition-all duration-300"
         style={{ width: `${clamped}%` }}
@@ -113,11 +113,11 @@ const statusStyles: Record<string, string> = {
   hard: "bg-rose-500/20 text-rose-200 border-rose-400/30",
   correct: "bg-emerald-500/20 text-emerald-200 border-emerald-400/30",
   wrong: "bg-rose-500/20 text-rose-200 border-rose-400/30",
-  skipped: "bg-white/[0.12] text-white/85 border-white/10",
+  skipped: "text-white/85 border-white/15",
 };
 
 export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: string }) {
-  const cls = statusStyles[tone] ?? "bg-white/[0.12] text-white/85 border-white/10";
+  const cls = statusStyles[tone] ?? "text-white/85 border-white/15";
   return (
     <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold capitalize ${cls}`}>
       {children}
@@ -159,7 +159,7 @@ export function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 text-[15px] font-bold text-white transition hover:brightness-105 active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:bg-white/[0.12] disabled:text-white/55 ${className}`}
+      className={`flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 text-[15px] font-bold text-white transition hover:bg-indigo-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
     >
       {children}
     </button>

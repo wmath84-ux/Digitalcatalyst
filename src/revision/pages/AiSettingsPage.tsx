@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import PageShell from "../components/PageShell";
 import AiConfigForm from "../components/AiConfigForm";
 import { Card } from "../components/ui";
+import { GlassTile } from "../../components/ui/glass-tile";
 import { CheckIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { fetchRemoteCatalog, type RevisionCatalog } from "../engine/catalogService";
@@ -49,23 +50,21 @@ function SourceOption({
   onSelect: (v: AiSource) => void;
 }) {
   return (
-    <button
-      type="button"
+    /* Wave 13: the source option is the pack GlassTile (selected state comes
+       from the pack); the radio dot is drawn on the tile, not a plate. */
+    <GlassTile
       disabled={disabled}
       onClick={() => onSelect(value)}
       data-ai-source={value}
-      className={`flex w-full items-start gap-3 rounded-2xl border p-3.5 text-left transition ${
-        selected
-          ? "border-indigo-400/30 bg-indigo-500/15 ring-2 ring-indigo-400/30"
-          : "border-white/10 bg-white/[0.08] hover:border-white/25"
-      } ${disabled ? "opacity-50" : "active:scale-[0.99]"}`}
+      selected={selected}
+      className={`dc-tile aspect-auto w-full p-3.5 text-left [&>span]:w-full [&>span]:items-start [&>span]:justify-start [&>span]:gap-3 ${disabled ? "opacity-50" : ""}`}
     >
       <span
         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-          selected ? "border-indigo-600 bg-indigo-600" : "border-white/10 bg-white/[0.08]"
+          selected ? "border-indigo-500 bg-indigo-500" : "border-white/25"
         }`}
       >
-        {selected && <span className="h-2 w-2 rounded-full bg-white/[0.08]" />}
+        {selected && <span className="h-2 w-2 rounded-full bg-white" />}
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
@@ -76,7 +75,7 @@ function SourceOption({
         </span>
         <span className="mt-0.5 block text-xs leading-relaxed text-white/75">{description}</span>
       </span>
-    </button>
+    </GlassTile>
   );
 }
 
@@ -186,7 +185,7 @@ export default function AiSettingsPage({ uid, route }: Props) {
               </span>
             )}
           </div>
-          <div className="mt-2.5 flex items-center gap-3 rounded-2xl bg-white/[0.06] p-3">
+          <div className="mt-2.5 flex items-center gap-3 rounded-2xl border border-white/10 p-3">
             <span
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white ${
                 userCfg.source === "default" && schoolProvider
@@ -202,7 +201,7 @@ export default function AiSettingsPage({ uid, route }: Props) {
             </div>
             <span
               className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                effective.config ? "bg-emerald-500/20 text-emerald-200" : "bg-white/[0.12] text-white/75"
+                effective.config ? "bg-emerald-500/20 text-emerald-200" : "border border-white/15 text-white/75"
               }`}
             >
               {effective.config ? "AI on" : "No AI"}
@@ -245,7 +244,7 @@ export default function AiSettingsPage({ uid, route }: Props) {
             <p className="mt-1 text-xs text-white/75">
               This is the configuration published from the admin panel. You don't need an API key.
             </p>
-            <div className="mt-3 flex items-center gap-3 rounded-2xl bg-white/[0.06] p-3">
+            <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 p-3">
               <span
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white ${schoolProvider.gradient}`}
               >

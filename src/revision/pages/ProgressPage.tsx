@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import PageShell from "../components/PageShell";
 import { Card, EmptyState } from "../components/ui";
+import { GlassCard } from "../../components/ui/GlassCard";
 import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 import { ChartIcon, CheckIcon, FlameIcon, SparklesIcon, TrophyIcon, XIcon } from "../components/icons";
 import { getProgressData } from "../engine/statsService";
@@ -32,7 +33,7 @@ function BarChart({ data }: { data: { label: string; accuracy: number; attempted
           <div key={`${d.label}-${i}`} className="flex flex-1 flex-col items-center gap-1.5">
             <div className="flex h-32 w-full items-end">
               <div
-                className={`w-full rounded-t-md transition-[height] duration-300 ease-out ${d.attempted === 0 ? "bg-white/[0.12]" : "bg-indigo-600"}`}
+                className={`w-full rounded-t-md transition-[height] duration-300 ease-out ${d.attempted === 0 ? "border border-white/15" : "bg-indigo-600"}`}
                 style={{ height: `${heightPct}%` }}
                 title={`${d.attempted} attempted · ${d.accuracy}% accuracy`}
               />
@@ -158,12 +159,14 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
 
 function TotalCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
   return (
-    <div className="rev-card flex items-center gap-3 rounded-2xl p-3 lg:rounded-xl lg:p-2.5">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.06]">{icon}</span>
+    /* Wave 13: `.rev-card` paints nothing on its own — the total tile is the
+       pack GlassCard. */
+    <GlassCard className="rev-card" contentClassName="flex items-center gap-3 p-3 lg:p-2.5">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10">{icon}</span>
       <div className="min-w-0 flex-1">
         <span className="block truncate text-lg font-bold leading-tight text-white">{value}</span>
         <span className="block truncate text-[11px] font-medium text-white/55">{label}</span>
       </div>
-    </div>
+    </GlassCard>
   );
 }

@@ -43,7 +43,7 @@ export default function TestBankLimitGate({ open, bank, onClose, onManageBank, o
             <span>Test Bank capacity</span>
             <span>{used}/{limit}</span>
           </div>
-          <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/[0.12]">
+          <div className="mt-2 h-2.5 overflow-hidden rounded-full border border-white/15">
             <div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.min(100, limit > 0 ? (used / limit) * 100 : 100)}%` }} />
           </div>
           <p className="mt-3 text-xs leading-relaxed text-indigo-200">

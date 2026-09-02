@@ -3,6 +3,9 @@ import { GlassSheet, GlassSheetContent, GlassSheetTitle, GlassSheetClose } from 
 import { GlassInput } from "../../components/ui/glass-input";
 import { GlassButton } from "../../components/ui/glass-button";
 import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
+import { GlassSurface } from "../../components/ui/glass";
+import { GlassTile } from "../../components/ui/glass-tile";
+import { GlassCard } from "../../components/ui/GlassCard";
 import { useEffect, useMemo, useState } from "react";
 import {
   Archive,
@@ -289,10 +292,10 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
 
       {actionError && (
         <div className="fixed inset-x-0 bottom-20 z-50 mx-auto w-full max-w-[440px] px-4">
-          <div className="flex items-center gap-2 rounded-2xl bg-white/[0.12] px-4 py-3 text-sm text-white shadow-xl">
+          <GlassSurface radius={20} className="text-white ring-1 ring-rose-400/30" contentClassName="flex items-center gap-2 px-4 py-3 text-sm">
             <span className="flex-1">{actionError}</span>
-            <button type="button" onClick={() => setActionError(null)} aria-label="Dismiss"><XIcon className="h-4 w-4" /></button>
-          </div>
+            <GlassButton onClick={() => setActionError(null)} aria-label="Dismiss" className="[&_.size-12]:size-8"><XIcon className="h-4 w-4" /></GlassButton>
+          </GlassSurface>
         </div>
       )}
 
@@ -380,7 +383,7 @@ function SavedTestsView({
             <div className="flex items-center justify-between text-[11px] font-bold text-indigo-200">
               <span>{bankStatus.planName} Test Bank</span><span>{used}/{limit}</span>
             </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.08]"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${percentage}%` }} /></div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full border border-white/15"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${percentage}%` }} /></div>
           </div>
         )}
         {bankStatus && allCount > bankStatus.used && (
@@ -487,20 +490,20 @@ function SavedTestCard({
         </div>
 
         <div className="mt-2 flex flex-wrap gap-1">
-          {labels.map((label) => <span key={label} className="rounded-full bg-white/[0.12] px-2 py-0.5 text-[9px] font-bold text-white/75">{label}</span>)}
+          {labels.map((label) => <span key={label} className="rounded-full border border-white/15 px-2 py-0.5 text-[9px] font-bold text-white/75">{label}</span>)}
           <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[9px] font-bold text-indigo-300">{questionModeLabel(test.planDetails.questionMode)}</span>
-          <span className="rounded-full bg-white/[0.12] px-2 py-0.5 text-[9px] font-bold capitalize text-white/75">{test.planDetails.difficulty}</span>
+          <span className="rounded-full border border-white/15 px-2 py-0.5 text-[9px] font-bold capitalize text-white/75">{test.planDetails.difficulty}</span>
         </div>
 
         {test.status === "in_progress" && (
           <div className="mt-2 rounded-xl bg-indigo-500/20 px-2.5 py-2">
             <div className="flex justify-between text-[10px] font-bold text-indigo-200"><span>Attempt in progress</span><span>{Math.min(test.currentIndex + 1, test.totalQuestions)}/{test.totalQuestions}</span></div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.08]"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${progress}%` }} /></div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full border border-white/15"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${progress}%` }} /></div>
           </div>
         )}
 
         {test.status === "completed" && (
-          <div data-rev-result-metrics className="mt-2 grid grid-cols-4 gap-1 rounded-xl bg-white/[0.06] p-2 text-center">
+          <div data-rev-result-metrics className="mt-2 grid grid-cols-4 gap-1 rounded-xl border border-white/10 p-2 text-center">
             <ResultMetric value={`${test.score ?? 0}%`} label="Score" />
             <ResultMetric value={String(test.correctCount)} label="Correct" tone="text-emerald-300" />
             <ResultMetric value={String(test.wrongCount)} label="Wrong" tone="text-rose-300" />
@@ -536,28 +539,31 @@ function SavedTestCard({
         </div>
 
         <div className="mt-1.5 flex items-center gap-1 border-t border-white/10 pt-1.5">
-          <button type="button" onClick={onExpand} className="flex min-h-[30px] flex-1 items-center justify-center gap-1.5 rounded-lg text-[10px] font-bold text-white/75 active:bg-white/[0.06]">
+          <button type="button" onClick={onExpand} className="flex min-h-[30px] flex-1 items-center justify-center gap-1.5 rounded-lg text-[10px] font-bold text-white/75 hover:text-white">
             <History className="h-3.5 w-3.5" /> Attempt history {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </button>
-          <button type="button" onClick={onDelete} className="grid h-8 w-9 place-items-center rounded-lg text-rose-500 active:bg-rose-500/15" aria-label={`Delete ${test.title}`}><Trash2 className="h-4 w-4" /></button>
+          <GlassButton onClick={onDelete} className="[&_.size-12]:size-8 [&_svg]:text-rose-300" aria-label={`Delete ${test.title}`}><Trash2 className="h-4 w-4" /></GlassButton>
         </div>
       </div>
 
       {expanded && (
-        <div className="absolute inset-0 z-20 flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.08] shadow-xl" data-saved-test-attempts>
+        <GlassSurface radius={20} className="absolute inset-0 z-20" contentClassName="flex h-full flex-col overflow-hidden p-0" data-saved-test-attempts>
           <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-3 py-2.5">
             <p className="text-xs font-black text-white/85">Attempt history</p>
-            <button type="button" onClick={onExpand} className="grid h-7 w-7 place-items-center rounded-lg bg-white/[0.06] text-white/75 transition hover:bg-white/[0.12]" aria-label="Close attempt history"><ChevronUp className="h-4 w-4" /></button>
+            <GlassButton onClick={onExpand} className="[&_.size-12]:size-7 [&_svg]:text-white/75" aria-label="Close attempt history"><ChevronUp className="h-4 w-4" /></GlassButton>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5">
             {attempts.length === 0 ? <p className="py-2 text-center text-xs text-white/55">No attempts yet.</p> : (
               <div className="space-y-2">
                 {attempts.map((attempt, index) => (
-                  <button
+                  <GlassCard
                     key={attempt.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => attempt.status === "completed" ? onOpenResult(attempt.id) : onOpenAttempt(attempt.id)}
-                    className="flex min-h-[50px] w-full items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.08] px-2.5 text-left"
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (attempt.status === "completed") onOpenResult(attempt.id); else onOpenAttempt(attempt.id); } }}
+                    className="cursor-pointer"
+                    contentClassName="flex min-h-[50px] w-full items-center gap-2.5 px-2.5 py-1.5 text-left"
                   >
                     <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-black ${attempt.status === "completed" ? "bg-emerald-500/15 text-emerald-200" : "bg-indigo-500/15 text-indigo-200"}`}>{attempts.length - index}</span>
                     <span className="min-w-0 flex-1">
@@ -565,12 +571,12 @@ function SavedTestCard({
                       <span className="mt-0.5 block text-[9px] text-white/55">{relativeDate(attempt.completedAt ?? attempt.startedAt)}</span>
                     </span>
                     <span className="text-right"><span className="block text-[11px] font-black text-white/85">{attempt.status === "completed" ? `${attempt.score}%` : "Continue"}</span><span className="text-[8px] font-bold uppercase tracking-wide text-white/55">{attempt.status}</span></span>
-                  </button>
+                  </GlassCard>
                 ))}
               </div>
             )}
           </div>
-        </div>
+        </GlassSurface>
       )}
     </Card>
   );
@@ -602,7 +608,7 @@ function SmartRevisionView({ bankData, summary, search, statusTab, activeFilterC
           <div className="relative min-w-0 flex-1"><GlassInput icon={<SearchIcon className="h-4 w-4" />} value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search weak questions or topics" className="w-full" />{search && <button type="button" onClick={() => onSearch("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2"><XIcon className="h-4 w-4 text-white/55" /></button>}</div>
           <GlassButton onClick={onFilters} aria-label="Filter and sort" className="relative shrink-0 [&_.size-12]:size-11"><FilterIcon className="h-5 w-5" />{activeFilterCount > 0 && <span className="absolute -right-1 -top-1 z-10 grid h-4 w-4 place-items-center rounded-full bg-indigo-600 text-[9px] font-bold text-white">{activeFilterCount}</span>}</GlassButton>
         </div>
-        <div className="no-scrollbar flex gap-2 overflow-x-auto">{STATUS_TABS.map((tab) => <button key={tab.key} type="button" onClick={() => onStatus(tab.key)} className={`min-h-[36px] shrink-0 rounded-full border px-3.5 text-xs font-semibold transition ${statusTab === tab.key ? "border-indigo-500 bg-indigo-600 text-white" : "border-white/10 bg-white/[0.06] text-white/75 hover:bg-white/[0.1]"}`}>{tab.label}{tab.key === "active" ? ` (${summary.due})` : ""}</button>)}</div>
+        <div className="no-scrollbar flex gap-2 overflow-x-auto"><GlassToggleGroup className="dc-segment shrink-0" value={statusTab} onValueChange={(next) => onStatus(next as StatusTab)} aria-label="Question status">{STATUS_TABS.map((tab) => <GlassToggleItem key={tab.key} value={tab.key} className="min-h-[36px] whitespace-nowrap px-3.5 text-xs font-semibold">{tab.label}{tab.key === "active" ? ` (${summary.due})` : ""}</GlassToggleItem>)}</GlassToggleGroup></div>
       </div>
       {bankData.length === 0 ? (
         <EmptyState icon={<BankIcon className="h-8 w-8" />} title={summary.total === 0 ? "No weak questions yet" : "No matching questions"} description={summary.total === 0 ? "Questions you answer incorrectly or skip are automatically organized here for focused revision." : "Adjust the search or filters to see more questions."} action={summary.total > 0 ? <SecondaryButton className="mt-2 w-auto" onClick={onClear}>Clear filters</SecondaryButton> : undefined} />
@@ -621,7 +627,7 @@ function DeleteConfirmation({ test, busy, onClose, onConfirm }: { test: CustomTe
         <span className="grid h-14 w-14 place-items-center rounded-2xl bg-rose-500/15 text-rose-300"><Trash2 className="h-7 w-7" /></span>
         <DialogTitle className="mt-4 text-xl font-black">Permanently delete this test?</DialogTitle>
         <DialogDescription className="leading-relaxed text-white/75"><strong className="text-white/85">{test.title}</strong>, all {test.attemptCount} completed attempt{test.attemptCount === 1 ? "" : "s"}, answers and historical results will be removed from every device. This cannot be undone.</DialogDescription>
-        <DialogFooter className="mt-5 grid grid-cols-2 gap-2"><SecondaryButton disabled={busy} onClick={onClose}>Keep Test</SecondaryButton><button type="button" disabled={busy} onClick={onConfirm} className="min-h-[48px] rounded-2xl bg-rose-600 px-4 text-sm font-black text-white disabled:opacity-60">{busy ? "Deleting…" : "Delete Permanently"}</button></DialogFooter>
+        <DialogFooter className="mt-5 grid grid-cols-2 gap-2"><SecondaryButton disabled={busy} onClick={onClose}>Keep Test</SecondaryButton><button type="button" disabled={busy} onClick={onConfirm} className="min-h-[48px] rounded-full bg-rose-600 px-4 text-sm font-black text-white hover:bg-rose-500 disabled:opacity-60">{busy ? "Deleting…" : "Delete Permanently"}</button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -645,7 +651,7 @@ function FilterSheet({ subjects, subjectId, difficulty, sort, onApply, onClose }
         <div className="mb-4 flex items-center justify-between"><GlassSheetTitle>Filter & Sort</GlassSheetTitle><GlassSheetClose aria-label="Close filters" className="grid h-9 w-9 place-items-center rounded-full"><XIcon className="h-5 w-5 text-white/55" /></GlassSheetClose></div>
         <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/55">Subject</p><div className="mb-4 flex flex-wrap gap-2"><FilterChoice active={localSubject === undefined} label="All Subjects" onClick={() => setLocalSubject(undefined)} />{subjects.map((subject) => <FilterChoice key={subject.id} active={localSubject === subject.id} label={`${subject.icon} ${subject.name}`} onClick={() => setLocalSubject(subject.id)} />)}</div>
         <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/55">Difficulty</p><div className="mb-4 flex flex-wrap gap-2"><FilterChoice active={localDifficulty === undefined} label="Any" onClick={() => setLocalDifficulty(undefined)} />{["easy", "medium", "hard"].map((item) => <FilterChoice key={item} active={localDifficulty === item} label={item} onClick={() => setLocalDifficulty(item)} />)}</div>
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/55">Sort by</p><div className="mb-6 space-y-2">{sorts.map((item) => <button key={item.key} type="button" onClick={() => setLocalSort(item.key)} className={`flex min-h-[44px] w-full items-center rounded-xl border px-3 text-sm font-medium ${localSort === item.key ? "border-indigo-600 bg-indigo-500/15 text-indigo-200" : "border-white/10 text-white/85"}`}>{item.label}</button>)}</div>
+        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/55">Sort by</p><div className="mb-6 space-y-2">{sorts.map((item) => <GlassTile key={item.key} onClick={() => setLocalSort(item.key)} selected={localSort === item.key} className={`dc-tile aspect-auto min-h-[44px] w-full rounded-xl px-3 text-left text-sm font-medium [&>span]:w-full [&>span]:justify-start ${localSort === item.key ? "text-indigo-200" : "text-white/85"}`}>{item.label}</GlassTile>)}</div>
         <PrimaryButton onClick={() => onApply({ subjectId: localSubject, difficulty: localDifficulty, sort: localSort })}>Apply Filters</PrimaryButton>
       </GlassSheetContent>
     </GlassSheet>
@@ -653,5 +659,7 @@ function FilterSheet({ subjects, subjectId, difficulty, sort, onApply, onClose }
 }
 
 function FilterChoice({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`rounded-full border px-3 py-1.5 text-xs font-semibold capitalize ${active ? "border-indigo-600 bg-indigo-600 text-white" : "border-white/10 text-white/85"}`}>{label}</button>;
+  /* Wave 13: filter chips are the pack GlassTile (pill radius); the pack's
+     selected ring marks the active choice. */
+  return <GlassTile onClick={onClick} selected={active} className={`dc-tile aspect-auto rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${active ? "text-white" : "text-white/85"}`}>{label}</GlassTile>;
 }

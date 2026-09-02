@@ -8,6 +8,8 @@
 import { useMemo, useState } from "react";
 import PageShell from "../components/PageShell";
 import { Card, PrimaryButton, SecondaryButton } from "../components/ui";
+import { GlassCard } from "../../components/ui/GlassCard";
+import { GlassButton } from "../../components/ui/glass-button";
 import { BookOpenIcon, CheckIcon, ChevronRightIcon, SparklesIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { parseQuestionText, type ParsedQuestion } from "../engine/bulkParser";
@@ -153,7 +155,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
               <button
                 type="button"
                 onClick={() => navigate("#/revision")}
-                className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-[15px] font-bold text-white transition active:scale-[0.98]"
+                className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[15px] font-bold text-white transition hover:bg-emerald-500 active:scale-[0.98]"
               >
                 Click & submit your score <ChevronRightIcon className="h-5 w-5" />
               </button>
@@ -233,24 +235,25 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                 </div>
                 <div className="space-y-3">
                   {preview.map((q, qi) => (
-                    <div key={q.key} className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+                    <GlassCard key={q.key} contentClassName="p-3">
                       <div className="flex items-start gap-2">
-                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.12] text-[11px] font-bold text-white">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/20 text-[11px] font-bold text-white">
                           {qi + 1}
                         </span>
                         <textarea
                           rows={2}
-                          className="w-full resize-none rounded-lg border border-transparent bg-transparent px-1 text-sm font-medium text-white outline-none focus:border-white/10 focus:bg-white/[0.08]"
+                          className="w-full resize-none rounded-lg border border-transparent bg-transparent px-1 text-sm font-medium text-white outline-none focus:border-white/15"
                           value={q.prompt}
                           onChange={(e) => patch(q.key, { prompt: e.target.value })}
                         />
-                        <button
+                        <GlassButton
                           type="button"
                           onClick={() => removeItem(q.key)}
-                          className="h-7 w-7 shrink-0 rounded-lg text-white/55 active:bg-white/[0.06]"
+                          aria-label="Remove question"
+                          className="shrink-0 [&_.size-12]:size-7 text-white/70"
                         >
                           ✕
-                        </button>
+                        </GlassButton>
                       </div>
                       <div className="mt-2 space-y-1.5">
                         {q.options.map((opt, i) => (
@@ -284,7 +287,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                           Correct answer not detected — tap it above.
                         </p>
                       )}
-                    </div>
+                    </GlassCard>
                   ))}
                 </div>
                 <PrimaryButton className="mt-3" disabled={preview.length === 0 || saving} onClick={() => void createTest()}>

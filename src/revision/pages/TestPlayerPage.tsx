@@ -1,6 +1,7 @@
 import { GlassSurface } from "../../components/ui/glass";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from "react";
 import PageShell from "../components/PageShell";
+import { GlassTile } from "../../components/ui/glass-tile";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { ErrorState, FullScreenLoader, PrimaryButton, ProgressBar, SecondaryButton, Badge } from "../components/ui";
 import { CheckIcon, ChevronRightIcon, XIcon } from "../components/icons";
@@ -239,7 +240,7 @@ export default function TestPlayerPage({
             <div key={question.id} className="animate-fade-in">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge tone={question.difficulty}>{question.difficulty}</Badge>
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[11px] font-semibold text-white/85">
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-semibold text-white/85">
                   {question.subjectIcon} {question.subjectName} · {question.topicName}
                 </span>
               </div>
@@ -249,25 +250,26 @@ export default function TestPlayerPage({
                 {question.options.map((opt, idx) => {
                   const selected = selections[question.id] === idx;
                   return (
-                    <button
+                    /* Wave 13: answer options are the pack GlassTile — the
+                       selected state (ring + tint) comes from the pack; indigo
+                       ink marks the chosen answer. */
+                    <GlassTile
                       key={idx}
-                      type="button"
                       onClick={() => selectOption(idx)}
-                      className={`flex min-h-[56px] w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-[15px] font-medium transition active:scale-[0.99] ${
-                        selected
-                          ? "border-indigo-600 bg-indigo-500/15 text-indigo-200"
-                          : "border-white/10 bg-white/[0.06] text-white/85 active:bg-white/[0.1]"
+                      selected={selected}
+                      className={`dc-tile aspect-auto min-h-[56px] w-full px-4 py-3 text-left text-[15px] font-medium [&>span]:w-full [&>span]:justify-start [&>span]:gap-3 ${
+                        selected ? "text-indigo-200" : "text-white/85"
                       }`}
                     >
                       <span
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          selected ? "bg-indigo-600 text-white" : "bg-white/[0.12] text-white/75"
+                          selected ? "bg-indigo-600 text-white" : "border border-white/20 text-white/75"
                         }`}
                       >
                         {OPTION_LETTERS[idx]}
                       </span>
                       <span className="flex-1">{opt}</span>
-                    </button>
+                    </GlassTile>
                   );
                 })}
               </div>
@@ -283,7 +285,7 @@ export default function TestPlayerPage({
           )}
         </div>
 
-        <div className="dc-glass-toolbar flex gap-3 border-t border-white/10 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+        <div className="flex gap-3 border-t border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
           <SecondaryButton onClick={goPrev} disabled={currentIndex === 0} className="flex-[1]">
             Previous
           </SecondaryButton>
@@ -320,18 +322,17 @@ function ReviewBeforeSubmit({
           {questions.map((q, idx) => {
             const answered = selections[q.id] !== null && selections[q.id] !== undefined;
             return (
-              <button
+              <GlassTile
                 key={q.id}
-                type="button"
                 onClick={() => onJump(idx)}
-                className={`flex h-12 flex-col items-center justify-center rounded-xl border text-sm font-bold transition active:scale-95 ${
+                className={`dc-tile aspect-auto h-12 rounded-xl text-sm font-bold ${
                   answered
-                    ? "border-indigo-400/30 bg-indigo-500/15 text-indigo-200"
-                    : "border-amber-400/30 bg-amber-500/15 text-amber-200"
+                    ? "ring-1 ring-indigo-400/50 text-indigo-200"
+                    : "ring-1 ring-amber-400/50 text-amber-200"
                 }`}
               >
                 {idx + 1}
-              </button>
+              </GlassTile>
             );
           })}
         </div>
@@ -344,7 +345,7 @@ function ReviewBeforeSubmit({
           </span>
         </div>
       </div>
-      <div className="dc-glass-toolbar flex gap-3 border-t border-white/10 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+      <div className="flex gap-3 border-t border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
         <SecondaryButton onClick={onBack} className="flex-1">
           Back
         </SecondaryButton>
@@ -445,7 +446,7 @@ function SubmitConfirmModal({
           paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",
         }}
       >
-        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-white/[0.12] sm:hidden" />
+        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-white/30 sm:hidden" />
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500/15 text-indigo-300">
           <CheckIcon className="h-7 w-7" />
         </div>

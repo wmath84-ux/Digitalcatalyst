@@ -67,13 +67,13 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
           <div data-rev-result-grid className="grid grid-cols-3 gap-3">
             <ResultChip icon={<CheckIcon className="h-5 w-5 text-emerald-300" />} label="Correct" value={data.correctCount} tone="bg-emerald-500/20" />
             <ResultChip icon={<XIcon className="h-5 w-5 text-rose-300" />} label="Wrong" value={data.wrongCount} tone="bg-rose-500/20" />
-            <ResultChip icon={<SparklesIcon className="h-5 w-5 text-white/55" />} label="Skipped" value={data.skippedCount} tone="bg-white/[0.06]" />
+            <ResultChip icon={<SparklesIcon className="h-5 w-5 text-white/55" />} label="Skipped" value={data.skippedCount} tone="border border-white/15" />
           </div>
 
           {data.planDetails && (
             <Card>
               <h2 className="mb-3 text-[15px] font-bold text-white">Saved Test Plan</h2>
-              <div className="space-y-1.5 rounded-2xl bg-white/[0.06] p-3 text-xs text-white/85">
+              <div className="space-y-1.5 rounded-2xl border border-white/10 p-3 text-xs text-white/85">
                 {data.planDetails.classNames.length > 0 && <PlanDetail label="Class" value={displayList(data.planDetails.classNames, "")} />}
                 <PlanDetail label="Subject" value={displayList(data.planDetails.subjectNames, "Subject not labelled")} />
                 <PlanDetail label="Chapter" value={displayList(data.planDetails.chapterNames, "Chapter not labelled")} />
@@ -81,7 +81,7 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 <span className="rounded-full bg-indigo-500/20 px-2.5 py-1 text-[11px] font-bold text-indigo-200">{questionModeLabel(data.planDetails.questionMode)}</span>
-                <span className="rounded-full bg-white/[0.12] px-2.5 py-1 text-[11px] font-bold capitalize text-white/85">{data.planDetails.difficulty} difficulty</span>
+                <span className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-bold capitalize text-white/85">{data.planDetails.difficulty} difficulty</span>
               </div>
             </Card>
           )}
@@ -104,7 +104,7 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
                 .sort((a, b) => a.accuracy - b.accuracy)
                 .map((t) => (
                   <div key={t.topicId} className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-lg">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-lg">
                       {t.subjectIcon}
                     </div>
                     <div className="min-w-0 flex-1">

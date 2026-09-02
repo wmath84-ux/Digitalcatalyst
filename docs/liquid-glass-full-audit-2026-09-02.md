@@ -600,3 +600,25 @@ Kept (pinned): `contentClassName="flex gap-3 p-2.5"`, `aria-label="Remove item"`
 **Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 204 → 192, `bg-white panels` 160 → 137, gradients 21 (=), `native title=` 126 (=), render-sites 571 → 598 · backdrop OK · frozen diff empty.
 
 **Wave 13b next:** Revision pages/components. **13c:** FlowPath + Profile + Settings.
+
+### Phase B · Wave 13b — Revision (2026-09-02)
+
+| Old | New |
+|---|---|
+| `ui.tsx` `Shimmer` `bg-white/[0.12]`, `ProgressBar` track, `Badge` default/skipped plate, `PrimaryButton` `rounded-2xl … disabled:bg-white/[0.12]` | indigo-tint skeleton, outlined track, outlined badge, `rounded-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50` |
+| `AiConfigForm` card plate `bg-white/[0.08]`, eye toggle text button, "Load available models" hand-painted accent/`bg-white/[0.06]` button, `.dc-field rounded-xl`, status plate | outlined card, `GlassButton` size-8, pack capsule (`SecondaryButton`, accent ink only), `.dc-field rounded-full`, outlined status |
+| `ExitGuardContext` leave `rounded-2xl bg-rose-600`; `TestBankLimitGate` track `bg-white/[0.12]`; `RevisionApp` loading `dc-glass rounded-3xl` | `rounded-full` rose; outlined track; pack **`GlassSurface radius={24}`** |
+| `AiSettingsPage` source option `<button … bg-white/[0.08]>` + hand-drawn radio, provider strips `bg-white/[0.06]`, "No AI" `bg-white/[0.12]` | pack **`GlassTile selected`** (`data-ai-source` kept), outlined strips/badge |
+| `BulkImportPage` preview rows `bg-white/[0.06]`, number disc `bg-white/[0.12]`, ✕ button, textarea `focus:bg-white/[0.08]`, emerald CTA `rounded-2xl` | **`GlassCard`** rows, outlined disc, `GlassButton` size-7, plain focus border, `rounded-full` emerald |
+| `DashboardPage` topic icon well, sparkles well `bg-white/20 backdrop-blur`, plan pills/details `bg-white/10` | outlined wells/pills, violet tint |
+| `ProgressPage` empty bar `bg-white/[0.12]`, `TotalCard` `rev-card` div + icon well | outlined bar, pack **`GlassCard`** + outlined well |
+| `RevisionSessionPage` / `TestPlayerPage` answer options `<button border-2 … bg-white/[0.06]>` (+ letter disc `bg-white/[0.12]`), topic chip, footers `dc-glass-toolbar`, jump grid buttons `bg-indigo/amber-500/15`, sheet grabber `bg-white/[0.12]` | pack **`GlassTile selected`** (indigo ink), outlined chip/disc, `--dc-chrome-glass` footers, `GlassTile` + meaning ring, `bg-white/30` grabber |
+| `RevisionSessionResultPage` / `TestResultPage` mastered chip `bg-white/20`, Skipped chip `bg-white/[0.06]`, plan box, difficulty pill, icon well | outlined |
+| `TestReviewPage` card `border-2 bg-emerald/rose-500/15` / `bg-white/[0.06]`, chips, option rows `bg-white/[0.08]`, letter discs, explanation box `bg-white/[0.08]`, Skipped pill `bg-slate-500` | pack card + emerald/rose **ring**, outlined chips/rows/discs/box, outlined pill |
+| `WeakTopicsPage` Stable pill `bg-white/[0.12]`, Revise Now `rounded-xl shadow-md` | outlined, `rounded-full` indigo (no shadow) |
+| `AiGeneratePage` `PickerButton` (`bg-white/[0.08]` / hand-rolled ring), `CheckBox` (`bg-white/[0.08]`), `PickerPanel` `bg-white/[0.08] shadow-lg` + `bg-white/[0.06]` head, provider strip `bg-white/[0.08]`, Configure `bg-white/[0.12]`, difficulty buttons, question-type box/pill, Configure-AI `shadow-md`, dashboard CTA `rounded-2xl` | pack **`GlassTile selected`** (+ indigo ring when picked), pack **`GlassCheckbox`** (inert), **`GlassSurface radius={20}`** panel, **`GlassCard`** strip, `GlassButton` capsule, **`GlassTile selected`**, outlined box/pill, no shadow, `rounded-full` |
+| `RevisionBankPage` error toast `bg-white/[0.12] shadow-xl`, tracks `bg-white/[0.08]`, label pills `bg-white/[0.12]`, result metrics `bg-white/[0.06]`, delete/close buttons, attempts overlay `bg-white/[0.08] shadow-xl` + attempt rows `bg-white/[0.08]`, status tabs `bg-indigo-600` / `bg-white/[0.06]`, sort rows, `FilterChoice` `bg-indigo-600` pills, Delete `rounded-2xl` | **`GlassSurface radius={20}`** (rose ring) + `GlassButton`, outlined tracks/pills/metrics, `GlassButton` size-8/7, **`GlassSurface`** overlay + **`GlassCard role="button"`** rows, **`GlassToggleGroup`** (`dc-segment`), **`GlassTile selected`** rows + pills, `rounded-full` rose. `dc-glass-toolbar` hook kept on the two sticky rows / header / fixed CTA (pinned by `revisionSubPageHeaderSeatContract` + `revisionTestBankHeaderSeatContract`; `index.css` l.5423 already maps it to the chrome-glass tokens inside `[data-revision-app]`). |
+
+**Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 192 → 175, `bg-white panels` 137 → 95, gradients 21 (=), `native title=` 126 (=), render-sites 598 → 623 · backdrop OK · frozen diff empty.
+
+**Wave 13c next:** FlowPath + Profile + Settings.

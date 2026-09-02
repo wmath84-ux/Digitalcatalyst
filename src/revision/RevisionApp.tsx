@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
+import { GlassSurface } from "../components/ui/glass";
 import StoreHeader from "../components/Header";
 import PageTabs, { type PageTabItem } from "../components/ui/PageTabs";
 import { useRegisterTopBarTabs, useTopBarTabsHost } from "../components/TopBarTabsContext";
@@ -341,10 +342,10 @@ export default function RevisionApp() {
 
             {revisionAccessLoading || revisionDataLoading ? (
               <div data-revision-access-loading data-revision-content className="grid min-h-0 flex-1 place-items-center bg-transparent px-4">
-                <div className="dc-glass flex flex-col items-center gap-2 rounded-3xl px-8 py-7 text-white/55">
+                <GlassSurface radius={24} className="text-white/55" contentClassName="flex flex-col items-center gap-2 px-8 py-7">
                   <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/10 border-t-violet-500" />
                   <p className="text-xs font-semibold">{revisionAccessLoading ? "Checking your membership…" : "Syncing your Test Bank…"}</p>
-                </div>
+                </GlassSurface>
               </div>
             ) : (
               <div data-revision-content className="flex min-h-0 flex-1 flex-col overflow-hidden">

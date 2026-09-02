@@ -28,7 +28,7 @@ function TrendBadge({ trend }: { trend: string }) {
     );
   if (trend === "stable")
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.12] px-2 py-0.5 text-[10px] font-bold text-white/85">
+      <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-bold text-white/85">
         <MinusIcon className="h-3 w-3" /> Stable
       </span>
     );
@@ -123,7 +123,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
                         type="button"
                         onClick={() => handleRevise(t.topicId)}
                         disabled={revisingTopicId === t.topicId}
-                        className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 text-sm font-bold text-white shadow-md transition hover:brightness-105 active:scale-[0.98] disabled:opacity-60 disabled:shadow-none"
+                        className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-full bg-indigo-600 text-sm font-bold text-white transition hover:bg-indigo-500 active:scale-[0.98] disabled:opacity-60"
                       >
                         <SparklesIcon className="h-4 w-4" />
                         {revisingTopicId === t.topicId ? "Starting…" : "Revise Now"}

@@ -21,6 +21,7 @@ import {
   type ProviderModel,
 } from "../engine/aiConfig";
 import { Spinner, SecondaryButton } from "./ui";
+import { GlassButton } from "../../components/ui/glass-button";
 
 export type AiConfigFormProps = {
   value: AiConfig;
@@ -175,7 +176,7 @@ export default function AiConfigForm({
   };
 
   return (
-    <div className={`space-y-4 ${card ? "rounded-2xl border border-white/10 bg-white/[0.08] p-4 " : ""}`}>
+    <div className={`space-y-4 ${card ? "rounded-2xl border border-white/10 p-4 " : ""}`}>
       {/* Provider picker */}
       <div>
         {title && <p className="text-[13px] font-bold text-white">{title}</p>}
@@ -227,19 +228,19 @@ export default function AiConfigForm({
         <div className="relative mt-1.5">
           <input
             type={showKey ? "text" : "password"}
-            className="dc-field w-full rounded-xl border px-3 py-2.5 pr-11 text-sm outline-none transition"
+            className="dc-field w-full rounded-full border px-3 py-2.5 pr-11 text-sm outline-none transition"
             placeholder={provider.keyPlaceholder}
             value={value.apiKey}
             autoComplete="off"
             spellCheck={false}
             onChange={(e) => onChange({ ...value, apiKey: e.target.value })}
           />
-          <button
+          <GlassButton
             type="button"
             tabIndex={-1}
             aria-label={showKey ? "Hide API key" : "Show API key"}
             onClick={() => setShowKey((s) => !s)}
-            className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-white/55 hover:text-white/85"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 [&_.size-12]:size-8 [&_svg]:text-white/70"
           >
             {showKey ? (
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -254,7 +255,7 @@ export default function AiConfigForm({
                 <circle cx="12" cy="12" r="3" />
               </svg>
             )}
-          </button>
+          </GlassButton>
         </div>
         <p className="mt-1.5 text-[11px] leading-relaxed text-white/55">
           🔒 Stored only in this browser — sent directly to {provider.name}. Never uploaded to the app's servers.
@@ -277,7 +278,7 @@ export default function AiConfigForm({
         <div>
           <label className="text-xs font-semibold text-white/85">Base URL</label>
           <input
-            className="dc-field mt-1.5 w-full rounded-xl border px-3 py-2.5 font-mono text-xs outline-none transition"
+            className="dc-field mt-1.5 w-full rounded-full border px-3 py-2.5 font-mono text-xs outline-none transition"
             placeholder={provider.id === "custom" ? "https://your-endpoint.example.com/v1" : provider.baseUrl || "https://…"}
             value={value.baseUrl}
             spellCheck={false}
@@ -293,19 +294,17 @@ export default function AiConfigForm({
 
       {/* Actions */}
       <div className="flex gap-2">
-        <button
-          type="button"
+        {/* Wave 13: pack Glass Button capsule; the provider accent stays on
+            the ink only once a key is present (meaning colour). */}
+        <SecondaryButton
+          size="sm"
+          className={`flex-1 [&>span>div]:h-10 [&>span>div]:rounded-xl text-[13px] ${hasKey ? provider.accentText : "text-white/55"}`}
           onClick={() => void refreshModels(false)}
           disabled={!hasKey || !hasCustomEndpoint || loadingModels}
-          className={`flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border text-[13px] font-bold transition active:scale-[0.98] disabled:opacity-50 ${
-            hasKey
-              ? `${provider.accentBg} ${provider.accentText} border-transparent`
-              : "border-white/10 bg-white/[0.06] text-white/55"
-          }`}
         >
           {loadingModels ? <Spinner className="h-4 w-4" /> : "⟳"}
           {loadingModels ? "Loading models…" : "Load available models"}
-        </button>
+        </SecondaryButton>
         <SecondaryButton size="sm" className="flex-1 [&>span>div]:h-10 [&>span>div]:rounded-xl text-[13px]" onClick={() => void runTest()} disabled={!hasKey || !hasCustomEndpoint || testing}>
           {testing ? <Spinner className="h-4 w-4" /> : "✓"}
           {testing ? "Testing…" : "Test connection"}
@@ -365,7 +364,7 @@ export default function AiConfigForm({
               ? "bg-emerald-500/15 text-emerald-200"
               : status.tone === "err"
                 ? "bg-rose-500/15 text-rose-200"
-                : "bg-white/[0.06] text-white/75"
+                : "border border-white/10 text-white/75"
           }`}
         >
           {status.text}
