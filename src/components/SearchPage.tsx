@@ -19,6 +19,9 @@
 // >= 1024 px viewports.
 
 import { GlassSelect, GlassSelectContent, GlassSelectItem, GlassSelectTrigger } from "./ui/glass-select";
+import { GlassInput } from "./ui/glass-input";
+import { GlassToggleGroup, GlassToggleItem } from "./ui/glass-toggle-group";
+import { GlassButton } from "./ui/glass-button";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Search as SearchIcon, X } from "lucide-react";
 import type { Product } from "../data/products";
@@ -202,10 +205,10 @@ export default function SearchPage({
 
         <div
           data-search-bar
-          className="sticky top-[68px] z-20 border-b border-white/10 bg-white/[0.08] px-4 pb-3 pt-3 shadow-[0_4px_18px_-12px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:top-[72px] sm:px-5 sm:pt-3 md:top-[80px] md:px-8 md:pt-4"
+          className="sticky top-[68px] z-20 border-b border-white/10 bg-[var(--dc-chrome-glass)] px-4 pb-3 pt-3 [backdrop-filter:var(--dc-chrome-glass-blur)] sm:top-[72px] sm:px-5 sm:pt-3 md:top-[80px] md:px-8 md:pt-4"
         >
           <div className="flex items-center gap-2">
-            <button
+            <GlassButton
               type="button"
               aria-label="Go back"
               onClick={() => {
@@ -215,52 +218,44 @@ export default function SearchPage({
                   onNavigateToHome();
                 }
               }}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200/70 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 active:scale-95"
+              className="shrink-0 [&_.size-12]:size-10"
             >
               <ArrowLeft className="h-4 w-4" strokeWidth={2.4} />
-            </button>
-            <label
+            </GlassButton>
+            <GlassInput
               data-search-input
-              className="flex flex-1 items-center gap-2 rounded-2xl border border-slate-200/80 bg-white px-3.5 py-2.5 shadow-sm transition focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-200/60"
-            >
-              <SearchIcon className="h-4 w-4 shrink-0 text-white/55" strokeWidth={2.4} />
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                type="search"
-                inputMode="search"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="Search by title, subject, instructor..."
-                aria-label="Search products"
-                className="w-full min-w-0 bg-transparent text-sm font-medium text-white placeholder:text-white/55 focus:outline-none"
-              />
-              {query ? (
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  aria-label="Clear search"
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600 transition active:scale-90"
-                >
-                  <X className="h-3.5 w-3.5" strokeWidth={2.6} />
-                </button>
-              ) : null}
-            </label>
-            <button
+              ref={inputRef}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              type="search"
+              inputMode="search"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="Search by title, subject, instructor..."
+              aria-label="Search products"
+              icon={<SearchIcon className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />}
+              className="min-w-0 flex-1"
+            />
+            {query ? (
+              <GlassButton
+                type="button"
+                onClick={handleClear}
+                aria-label="Clear search"
+                className="shrink-0 [&_.size-12]:size-10"
+              >
+                <X className="h-3.5 w-3.5" strokeWidth={2.6} />
+              </GlassButton>
+            ) : null}
+            <GlassButton
               type="button"
               aria-label="Show filters"
               aria-expanded={showFilters}
               onClick={() => setShowFilters((current) => !current)}
               data-search-filter-toggle
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition active:scale-95 ${
-                showFilters
-                  ? "border-indigo-300 bg-indigo-50 text-indigo-600"
-                  : "border-slate-200/70 bg-white text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900"
-              }`}
+              className={`shrink-0 [&_.size-12]:size-10 ${showFilters ? "text-indigo-300" : ""}`}
             >
               <FilterIcon className="h-4 w-4" />
-            </button>
+            </GlassButton>
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -272,7 +267,7 @@ export default function SearchPage({
                 aria-label="Sort by"
                 className="dc-glass-select h-8 min-w-[9.5rem] text-[11px] font-bold uppercase tracking-wide"
               />
-              <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Sort options">
+              <GlassSelectContent className="dc-glass-select-pop" aria-label="Sort options">
                 {SORT_OPTIONS.map((option) => (
                   <GlassSelectItem key={option.value} value={option.value}>
                     {option.label}
@@ -282,12 +277,12 @@ export default function SearchPage({
             </GlassSelect>
             <span
               data-search-result-count
-              className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500"
+              className="rounded-full bg-white/[0.08] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white/55"
             >
               {loading ? "Loading…" : `${results.length} result${results.length === 1 ? "" : "s"}`}
             </span>
             {queryIsLive ? (
-              <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-600">
+              <span className="rounded-full bg-indigo-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-300">
                 for “{query.trim().length > 18 ? `${query.trim().slice(0, 18)}…` : query.trim()}”
               </span>
             ) : null}
@@ -298,23 +293,18 @@ export default function SearchPage({
               data-search-filters
               className="mt-3 flex gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible"
             >
-              {chips.map((chip) => {
-                const active = chip.id === activeFilter.id;
-                return (
-                  <button
-                    key={chip.id}
-                    type="button"
-                    onClick={() => setActiveFilterId(chip.id)}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                      active
-                        ? "border-indigo-500 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md"
-                        : "border-white/10 bg-white/[0.08] text-white/75 hover:border-indigo-300 hover:text-indigo-600"
-                    }`}
-                  >
+              <GlassToggleGroup
+                className="dc-segment shrink-0"
+                value={activeFilter.id}
+                onValueChange={setActiveFilterId}
+                aria-label="Filter results"
+              >
+                {chips.map((chip) => (
+                  <GlassToggleItem key={chip.id} value={chip.id} className="whitespace-nowrap px-3 py-1.5 text-xs font-semibold">
                     {chip.label}
-                  </button>
-                );
-              })}
+                  </GlassToggleItem>
+                ))}
+              </GlassToggleGroup>
             </div>
           ) : null}
         </div>
@@ -324,7 +314,7 @@ export default function SearchPage({
           className="flex-1 overflow-y-auto px-4 pb-4 pt-3 sm:px-5 md:px-8 md:pb-8"
         >
           {error ? (
-            <div className="mt-6 rounded-3xl border border-rose-200/70 bg-rose-50/70 px-5 py-8 text-center text-sm font-semibold text-rose-700 shadow-lg shadow-rose-200/40 backdrop-blur-xl">
+            <div className="mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200">
               {error}
             </div>
           ) : loading ? (
@@ -335,12 +325,12 @@ export default function SearchPage({
               {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
                 <div
                   key={index}
-                  className="h-64 animate-pulse rounded-2xl border border-white/10 bg-white/[0.08]"
+                  className="h-64 animate-pulse rounded-2xl border border-white/10 bg-white/[0.06]"
                 />
               ))}
             </div>
           ) : showEmpty ? (
-            <div className="mt-10 flex flex-col items-center gap-3 rounded-3xl border border-dashed border-indigo-200/80 bg-white/55 px-6 py-14 text-center shadow-xl backdrop-blur-xl">
+            <div className="mt-10 flex flex-col items-center gap-3 rounded-3xl border border-dashed border-white/10 bg-white/[0.04] px-6 py-14 text-center">
               <BookOpenIcon className="h-8 w-8 text-indigo-400" />
               <p className="text-sm font-bold text-white/85">No results</p>
               <p className="max-w-xs text-xs font-medium text-white/55">
@@ -352,7 +342,7 @@ export default function SearchPage({
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="mt-1 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-1.5 text-xs font-bold text-indigo-600 transition hover:bg-indigo-100"
+                  className="mt-1 rounded-full border border-indigo-400/30 bg-indigo-500/15 px-4 py-1.5 text-xs font-bold text-indigo-300 transition hover:bg-indigo-500/20"
                 >
                   Clear search
                 </button>

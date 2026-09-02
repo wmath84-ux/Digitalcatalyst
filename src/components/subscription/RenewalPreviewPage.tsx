@@ -157,7 +157,7 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
                 <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-white/55">Plan</span>
                 <GlassSelect value={planName} onValueChange={setPlanName}>
                   <GlassSelectTrigger aria-label="Plan" className="dc-glass-select h-9 w-full text-xs font-bold" />
-                  <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Plan options">
+                  <GlassSelectContent className="dc-glass-select-pop" aria-label="Plan options">
                     {["Basic", "Premium", "Pro"].map((name) => (
                       <GlassSelectItem key={name} value={name}>{name}</GlassSelectItem>
                     ))}
@@ -168,7 +168,7 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
                 <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-white/55">Cycle</span>
                 <GlassSelect value={cycle} onValueChange={(v) => setCycle(v as "monthly" | "yearly")}>
                   <GlassSelectTrigger aria-label="Cycle" className="dc-glass-select h-9 w-full text-xs font-bold" />
-                  <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Cycle options">
+                  <GlassSelectContent className="dc-glass-select-pop" aria-label="Cycle options">
                     <GlassSelectItem value="monthly">Monthly</GlassSelectItem>
                     <GlassSelectItem value="yearly">Yearly</GlassSelectItem>
                   </GlassSelectContent>

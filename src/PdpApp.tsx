@@ -30,6 +30,8 @@ import {
   Zap,
 } from "lucide-react";
 import Header from "./components/Header";
+import { GlassSurface } from "./components/ui/glass";
+import { GlassButton } from "./components/ui/glass-button";
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import type { Product } from "./data/products";
 import type { CheckoutSelection } from "./types/commerce";
@@ -510,43 +512,38 @@ function PremiumProductContent({
   const highlights = product.features?.length ? product.features : autoHighlights;
 
   return (
-    <div data-pdp-root className="relative pb-5 text-zinc-900">
-      <div data-glass-ambient className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-24 left-1/4 h-64 w-64 rounded-full bg-gradient-to-br from-violet-300/40 to-transparent blur-3xl" />
-        <div className="absolute top-1/3 -right-24 h-64 w-64 rounded-full bg-gradient-to-bl from-sky-300/35 to-transparent blur-3xl" />
-        <div className="absolute bottom-24 -left-20 h-64 w-64 rounded-full bg-gradient-to-tr from-fuchsia-200/35 to-transparent blur-3xl" />
-      </div>
+    <div data-pdp-root className="relative pb-5 text-white">
 
       <div className="relative">
-        <nav data-pdp-loose className="flex flex-wrap items-center gap-1.5 px-4 pt-4 text-[11px] text-zinc-500">
-          <button onClick={onBack} className="transition hover:text-zinc-900">Store</button>
-          <ChevronRight className="h-3 w-3 text-zinc-300" />
+        <nav data-pdp-loose className="flex flex-wrap items-center gap-1.5 px-4 pt-4 text-[11px] text-white/55">
+          <button onClick={onBack} className="transition hover:text-white">Store</button>
+          <ChevronRight className="h-3 w-3 text-white/40" />
           <span>{product.category}</span>
-          <ChevronRight className="h-3 w-3 text-zinc-300" />
-          <span className="max-w-[190px] truncate font-medium text-zinc-900">{product.title}</span>
+          <ChevronRight className="h-3 w-3 text-white/40" />
+          <span className="max-w-[190px] truncate font-medium text-white">{product.title}</span>
         </nav>
 
         <div className="space-y-6 px-4 pb-8 pt-4">
           <section className="flex flex-col gap-3">
-            <div className="group relative overflow-hidden rounded-3xl border border-white/70 bg-gradient-to-br from-white/70 via-indigo-50/60 to-violet-100/60 shadow-[0_18px_50px_-18px_rgba(79,70,229,0.5)] backdrop-blur-xl">
+            <GlassSurface radius={24} className="group relative overflow-hidden" contentClassName="relative">
               <img src={selectedImage} alt={product.title} className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105" />
               <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[10px] font-medium text-white backdrop-blur-md">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
               </div>
               <div className="absolute right-3 top-3 flex gap-2">
-                <button onClick={() => onToggleFavorite?.(product.id)} aria-label="Save product" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-zinc-700 shadow-md backdrop-blur-md transition active:scale-95">
+                <GlassButton type="button" onClick={() => onToggleFavorite?.(product.id)} aria-label="Save product" className="[&_.size-12]:size-9">
                   <Heart className={`h-4 w-4 ${favorite ? "fill-rose-500 text-rose-500" : ""}`} />
-                </button>
-                <a href={selectedImage} target="_blank" rel="noreferrer" aria-label="Open image" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-zinc-700 shadow-md backdrop-blur-md">
+                </GlassButton>
+                <GlassButton type="button" onClick={() => window.open(selectedImage, "_blank", "noopener,noreferrer")} aria-label="Open image" className="[&_.size-12]:size-9">
                   <Expand className="h-4 w-4" />
-                </a>
+                </GlassButton>
               </div>
               <div className="absolute bottom-3 right-3 rounded-full bg-black/50 px-3 py-1 text-[10px] font-medium text-white backdrop-blur-md">{activeImage + 1} / {gallery.length}</div>
-            </div>
+            </GlassSurface>
             {gallery.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {gallery.map((image, index) => (
-                  <button key={`${image}-${index}`} onClick={() => setActiveImage(index)} className={`h-16 min-w-16 flex-1 overflow-hidden rounded-xl border-2 shadow-sm transition ${activeImage === index ? "border-zinc-900" : "border-transparent opacity-70"}`}>
+                  <button key={`${image}-${index}`} onClick={() => setActiveImage(index)} className={`h-16 min-w-16 flex-1 overflow-hidden rounded-xl border-2 transition ${activeImage === index ? "border-zinc-900" : "border-transparent opacity-70"}`}>
                     <img src={image} alt={`${product.title} ${index + 1}`} className="h-full w-full object-cover" />
                   </button>
                 ))}
@@ -557,93 +554,92 @@ function PremiumProductContent({
           <section className="flex flex-col gap-5">
             <div data-pdp-loose className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">{product.category}</span>
-                {product.tags.slice(0, 2).map((tag) => <span key={tag} className="rounded-full bg-orange-50 px-2.5 py-1 text-[10px] font-semibold text-orange-600">{tag}</span>)}
-                <span className="text-[11px] text-zinc-400">by <span className="font-medium text-zinc-600">{product.instructor}</span></span>
+                <span className="rounded-full bg-indigo-600 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">{product.category}</span>
+                {product.tags.slice(0, 2).map((tag) => <span key={tag} className="rounded-full bg-orange-500/15 px-2.5 py-1 text-[10px] font-semibold text-orange-300">{tag}</span>)}
+                <span className="text-[11px] text-white/55">by <span className="font-medium text-white/85">{product.instructor}</span></span>
               </div>
-              <h1 className="text-2xl font-bold leading-tight tracking-tight text-zinc-900">{product.title}</h1>
-              <p className="text-sm leading-relaxed text-zinc-500">{product.description || `A focused ${product.category.toLowerCase()} resource for practical learning and measurable progress.`}</p>
+              <h1 className="text-2xl font-bold leading-tight tracking-tight text-white">{product.title}</h1>
+              <p className="text-sm leading-relaxed text-white/55">{product.description || `A focused ${product.category.toLowerCase()} resource for practical learning and measurable progress.`}</p>
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <RatingStars rating={product.rating} />
-                <span className="font-semibold text-zinc-800">{product.rating.toFixed(1)}</span>
-                <a href="#product-reviews" className="text-zinc-400 underline underline-offset-2">({product.reviews.toLocaleString("en-IN")} ratings)</a>
+                <span className="font-semibold text-white">{product.rating.toFixed(1)}</span>
+                <a href="#product-reviews" className="text-white/55 underline underline-offset-2">({product.reviews.toLocaleString("en-IN")} ratings)</a>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/70 bg-white/55 p-3 text-[11px] text-zinc-600 shadow-lg backdrop-blur-xl">
+            <GlassSurface radius={16} className="text-white/85" contentClassName="grid grid-cols-2 gap-2 p-3 text-[11px]">
               <Meta icon={Clock} text={product.classLevel} />
               <Meta icon={BarChart3} text={product.subject} />
               <Meta icon={Globe} text={product.category} />
               <Meta icon={BadgeCheck} text={`${modulesCount} modules`} />
-            </div>
+            </GlassSurface>
 
             {isProductOwned ? (
               availablePaidUpdates.length > 0 ? (
-                <section data-pdp-upgrade-box className="relative overflow-hidden rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 shadow-[0_10px_50px_-15px_rgba(99,102,241,0.35)]">
-                  <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-indigo-200/40 blur-2xl" />
+                <GlassSurface data-pdp-upgrade-box radius={24} className="relative overflow-hidden text-white" contentClassName="p-5">
                   <div className="relative flex items-start gap-3">
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white">
                       <Zap size={20} />
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <p className="text-[11px] font-black uppercase tracking-wider text-indigo-600">Course upgrade available</p>
-                        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-indigo-700">Premium content update</span>
+                        <p className="text-[11px] font-black uppercase tracking-wider text-indigo-300">Course upgrade available</p>
+                        <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-indigo-200">Premium content update</span>
                       </div>
-                      <h2 className="mt-0.5 text-base font-black text-zinc-900">{availablePaidUpdates[0].title}</h2>
-                      <p className="mt-1 text-xs leading-5 text-zinc-600">New modules or files were added after your original purchase. Review exactly what is new before upgrading.</p>
+                      <h2 className="mt-0.5 text-base font-black text-white">{availablePaidUpdates[0].title}</h2>
+                      <p className="mt-1 text-xs leading-5 text-white/85">New modules or files were added after your original purchase. Review exactly what is new before upgrading.</p>
                     </div>
                   </div>
-                  <button onClick={handleBuyUpgrade} className="relative mt-4 w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-black text-white shadow-md transition hover:brightness-110 active:scale-[0.99]">
+                  <button onClick={handleBuyUpgrade} className="relative mt-4 w-full rounded-full bg-indigo-600 py-3 text-sm font-black text-white transition hover:bg-indigo-500 active:scale-[0.99]">
                     Buy upgrade · {formatPrice(availablePaidUpdates[0].cashPrice)}
                   </button>
                   {onOpenCourse ? (
-                    <button onClick={() => onOpenCourse(product)} className="relative mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-indigo-200 bg-white/[0.08] py-2.5 text-xs font-bold text-indigo-600 transition hover:bg-indigo-50">
+                    <GlassButton variant="capsule" type="button" onClick={() => onOpenCourse(product)} className="mt-2.5 w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:gap-1.5 [&>span>div]:text-xs [&>span>div]:font-bold">
                       <PlayCircle className="h-4 w-4" /> Open course in library
-                    </button>
+                    </GlassButton>
                   ) : null}
-                </section>
+                </GlassSurface>
               ) : null
             ) : (
-              <div className="relative overflow-hidden rounded-3xl border border-white/70 bg-white/[0.08] p-5 shadow-[0_18px_55px_-18px_rgba(79,70,229,0.45)] backdrop-blur-2xl">
+              <GlassSurface radius={24} className="relative overflow-visible text-white" contentClassName="p-5">
                 <div className="relative flex flex-wrap items-end gap-2">
-                  <span className="text-4xl font-extrabold tracking-tight text-zinc-900">{formatPrice(product.price)}</span>
-                  {product.originalPrice > product.price && <span className="mb-1 text-base text-zinc-400 line-through">{formatPrice(product.originalPrice)}</span>}
-                  {discount > 0 && <span className="mb-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">-{discount}%</span>}
+                  <span className="text-4xl font-extrabold tracking-tight text-white">{formatPrice(product.price)}</span>
+                  {product.originalPrice > product.price && <span className="mb-1 text-base text-white/55 line-through">{formatPrice(product.originalPrice)}</span>}
+                  {discount > 0 && <span className="mb-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-bold text-emerald-200">-{discount}%</span>}
                 </div>
                 <div className="relative mt-5 flex gap-3">
-                  <button disabled={unavailable} onClick={primaryAction} className="group flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 px-4 py-3.5 text-sm font-bold text-white shadow-[0_14px_34px_-10px_rgba(99,102,241,0.85)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:from-amber-200 disabled:via-amber-200 disabled:to-amber-300 disabled:text-amber-900 disabled:shadow-none active:scale-[0.98]">
+                  <button disabled={unavailable} onClick={primaryAction} className="group flex flex-1 items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-amber-500/30 disabled:text-amber-200 active:scale-[0.98]">
                     <Zap className="h-4 w-4 fill-current" /> {unavailable ? "Coming soon" : "Buy Now"}
                   </button>
-                  <button disabled={inCart || unavailable} onClick={() => !unavailable && onAddToCart?.(product.id)} className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/[0.08] px-3 py-3.5 text-sm font-bold text-indigo-700 shadow-lg backdrop-blur-xl transition hover:bg-white/[0.08] disabled:opacity-60">
+                  <GlassButton variant="capsule" type="button" disabled={inCart || unavailable} onClick={() => !unavailable && onAddToCart?.(product.id)} className="flex-1 disabled:opacity-60 [&>span>div]:h-12 [&>span>div]:w-full [&>span>div]:gap-2 [&>span>div]:px-3 [&>span>div]:text-sm [&>span>div]:font-bold">
                     <ShoppingCart className="h-4 w-4" /> {unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to Cart"}
-                  </button>
+                  </GlassButton>
                 </div>
                 <div className="relative mt-3 flex justify-end">
                   <div ref={shareRef} className="relative">
-                    <button type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/65 text-indigo-600 shadow-md backdrop-blur-md transition hover:bg-white/[0.08]"><Share2 className="h-4 w-4" /></button>
-                    <div data-product-share className="absolute right-0 top-12 z-50 w-60 rounded-2xl border border-white/70 bg-white/[0.08] p-3 shadow-2xl shadow-indigo-900/20 backdrop-blur-2xl" hidden={!shareOpen}>
-                      <p className="pb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Share this product</p>
+                    <GlassButton type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="[&_.size-12]:size-10"><Share2 className="h-4 w-4" /></GlassButton>
+                    <GlassSurface data-product-share radius={16} className="absolute right-0 top-12 z-50 w-60 text-white" contentClassName="p-3" hidden={!shareOpen}>
+                      <p className="pb-2 text-[10px] font-semibold uppercase tracking-wide text-white/55">Share this product</p>
                       <div className="space-y-1.5">
-                        <button type="button" onClick={() => void shareNative()} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><Share2 className="h-3.5 w-3.5" /> Share via device</button>
-                        <button type="button" onClick={() => shareTo("whatsapp")} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</button>
-                        <button type="button" onClick={() => shareTo("telegram")} className="flex w-full items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><Send className="h-3.5 w-3.5" /> Telegram</button>
-                        <button type="button" onClick={() => void copyLink()} className="flex w-full items-center justify-between rounded-xl bg-zinc-50 px-3 py-2.5 text-xs font-medium text-zinc-700"><span className="flex items-center gap-2"><Copy className="h-3.5 w-3.5" /> Copy product link</span>{copied && <Check className="h-3.5 w-3.5 text-emerald-500" />}</button>
+                        <button type="button" onClick={() => void shareNative()} className="flex w-full items-center gap-2 rounded-xl bg-white/[0.06] px-3 py-2.5 text-xs font-medium text-white/85"><Share2 className="h-3.5 w-3.5" /> Share via device</button>
+                        <button type="button" onClick={() => shareTo("whatsapp")} className="flex w-full items-center gap-2 rounded-xl bg-white/[0.06] px-3 py-2.5 text-xs font-medium text-white/85"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</button>
+                        <button type="button" onClick={() => shareTo("telegram")} className="flex w-full items-center gap-2 rounded-xl bg-white/[0.06] px-3 py-2.5 text-xs font-medium text-white/85"><Send className="h-3.5 w-3.5" /> Telegram</button>
+                        <button type="button" onClick={() => void copyLink()} className="flex w-full items-center justify-between rounded-xl bg-white/[0.06] px-3 py-2.5 text-xs font-medium text-white/85"><span className="flex items-center gap-2"><Copy className="h-3.5 w-3.5" /> Copy product link</span>{copied && <Check className="h-3.5 w-3.5 text-emerald-500" />}</button>
                       </div>
-                    </div>
+                    </GlassSurface>
                   </div>
                 </div>
-              </div>
+              </GlassSurface>
             )}
 
             {unavailable && (
-              <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 p-4 text-sm text-amber-900 shadow-lg backdrop-blur-xl">
+              <div className="rounded-2xl border border-amber-400/30 bg-amber-500/15 p-4 text-sm text-amber-200 backdrop-blur-xl">
                 This product is published for preview, but checkout is not enabled yet.
               </div>
             )}
 
             {!isProductOwned && !unavailable && canShowCouponInput && (
-              <div className="rounded-2xl border border-white/70 bg-white/[0.08] p-4 shadow-lg backdrop-blur-xl">
+              <GlassSurface radius={16} className="text-white" contentClassName="p-4">
                 <PromoCodeInput
                   kind="coupon"
                   label="Have a coupon? Enter the code below."
@@ -654,14 +650,14 @@ function PremiumProductContent({
                   onApply={handleApplyCoupon}
                   onRemove={handleRemoveCoupon}
                 />
-              </div>
+              </GlassSurface>
             )}
 
           </section>
 
           {!isProductOwned && !unavailable && (
             <section id="pdp-purchase-options" className="scroll-mt-32">
-              <div className="mb-3 px-1"><h2 className="text-lg font-bold text-zinc-900">Select course modules</h2><p className="text-xs text-zinc-500">Same as subscription extras: tick the modules you need, see the price beside each one, then checkout.</p></div>
+              <div className="mb-3 px-1"><h2 className="text-lg font-bold text-white">Select course modules</h2><p className="text-xs text-white/55">Same as subscription extras: tick the modules you need, see the price beside each one, then checkout.</p></div>
               <PdpPurchaseBuilder
                 product={product}
                 isProductOwned={isProductOwned}
@@ -720,11 +716,11 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
   }, []);
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/70 bg-white/[0.08] shadow-[0_16px_45px_-20px_rgba(49,46,129,0.55)] backdrop-blur-xl">
+    <GlassSurface radius={24} className="overflow-hidden text-white" contentClassName="relative">
       <div ref={sentinelRef} aria-hidden className="h-px" />
       <div
         data-pdp-tabbar
-        className={`sticky top-0 z-30 bg-white/95 px-3 pb-2 pt-3 backdrop-blur transition-shadow duration-200 ${tabBarStuck ? "shadow-[0_10px_24px_-12px_rgba(24,24,27,0.28)]" : "rounded-t-[23px]"}`}
+        className={`sticky top-0 z-30 px-3 pb-2 pt-3 backdrop-blur-xl transition-shadow duration-200 ${tabBarStuck ? "bg-[var(--dc-chrome-glass)]" : "rounded-t-[23px]"}`}
       >
         {/* Wave 3 (commerce): the tab strip is the pack's `glass-toggle-group`,
             the same control the store filter row uses — one sliding droplet
@@ -735,7 +731,6 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
         <div className="flex overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <GlassToggleGroup
             className="dc-segment shrink-0"
-            tint={0.5}
             value={tab}
             onValueChange={(next) => onTab(next as DetailTab)}
             aria-label="Product details"
@@ -751,12 +746,12 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
       <div className="p-4 pt-3">
         {tab === "Description" && (
           <div className="space-y-4">
-            <p className="text-sm leading-relaxed text-zinc-600">{product.description || `Complete information for ${product.title}.`}</p>
+            <p className="text-sm leading-relaxed text-white/85">{product.description || `Complete information for ${product.title}.`}</p>
             {highlights.length > 0 && (
-              <div className="rounded-2xl bg-zinc-50 p-4">
-                <p className="mb-3 text-sm font-semibold text-zinc-900">What's included</p>
+              <div className="rounded-2xl bg-white/[0.06] p-4">
+                <p className="mb-3 text-sm font-semibold text-white">What's included</p>
                 <ul className="space-y-2.5">
-                  {highlights.map((highlight) => <li key={highlight} className="flex items-start gap-2 text-sm text-zinc-600"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{highlight}</li>)}
+                  {highlights.map((highlight) => <li key={highlight} className="flex items-start gap-2 text-sm text-white/85"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{highlight}</li>)}
                 </ul>
               </div>
             )}
@@ -768,9 +763,9 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
           ) : (
             <div className="space-y-3" data-pdp-curriculum data-pdp-curriculum-mode={curriculumMode}>
               {curriculumMode === "paid-upgrade" ? (
-                <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50 to-white px-3.5 py-3" data-pdp-curriculum-upgrade-hint>
-                  <p className="text-[11px] font-black uppercase tracking-wider text-amber-700">Paid upgrades</p>
-                  <p className="mt-1 text-xs leading-5 text-amber-900/75">These modules stay locked after the course purchase. Unlock them with a paid upgrade — they look different here so they are never mixed with included lessons.</p>
+                <div className="rounded-2xl border border-amber-400/30 bg-amber-500/15 px-3.5 py-3" data-pdp-curriculum-upgrade-hint>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-amber-200">Paid upgrades</p>
+                  <p className="mt-1 text-xs leading-5 text-amber-200/75">These modules stay locked after the course purchase. Unlock them with a paid upgrade — they look different here so they are never mixed with included lessons.</p>
                 </div>
               ) : null}
               <div className="space-y-2">
@@ -781,9 +776,9 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
             </div>
           )
         )}
-        {tab === "Instructor" && <div className="flex items-start gap-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-zinc-700 via-zinc-500 to-zinc-800 text-lg font-bold text-white shadow-lg">{initials(product.instructor)}</div><div><p className="font-bold text-zinc-900">{product.instructor}</p><p className="text-xs text-zinc-500">Creator of {product.title}</p><p className="mt-2 text-sm leading-relaxed text-zinc-500">Instructor information is synced from this live product's catalog record.</p></div></div>}
+        {tab === "Instructor" && <div className="flex items-start gap-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-bold text-white">{initials(product.instructor)}</div><div><p className="font-bold text-white">{product.instructor}</p><p className="text-xs text-white/55">Creator of {product.title}</p><p className="mt-2 text-sm leading-relaxed text-white/55">Instructor information is synced from this live product's catalog record.</p></div></div>}
       </div>
-    </section>
+    </GlassSurface>
   );
 }
 
@@ -794,42 +789,42 @@ function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, de
   const paid = Boolean(module.paid);
   return (
     <div
-      className={`overflow-hidden rounded-2xl border ${paid ? "border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50/70 to-white shadow-[0_8px_24px_-16px_rgba(180,83,9,0.55)]" : "border-zinc-100"}`}
+      className={`overflow-hidden rounded-2xl border ${paid ? "border-amber-400/30 bg-amber-500/15" : "border-white/10"}`}
       style={{ marginLeft: depth ? depth * 12 : 0 }}
       data-pdp-curriculum-module
       data-module-id={module.id}
       data-paid={paid ? "true" : "false"}
     >
-      <button type="button" onClick={() => onExpandModule(open ? null : module.id)} className={`flex w-full items-center gap-3 px-3 py-3 text-left ${paid ? "bg-amber-100/40" : "bg-zinc-50/60"}`}>
-        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm ${paid ? "bg-gradient-to-br from-amber-500 to-orange-600" : "bg-gradient-to-br from-indigo-600 to-violet-600"}`}>{index + 1}</span>
+      <button type="button" onClick={() => onExpandModule(open ? null : module.id)} className={`flex w-full items-center gap-3 px-3 py-3 text-left ${paid ? "bg-amber-500/20" : "bg-white/[0.06]/60"}`}>
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${paid ? "bg-amber-500" : "bg-indigo-600"}`}>{index + 1}</span>
         <span className="min-w-0 flex-1">
-          <span className={`block truncate text-sm font-semibold ${paid ? "text-amber-950" : "text-zinc-800"}`}>{module.title}</span>
+          <span className={`block truncate text-sm font-semibold ${paid ? "text-amber-950" : "text-white"}`}>{module.title}</span>
           {paid ? (
             <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-800">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-200">
                 <LockKeyhole className="h-2.5 w-2.5" /> Paid upgrade
               </span>
-              {module.paidUpdatePrice ? <span className="text-[10px] font-bold text-amber-700">{module.paidUpdatePrice}</span> : null}
+              {module.paidUpdatePrice ? <span className="text-[10px] font-bold text-amber-200">{module.paidUpdatePrice}</span> : null}
             </span>
           ) : null}
         </span>
-        <span className={`text-[10px] ${paid ? "text-amber-700/70" : "text-zinc-400"}`}>{resources.length} resources{childModules.length ? ` · ${childModules.length} modules` : ""}</span>
+        <span className={`text-[10px] ${paid ? "text-amber-200/70" : "text-white/55"}`}>{resources.length} resources{childModules.length ? ` · ${childModules.length} modules` : ""}</span>
         {paid ? <Crown className="h-3.5 w-3.5 shrink-0 text-amber-500" /> : null}
-        <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""} ${paid ? "text-amber-500" : "text-zinc-400"}`} />
+        <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""} ${paid ? "text-amber-500" : "text-white/55"}`} />
       </button>
       {open && (
         <div className="space-y-2 px-4 py-3">
           {resources.map((resource) => (
-            <div key={resource.id} className={`flex items-center gap-2 text-xs ${paid ? "text-amber-900/70" : "text-zinc-500"}`}>
-              <PlayCircle className={`h-4 w-4 ${paid ? "text-amber-400" : "text-zinc-300"}`} />
+            <div key={resource.id} className={`flex items-center gap-2 text-xs ${paid ? "text-amber-200/70" : "text-white/55"}`}>
+              <PlayCircle className={`h-4 w-4 ${paid ? "text-amber-400" : "text-white/40"}`} />
               <span className="min-w-0 flex-1 truncate">{resource.name}</span>
-              <span className={`uppercase text-[9px] ${paid ? "text-amber-600/70" : "text-zinc-400"}`}>{resource.type}</span>
+              <span className={`uppercase text-[9px] ${paid ? "text-amber-300/70" : "text-white/55"}`}>{resource.type}</span>
             </div>
           ))}
           {childModules.map((child, childIndex) => (
             <CurriculumModuleRow key={child.id || `${module.id}-${childIndex}`} module={child} index={childIndex} expandedModule={expandedModule} onExpandModule={onExpandModule} depth={depth + 1} />
           ))}
-          {resources.length === 0 && childModules.length === 0 ? <p className={`text-xs ${paid ? "text-amber-700/70" : "text-zinc-400"}`}>Module details will appear here when published.</p> : null}
+          {resources.length === 0 && childModules.length === 0 ? <p className={`text-xs ${paid ? "text-amber-200/70" : "text-white/55"}`}>Module details will appear here when published.</p> : null}
         </div>
       )}
     </div>
@@ -859,39 +854,39 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
   const visibleReviews = reviews.slice(0, visibleCount);
   const remaining = Math.max(0, reviews.length - visibleCount);
   return (
-    <section id="product-reviews" className="scroll-mt-36 rounded-3xl border border-white/70 bg-white/[0.08] p-5 shadow-[0_16px_45px_-20px_rgba(49,46,129,0.55)] backdrop-blur-xl">
+    <GlassSurface id="product-reviews" radius={24} className="scroll-mt-36 text-white" contentClassName="p-5">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-bold text-zinc-900">Ratings & Reviews</h2>
-        <button onClick={onToggleComposer} className="rounded-full bg-zinc-900 px-3 py-2 text-[11px] font-semibold text-white">{composerOpen ? "Cancel" : canReview ? "Write a review" : "Review eligibility"}</button>
+        <h2 className="text-lg font-bold text-white">Ratings & Reviews</h2>
+        <button onClick={onToggleComposer} className="rounded-full bg-indigo-600 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-indigo-500">{composerOpen ? "Cancel" : canReview ? "Write a review" : "Review eligibility"}</button>
       </div>
-      <div className="mt-5 flex items-center gap-5 rounded-2xl border border-white/70 bg-gradient-to-br from-indigo-50/80 to-white/50 p-5 shadow-inner shadow-white/60 backdrop-blur-md">
-        <div className="text-center"><span className="text-4xl font-extrabold text-zinc-900">{product.rating.toFixed(1)}</span><RatingStars rating={product.rating} className="mt-1" /></div>
-        <div className="h-14 w-px bg-zinc-200" />
-        <div><p className="text-sm font-semibold text-zinc-700">{product.reviews.toLocaleString("en-IN")} rating{product.reviews === 1 ? "" : "s"}</p><p className="mt-1 text-xs text-zinc-400">Live aggregate from the product catalog</p></div>
+      <div className="mt-5 flex items-center gap-5 rounded-2xl border border-white/10 bg-white/[0.06] p-5">
+        <div className="text-center"><span className="text-4xl font-extrabold text-white">{product.rating.toFixed(1)}</span><RatingStars rating={product.rating} className="mt-1" /></div>
+        <div className="h-14 w-px bg-white/[0.12]" />
+        <div><p className="text-sm font-semibold text-white/85">{product.reviews.toLocaleString("en-IN")} rating{product.reviews === 1 ? "" : "s"}</p><p className="mt-1 text-xs text-white/55">Live aggregate from the product catalog</p></div>
       </div>
       {composerOpen && (
-        <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-4">
           {canReview ? (
             <>
-              <p className="text-xs font-semibold text-zinc-700">Your rating</p>
-              <div className="mt-2 flex gap-1">{[1, 2, 3, 4, 5].map((value) => <button key={value} onClick={() => onRating(value)} aria-label={`${value} stars`}><Star className={`h-6 w-6 ${value <= rating ? "fill-amber-400 text-amber-400" : "text-zinc-300"}`} /></button>)}</div>
-              <textarea value={comment} onChange={(event) => onComment(event.target.value.slice(0, 2000))} rows={4} placeholder="Share your experience with this product…" className="mt-3 w-full resize-none rounded-xl border border-zinc-200 bg-white p-3 text-sm outline-none focus:border-zinc-400" />
-              <button disabled={submitting} onClick={onSubmit} className="mt-3 w-full rounded-xl bg-zinc-900 py-3 text-sm font-bold text-white disabled:opacity-60">{submitting ? "Submitting…" : "Submit for review"}</button>
+              <p className="text-xs font-semibold text-white/85">Your rating</p>
+              <div className="mt-2 flex gap-1">{[1, 2, 3, 4, 5].map((value) => <button key={value} onClick={() => onRating(value)} aria-label={`${value} stars`}><Star className={`h-6 w-6 ${value <= rating ? "fill-amber-400 text-amber-400" : "text-white/40"}`} /></button>)}</div>
+              <textarea value={comment} onChange={(event) => onComment(event.target.value.slice(0, 2000))} rows={4} placeholder="Share your experience with this product…" className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-white/[0.08] p-3 text-sm outline-none focus:border-zinc-400" />
+              <button disabled={submitting} onClick={onSubmit} className="mt-3 w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white disabled:opacity-60">{submitting ? "Submitting…" : "Submit for review"}</button>
             </>
-          ) : <p className="text-xs leading-relaxed text-zinc-500">Sign in to submit a genuine learner review. It is saved online in Firestore.</p>}
+          ) : <p className="text-xs leading-relaxed text-white/55">Sign in to submit a genuine learner review. It is saved online in Firestore.</p>}
         </div>
       )}
-      {notice && <p className="mt-3 rounded-xl bg-indigo-50 p-3 text-xs font-medium text-indigo-700">{notice}</p>}
+      {notice && <p className="mt-3 rounded-xl bg-indigo-500/15 p-3 text-xs font-medium text-indigo-200">{notice}</p>}
       {reviews.length > 0 ? (
         <div className="mt-4 space-y-3">
           {visibleReviews.map((review) => (
-            <article key={review.id} className="rounded-2xl border border-white/70 bg-white/55 p-4 backdrop-blur-md">
+            <article key={review.id} className="rounded-2xl border border-white/10 bg-white/[0.08] p-4 backdrop-blur-md">
               <div className="flex items-center gap-3">
                 <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>{review.initials}</div>
-                       <div className="min-w-0 flex-1"><p className="flex items-center gap-1 text-sm font-semibold text-zinc-800"><span className="truncate">{review.name}</span>{review.verifiedPurchase && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}</p><p className="text-[11px] text-zinc-400">{review.date}</p></div>
+                       <div className="min-w-0 flex-1"><p className="flex items-center gap-1 text-sm font-semibold text-white"><span className="truncate">{review.name}</span>{review.verifiedPurchase && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}</p><p className="text-[11px] text-white/55">{review.date}</p></div>
                 <RatingStars rating={review.rating} />
               </div>
-              <p className="mt-3 text-sm leading-relaxed text-zinc-600">“{review.comment}”</p>
+              <p className="mt-3 text-sm leading-relaxed text-white/85">“{review.comment}”</p>
             </article>
           ))}
           {remaining > 0 ? (
@@ -899,32 +894,32 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
               type="button"
               data-load-more-reviews
               onClick={() => setVisibleCount((count) => count + REVIEW_PAGE_SIZE)}
-              className="w-full rounded-2xl border border-zinc-200 bg-white py-3 text-sm font-bold text-zinc-800 shadow-sm"
+              className="w-full rounded-2xl border border-white/10 bg-white/[0.08] py-3 text-sm font-bold text-white"
             >
               Load more · {Math.min(REVIEW_PAGE_SIZE, remaining)} of {remaining} remaining
             </button>
           ) : null}
         </div>
-      ) : <p className="mt-4 text-center text-xs text-zinc-400">Published written reviews will appear here when available.</p>}
-    </section>
+      ) : <p className="mt-4 text-center text-xs text-white/55">Published written reviews will appear here when available.</p>}
+    </GlassSurface>
   );
 }
 
 function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavigate?: (product: Product) => void }) {
   return (
-    <section className="rounded-3xl border border-white/70 bg-white/[0.08] p-5 shadow-[0_16px_45px_-20px_rgba(49,46,129,0.55)] backdrop-blur-xl">
-      <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-bold text-zinc-900">You may also like</h2><p className="text-[10px] text-zinc-400">Matched from the live catalog</p></div><ArrowUpRight className="h-4 w-4 text-zinc-400" /></div>
-      <div className="space-y-3">{products.map((item) => <button key={item.id} onClick={() => onNavigate?.(item)} className="group flex w-full overflow-hidden rounded-2xl border border-white/70 bg-white/[0.08] text-left shadow-md backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-white/[0.08] hover:shadow-xl"><img src={item.image} alt={item.title} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-zinc-800">{item.title}</span><span className="flex items-center gap-1 text-xs text-zinc-500"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-zinc-900">{formatPrice(item.price)}</span></span></button>)}</div>
-    </section>
+    <GlassSurface radius={24} className="text-white" contentClassName="p-5">
+      <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-bold text-white">You may also like</h2><p className="text-[10px] text-white/55">Matched from the live catalog</p></div><ArrowUpRight className="h-4 w-4 text-white/55" /></div>
+      <div className="space-y-3">{products.map((item) => <button key={item.id} onClick={() => onNavigate?.(item)} className="group flex w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] text-left backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-white/[0.08]"><img src={item.image} alt={item.title} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-white">{item.title}</span><span className="flex items-center gap-1 text-xs text-white/55"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-white">{formatPrice(item.price)}</span></span></button>)}</div>
+    </GlassSurface>
   );
 }
 
 function RatingStars({ rating, className = "" }: { rating: number; className?: string }) {
-  return <span className={`flex items-center gap-0.5 ${className}`}>{Array.from({ length: 5 }).map((_, index) => <Star key={index} className={`h-3.5 w-3.5 ${rating >= index + 0.5 ? "fill-amber-400 text-amber-400" : "text-zinc-300"}`} />)}</span>;
+  return <span className={`flex items-center gap-0.5 ${className}`}>{Array.from({ length: 5 }).map((_, index) => <Star key={index} className={`h-3.5 w-3.5 ${rating >= index + 0.5 ? "fill-amber-400 text-amber-400" : "text-white/40"}`} />)}</span>;
 }
 
-function Meta({ icon: Icon, text }: { icon: typeof Clock; text: string }) { return <div className="flex min-w-0 items-center gap-2"><Icon className="h-4 w-4 shrink-0 text-zinc-400" /><span className="truncate">{text}</span></div>; }
-function EmptyDetail({ text }: { text: string }) { return <div className="flex flex-col items-center rounded-2xl bg-zinc-50 py-8 text-center"><PackageOpen className="h-7 w-7 text-zinc-300" /><p className="mt-2 px-5 text-xs text-zinc-400">{text}</p></div>; }
+function Meta({ icon: Icon, text }: { icon: typeof Clock; text: string }) { return <div className="flex min-w-0 items-center gap-2"><Icon className="h-4 w-4 shrink-0 text-white/55" /><span className="truncate">{text}</span></div>; }
+function EmptyDetail({ text }: { text: string }) { return <div className="flex flex-col items-center rounded-2xl bg-white/[0.06] py-8 text-center"><PackageOpen className="h-7 w-7 text-white/40" /><p className="mt-2 px-5 text-xs text-white/55">{text}</p></div>; }
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "DC"; }
 
 const asCurriculumModule = (raw: unknown, product: Product, paidModuleIds: Set<string>): CurriculumModule | null => {
@@ -975,4 +970,4 @@ const curriculumContainsId = (modules: CurriculumModule[], id: string): boolean 
 
 export const countCurriculumResources = (modules: CurriculumModule[]): number =>
   modules.reduce((sum, module) => sum + (module.resources?.length || 0) + countCurriculumResources(module.modules || []), 0);
-function MissingProduct({ onBack }: { onBack: () => void }) { return <div className="grid min-h-[70vh] place-items-center bg-slate-50 px-6 text-center"><div><ShoppingBag className="mx-auto h-12 w-12 text-white/40" /><h1 className="mt-4 text-2xl font-black text-white">Product not found</h1><p className="mt-2 text-sm text-white/55">It may have been hidden or removed from the live catalog.</p><button onClick={onBack} className="mt-6 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white">Back to store</button></div></div>; }
+function MissingProduct({ onBack }: { onBack: () => void }) { return <div className="grid min-h-[70vh] place-items-center px-6 text-center"><div><ShoppingBag className="mx-auto h-12 w-12 text-white/40" /><h1 className="mt-4 text-2xl font-black text-white">Product not found</h1><p className="mt-2 text-sm text-white/55">It may have been hidden or removed from the live catalog.</p><button onClick={onBack} className="mt-6 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-black text-white transition hover:bg-indigo-500">Back to store</button></div></div>; }

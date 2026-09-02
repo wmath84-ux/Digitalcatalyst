@@ -341,7 +341,7 @@ export default function AiConfigForm({
             }
             className="dc-glass-select mt-1.5 h-11 w-full text-sm font-medium"
           />
-          <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Model options">
+          <GlassSelectContent className="dc-glass-select-pop" aria-label="Model options">
             {allModels.map((m) => (
               <GlassSelectItem key={m.id} value={m.id}>
                 {m.name}

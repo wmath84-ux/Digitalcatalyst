@@ -217,7 +217,7 @@ export function BulkRevisionCreator({ open, onClose, uid, onBulkCreate }: BulkRe
                         aria-label="Difficulty"
                         className="dc-glass-select col-span-3 h-9 w-full text-sm"
                       />
-                      <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Difficulty options">
+                      <GlassSelectContent className="dc-glass-select-pop" aria-label="Difficulty options">
                         {Object.entries(DIFFICULTY_PRESETS).map(([k, v]) => (
                           <GlassSelectItem key={k} value={k}>{v.label}</GlassSelectItem>
                         ))}

@@ -25,7 +25,6 @@ export default function FavoriteCard({
 
   return (
     <GlassCard
-      tint={0.5}
       contentClassName="p-0"
       className="group relative flex flex-col overflow-hidden"
     >
@@ -44,7 +43,7 @@ export default function FavoriteCard({
         </button>
         <button
           onClick={() => onRemove(product.id)}
-          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-white/[0.08] shadow-lg shadow-slate-900/10 backdrop-blur-md transition active:scale-90"
+          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] backdrop-blur-md transition active:scale-90"
           aria-label="Remove from favorites"
         >
           <Heart size={16} className="fill-rose-500 text-rose-500" />
@@ -75,7 +74,7 @@ export default function FavoriteCard({
           <span className="text-[11px] text-white/55 line-through">
             {formatINR(product.originalPrice)}
           </span>
-          <span className="text-[11px] font-semibold text-emerald-600">
+          <span className="text-[11px] font-semibold text-emerald-300">
             {discount}% off
           </span>
         </div>

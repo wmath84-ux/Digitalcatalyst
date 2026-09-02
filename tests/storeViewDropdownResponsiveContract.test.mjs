@@ -45,8 +45,10 @@ test("the three option buttons keep their fixed tap-target size", () => {
     /className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl transition/,
     "each option button must be flex-none with a fixed 36px box",
   );
-  // The popover is a horizontal row — options must never stack.
-  assert.match(storePage, /flex w-max gap-1 rounded-2xl/);
+  // The popover is a horizontal row — options must never stack. Phase A6:
+  // the row is the pack's GlassSurface (radius 16 = rounded-2xl), whose
+  // content div carries the flex row.
+  assert.match(storePage, /contentClassName="flex w-max gap-1 p-1\.5"/);
 });
 
 test("the unlayered CSS rule pins the same guarantees", () => {
@@ -63,5 +65,5 @@ test("the unlayered CSS rule pins the same guarantees", () => {
 test("the popover still opens below the toggle, right-aligned to it", () => {
   // The anchor geometry is untouched — the popover drops below the button
   // (top-full) and stays right-aligned (right-0), just at its natural size.
-  assert.match(storePage, /className="absolute right-0 top-full z-30 mt-1\.5 flex w-max gap-1 rounded-2xl/);
+  assert.match(storePage, /className="absolute right-0 top-full z-30 mt-1\.5 flex w-max text-white"\s*\n\s*radius=\{16\}/);
 });

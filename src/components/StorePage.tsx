@@ -5,6 +5,9 @@ import Hero from "./Hero";
 import SearchBar from "./SearchBar";
 import FilterChips from "./FilterChips";
 import ProductCard from "./ProductCard";
+import { GlassCard } from "./ui/GlassCard";
+import { GlassSurface } from "./ui/glass";
+import { GlassButton } from "./ui/glass-button";
 import { BookOpenIcon } from "./icons";
 import { useStoreFilters } from "../hooks/useStoreFilters";
 import {
@@ -100,32 +103,31 @@ function ProductCardList({
   const unavailable = product.availableForSale === false && !purchased;
 
   return (
-    <div
+    <GlassCard
       onClick={() => onView(product)}
-      className="group relative flex overflow-hidden rounded-3xl border border-white/70 bg-white/[0.08] shadow-[0_14px_40px_-20px_rgba(49,46,129,0.65)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-indigo-200/80 hover:bg-white/[0.08] hover:shadow-[0_22px_55px_-18px_rgba(79,70,229,0.55)]"
+      contentClassName="flex p-0"
+      className="group relative flex overflow-hidden transition duration-300 hover:-translate-y-1"
     >
-      {/* Glass sheen */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/70 via-white/10 to-transparent opacity-70" />
       {/* Image — left side */}
-      <div className="relative h-auto w-36 shrink-0 overflow-hidden bg-slate-100 sm:w-44">
+      <div className="relative h-auto w-36 shrink-0 overflow-hidden bg-white/[0.06] sm:w-44">
         <img src={product.image} alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         <div className="absolute left-2 top-2 flex gap-1">
           {purchased && (
-            <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white shadow">
+            <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white">
               Purchased
             </span>
           )}
         </div>
-        <button
+        <GlassButton
           type="button"
           aria-label="Toggle wishlist"
           onClick={(e) => { e.stopPropagation(); onToggleWishlist(product.id); }}
-          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-white/60 bg-white/[0.08] text-white/75 shadow-lg shadow-slate-900/10 backdrop-blur-md transition hover:scale-105 hover:bg-white/[0.08] active:scale-95"
+          className="absolute right-2 top-2 z-20 [&_.size-12]:size-7"
         >
           <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 ${wishlisted ? "fill-rose-500 text-rose-500" : "fill-none text-white/75"}`} strokeWidth={2} stroke="currentColor">
             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
           </svg>
-        </button>
+        </GlassButton>
       </div>
 
       {/* Content — right side */}
@@ -143,7 +145,7 @@ function ProductCardList({
           )}
           <span className="text-base font-extrabold text-white">₹{product.price}</span>
           {discount > 0 && (
-            <span className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-600">-{discount}%</span>
+            <span className="rounded-md bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-300">-{discount}%</span>
           )}
         </div>
         <button
@@ -152,16 +154,16 @@ function ProductCardList({
           onClick={(e) => { e.stopPropagation(); if (!unavailable) onAddToCart(product.id); }}
           className={`mt-1 flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-xs font-extrabold uppercase tracking-wide transition ${
             unavailable
-              ? "cursor-default border border-amber-200/70 bg-amber-100/70 text-amber-800 backdrop-blur"
+              ? "cursor-default border border-amber-400/30 bg-amber-500/20 text-amber-200 backdrop-blur"
               : purchased || inCart
-                ? "cursor-default border border-emerald-200/70 bg-emerald-100/70 text-emerald-700 backdrop-blur"
-                : "dc-cta-brand text-white shadow-lg shadow-indigo-500/30 hover:brightness-110 active:scale-[0.98]"
+                ? "cursor-default border border-emerald-400/30 bg-emerald-500/20 text-emerald-200 backdrop-blur"
+                : "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-[0.98]"
           }`}
         >
           {purchased ? "Purchased" : unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to Cart"}
         </button>
       </div>
-    </div>
+    </GlassCard>
   );
 }
 
@@ -246,7 +248,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
 
       <div className="space-y-4">
         <SearchBar value={search} onChange={setSearch} sort={sort} onSortChange={setSort} />
-        <div data-store-filter-bar className="sticky top-0 z-20 border-b border-white/60 bg-white/55 py-2.5 shadow-[0_10px_30px_-18px_rgba(49,46,129,0.55)] backdrop-blur-2xl backdrop-saturate-150">
+        <div data-store-filter-bar className="sticky top-0 z-20 border-b border-white/10 bg-[var(--dc-chrome-glass)] py-2.5 [backdrop-filter:var(--dc-chrome-glass-blur)]">
           <div className="relative flex items-center">
             <div className="flex-1 overflow-hidden pr-14">
               <FilterChips filters={chips} activeId={activeFilter.id} onSelect={setActiveFilterId} />
@@ -254,23 +256,22 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
 
             {/* View mode toggle — positioned at the right edge */}
             <div ref={dropdownRef} className="absolute right-4 top-1/2 z-10 -translate-y-1/2">
-              <button
+              <GlassButton
                 type="button"
                 aria-label="Change view layout"
+                aria-expanded={viewDropdownOpen}
                 onClick={() => setViewDropdownOpen((o) => !o)}
-                className={`flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm backdrop-blur-md transition ${
-                  viewDropdownOpen
-                    ? "border-indigo-400/70 bg-indigo-500/15 text-indigo-700"
-                    : "border-white/70 bg-white/[0.08] text-white/75 hover:bg-white/[0.08] hover:text-white"
-                }`}
+                className={`[&_.size-12]:size-9 ${viewDropdownOpen ? "text-indigo-200" : ""}`}
               >
                 <LayoutIcon className="h-[18px] w-[18px]" />
-              </button>
+              </GlassButton>
 
               {viewDropdownOpen && (
-                <div
+                <GlassSurface
                   data-store-view-options
-                  className="absolute right-0 top-full z-30 mt-1.5 flex w-max gap-1 rounded-2xl border border-white/70 bg-white/[0.08] p-1.5 shadow-2xl shadow-indigo-900/20 backdrop-blur-2xl"
+                  className="absolute right-0 top-full z-30 mt-1.5 flex w-max text-white"
+                  radius={16}
+                  contentClassName="flex w-max gap-1 p-1.5"
                 >
                   {VIEW_OPTIONS.map(({ mode, label, Icon }) => (
                     <button
@@ -282,14 +283,14 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
                       aria-pressed={viewMode === mode}
                       className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl transition ${
                         viewMode === mode
-                          ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md"
+                          ? "bg-indigo-600 text-white"
                           : "text-white/55 hover:bg-white/[0.08] hover:text-white/85"
                       }`}
                     >
                       <Icon className="h-4 w-4" />
                     </button>
                   ))}
-                </div>
+                </GlassSurface>
               )}
             </div>
           </div>
@@ -297,11 +298,11 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
       </div>
 
       {error ? (
-        <div className="mx-4 mt-6 rounded-3xl border border-rose-200/70 bg-rose-50/70 px-5 py-8 text-center text-sm font-semibold text-rose-700 shadow-lg shadow-rose-200/40 backdrop-blur-xl">{error}</div>
+        <div className="mx-4 mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200">{error}</div>
       ) : loading ? (
-        <div className="mx-4 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">{[0, 1, 2, 3].map((item) => <div key={item} className="h-72 animate-pulse rounded-3xl border border-white/60 bg-white/50 shadow-lg backdrop-blur-xl" />)}</div>
+        <div className="mx-4 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">{[0, 1, 2, 3].map((item) => <div key={item} className="h-72 animate-pulse rounded-3xl border border-white/10 bg-white/[0.06]" />)}</div>
       ) : filtered.length === 0 ? (
-        <div className="mx-4 mt-6 flex flex-col items-center gap-2 rounded-3xl border border-dashed border-indigo-200/80 bg-white/55 py-14 text-center shadow-xl backdrop-blur-xl">
+        <div className="mx-4 mt-6 flex flex-col items-center gap-2 rounded-3xl border border-dashed border-white/10 bg-white/[0.04] py-14 text-center">
           <BookOpenIcon className="h-8 w-8 text-indigo-400" />
           <p className="text-sm font-bold text-white/85">No resources match your search</p>
           <p className="text-xs font-medium text-white/55">Try a different keyword or clear filters</p>

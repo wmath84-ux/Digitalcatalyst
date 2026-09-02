@@ -30,7 +30,7 @@ export default function FavoritesPage({
           subtitle="Tap the heart icon on any course to save it here for later. Start exploring to build your wishlist!"
           actionLabel="Explore Store"
           onAction={() => onNavigate("home")}
-          accent="from-rose-500 to-pink-600"
+          accent="bg-rose-500"
         />
       </div>
     );
@@ -64,7 +64,7 @@ export default function FavoritesPage({
 
 function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="dc-glass-toolbar flex items-center justify-between border-b border-white/60 px-4 py-4">
+    <div className="dc-glass-toolbar flex items-center justify-between border-b border-white/10 px-4 py-4">
       <div>
         <h1 className="text-lg font-extrabold text-white">{title}</h1>
         <p className="text-[11px] font-medium text-white/55">{subtitle}</p>

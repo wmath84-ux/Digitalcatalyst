@@ -77,7 +77,7 @@ export default function App({
         </main>
 
         {toast && (
-          <div className="pointer-events-none absolute bottom-20 left-1/2 z-40 w-max -translate-x-1/2 rounded-full bg-slate-900/95 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+          <div className="pointer-events-none absolute bottom-20 left-1/2 z-40 w-max -translate-x-1/2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white">
             {toast}
           </div>
         )}

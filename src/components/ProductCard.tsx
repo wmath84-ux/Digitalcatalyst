@@ -30,12 +30,11 @@ export default function ProductCard({
 
   return (
     /* Wave 3 (commerce): the card is `glass-card`, so the material, the rim and
-       the sheen come from the pack — the hand-painted `bg-white/60`, the
-       `shadow-[…]` and the separate fake "Glass sheen" layer are gone
+       the sheen come from the pack — the hand-painted `bg-white/[0.08]`, the
+       `` and the separate fake "Glass sheen" layer are gone
        (`GlassSurface` paints a real specular sheen, which is what that div was
        imitating). `contentClassName="p-0"` keeps the media edge-to-edge. */
     <GlassCard
-      tint={0.55}
       onClick={() => onView(product)}
       contentClassName="p-0"
       className="group relative flex h-full flex-col overflow-hidden transition duration-300 hover:-translate-y-1"
@@ -45,22 +44,22 @@ export default function ProductCard({
 
         <div className="absolute left-2 top-2 z-20 flex gap-1.5">
           {purchased && (
-            <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow">
+            <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white">
               Purchased
             </span>
           )}
           {unavailable && (
-            <span className="rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow">
+            <span className="rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white">
               Coming soon
             </span>
           )}
           {!purchased && !unavailable && product.tags.includes("SALE") && (
-            <span className="rounded-full bg-teal-400 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow">
+            <span className="rounded-full bg-teal-400 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white">
               Sale
             </span>
           )}
           {product.tags.includes("BOARD") && (
-            <span className="rounded-md bg-white px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-rose-600 shadow">
+            <span className="rounded-md bg-white/[0.08] px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-rose-300">
               Board
             </span>
           )}
@@ -78,10 +77,7 @@ export default function ProductCard({
           {/* the same action disc the header and the desktop top bar use, so a
               save control reads identically everywhere in the app */}
           <GlassSurface
-            tint={wishlisted ? 0.72 : 0.62}
-            tintColor={wishlisted ? "254,226,226" : "255,255,255"}
-            blur={12}
-            saturation={1.35}
+            tint={0.4}
             radius={999}
             aria-hidden="true"
             className="pointer-events-none absolute inset-0"
@@ -109,7 +105,7 @@ export default function ProductCard({
           )}
           <span className="text-lg font-extrabold text-white">₹{product.price}</span>
           {discount > 0 && (
-            <span className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-bold text-rose-600">
+            <span className="rounded-md bg-rose-500/20 px-1.5 py-0.5 text-[11px] font-bold text-rose-300">
               -{discount}%
             </span>
           )}
@@ -123,8 +119,8 @@ export default function ProductCard({
           <div
             className={`mt-1 flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-extrabold uppercase tracking-wide ${
               unavailable
-                ? "cursor-default border border-amber-200/70 bg-amber-100/70 text-amber-800"
-                : "cursor-default border border-emerald-200/70 bg-emerald-100/70 text-emerald-700"
+                ? "cursor-default border border-amber-400/30 bg-amber-500/20 text-amber-200"
+                : "cursor-default border border-emerald-400/30 bg-emerald-500/20 text-emerald-200"
             }`}
           >
             <span>{purchased ? "Purchased" : unavailable ? "Not for sale" : "In Cart"}</span>

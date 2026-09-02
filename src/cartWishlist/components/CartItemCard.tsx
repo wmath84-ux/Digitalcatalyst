@@ -14,14 +14,13 @@ export default function CartItemCard({ product, onRemove, onOpen }: CartItemCard
     /* Wave 3 (commerce): the row is a `glass-card` — the pack's surface already
        paints the specular sheen this file was faking with its own gradient div. */
     <GlassCard
-      tint={0.5}
       contentClassName="flex gap-3 p-2.5"
       className="group relative overflow-hidden"
     >
       <button
         type="button"
         onClick={() => onOpen?.(product.id)}
-        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] bg-slate-100 ring-1 ring-white/60"
+        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] bg-white/[0.08] ring-1 ring-white/10"
         aria-label={`View ${product.title}`}
       >
         <img
@@ -53,7 +52,7 @@ export default function CartItemCard({ product, onRemove, onOpen }: CartItemCard
           </div>
           <button
             onClick={() => onRemove(product.id)}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-rose-50/85 text-rose-500 shadow-md shadow-rose-100/60 backdrop-blur transition active:scale-90"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-rose-500/15 text-rose-500 backdrop-blur transition active:scale-90"
             aria-label="Remove item"
           >
             <Trash2 size={15} />

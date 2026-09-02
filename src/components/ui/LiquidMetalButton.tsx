@@ -30,17 +30,16 @@ export interface LiquidMetalButtonProps extends React.ButtonHTMLAttributes<HTMLB
   shape?: "capsule" | "icon";
 }
 
-// tone → (surface tint colour, label colour). Silver is the neutral/secondary
-// action, blue/dark the primary, danger the destructive confirm.
-// Tint is deliberately high for the coloured tones: a lens over a *light* page
-// is a pale wash, so a white label would drop under contrast if the fill were
-// as thin as upstream's 0.4 default. Silver stays a light frosted neutral.
-const TONES: Record<LiquidMetalTone, { rgb: string; tint: number; label: string }> = {
-  silver: { rgb: "226,232,240", tint: 0.72, label: "text-slate-700" },
-  blue: { rgb: "59,130,246", tint: 0.62, label: "text-white" },
-  dark: { rgb: "15,23,42", tint: 0.7, label: "text-white" },
-  danger: { rgb: "225,29,72", tint: 0.62, label: "text-white" },
-  primary: { rgb: "79,70,229", tint: 0.66, label: "text-white" },
+// tone → material. Phase A6 (owner: use the pack exactly, no invented tints):
+//   silver  → the pack's own GlassButton material (tint 0.4, scheme-aware
+//             `60,62,68` / `255,255,255`, white ink) — no app colour, no lift.
+//   coloured tones → a solid brand fill (indigo / blue / rose / slate), white ink.
+const TONES: Record<LiquidMetalTone, { fill?: string; label: string }> = {
+  silver: { label: "text-white" },
+  blue: { fill: "bg-blue-600", label: "text-white" },
+  dark: { fill: "bg-slate-900", label: "text-white" },
+  danger: { fill: "bg-rose-600", label: "text-white" },
+  primary: { fill: "bg-indigo-600", label: "text-white" },
 };
 
 const LiquidMetalButton = forwardRef<HTMLButtonElement, LiquidMetalButtonProps>(({
@@ -94,15 +93,12 @@ const LiquidMetalButton = forwardRef<HTMLButtonElement, LiquidMetalButtonProps>(
       <span ref={scaleEl} className="block h-full w-full origin-center" style={{ scale: "1" }}>
         <GlassSurface
           handleRef={surface}
-          tint={tint ?? spec.tint}
-          tintColor={spec.rgb}
-          blur={16}
-          saturation={1.5}
+          tint={tint ?? 0.4}
           radius={isIcon ? 999 : 14}
           /* height lives here (like upstream GlassButton) so the flex-1 caller
              only decides the width; `min-w-0` lets long labels truncate instead
              of pushing the neighbour out of a `flex gap-3` row. */
-          className={isIcon ? "size-11" : "h-11 w-full min-w-0"}
+          className={`${isIcon ? "size-11" : "h-11 w-full min-w-0"} ${spec.fill ?? ""}`.trim()}
           contentClassName={`flex h-full w-full items-center justify-center gap-2 px-5 text-sm font-semibold ${spec.label}`}
         >
           {children}

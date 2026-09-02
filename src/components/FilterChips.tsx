@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { CheckIcon, SlidersIcon, XIcon } from "./icons";
 import type { StoreFilter } from "../data/storeFilters";
 import { GlassSurface } from "./ui/glass";
+import { GlassButton } from "./ui/glass-button";
 import { GlassToggleGroup, GlassToggleItem } from "./ui/glass-toggle-group";
 import { LiquidMetalButton } from "./ui/LiquidMetalButton";
 
@@ -41,28 +42,19 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
           stays glued to its chip while scrolling. `dc-segment` is the shared
           light-theme recipe in src/glass.css (the PDP tab strip uses it too). */}
       <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <button
+        <GlassButton
+          variant="capsule"
           type="button"
           onClick={() => setShowFilters((prev) => !prev)}
           aria-expanded={showFilters}
-          className="relative flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold text-white/85 transition"
+          className={`shrink-0 [&>span>div]:h-10 [&>span>div]:gap-1.5 [&>span>div]:px-3.5 [&>span>div]:text-sm [&>span>div]:font-semibold ${showFilters ? "text-indigo-200" : ""}`}
         >
-          <GlassSurface
-            tint={showFilters ? 0.72 : 0.55}
-            tintColor={showFilters ? "224,231,255" : "255,255,255"}
-            blur={12}
-            saturation={1.35}
-            radius={999}
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0"
-          />
-          <SlidersIcon className="relative h-4 w-4" />
-          <span className="relative">Filters</span>
-        </button>
+          <SlidersIcon className="h-4 w-4" />
+          <span>Filters</span>
+        </GlassButton>
 
         <GlassToggleGroup
           className="dc-segment shrink-0"
-          tint={0.5}
           value={activeId}
           onValueChange={onSelect}
           aria-label="Filter the catalogue"
@@ -83,9 +75,6 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
 
       {showFilters && (
         <GlassSurface
-          tint={0.85}
-          blur={18}
-          saturation={1.5}
           radius={24}
           className="absolute left-4 right-4 top-full z-30 mt-2 overflow-hidden text-sm text-white/85"
           contentClassName="p-4"
@@ -95,14 +84,14 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
               <p className="font-extrabold text-white">Refine your search</p>
               <p className="mt-0.5 text-xs text-white/75">Pick a filter to narrow the catalog.</p>
             </div>
-            <button
+            <GlassButton
               type="button"
               aria-label="Close filters"
               onClick={() => setShowFilters(false)}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900/5 text-white/55 transition hover:bg-slate-900/10 hover:text-white/85"
+              className="shrink-0 [&_.size-12]:size-8"
             >
               <XIcon className="h-4 w-4" />
-            </button>
+            </GlassButton>
           </div>
 
           <div className="mt-3 max-h-64 space-y-3 overflow-y-auto pr-1">
@@ -111,7 +100,7 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
             ) : (
               grouped.map(([group, items]) => (
                 <div key={group}>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">{group}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-indigo-300">{group}</p>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {items.map((filter) => {
                       const isActive = activeId === filter.id;
@@ -122,8 +111,8 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
                           onClick={() => { onSelect(filter.id); setShowFilters(false); }}
                           className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                             isActive
-                              ? "border-transparent bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
-                              : "border-white/10 bg-white/[0.08] text-white/85 hover:border-indigo-300 hover:text-indigo-700"
+                              ? "border-transparent bg-indigo-600 text-white"
+                              : "border-white/10 bg-white/[0.08] text-white/85 hover:border-indigo-400/50 hover:text-indigo-200"
                           }`}
                         >
                           {filter.label}

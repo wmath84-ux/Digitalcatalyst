@@ -37,6 +37,8 @@ import type {
 } from "@/types/commerce";
 import type { Product } from "@/data/products";
 import ModuleSelectTrigger from "./ModuleSelectTrigger";
+import { GlassSurface } from "../ui/glass";
+import { GlassButton } from "../ui/glass-button";
 import ModuleSelectModal from "./ModuleSelectModal";
 import {
   buildCheckoutSelection,
@@ -425,18 +427,17 @@ export default function PdpPurchaseBuilder({
 /** Compact opt-in chip for the non-module extras (resources / paid updates). */
 function ExtraModeChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <button
+    <GlassButton
+      variant="capsule"
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`inline-flex items-center justify-center rounded-2xl border px-3 py-2 text-xs font-black transition sm:text-sm ${
-        active
-          ? "border-violet-600 bg-violet-600 text-white shadow-md"
-          : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:text-violet-700"
+      className={`[&>span>div]:h-10 [&>span>div]:px-3 [&>span>div]:text-xs [&>span>div]:font-black sm:[&>span>div]:text-sm ${
+        active ? "[&>span>div]:bg-violet-600" : ""
       }`}
     >
       {children}
-    </button>
+    </GlassButton>
   );
 }
 
@@ -458,13 +459,13 @@ function FullCoursePanel({
       ? Math.round(((fullCourse.regularPrice - fullCourse.effectivePrice) / fullCourse.regularPrice) * 100)
       : 0;
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <GlassSurface radius={24} className="text-white" contentClassName="p-4 sm:p-5">
       {isProductOwned ? (
-        <div className="flex items-start gap-2 rounded-2xl bg-emerald-50 p-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
+        <div className="flex items-start gap-2 rounded-2xl bg-emerald-500/15 p-3 text-sm text-emerald-200 ring-1 ring-emerald-400/30">
           <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <p className="font-black">You already own this course</p>
-            <p className="mt-1 text-xs text-emerald-700/80">Open it from your library to start learning.</p>
+            <p className="mt-1 text-xs text-emerald-200/80">Open it from your library to start learning.</p>
           </div>
         </div>
       ) : null}
@@ -478,7 +479,7 @@ function FullCoursePanel({
           </span>
         ) : null}
         {!isProductOwned && discount > 0 ? (
-          <span className="mb-1 rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">
+          <span className="mb-1 rounded-lg bg-emerald-500/20 px-2 py-1 text-xs font-black text-emerald-200">
             SAVE {discount}%
           </span>
         ) : null}
@@ -491,7 +492,7 @@ function FullCoursePanel({
         <ul className="mt-2 space-y-1.5 text-xs text-white/75 sm:text-sm">
           {modules.slice(0, 6).map((m) => (
             <li key={m.id} className="flex items-center gap-2">
-              <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+              <Check className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
               <span className="truncate">{m.title}</span>
             </li>
           ))}
@@ -500,7 +501,7 @@ function FullCoursePanel({
           ) : null}
         </ul>
       </div>
-    </div>
+    </GlassSurface>
   );
 }
 
@@ -519,9 +520,9 @@ function ResourceSelector({
 }) {
   if (resources.length === 0) {
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
+      <GlassSurface radius={24} className="text-white/55" contentClassName="p-4 text-sm">
         No resources are sold individually for this course.
-      </div>
+      </GlassSurface>
     );
   }
   return (
@@ -541,8 +542,8 @@ function ResourceSelector({
             key={r.id}
             data-pdp-resource
             data-resource-id={r.id}
-            className={`flex items-start gap-3 rounded-2xl border bg-white p-3 shadow-sm transition sm:p-4 ${
-              isSelected ? "border-violet-500 ring-2 ring-violet-200" : "border-white/10"
+            className={`flex items-start gap-3 rounded-2xl border bg-white/[0.08] p-3 transition sm:p-4 ${
+              isSelected ? "border-violet-500 ring-2 ring-violet-400/30" : "border-white/10"
             }`}
           >
             <button
@@ -556,22 +557,22 @@ function ResourceSelector({
                   ? "cursor-not-allowed border-emerald-500 bg-emerald-500 text-white"
                   : isSelected
                     ? "border-violet-600 bg-violet-600 text-white"
-                    : "border-white/10 bg-white"
+                    : "border-white/10 bg-white/[0.08]"
               }`}
             >
               {isOwned ? <Unlock size={12} /> : isSelected ? <Check size={14} /> : null}
             </button>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-slate-50 text-slate-500">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-white/[0.06] text-white/55">
                   <TypeIcon size={12} />
                 </span>
                 <h3 className="min-w-0 truncate text-sm font-black text-white">{r.name}</h3>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
+                <span className="rounded-full bg-white/[0.08] px-2 py-0.5 text-[10px] font-bold uppercase text-white/85">
                   {RESOURCE_TYPE_LABEL[r.type] || r.type}
                 </span>
                 {isOwned ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-200">
                     <CircleCheck size={10} /> Owned
                   </span>
                 ) : null}
@@ -611,9 +612,9 @@ function PaidUpdateSelector({
 }) {
   if (updates.length === 0) {
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
+      <GlassSurface radius={24} className="text-white/55" contentClassName="p-4 text-sm">
         No paid updates are available for this course right now.
-      </div>
+      </GlassSurface>
     );
   }
   return (
@@ -628,13 +629,13 @@ function PaidUpdateSelector({
             data-pdp-update
             data-update-id={u.id}
             onClick={() => onSelect(isSelected ? null : u.id)}
-            className={`flex w-full items-start gap-3 rounded-2xl border bg-white p-3 text-left shadow-sm transition sm:p-4 ${
-              isSelected ? "border-violet-500 ring-2 ring-violet-200" : "border-white/10 hover:border-violet-300"
+            className={`flex w-full items-start gap-3 rounded-2xl border bg-white/[0.08] p-3 text-left transition sm:p-4 ${
+              isSelected ? "border-violet-500 ring-2 ring-violet-400/30" : "border-white/10 hover:border-violet-400/50"
             }`}
           >
             <span
               className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 ${
-                isSelected ? "border-violet-600 bg-violet-600 text-white" : "border-white/10 bg-white"
+                isSelected ? "border-violet-600 bg-violet-600 text-white" : "border-white/10 bg-white/[0.08]"
               }`}
             >
               {isSelected ? <Check size={14} /> : null}
@@ -644,7 +645,7 @@ function PaidUpdateSelector({
               {u.description ? (
                 <p className="mt-1 line-clamp-2 text-xs text-white/55 sm:text-sm">{u.description}</p>
               ) : null}
-              <p className="mt-1 text-[11px] font-semibold text-violet-600">Includes {u.includedModuleIds.length} module{u.includedModuleIds.length === 1 ? "" : "s"} and {u.includedResourceIds.length} file{u.includedResourceIds.length === 1 ? "" : "s"}</p>
+              <p className="mt-1 text-[11px] font-semibold text-violet-300">Includes {u.includedModuleIds.length} module{u.includedModuleIds.length === 1 ? "" : "s"} and {u.includedResourceIds.length} file{u.includedResourceIds.length === 1 ? "" : "s"}</p>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs">
                 <span className="font-black text-white">{formatPrice(u.cashPrice)}</span>
                 {u.publishDate ? (
@@ -671,7 +672,7 @@ function SummaryPanel({
       ? `Full course is ${formatPriceValue(-diff) || ""} cheaper`
       : "Same price as full course";
   return (
-    <section data-pdp-summary className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <GlassSurface data-pdp-summary radius={24} className="text-white" contentClassName="p-4 sm:p-5">
       <div className="flex items-center justify-between">
         <p className="text-xs font-black uppercase tracking-wider text-white/55">Order summary</p>
         <p className="text-[10px] font-bold uppercase tracking-wider text-white/55">{summary.selectedCount} item{summary.selectedCount === 1 ? "" : "s"}</p>
@@ -681,7 +682,7 @@ function SummaryPanel({
           <ul className="space-y-1 text-xs text-white/75 sm:text-sm">
             {summary.lineItems.filter((l) => !l.alreadyOwned).map((line) => (
               <li key={line.id} className="flex items-center gap-2">
-                <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-violet-100 text-violet-700">
+                <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-violet-500/20 text-violet-200">
                   <Check size={10} />
                 </span>
                 <span className="truncate">{line.title}</span>
@@ -711,7 +712,7 @@ function SummaryPanel({
           <span className="font-medium text-white/85">{formatPriceValue(summary.regularSubtotal) || "₹0"}</span>
         </div>
         {summary.saleSavings > 0 ? (
-          <div className="flex items-center justify-between text-emerald-600">
+          <div className="flex items-center justify-between text-emerald-300">
             <span className="inline-flex items-center gap-1">
               <BadgePercent size={12} /> Sale savings
             </span>
@@ -724,14 +725,14 @@ function SummaryPanel({
         </div>
       </div>
       {summary.fullCourse.effectivePrice > 0 ? (
-        <div className="mt-3 flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500 sm:text-sm">
+        <div className="mt-3 flex items-center justify-between rounded-2xl bg-white/[0.06] px-3 py-2 text-xs text-white/55 sm:text-sm">
           <span className="inline-flex items-center gap-1">
             <ShoppingBag size={12} /> Full course: {formatPriceValue(summary.fullCourse.effectivePrice)}
           </span>
           <span className="font-semibold text-white/85">{diffLabel}</span>
         </div>
       ) : null}
-    </section>
+    </GlassSurface>
   );
 }
 
@@ -809,18 +810,18 @@ function CtaBar({
   return (
     <div className="space-y-2" data-pdp-cta>
       {previewNotice && !validation.ok ? (
-        <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 sm:text-sm">
+        <div className="flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-500/15 p-3 text-xs text-amber-200 sm:text-sm">
           <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="flex-1">
             <p className="font-black">{previewNotice}</p>
           </div>
-          <button type="button" onClick={onClearNotice} className="text-amber-700 underline">
+          <button type="button" onClick={onClearNotice} className="text-amber-200 underline">
             Dismiss
           </button>
         </div>
       ) : null}
       {previewNotice && validation.ok ? (
-        <div className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 sm:text-sm">
+        <div className="flex items-start gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 p-3 text-xs text-emerald-200 sm:text-sm">
           <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" />
           <p className="font-semibold">{previewNotice}</p>
         </div>
@@ -829,7 +830,7 @@ function CtaBar({
         type="button"
         onClick={onPreview}
         disabled={disabled}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-4 text-base font-black text-white shadow-lg transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 py-4 text-base font-black text-white transition hover:bg-indigo-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <Star className="hidden sm:block" size={16} />
         {icon ? (() => {

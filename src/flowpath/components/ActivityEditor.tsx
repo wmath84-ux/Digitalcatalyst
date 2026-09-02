@@ -100,7 +100,7 @@ function FieldSelect({
         aria-label={label}
         className={`dc-glass-select mt-1 h-9 w-full text-sm ${className ?? ""}`}
       />
-      <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label={label}>
+      <GlassSelectContent className="dc-glass-select-pop" aria-label={label}>
         {options.map((option) => (
           <GlassSelectItem key={option.value} value={option.value}>
             {option.label}

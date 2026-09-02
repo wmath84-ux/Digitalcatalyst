@@ -963,6 +963,11 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
 [data-store-view-options] > button {
   flex: 0 0 auto;
 }
+/* Phase A6: the options row is a pack GlassSurface, so the buttons sit one
+   level down (inside its content div). Same no-shrink guarantee. */
+[data-store-view-options] > div > button {
+  flex: 0 0 auto;
+}
 
 /* ── Revision "test submit" confirm dialog ─────────────────────────────
    The dialog must never grow past the visible viewport on any tablet or

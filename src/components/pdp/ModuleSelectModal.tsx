@@ -4,6 +4,9 @@ import { BadgeCheck, Check, Search, Sparkles, X } from "lucide-react";
 import type { CanonicalCourseModule } from "../../types/commerce";
 import { getModuleEffectivePrice } from "../../../utils/pdpSelection";
 import { lockBodyScroll, unlockBodyScroll } from "../ui/overlayBounds";
+import { GlassSurface } from "../ui/glass";
+import { GlassButton } from "../ui/glass-button";
+import { GlassInput } from "../ui/glass-input";
 
 const formatPrice = (value: number | null) => {
   if (value === null || !Number.isFinite(value)) return "Included";
@@ -81,10 +84,13 @@ export default function ModuleSelectModal({
       data-pdp-module-select-overlay
       onClick={onClose}
     >
-      <div
+      <GlassSurface
         onClick={(event) => event.stopPropagation()}
         data-pdp-module-select-modal
-        className="flex min-h-0 w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-3xl"
+        radius={0}
+        style={{ borderRadius: "var(--glass-sheet-radius)" }}
+        className="flex min-h-0 w-full max-w-md flex-col overflow-hidden text-white"
+        contentClassName="flex min-h-0 flex-1 flex-col"
       >
         <div className="flex justify-center pb-1 pt-3 sm:hidden">
           <div className="h-1.5 w-12 rounded-full bg-white/[0.12]" />
@@ -96,24 +102,25 @@ export default function ModuleSelectModal({
               {selectedIds.length} of {modules.length} selected · {formatPrice(selectedTotal)}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500" aria-label="Close">
+          <GlassButton type="button" onClick={onClose} className="[&_.size-12]:size-9" aria-label="Close">
             <X className="h-4 w-4" />
-          </button>
+          </GlassButton>
         </div>
 
         {modules.length > 0 ? <div className="px-5 pb-3">
-          <div className="flex items-center gap-2 rounded-2xl bg-slate-100 px-3.5 py-2.5">
-            <Search className="h-4 w-4 shrink-0 text-white/55" />
-            <input
+          <div className="flex items-center gap-2">
+            <GlassInput
+              type="search"
+              className="w-full"
+              icon={<Search className="h-4 w-4" aria-hidden="true" />}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search modules..."
-              className="w-full bg-transparent text-sm text-white/85 placeholder:text-white/55 focus:outline-none"
             />
             {query ? (
-              <button type="button" onClick={() => setQuery("")} className="text-white/55" aria-label="Clear search">
+              <GlassButton type="button" onClick={() => setQuery("")} className="shrink-0 [&_.size-12]:size-9" aria-label="Clear search">
                 <X className="h-4 w-4" />
-              </button>
+              </GlassButton>
             ) : null}
           </div>
         </div> : null}
@@ -126,17 +133,17 @@ export default function ModuleSelectModal({
           className="mx-5 mb-2 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3"
         >
           <div className="flex items-center gap-2.5">
-            <span className={`flex h-5 w-5 items-center justify-center rounded-md border-2 ${allFilteredSelected ? "border-violet-600 bg-violet-600" : "border-white/10 bg-white"}`}>
+            <span className={`flex h-5 w-5 items-center justify-center rounded-md border-2 ${allFilteredSelected ? "border-violet-600 bg-violet-600" : "border-white/10 bg-white/[0.08]"}`}>
               {allFilteredSelected ? <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} /> : null}
             </span>
             <span className="text-sm font-bold text-white/85">Select all {query ? "(filtered)" : ""}</span>
           </div>
-          <span className="text-xs font-medium text-violet-600">{filtered.length} modules</span>
+          <span className="text-xs font-medium text-violet-300">{filtered.length} modules</span>
         </button> : null}
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4">
           {modules.length === 0 ? (
-            <div data-pdp-no-modules className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-16 text-center">
+            <div data-pdp-no-modules className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/[0.06] px-6 py-16 text-center">
               <PackageOpenIcon />
               <p className="mt-3 text-base font-black text-white">No modules</p>
               <p className="mt-1 text-sm leading-relaxed text-white/55">This course has no modules yet. Check back when the instructor publishes them.</p>
@@ -163,10 +170,10 @@ export default function ModuleSelectModal({
               onClick={() => toggleModule(module.id)}
                       data-pdp-module-pick={module.id}
                       className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors ${
-                        owned ? "border-emerald-100 bg-emerald-50/70 opacity-80" : checked ? "border-violet-200 bg-violet-50" : "border-white/10 bg-white"
+                        owned ? "border-emerald-400/30 bg-emerald-500/15 opacity-80" : checked ? "border-violet-400/30 bg-violet-500/15" : "border-white/10 bg-white/[0.08]"
                       }`}
                     >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-300">
                         <LayoutIcon />
                       </span>
                       <div className="min-w-0 flex-1">
@@ -176,9 +183,9 @@ export default function ModuleSelectModal({
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <span className={`text-sm font-extrabold ${owned ? "text-emerald-700" : "text-white/85"}`}>{owned ? "Purchased" : `+${formatPrice(price)}`}</span>
+                        <span className={`text-sm font-extrabold ${owned ? "text-emerald-200" : "text-white/85"}`}>{owned ? "Purchased" : `+${formatPrice(price)}`}</span>
                         <span aria-label={owned ? "Purchased" : undefined} className={`flex h-5 w-5 items-center justify-center rounded-md border-2 ${
-                          owned ? "border-emerald-500 bg-emerald-500 text-white" : checked ? "border-violet-600 bg-violet-600 text-white" : "border-white/10 bg-white"
+                          owned ? "border-emerald-500 bg-emerald-500 text-white" : checked ? "border-violet-600 bg-violet-600 text-white" : "border-white/10 bg-white/[0.08]"
                         }`}>
                           {owned ? <BadgeCheck className="h-3.5 w-3.5" strokeWidth={2.5} /> : checked ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
                         </span>
@@ -191,16 +198,16 @@ export default function ModuleSelectModal({
           )}
         </div>
 
-        <div className="border-t border-slate-100 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div className="border-t border-white/10 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <button
             type="button"
             onClick={onClose}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3.5 text-sm font-bold text-white"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-indigo-600 py-3.5 text-sm font-bold text-white transition hover:bg-indigo-500"
           >
             Done · {selectedIds.length} modules · {formatPrice(selectedTotal)}
           </button>
         </div>
-      </div>
+      </GlassSurface>
     </div>
   );
 

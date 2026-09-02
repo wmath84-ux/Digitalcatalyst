@@ -517,29 +517,12 @@ html[data-glass="on"] :where([data-glass-ambient]) {
 }
 
 /* ── Wave 3 · SearchPage + PDP over the Black Ice backdrop ───────────────────
- * SearchPage's canvas (its own `data-search-frame`) goes fully transparent: its
- * search bar (bg-white/85 + backdrop-blur-xl) and every result card already sit
- * on frost, so the backdrop shows behind them and their dark ink stays put.
- *
- * The PDP root paints `text-zinc-900` straight onto its wash and has ~36 dark
- * text sites that are not all carded, so hiding the wash outright would strand
- * dark-on-dark text. Instead it gets a translucent white *veil*: the backdrop
- * glows through, the dark ink stays readable, and `?glass=off` keeps the old
- * opaque wash. A full re-ink to light-on-dark is a separate, visually-QA'd pass. */
+ * Phase A6 (2026-09-02): SearchPage and the PDP now paint no wash of their own
+ * and their ink is white at the source (pack GlassSurface / GlassCard sections,
+ * `text-white` root), so the former veil + `data-pdp-loose` re-ink rules are
+ * gone. Only the transparent search frame remains as a guard. */
 html[data-glass="on"] :where([data-search-frame]) {
   background-color: transparent;
-}
-html[data-glass="on"] :where([data-pdp-root]) {
-  background-image: none;            /* drop the wash -> the backdrop shows */
-  color: rgb(var(--dc-paper-on-ink) / 0.92);  /* base ink goes light */
-}
-/* Loose text that sits straight on the backdrop (breadcrumb, title, description,
-   meta) is re-inked light. Badges/pills are protected by :not([class*="bg-"])
-   so a `bg-zinc-900 text-white` chip or `bg-orange-50 text-orange-600` tag keeps
-   its own colours. Text inside the frosted cards keeps its explicit dark ink
-   (a direct utility beats this inherited rule), so cards stay dark-on-frost. */
-html[data-glass="on"] :where([data-pdp-loose]) :where(h1, h2, p, span, a, button):not([class*="bg-"]) {
-  color: rgb(var(--dc-paper-on-ink) / 0.92);
 }
 
 /* ── Wave 4 · My Day desktop canvas over the backdrop ────────────────────────

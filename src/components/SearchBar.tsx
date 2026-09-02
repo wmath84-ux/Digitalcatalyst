@@ -30,7 +30,7 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
   return (
     <div className="space-y-2 px-4">
       {/* Wave 2 (global chrome): the capsule used to be an ad-hoc
-          `bg-white/60 border-white/70 shadow-lg backdrop-blur-xl` div. It is
+          `bg-white/[0.08] border-white/10 backdrop-blur-xl` div. It is
           now a `GlassSurface` lens, i.e. the same refraction layer the header
           discs and the desktop top bar use, so the store's search reads as one
           material with the rest of the chrome. The interaction contract is
@@ -51,10 +51,7 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
         data-store-search-trigger
       >
         <GlassSurface
-          tint={0.62}
-          tintColor="255,255,255"
-          blur={18}
-          saturation={1.4}
+          tint={0.4}
           radius={18}
           className="pointer-events-none absolute inset-0 transition duration-200 group-hover:brightness-[1.02]"
         />
@@ -77,12 +74,12 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
                 e.stopPropagation();
                 onChange("");
               }}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white/55 transition hover:bg-white/[0.12] hover:text-white/85"
             >
               <XIcon className="h-4 w-4" />
             </button>
           ) : (
-            <span className="hidden shrink-0 rounded-md bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 sm:inline">
+            <span className="hidden shrink-0 rounded-md bg-white/[0.12] px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/85 sm:inline">
               Tap to search
             </span>
           )}
@@ -100,7 +97,7 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
             aria-label="Sort products"
             className="dc-glass-select h-9 w-auto min-w-[11rem] text-xs font-bold"
           />
-          <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Sort options">
+          <GlassSelectContent className="dc-glass-select-pop" aria-label="Sort options">
             {SORT_OPTIONS.map((option) => (
               <GlassSelectItem key={option} value={option}>
                 {option}
