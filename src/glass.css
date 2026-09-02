@@ -626,3 +626,17 @@ html[data-glass="on"] :where([data-pdp-loose]) :where(h1, h2, p, span, a, button
 html[data-glass="on"] [class*="bg-gradient-to"]:not([data-banner-id]):not(button):not(a) {
   background-image: none;
 }
+
+/* ── Part 2 · white ink on the backdrop (owner direction) ────────────────────
+ * After Part 1 the page background is the dark backdrop, so the base text ink
+ * goes light. Dark ink is preserved inside any white / frosted card
+ * ([class*="bg-white"] covers bg-white, bg-white/60, bg-white/80 …) so card
+ * text stays readable on its frost. A child with its own explicit text-* utility
+ * still wins, so already-coloured text is untouched. Admin is data-glass="off",
+ * so it is unaffected. ?glass=off restores the dark ink. */
+html[data-glass="on"] body {
+  color: rgb(var(--dc-paper-on-ink) / 0.92);
+}
+html[data-glass="on"] [class*="bg-white"] {
+  color: rgb(15 23 42); /* slate-900 — dark ink inside white/frosted cards */
+}
