@@ -216,3 +216,33 @@ test("the pack's own light/dark material is user-switchable via the docs' GlassS
   const engine = read("src/components/ui/glass.tsx");
   assert.match(engine, /if \(root\.classList\.contains\("light"\)\) return false;/);
 });
+
+// ---------------------------------------------------------------------------
+// Wave A3 — Profile + Settings + Subscriber experience
+// ---------------------------------------------------------------------------
+test("A3: profile + settings paint no opaque white / gradient surface; cards, actions and dialogs are pack components", () => {
+  for (const file of [
+    "src/profile/App.tsx",
+    "src/profile/ProfileLayout.tsx",
+    "src/profile/ProfilePreview.tsx",
+    "src/profile/SubscriberExperiencePage.tsx",
+    "src/settings/SettingsPage.tsx",
+  ]) {
+    const src = read(file);
+    const opaque = src.match(/\b(bg-white|bg-slate-(?:50|100|900)|bg-gray-(?:50|100))(?=["'`\s])/g) || [];
+    assert.equal(opaque.length, 0, `${file}: ${opaque.length} opaque white/light fill(s) left`);
+    assert.doesNotMatch(src, /bg-gradient-to-/, `${file}: gradient wash left`);
+    assert.doesNotMatch(src, /backdrop-blur/, `${file}: hand-rolled frost left`);
+  }
+  const layout = read("src/profile/ProfileLayout.tsx");
+  assert.match(layout, /<GlassCard data-profile-hero/);
+  assert.match(layout, /<GlassCard data-profile-membership-tier/);
+  assert.match(layout, /<GlassCard data-renewal-card/);
+  assert.match(layout, /<GlassButton variant="capsule"/);
+  assert.match(layout, /<DialogContent/);
+  assert.match(layout, /<GlassSwitch/);
+  assert.doesNotMatch(layout, /^const CARD =/m, "the hand-painted CARD token is gone");
+  const settings = read("src/settings/SettingsPage.tsx");
+  assert.match(settings, /<GlassCard>/);
+  assert.match(settings, /<GlassButton variant="capsule"/);
+});

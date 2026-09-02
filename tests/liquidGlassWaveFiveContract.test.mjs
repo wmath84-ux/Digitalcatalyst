@@ -80,9 +80,10 @@ test("profile + settings preference rows use the registry switch", () => {
 test("profile dialogs and fields take the pack surface and field ink", () => {
   const s = read("src/profile/ProfileLayout.tsx");
   const modal = s.slice(s.indexOf("export function BaseModal"), s.indexOf("export function PreferenceRow"));
-  assert.match(modal, /<GlassSurface/);
-  assert.match(modal, /rounded-t-3xl/);
-  assert.match(modal, /sm:rounded-3xl/);
+  // Phase A / A3: the pack's Dialog (glass-dialog) at its defaults.
+  assert.match(modal, /<Dialog open onOpenChange/);
+  assert.match(modal, /<DialogContent/);
+  assert.match(modal, /<DialogTitle/);
   assert.doesNotMatch(modal, /bg-white p-6/, "the flat card is back");
   // `.dc-field` — the pack's frost on a real form field, because glass-input is a
   // search pill and the profile form needs `required`, `inputMode` and a textarea

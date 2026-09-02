@@ -248,7 +248,7 @@ export default function ProfileApp() {
     <span
       data-profile-membership-status={membership.active ? "active" : "expired"}
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
-        membership.active ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "bg-rose-50 text-rose-600 ring-1 ring-rose-200"
+        membership.active ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30" : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/30"
       }`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${membership.active ? "bg-emerald-500" : "bg-rose-500"}`} />
@@ -267,7 +267,7 @@ export default function ProfileApp() {
   };
 
   return (
-    <div data-profile-page className="min-h-screen text-slate-900 sm:py-0 lg:py-0">
+    <div data-profile-page className="min-h-screen text-white sm:py-0 lg:py-0">
       <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 lg:max-w-full lg:rounded-none lg:border-0">
         <Header
           cartCount={cartIds.size}

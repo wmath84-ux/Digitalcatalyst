@@ -35,7 +35,7 @@ export default function SubscriberExperiencePage() {
 
         <main ref={mainRef} className="flex flex-1 items-center justify-center overflow-y-auto px-6 py-12">
           <div data-subscriber-experience-empty className="text-center">
-            <p className="text-5xl font-black tracking-tight text-slate-200">Empty</p>
+            <p className="text-5xl font-black tracking-tight text-white/30">Empty</p>
           </div>
         </main>
 

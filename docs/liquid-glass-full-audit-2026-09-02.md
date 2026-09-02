@@ -357,3 +357,10 @@ Owner refinement before the wave: **pack components at their defaults** (no `.dc
 - Ink convention inside pages: sub-panels `bg-white/[0.06]` (hover `/[0.08]`), borders `border-white/10`, text `white / white/85 / white/75 / white/55`, callouts `<color>-500/15 + <color>-200 text + <color>-400/30 border`, brand fills solid (`bg-indigo-600`, `bg-emerald-600`).
 - Tests updated where they pinned the old paint: `checkoutMobileWidths`, `liquidGlassWaveSixContract`, `subscriptionRepurchaseGuard` (owned CTA colour), `revisionSubscriptionFeatureContract` (icon bg), `premiumGateResponsiveContract` (headline gradient text). A2 contract appended to `liquidGlassPhaseABackdropContract` (4 tests).
 - Gates: tsc 7 (baseline), tests 1965 pass / 8 baseline fails, build ok, coverage: `rounded-* bg-white` 301→290, `bg-gradient-to-*` 162→137, backdrop-blur-in-scrolling 78 (=), `in oklab` 530→521, render-sites 190→239; verify-backdrop OK; frozen paths untouched.
+
+### A3 Profile + Settings + Subscriber experience — shipped (this commit)
+- `ProfileLayout`: hero (brand gradient) → `GlassCard data-profile-hero`; every `CARD` section (membership, upgrade, referral, learning, renewal) → `GlassCard`; every `BTN_PRIMARY/SECONDARY` (gradient / white) → `GlassButton variant="capsule"`; edit + close icons → `GlassButton`; `BaseModal` → pack `Dialog/DialogContent/DialogTitle`; `PreferenceRow` keeps `GlassSwitch`, row panel `bg-white/[0.06]`; form fields keep `.dc-field` with dark ink; QuickStat/StatChip → soft panels.
+- `SettingsPage`: white section → `GlassCard`; Sign-in / Got-it → `GlassButton`; back pill soft.
+- `ProfilePreview` (dev): two white cards → `GlassCard`; sticky frost toolbar → plain strip.
+- Tests re-pinned: `profilePlanGlowContract` (gradient → pack components), `liquidGlassWaveFiveContract` (BaseModal = Dialog). A3 contract appended.
+- Coverage: gradients 137→126, `in oklab` 521→522 (±, ceiling 530 holds), render-sites 248→270. Note: the `rounded-* bg-white` metric's `\bbg-white\b` also counts translucent `bg-white/[0.06]` soft panels; re-baseline in A9.

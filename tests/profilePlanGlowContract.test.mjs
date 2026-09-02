@@ -47,11 +47,10 @@ test("profile page is clean: no legacy orbs or animated gradients", () => {
   assert.doesNotMatch(styles, /conic-gradient\(/);
 });
 
-test("profile reuses the store's brand gradient for actions and accents", () => {
-  // The Store's CTA gradient (indigo → violet → fuchsia) is the only
-  // gradient on the redesigned profile — buttons, progress and small icon
-  // chips carry it, exactly like the Store page's Add-to-Cart button.
-  assert.match(profilePage, /from-indigo-600 via-violet-600 to-fuchsia-600/);
+test("profile actions and cards are the pack components, not the old brand gradient (Phase A / A3)", () => {
+  assert.doesNotMatch(profilePage, /from-indigo-600 via-violet-600 to-fuchsia-600/);
+  assert.match(profilePage, /<GlassCard data-profile-hero/);
+  assert.match(profilePage, /<GlassButton variant="capsule"/);
 });
 
 test("profile page paints no background of its own (Phase A)", () => {
