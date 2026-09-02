@@ -6,12 +6,12 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { type RevisionCatalog } from "@/revision/engine/catalogService";
 import { adminFetch } from "@/lib/admin/client";
+import { toast as glassToast } from "@/components/ui/glass-toast";
 
 /* ------------------------------------------------------------------ */
 /* Toast feedback                                                      */
@@ -112,8 +112,6 @@ export function useRevisionCatalog() {
 /* ------------------------------------------------------------------ */
 
 export function AdminProviders({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const idRef = useRef(0);
   const [dirty, setDirty] = useState(false);
   const [online, setOnline] = useState(true);
   const [catalog, setCatalogState] = useState<RevisionCatalog | null>(null);
@@ -126,9 +124,9 @@ export function AdminProviders({ children }: { children: ReactNode }) {
   const [reasonInput, setReasonInput] = useState("");
 
   const notify = useCallback((kind: Toast["kind"], message: string) => {
-    const id = ++idRef.current;
-    setToasts((prev) => [...prev, { id, kind, message }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+    // All admin feedback rides the app-wide AI Canvas glass toast stack
+    // (GlassToaster mounted once in src/main.tsx) — one look everywhere.
+    glassToast({ title: message, variant: kind });
   }, []);
 
   const confirm = useCallback((options: ConfirmOptions) => {
@@ -209,27 +207,8 @@ export function AdminProviders({ children }: { children: ReactNode }) {
             <CatalogContext.Provider value={catalogValue}>
               {children}
 
-            {/* Toast stack */}
-            <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+8px)] z-[70] flex flex-col items-center gap-2 px-3">
-              {toasts.map((t) => (
-                <div
-                  key={t.id}
-                  className={`pointer-events-auto w-full max-w-[420px] rounded-xl border px-4 py-3 text-sm shadow-lg ${
-                    t.kind === "success"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : t.kind === "error"
-                        ? "border-red-200 bg-red-50 text-red-800"
-                        : t.kind === "warning"
-                          ? "border-amber-300 bg-amber-50 text-amber-800"
-                          : "border-slate-200 bg-white text-slate-800"
-                  }`}
-                  role="status"
-                >
-                  {t.message}
-                </div>
-              ))}
-            </div>
-
+            {/* Toast stack now renders through the global GlassToaster
+                (AI Canvas glass-toast) mounted in src/main.tsx. */}
             {/* Global confirmation sheet */}
             {confirmState && (
               <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 sm:items-center" role="dialog" aria-modal="true">

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { Minimize, Settings2 } from "lucide-react";
+import { Minimize } from "lucide-react";
 import { GlassButton } from "./components/ui/glass-button";
 import { applyGlassScheme } from "./lib/glassScheme";
-import { GlassSurface } from "./components/ui/glass";
-import { GlassSwitch } from "./components/ui/glass-switch";
+import { TagaToggle } from "./components/ui/taga-toggle";
+import { GlassPrefToggle } from "./components/ui/glass-pref-toggle";
+import { toast } from "./components/ui/glass-toast";
 import { Popover, PopoverContent, PopoverSeparator, PopoverTrigger } from "./components/ui/glass-popover";
 import ShimmerProgress from "./components/ui/ShimmerProgress";
 import ChargingCompleteButton from "./course/ChargingCompleteButton";
@@ -326,6 +327,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // flips the state back at any time.
   const [fileBarsHidden, setFileBarsHidden] = useState<boolean>(() => isMobileDevice());
   const [playerChromeHidden, setPlayerChromeHidden] = useState(false);
+  // ⚙ Player settings popover open state — controlled so the Taga Toggle
+  // trigger (glass pill with the expressive face) mirrors it: dead face when
+  // closed, happy face when open.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // The old secondary header strip (file-bars / viewport / theme / snow quick
   // toggles) is gone — every one of those preferences now lives in the ⚙
   // Player settings popover, so the header stays a single clean row.
@@ -928,41 +933,65 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   );
 
   // ── ⚙ Settings popover ──────────────────────────────────────────────────
-  // The ONE home for every player preference. The popover follows the
-  // player's own light/dark pick, so its labels stay legible on the light
-  // material too (they used to be white-on-white).
-  const settingsInk = theme === "light" ? "text-slate-900/85" : "text-white/85";
+  // The ONE home for every player preference. The trigger is the AI Canvas
+  // Taga Toggle (glass edition) — dead face while the panel is closed, happy
+  // face once it opens. The rows inside are AI Canvas Glass Toggles: one
+  // spring-driven progress value animates track colour, border, thumb and
+  // glow, with a staggered entrance on every open.
   const settingsInkSoft = theme === "light" ? "text-slate-900/55" : "text-white/55";
-  const settingsRow = (label: string, checked: boolean, onChange: (next: boolean) => void, attr: string) => (
-    <div className={`flex items-center justify-between gap-4 px-4 py-2.5 text-sm ${settingsInk}`} data-course-setting={attr}>
-      <span className="font-semibold">{label}</span>
-      <GlassSwitch checked={checked} onCheckedChange={onChange} ariaLabel={label} />
-    </div>
+  const settingsDivider = theme === "light" ? "bg-black/[0.08]" : "bg-white/[0.06]";
+  const notifySetting = (label: string, next: boolean) => {
+    toast({ title: `${label} ${next ? "on" : "off"}`, variant: next ? "success" : "info", duration: 2200 });
+  };
+  const settingsRow = (label: string, checked: boolean, onChange: (next: boolean) => void, attr: string, color: string, delay: number) => (
+    <GlassPrefToggle
+      label={label}
+      on={checked}
+      onChange={(next) => {
+        onChange(next);
+        notifySetting(label, next);
+      }}
+      color={color}
+      delay={delay}
+      open={settingsOpen}
+      light={theme === "light"}
+      attr={attr}
+    />
   );
   const settingsPopover = (side: "bottom" | "right") => (
-    <Popover>
+    <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
       <PopoverTrigger
         className="shrink-0 rounded-full"
         aria-label="Player settings"
         title="Player settings"
         data-course-settings-trigger
       >
-        <GlassSurface radius={999} className="size-10 text-white" contentClassName="grid place-items-center">
-          <Settings2 size={17} />
-        </GlassSurface>
+        <TagaToggle on={settingsOpen} width={side === "right" ? 48 : 60} />
       </PopoverTrigger>
-      <PopoverContent side={side} align={side === "bottom" ? "end" : "start"} className="min-w-[240px]" data-course-settings-menu data-course-theme={theme}>
+      <PopoverContent side={side} align={side === "bottom" ? "end" : "start"} className="min-w-[260px]" data-course-settings-menu data-course-theme={theme}>
         <p className={`px-4 pb-1 pt-1 text-[10px] font-black uppercase tracking-[0.14em] ${settingsInkSoft}`}>Player settings</p>
-        {settingsRow("Light theme", theme === "light", (next) => setTheme(next ? "light" : "dark"), "theme")}
-        {settingsRow("Snowfall", snowMode, (next) => setSnowMode(next), "snow")}
-        {showViewportToggle ? settingsRow("Desktop view", desktopView, (next) => setDesktopView(next), "viewport") : null}
+        {settingsRow("Light theme", theme === "light", (next) => setTheme(next ? "light" : "dark"), "theme", "#FF6BF5", 0.1)}
+        <div className={`mx-4 h-[1px] ${settingsDivider}`} aria-hidden />
+        {settingsRow("Snowfall", snowMode, (next) => setSnowMode(next), "snow", "#3A86FF", 0.15)}
+        {showViewportToggle ? (
+          <>
+            <div className={`mx-4 h-[1px] ${settingsDivider}`} aria-hidden />
+            {settingsRow("Desktop view", desktopView, (next) => setDesktopView(next), "viewport", "#06D6A0", 0.2)}
+          </>
+        ) : null}
         <PopoverSeparator />
-        {settingsRow("File bars", !fileBarsHidden, (next) => setFileBarsHidden(!next), "file-bars")}
-        {settingsRow("Player bars", !playerChromeHidden, (next) => setPlayerChromeHidden(!next), "player-chrome")}
-        {canFullscreen ? settingsRow("Hide status bar", courseFullscreen, (next) => {
-          if (next) enterCoursePlayerFullscreen();
-          else exitCoursePlayerFullscreen();
-        }, "fullscreen") : null}
+        {settingsRow("File bars", !fileBarsHidden, (next) => setFileBarsHidden(!next), "file-bars", "#FFBE0B", 0.25)}
+        <div className={`mx-4 h-[1px] ${settingsDivider}`} aria-hidden />
+        {settingsRow("Player bars", !playerChromeHidden, (next) => setPlayerChromeHidden(!next), "player-chrome", "#FF7B54", 0.3)}
+        {canFullscreen ? (
+          <>
+            <div className={`mx-4 h-[1px] ${settingsDivider}`} aria-hidden />
+            {settingsRow("Hide status bar", courseFullscreen, (next) => {
+              if (next) enterCoursePlayerFullscreen();
+              else exitCoursePlayerFullscreen();
+            }, "fullscreen", "#B388FF", 0.35)}
+          </>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

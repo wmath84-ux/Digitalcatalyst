@@ -27,10 +27,10 @@ interface ToastProps {
   onRemove: (id: string) => void;
 }
 
-const variantOf: Record<ToastType, "success" | "error" | "default"> = {
+const variantOf: Record<ToastType, "success" | "error" | "info"> = {
   success: "success",
   error: "error",
-  info: "default",
+  info: "info",
 };
 
 export default function Toast({ toasts, onRemove }: ToastProps) {
