@@ -1,12 +1,10 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { Bell, Heart, Search, Trophy, UserRound, X } from "lucide-react";
-import { GlassSwitch } from "../../components/ui/glass-switch";
 import ExpandingTabs from "../../components/ui/ExpandingTabs";
 import { GlassSurface } from "../../components/ui/glass";
 import { GlassButton } from "../../components/ui/glass-button";
 import { GlassInput } from "../../components/ui/glass-input";
 import { PopoverItem } from "../../components/ui/glass-popover";
-import { useGlassScheme } from "../../lib/glassScheme";
 import { openCommandPalette } from "../../lib/commandPalette";
 import type { Product } from "../types";
 import { useUnreadNotificationCount } from "../../hooks/useUnreadNotificationCount";
@@ -57,7 +55,6 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
   { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications },
   ref,
 ) {
-  const [scheme, setScheme] = useGlassScheme();
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
   // Which header action wears the expanded pill. On Home none of the
   // shortcuts is "the current page", so the bar starts collapsed and the
@@ -216,9 +213,9 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
               },
             ]}
           />
-          {/* websiteglass.com Glass Switch — the docs' controlled "Dark mode"
-              example, flipping the pack between its own light and dark material. */}
-          <GlassSwitch checked={scheme === "dark"} onCheckedChange={(v) => setScheme(v ? "dark" : "light")} ariaLabel="Dark mode" />
+          {/* The "Dark mode" GlassSwitch moved off the header — appearance now
+              lives with the rest of the account preferences (Profile →
+              Preferences modal and the #/settings page). */}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
-import { Bell, Lock, Sparkles, UserRound } from "lucide-react";
+import { Bell, Lock, Moon, Sparkles, UserRound } from "lucide-react";
 import { db } from "../../firebase";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
@@ -8,6 +8,8 @@ import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useBranding } from "../context/BrandingContext";
+import { useGlassScheme } from "../lib/glassScheme";
+import { toast } from "../components/ui/glass-toast";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
 import { APPROVED_ADMIN_EMAIL } from "../utils/adminSession";
 import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
@@ -94,6 +96,9 @@ export default function ProfileApp() {
   // The Profile uses this as the authoritative Purchased count.
   const { ownedProductIds: canonicalOwnedIds, signedIn } = useOwnedProducts();
   const [modal, setModal] = useState<Modal>(null);
+  // Appearance (device preference) — the dark-mode switch moved here from the
+  // home header, so it sits with the rest of the account settings.
+  const [scheme, setScheme] = useGlassScheme();
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
   const [preferencesSaving, setPreferencesSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -353,6 +358,15 @@ export default function ProfileApp() {
         {modal === "settings" && (
           <BaseModal title="Preferences" onClose={() => setModal(null)}>
             <div className="space-y-2">
+              <PreferenceRow
+                icon={<Moon />}
+                label="Dark mode"
+                checked={scheme === "dark"}
+                onChange={(checked) => {
+                  setScheme(checked ? "dark" : "light");
+                  toast({ title: `Dark mode ${checked ? "on" : "off"}`, variant: checked ? "success" : "info", duration: 2200 });
+                }}
+              />
               <PreferenceRow icon={<Bell />} label="Push notifications" checked={preferences.push} onChange={(checked) => void handlePushToggle(checked)} />
               <PreferenceRow icon={<Sparkles />} label="Email updates" checked={preferences.email} onChange={(checked) => void savePreferences({ ...preferences, email: checked })} />
               <PreferenceRow icon={<Bell />} label="Promotions" checked={preferences.promotions} onChange={(checked) => void savePreferences({ ...preferences, promotions: checked })} />

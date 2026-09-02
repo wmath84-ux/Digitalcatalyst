@@ -156,7 +156,10 @@ test("The two hides are independent and always reversible", () => {
   assert.match(coursePlayer, /data-course-chrome-restore/);
   // Escape restores everything.
   assert.match(coursePlayer, /if \(playerChromeHidden \|\| fileBarsHidden\) \{ setPlayerChromeHidden\(false\); setFileBarsHidden\(false\); \}/);
-  // Each preference is a Glass Switch row that reflects its state.
+  // Each preference is an AI Canvas glass-toggle row that reflects its state
+  // (owner direction 2026-09-02: GlassSwitch → GlassPrefToggle, the
+  // spring-driven aicanvas.me glass-toggle, keeping the same 4-arg
+  // settingsRow(label, checked, onChange, attr) contract).
   assert.match(coursePlayer, /data-course-setting=\{attr\}/);
-  assert.match(coursePlayer, /GlassSwitch checked=\{checked\} onCheckedChange=\{onChange\}/);
+  assert.match(coursePlayer, /<GlassPrefToggle\b[\s\S]*?on=\{checked\}[\s\S]*?onChange=\{/);
 });

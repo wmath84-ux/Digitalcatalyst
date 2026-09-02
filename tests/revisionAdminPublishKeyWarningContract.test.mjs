@@ -16,7 +16,11 @@ const aiConfig = fs.readFileSync("src/revision/engine/aiConfig.ts", "utf8");
 
 test("admin providers expose a warning toast kind", () => {
   assert.match(providers, /kind: "success" \| "error" \| "info" \| "warning"/);
-  assert.match(providers, /border-amber-300 bg-amber-50 text-amber-800/);
+  // 2026-09-02: admin feedback rides the app-wide AI Canvas glass toast stack
+  // (GlassToaster in src/main.tsx); the warning kind maps onto the pack's
+  // warning variant instead of a local amber div.
+  assert.match(providers, /glassToast\(\{ title: message, variant: kind \}\)/);
+  assert.match(fs.readFileSync("src/components/ui/glass-toast.tsx", "utf8"), /warning: \{ color: "#FFBE0B"/);
 });
 
 test("publishing without a shared key asks for explicit confirmation", () => {

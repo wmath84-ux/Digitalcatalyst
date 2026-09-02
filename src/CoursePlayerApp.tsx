@@ -937,27 +937,40 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Taga Toggle (glass edition) — dead face while the panel is closed, happy
   // face once it opens. The rows inside are AI Canvas Glass Toggles: one
   // spring-driven progress value animates track colour, border, thumb and
-  // glow, with a staggered entrance on every open.
+  // glow, with a staggered entrance on every open. Accent colour, stagger
+  // delay and the thin divider are looked up per row key so every call site
+  // keeps the original 4-argument shape.
   const settingsInkSoft = theme === "light" ? "text-slate-900/55" : "text-white/55";
-  const settingsDivider = theme === "light" ? "bg-black/[0.08]" : "bg-white/[0.06]";
+  const SETTING_ACCENTS: Record<string, { color: string; delay: number; divider: boolean }> = {
+    theme: { color: "#FF6BF5", delay: 0.1, divider: false },
+    snow: { color: "#3A86FF", delay: 0.15, divider: true },
+    viewport: { color: "#06D6A0", delay: 0.2, divider: true },
+    "file-bars": { color: "#FFBE0B", delay: 0.25, divider: false },
+    "player-chrome": { color: "#FF7B54", delay: 0.3, divider: true },
+    fullscreen: { color: "#B388FF", delay: 0.35, divider: true },
+  };
   const notifySetting = (label: string, next: boolean) => {
     toast({ title: `${label} ${next ? "on" : "off"}`, variant: next ? "success" : "info", duration: 2200 });
   };
-  const settingsRow = (label: string, checked: boolean, onChange: (next: boolean) => void, attr: string, color: string, delay: number) => (
-    <GlassPrefToggle
-      label={label}
-      on={checked}
-      onChange={(next) => {
-        onChange(next);
-        notifySetting(label, next);
-      }}
-      color={color}
-      delay={delay}
-      open={settingsOpen}
-      light={theme === "light"}
-      attr={attr}
-    />
-  );
+  const settingsRow = (label: string, checked: boolean, onChange: (next: boolean) => void, attr: string) => {
+    const accent = SETTING_ACCENTS[attr] ?? { color: "#3A86FF", delay: 0.1, divider: true };
+    return (
+      <GlassPrefToggle
+        label={label}
+        on={checked}
+        onChange={(next) => {
+          onChange(next);
+          notifySetting(label, next);
+        }}
+        color={accent.color}
+        delay={accent.delay}
+        divider={accent.divider}
+        open={settingsOpen}
+        light={theme === "light"}
+        data-course-setting={attr}
+      />
+    );
+  };
   const settingsPopover = (side: "bottom" | "right") => (
     <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
       <PopoverTrigger
@@ -970,28 +983,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       </PopoverTrigger>
       <PopoverContent side={side} align={side === "bottom" ? "end" : "start"} className="min-w-[260px]" data-course-settings-menu data-course-theme={theme}>
         <p className={`px-4 pb-1 pt-1 text-[10px] font-black uppercase tracking-[0.14em] ${settingsInkSoft}`}>Player settings</p>
-        {settingsRow("Light theme", theme === "light", (next) => setTheme(next ? "light" : "dark"), "theme", "#FF6BF5", 0.1)}
-        <div className={`mx-4 h-[1px] ${settingsDivider}`} aria-hidden />
-        {settingsRow("Snowfall", snowMode, (next) => setSnowMode(next), "snow", "#3A86FF", 0.15)}
-        {showViewportToggle ? (
-          <>
-            <div className={`mx-4 h-[1px] ${settingsDivider}`} aria-hidden />
-            {settingsRow("Desktop view", desktopView, (next) => setDesktopView(next), "viewport", "#06D6A0", 0.2)}
-          </>
-        ) : null}
+        {settingsRow("Light theme", theme === "light", (next) => setTheme(next ? "light" : "dark"), "theme")}
+        {settingsRow("Snowfall", snowMode, (next) => setSnowMode(next), "snow")}
+        {showViewportToggle ? settingsRow("Desktop view", desktopView, (next) => setDesktopView(next), "viewport") : null}
         <PopoverSeparator />
-        {settingsRow("File bars", !fileBarsHidden, (next) => setFileBarsHidden(!next), "file-bars", "#FFBE0B", 0.25)}
-        <div className={`mx-4 h-[1px] ${settingsDivider}`} aria-hidden />
-        {settingsRow("Player bars", !playerChromeHidden, (next) => setPlayerChromeHidden(!next), "player-chrome", "#FF7B54", 0.3)}
-        {canFullscreen ? (
-          <>
-            <div className={`mx-4 h-[1px] ${settingsDivider}`} aria-hidden />
-            {settingsRow("Hide status bar", courseFullscreen, (next) => {
-              if (next) enterCoursePlayerFullscreen();
-              else exitCoursePlayerFullscreen();
-            }, "fullscreen", "#B388FF", 0.35)}
-          </>
-        ) : null}
+        {settingsRow("File bars", !fileBarsHidden, (next) => setFileBarsHidden(!next), "file-bars")}
+        {settingsRow("Player bars", !playerChromeHidden, (next) => setPlayerChromeHidden(!next), "player-chrome")}
+        {canFullscreen ? settingsRow("Hide status bar", courseFullscreen, (next) => {
+          if (next) enterCoursePlayerFullscreen();
+          else exitCoursePlayerFullscreen();
+        }, "fullscreen") : null}
       </PopoverContent>
     </Popover>
   );

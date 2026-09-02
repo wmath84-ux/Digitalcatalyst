@@ -17,7 +17,10 @@ interface GlassPrefToggleProps {
   delay?: number; // entrance stagger
   open?: boolean; // popover visibility — replays the entrance on every open
   light?: boolean; // player light theme → dark ink
-  attr?: string; // data-course-setting hook
+  /** Renders the thin divider line above the row (glass-toggle spec). */
+  divider?: boolean;
+  /** Contract hook, e.g. data-course-setting="theme". */
+  "data-course-setting"?: string;
 }
 
 export function GlassPrefToggle({
@@ -28,7 +31,8 @@ export function GlassPrefToggle({
   delay = 0,
   open = true,
   light = false,
-  attr,
+  divider = false,
+  "data-course-setting": dataSetting,
 }: GlassPrefToggleProps) {
   // One spring drives everything: track bg, border, thumb x, thumb shadow.
   const progress = useSpring(on ? 1 : 0, { stiffness: 300, damping: 22 });
@@ -50,11 +54,12 @@ export function GlassPrefToggle({
   );
 
   const ink = light ? "text-slate-900/70" : "text-white/60";
+  const dividerClass = light ? "border-black/[0.08]" : "border-white/[0.06]";
 
   return (
     <motion.div
-      className="flex items-center justify-between gap-4 px-4 py-2.5"
-      data-course-setting={attr}
+      className={`flex items-center justify-between gap-4 px-4 py-2.5 ${divider ? `border-t ${dividerClass}` : ""}`}
+      data-course-setting={dataSetting}
       initial={false}
       animate={open ? { opacity: 1, x: 0 } : { opacity: 0, x: -16 }}
       transition={{ type: "spring", stiffness: 200, damping: 22, delay: open ? delay : 0 }}

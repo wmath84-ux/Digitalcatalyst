@@ -211,8 +211,16 @@ test("the pack's own light/dark material is user-switchable via the docs' GlassS
   assert.match(scheme, /classList\.toggle\("dark", scheme === "dark"\)/);
   assert.match(scheme, /classList\.toggle\("light", scheme === "light"\)/);
   assert.match(main, /applyGlassScheme\(\)/);
+  // Owner direction (2026-09-02): the "Dark mode" switch moved OFF the home
+  // header — appearance now lives with the account settings, as a
+  // PreferenceRow (which renders the same pack GlassSwitch) on both the
+  // Profile's Preferences modal and the #/settings page.
   const header = read("src/home/components/Header.tsx");
-  assert.match(header, /<GlassSwitch checked=\{scheme === "dark"\} onCheckedChange=\{[^}]+\} ariaLabel="Dark mode" \/>/);
+  assert.doesNotMatch(header, /<GlassSwitch/, "the header no longer carries the scheme switch");
+  const settingsPage = read("src/settings/SettingsPage.tsx");
+  assert.match(settingsPage, /label="Dark mode"[\s\S]*?checked=\{scheme === "dark"\}/);
+  const profileApp = read("src/profile/App.tsx");
+  assert.match(profileApp, /label="Dark mode"[\s\S]*?checked=\{scheme === "dark"\}/);
   // The vendored engine still carries upstream's scheme reader untouched.
   const engine = read("src/components/ui/glass.tsx");
   assert.match(engine, /if \(root\.classList\.contains\("light"\)\) return false;/);
