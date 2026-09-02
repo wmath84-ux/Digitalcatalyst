@@ -22,6 +22,7 @@ import { GlassSelect, GlassSelectContent, GlassSelectItem, GlassSelectTrigger } 
 import { GlassInput } from "./ui/glass-input";
 import { GlassToggleGroup, GlassToggleItem } from "./ui/glass-toggle-group";
 import { GlassButton } from "./ui/glass-button";
+import { GlassCard } from "./ui/GlassCard";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Search as SearchIcon, X } from "lucide-react";
 import type { Product } from "../data/products";
@@ -277,7 +278,7 @@ export default function SearchPage({
             </GlassSelect>
             <span
               data-search-result-count
-              className="rounded-full bg-white/[0.08] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white/55"
+              className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white/55"
             >
               {loading ? "Loading…" : `${results.length} result${results.length === 1 ? "" : "s"}`}
             </span>
@@ -323,14 +324,11 @@ export default function SearchPage({
               className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4"
             >
               {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
-                <div
-                  key={index}
-                  className="h-64 animate-pulse rounded-2xl border border-white/10 bg-white/[0.06]"
-                />
+                <GlassCard key={index} className="h-64 animate-pulse" aria-hidden="true" />
               ))}
             </div>
           ) : showEmpty ? (
-            <div className="mt-10 flex flex-col items-center gap-3 rounded-3xl border border-dashed border-white/10 bg-white/[0.04] px-6 py-14 text-center">
+            <GlassCard className="mt-10" contentClassName="flex flex-col items-center gap-3 px-6 py-14 text-center">
               <BookOpenIcon className="h-8 w-8 text-indigo-400" />
               <p className="text-sm font-bold text-white/85">No results</p>
               <p className="max-w-xs text-xs font-medium text-white/55">
@@ -339,15 +337,16 @@ export default function SearchPage({
                   : "Start typing to search the catalog. The list updates live as you type."}
               </p>
               {queryIsLive ? (
-                <button
+                <GlassButton
+                  variant="capsule"
                   type="button"
                   onClick={handleClear}
-                  className="mt-1 rounded-full border border-indigo-400/30 bg-indigo-500/15 px-4 py-1.5 text-xs font-bold text-indigo-300 transition hover:bg-indigo-500/20"
+                  className="mt-1 [&>span>div]:h-9 [&>span>div]:px-4 [&>span>div]:text-xs [&>span>div]:font-bold"
                 >
                   Clear search
-                </button>
+                </GlassButton>
               ) : null}
-            </div>
+            </GlassCard>
           ) : (
             <div
               data-search-grid

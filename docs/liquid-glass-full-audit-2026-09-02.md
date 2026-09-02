@@ -487,3 +487,37 @@ Kept (pinned by tests): `className="mm-tool` literal + every `data-course-mindma
 **Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 271 → 267, gradients 34 → 32, render-sites 458 → 465 (`native title=` 127 is unchanged from Wave 8, not a Wave 9 regression) · backdrop OK · frozen diff empty.
 
 **Wave 10 next:** store / search / PDP (PurchaseBuilder module rows + checkboxes, curriculum rows, review/related rows, share-menu items).
+
+---
+
+## Phase B · Wave 10 — Store · Search · PDP (`PdpApp`, `pdp/PdpPurchaseBuilder`, `pdp/ModuleSelectModal`, `StorePage`, `SearchPage`, `SearchBar`, `FilterChips`, `ProductCard`)
+
+| Old | New |
+|---|---|
+| PDP curriculum `CurriculumModuleRow` (hand-rolled `<button>` + `ChevronDown`, `bg-white/[0.06]` / amber plates) | pack **`GlassAccordion`** (tint 0.4, radius 18) per module, controlled by the same single `expandedModule` state (nested rows recurse inside `GlassAccordionContent`); paid module keeps its amber rim/ink as meaning colour; every `data-pdp-curriculum*` / `data-paid` pin untouched |
+| PDP share menu rows (`bg-white/[0.06]` buttons) | `GlassSurface radius={20}` + pack **`PopoverItem`** rows (`data-product-share` kept) |
+| PDP "What's included" box, rating aggregate box, review composer box, review articles (`bg-white/[0.06–0.08]` + `backdrop-blur-md`), `EmptyDetail` | **`GlassCard`** (app wrapper, pack tint 0.4) |
+| Review star pickers (bare `<button>`), "Load more" plate button | `GlassButton` icon discs (`aria-pressed`) · `GlassButton` capsule (`data-load-more-reviews` kept) |
+| Review textarea `bg-white/[0.08] focus:border-zinc-400` | `.dc-field` (Glass Input material), white ink |
+| Related-product rows (`<button … bg-white/[0.08] backdrop-blur-md>`) | clickable `GlassCard` (`role="button"`, Enter/Space) |
+| Image caption chips `bg-black/60` / `bg-black/50` | `--dc-chrome-glass` + blur (pack material) |
+| Gallery thumb active ring `border-zinc-900` (invisible on dark) | `border-white/80` |
+| Submit review / Back-to-store `rounded-xl` | solid indigo `rounded-full` primaries |
+| PurchaseBuilder resource rows + paid-update rows (`<article>`/`<button>` `bg-white/[0.08]`, hand-drawn `role="checkbox"` squares) | **`GlassCard`** rows + pack **`GlassCheckbox`** (owned = checked + disabled, emerald tint); paid-update card carries `role="checkbox"` + keyboard; `data-pdp-resource` / `data-pdp-update` kept |
+| Builder type-icon well / type chip / full-course delta strip (`bg-white/[0.06–0.08]`) | violet-tint icon well, outlined chip, outlined strip |
+| ModuleSelectModal "Select all" row + module rows (`bg-white/[0.06–0.08]`, violet/emerald fills, hand-drawn boxes) | `GlassCard` rows (`role="checkbox"`, `aria-checked`, `data-pdp-module-pick` kept; selected = violet ring) + pack `GlassCheckbox`; owned indicator = emerald badge; drag handle `bg-white/30`; empty-state dashed outline only, icon well violet tint |
+| StorePage list-card CTA (single button with amber/emerald disabled fills) | terminal states = flat meaning-colour plates; actionable = solid indigo `rounded-full` (same rule as grid card) |
+| StorePage view-mode option buttons (`bg-indigo-600` active / `hover:bg-white/[0.08]`) | `GlassButton` (active = violet icon ink); pinned `flex h-9 w-9 flex-none …` class string kept |
+| Store / Search loading skeletons + empty states (`bg-white/[0.04–0.06]` dashed boxes) | `GlassCard` |
+| SearchPage "Clear search" (`bg-indigo-500/15` pill), result-count chip `bg-white/[0.08]` | `GlassButton` capsule · outlined chip |
+| SearchBar clear `×` (`hover:bg-white/[0.12]`), "Tap to search" kbd chip `bg-white/[0.12]` | `GlassButton` size-7 · outlined chip |
+| FilterChips panel chips (`bg-white/[0.08]` / `bg-indigo-600`) | `GlassButton` capsules (`aria-pressed`; active = solid indigo capsule fill) |
+| ProductCard wishlist disc (hand-rolled `<button>` + `GlassSurface tint={0.4}` backing), image well `bg-white/[0.06]`, Board chip `bg-white/[0.08]` | `GlassButton` icon disc · no plate · `bg-rose-500/15` meaning chip |
+
+Kept (pinned): `<GlassCard` + `contentClassName="p-0"` + `<LiquidMetalButton tone="primary"` on ProductCard; `data-store-search-trigger` / `role="button"` / `readOnly` on SearchBar; `data-store-view-options` row + `contentClassName="flex w-max gap-1 p-1.5"`; `data-pdp-tabbar`, `dc-segment shrink-0`; `role="checkbox"` + `aria-checked` + `getModuleEffectivePrice` in ModuleSelectModal; `bg-indigo-950/30` overlay + `min-h-0`; `border-amber-400/30 bg-amber-500/15` + `paid ? "bg-amber-500" : "bg-indigo-600"` + `LockKeyhole` in PdpApp; `ExtraModeChip`, `<SummaryPanel summary={summary} />`, `<CtaBar mode={mode}`.
+
+Note: `GlassCard` is imported from the app wrapper `ui/GlassCard.tsx` (pack `glass-card` does not type `contentClassName`); the wrapper renders the pack card at its own defaults.
+
+**Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 267 → 250, render-sites 465 → 497 (`native title=` 127 unchanged since Wave 8) · backdrop OK · frozen diff empty.
+
+**Wave 11 next:** Cart / Checkout / Subscription (`cartWishlist/**`, `checkout/**`, `subscription/**`).

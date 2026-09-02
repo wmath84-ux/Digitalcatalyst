@@ -1,4 +1,5 @@
 import { GlassSurface } from "@/components/ui/glass";
+import { GlassButton } from "@/components/ui/glass-button";
 import {
   GlassSelect,
   GlassSelectContent,
@@ -67,19 +68,19 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
             readOnly
           />
           {value ? (
-            <button
+            <GlassButton
               type="button"
               aria-label="Clear search"
               onClick={(e) => {
                 e.stopPropagation();
                 onChange("");
               }}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white/55 transition hover:bg-white/[0.12] hover:text-white/85"
+              className="shrink-0 [&_.size-12]:size-7"
             >
               <XIcon className="h-4 w-4" />
-            </button>
+            </GlassButton>
           ) : (
-            <span className="hidden shrink-0 rounded-md bg-white/[0.12] px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/85 sm:inline">
+            <span className="hidden shrink-0 rounded-md border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/85 sm:inline">
               Tap to search
             </span>
           )}

@@ -10,7 +10,6 @@ import {
   BarChart3,
   Check,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   Clock,
   Copy,
@@ -32,6 +31,9 @@ import {
 import Header from "./components/Header";
 import { GlassSurface } from "./components/ui/glass";
 import { GlassButton } from "./components/ui/glass-button";
+import { GlassCard } from "./components/ui/GlassCard";
+import { PopoverItem } from "./components/ui/glass-popover";
+import { GlassAccordion, GlassAccordionContent, GlassAccordionItem, GlassAccordionTrigger } from "./components/ui/glass-accordion";
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import type { Product } from "./data/products";
 import type { CheckoutSelection } from "./types/commerce";
@@ -516,7 +518,7 @@ function PremiumProductContent({
 
       <div className="relative">
         <nav data-pdp-loose className="flex flex-wrap items-center gap-1.5 px-4 pt-4 text-[11px] text-white/55">
-          <button onClick={onBack} className="transition hover:text-white">Store</button>
+          <button type="button" onClick={onBack} className="transition hover:text-white">Store</button>
           <ChevronRight className="h-3 w-3 text-white/40" />
           <span>{product.category}</span>
           <ChevronRight className="h-3 w-3 text-white/40" />
@@ -527,7 +529,7 @@ function PremiumProductContent({
           <section className="flex flex-col gap-3">
             <GlassSurface radius={24} className="group relative overflow-hidden" contentClassName="relative">
               <img src={selectedImage} alt={product.title} className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105" />
-              <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[10px] font-medium text-white backdrop-blur-md">
+              <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1.5 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
               </div>
               <div className="absolute right-3 top-3 flex gap-2">
@@ -538,12 +540,12 @@ function PremiumProductContent({
                   <Expand className="h-4 w-4" />
                 </GlassButton>
               </div>
-              <div className="absolute bottom-3 right-3 rounded-full bg-black/50 px-3 py-1 text-[10px] font-medium text-white backdrop-blur-md">{activeImage + 1} / {gallery.length}</div>
+              <div className="absolute bottom-3 right-3 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">{activeImage + 1} / {gallery.length}</div>
             </GlassSurface>
             {gallery.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {gallery.map((image, index) => (
-                  <button key={`${image}-${index}`} onClick={() => setActiveImage(index)} className={`h-16 min-w-16 flex-1 overflow-hidden rounded-xl border-2 transition ${activeImage === index ? "border-zinc-900" : "border-transparent opacity-70"}`}>
+                  <button key={`${image}-${index}`} onClick={() => setActiveImage(index)} className={`h-16 min-w-16 flex-1 overflow-hidden rounded-xl border-2 transition ${activeImage === index ? "border-white/80" : "border-transparent opacity-70"}`}>
                     <img src={image} alt={`${product.title} ${index + 1}`} className="h-full w-full object-cover" />
                   </button>
                 ))}
@@ -618,14 +620,14 @@ function PremiumProductContent({
                 <div className="relative mt-3 flex justify-end">
                   <div ref={shareRef} className="relative">
                     <GlassButton type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="[&_.size-12]:size-10"><Share2 className="h-4 w-4" /></GlassButton>
-                    <GlassSurface data-product-share radius={16} className="absolute right-0 top-12 z-50 w-60 text-white" contentClassName="p-3" hidden={!shareOpen}>
-                      <p className="pb-2 text-[10px] font-semibold uppercase tracking-wide text-white/55">Share this product</p>
-                      <div className="space-y-1.5">
-                        <button type="button" onClick={() => void shareNative()} className="flex w-full items-center gap-2 rounded-xl bg-white/[0.06] px-3 py-2.5 text-xs font-medium text-white/85"><Share2 className="h-3.5 w-3.5" /> Share via device</button>
-                        <button type="button" onClick={() => shareTo("whatsapp")} className="flex w-full items-center gap-2 rounded-xl bg-white/[0.06] px-3 py-2.5 text-xs font-medium text-white/85"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</button>
-                        <button type="button" onClick={() => shareTo("telegram")} className="flex w-full items-center gap-2 rounded-xl bg-white/[0.06] px-3 py-2.5 text-xs font-medium text-white/85"><Send className="h-3.5 w-3.5" /> Telegram</button>
-                        <button type="button" onClick={() => void copyLink()} className="flex w-full items-center justify-between rounded-xl bg-white/[0.06] px-3 py-2.5 text-xs font-medium text-white/85"><span className="flex items-center gap-2"><Copy className="h-3.5 w-3.5" /> Copy product link</span>{copied && <Check className="h-3.5 w-3.5 text-emerald-500" />}</button>
-                      </div>
+                    {/* Wave 10: the share menu is the pack popover material (GlassSurface
+                        radius 20) with the pack's own PopoverItem rows — no painted row plates. */}
+                    <GlassSurface data-product-share radius={20} className="absolute right-0 top-12 z-50 w-60 text-white" contentClassName="py-1" hidden={!shareOpen}>
+                      <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-white/55">Share this product</p>
+                      <PopoverItem onClick={() => void shareNative()} className="text-xs font-medium"><Share2 className="h-3.5 w-3.5" /> Share via device</PopoverItem>
+                      <PopoverItem onClick={() => shareTo("whatsapp")} className="text-xs font-medium"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</PopoverItem>
+                      <PopoverItem onClick={() => shareTo("telegram")} className="text-xs font-medium"><Send className="h-3.5 w-3.5" /> Telegram</PopoverItem>
+                      <PopoverItem onClick={() => void copyLink()} className="justify-between text-xs font-medium"><span className="flex items-center gap-3"><Copy className="h-3.5 w-3.5" /> Copy product link</span>{copied && <Check className="h-3.5 w-3.5 text-emerald-400" />}</PopoverItem>
                     </GlassSurface>
                   </div>
                 </div>
@@ -748,12 +750,12 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
           <div className="space-y-4">
             <p className="text-sm leading-relaxed text-white/85">{product.description || `Complete information for ${product.title}.`}</p>
             {highlights.length > 0 && (
-              <div className="rounded-2xl bg-white/[0.06] p-4">
+              <GlassCard contentClassName="p-4">
                 <p className="mb-3 text-sm font-semibold text-white">What's included</p>
                 <ul className="space-y-2.5">
                   {highlights.map((highlight) => <li key={highlight} className="flex items-start gap-2 text-sm text-white/85"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />{highlight}</li>)}
                 </ul>
-              </div>
+              </GlassCard>
             )}
           </div>
         )}
@@ -787,33 +789,39 @@ function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, de
   const childModules = module.modules || [];
   const resources = module.resources || [];
   const paid = Boolean(module.paid);
+  /* Wave 10: each module is the pack GlassAccordion (tint 0.4, radius 18), driven
+     by the same single `expandedModule` state as before, so only one module is
+     open at a time across every nesting level. A paid upgrade keeps its amber
+     meaning colour on the rim + text; the material itself is the pack's. */
   return (
-    <div
-      className={`overflow-hidden rounded-2xl border ${paid ? "border-amber-400/30 bg-amber-500/15" : "border-white/10"}`}
+    <GlassAccordion
+      type="single"
+      value={open ? [module.id] : []}
+      onValueChange={(next) => onExpandModule(next.includes(module.id) ? module.id : null)}
+      className={paid ? "border border-amber-400/30 bg-amber-500/15" : ""}
       style={{ marginLeft: depth ? depth * 12 : 0 }}
       data-pdp-curriculum-module
       data-module-id={module.id}
       data-paid={paid ? "true" : "false"}
     >
-      <button type="button" onClick={() => onExpandModule(open ? null : module.id)} className={`flex w-full items-center gap-3 px-3 py-3 text-left ${paid ? "bg-amber-500/20" : "bg-white/[0.06]/60"}`}>
-        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${paid ? "bg-amber-500" : "bg-indigo-600"}`}>{index + 1}</span>
-        <span className="min-w-0 flex-1">
-          <span className={`block truncate text-sm font-semibold ${paid ? "text-amber-950" : "text-white"}`}>{module.title}</span>
-          {paid ? (
-            <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-200">
-                <LockKeyhole className="h-2.5 w-2.5" /> Paid upgrade
+      <GlassAccordionItem value={module.id} className="px-3">
+        <GlassAccordionTrigger className="gap-3 py-3">
+          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${paid ? "bg-amber-500" : "bg-indigo-600"}`}>{index + 1}</span>
+          <span className="min-w-0 flex-1">
+            <span className={`block truncate text-sm font-semibold ${paid ? "text-amber-100" : "text-white"}`}>{module.title}</span>
+            {paid ? (
+              <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-200">
+                  <LockKeyhole className="h-2.5 w-2.5" /> Paid upgrade
+                </span>
+                {module.paidUpdatePrice ? <span className="text-[10px] font-bold text-amber-200">{module.paidUpdatePrice}</span> : null}
               </span>
-              {module.paidUpdatePrice ? <span className="text-[10px] font-bold text-amber-200">{module.paidUpdatePrice}</span> : null}
-            </span>
-          ) : null}
-        </span>
-        <span className={`text-[10px] ${paid ? "text-amber-200/70" : "text-white/55"}`}>{resources.length} resources{childModules.length ? ` · ${childModules.length} modules` : ""}</span>
-        {paid ? <Crown className="h-3.5 w-3.5 shrink-0 text-amber-500" /> : null}
-        <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""} ${paid ? "text-amber-500" : "text-white/55"}`} />
-      </button>
-      {open && (
-        <div className="space-y-2 px-4 py-3">
+            ) : null}
+          </span>
+          <span className={`text-[10px] ${paid ? "text-amber-200/70" : "text-white/55"}`}>{resources.length} resources{childModules.length ? ` · ${childModules.length} modules` : ""}</span>
+          {paid ? <Crown className="h-3.5 w-3.5 shrink-0 text-amber-400" /> : null}
+        </GlassAccordionTrigger>
+        <GlassAccordionContent className="space-y-2 pb-3">
           {resources.map((resource) => (
             <div key={resource.id} className={`flex items-center gap-2 text-xs ${paid ? "text-amber-200/70" : "text-white/55"}`}>
               <PlayCircle className={`h-4 w-4 ${paid ? "text-amber-400" : "text-white/40"}`} />
@@ -825,9 +833,9 @@ function CurriculumModuleRow({ module, index, expandedModule, onExpandModule, de
             <CurriculumModuleRow key={child.id || `${module.id}-${childIndex}`} module={child} index={childIndex} expandedModule={expandedModule} onExpandModule={onExpandModule} depth={depth + 1} />
           ))}
           {resources.length === 0 && childModules.length === 0 ? <p className={`text-xs ${paid ? "text-amber-200/70" : "text-white/55"}`}>Module details will appear here when published.</p> : null}
-        </div>
-      )}
-    </div>
+        </GlassAccordionContent>
+      </GlassAccordionItem>
+    </GlassAccordion>
   );
 }
 
@@ -859,45 +867,48 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
         <h2 className="text-lg font-bold text-white">Ratings & Reviews</h2>
         <button onClick={onToggleComposer} className="rounded-full bg-indigo-600 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-indigo-500">{composerOpen ? "Cancel" : canReview ? "Write a review" : "Review eligibility"}</button>
       </div>
-      <div className="mt-5 flex items-center gap-5 rounded-2xl border border-white/10 bg-white/[0.06] p-5">
+      <GlassCard className="mt-5" contentClassName="flex items-center gap-5 p-5">
         <div className="text-center"><span className="text-4xl font-extrabold text-white">{product.rating.toFixed(1)}</span><RatingStars rating={product.rating} className="mt-1" /></div>
         <div className="h-14 w-px bg-white/[0.12]" />
         <div><p className="text-sm font-semibold text-white/85">{product.reviews.toLocaleString("en-IN")} rating{product.reviews === 1 ? "" : "s"}</p><p className="mt-1 text-xs text-white/55">Live aggregate from the product catalog</p></div>
-      </div>
+      </GlassCard>
       {composerOpen && (
-        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+        <GlassCard className="mt-4" contentClassName="p-4">
           {canReview ? (
             <>
               <p className="text-xs font-semibold text-white/85">Your rating</p>
-              <div className="mt-2 flex gap-1">{[1, 2, 3, 4, 5].map((value) => <button key={value} onClick={() => onRating(value)} aria-label={`${value} stars`}><Star className={`h-6 w-6 ${value <= rating ? "fill-amber-400 text-amber-400" : "text-white/40"}`} /></button>)}</div>
-              <textarea value={comment} onChange={(event) => onComment(event.target.value.slice(0, 2000))} rows={4} placeholder="Share your experience with this product…" className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-white/[0.08] p-3 text-sm outline-none focus:border-zinc-400" />
-              <button disabled={submitting} onClick={onSubmit} className="mt-3 w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white disabled:opacity-60">{submitting ? "Submitting…" : "Submit for review"}</button>
+              <div className="mt-2 flex gap-1">{[1, 2, 3, 4, 5].map((value) => <GlassButton key={value} onClick={() => onRating(value)} aria-label={`${value} stars`} aria-pressed={value <= rating} className="[&_.size-12]:size-9"><Star className={`h-5 w-5 ${value <= rating ? "fill-amber-400 text-amber-400" : "text-white/40"}`} /></GlassButton>)}</div>
+              <textarea value={comment} onChange={(event) => onComment(event.target.value.slice(0, 2000))} rows={4} placeholder="Share your experience with this product…" className="dc-field mt-3 w-full resize-none rounded-2xl p-3 text-sm text-white outline-none placeholder:text-white/40" />
+              <button disabled={submitting} onClick={onSubmit} className="mt-3 w-full rounded-full bg-indigo-600 py-3 text-sm font-bold text-white transition hover:bg-indigo-500 disabled:opacity-60">{submitting ? "Submitting…" : "Submit for review"}</button>
             </>
           ) : <p className="text-xs leading-relaxed text-white/55">Sign in to submit a genuine learner review. It is saved online in Firestore.</p>}
-        </div>
+        </GlassCard>
       )}
       {notice && <p className="mt-3 rounded-xl bg-indigo-500/15 p-3 text-xs font-medium text-indigo-200">{notice}</p>}
       {reviews.length > 0 ? (
         <div className="mt-4 space-y-3">
           {visibleReviews.map((review) => (
-            <article key={review.id} className="rounded-2xl border border-white/10 bg-white/[0.08] p-4 backdrop-blur-md">
+            <GlassCard key={review.id} contentClassName="p-4">
+              <article>
               <div className="flex items-center gap-3">
                 <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${review.avatarColor}`}>{review.initials}</div>
                        <div className="min-w-0 flex-1"><p className="flex items-center gap-1 text-sm font-semibold text-white"><span className="truncate">{review.name}</span>{review.verifiedPurchase && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}</p><p className="text-[11px] text-white/55">{review.date}</p></div>
                 <RatingStars rating={review.rating} />
               </div>
               <p className="mt-3 text-sm leading-relaxed text-white/85">“{review.comment}”</p>
-            </article>
+              </article>
+            </GlassCard>
           ))}
           {remaining > 0 ? (
-            <button
+            <GlassButton
+              variant="capsule"
               type="button"
               data-load-more-reviews
               onClick={() => setVisibleCount((count) => count + REVIEW_PAGE_SIZE)}
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.08] py-3 text-sm font-bold text-white"
+              className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold"
             >
               Load more · {Math.min(REVIEW_PAGE_SIZE, remaining)} of {remaining} remaining
-            </button>
+            </GlassButton>
           ) : null}
         </div>
       ) : <p className="mt-4 text-center text-xs text-white/55">Published written reviews will appear here when available.</p>}
@@ -909,7 +920,7 @@ function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavi
   return (
     <GlassSurface radius={24} className="text-white" contentClassName="p-5">
       <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-bold text-white">You may also like</h2><p className="text-[10px] text-white/55">Matched from the live catalog</p></div><ArrowUpRight className="h-4 w-4 text-white/55" /></div>
-      <div className="space-y-3">{products.map((item) => <button key={item.id} onClick={() => onNavigate?.(item)} className="group flex w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] text-left backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-white/[0.08]"><img src={item.image} alt={item.title} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-white">{item.title}</span><span className="flex items-center gap-1 text-xs text-white/55"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-white">{formatPrice(item.price)}</span></span></button>)}</div>
+      <div className="space-y-3">{products.map((item) => <GlassCard key={item.id} role="button" tabIndex={0} onClick={() => onNavigate?.(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate?.(item); } }} aria-label={`View ${item.title}`} className="group w-full cursor-pointer overflow-hidden text-left transition hover:-translate-y-0.5" contentClassName="flex p-0"><img src={item.image} alt={item.title} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-white">{item.title}</span><span className="flex items-center gap-1 text-xs text-white/55"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-white">{formatPrice(item.price)}</span></span></GlassCard>)}</div>
     </GlassSurface>
   );
 }
@@ -919,7 +930,7 @@ function RatingStars({ rating, className = "" }: { rating: number; className?: s
 }
 
 function Meta({ icon: Icon, text }: { icon: typeof Clock; text: string }) { return <div className="flex min-w-0 items-center gap-2"><Icon className="h-4 w-4 shrink-0 text-white/55" /><span className="truncate">{text}</span></div>; }
-function EmptyDetail({ text }: { text: string }) { return <div className="flex flex-col items-center rounded-2xl bg-white/[0.06] py-8 text-center"><PackageOpen className="h-7 w-7 text-white/40" /><p className="mt-2 px-5 text-xs text-white/55">{text}</p></div>; }
+function EmptyDetail({ text }: { text: string }) { return <GlassCard contentClassName="flex flex-col items-center py-8 text-center"><PackageOpen className="h-7 w-7 text-white/40" /><p className="mt-2 px-5 text-xs text-white/55">{text}</p></GlassCard>; }
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "DC"; }
 
 const asCurriculumModule = (raw: unknown, product: Product, paidModuleIds: Set<string>): CurriculumModule | null => {
@@ -970,4 +981,4 @@ const curriculumContainsId = (modules: CurriculumModule[], id: string): boolean 
 
 export const countCurriculumResources = (modules: CurriculumModule[]): number =>
   modules.reduce((sum, module) => sum + (module.resources?.length || 0) + countCurriculumResources(module.modules || []), 0);
-function MissingProduct({ onBack }: { onBack: () => void }) { return <div className="grid min-h-[70vh] place-items-center px-6 text-center"><div><ShoppingBag className="mx-auto h-12 w-12 text-white/40" /><h1 className="mt-4 text-2xl font-black text-white">Product not found</h1><p className="mt-2 text-sm text-white/55">It may have been hidden or removed from the live catalog.</p><button onClick={onBack} className="mt-6 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-black text-white transition hover:bg-indigo-500">Back to store</button></div></div>; }
+function MissingProduct({ onBack }: { onBack: () => void }) { return <div className="grid min-h-[70vh] place-items-center px-6 text-center"><div><ShoppingBag className="mx-auto h-12 w-12 text-white/40" /><h1 className="mt-4 text-2xl font-black text-white">Product not found</h1><p className="mt-2 text-sm text-white/55">It may have been hidden or removed from the live catalog.</p><button onClick={onBack} className="mt-6 rounded-full bg-indigo-600 px-5 py-3 text-sm font-black text-white transition hover:bg-indigo-500">Back to store</button></div></div>; }

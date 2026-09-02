@@ -1,7 +1,7 @@
 import type { Product } from "../data/products";
 import { GlassCard } from "./ui/GlassCard";
 import { LiquidMetalButton } from "./ui/LiquidMetalButton";
-import { GlassSurface } from "./ui/glass";
+import { GlassButton } from "./ui/glass-button";
 import { HeartIcon, StarIcon } from "./icons";
 
 type ProductCardProps = {
@@ -39,7 +39,7 @@ export default function ProductCard({
       contentClassName="p-0"
       className="group relative flex h-full flex-col overflow-hidden transition duration-300 hover:-translate-y-1"
     >
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-white/[0.06]">
+      <div className="relative aspect-[16/10] w-full overflow-hidden">
         <img src={product.image} alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
 
         <div className="absolute left-2 top-2 z-20 flex gap-1.5">
@@ -59,34 +59,28 @@ export default function ProductCard({
             </span>
           )}
           {product.tags.includes("BOARD") && (
-            <span className="rounded-md bg-white/[0.08] px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-rose-300">
+            <span className="rounded-md bg-rose-500/15 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-rose-300">
               Board
             </span>
           )}
         </div>
 
-        <button
+        {/* Wave 10: the pack GlassButton icon disc — the same save control the
+            store header and the list card use. */}
+        <GlassButton
           type="button"
           aria-label="Toggle wishlist"
           onClick={(event) => {
             event.stopPropagation();
             onToggleWishlist(product.id);
           }}
-          className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full text-white/75 transition hover:scale-105 active:scale-95"
+          className="absolute right-2 top-2 z-20 [&_.size-12]:size-8"
         >
-          {/* the same action disc the header and the desktop top bar use, so a
-              save control reads identically everywhere in the app */}
-          <GlassSurface
-            tint={0.4}
-            radius={999}
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0"
-          />
           <HeartIcon
             filled={wishlisted}
             className={`relative h-4 w-4 ${wishlisted ? "text-rose-500" : "text-white/75"}`}
           />
-        </button>
+        </GlassButton>
       </div>
 
       <div className="relative z-20 flex flex-1 flex-col gap-2 p-4">

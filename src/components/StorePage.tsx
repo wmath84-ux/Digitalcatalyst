@@ -109,7 +109,7 @@ function ProductCardList({
       className="group relative flex overflow-hidden transition duration-300 hover:-translate-y-1"
     >
       {/* Image — left side */}
-      <div className="relative h-auto w-36 shrink-0 overflow-hidden bg-white/[0.06] sm:w-44">
+      <div className="relative h-auto w-36 shrink-0 overflow-hidden sm:w-44">
         <img src={product.image} alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         <div className="absolute left-2 top-2 flex gap-1">
           {purchased && (
@@ -148,20 +148,26 @@ function ProductCardList({
             <span className="rounded-md bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-300">-{discount}%</span>
           )}
         </div>
-        <button
-          type="button"
-          disabled={purchased || inCart || unavailable}
-          onClick={(e) => { e.stopPropagation(); if (!unavailable) onAddToCart(product.id); }}
-          className={`mt-1 flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-xs font-extrabold uppercase tracking-wide transition ${
-            unavailable
-              ? "cursor-default border border-amber-400/30 bg-amber-500/20 text-amber-200 backdrop-blur"
-              : purchased || inCart
-                ? "cursor-default border border-emerald-400/30 bg-emerald-500/20 text-emerald-200 backdrop-blur"
-                : "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-[0.98]"
-          }`}
-        >
-          {purchased ? "Purchased" : unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to Cart"}
-        </button>
+        {/* Wave 10: terminal states are flat meaning-colour plates (amber /
+            emerald, same rule as the grid card); the actionable state is the
+            solid indigo primary capsule. */}
+        {purchased || inCart || unavailable ? (
+          <div
+            className={`mt-1 flex w-full cursor-default items-center justify-center rounded-full border px-3 py-2.5 text-xs font-extrabold uppercase tracking-wide ${
+              unavailable ? "border-amber-400/30 bg-amber-500/20 text-amber-200" : "border-emerald-400/30 bg-emerald-500/20 text-emerald-200"
+            }`}
+          >
+            {purchased ? "Purchased" : unavailable ? "Not for sale" : "In Cart"}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onAddToCart(product.id); }}
+            className="mt-1 flex w-full items-center justify-center rounded-full bg-indigo-600 px-3 py-2.5 text-xs font-extrabold uppercase tracking-wide text-white transition hover:bg-indigo-500 active:scale-[0.98]"
+          >
+            Add to Cart
+          </button>
+        )}
       </div>
     </GlassCard>
   );
@@ -274,21 +280,19 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
                   contentClassName="flex w-max gap-1 p-1.5"
                 >
                   {VIEW_OPTIONS.map(({ mode, label, Icon }) => (
-                    <button
+                    <GlassButton
                       key={mode}
                       type="button"
                       onClick={() => { setViewMode(mode); setViewDropdownOpen(false); }}
                       title={label}
                       aria-label={`${label} view`}
                       aria-pressed={viewMode === mode}
-                      className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl transition ${
-                        viewMode === mode
-                          ? "bg-indigo-600 text-white"
-                          : "text-white/55 hover:bg-white/[0.08] hover:text-white/85"
+                      className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl transition [&_.size-12]:size-9 ${
+                        viewMode === mode ? "[&_svg]:text-violet-300" : "[&_svg]:text-white/70"
                       }`}
                     >
                       <Icon className="h-4 w-4" />
-                    </button>
+                    </GlassButton>
                   ))}
                 </GlassSurface>
               )}
@@ -300,13 +304,13 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
       {error ? (
         <div className="mx-4 mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200">{error}</div>
       ) : loading ? (
-        <div className="mx-4 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">{[0, 1, 2, 3].map((item) => <div key={item} className="h-72 animate-pulse rounded-3xl border border-white/10 bg-white/[0.06]" />)}</div>
+        <div className="mx-4 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">{[0, 1, 2, 3].map((item) => <GlassCard key={item} className="h-72 animate-pulse" aria-hidden="true" />)}</div>
       ) : filtered.length === 0 ? (
-        <div className="mx-4 mt-6 flex flex-col items-center gap-2 rounded-3xl border border-dashed border-white/10 bg-white/[0.04] py-14 text-center">
+        <GlassCard className="mx-4 mt-6" contentClassName="flex flex-col items-center gap-2 py-14 text-center">
           <BookOpenIcon className="h-8 w-8 text-indigo-400" />
           <p className="text-sm font-bold text-white/85">No resources match your search</p>
           <p className="text-xs font-medium text-white/55">Try a different keyword or clear filters</p>
-        </div>
+        </GlassCard>
       ) : viewMode === "list" ? (
         /* ── Rectangular cards / list view ── */
         <div data-store-list className="flex flex-col gap-3 px-4 pt-4">

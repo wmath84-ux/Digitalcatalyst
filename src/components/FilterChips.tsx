@@ -105,18 +105,18 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
                     {items.map((filter) => {
                       const isActive = activeId === filter.id;
                       return (
-                        <button
+                        <GlassButton
                           key={filter.id}
+                          variant="capsule"
                           type="button"
+                          aria-pressed={isActive}
                           onClick={() => { onSelect(filter.id); setShowFilters(false); }}
-                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                            isActive
-                              ? "border-transparent bg-indigo-600 text-white"
-                              : "border-white/10 bg-white/[0.08] text-white/85 hover:border-indigo-400/50 hover:text-indigo-200"
+                          className={`[&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-xs [&>span>div]:font-semibold ${
+                            isActive ? "[&>span>div]:bg-indigo-600" : ""
                           }`}
                         >
                           {filter.label}
-                        </button>
+                        </GlassButton>
                       );
                     })}
                   </div>

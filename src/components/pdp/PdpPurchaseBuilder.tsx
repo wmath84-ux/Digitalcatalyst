@@ -39,6 +39,8 @@ import type { Product } from "@/data/products";
 import ModuleSelectTrigger from "./ModuleSelectTrigger";
 import { GlassSurface } from "../ui/glass";
 import { GlassButton } from "../ui/glass-button";
+import { GlassCard } from "../ui/GlassCard";
+import { GlassCheckbox } from "../ui/glass-checkbox";
 import ModuleSelectModal from "./ModuleSelectModal";
 import {
   buildCheckoutSelection,
@@ -538,37 +540,29 @@ function ResourceSelector({
         const sale = r.salePrice;
         const TypeIcon = RESOURCE_TYPE_ICON[r.type] || Package;
         return (
-          <article
+          <GlassCard
             key={r.id}
             data-pdp-resource
             data-resource-id={r.id}
-            className={`flex items-start gap-3 rounded-2xl border bg-white/[0.08] p-3 transition sm:p-4 ${
-              isSelected ? "border-violet-500 ring-2 ring-violet-400/30" : "border-white/10"
-            }`}
+            className={isSelected ? "ring-2 ring-violet-400/50" : ""}
+            contentClassName="flex items-start gap-3 p-3 sm:p-4"
           >
-            <button
-              type="button"
-              role="checkbox"
-              aria-checked={isOwned ? "true" : isSelected}
+            {/* Wave 10: the pack GlassCheckbox; an owned file shows the checkbox
+                checked + disabled with the emerald "Owned" chip carrying the meaning. */}
+            <GlassCheckbox
+              checked={isOwned ? true : isSelected}
               disabled={isOwned}
-              onClick={() => onToggle(r.id)}
-              className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 transition ${
-                isOwned
-                  ? "cursor-not-allowed border-emerald-500 bg-emerald-500 text-white"
-                  : isSelected
-                    ? "border-violet-600 bg-violet-600 text-white"
-                    : "border-white/10 bg-white/[0.08]"
-              }`}
-            >
-              {isOwned ? <Unlock size={12} /> : isSelected ? <Check size={14} /> : null}
-            </button>
+              onCheckedChange={() => onToggle(r.id)}
+              ariaLabel={isOwned ? `${r.name} — already owned` : `Select ${r.name}`}
+              className={`mt-0.5 shrink-0 ${isOwned ? "cursor-not-allowed border-emerald-400/70 bg-emerald-500/80" : ""}`}
+            />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-white/[0.06] text-white/55">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-violet-500/15 text-violet-300">
                   <TypeIcon size={12} />
                 </span>
                 <h3 className="min-w-0 truncate text-sm font-black text-white">{r.name}</h3>
-                <span className="rounded-full bg-white/[0.08] px-2 py-0.5 text-[10px] font-bold uppercase text-white/85">
+                <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-bold uppercase text-white/85">
                   {RESOURCE_TYPE_LABEL[r.type] || r.type}
                 </span>
                 {isOwned ? (
@@ -594,7 +588,7 @@ function ResourceSelector({
 
               </div>
             </div>
-          </article>
+          </GlassCard>
         );
       })}
     </div>
@@ -623,23 +617,31 @@ function PaidUpdateSelector({
       {updates.map((u) => {
         const isSelected = selectedId === u.id;
         return (
-          <button
-            type="button"
+          <GlassCard
             key={u.id}
+            role="checkbox"
+            aria-checked={isSelected}
+            tabIndex={0}
             data-pdp-update
             data-update-id={u.id}
             onClick={() => onSelect(isSelected ? null : u.id)}
-            className={`flex w-full items-start gap-3 rounded-2xl border bg-white/[0.08] p-3 text-left transition sm:p-4 ${
-              isSelected ? "border-violet-500 ring-2 ring-violet-400/30" : "border-white/10 hover:border-violet-400/50"
-            }`}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onSelect(isSelected ? null : u.id);
+              }
+            }}
+            className={`w-full cursor-pointer text-left ${isSelected ? "ring-2 ring-violet-400/50" : ""}`}
+            contentClassName="flex items-start gap-3 p-3 sm:p-4"
           >
-            <span
-              className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 ${
-                isSelected ? "border-violet-600 bg-violet-600 text-white" : "border-white/10 bg-white/[0.08]"
-              }`}
-            >
-              {isSelected ? <Check size={14} /> : null}
-            </span>
+            <GlassCheckbox
+              checked={isSelected}
+              tabIndex={-1}
+              aria-hidden="true"
+              onCheckedChange={() => onSelect(isSelected ? null : u.id)}
+              onClick={(event) => event.stopPropagation()}
+              className="mt-0.5 shrink-0"
+            />
             <div className="min-w-0 flex-1">
               <h3 className="text-sm font-black text-white">{u.title}</h3>
               {u.description ? (
@@ -653,7 +655,7 @@ function PaidUpdateSelector({
                 ) : null}
               </div>
             </div>
-          </button>
+          </GlassCard>
         );
       })}
     </div>
@@ -725,7 +727,7 @@ function SummaryPanel({
         </div>
       </div>
       {summary.fullCourse.effectivePrice > 0 ? (
-        <div className="mt-3 flex items-center justify-between rounded-2xl bg-white/[0.06] px-3 py-2 text-xs text-white/55 sm:text-sm">
+        <div className="mt-3 flex items-center justify-between rounded-2xl border border-white/10 px-3 py-2 text-xs text-white/55 sm:text-sm">
           <span className="inline-flex items-center gap-1">
             <ShoppingBag size={12} /> Full course: {formatPriceValue(summary.fullCourse.effectivePrice)}
           </span>
