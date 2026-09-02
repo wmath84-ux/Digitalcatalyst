@@ -670,3 +670,16 @@ html[data-glass="on"] [data-home-header] :where(h1, p, span, a, button, svg):not
 html[data-glass="on"] .dc-app-shell {
   background: transparent !important;
 }
+
+/* ── Part 1c · kill the remaining page-canvas gradients (mobile/tablet/profile)
+ * `.dc-app-frame` paints a translucent white linear-gradient (the mobile/tablet
+ * canvas) and `[data-profile-page]` a soft indigo wash — both are CSS-file
+ * backgrounds in src/index.css that the class-based strip can't reach. Under
+ * glass they go transparent so the single backdrop shows on EVERY device. The
+ * glass components (.dc-glass*) and chrome are left alone. !important beats the
+ * index.css declarations; gated on data-glass="on"; ?glass=off restores them. */
+html[data-glass="on"] .dc-app-frame,
+html[data-glass="on"] [data-profile-page] {
+  background: transparent !important;
+  background-image: none !important;
+}
