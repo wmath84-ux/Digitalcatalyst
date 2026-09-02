@@ -116,12 +116,12 @@ export default function SubscribeBar({
         disabled={isDisabled}
         data-subscription-subscribe
         data-subscription-cta-tone={cta.tone}
-        className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-extrabold transition-transform active:scale-[0.98] disabled:cursor-not-allowed ${
+        className={`flex w-full items-center justify-center gap-2 rounded-full py-4 text-sm font-extrabold transition active:scale-[0.98] disabled:cursor-not-allowed ${
           isOwned
-            ? "bg-emerald-600 text-white shadow-lg  disabled:opacity-100"
+            ? "bg-emerald-600 text-white disabled:opacity-100"
             : isDowngradeBlocked
-              ? "bg-white/[0.12] text-white/55 disabled:opacity-100"
-              : "bg-indigo-600 text-white shadow-lg  disabled:opacity-70"
+              ? "border border-white/15 text-white/55 disabled:opacity-100"
+              : "bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-70"
         }`}
       >
         {loading ? (

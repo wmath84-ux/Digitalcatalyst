@@ -13,6 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { GlassCard } from "../ui/glass-card";
+import { GlassButton } from "../ui/glass-button";
 import { ArrowLeft, BadgeCheck, CircleCheck, Package, ShoppingBag, Sparkles } from "lucide-react";
 import { useCheckout } from "../../checkout/CheckoutContext";
 import CheckoutLineItemCard from "./CheckoutLineItemCard";
@@ -178,7 +179,7 @@ export default function CheckoutSuccessStep({
               <li
                 key={id}
                 data-granted-entitlement-id={id}
-                className="flex items-center gap-2 truncate rounded-xl bg-white/[0.06] px-3 py-2 text-[11px] font-mono text-white/85"
+                className="flex items-center gap-2 truncate rounded-xl border border-white/10 px-3 py-2 text-[11px] font-mono text-white/85"
               >
                 <BadgeCheck size={12} className="shrink-0 text-emerald-300" />
                 <span className="truncate">{id}</span>
@@ -240,34 +241,36 @@ export default function CheckoutSuccessStep({
               type="button"
               onClick={() => { window.location.hash = "#/subscription"; }}
               data-checkout-success-membership
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 py-4 text-base font-black text-white shadow-lg transition hover:brightness-110 active:scale-[0.99]"
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 py-4 text-base font-black text-white transition hover:bg-indigo-500 active:scale-[0.99]"
             >
               <Sparkles size={18} /> Open my membership
             </button>
-            <button
+            <GlassButton
+              variant="capsule"
               type="button"
               onClick={() => setCelebrationOpen(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white/[0.06] py-3 text-sm font-bold text-white/85"
+              className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold"
             >
               Replay celebration
-            </button>
+            </GlassButton>
           </>
         ) : (
           <button
             type="button"
             onClick={onGoToLibrary}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-4 text-base font-black text-white shadow-lg transition hover:brightness-110 active:scale-[0.99]"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-4 text-base font-black text-white transition hover:bg-emerald-500 active:scale-[0.99]"
           >
             <ShoppingBag size={18} /> Go to my library
           </button>
         )}
-        <button
+        <GlassButton
+          variant="capsule"
           type="button"
           onClick={onBackToSource}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white/[0.06] py-3 text-sm font-bold text-white/85"
+          className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold"
         >
-          <ArrowLeft size={14} /> Back to source
-        </button>
+          <span className="flex items-center gap-2"><ArrowLeft size={14} /> Back to source</span>
+        </GlassButton>
       </div>
 
       {/* Sparkle-blast welcome for a freshly activated membership. */}

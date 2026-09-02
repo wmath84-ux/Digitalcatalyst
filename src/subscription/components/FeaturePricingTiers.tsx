@@ -11,6 +11,8 @@
 
 import { BadgeCheck, Check, Gift, Sparkles } from "lucide-react";
 import type { FeaturePriceTier } from "../../../utils/featurePricing";
+import { GlassCard } from "../../components/ui/GlassCard";
+import { GlassCheckbox } from "../../components/ui/glass-checkbox";
 
 const formatRupee = (paise: number): string =>
   `₹${Math.max(0, Math.round(paise / 100)).toLocaleString("en-IN")}`;
@@ -54,21 +56,32 @@ export default function FeaturePricingTiers({ tiers, cycle, selectedIds, onToggl
           const allPurchased = purchasableIds.length === 0;
 
           return (
-            <button
+            <GlassCard
               key={tier.pricePaise}
-              type="button"
-              onClick={() => onToggleTier(purchasableIds, allSelected)}
+              role="checkbox"
+              aria-checked={allSelected ? true : someSelected ? "mixed" : false}
+              aria-disabled={allPurchased || undefined}
+              tabIndex={allPurchased ? -1 : 0}
+              onClick={() => { if (!allPurchased) onToggleTier(purchasableIds, allSelected); }}
+              onKeyDown={(event) => {
+                if (allPurchased) return;
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onToggleTier(purchasableIds, allSelected);
+                }
+              }}
               data-tier-price={tier.pricePaise}
               data-tier-selected={allSelected ? "true" : someSelected ? "partial" : "false"}
-              className={`w-full rounded-2xl border p-3 text-left transition active:scale-[0.99] ${
+              className={`w-full cursor-pointer text-left transition active:scale-[0.99] ${
                 allPurchased
-                  ? "border-emerald-400/30 bg-emerald-500/15"
+                  ? "cursor-default ring-1 ring-emerald-400/40"
                   : allSelected
-                    ? "border-violet-400/30 bg-violet-500/15"
+                    ? "ring-2 ring-violet-400/50"
                     : someSelected
-                      ? "border-violet-400/30 bg-white/[0.08]"
-                      : "border-white/10 bg-white/[0.06]"
+                      ? "ring-1 ring-violet-400/40"
+                      : ""
               }`}
+              contentClassName="p-3"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -91,19 +104,18 @@ export default function FeaturePricingTiers({ tiers, cycle, selectedIds, onToggl
                   </span>
                 </div>
 
-                <span
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
-                    allPurchased || allSelected
-                      ? allPurchased
-                        ? "border-emerald-600 bg-emerald-600 text-white"
-                        : "border-violet-600 bg-violet-600 text-white"
-                      : someSelected
-                        ? "border-violet-400 bg-white/[0.12]"
-                        : "border-white/20 bg-white/[0.06]"
-                  }`}
-                >
-                  {allPurchased ? <Check className="h-3 w-3" /> : allSelected ? <Check className="h-3 w-3" /> : someSelected ? <span className="h-2 w-2 rounded-full bg-violet-500" /> : null}
-                </span>
+                {allPurchased ? (
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+                    <Check className="h-3 w-3" />
+                  </span>
+                ) : (
+                  <GlassCheckbox
+                    checked={allSelected}
+                    tabIndex={-1}
+                    aria-hidden
+                    className={`pointer-events-none shrink-0 ${someSelected ? "border-violet-400/70" : ""}`}
+                  />
+                )}
               </div>
 
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -118,7 +130,7 @@ export default function FeaturePricingTiers({ tiers, cycle, selectedIds, onToggl
                           ? "bg-emerald-500/20 font-bold text-emerald-200"
                           : selected.has(String(feature.id))
                             ? "bg-violet-500/20 text-violet-200"
-                            : "bg-white/[0.06] text-white/75"
+                            : "border border-white/15 text-white/75"
                       }`}
                     >
                       {isPurchased ? <BadgeCheck className="h-3 w-3" /> : null}
@@ -127,7 +139,7 @@ export default function FeaturePricingTiers({ tiers, cycle, selectedIds, onToggl
                   );
                 })}
               </div>
-            </button>
+            </GlassCard>
           );
         })}
       </div>

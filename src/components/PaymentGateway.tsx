@@ -19,6 +19,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, CreditCard, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import { GlassSurface } from "./ui/glass";
+import { GlassButton } from "./ui/glass-button";
 import { auth } from "../../firebase";
 import { apiFetch } from "../utils/apiBase";
 import { revealCheckoutChromeOverRazorpay, type CheckoutChromeController } from "../utils/razorpayCheckoutChrome";
@@ -355,13 +356,13 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
 
   return (
     <div className="flex flex-col gap-4 animate-fadeIn">
-      <div className="dc-card rounded-2xl border border-white/10 bg-white/[0.06] p-5 text-center">
+      <GlassSurface radius={16} className="text-white" contentClassName="p-5 text-center">
         <ShieldCheck className="mx-auto h-9 w-9 text-emerald-300" />
         <p className="mt-2 text-sm font-black text-white">Server-verified secure checkout</p>
         <p className="mt-1 text-xs text-white/55">The payable amount comes from the verified quote and is reconfirmed by Razorpay on the server.</p>
-      </div>
+      </GlassSurface>
 
-      <div className="dc-quote rounded-2xl bg-indigo-600 p-5 text-white shadow-lg ">
+      <div className="dc-quote rounded-2xl bg-indigo-600 p-5 text-white">
         <p className="text-xs font-bold uppercase tracking-wider text-indigo-200">{finalPrice === 0 ? "No payment needed" : "Amount to pay"}</p>
         <p className="mt-1 text-3xl font-extrabold">{finalPrice === 0 ? "FREE" : displayAmount}</p>
         <p className="mt-1 truncate text-xs text-indigo-200">{productName}</p>
@@ -373,7 +374,7 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
       {error && <div role="alert" className="rounded-2xl border border-rose-400/30 bg-rose-500/15 p-4 text-sm font-semibold leading-6 text-rose-200"><TriangleAlert className="mb-2 h-5 w-5" />{error}</div>}
 
       {paymentState !== "success" && (
-        <button disabled={busy} onClick={startPayment} className="relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-emerald-600 py-4 text-base font-black text-white shadow-lg transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60">
+        <button disabled={busy} onClick={startPayment} className="relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-emerald-600 py-4 text-base font-black text-white transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60">
           {/* Checkout's money button keeps its emerald identity (it is the one
               colour a user is told to trust) and wears the pack's specular
               layer over it — frost + rim + sheen, content above the gloss. */}
@@ -384,12 +385,12 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
           </span>
         </button>
       )}
-      {!busy && paymentState !== "success" && <button onClick={onGoBack} className="dc-glass-soft w-full rounded-2xl bg-white/[0.06] py-3 text-sm font-bold text-white/75">← Back to order summary</button>}
+      {!busy && paymentState !== "success" && <GlassButton variant="capsule" onClick={onGoBack} className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold">← Back to order summary</GlassButton>}
       <p className="text-center text-[11px] font-medium text-white/55">Razorpay handles UPI, cards, net banking and supported wallets. Card details never touch this app.</p>
     </div>
   );
 }
 
 function StatusCard({ icon, title, detail, tone }: { icon: React.ReactNode; title: string; detail: string; tone: "emerald" | "indigo" }) {
-  return <div className={`dc-card rounded-2xl border p-6 text-center ${tone === "emerald" ? "border-emerald-400/30 bg-emerald-500/15" : "border-indigo-400/30 bg-indigo-500/15"}`}><div className="flex justify-center">{icon}</div><p className="mt-3 text-sm font-black text-white">{title}</p><p className="mt-1 text-xs leading-5 text-white/55">{detail}</p></div>;
+  return <div className={`rounded-2xl border p-6 text-center ${tone === "emerald" ? "border-emerald-400/30 bg-emerald-500/15" : "border-indigo-400/30 bg-indigo-500/15"}`}><div className="flex justify-center">{icon}</div><p className="mt-3 text-sm font-black text-white">{title}</p><p className="mt-1 text-xs leading-5 text-white/55">{detail}</p></div>;
 }

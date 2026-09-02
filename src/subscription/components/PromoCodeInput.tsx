@@ -8,6 +8,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Tag, Users, CheckCircle2, XCircle, X, Loader2, AlertTriangle } from "lucide-react";
+import { GlassButton } from "../../components/ui/glass-button";
+import { GlassInput } from "../../components/ui/glass-input";
 
 export interface PromoResult {
   valid: boolean;
@@ -78,14 +80,14 @@ export default function PromoCodeInput({
               <p className="text-[11px] text-emerald-200">{appliedMessage || "Verified savings"}</p>
             </div>
           </div>
-          <button
+          <GlassButton
             type="button"
             onClick={onRemove}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.12] text-white/70 active:scale-90 transition-transform"
+            className="[&_.size-12]:size-7"
             aria-label="Remove code"
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </GlassButton>
         </motion.div>
       ) : (
         <div>
@@ -96,31 +98,30 @@ export default function PromoCodeInput({
             transition={{ duration: 0.35 }}
             className="flex items-center gap-2"
           >
-            <div className="flex flex-1 items-center gap-2 rounded-2xl bg-white/[0.06] px-3.5 py-2.5 ring-1 ring-white/10 focus-within:ring-2 focus-within:ring-violet-400">
-              <Icon className="h-4 w-4 shrink-0 text-white/55" />
-              <input
-                type="text"
-                value={value}
-                onChange={(e) => setValue(e.target.value.toUpperCase())}
-                placeholder={placeholder}
-                disabled={Boolean(disabled) || status === "loading"}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void handleApply();
-                  }
-                }}
-                className="w-full bg-transparent text-sm font-bold uppercase tracking-wider text-white/85 placeholder:font-normal placeholder:tracking-normal placeholder:text-white/55 focus:outline-none disabled:opacity-60"
-              />
-            </div>
-            <button
+            <GlassInput
+              icon={<Icon className="h-4 w-4 shrink-0" />}
+              type="text"
+              value={value}
+              onChange={(e) => setValue(e.target.value.toUpperCase())}
+              placeholder={placeholder}
+              disabled={Boolean(disabled) || status === "loading"}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void handleApply();
+                }
+              }}
+              className="min-w-0 flex-1 [&_input]:font-bold [&_input]:uppercase [&_input]:tracking-wider [&_input]:placeholder:font-normal [&_input]:placeholder:tracking-normal"
+            />
+            <GlassButton
+              variant="capsule"
               type="button"
               onClick={handleApply}
               disabled={!value.trim() || status === "loading" || Boolean(disabled)}
-              className="flex h-10 w-20 items-center justify-center rounded-2xl bg-slate-900 text-xs font-extrabold uppercase tracking-wider text-white active:scale-[0.98] transition-transform disabled:cursor-not-allowed disabled:opacity-50"
+              className="shrink-0 [&>span>div]:h-11 [&>span>div]:w-20 [&>span>div]:px-0 [&>span>div]:text-xs [&>span>div]:font-extrabold [&>span>div]:uppercase [&>span>div]:tracking-wider disabled:cursor-not-allowed disabled:opacity-50"
             >
               {status === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}
-            </button>
+            </GlassButton>
           </motion.div>
           {displayError ? (
             kind === "referral" && /already used/i.test(displayError) ? (
@@ -144,7 +145,7 @@ export default function PromoCodeInput({
                     <button
                       type="button"
                       onClick={() => { window.location.hash = "#/leaderboard"; }}
-                      className="mt-2 rounded-xl bg-rose-600 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white active:scale-[0.98] transition-transform"
+                      className="mt-2 rounded-full bg-rose-600 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white transition hover:bg-rose-500 active:scale-[0.98]"
                     >
                       Open Unused IDs
                     </button>

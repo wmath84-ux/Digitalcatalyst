@@ -220,7 +220,7 @@ export default function FeatureSelectModal({
                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
                           isPurchased
                             ? "bg-emerald-500/20 text-emerald-300"
-                            : ICON_BG[feat.icon] || "bg-white/[0.06] text-white/70"
+                            : ICON_BG[feat.icon] || "bg-indigo-500/15 text-indigo-200"
                         }`}
                       >
                         {isPurchased

@@ -5,6 +5,7 @@
 // discount, effective total, and the already-owned badge when relevant.
 
 import { BadgeCheck, CircleCheck, Package, PackageOpen, Unlock } from "lucide-react";
+import { GlassCard } from "../ui/GlassCard";
 import type { CheckoutLineItem } from "../../types/commerce";
 import { formatPaise } from "../../utils/money";
 
@@ -44,21 +45,20 @@ export default function CheckoutLineItemCard({ line, readOnly }: CheckoutLineIte
   const hasSale = line.salePrice !== null && line.salePrice !== undefined && line.salePrice < line.regularPrice;
   const discount = Math.max(0, line.regularPrice - line.effectivePrice);
   return (
-    <article
+    <GlassCard
       data-checkout-line-item
       data-line-kind={line.kind}
       data-line-id={line.id}
-      className={`rounded-2xl border bg-white/[0.06] p-3 sm:p-4 ${
-        line.alreadyOwned ? "border-emerald-400/30 bg-emerald-500/15" : "border-white/10"
-      }`}
+      className={line.alreadyOwned ? "ring-1 ring-emerald-400/40" : ""}
+      contentClassName="p-3 sm:p-4"
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/[0.06] text-white/75">
+        <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-500/15 text-indigo-200">
           <Icon size={14} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/75">
+            <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/75">
               {label}
             </span>
             {line.alreadyOwned ? (
@@ -67,7 +67,7 @@ export default function CheckoutLineItemCard({ line, readOnly }: CheckoutLineIte
               </span>
             ) : null}
             {line.quantity > 1 ? (
-              <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/75">
+              <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/75">
                 × {line.quantity}
               </span>
             ) : null}
@@ -100,11 +100,11 @@ export default function CheckoutLineItemCard({ line, readOnly }: CheckoutLineIte
         </div>
       </div>
       {hasSale && !line.alreadyOwned ? (
-        <div className="mt-3 flex items-center justify-between rounded-xl bg-white/[0.06] px-3 py-2 text-[11px] text-white/75">
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-[11px] text-white/75">
           <span>Sale saving</span>
           <span className="font-black text-emerald-200">− {formatRupee(discount * line.quantity)}</span>
         </div>
       ) : null}
-    </article>
+    </GlassCard>
   );
 }

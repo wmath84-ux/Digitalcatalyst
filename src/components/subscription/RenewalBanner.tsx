@@ -9,6 +9,7 @@
 // notification row and the profile card stay perfectly in sync.
 
 import { AlertTriangle, CalendarClock, Clock, Lock, X } from "lucide-react";
+import { GlassButton } from "../ui/glass-button";
 import type { RenewalView } from "../../../utils/renewalPresentation";
 
 const ICONS = {
@@ -96,33 +97,34 @@ export default function RenewalBanner({ view, onRenew, onDismiss, className = ""
                 type="button"
                 onClick={onRenew}
                 data-renewal-cta
-                className={`rounded-xl px-3.5 py-2 text-xs font-black  transition active:scale-[0.98] ${tone.cta}`}
+                className={`rounded-full px-3.5 py-2 text-xs font-black transition active:scale-[0.98] ${tone.cta}`}
               >
                 {view.cta}
               </button>
             ) : null}
             {view.dismissible && onDismiss ? (
-              <button
+              <GlassButton
+                variant="capsule"
                 type="button"
                 onClick={() => onDismiss(view.stage)}
-                className="rounded-xl px-3 py-2 text-xs font-bold text-white/55 transition hover:bg-white/[0.08]"
+                className="[&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-xs [&>span>div]:font-bold"
               >
                 Later
-              </button>
+              </GlassButton>
             ) : null}
           </div>
         </div>
 
         {view.dismissible && onDismiss ? (
-          <button
+          <GlassButton
             type="button"
             onClick={() => onDismiss(view.stage)}
             aria-label="Dismiss renewal notice"
             data-renewal-dismiss
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition ${tone.dismiss}`}
+            className={`shrink-0 [&_.size-12]:size-7 ${tone.dismiss}`}
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </GlassButton>
         ) : null}
       </div>
     </div>

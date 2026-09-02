@@ -1,6 +1,7 @@
 import { GlassSheet, GlassSheetContent, GlassSheetTitle, GlassSheetDescription } from "../../components/ui/glass-sheet";
 import { GlassAccordion, GlassAccordionItem, GlassAccordionTrigger, GlassAccordionContent } from "../../components/ui/glass-accordion";
 import { GlassButton } from "../../components/ui/glass-button";
+import { GlassCard } from "../../components/ui/GlassCard";
 import {
   X,
   MessageCircle,
@@ -78,7 +79,7 @@ export default function HelpModal({ open, onClose }: Props) {
             <GlassAccordionItem key={i} value={`faq-${i}`}>
               <GlassAccordionTrigger>
                 <span className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10">{faq.icon}</span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-200">{faq.icon}</span>
                   <span className="text-sm font-bold">{faq.q}</span>
                 </span>
               </GlassAccordionTrigger>
@@ -92,7 +93,7 @@ export default function HelpModal({ open, onClose }: Props) {
         <div className="mt-6">
           <h3 className="mb-3 text-sm font-bold text-white/85">Still need help?</h3>
           <div className="space-y-2">
-            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
+            <GlassCard contentClassName="flex items-center gap-3 p-3.5">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15">
                 <MessageCircle className="h-5 w-5 text-blue-300" />
               </span>
@@ -101,8 +102,8 @@ export default function HelpModal({ open, onClose }: Props) {
                 <p className="text-[11px] text-white/55">Available 24/7 — average response 2 min</p>
               </div>
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-emerald-400/30" />
-            </div>
-            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
+            </GlassCard>
+            <GlassCard contentClassName="flex items-center gap-3 p-3.5">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15">
                 <Mail className="h-5 w-5 text-violet-300" />
               </span>
@@ -110,8 +111,8 @@ export default function HelpModal({ open, onClose }: Props) {
                 <p className="text-sm font-bold">Email Support</p>
                 <p className="text-[11px] text-white/55">{supportEmail}</p>
               </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
+            </GlassCard>
+            <GlassCard contentClassName="flex items-center gap-3 p-3.5">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15">
                 <Phone className="h-5 w-5 text-amber-300" />
               </span>
@@ -119,7 +120,7 @@ export default function HelpModal({ open, onClose }: Props) {
                 <p className="text-sm font-bold">Call Us</p>
                 <p className="text-[11px] text-white/55">{supportPhone}</p>
               </div>
-            </div>
+            </GlassCard>
           </div>
         </div>
 

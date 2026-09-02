@@ -21,6 +21,8 @@
 import { GlassSelect, GlassSelectContent, GlassSelectItem, GlassSelectTrigger } from "../ui/glass-select";
 import { GlassSlider } from "../ui/glass-slider";
 import { GlassCheckbox } from "../ui/glass-checkbox";
+import { GlassButton } from "../ui/glass-button";
+import { GlassToggleGroup, GlassToggleItem } from "../ui/glass-toggle-group";
 import { useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -94,14 +96,14 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
         {/* Header */}
         <header className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
           {onBack ? (
-            <button
+            <GlassButton
               type="button"
               onClick={onBack}
               aria-label="Back"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.06] text-white/75 active:scale-90"
+              className="[&_.size-12]:size-9"
             >
               <ArrowLeft className="h-4 w-4" />
-            </button>
+            </GlassButton>
           ) : null}
           <div className="min-w-0">
             <h1 className="text-base font-black text-white">Renewal preview</h1>
@@ -118,7 +120,7 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
               </label>
               <span
                 data-preview-offset
-                className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-black text-white"
+                className="rounded-full bg-violet-600 px-2.5 py-1 text-[11px] font-black text-white"
               >
                 {offsetDays > 0 ? `+${offsetDays}d` : offsetDays === 0 ? "today" : `${offsetDays}d`}
               </span>
@@ -135,21 +137,23 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
               className="mt-3 w-full"
             />
 
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className="mt-3 max-w-full overflow-x-auto [scrollbar-width:none]">
+              <GlassToggleGroup
+                className="dc-segment shrink-0"
+                value={String(offsetDays)}
+                onValueChange={(next) => setOffsetDays(Number(next))}
+                aria-label="Days to expiry presets"
+              >
               {PRESETS.map((preset) => (
-                <button
+                <GlassToggleItem
                   key={preset.label}
-                  type="button"
-                  onClick={() => setOffsetDays(preset.days)}
-                  className={`rounded-full px-2.5 py-1.5 text-[11px] font-bold transition active:scale-95 ${
-                    offsetDays === preset.days
-                      ? "bg-violet-600 text-white"
-                      : "bg-white/[0.06] text-white/75 ring-1 ring-white/10"
-                  }`}
+                  value={String(preset.days)}
+                  className="whitespace-nowrap px-2.5 py-1.5 text-[11px] font-bold"
                 >
                   {preset.label}
-                </button>
+                </GlassToggleItem>
               ))}
+              </GlassToggleGroup>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -221,7 +225,7 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
                     className="mx-0"
                   />
                 ) : (
-                  <p className="rounded-2xl bg-white/[0.06] px-3 py-4 text-center text-xs font-semibold text-white/55">
+                  <p className="rounded-2xl border border-dashed border-white/15 px-3 py-4 text-center text-xs font-semibold text-white/55">
                     Dismissed for this stage. The next stage will show again.
                   </p>
                 )}
@@ -269,7 +273,7 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
               >
                 <pre
                   data-preview-payload
-                  className="overflow-x-auto rounded-2xl bg-slate-900 p-3 text-[10px] leading-relaxed text-emerald-300"
+                  className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40 p-3 text-[10px] leading-relaxed text-emerald-300"
                 >
 {JSON.stringify(
   {

@@ -256,9 +256,9 @@ function GateContent({
           {perks.map(({ icon: Icon, title, text }) => (
             <div
               key={title}
-              className="dc-premium-perk flex items-start gap-[clamp(0.6rem,1.5vw,0.9rem)] rounded-[clamp(0.85rem,2vw,1.15rem)] border border-white/10 bg-white/[0.06] p-[clamp(0.75rem,2vw,1.1rem)]"
+              className="dc-premium-perk flex items-start gap-[clamp(0.6rem,1.5vw,0.9rem)] rounded-[clamp(0.85rem,2vw,1.15rem)] border border-white/15 p-[clamp(0.75rem,2vw,1.1rem)]"
             >
-              <span className="grid h-[clamp(2.25rem,5vw,2.65rem)] w-[clamp(2.25rem,5vw,2.65rem)] shrink-0 place-items-center rounded-[clamp(0.6rem,1.5vw,0.85rem)] bg-indigo-600 text-indigo-300 ring-1 ring-indigo-400/30">
+              <span className="grid h-[clamp(2.25rem,5vw,2.65rem)] w-[clamp(2.25rem,5vw,2.65rem)] shrink-0 place-items-center rounded-[clamp(0.6rem,1.5vw,0.85rem)] bg-indigo-500/15 text-indigo-200 ring-1 ring-indigo-400/30">
                 <Icon className="h-[clamp(1rem,2.4vw,1.25rem)] w-[clamp(1rem,2.4vw,1.25rem)]" />
               </span>
               <div className="min-w-0 flex-1">
@@ -287,7 +287,6 @@ function GateContent({
         <div className="dc-premium-offer relative mt-[clamp(1.5rem,4vw,2rem)] overflow-hidden rounded-[clamp(1rem,2.5vw,1.5rem)] bg-indigo-600 p-[clamp(1rem,3vw,1.5rem)] text-white shadow-[0_18px_40px_-12px_rgba(79,70,229,0.55)]">
           {/* Subtle grid pattern for a premium feel */}
           <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.18)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.18)_1px,transparent_1px)] [background-size:24px_24px]" />
-          <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
 
           <div className="relative">
             <div className="flex flex-wrap items-center gap-2">
@@ -329,7 +328,7 @@ function GateContent({
                     </span>
                   )}
                   {tier.highlight && (
-                    <span className="absolute -top-2 left-2 inline-flex items-center gap-1 rounded-full bg-white/[0.08] px-2 py-0.5 text-[clamp(9px,1.5vw,10px)] font-black uppercase tracking-wider text-violet-200 shadow-md">
+                    <span className="absolute -top-2 left-2 inline-flex items-center gap-1 rounded-full bg-indigo-950/70 px-2 py-0.5 text-[clamp(9px,1.5vw,10px)] font-black uppercase tracking-wider text-violet-200">
                       <Crown className="h-2.5 w-2.5" />
                       Best value
                     </span>

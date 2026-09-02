@@ -3,6 +3,7 @@ import { Product } from "../types";
 import { formatINR } from "../utils/format";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { LiquidMetalButton } from "@/components/ui/LiquidMetalButton";
+import { GlassButton } from "@/components/ui/glass-button";
 
 interface FavoriteCardProps {
   product: Product;
@@ -28,7 +29,7 @@ export default function FavoriteCard({
       contentClassName="p-0"
       className="group relative flex flex-col overflow-hidden"
     >
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-white/[0.06]">
+      <div className="relative aspect-[16/10] w-full overflow-hidden">
         <button
           type="button"
           onClick={() => onOpen?.(product.id)}
@@ -41,20 +42,20 @@ export default function FavoriteCard({
             className="h-full w-full object-cover"
           />
         </button>
-        <button
+        <GlassButton
           onClick={() => onRemove(product.id)}
-          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] backdrop-blur-md transition active:scale-90"
+          className="absolute right-2 top-2 [&_.size-12]:size-8"
           aria-label="Remove from favorites"
         >
           <Heart size={16} className="fill-rose-500 text-rose-500" />
-        </button>
-        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-semibold text-white backdrop-blur">
+        </GlassButton>
+        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-[var(--dc-chrome-glass)] px-2 py-0.5 text-[9px] font-semibold text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
           {product.hours} • {product.lessons} lessons
         </span>
       </div>
       <div className="relative flex flex-1 flex-col gap-1.5 p-3">
         <button type="button" onClick={() => onOpen?.(product.id)} className="text-left">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-300">
             {product.category}
           </span>
           <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-white">

@@ -12,6 +12,7 @@
 
 import { BadgeCheck, CalendarClock, Check, Info, Package, PlusCircle, Sparkles } from "lucide-react";
 import { GlassCard } from "../../components/ui/glass-card";
+import { GlassButton } from "../../components/ui/glass-button";
 import type { OwnedPlanSummary } from "../../../utils/subscriptionOwnership";
 import type { SubscriptionFeatureDoc } from "../utils/subscriptionCatalog";
 
@@ -39,11 +40,9 @@ export default function OwnedPlanCard({
       {/* Hero — the plan they already own. Emerald throughout so the colour
           alone signals "already yours", never "buy me". */}
       <GlassCard>
-        <div className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-14 -left-8 h-32 w-32 rounded-full bg-white/5 blur-2xl" />
         <div className="relative">
           <span
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider backdrop-blur"
+            className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-200 ring-1 ring-emerald-400/30"
             data-subscription-owned-badge
           >
             <BadgeCheck className="h-3 w-3" /> Already subscribed
@@ -55,16 +54,16 @@ export default function OwnedPlanCard({
             {summary.cycleLabel} plan · active now
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className="rounded-xl bg-white/15 px-3 py-1.5 text-[11px] font-bold backdrop-blur">
+            <span className="rounded-xl border border-white/15 px-3 py-1.5 text-[11px] font-bold">
               {summary.featureCount} feature{summary.featureCount === 1 ? "" : "s"} unlocked
             </span>
             {summary.productTitles.length > 0 ? (
-              <span className="rounded-xl bg-white/15 px-3 py-1.5 text-[11px] font-bold backdrop-blur">
+              <span className="rounded-xl border border-white/15 px-3 py-1.5 text-[11px] font-bold">
                 {summary.productTitles.length} course{summary.productTitles.length === 1 ? "" : "s"} included
               </span>
             ) : null}
             {expiresAtLabel ? (
-              <span className="rounded-xl bg-white/15 px-3 py-1.5 text-[11px] font-bold backdrop-blur">
+              <span className="rounded-xl border border-white/15 px-3 py-1.5 text-[11px] font-bold">
                 {summary.remainingLabel}
               </span>
             ) : null}
@@ -170,23 +169,26 @@ export default function OwnedPlanCard({
 
       {/* Forward path 2: a different plan or a different cycle. */}
       {otherPlanNames.length > 0 ? (
-        <button
+        <GlassButton
+          variant="capsule"
           type="button"
           onClick={onSeeOtherPlans}
           data-subscription-owned-switch
-          className="flex items-start gap-3 rounded-3xl border border-white/10 bg-white/[0.06] p-4 text-left transition active:scale-[0.99] hover:bg-white/[0.08]"
+          className="w-full text-left [&>span>div]:h-auto [&>span>div]:w-full [&>span>div]:rounded-3xl [&>span>div]:p-4 [&>span>div>span]:w-full"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-500">
-            <Info className="h-4.5 w-4.5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-black text-white">Want something different?</span>
-            <span className="mt-0.5 block text-[11px] leading-4 text-white/55">
-              Pick {otherPlanNames.join(", ")} above, or switch between monthly and yearly, to see a
-              purchasable plan.
+          <span className="flex w-full items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-300">
+              <Info className="h-4.5 w-4.5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-black text-white">Want something different?</span>
+              <span className="mt-0.5 block text-[11px] font-normal leading-4 text-white/55">
+                Pick {otherPlanNames.join(", ")} above, or switch between monthly and yearly, to see a
+                purchasable plan.
+              </span>
             </span>
           </span>
-        </button>
+        </GlassButton>
       ) : null}
     </div>
   );

@@ -521,3 +521,35 @@ Note: `GlassCard` is imported from the app wrapper `ui/GlassCard.tsx` (pack `gla
 **Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 267 → 250, render-sites 465 → 497 (`native title=` 127 unchanged since Wave 8) · backdrop OK · frozen diff empty.
 
 **Wave 11 next:** Cart / Checkout / Subscription (`cartWishlist/**`, `checkout/**`, `subscription/**`).
+
+### Phase B · Wave 11 — Cart / Checkout / Subscription (2026-09-02)
+
+Interlude (owner request, same day): tapping the store `SearchBar` or the home header search box with an empty draft now opens the pack **`GlassCommand`** palette (`src/lib/commandPalette.ts` → `openCommandPalette()` → `dc:command-palette-open` event → `GlassCommandPalette`); a non-empty draft still deep-links to `#/search?q=`.
+
+| Old | New |
+|---|---|
+| Cart `CartItemCard` Remove disc (`bg-rose-500/15` plate), `FavoriteCard` heart disc (`bg-white/[0.08] backdrop-blur-md`), image wells `bg-white/[0.06–0.08]`, price chip `bg-black/60` | `GlassButton` icon discs (size-8; rose ink on Remove) · no plate behind images · `--dc-chrome-glass` chip |
+| `CartPage` Clear (`bg-rose-500/15` pill), summary box `dc-glass`, EmptyState accent `from-violet-500 to-indigo-600` | `GlassButton` capsule (rose ink) · `GlassSurface radius={24}` · solid `bg-indigo-600` |
+| Checkout back disc (`bg-white/[0.06]`), `CheckoutLineItemCard` `<article bg-white/[0.06]>` + inner `bg-white/[0.06]` wells/chips/strips | `GlassButton` size-9 · **`GlassCard`** (owned = emerald ring) · indigo-tint icon well, outlined chips/strip |
+| `CheckoutReviewStep` "Show selection details", Back/Refresh/Edit plates, coupon Remove (`bg-white/[0.08]`), coupon `<input bg-white/[0.06]>`, amber "Try again", membership row `bg-white/[0.08]`, feature/product rows `bg-white/[0.06]` | `GlassButton` capsules (all pins `data-checkout-*` kept) · pack **`GlassInput`** · violet-tint row, outlined rows; primaries solid `rounded-full` (`hover:bg-*-500`), no `shadow-lg` |
+| `CheckoutSuccessStep` Replay / Back plates, entitlement rows `bg-white/[0.06]` | `GlassButton` capsules · outlined rows |
+| `PaymentGateway` secure card `dc-card bg-white/[0.06]`, Back `dc-glass-soft bg-white/[0.06]`, `shadow-lg` on quote/pay | `GlassSurface radius={16}` · `GlassButton` capsule · shadows dropped (emerald pay button + `dc-quote bg-indigo-600` pins kept; `liquidGlassWaveSixContract` re-pinned to the capsule) |
+| Subscription `ActiveMemberView` / `OwnedPlanCard` hero blobs (`bg-white/10`, `bg-white/5 blur-2xl`), `bg-white/20` badge, `bg-white/15` stat chips, feature rows / Change-plan / Switch rows (`bg-white/[0.06]`), Renew early `bg-slate-900` | blobs removed · emerald meaning badge · outlined chips · **`GlassButton` capsule rows** (`[&>span>div]:h-auto … w-full`, `data-member-*` / `data-subscription-owned-*` kept) · solid indigo |
+| `CourseSelectTrigger` / `FeatureSelectTrigger` (`<button bg-white/[0.06] p-4>`) | `GlassButton` capsule rows (`data-subscription-products-trigger` / `-features-trigger` kept) |
+| `FeaturePricingTiers` tier `<button>` (white/violet/emerald fills, hand-drawn radio disc), feature chips `bg-white/[0.06]` | **`GlassCard role="checkbox"`** (`aria-checked` incl. `"mixed"`, keyboard) + pack **`GlassCheckbox`**; selected = violet ring, purchased = emerald ring + disc; outlined chips |
+| `PlanOverview` plan pills (`bg-white text-slate-900` active / `bg-white/10`), cycle toggle (`bg-white/10 p-1 ring`) | pack **`GlassToggleGroup`** (`dc-segment`) ×2; owned = emerald ink; every `data-subscription-plan-pill` / `-cycle*` pin kept; icon wells indigo tint |
+| `PromoCodeInput` field (`bg-white/[0.06] ring`), Apply `bg-slate-900`, Remove disc `bg-white/[0.12]`, referral CTA `rounded-xl` | pack **`GlassInput icon`** · `GlassButton` capsule · `GlassButton` size-7 · rose `rounded-full` |
+| `StackedCards` prev/next (`bg-white/[0.12]` / `bg-slate-900 shadow`), eyebrow chip `bg-white/15` | `GlassButton` icon discs · `--dc-chrome-glass` chip |
+| `SubscribeBar` CTA (`rounded-2xl shadow-lg`, blocked `bg-white/[0.12]`), `SubscriptionPage` Retry `bg-slate-900`, Cancel `bg-white/[0.1]`, Upgrade `rounded-2xl` | `rounded-full` no shadow, blocked = outline · `GlassButton` capsules · `rounded-full hover:bg-indigo-500` (`bg-emerald-600 text-white` owned pin kept) |
+| `HelpModal` contact rows `bg-white/[0.06]`, FAQ icon well `bg-white/10`; `FeatureSelectModal` fallback icon well | `GlassCard` rows · indigo-tint wells |
+| `HiddenFeatureHint` (`bg-white/[0.08]` box), `SubscriberActiveBadge` (**`bg-gradient-to-br from-emerald-50 via-white to-amber-50`** + pastel blobs — a light plate) | `GlassSurface radius={24}` (emerald ring on the badge); CTA `rounded-full`; `shadow-md` dropped |
+| `RenewalBanner` Later / dismiss, `RenewalStatusCard` reminder toggle (`bg-white/[0.08] ring`), progress track `bg-white/[0.12]`, blocked note `bg-white/[0.08]` | `GlassButton` capsule / size-7 / capsule · outlined track · rose meaning plate; CTAs `rounded-full` |
+| `RenewalPreviewPage` back disc, offset chip `bg-slate-900`, preset chips (`bg-white/[0.06]` / violet), dismissed box, payload `<pre bg-slate-900>` | `GlassButton` size-9 · violet chip · pack **`GlassToggleGroup`** · dashed outline · `bg-black/40` code well |
+| `PremiumGate` perk rows `bg-white/[0.06]`, icon well `bg-indigo-600`, offer blob `bg-white/10 blur-2xl`, "Best value" `bg-white/[0.08] shadow-md` | outlined perk rows · indigo-tint well · blob removed · `bg-indigo-950/70` chip (all `dc-premium-*` / `data-premium-gate*` / clamp pins kept) |
+| `UnlockCelebration` header blobs, seal `bg-white text-violet-600 shadow-lg`, `bg-white/20` chips, CTA `shadow-lg shadow-violet-500/25` | blobs removed · emerald seal · outlined chips · solid indigo `rounded-full` |
+
+Kept (pinned): `contentClassName="flex gap-3 p-2.5"`, `aria-label="Remove item"`, `disabled={inCart}`, `<LiquidMetalButton`, `formatINR(product.price)` (cart); `bg-emerald-600` + `<GlassSurface className="pointer-events-none absolute inset-0" />` + `dc-quote rounded-2xl bg-indigo-600` (PaymentGateway); `bg-indigo-950/30` + `dc-premium-*` (PremiumGate); `<GlassSlider` / `<GlassCheckbox` / `<GlassSelect` + `data-preview-*` (RenewalPreviewPage); `data-subscription-*` / `data-member-*` / `data-renewal-*` / `data-checkout-*` hooks.
+
+**Gates:** tsc clean · tests 1966 / 8 (baseline) · build OK · coverage `<button>` 250 → 218, `rounded-* bg-white panels` → 177, render-sites 497 → 543 (`native title=` 127 unchanged since Wave 8) · backdrop OK · frozen diff empty.
+
+**Wave 12 next:** Home / Landing / Auth / Leaderboard / Notifications (must update `liquidGlassWaveThreeContract` l.228 import guard for `src/home/components/{ProductCard,Header,Reviews}.tsx`).

@@ -2,6 +2,7 @@ import { Trash2 } from "lucide-react";
 import { Product } from "../types";
 import { formatINR } from "../utils/format";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { GlassButton } from "@/components/ui/glass-button";
 
 interface CartItemCardProps {
   product: Product;
@@ -20,7 +21,7 @@ export default function CartItemCard({ product, onRemove, onOpen }: CartItemCard
       <button
         type="button"
         onClick={() => onOpen?.(product.id)}
-        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] bg-white/[0.08] ring-1 ring-white/10"
+        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] ring-1 ring-white/10"
         aria-label={`View ${product.title}`}
       >
         <img
@@ -32,7 +33,7 @@ export default function CartItemCard({ product, onRemove, onOpen }: CartItemCard
       <div className="relative flex min-w-0 flex-1 flex-col justify-between py-0.5">
         <div>
           <button type="button" onClick={() => onOpen?.(product.id)} className="text-left">
-            <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-500">
+            <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-300">
               {product.category}
             </span>
             <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-white">
@@ -50,13 +51,13 @@ export default function CartItemCard({ product, onRemove, onOpen }: CartItemCard
               {formatINR(product.originalPrice)}
             </span>
           </div>
-          <button
+          <GlassButton
             onClick={() => onRemove(product.id)}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-rose-500/15 text-rose-500 backdrop-blur transition active:scale-90"
+            className="[&_.size-12]:size-8 [&_svg]:text-rose-300"
             aria-label="Remove item"
           >
             <Trash2 size={15} />
-          </button>
+          </GlassButton>
         </div>
       </div>
     </GlassCard>

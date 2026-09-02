@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
+import { GlassButton } from "../ui/glass-button";
 import StepIndicator from "../StepIndicator";
 import PaymentGateway, { type VerifiedPayment } from "../PaymentGateway";
 import Header from "../Header";
@@ -156,14 +157,14 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
 
         <div data-checkout-toolbar className="border-b border-white/10">
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
-            <button
+            <GlassButton
               type="button"
               onClick={checkout.goBack}
-              className="grid h-9 w-9 place-items-center rounded-xl bg-white/[0.06] text-white/75"
+              className="[&_.size-12]:size-9"
               aria-label="Back to source"
             >
               <ArrowLeft size={16} />
-            </button>
+            </GlassButton>
             <h1 className="text-base font-extrabold tracking-tight text-white">Checkout</h1>
             <span className="text-[10px] font-mono text-white/55">Step {step}/3</span>
           </div>

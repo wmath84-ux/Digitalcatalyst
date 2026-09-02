@@ -8,6 +8,7 @@
 
 import { BadgeCheck, Check, Crown, Lock, X as XIcon, ChevronDown, ChevronUp } from "lucide-react";
 import { GlassCard } from "../../components/ui/glass-card";
+import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 import SubscriberOnlyPriceBadge from "../../components/subscription/SubscriberOnlyPriceBadge";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -77,37 +78,41 @@ export default function PlanOverview({
         <div className="pointer-events-none absolute -bottom-16 -left-10 h-40 w-40 rounded-full bg-fuchsia-500/20 blur-3xl" />
 
         {/* Plan picker */}
-        <div className="relative mb-3 flex flex-wrap items-center gap-2">
+        {/* Wave 11: plan pills are the pack GlassToggleGroup (segment material);
+            owned plan keeps its emerald ink because the colour carries meaning. */}
+        <div className="relative mb-3 max-w-full overflow-x-auto [scrollbar-width:none]">
+        <GlassToggleGroup
+          className="dc-segment shrink-0"
+          value={selectedPlanId ?? ""}
+          onValueChange={(id) => {
+            const plan = plans.find((candidate) => candidate.id === id);
+            if (plan && plan.active) onChangePlan(id);
+          }}
+          aria-label="Choose a plan"
+        >
           {plans.map((plan) => {
-            const isActive = plan.id === selectedPlanId;
             // Owned plans are marked so the buyer can tell, before tapping,
             // which subscription type is already on their account.
             const isOwned = Boolean(ownedPlanId && plan.id === ownedPlanId);
             return (
-              <button
+              <GlassToggleItem
                 key={plan.id}
-                type="button"
-                onClick={() => onChangePlan(plan.id)}
+                value={plan.id}
                 disabled={!plan.active}
                 data-subscription-plan-pill={plan.id}
                 data-subscription-plan-owned={isOwned ? "true" : undefined}
-                className={`inline-flex items-center rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-wider transition ${
-                  isActive
-                    ? isOwned
-                      ? "bg-emerald-400 text-emerald-950 shadow"
-                      : "bg-white text-slate-900 shadow"
-                    : isOwned
-                      ? "bg-emerald-400/20 text-emerald-100 ring-1 ring-emerald-400/30 hover:bg-emerald-400/30"
-                      : "bg-white/10 text-white/80 ring-1 ring-white/20 hover:bg-white/20"
+                className={`whitespace-nowrap px-3 py-1.5 text-[11px] font-black uppercase tracking-wider ${
+                  isOwned ? "text-emerald-200 hover:text-emerald-100" : ""
                 } ${!plan.active ? "cursor-not-allowed opacity-50" : ""}`}
               >
                 {isOwned ? <BadgeCheck className="mr-1 h-3 w-3" aria-hidden="true" /> : null}
                 {plan.name}
                 {isOwned ? <span className="ml-1 text-[9px] font-black">· ACTIVE</span> : null}
-                {!isOwned && plan.badge ? <span className="ml-1 rounded bg-amber-300/90 px-1 text-[9px] text-white">{plan.badge}</span> : null}
-              </button>
+                {!isOwned && plan.badge ? <span className="ml-1 rounded bg-amber-500/80 px-1 text-[9px] text-white">{plan.badge}</span> : null}
+              </GlassToggleItem>
             );
           })}
+        </GlassToggleGroup>
         </div>
 
         {/* Plan + price */}
@@ -147,7 +152,18 @@ export default function PlanOverview({
         </div>
 
         {/* Cycle toggle */}
-        <div className="relative mt-4 inline-flex rounded-full bg-white/10 p-1 text-[11px] font-bold ring-1 ring-white/15">
+        <GlassToggleGroup
+          className="dc-segment relative mt-4 text-[11px] font-bold"
+          value={cycle}
+          onValueChange={(next) => {
+            const c = next as BillingCycle;
+            const isCycleDowngrade = Boolean(
+              ownedPlanId && ownedCycle === "yearly" && selectedPlanId === ownedPlanId && c === "monthly",
+            );
+            if (supportedCycles.includes(c) && !isCycleDowngrade) onChangeCycle(c);
+          }}
+          aria-label="Billing cycle"
+        >
           {(["monthly", "yearly"] as BillingCycle[]).map((c) => {
             // NO-DOWNGRADE rule: a yearly member cannot drop to the monthly
             // cycle of the SAME plan while that yearly membership is active.
@@ -163,21 +179,16 @@ export default function PlanOverview({
               ownedPlanId && ownedCycle === c && selectedPlanId === ownedPlanId,
             );
             return (
-              <button
+              <GlassToggleItem
                 key={c}
-                type="button"
+                value={c}
                 disabled={!enabled}
-                onClick={() => enabled && onChangeCycle(c)}
                 data-subscription-cycle={c}
                 data-subscription-cycle-owned={isOwnedCycle ? "true" : undefined}
                 data-subscription-cycle-downgrade={isCycleDowngrade ? "true" : undefined}
                 title={isCycleDowngrade ? "Available after your yearly membership ends" : undefined}
-                className={`inline-flex items-center rounded-full px-3 py-1.5 transition ${
-                  cycle === c
-                    ? isOwnedCycle
-                      ? "bg-emerald-400 text-emerald-950 shadow"
-                      : "bg-white text-slate-900 shadow"
-                    : "text-white/80 hover:text-white"
+                className={`px-3 py-1.5 text-[11px] font-bold ${
+                  isOwnedCycle ? "text-emerald-200" : ""
                 } ${!enabled ? "cursor-not-allowed opacity-50" : ""}`}
               >
                 {c === "monthly" ? "Monthly" : "Yearly"}
@@ -188,10 +199,10 @@ export default function PlanOverview({
                 ) : c === "yearly" ? (
                   <span className="ml-1 text-[9px] text-emerald-300">Save</span>
                 ) : null}
-              </button>
+              </GlassToggleItem>
             );
           })}
-        </div>
+        </GlassToggleGroup>
         {ownedPlanId && ownedCycle === "yearly" && selectedPlanId === ownedPlanId ? (
           <p
             data-subscription-cycle-downgrade-note
@@ -206,7 +217,7 @@ export default function PlanOverview({
             data-revision-bank-benefit
             className="relative mt-4 flex items-center gap-2 rounded-2xl bg-indigo-400/10 px-3 py-2.5 text-[11px] font-semibold text-indigo-50 ring-1 ring-indigo-400/30"
           >
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white/10 text-sm">🧠</span>
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-sm">🧠</span>
             <span>
               {activePlan.revisionTestBankLimits?.[cycle] === -1
                 ? "With Revision Studio: unlimited cloud-saved tests"
@@ -217,7 +228,7 @@ export default function PlanOverview({
 
         {activePlan ? (
           <div data-school-ai-benefit className="relative mt-2 flex items-center gap-2 rounded-2xl bg-violet-400/10 px-3 py-2.5 text-[11px] font-semibold text-violet-50 ring-1 ring-violet-400/30">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white/10 text-sm">✨</span>
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-sm">✨</span>
             <span>
               School AI: {activePlan.aiAllowances?.[cycle]?.dailyGenerationLimit === 0 ? "unlimited" : `${activePlan.aiAllowances?.[cycle]?.dailyGenerationLimit ?? 20} successful tests/day`}
               {(activePlan.aiAllowances?.[cycle]?.costBudgetMicros ?? -1) >= 0

@@ -16,6 +16,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { GlassCard } from "../ui/glass-card";
+import { GlassButton } from "../ui/glass-button";
+import { GlassInput } from "../ui/glass-input";
 import {
   AlertCircle,
   ArrowLeft,
@@ -335,13 +337,14 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           ) : null}
         </GlassCard>
       ) : (
-        <button
+        <GlassButton
+          variant="capsule"
           type="button"
           onClick={() => setShowDetails(true)}
-          className="rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/75 hover:bg-white/[0.06]"
+          className="[&>span>div]:h-9 [&>span>div]:px-4 [&>span>div]:text-xs [&>span>div]:font-bold"
         >
           Show selection details
-        </button>
+        </GlassButton>
       )}
 
       {/* Refresh banner */}
@@ -369,40 +372,45 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           type="button"
           onClick={onProceed}
           disabled={showLoading}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 py-4 text-base font-black text-white shadow-lg transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 py-4 text-base font-black text-white transition hover:bg-indigo-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {showLoading ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <ShoppingBag className="h-5 w-5" />}
           {finalTotal === 0 ? "Get free access" : `Proceed to payment — ${formatRupee(finalTotal)}`}
         </button>
         <div className="grid grid-cols-2 gap-2">
-          <button
+          <GlassButton
+            variant="capsule"
             type="button"
             onClick={checkout.goBack}
-            className="flex items-center justify-center gap-1.5 rounded-2xl bg-white/[0.06] py-3 text-sm font-bold text-white/85"
+            className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:px-3 [&>span>div]:font-bold"
           >
-            <ArrowLeft size={14} /> Back to source
-          </button>
-          <button
+            <span className="flex items-center gap-1.5"><ArrowLeft size={14} /> Back to source</span>
+          </GlassButton>
+          <GlassButton
+            variant="capsule"
             type="button"
             onClick={() => void checkout.refresh()}
             disabled={showLoading}
-            className="flex items-center justify-center gap-1.5 rounded-2xl bg-white/[0.06] py-3 text-sm font-bold text-white/85 disabled:opacity-60"
+            className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:px-3 [&>span>div]:font-bold disabled:opacity-60"
           >
-            {showLoading && checkout.quoteStatus === "refreshing" ? (
-              <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw size={14} />
-            )}
-            Refresh quote
-          </button>
+            <span className="flex items-center gap-1.5">
+              {showLoading && checkout.quoteStatus === "refreshing" ? (
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw size={14} />
+              )}
+              Refresh quote
+            </span>
+          </GlassButton>
         </div>
-        <button
+        <GlassButton
+          variant="capsule"
           type="button"
           onClick={onEdit}
-          className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] py-3 text-sm font-bold text-white/85"
+          className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold"
         >
-          Edit selection <ChevronRight size={14} />
-        </button>
+          <span className="flex items-center gap-1.5">Edit selection <ChevronRight size={14} /></span>
+        </GlassButton>
         <p className="px-1 text-center text-[10px] font-medium text-white/55">
           Quote expires at {new Date(quote.expiresAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · Prices are verified server-side before payment.
         </p>
@@ -591,7 +599,7 @@ export function SubscriptionUnlocksCard({
       </header>
 
       {/* Membership row */}
-      <div className="mt-3 rounded-2xl border border-violet-400/30 bg-white/[0.08] p-3">
+      <div className="mt-3 rounded-2xl border border-violet-400/30 bg-violet-500/15 p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-black text-white" data-checkout-subscription-plan-name>
@@ -636,7 +644,7 @@ export function SubscriptionUnlocksCard({
               <li
                 key={`feature:${row.id}`}
                 data-checkout-subscription-feature={row.id}
-                className="flex items-start justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-2.5"
+                className="flex items-start justify-between gap-3 rounded-2xl border border-white/10 p-2.5"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-black text-white">{row.name}</p>
@@ -673,7 +681,7 @@ export function SubscriptionUnlocksCard({
               <li
                 key={row.id}
                 data-checkout-subscription-product={row.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-2.5"
+                className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 p-2.5"
               >
                 <span className="min-w-0 flex-1 text-xs font-bold text-white/85">{row.name}</span>
                 {row.alreadyOwned ? (
@@ -817,20 +825,23 @@ function SafeRecoveryUI({
         <button
           type="button"
           onClick={onGoBack}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-amber-600 py-3 text-sm font-bold text-white hover:bg-amber-700"
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-amber-600 py-3 text-sm font-bold text-white hover:bg-amber-500"
         >
           <ArrowLeft size={14} /> Return to source
         </button>
         {kind !== "empty" ? (
-          <button
+          <GlassButton
+            variant="capsule"
             type="button"
             onClick={onRefresh}
             disabled={refreshPending}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/[0.08] py-3 text-sm font-bold text-amber-200 ring-1 ring-amber-400/30 disabled:opacity-60"
+            className="flex-1 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold [&>span>div]:text-amber-200 disabled:opacity-60"
           >
-            {refreshPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw size={14} />}
-            Try again
-          </button>
+            <span className="flex items-center gap-1.5">
+              {refreshPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw size={14} />}
+              Try again
+            </span>
+          </GlassButton>
         ) : null}
       </div>
     </GlassCard>
@@ -912,15 +923,16 @@ function CouponCard({
               You saved {formatRupee(appliedDiscount)} on this order.
             </p>
           </div>
-          <button
+          <GlassButton
+            variant="capsule"
             type="button"
             onClick={() => void onRemove()}
             disabled={disabled || applying}
-            className="shrink-0 rounded-xl bg-white/[0.08] px-3 py-2 text-xs font-bold text-emerald-200 ring-1 ring-emerald-400/30 transition active:scale-[0.98] disabled:opacity-60"
+            className="shrink-0 [&>span>div]:h-9 [&>span>div]:px-3 [&>span>div]:text-xs [&>span>div]:font-bold [&>span>div]:text-emerald-200 disabled:opacity-60"
             data-checkout-coupon-remove
           >
             {applying ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : "Remove"}
-          </button>
+          </GlassButton>
         </div>
       ) : (
         <form
@@ -932,7 +944,7 @@ function CouponCard({
           className="space-y-2"
         >
           <div className="flex items-stretch gap-2">
-            <input
+            <GlassInput
               type="text"
               inputMode="text"
               autoCapitalize="characters"
@@ -943,13 +955,13 @@ function CouponCard({
               placeholder="Enter coupon code"
               disabled={applying || disabled}
               data-checkout-coupon-input
-              className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm font-bold uppercase tracking-wider text-white placeholder:font-normal placeholder:tracking-normal placeholder:text-white/55 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400 disabled:opacity-60"
+              className="min-w-0 flex-1 [&_input]:font-bold [&_input]:uppercase [&_input]:tracking-wider [&_input]:placeholder:font-normal [&_input]:placeholder:tracking-normal"
             />
             <button
               type="submit"
               disabled={applying || disabled || !input.trim()}
               data-checkout-coupon-apply
-              className="flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-violet-600 px-4 py-2.5 text-sm font-black text-white transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-violet-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-violet-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {applying ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Apply"}
             </button>

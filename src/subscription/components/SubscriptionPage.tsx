@@ -25,6 +25,7 @@ import CourseSelectModal from "./CourseSelectModal";
 import FeatureSelectTrigger from "./FeatureSelectTrigger";
 import FeatureSelectModal from "./FeatureSelectModal";
 import PriceSummary from "./PriceSummary";
+import { GlassButton } from "../../components/ui/glass-button";
 import SubscribeBar from "./SubscribeBar";
 import HelpModal from "./HelpModal";
 import SubscriberActiveBadge from "../../components/subscription/SubscriberActiveBadge";
@@ -916,13 +917,14 @@ export default function SubscriptionPage({
               <div data-subscription-catalog-error className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-white/85">
                 <p className="font-black text-rose-200">We couldn't load the subscription catalog.</p>
                 <p className="text-xs text-white/55">{catalogError}</p>
-                <button
+                <GlassButton
+                  variant="capsule"
                   type="button"
                   onClick={() => window.location.reload()}
-                  className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-bold text-white"
+                  className="[&>span>div]:h-9 [&>span>div]:px-4 [&>span>div]:text-xs [&>span>div]:font-bold"
                 >
                   Retry
-                </button>
+                </GlassButton>
               </div>
             ) : (
               <>
@@ -987,7 +989,7 @@ export default function SubscriptionPage({
                   setSelectedPlanId(next.id);
                   setManageMode(true);
                 }}
-                className="w-full rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                className="w-full rounded-full bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
               >
                 Upgrade — view higher plans
               </button>
@@ -1007,16 +1009,17 @@ export default function SubscriptionPage({
         {isActiveMember && manageMode ? (
           <div className="mx-5 mt-4 space-y-2">
             <div className="flex items-center justify-end gap-3">
-              <button
+              <GlassButton
+                variant="capsule"
                 type="button"
                 onClick={() => {
                   setManageMode(false);
                   setAddOnIntent(false);
                 }}
-                className="shrink-0 rounded-xl bg-white/[0.1] px-2.5 py-1.5 text-[11px] font-black text-violet-200 ring-1 ring-violet-400/30"
+                className="shrink-0 [&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-[11px] [&>span>div]:font-black [&>span>div]:text-violet-200"
               >
                 Cancel
-              </button>
+              </GlassButton>
             </div>
             {isAddOnUpgrade ? (
               <div

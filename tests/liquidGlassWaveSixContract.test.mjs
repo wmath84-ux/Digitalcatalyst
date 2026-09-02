@@ -71,7 +71,9 @@ test("checkout keeps its identity colours and gains only the gloss", () => {
   assert.match(pg, /<span className="relative z-10 flex items-center justify-center gap-2">/);
   assert.match(pg, /disabled=\{busy\}/);
   assert.match(pg, /disabled:cursor-wait/);
-  assert.match(pg, /dc-glass-soft w-full rounded-2xl bg-white\/\[0\.06\]/);
+  // Wave 11: the secondary "Back" is the pack GlassButton capsule (no hand-painted plate)
+  assert.match(pg, /<GlassButton variant="capsule" onClick=\{onGoBack\}/);
+  assert.doesNotMatch(pg, /dc-glass-soft w-full rounded-2xl bg-white\/\[0\.06\]/);
   assert.match(pg, /role="alert"/); // the error surface
   const css = read("src/glass.css");
   assert.match(css, /:where\(\.dc-card\) \{/);

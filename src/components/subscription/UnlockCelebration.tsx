@@ -127,16 +127,14 @@ export default function UnlockCelebration({
                 <GlassSurface radius={24} className="overflow-hidden text-white">
                 {/* Gradient header with a pulsing seal */}
                 <div className="relative overflow-hidden bg-violet-600/40 px-6 pb-7 pt-8 text-center text-white">
-                  <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10" />
-                  <div className="absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-white/10" />
 
                   <motion.div
                     initial={reduceMotion ? undefined : { scale: 0 }}
                     animate={reduceMotion ? undefined : { scale: [0, 1.18, 1] }}
                     transition={{ duration: 0.55, ease: "easeOut" }}
-                    className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur"
+                    className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/20"
                   >
-                    <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-violet-600 shadow-lg">
+                    <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white">
                       <Check className="h-8 w-8" strokeWidth={3} />
                     </span>
                     {!reduceMotion ? (
@@ -148,7 +146,7 @@ export default function UnlockCelebration({
                     ) : null}
                   </motion.div>
 
-                  <p className="relative mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest backdrop-blur">
+                  <p className="relative mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest">
                     <PartyPopper className="h-3 w-3" /> Welcome aboard
                   </p>
                   <h2 className="relative mt-2 text-2xl font-black leading-tight" data-celebration-title>
@@ -187,7 +185,7 @@ export default function UnlockCelebration({
                       </ul>
                     </>
                   ) : (
-                    <p className="rounded-xl bg-white/[0.06] px-3 py-3 text-center text-xs font-semibold text-white/75">
+                    <p className="rounded-xl border border-white/15 px-3 py-3 text-center text-xs font-semibold text-white/75">
                       Your membership is active and ready to use.
                     </p>
                   )}
@@ -202,7 +200,7 @@ export default function UnlockCelebration({
                     type="button"
                     onClick={onPrimaryAction}
                     data-celebration-cta
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-3.5 text-sm font-black text-white shadow-lg shadow-violet-500/25 transition active:scale-[0.98]"
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-indigo-600 py-3.5 text-sm font-black text-white transition hover:bg-indigo-500 active:scale-[0.98]"
                   >
                     {primaryLabel} <ArrowRight className="h-4 w-4" />
                   </button>
