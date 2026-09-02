@@ -640,3 +640,20 @@ html[data-glass="on"] body {
 html[data-glass="on"] [class*="bg-white"] {
   color: rgb(15 23 42); /* slate-900 — dark ink inside white/frosted cards */
 }
+
+/* ── Part 2b · home header inline gradient (owner: no gradient anywhere) ─────
+ * The home header paints its brand gradient with an INLINE style
+ * (Header.tsx: `backgroundImage: brandGlassGradient(...)`), which a class-based
+ * rule can't reach — inline styles only yield to !important. Under glass the
+ * gradient is dropped (the header keeps its inline backdrop-filter, so it becomes
+ * a frosted bar over the backdrop) and its ink goes white. Scoped to
+ * [data-home-header] + background-image only — this is NOT the FlowPath dark-ink
+ * !important the owner vetoed. Source untouched, so homeHeaderGlassCollapse's
+ * source assertions still match. ?glass=off restores the gradient + dark ink. */
+html[data-glass="on"] [data-home-header] {
+  background-image: none !important;
+  color: rgb(var(--dc-paper-on-ink) / 0.95);
+}
+html[data-glass="on"] [data-home-header] :where(h1, p, span, a, button, svg):not([class*="bg-"]) {
+  color: rgb(var(--dc-paper-on-ink) / 0.95);
+}
