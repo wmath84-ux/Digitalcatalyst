@@ -1,12 +1,10 @@
 import { useExitGuard } from "./ExitGuardContext";
 import { BankIcon, ChartIcon, DashboardIcon, HomeIcon, TargetIcon, UserIcon } from "./icons";
-import { useHomeHold } from "../../hooks/useHomeHold";
-import { HoldRing } from "../../components/ui/HoldRing";
 import GlassDock, { type GlassDockItem } from "../../components/glass-dock/GlassDock";
 
 // The revision footer mirrors the main app footer
 // (src/components/BottomNav.tsx) exactly: same glass dock magnification,
-// same Home 1-second long-press to FlowPath. Only the tab set differs —
+// plain-tap Home (the long-press → FlowPath shortcut is gone). Only the tab set differs —
 // Home stays, and Dashboard / Bank / Weak Spots / Progress / Profile fill
 // the other slots. Dashboard sits right next to Home and points at the
 // revision dashboard (#/revision), which is the feature's own landing screen.
@@ -29,29 +27,18 @@ const TABS = [
 
 export default function BottomNav({ route }: { route: string }) {
   const { navigate } = useExitGuard();
-  const homeHold = useHomeHold(() => {
-    window.location.hash = "#/flowpath";
-  });
 
   const items: GlassDockItem[] = TABS.map((tab) => {
     const active =
       tab.href === "#/revision/bank"
         ? route.startsWith("#/revision/bank") || route.startsWith("#/revision/session")
         : tab.match(route);
-    const isHome = tab.href === "#/home";
     return {
       id: tab.href,
       label: tab.label,
       icon: tab.icon,
       color: tab.color,
       active,
-      buttonProps: isHome
-        ? {
-            ...homeHold.handlers,
-            className: homeHold.holding ? "[touch-action:none]" : "",
-          }
-        : undefined,
-      extra: isHome && homeHold.holding ? <HoldRing holding={homeHold.holding} durationMs={homeHold.durationMs} /> : undefined,
     };
   });
 
@@ -70,7 +57,6 @@ export default function BottomNav({ route }: { route: string }) {
           siteFooter
           items={items}
           onSelect={(href) => {
-            if (href === "#/home" && homeHold.consumeSuppressedClick()) return;
             navigate(href);
           }}
         />

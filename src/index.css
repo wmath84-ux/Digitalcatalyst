@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Wave 14: the pack's sheet / dialog / command / toast use tw-animate-css
+   utilities (`animate-in fade-in-0 slide-in-from-bottom-2 …`). */
+@import "tw-animate-css";
 
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
@@ -121,10 +124,17 @@ body,
   height: 100%;
   width: 100%;
   margin: 0;
-  background-color: #ffffff;
+  /* Phase A: the canvas is the Black Ice base ink, never white. The fixed
+     .dc-backdrop paints the gradient; body/#root stay transparent so it
+     shows through on every route (iOS overscroll shows this ink, not white). */
+  background-color: #0a0c12;
   touch-action: pan-x pan-y;
   overscroll-behavior: none;
   -ms-touch-action: pan-x pan-y;
+}
+body,
+#root {
+  background-color: transparent;
 }
 
 body {
@@ -390,11 +400,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
      page background, comfortable horizontal padding, and a wider
      max-width so the content reads at tablet scale. */
   .dc-app-shell {
-    background:
-      radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.18), transparent 48%),
-      radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.16), transparent 42%),
-      radial-gradient(88% 62% at 50% 100%, rgba(244, 114, 182, 0.10), transparent 48%),
-      linear-gradient(180deg, #f6f8ff 0%, #eef3ff 46%, #f8fafc 100%);
+    background: transparent;
     /* `sm:py-6` exists to float the phone card inside the window. Once
        the card is gone it only leaves a 24 px band of dead background
        above and below the page (plus 48 px of extra scroll), so the
@@ -581,10 +587,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   }
 
   .dc-app-shell {
-    background:
-      radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.10), transparent 50%),
-      radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.08), transparent 44%),
-      linear-gradient(180deg, #f7f8fc 0%, #eef1f8 48%, #f6f7fb 100%);
+    background: transparent;
     padding: 0;
   }
 
@@ -767,10 +770,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   }
   .dc-app-shell {
     padding: 0;
-    background:
-      radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.10), transparent 50%),
-      radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.08), transparent 44%),
-      linear-gradient(180deg, #f7f8fc 0%, #eef1f8 48%, #f6f7fb 100%);
+    background: transparent;
   }
   .dc-desktop-shell [data-desktop-side-panel] {
     display: block !important;
@@ -852,10 +852,7 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   /* The shell: a soft surface that supports the rail + top bar
      without competing with them. */
   .dc-app-shell {
-    background:
-      radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.10), transparent 50%),
-      radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.08), transparent 44%),
-      linear-gradient(180deg, #f7f8fc 0%, #eef1f8 48%, #f6f7fb 100%);
+    background: transparent;
   }
 
   /* The mobile + tablet per-page chrome is hidden on desktop. The
@@ -969,6 +966,11 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
 [data-store-view-options] > button {
   flex: 0 0 auto;
 }
+/* Phase A6: the options row is a pack GlassSurface, so the buttons sit one
+   level down (inside its content div). Same no-shrink guarantee. */
+[data-store-view-options] > div > button {
+  flex: 0 0 auto;
+}
 
 /* ── Revision "test submit" confirm dialog ─────────────────────────────
    The dialog must never grow past the visible viewport on any tablet or
@@ -1021,14 +1023,12 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 .dc-desktop-shell [data-desktop-rail] [data-desktop-rail-item]:hover:not([data-active="true"]) {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
 }
 .dc-desktop-shell [data-desktop-rail] [data-desktop-rail-item][data-active="true"] {
-  /* The active item is a gradient pill — same brand colour as the
-     mobile / tablet accent, but rendered as a proper desktop button
-     rather than a tap target. */
-  background-image: linear-gradient(135deg, #6366f1, #8b5cf6);
+  /* Phase A: solid brand pill (no gradient anywhere). */
+  background-color: #4f46e5;
   color: #ffffff;
   box-shadow:
     0 6px 16px -8px rgba(99, 102, 241, 0.6),
@@ -1042,16 +1042,13 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
 /* The top bar — pill-style icon buttons, an inline search input, a
    page title that mirrors the current section. */
 .dc-desktop-shell [data-desktop-topbar] {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.86));
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  /* Phase A: no paint of its own — the chrome glass below is the material. */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .dc-desktop-shell [data-desktop-topbar-button]:hover {
-  background: #f1f5f9 !important;
-  color: #4f46e5 !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
 }
 
 /* Page body: comfortable gutters, but the content still caps at a
@@ -1537,54 +1534,29 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 
-/* Mind map library cards: the same raised-surface treatment the note squares
-   get, so a card reads as a card (tinted, lifted, edged) at any grid width
-   instead of a flat grey tile — and the map that is open right now stays
-   clearly violet. Unlayered, so these win over the Tailwind state classes on
-   the same element; the border colour still comes from JSX. */
-[data-course-mindmap-map-card] {
-  background:
-    linear-gradient(165deg, rgb(167 139 250 / 0.18), rgb(99 102 241 / 0.07) 46%, rgb(2 6 23 / 0.28)),
-    var(--mm-surface);
-  box-shadow:
-    0 16px 28px -14px rgb(76 29 149 / 0.6),
-    0 8px 16px -10px rgb(2 6 23 / 0.55);
+/* While the library is open the diagram underneath is hidden (kept in the
+   layout so React Flow's measurements survive), so the pack cards never read
+   through to node text behind the sheet. */
+[data-course-mindmap-canvas][data-library-open="true"] > .react-flow {
+  visibility: hidden;
 }
 
-[data-course-mindmap-map-card]:hover {
-  background:
-    linear-gradient(165deg, rgb(167 139 250 / 0.26), rgb(99 102 241 / 0.1) 46%, rgb(2 6 23 / 0.24)),
-    var(--mm-surface);
+/* Mind map library cards (Wave 9): the card IS the pack GlassCard (tint 0.4,
+   radius 20) — no painted gradient plate or drop shadow in either map theme.
+   The only thing the stylesheet adds is the violet ring on the map that is
+   open right now; the `background` here is transparent so nothing can paint
+   under the component's own layers. */
+[data-course-mindmap-map-card] {
+  background: transparent;
+  box-shadow: none;
 }
 
 [data-course-mindmap-map-card][data-active="true"] {
-  background:
-    linear-gradient(165deg, rgb(139 92 246 / 0.42), rgb(99 102 241 / 0.24) 52%, rgb(139 92 246 / 0.16)),
-    var(--mm-surface);
-  box-shadow:
-    0 16px 30px -12px rgb(124 58 237 / 0.65),
-    0 0 0 1px rgb(167 139 250 / 0.5);
+  box-shadow: 0 0 0 1px rgb(167 139 250 / 0.6);
 }
 
 .course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-map-card] {
-  background:
-    linear-gradient(165deg, rgb(237 233 254 / 0.95), rgb(224 231 255 / 0.6) 48%, #ffffff);
-  box-shadow:
-    0 14px 26px -14px rgb(76 29 149 / 0.3),
-    0 6px 14px -10px rgb(15 23 42 / 0.18);
-}
-
-.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-map-card]:hover {
-  background:
-    linear-gradient(165deg, rgb(221 214 254 / 1), rgb(212 222 255 / 0.75) 48%, #ffffff);
-}
-
-.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-map-card][data-active="true"] {
-  background:
-    linear-gradient(165deg, rgb(196 181 253 / 0.9), rgb(199 210 254 / 0.6) 52%, #ffffff);
-  box-shadow:
-    0 14px 26px -12px rgb(109 40 217 / 0.35),
-    0 0 0 1px rgb(139 92 246 / 0.45);
+  background: transparent;
 }
 
 /* Course Player — square note cards lift off the panel with a mixed
@@ -1594,24 +1566,20 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    shell hands the card white text, and a light/white card would swallow it. */
 [data-course-notes-grid] [data-course-note] {
   color: var(--course-text);
-  background:
-    linear-gradient(165deg, rgb(125 211 252 / 0.22), rgb(37 99 235 / 0.08) 46%, rgb(29 78 216 / 0.04)),
-    var(--course-soft);
-  border: 1px solid rgb(96 165 250 / 0.38);
-  box-shadow:
-    0 16px 28px -12px rgb(37 99 235 / 0.62),
-    0 8px 18px -8px rgb(14 165 233 / 0.48),
-    0 0 0 1px rgb(59 130 246 / 0.22);
+  /* Wave 8: the card IS the pack GlassCard (tint 0.4, radius 20) — no painted
+     blue-gradient plate, border or drop shadow any more. The theme's soft
+     tone only tints the action row's hover; the focus ring stays blue. */
+  --course-note-hover: var(--course-soft);
+  outline-color: rgb(37 99 235 / 0.6);
+}
+
+[data-course-notes-grid] [data-course-note]:focus-within {
+  outline: 2px solid;
+  outline-offset: 2px;
 }
 
 .course-player-shell[data-course-theme="light"] [data-course-notes-grid] [data-course-note] {
-  background:
-    linear-gradient(165deg, rgb(219 234 254 / 0.95), rgb(191 219 254 / 0.55) 48%, #ffffff);
-  border-color: rgb(59 130 246 / 0.28);
-  box-shadow:
-    0 16px 26px -12px rgb(37 99 235 / 0.42),
-    0 8px 16px -8px rgb(14 165 233 / 0.32),
-    0 0 0 1px rgb(59 130 246 / 0.16);
+  outline-color: rgb(37 99 235 / 0.6);
 }
 
 /* Course Player — a saved note card shows ONLY the note's first heading or
@@ -1707,41 +1675,42 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 /* Course Player — scoped dark / light palette. The variables inherit through
    the viewer, overlay, notes and media tools without changing the site theme. */
 .course-player-shell {
-  --course-bg: #090912;
-  --course-surface: #10101a;
-  --course-surface-translucent: rgb(16 16 26 / 0.95);
-  --course-panel: #11111d;
+  /* Wave 7 (Phase B / A8): the player paints NO plate of its own any more.
+     It sits on the one Black Ice backdrop like every other route, and every
+     surface inside it is the pack's GlassSurface material (websiteglass.com
+     GlassSurface dark: rgba(60,62,68,0.21) · blur 9.8px · saturate 1.3 — the
+     same `--dc-chrome-glass` token the store header uses). Ink is white. */
+  --course-bg: transparent;
+  --course-surface: var(--dc-chrome-glass);
+  --course-surface-translucent: var(--dc-chrome-glass);
+  --course-panel: var(--dc-chrome-glass);
   --course-text: #ffffff;
-  --course-muted: rgb(255 255 255 / 0.52);
-  --course-border: rgb(255 255 255 / 0.1);
-  --course-soft: rgb(255 255 255 / 0.055);
-  --course-soft-hover: rgb(255 255 255 / 0.11);
+  --course-muted: rgb(255 255 255 / 0.62);
+  --course-border: rgb(255 255 255 / 0.12);
+  --course-soft: rgb(255 255 255 / 0.06);
+  --course-soft-hover: rgb(255 255 255 / 0.12);
   --course-strong: rgb(255 255 255 / 0.24);
-  --course-loading: rgb(2 6 23 / 0.74);
-  background-color: var(--course-bg);
+  --course-loading: rgb(10 12 18 / 0.6);
   color: var(--course-text);
-  transition: background-color 180ms ease, color 180ms ease;
+  transition: color 180ms ease;
 }
 
-/* The light palette keeps the viewer surfaces slightly grey so white
-   documents (Forms, Docs, Sheets) stay visible against the canvas. */
+/* The light theme is the pack's LIGHT material (rgba(255,255,255,0.21) on the
+   same backdrop — exactly what the site-wide Dark-mode switch renders); the
+   player syncs `html.light` while it is active so every vendored component
+   inside it flips too. Ink stays white on both materials. */
 .course-player-shell[data-course-theme="light"] {
-  --course-bg: #f1f5f9;
-  --course-surface: #ffffff;
-  --course-surface-translucent: rgb(255 255 255 / 0.94);
-  --course-panel: #ffffff;
-  --course-text: #0f172a;
-  --course-muted: #64748b;
-  --course-border: rgb(15 23 42 / 0.12);
-  --course-soft: rgb(15 23 42 / 0.055);
-  --course-soft-hover: rgb(15 23 42 / 0.1);
-  --course-strong: rgb(15 23 42 / 0.2);
-  --course-loading: rgb(248 250 252 / 0.82);
-}
-
-.course-viewer-empty-surface,
-.course-audio-surface {
-  background-image: radial-gradient(circle at 50% 25%, rgb(124 58 237 / 0.2), transparent 44%);
+  --course-bg: transparent;
+  --course-surface: rgba(255, 255, 255, 0.21);
+  --course-surface-translucent: rgba(255, 255, 255, 0.21);
+  --course-panel: rgba(255, 255, 255, 0.21);
+  --course-text: #ffffff;
+  --course-muted: rgb(255 255 255 / 0.7);
+  --course-border: rgb(255 255 255 / 0.22);
+  --course-soft: rgb(255 255 255 / 0.1);
+  --course-soft-hover: rgb(255 255 255 / 0.18);
+  --course-strong: rgb(255 255 255 / 0.32);
+  --course-loading: rgb(10 12 18 / 0.5);
 }
 
 /* Course audio card: never clip on tablet `* { max-width: 100% }` or short
@@ -1761,24 +1730,11 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   max-width: 100%;
 }
 
-.course-player-shell[data-course-theme="light"] .course-viewer-empty-surface,
-.course-player-shell[data-course-theme="light"] .course-audio-surface {
-  background-image: radial-gradient(circle at 50% 25%, rgb(124 58 237 / 0.13), transparent 48%);
-}
-
 /* Strict containment prevents a mobile YouTube iframe's intrinsic size from
    extending below the short landscape viewport or under either side rail. */
 .course-youtube-stage {
   contain: size layout paint;
   isolation: isolate;
-}
-
-.course-image-surface {
-  background-image: radial-gradient(circle at center, #1e293b, #020617);
-}
-
-.course-player-shell[data-course-theme="light"] .course-image-surface {
-  background-image: radial-gradient(circle at center, #ffffff, #dbe4f0);
 }
 
 .course-player-shell[data-course-theme="light"] [data-course-subscription-badge] {
@@ -1794,34 +1750,41 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    through the canvas dots, node borders, toolbar tiles and the SVG edge
    strokes without touching the site or player theme. */
 .course-mindmap-shell {
-  --mm-bg: #0b0b16;
-  --mm-surface: #11111d;
-  --mm-border: rgb(255 255 255 / 0.1);
-  --mm-text: #e2e8f0;
-  --mm-muted: #94a3b8;
-  --mm-soft: rgb(255 255 255 / 0.08);
-  --mm-soft-hover: rgb(255 255 255 / 0.15);
+  /* Wave 9: the map paints NO canvas plate. It sits on the shared Black Ice
+     backdrop like the rest of the player, and every tile / pill / menu is the
+     pack's GlassSurface material (websiteglass.com GlassSurface dark at tint
+     0.5 — the same `--dc-chrome-glass` token the store header and the course
+     toolbar use). Ink is white. */
+  --mm-bg: transparent;
+  --mm-surface: var(--dc-chrome-glass);
+  --mm-surface-blur: var(--dc-chrome-glass-blur);
+  --mm-surface-rim: var(--dc-chrome-glass-rim);
+  --mm-border: rgb(255 255 255 / 0.12);
+  --mm-text: #ffffff;
+  --mm-muted: rgb(255 255 255 / 0.62);
+  --mm-soft: var(--dc-chrome-glass);
+  --mm-soft-hover: rgb(255 255 255 / 0.14);
   --mm-dot: rgb(255 255 255 / 0.07);
   --mm-edge-left: rgb(167 139 250 / 0.55);
   --mm-edge-right: rgb(129 140 248 / 0.55);
-  background-color: var(--mm-bg);
   color: var(--mm-text);
-  transition: background-color 180ms ease, color 180ms ease;
+  transition: color 180ms ease;
 }
 
-/* White mode: an off-white canvas keeps the white leaf cards visible, and
-   the wire colours deepen so the diagram reads on paper-white. */
+/* White mode: the pack's LIGHT material (rgba(255,255,255,0.21) on the same
+   backdrop — exactly what the site-wide Dark-mode switch renders). No paper
+   plate; ink stays white on both materials. */
 .course-mindmap-shell[data-mindmap-theme="light"] {
-  --mm-bg: #f8fafc;
-  --mm-surface: #ffffff;
-  --mm-border: rgb(15 23 42 / 0.12);
-  --mm-text: #0f172a;
-  --mm-muted: #64748b;
-  --mm-soft: rgb(15 23 42 / 0.06);
-  --mm-soft-hover: rgb(15 23 42 / 0.12);
-  --mm-dot: rgb(15 23 42 / 0.16);
-  --mm-edge-left: rgb(124 58 237 / 0.6);
-  --mm-edge-right: rgb(79 70 229 / 0.6);
+  --mm-bg: transparent;
+  --mm-surface: rgba(255, 255, 255, 0.21);
+  --mm-border: rgb(255 255 255 / 0.22);
+  --mm-text: #ffffff;
+  --mm-muted: rgb(255 255 255 / 0.7);
+  --mm-soft: rgba(255, 255, 255, 0.21);
+  --mm-soft-hover: rgb(255 255 255 / 0.3);
+  --mm-dot: rgb(255 255 255 / 0.14);
+  --mm-edge-left: rgb(196 181 253 / 0.7);
+  --mm-edge-right: rgb(165 180 252 / 0.7);
 }
 
 .course-player-shell[data-course-theme="light"] [data-course-preview-badge] {
@@ -2059,8 +2022,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 [data-profile-page] {
   --profile-ink: #0f172a;
   --profile-muted: #64748b;
-  background-color: #eef2ff;
-  background-image: linear-gradient(180deg, #eef2ff 0%, #f8fafc 55%, #ffffff 100%);
+  /* Phase A: no page wash — the Black Ice backdrop is the page. */
+  background: transparent;
 }
 
 .dc-app-shell {
@@ -2077,213 +2040,93 @@ body.eduvora-razorpay-open .razorpay-container iframe {
      NOT create a scroll container, so body scrolling and sticky headers
      inside the shell keep working exactly as before. */
   overflow: clip;
-  background:
-    radial-gradient(120% 70% at 0% -8%, rgba(139, 92, 246, 0.22), transparent 48%),
-    radial-gradient(90% 62% at 100% 8%, rgba(56, 189, 248, 0.18), transparent 42%),
-    radial-gradient(88% 62% at 50% 100%, rgba(244, 114, 182, 0.12), transparent 48%),
-    linear-gradient(180deg, #f6f8ff 0%, #eef3ff 46%, #f8fafc 100%);
-}
-
-.dc-app-shell::before,
-.dc-app-shell::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  pointer-events: none;
-  border-radius: 9999px;
-  filter: blur(56px);
-}
-
-.dc-app-shell::before {
-  top: 4rem;
-  left: -5rem;
-  width: 15rem;
-  height: 15rem;
-  background: rgba(167, 139, 250, 0.32);
-}
-
-.dc-app-shell::after {
-  right: -4rem;
-  top: 12rem;
-  width: 16rem;
-  height: 16rem;
-  background: rgba(125, 211, 252, 0.26);
+  /* Phase A: the shell paints nothing. The single fixed Black Ice backdrop
+     (src/glass-theme.css) is the page background on every breakpoint; the
+     old indigo/sky wash and the two aurora orbs are gone at the source. */
+  background: transparent;
 }
 
 .dc-app-frame {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(248, 250, 252, 0.58));
-  backdrop-filter: blur(30px) saturate(165%);
-  -webkit-backdrop-filter: blur(30px) saturate(165%);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  box-shadow:
-    0 24px 60px -26px rgba(79, 70, 229, 0.42),
-    0 14px 30px -20px rgba(15, 23, 42, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  /* Phase A: the mobile/tablet "phone card" no longer paints a white wash,
+     border or shadow — the page body scrolls directly over the backdrop. */
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
-.dc-glass {
+/* ── Legacy `.dc-glass*` hooks → the pack material ─────────────────────────
+   Phase A4. These class names are still referenced by call sites that have not
+   yet been rewritten onto the vendored components (My Day, cart, search, a few
+   revision toolbars). Until they are, the hooks resolve to *exactly* the
+   websiteglass GlassSurface material at its defaults — dark tint rgba(60,62,68)
+   at 0.5·0.42 = 0.21, blur 14·(0.4+0.5·0.6) = 9.8px, saturate 1+0.6·0.5 = 1.3,
+   the dark rim — and to the light material when `html.light` is set by the
+   header's Dark-mode switch. No white gradients, no identity washes. */
+.dc-glass,
+.dc-glass-soft,
+.dc-glass-chip,
+.dc-glass-input,
+.dc-glass-toolbar,
+.dc-modal-glass,
+.dc-glass-dark {
   position: relative;
   isolation: isolate;
-  background:
-    linear-gradient(165deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.42));
-  backdrop-filter: blur(22px) saturate(170%);
-  -webkit-backdrop-filter: blur(22px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(60, 62, 68, 0.21);
+  backdrop-filter: blur(9.8px) saturate(1.3);
+  -webkit-backdrop-filter: blur(9.8px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
-    0 20px 40px -24px rgba(79, 70, 229, 0.45),
-    0 10px 22px -16px rgba(15, 23, 42, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
-
-.dc-glass::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.38), transparent 36%);
-}
-
-.dc-glass-soft {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.5));
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+html.light .dc-glass,
+html.light .dc-glass-soft,
+html.light .dc-glass-chip,
+html.light .dc-glass-input,
+html.light .dc-glass-toolbar,
+html.light .dc-modal-glass,
+html.light .dc-glass-dark {
+  background: rgba(255, 255, 255, 0.21);
   box-shadow:
-    0 16px 34px -24px rgba(79, 70, 229, 0.45),
-    0 8px 18px -16px rgba(15, 23, 42, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    inset 0 1px 1px rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
 /*
- * Stable card surface for the Revision feature.
- *
- * The revision pages render lists of `Card`s inside a scroll container and
- * switch tabs / re-render their content in place (e.g. the Progress page's
- * daily / weekly / monthly chart). `dc-glass` uses a heavy
- * `backdrop-filter: blur(...) saturate(...)`, and re-compositing that over
- * rapidly changing content causes two mobile-browser artifacts: a white flash
- * / glitch on a card and a flicker when the chart swaps. A plain opaque card
- * has no backdrop to sample, so it renders pixel-stable.
+ * Revision `Card` (src/revision/components/ui.tsx) renders the pack's
+ * GlassSurface itself (Glass Card values: tint 0.4, radius 20). The `.rev-card`
+ * hook stays on the box only so the responsive bands can size its padding —
+ * it paints nothing and carries no backdrop-filter of its own.
  */
 .rev-card {
   position: relative;
   isolation: isolate;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.94));
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  box-shadow:
-    0 20px 40px -26px rgba(79, 70, 229, 0.45),
-    0 10px 22px -18px rgba(15, 23, 42, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-}
-
-
-.dc-glass-toolbar {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.64));
-  backdrop-filter: blur(22px) saturate(170%);
-  -webkit-backdrop-filter: blur(22px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, 0.76);
-  box-shadow:
-    0 12px 30px -22px rgba(79, 70, 229, 0.46),
-    inset 0 1px 0 rgba(255, 255, 255, 0.92);
-}
-
-.dc-glass-dark {
-  background:
-    radial-gradient(120% 90% at 100% 0%, rgba(167, 139, 250, 0.24), transparent 46%),
-    radial-gradient(90% 80% at 0% 100%, rgba(34, 211, 238, 0.16), transparent 48%),
-    linear-gradient(165deg, rgba(17, 24, 39, 0.88), rgba(30, 41, 59, 0.82));
-  backdrop-filter: blur(24px) saturate(140%);
-  -webkit-backdrop-filter: blur(24px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow:
-    0 22px 44px -24px rgba(15, 23, 42, 0.62),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-
-.dc-glass-chip {
-  background: rgba(255, 255, 255, 0.64);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.74);
-  box-shadow: 0 10px 22px -20px rgba(79, 70, 229, 0.44);
-}
-
-.dc-glass-input {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.74);
-  box-shadow:
-    0 10px 22px -18px rgba(79, 70, 229, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-}
-
-.dc-modal-glass {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 255, 0.86));
-  backdrop-filter: blur(28px) saturate(170%);
-  -webkit-backdrop-filter: blur(28px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow:
-    0 30px 70px -24px rgba(79, 70, 229, 0.45),
-    0 10px 24px -12px rgba(15, 23, 42, 0.25);
+  background: transparent;
+  border: 0;
 }
 
 .dc-glass-hero {
   position: relative;
   isolation: isolate;
-  /* Match the app brand: the home header / icon blend is indigo → violet
-     (#4f46e5 → #7c3aed). The profile hero now uses the same gradient so the
-     card reads as the website's own colour instead of the old dark navy. */
-  background:
-    radial-gradient(120% 90% at 100% 0%, rgba(255, 255, 255, 0.16), transparent 46%),
-    radial-gradient(90% 80% at 0% 110%, rgba(34, 211, 238, 0.2), transparent 48%),
-    linear-gradient(160deg, #4f46e5 0%, #7c3aed 55%, #a21caf 100%);
-  backdrop-filter: blur(26px) saturate(150%);
-  -webkit-backdrop-filter: blur(26px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  /* Phase A: no identity gradient. The hero is the same frosted material as
+     the pack's GlassSurface (dark-scheme tint 0.5, blur 14, saturate 1.6,
+     specular rim) so it reads as a glass card over the Black Ice backdrop. */
+  background-color: rgba(60, 62, 68, 0.21);
+  backdrop-filter: blur(14px) saturate(1.6);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow:
-    0 28px 56px -20px rgba(109, 40, 217, 0.6),
-    0 0 0 1px rgba(167, 139, 250, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 18px 40px -24px rgba(0, 0, 0, 0.55);
 }
 
-.dc-glass-hero--basic {
-  background:
-    radial-gradient(120% 90% at 100% 0%, rgba(34, 211, 238, 0.38), transparent 46%),
-    radial-gradient(90% 80% at 0% 110%, rgba(56, 189, 248, 0.24), transparent 48%),
-    linear-gradient(165deg, rgba(10, 22, 38, 0.9), rgba(7, 10, 22, 0.88));
-  box-shadow:
-    0 28px 56px -20px rgba(14, 165, 233, 0.5),
-    0 0 0 1px rgba(103, 232, 249, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
-}
-
-.dc-glass-hero--premium {
-  background:
-    radial-gradient(120% 90% at 100% 0%, rgba(232, 121, 249, 0.42), transparent 46%),
-    radial-gradient(90% 80% at 0% 110%, rgba(167, 139, 250, 0.24), transparent 48%),
-    linear-gradient(165deg, rgba(32, 12, 38, 0.9), rgba(10, 7, 20, 0.88));
-  box-shadow:
-    0 28px 56px -20px rgba(192, 38, 211, 0.52),
-    0 0 0 1px rgba(240, 171, 252, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
-}
-
+.dc-glass-hero--basic,
+.dc-glass-hero--premium,
 .dc-glass-hero--pro {
-  background:
-    radial-gradient(120% 90% at 100% 0%, rgba(139, 92, 246, 0.5), transparent 44%),
-    radial-gradient(90% 80% at 0% 110%, rgba(244, 114, 182, 0.22), transparent 48%),
-    linear-gradient(165deg, rgba(24, 14, 52, 0.92), rgba(8, 6, 20, 0.9));
-  box-shadow:
-    0 28px 56px -18px rgba(109, 40, 217, 0.68),
-    0 0 0 1px rgba(196, 181, 253, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  /* Tier variants no longer carry their own colour wash — the plan's identity
+     is the copy, badge and CTA, not a painted background. */
+  background-color: rgba(60, 62, 68, 0.21);
 }
 
 /* ==================== FlowPath 3D Dashboard Styles ==================== */
@@ -2412,66 +2255,19 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 
 /* ---------- FlowPath glass surfaces ----------
-   Scoped under `.flowpath-app` so the theme-aware surface always wins over the
-   dark `.glass-panel` defined in landing.css (which loads after index.css and
-   would otherwise pin the FlowPath header to a black background even in light
-   mode). The provided design zip ships a single index.css, so this conflict
-   did not exist there; scoping reproduces the same result in this app. */
-.flowpath-app .glass-panel {
-  background: var(--fp-panel);
-  backdrop-filter: blur(22px) saturate(140%);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  border: 1px solid var(--fp-border);
-  box-shadow:
-    0 1px 0 var(--fp-border) inset,
-    var(--fp-card-shadow);
-  transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
-}
-
-.flowpath-app .glass-panel-strong {
-  background: var(--fp-surface-strong);
-  backdrop-filter: blur(28px) saturate(150%);
-  -webkit-backdrop-filter: blur(28px) saturate(150%);
-  border: 1px solid var(--fp-border);
-  box-shadow:
-    0 1px 0 var(--fp-border) inset,
-    var(--fp-strong-shadow);
-  transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
-}
+   Wave 14: `.flowpath-app .glass-panel` / `.glass-panel-strong` are gone —
+   every FlowPath card / sheet / radial item renders the pack GlassSurface
+   (websiteglass.com values) directly in JSX, so there is no theme-aware
+   hand-painted plate left to scope. `.flowpath-app` stays as the theme
+   scope for the `--fp-*` ink tokens. */
 
 .fp-overlay {
   background: var(--fp-overlay);
   backdrop-filter: blur(2px);
 }
 
-/* ---------- FlowPath background ambience ---------- */
-.fp-bg-grid {
-  background-image:
-    linear-gradient(to right, var(--fp-grid-line) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--fp-grid-line) 1px, transparent 1px);
-  background-size: 46px 46px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 40%, transparent 100%);
-}
-
-@keyframes fp-drift {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(2%, -3%, 0) scale(1.05); }
-  100% { transform: translate3d(0, 0, 0) scale(1); }
-}
-
-.fp-orb {
-  animation: fp-drift 22s ease-in-out infinite;
-  will-change: transform;
-}
-
-@keyframes fp-particle-float {
-  0%, 100% { transform: translateY(0) translateX(0); opacity: var(--op, 0.5); }
-  50% { transform: translateY(-18px) translateX(6px); opacity: calc(var(--op, 0.5) * 1.4); }
-}
-
-.fp-particle {
-  animation: fp-particle-float linear infinite;
-}
+/* ---------- FlowPath background ambience: removed in Wave 14 (A8) — the
+   canvas sits on the app backdrop; no grid / orbs / particles. ---------- */
 
 /* ---------- FlowPath node pulse ---------- */
 @keyframes fp-pulse-ring {
@@ -2561,33 +2357,10 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   to { stroke-dashoffset: 0; }
 }
 
-@keyframes fp-liquid-expand {
-  0% {
-    transform: scale(0);
-    border-radius: 50%;
-    opacity: 1;
-  }
-  40% {
-    border-radius: 50%;
-    opacity: 1;
-  }
-  70% {
-    border-radius: 28%;
-    opacity: 1;
-  }
-  100% {
-    transform: scale(60);
-    border-radius: 0%;
-    opacity: 1;
-  }
-}
-
-.fp-liquid-expand {
-  animation: fp-liquid-expand 0.85s cubic-bezier(0.23, 1, 0.32, 1) forwards;
-}
+/* `.fp-liquid-expand` (Home long-press → FlowPath) removed with the gesture. */
 
 @media (prefers-reduced-motion: reduce) {
-  .fp-orb, .fp-particle, .fp-pulse::before, .fp-floaty, .fp-shimmer {
+  .fp-pulse::before, .fp-floaty, .fp-shimmer {
     animation: none !important;
   }
 }
@@ -2650,15 +2423,15 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   /* The first spread is the halo that separates the bead from the box border
      it straddles (a ring would do this too, but this rule owns box-shadow). */
   box-shadow:
-    0 0 0 2px var(--mm-bg),
+    0 0 0 2px var(--dc-bd-base),
     0 0 8px rgb(139 92 246 / 0.55);
 }
 
 .course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-anchor] {
-  background: #7c3aed;
+  background: #a78bfa;
   box-shadow:
-    0 0 0 2px var(--mm-bg),
-    0 0 8px rgb(124 58 237 / 0.3);
+    0 0 0 2px var(--dc-bd-base),
+    0 0 8px rgb(167 139 250 / 0.45);
 }
 
 /* ── Mind map toolbar — one icon per control, sized per screen ───────────
@@ -2726,7 +2499,11 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   width: var(--mm-tool-size);
   height: var(--mm-tool-size);
   border-radius: var(--mm-tool-radius);
+  /* Wave 9: the tile is the pack GlassSurface material (tint, blur, rim). */
   background: var(--mm-soft);
+  -webkit-backdrop-filter: var(--mm-surface-blur);
+  backdrop-filter: var(--mm-surface-blur);
+  box-shadow: var(--mm-surface-rim);
   color: var(--mm-text);
   transition:
     background-color 140ms ease,
@@ -2763,13 +2540,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 .mm-tool-danger:hover:not(:disabled) {
   color: #fb7185;
 }
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool-violet,
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-mm-active="true"] {
-  color: #5b21b6;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool-emerald {
-  color: #065f46;
-}
 
 /* The cloud-save tile is tinted by the save state — the text label it
    replaced is now a tooltip + menu, so the colour is the status. A quiet
@@ -2789,15 +2559,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 .mm-tool[data-save-status="error"] {
   color: #fda4af;
 }
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="saving"] {
-  color: #b45309;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="saved"] {
-  color: #047857;
-}
-.course-mindmap-shell[data-mindmap-theme="light"] .mm-tool[data-save-status="error"] {
-  color: #be123c;
-}
 
 /* ── The blinking save beacon ───────────────────────────────────────────
    Sits on the TOP-RIGHT corner of the cloud tile and inherits that tile's
@@ -2812,7 +2573,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   height: 8px;
   border-radius: 999px;
   background: currentColor;
-  box-shadow: 0 0 0 2px var(--mm-bg);
+  box-shadow: 0 0 0 2px var(--dc-bd-base);
   pointer-events: none;
   animation: mm-blink 1.05s ease-in-out infinite;
 }
@@ -2867,6 +2628,9 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   padding-right: 0.45rem;
   border-radius: var(--mm-tool-radius);
   background: var(--mm-soft);
+  -webkit-backdrop-filter: var(--mm-surface-blur);
+  backdrop-filter: var(--mm-surface-blur);
+  box-shadow: var(--mm-surface-rim);
   color: var(--mm-text);
   font-size: 10px;
   font-weight: 800;
@@ -2910,20 +2674,22 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0.4rem;
-  border: 1px solid rgb(255 255 255 / 0.12);
   border-radius: 18px;
-  background: #14141f;
-  color: #e2e8f0;
-  box-shadow: 0 24px 60px rgb(0 0 0 / 0.55);
+  /* Wave 9: the pack PopoverContent material (GlassSurface, white ink) —
+     read from the :root token because the menu is portalled outside the
+     shell. No drop shadow; the rim is the component's own. */
+  background: var(--dc-chrome-glass);
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur);
+  backdrop-filter: var(--dc-chrome-glass-blur);
+  box-shadow: var(--dc-chrome-glass-rim);
+  color: #ffffff;
   /* Opens upward out of its trigger, so the growth starts at the bar. */
   transform-origin: bottom right;
   animation: mm-menu-in 0.16s ease both;
 }
 .mm-menu[data-menu-theme="light"] {
-  border-color: rgb(15 23 42 / 0.14);
-  background: #ffffff;
-  color: #0f172a;
-  box-shadow: 0 24px 60px rgb(15 23 42 / 0.22);
+  background: rgba(255, 255, 255, 0.21);
+  color: #ffffff;
 }
 @keyframes mm-menu-in {
   from {
@@ -2974,7 +2740,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   background: rgb(255 255 255 / 0.08);
 }
 .mm-menu[data-menu-theme="light"] .mm-menu-item:hover {
-  background: rgb(15 23 42 / 0.07);
+  background: rgb(255 255 255 / 0.14);
 }
 .mm-menu-item[aria-checked="true"] {
   background: rgb(139 92 246 / 0.3);
@@ -3003,8 +2769,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   [data-profile-page] [data-profile-content] { min-height: 0; padding-inline: clamp(24px, 5vw, 48px); }
 }
 @media (max-width: 1023px) and (prefers-reduced-motion: reduce), (max-width: 767px) and (update: slow) {
-  .dc-app-shell, [data-profile-page] { background: #f4f6fb !important; background-image: none !important; }
-  .dc-app-shell::before, .dc-app-shell::after, .dc-glass::before, [data-profile-page] .dc-glass-hero > div { display: none !important; }
+  .dc-app-shell, [data-profile-page] { background: transparent !important; background-image: none !important; }
+  .dc-glass::before, [data-profile-page] .dc-glass-hero > div { display: none !important; }
   .dc-glass, .dc-glass-soft, .dc-glass-toolbar, .dc-glass-chip, .dc-glass-input, .dc-modal-glass, .dc-glass-hero { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 }
 @media (max-width: 767px) { [data-app-frame] { overscroll-behavior: none; } [data-revision-content] { overflow: hidden; } }
@@ -3547,7 +3313,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 @media (min-width: 960px) {
   [data-profile-page] {
     min-height: 100dvh;
-    background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 40%, #ffffff 100%);
+    background: transparent;
   }
   [data-profile-page] [data-app-frame] {
     max-width: 100% !important;
@@ -4931,12 +4697,13 @@ html[data-course-player-active="true"] {
      longer uses `mt-auto` (the growing `data-rev-plan-details` box absorbs the
      slack instead), so it needs its own hook to keep the compact phone box. */
   [data-revision-app] [data-revision-page-main] .min-h-\[270px\] button.mt-auto,
-  [data-revision-app] [data-revision-page-main] [data-rev-plan-cta] {
+  [data-revision-app] [data-revision-page-main] [data-rev-plan-cta] button {
     min-height: 38px !important;
     border-radius: 0.75rem !important;
     font-size: 0.75rem !important;
   }
-  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] button.mt-auto svg {
+  [data-revision-app] [data-revision-page-main] .min-h-\[270px\] button.mt-auto svg,
+  [data-revision-app] [data-revision-page-main] [data-rev-plan-cta] svg {
     height: 0.875rem !important;
     width: 0.875rem !important;
   }
@@ -5276,22 +5043,8 @@ html[data-course-player-active="true"] {
   }
 }
 
-/* The modal mounts after the page body so its animation runs after the
-   parent flex resolves — the entry happens at the card's real position. */
-.dc-premium-modal .dc-premium-modal-inner {
-  animation: dc-premium-modal-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes dc-premium-modal-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
+/* Wave 14: the modal mode is the pack GlassSheet (bottom) — its slide-in
+   is the sheet's own, so the old `.dc-premium-modal` entrance is gone. */
 
 /* Mobile bottom-sheet only: the sheet is a flex child that fills the
    available height of the backdrop (which is `flex items-end` for
@@ -5314,49 +5067,25 @@ html[data-course-player-active="true"] {
 .dc-premium-perk:hover {
   transform: translateY(-1px);
   border-color: rgb(165 180 252 / 0.6);
-  box-shadow: 0 6px 18px -10px rgba(79, 70, 229, 0.35),
-    0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
-/* CTA press feedback — an extra-satisfying tap. */
+/* CTA — a pack GlassButton (capsule); no extra highlight is painted over
+   the registry material. The class only remains as the contract hook. */
 .dc-premium-cta {
   position: relative;
-  overflow: hidden;
-}
-
-.dc-premium-cta::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    circle at var(--dc-cta-x, 50%) var(--dc-cta-y, 50%),
-    rgba(255, 255, 255, 0.6),
-    transparent 55%
-  );
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  pointer-events: none;
-}
-
-.dc-premium-cta:hover::after {
-  opacity: 1;
 }
 
 /* Close button focus ring + reduce-motion support. */
 .dc-premium-close:focus-visible {
   outline: 3px solid rgb(255 255 255);
   outline-offset: 2px;
-  box-shadow:
-    0 0 0 5px rgb(99 102 241 / 0.55),
-    0 8px 20px -6px rgba(99, 102, 241, 0.55);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .dc-premium-page,
   .dc-premium-sheet,
   .dc-premium-modal-inner,
-  .dc-premium-perk,
-  .dc-premium-cta::after {
+  .dc-premium-perk {
     animation: none !important;
     transition: none !important;
   }
@@ -5389,12 +5118,13 @@ html[data-course-player-active="true"] {
 
 /* Unlayered .rev-card background beats Tailwind gradients — keep score cards readable. */
 .rev-card[data-rev-score-card] {
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+  /* Solid brand paint under the glass tint — the score is the one card whose
+     colour carries meaning (indigo = test, emerald = smart revision). */
+  background: #4f46e5 !important;
   color: #fff !important;
-  border-color: transparent !important;
 }
 .rev-card[data-rev-score-card="emerald"] {
-  background: linear-gradient(135deg, #059669 0%, #0d9488 100%) !important;
+  background: #059669 !important;
 }
 .rev-card[data-rev-score-card] p,
 .rev-card[data-rev-score-card] h1,
@@ -5533,12 +5263,24 @@ html[data-course-player-active="true"] {
    page scroller moves. */
 
 :root {
-  --dc-chrome-glass:
-    linear-gradient(165deg, rgba(186, 230, 253, 0.18), rgba(255, 255, 255, 0.08) 42%, rgba(196, 181, 253, 0.16));
-  --dc-chrome-glass-blur: blur(18px) saturate(160%);
+  /* Phase A: exactly the pack's GlassSurface dark material at its defaults
+     (websiteglass.com GlassSurface tint 0.5: rgba(60,62,68, 0.5*0.42=0.21) ·
+     blur 14*(0.4+0.5*0.6)=9.8px · saturate 1+0.6*0.5=1.3 · dark rimShadow) so every header reads as the same
+     component the cards use. Light scheme swaps to the light material. */
+  --dc-chrome-glass: rgba(60, 62, 68, 0.21);
+  --dc-chrome-glass-blur: blur(9.8px) saturate(1.3);
   --dc-chrome-glass-rim:
-    inset 0 1px 1px rgba(255, 255, 255, 0.72),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+html.light {
+  /* The pack's light material (255,255,255 at the same 0.21) when the header's
+     Dark-mode switch is off. */
+  --dc-chrome-glass: rgba(255, 255, 255, 0.21);
+  --dc-chrome-glass-rim:
+    inset 0 1px 1px rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
 [data-site-header]:not([data-home-header]) {
@@ -5553,16 +5295,18 @@ html[data-course-player-active="true"] {
   background: var(--dc-chrome-glass) !important;
   backdrop-filter: var(--dc-chrome-glass-blur) !important;
   -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
-  border-bottom-color: rgba(255, 255, 255, 0.42) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
   box-shadow: var(--dc-chrome-glass-rim);
 }
 
 [data-revision-app-header] {
-  background: var(--dc-chrome-glass) !important;
-  backdrop-filter: var(--dc-chrome-glass-blur) !important;
-  -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
-  border-bottom-color: rgba(255, 255, 255, 0.42) !important;
-  box-shadow: var(--dc-chrome-glass-rim), 0 10px 30px -18px rgba(79, 70, 229, 0.22);
+  /* Phase A4: the wrapper paints nothing — the pack GlassSurface it renders
+     (src/revision/components/AppHeader.tsx) is the material. */
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 [data-search-bar],
@@ -5572,7 +5316,7 @@ html[data-course-player-active="true"] {
 [data-admin-shell] > header,
 [data-rev-bank-header],
 [data-revision-page-main] > .dc-glass-toolbar.sticky,
-[data-revision-app] .dc-glass-toolbar {
+[data-revision-app] .dc-glass-toolbar:not([data-revision-app-header]) {
   background: var(--dc-chrome-glass) !important;
   backdrop-filter: var(--dc-chrome-glass-blur) !important;
   -webkit-backdrop-filter: var(--dc-chrome-glass-blur) !important;
@@ -5607,6 +5351,18 @@ html[data-course-player-active="true"] {
 
 [data-home-header][data-collapsed] [data-home-search-slot] {
   pointer-events: none;
+}
+
+/* Sticky host for the home header on pages without an app frame (FlowPath):
+   fixed to the measured seat so the header's collapse cannot change the
+   scroll height (no scroll ↔ collapse feedback = no flicker). The host is
+   transparent and lets taps through the gap under the collapsed header. */
+[data-home-header-host] {
+  height: var(--dc-home-header-seat, auto);
+  pointer-events: none;
+}
+[data-home-header-host] > [data-home-header] {
+  pointer-events: auto;
 }
 
 [data-home-header] [data-home-brand] {
@@ -5830,14 +5586,12 @@ html[data-course-player-active="true"] {
    desktop: lighter indigo scrim, width cap, 100vh→100dvh height cap,
    inner scroll. */
 
-.dc-premium-modal,
+/* Wave 14: the premium gate's scrim is the pack GlassSheet's own
+   (`bg-black/50`); only the PDP module-select overlay keeps this rule. */
 [data-pdp-module-select-overlay] {
   /* Beat tablet `* { max-width: 100% }` so a portalled overlay is not
      squeezed to a parent width of 0 / stretched to 100vw of a padded box. */
   max-width: none !important;
-  background: rgba(49, 46, 129, 0.28) !important;
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -6020,9 +5774,6 @@ html[data-course-player-active="true"] {
        shell pages and clips its own decorations;
      • the fixed bottom dock centers over the CONTENT column, not the
        whole viewport (which would offset it by half the rail width). */
-.dc-desktop-shell [data-fp-ambient] {
-  position: absolute;
-}
 .dc-desktop-shell .flowpath-app {
   border-radius: 24px;
   overflow: clip;

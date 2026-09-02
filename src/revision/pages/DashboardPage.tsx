@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import PageShell from "../components/PageShell";
 import { Card, PrimaryButton, ProgressBar } from "../components/ui";
+import { GlassSurface } from "../../components/ui/glass";
+import { GlassButton } from "../../components/ui/glass-button";
 import {
   BankIcon,
   ChartIcon,
@@ -24,8 +26,8 @@ const SWIPE_DISTANCE = 65;
 const SWIPE_VELOCITY = 350;
 
 function trendIcon(trend: string) {
-  if (trend === "improving") return <TrendUpIcon className="h-4 w-4 text-emerald-600" />;
-  if (trend === "declining") return <TrendDownIcon className="h-4 w-4 text-rose-600" />;
+  if (trend === "improving") return <TrendUpIcon className="h-4 w-4 text-emerald-300" />;
+  if (trend === "declining") return <TrendDownIcon className="h-4 w-4 text-rose-300" />;
   return null;
 }
 
@@ -77,7 +79,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
   const streakSlot = useMemo(
     () =>
       data.quickStats.streak > 0 ? (
-        <div className="flex items-center gap-1 rounded-full border border-orange-200 bg-orange-100 px-2.5 py-1.5 text-orange-700 shadow-sm">
+        <div className="flex items-center gap-1 rounded-full border border-orange-400/30 bg-orange-500/20 px-2.5 py-1.5 text-orange-200">
           <FlameIcon className="h-4 w-4" />
           <span className="text-xs font-bold">{data.quickStats.streak}</span>
         </div>
@@ -112,9 +114,9 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
           <RevisionPlanCarousel plans={revisionPlans} onOpen={openPlan} />
         )}
         <div data-rev-stat-grid className="grid shrink-0 grid-cols-3 gap-3 lg:gap-2">
-          <StatChip icon={<ChartIcon className="h-5 w-5 text-indigo-600" />} label="Revisions" value={String(data.quickStats.testsCompleted)} />
-          <StatChip icon={<TargetIcon className="h-5 w-5 text-emerald-600" />} label="Accuracy" value={`${data.quickStats.overallAccuracy}%`} />
-          <StatChip icon={<FlameIcon className="h-5 w-5 text-orange-600" />} label="Streak" value={`${data.quickStats.streak}d`} />
+          <StatChip icon={<ChartIcon className="h-5 w-5 text-indigo-300" />} label="Revisions" value={String(data.quickStats.testsCompleted)} />
+          <StatChip icon={<TargetIcon className="h-5 w-5 text-emerald-300" />} label="Accuracy" value={`${data.quickStats.overallAccuracy}%`} />
+          <StatChip icon={<FlameIcon className="h-5 w-5 text-orange-300" />} label="Streak" value={`${data.quickStats.streak}d`} />
         </div>
         </div>
 
@@ -122,22 +124,22 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
         <div className="space-y-4 lg:space-y-3">
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[15px] font-bold text-slate-900 lg:text-[14px]">Weak Topics</h2>
-            <button type="button" onClick={() => navigate("#/revision/weak-topics")} className="text-xs font-semibold text-indigo-600">
+            <h2 className="text-[15px] font-bold text-white lg:text-[14px]">Weak Topics</h2>
+            <button type="button" onClick={() => navigate("#/revision/weak-topics")} className="text-xs font-semibold text-indigo-300">
               View all
             </button>
           </div>
           {data.weakTopicSummary.length === 0 ? (
-            <p className="text-sm text-slate-600">No weak topics yet. Complete a revision plan to build your learning profile.</p>
+            <p className="text-sm text-white/75">No weak topics yet. Complete a revision plan to build your learning profile.</p>
           ) : (
             <div className="space-y-3">
               {data.weakTopicSummary.map((topic) => (
                 <div key={topic.topicId} className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg">{topic.subjectIcon}</div>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 text-lg">{topic.subjectIcon}</div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
-                      <p className="truncate text-sm font-medium text-slate-800">{topic.topicName}</p>
-                      <span className="ml-2 flex items-center gap-1 text-xs font-semibold text-slate-600">
+                      <p className="truncate text-sm font-medium text-white/85">{topic.topicName}</p>
+                      <span className="ml-2 flex items-center gap-1 text-xs font-semibold text-white/75">
                         {trendIcon(topic.trend)} {topic.accuracy}%
                       </span>
                     </div>
@@ -151,8 +153,8 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
 
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[15px] font-bold text-slate-900">Revision Bank</h2>
-            <button type="button" onClick={() => navigate("#/revision/bank")} className="text-xs font-semibold text-indigo-600">
+            <h2 className="text-[15px] font-bold text-white">Revision Bank</h2>
+            <button type="button" onClick={() => navigate("#/revision/bank")} className="text-xs font-semibold text-indigo-300">
               Open
             </button>
           </div>
@@ -166,7 +168,7 @@ export default function DashboardPage({ uid, route, userName, hasAccess = true, 
               <SparklesIcon className="h-4 w-4" /> Revise {data.revisionBankSummary.due} due question{data.revisionBankSummary.due === 1 ? "" : "s"}
             </PrimaryButton>
           ) : (
-            <p className="mt-3 text-center text-xs font-medium text-slate-500">
+            <p className="mt-3 text-center text-xs font-medium text-white/55">
               {data.revisionBankSummary.total === 0 ? "Your revision bank will grow from your completed plans." : "You're all caught up on revisions 🎉"}
             </p>
           )}
@@ -184,11 +186,9 @@ function FirstRevisionCard({ onGenerate }: { onGenerate: () => void }) {
        card shrink to less than its own content, which `overflow-hidden` would
        then clip. `auto` keeps the content height as the floor and still grows
        into whatever the row gives the column. */
-    <div className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-0 text-white shadow-[0_20px_46px_-28px_rgba(79,70,229,0.42)] lg:rounded-2xl lg:min-h-[220px]">
-      <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/10" />
-      <div className="absolute -bottom-16 -left-12 h-44 w-44 rounded-full bg-indigo-300/10" />
-      <div className="relative flex min-h-0 flex-1 flex-col p-5 lg:p-4">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 shadow-sm backdrop-blur lg:h-10 lg:w-10 lg:rounded-xl">
+    <GlassSurface className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden text-white lg:min-h-[220px]" contentClassName="flex min-h-0 flex-1 flex-col p-5 lg:p-4">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/20 text-violet-100 lg:h-10 lg:w-10 lg:rounded-xl">
           <SparklesIcon className="h-6 w-6" />
         </span>
         <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-violet-100">Your first revision plan</p>
@@ -196,15 +196,11 @@ function FirstRevisionCard({ onGenerate }: { onGenerate: () => void }) {
         <p className="mt-2 text-sm leading-relaxed text-violet-100">
           Choose your class, subject, chapter and exact topics. AI will build a focused revision plan—nothing random.
         </p>
-        <button
-          type="button"
-          onClick={onGenerate}
-          className="mt-auto flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-white text-sm font-extrabold text-violet-700 shadow-lg shadow-violet-950/15 transition active:scale-[0.98]"
-        >
+        <PrimaryButton onClick={onGenerate} className="mt-auto">
           <SparklesIcon className="h-5 w-5" /> Create my revision plan
-        </button>
+        </PrimaryButton>
       </div>
-    </div>
+    </GlassSurface>
   );
 }
 
@@ -250,20 +246,20 @@ function RevisionPlanCarousel({ plans, onOpen }: { plans: CustomTestListItem[]; 
 
       {plans.length > 1 && (
         <div className="mt-3 flex shrink-0 items-center justify-center gap-4">
-          <button type="button" onClick={() => move(-1)} aria-label="Previous revision plan" className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 shadow-md ring-1 ring-slate-100 transition active:scale-90">
+          <GlassButton onClick={() => move(-1)} aria-label="Previous revision plan" className="[&_.size-12]:size-11">
             <ChevronLeftIcon className="h-5 w-5" />
-          </button>
+          </GlassButton>
           <div className="min-w-[132px] text-center">
-            <p className="text-xs font-semibold text-slate-500">Swipe to change plan</p>
+            <p className="text-xs font-semibold text-white/55">Swipe to change plan</p>
             <div className="mt-1.5 flex justify-center gap-1">
               {plans.map((item, index) => (
-                <span key={item.id} className={`h-1.5 rounded-full transition-all ${index === activeIndex ? "w-5 bg-indigo-600" : "w-1.5 bg-slate-300"}`} />
+                <span key={item.id} className={`h-1.5 rounded-full transition-all ${index === activeIndex ? "w-5 bg-indigo-600" : "w-1.5 bg-white/25"}`} />
               ))}
             </div>
           </div>
-          <button type="button" onClick={() => move(1)} aria-label="Next revision plan" className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white shadow-md transition active:scale-90">
+          <GlassButton onClick={() => move(1)} aria-label="Next revision plan" className="[&_.size-12]:size-11">
             <ChevronRightIcon className="h-5 w-5" />
-          </button>
+          </GlassButton>
         </div>
       )}
     </section>
@@ -280,15 +276,14 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
   return (
     /* Same fill chain as `FirstRevisionCard` — `flex-auto`, not `flex-1`, so the
        card can never be squeezed below its content. */
-    <div className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-900 p-0 text-white shadow-lg shadow-indigo-200">
-      <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-violet-400/15" />
-      <div className="relative flex min-h-0 flex-1 flex-col p-5">
+    <GlassSurface className="relative flex min-h-[270px] flex-auto flex-col overflow-hidden text-white" contentClassName="flex min-h-0 flex-1 flex-col p-5">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="flex shrink-0 items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-200">Start Revision</p>
             <h2 className="mt-1 line-clamp-2 text-xl font-extrabold leading-tight">{subjects}</h2>
           </div>
-          <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-indigo-100">{position}</span>
+          <span className="shrink-0 rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-bold text-indigo-100">{position}</span>
         </div>
 
         {/* The slack lands HERE, not under the copy: when the row is taller than the
@@ -296,7 +291,7 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
             rows. That keeps the card filled instead of opening an empty band between
             the text and the button — which is what an `mt-auto` button would do (auto
             margins take free space before `flex-grow` can). */}
-        <div data-rev-plan-details className="mt-3 flex min-h-0 flex-auto flex-col justify-center space-y-1.5 rounded-2xl bg-white/10 p-3 text-xs backdrop-blur-sm">
+        <div data-rev-plan-details className="mt-3 flex min-h-0 flex-auto flex-col justify-center space-y-1.5 rounded-2xl border border-white/10 p-3 text-xs">
           {details.classNames.length > 0 && <PlanRow label="Class" value={displayList(details.classNames, "")} />}
           <PlanRow label="Chapter" value={chapters} />
           <PlanRow label="Topics" value={topics} />
@@ -305,17 +300,19 @@ function RevisionPlanCard({ plan, onOpen, position }: { plan: CustomTestListItem
         <div className="mt-3 flex shrink-0 flex-wrap items-center gap-2 text-xs font-semibold text-indigo-100">
           <span className="flex items-center gap-1"><BankIcon className="h-4 w-4" /> {plan.totalQuestions} questions</span>
           <span className="flex items-center gap-1"><ClockIcon className="h-4 w-4" /> {plan.estimatedMinutes} min</span>
-          <span className="rounded-full bg-white/10 px-2 py-1 capitalize">{details.difficulty} difficulty</span>
-          <span className="rounded-full bg-white/10 px-2 py-1">{questionModeLabel(details.questionMode)}</span>
+          <span className="rounded-full border border-white/15 px-2 py-1 capitalize">{details.difficulty} difficulty</span>
+          <span className="rounded-full border border-white/15 px-2 py-1">{questionModeLabel(details.questionMode)}</span>
         </div>
 
-        <button type="button" data-rev-plan-cta onClick={onOpen} className="mt-3 flex min-h-[48px] w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-white text-sm font-extrabold text-indigo-800 shadow-sm transition active:scale-[0.98]">
-          {plan.status === "completed" && <CheckIcon className="h-4 w-4" />}
-          {action}
-          {plan.status !== "completed" && <ChevronRightIcon className="h-4 w-4" />}
-        </button>
+        <div data-rev-plan-cta className="mt-3 min-h-[48px] w-full shrink-0">
+          <PrimaryButton onClick={onOpen}>
+            {plan.status === "completed" && <CheckIcon className="h-4 w-4" />}
+            {action}
+            {plan.status !== "completed" && <ChevronRightIcon className="h-4 w-4" />}
+          </PrimaryButton>
+        </div>
       </div>
-    </div>
+    </GlassSurface>
   );
 }
 
@@ -331,13 +328,13 @@ function PlanRow({ label, value }: { label: string; value: string }) {
 
 function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-white py-3 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)] lg:rounded-xl lg:py-2 lg:shadow-sm">
-      {icon}<span className="text-base font-bold text-slate-900 lg:text-sm">{value}</span><span className="text-[10px] font-medium text-slate-500 lg:text-[9px]">{label}</span>
-    </div>
+    <GlassSurface tint={0.4} radius={20} className="text-white" contentClassName="flex flex-col items-center gap-1 py-3 lg:py-2">
+      {icon}<span className="text-base font-bold text-white lg:text-sm">{value}</span><span className="text-[10px] font-medium text-white/55 lg:text-[9px]">{label}</span>
+    </GlassSurface>
   );
 }
 
 function BankCount({ tone, value, label }: { tone: "amber" | "sky" | "emerald"; value: number; label: string }) {
-  const tones = { amber: "bg-amber-100 text-amber-800", sky: "bg-sky-100 text-sky-800", emerald: "bg-emerald-100 text-emerald-800" };
+  const tones = { amber: "bg-amber-500/20 text-amber-200", sky: "bg-sky-500/20 text-sky-200", emerald: "bg-emerald-500/20 text-emerald-200" };
   return <div className={`rounded-2xl py-2.5 ${tones[tone]}`}><p className="text-lg font-bold">{value}</p><p className="text-[11px] font-medium">{label}</p></div>;
 }

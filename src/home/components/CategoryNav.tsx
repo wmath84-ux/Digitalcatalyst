@@ -1,4 +1,5 @@
 import type { Category } from "../types";
+import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 
 interface CategoryNavProps {
   categories: Category[];
@@ -8,25 +9,26 @@ interface CategoryNavProps {
 
 export default function CategoryNav({ categories, activeCategory, onSelect }: CategoryNavProps) {
   return (
-    <div className="mt-5 flex gap-2 overflow-x-auto px-5 pb-1 no-scrollbar">
-      {categories.map((category) => {
-        const isActive = category.id === activeCategory;
-        return (
-          <button
+    <div className="mt-5 flex overflow-x-auto px-5 pb-1 no-scrollbar">
+      {/* Wave 12: the category strip is the pack GlassToggleGroup (segment
+          material, sliding indicator) instead of hand-frosted pills. */}
+      <GlassToggleGroup
+        className="dc-segment shrink-0"
+        value={activeCategory}
+        onValueChange={onSelect}
+        aria-label="Browse by category"
+      >
+        {categories.map((category) => (
+          <GlassToggleItem
             key={category.id}
-            type="button"
-            onClick={() => onSelect(category.id)}
-            className={`flex flex-shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 active:scale-95 ${
-              isActive
-                ? "border border-indigo-300/70 bg-indigo-500/15 text-indigo-700 shadow-[0_14px_30px_-18px_rgba(79,70,229,0.65)] backdrop-blur-xl"
-                : "border border-white/70 bg-white/60 text-slate-600 shadow-[0_12px_26px_-18px_rgba(15,23,42,0.3)] backdrop-blur-xl hover:bg-white/80"
-            }`}
+            value={category.id}
+            className="whitespace-nowrap px-4 py-2 text-sm font-semibold"
           >
             <span>{category.icon}</span>
             <span>{category.label}</span>
-          </button>
-        );
-      })}
+          </GlassToggleItem>
+        ))}
+      </GlassToggleGroup>
     </div>
   );
 }

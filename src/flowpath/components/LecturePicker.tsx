@@ -29,6 +29,12 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { BookOpen, Check, ChevronRight, Plus, Search, Trash2, X } from "lucide-react";
 import type { FlowPathActivity, FlowPathActivityKind } from "../types/flowpath";
+import { GlassSurface } from "../../components/ui/glass";
+import { GlassButton } from "../../components/ui/glass-button";
+import { GlassCard } from "../../components/ui/GlassCard";
+import { GlassTile } from "../../components/ui/glass-tile";
+import { GlassInput } from "../../components/ui/glass-input";
+import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 
 export type LectureCourseOption = {
   id: string;
@@ -236,7 +242,7 @@ export function LecturePicker({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4"
           role="dialog"
           aria-modal="true"
           data-lecture-picker
@@ -246,29 +252,31 @@ export function LecturePicker({
             initial={{ scale: 0.96, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.96, opacity: 0, y: 20 }}
-            className="relative flex max-h-[88vh] w-full max-w-[760px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl shadow-slate-900/20"
+            className="relative w-full max-w-[760px]"
           >
+          {/* Wave 13: the picker is the pack GlassSurface (Dialog values) —
+              no white panel, no cyan header gradient. */}
+          <GlassSurface radius={24} className="text-white" contentClassName="flex max-h-[88vh] flex-col overflow-hidden p-0">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-cyan-50 to-white px-5 py-3">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
               <div>
-                <h3 className="text-base font-black tracking-tight text-slate-900">Plan lectures</h3>
-                <p className="mt-0.5 text-xs font-medium text-slate-500">
+                <h3 className="text-base font-black tracking-tight text-white">Plan lectures</h3>
+                <p className="mt-0.5 text-xs font-medium text-white/55">
                   Pick a course, choose a module, set a time. Add several in one batch.
                 </p>
               </div>
-              <button
-                type="button"
+              <GlassButton
                 onClick={onClose}
                 disabled={submitting}
                 aria-label="Close"
-                className="grid h-9 w-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 disabled:opacity-40"
+                className="disabled:opacity-40 [&_.size-12]:size-9"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </GlassButton>
             </div>
 
             {/* Step indicator */}
-            <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-2 text-[11px] font-bold uppercase tracking-wide">
+            <div className="flex items-center gap-2 border-b border-white/10 px-5 py-2 text-[11px] font-bold uppercase tracking-wide">
               {[
                 { id: 1 as const, label: "Pick course" },
                 { id: 2 as const, label: "Pick module" },
@@ -279,17 +287,17 @@ export function LecturePicker({
                     data-step-indicator={s.id}
                     data-step-active={step === s.id ? "true" : "false"}
                     className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${
-                      step === s.id ? "bg-cyan-600 text-white" : step > s.id ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"
+                      step === s.id ? "bg-cyan-600 text-white" : step > s.id ? "bg-emerald-500 text-white" : "border border-white/20 text-white/55"
                     }`}
                   >
                     {step > s.id ? <Check className="h-3 w-3" /> : s.id}
                   </span>
-                  <span className={step === s.id ? "text-slate-900" : "text-slate-500"}>{s.label}</span>
-                  {i < 2 ? <ChevronRight className="h-3 w-3 text-slate-300" /> : null}
+                  <span className={step === s.id ? "text-white" : "text-white/55"}>{s.label}</span>
+                  {i < 2 ? <ChevronRight className="h-3 w-3 text-white/30" /> : null}
                 </div>
               ))}
               {queue.length > 0 ? (
-                <span className="ml-auto rounded-full bg-cyan-100 px-2.5 py-0.5 text-[10px] font-black text-cyan-700" data-queue-count>
+                <span className="ml-auto rounded-full bg-cyan-500/15 px-2.5 py-0.5 text-[10px] font-black text-cyan-200 ring-1 ring-cyan-400/30" data-queue-count>
                   {queue.length} queued
                 </span>
               ) : null}
@@ -339,22 +347,22 @@ export function LecturePicker({
 
               {/* Queue (visible on every step) */}
               {queue.length > 0 ? (
-                <div className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50/40 p-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-cyan-800">Queued lectures</p>
+                <div className="mt-4 rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-cyan-200">Queued lectures</p>
                   <ul className="mt-2 space-y-1.5">
                     {queue.map((sel, i) => (
                       <li
                         key={i}
                         data-queued-lecture-index={i}
-                        className="flex items-center gap-2 rounded-lg border border-cyan-200 bg-white px-2.5 py-1.5 text-xs"
+                        className="flex items-center gap-2 rounded-lg border border-white/15 px-2.5 py-1.5 text-xs"
                       >
-                        <BookOpen className="h-3.5 w-3.5 text-cyan-600" />
+                        <BookOpen className="h-3.5 w-3.5 text-cyan-300" />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-semibold text-slate-900">
+                          <p className="truncate font-semibold text-white">
                             {sel.productTitle}
-                            {sel.moduleTitle ? <span className="font-normal text-slate-500"> · {sel.moduleTitle}</span> : null}
+                            {sel.moduleTitle ? <span className="font-normal text-white/55"> · {sel.moduleTitle}</span> : null}
                           </p>
-                          <p className="truncate text-[10px] text-slate-500">
+                          <p className="truncate text-[10px] text-white/55">
                             {sel.scheduledFor
                               ? `Fires ${new Date(sel.scheduledFor).toLocaleString()}`
                               : "Immediate"}{" "}
@@ -362,14 +370,13 @@ export function LecturePicker({
                             {sel.previewOnly ? " · Preview (not purchased)" : ""}
                           </p>
                         </div>
-                        <button
-                          type="button"
+                        <GlassButton
                           onClick={() => handleRemoveFromQueue(i)}
-                          className="grid h-7 w-7 place-items-center rounded-lg border border-rose-200 bg-white text-rose-500 transition hover:bg-rose-50"
+                          className="[&_.size-12]:size-7 [&_svg]:text-rose-300"
                           aria-label="Remove from queue"
                         >
                           <Trash2 className="h-3 w-3" />
-                        </button>
+                        </GlassButton>
                       </li>
                     ))}
                   </ul>
@@ -377,37 +384,38 @@ export function LecturePicker({
               ) : null}
 
               {error ? (
-                <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
+                <p className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/15 px-3 py-2 text-sm text-rose-200">{error}</p>
               ) : null}
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/60 px-5 py-3">
-              <span className="text-[11px] text-slate-500">
+            <div className="flex items-center justify-between gap-2 border-t border-white/10 px-5 py-3">
+              <span className="text-[11px] text-white/55">
                 {queue.length === 0
                   ? "Pick a course, then a module, then schedule."
                   : `${queue.length} lecture${queue.length === 1 ? "" : "s"} ready. Tap "Schedule all" to commit.`}
               </span>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
+                <GlassButton
+                  variant="capsule"
                   onClick={onClose}
                   disabled={submitting}
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-40"
+                  className="disabled:opacity-40 [&>span>div]:h-10 [&>span>div]:px-3 [&>span>div]:text-sm [&>span>div]:font-semibold"
                 >
                   Cancel
-                </button>
+                </GlassButton>
                 <button
                   type="button"
                   onClick={handleSubmit}
                   disabled={submitting || queue.length === 0}
                   data-submit-lectures
-                  className="h-10 rounded-lg bg-cyan-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-cyan-500 disabled:opacity-40"
+                  className="h-10 rounded-full bg-cyan-600 px-4 text-sm font-black text-white transition hover:bg-cyan-500 disabled:opacity-40"
                 >
                   {submitting ? "Scheduling…" : `Schedule ${queue.length || ""} lecture${queue.length === 1 ? "" : "s"}`.trim()}
                 </button>
               </div>
             </div>
+          </GlassSurface>
           </motion.div>
         </motion.div>
       ) : null}
@@ -435,38 +443,41 @@ function StepPickCourse({
   return (
     <div>
       <label className="block">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Search courses</span>
-        <div className="relative mt-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
+        <span className="text-[11px] font-bold uppercase tracking-wide text-white/55">Search courses</span>
+        <div className="mt-1">
+          <GlassInput
             type="text"
+            icon={<Search className="h-4 w-4" />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Mathematics, Physics, or any course name"
             data-field="course-search"
-            className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 outline-none transition focus:border-cyan-500"
+            className="w-full"
           />
         </div>
       </label>
 
       {loading ? (
-        <p className="mt-3 text-center text-xs text-slate-500">Loading courses…</p>
+        <p className="mt-3 text-center text-xs text-white/55">Loading courses…</p>
       ) : courses.length === 0 ? (
-        <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-xs text-slate-500">
+        <p className="mt-3 rounded-lg border border-dashed border-white/15 p-6 text-center text-xs text-white/55">
           No courses found. Add a course in Products first.
         </p>
       ) : (
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2" data-course-list>
           {courses.map((c) => (
-            <button
+            <GlassCard
               key={c.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => onSelect(c)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(c); } }}
               data-course-id={c.id}
               data-course-preview={c.previewOnly ? "true" : "false"}
-              className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5 text-left transition hover:border-cyan-300 hover:bg-cyan-50/40"
+              className="cursor-pointer text-left transition hover:ring-1 hover:ring-cyan-400/40"
+              contentClassName="flex items-center gap-3 p-2.5"
             >
-              <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-md bg-slate-100">
+              <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-md border border-white/10">
                 {c.image ? (
                   <img src={c.image} alt="" className="h-full w-full object-cover" />
                 ) : (
@@ -474,18 +485,18 @@ function StepPickCourse({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-slate-900">{c.title}</p>
-                <p className="truncate text-[11px] text-slate-500">
+                <p className="truncate text-sm font-semibold text-white">{c.title}</p>
+                <p className="truncate text-[11px] text-white/55">
                   {c.category || "Course"} · {c.moduleCount} module{c.moduleCount === 1 ? "" : "s"}
                 </p>
                 {c.previewOnly ? (
-                  <span className="mt-0.5 inline-block rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">
+                  <span className="mt-0.5 inline-block rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-200 ring-1 ring-amber-400/30">
                     Preview · not purchased
                   </span>
                 ) : null}
               </div>
-              <ChevronRight className="h-4 w-4 text-slate-400" />
-            </button>
+              <ChevronRight className="h-4 w-4 text-white/40" />
+            </GlassCard>
           ))}
         </div>
       )}
@@ -517,8 +528,8 @@ function StepPickModule({
   return (
     <div>
       {course ? (
-        <div className="mb-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-2.5">
-          <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-md bg-slate-100">
+        <div className="mb-3 flex items-center gap-3 rounded-xl border border-white/10 p-2.5">
+          <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-md border border-white/10">
             {course.image ? (
               <img src={course.image} alt="" className="h-full w-full object-cover" />
             ) : (
@@ -526,56 +537,52 @@ function StepPickModule({
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-slate-900">{course.title}</p>
-            <p className="truncate text-[11px] text-slate-500">
+            <p className="truncate text-sm font-semibold text-white">{course.title}</p>
+            <p className="truncate text-[11px] text-white/55">
               {course.moduleCount} module{course.moduleCount === 1 ? "" : "s"} · {course.previewOnly ? "Preview only" : "Owned"}
             </p>
           </div>
-          <button
-            type="button"
+          <GlassButton
+            variant="capsule"
             onClick={onBack}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+            className="shrink-0 [&>span>div]:h-8 [&>span>div]:px-2.5 [&>span>div]:text-xs [&>span>div]:font-semibold"
           >
             Change course
-          </button>
+          </GlassButton>
         </div>
       ) : null}
 
       {loading ? (
-        <p className="text-center text-xs text-slate-500">Loading modules…</p>
+        <p className="text-center text-xs text-white/55">Loading modules…</p>
       ) : modules.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-xs text-slate-500">
+        <p className="rounded-lg border border-dashed border-white/15 p-4 text-center text-xs text-white/55">
           This course has no modules. The full course will be scheduled.
         </p>
       ) : (
         <div className="space-y-1.5" data-module-list>
           {modules.map((m) => (
-            <button
+            <GlassTile
               key={m.id}
-              type="button"
               onClick={() => setSelectedId(m.id)}
+              selected={selectedId === m.id}
               data-module-id={m.id}
               data-module-selected={selectedId === m.id ? "true" : "false"}
-              className={`flex w-full items-start gap-2 rounded-lg border p-2.5 text-left text-sm transition ${
-                selectedId === m.id
-                  ? "border-cyan-500 bg-cyan-50/60"
-                  : "border-slate-200 bg-white hover:border-cyan-300 hover:bg-cyan-50/30"
-              }`}
+              className="dc-tile aspect-auto w-full rounded-lg p-2.5 text-left text-sm [&>span]:w-full [&>span]:items-start [&>span]:justify-start [&>span]:gap-2"
             >
               <span
                 className={`mt-0.5 grid h-5 w-5 flex-shrink-0 place-items-center rounded-full text-[10px] ${
-                  selectedId === m.id ? "bg-cyan-600 text-white" : "bg-slate-200 text-slate-500"
+                  selectedId === m.id ? "bg-cyan-600 text-white" : "border border-white/20 text-white/55"
                 }`}
               >
                 {m.order + 1}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-slate-900">{m.title}</p>
+                <p className="truncate font-semibold text-white">{m.title}</p>
                 {m.description ? (
-                  <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-500">{m.description}</p>
+                  <p className="mt-0.5 line-clamp-2 text-[11px] text-white/55">{m.description}</p>
                 ) : null}
               </div>
-            </button>
+            </GlassTile>
           ))}
         </div>
       )}
@@ -584,7 +591,7 @@ function StepPickModule({
         <button
           type="button"
           onClick={onContinue}
-          className="h-10 rounded-lg bg-cyan-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-cyan-500"
+          className="h-10 rounded-full bg-cyan-600 px-4 text-sm font-black text-white transition hover:bg-cyan-500"
           data-continue-to-schedule
         >
           Continue
@@ -629,14 +636,14 @@ function StepSchedule({
 }) {
   return (
     <div>
-      <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Lecture summary</p>
-        <p className="mt-1 text-sm font-semibold text-slate-900">
+      <div className="rounded-xl border border-white/10 p-3">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-white/55">Lecture summary</p>
+        <p className="mt-1 text-sm font-semibold text-white">
           {course?.title || "Course"}
-          {module ? <span className="text-slate-500"> · {module.title}</span> : null}
+          {module ? <span className="text-white/55"> · {module.title}</span> : null}
         </p>
         {course?.previewOnly ? (
-          <p className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+          <p className="mt-1 rounded-md border border-amber-400/30 bg-amber-500/15 px-2 py-1 text-[11px] text-amber-200">
             You don't own this course yet. The notification will open the product page so you can purchase it.
           </p>
         ) : null}
@@ -644,42 +651,38 @@ function StepSchedule({
 
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Estimated minutes</span>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-white/55">Estimated minutes</span>
           <input
             type="number"
             min={5}
             max={480}
             value={estimatedMinutes}
             onChange={(e) => setEstimatedMinutes(Number(e.target.value || 30))}
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-cyan-500"
+            className="dc-field mt-1 w-full rounded-full border px-3 py-1.5 text-sm text-white outline-none"
           />
         </label>
         <div />
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Schedule</p>
+      <div className="mt-4 rounded-xl border border-white/10 p-3">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-white/55">Schedule</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
+          <GlassToggleGroup className="dc-segment" value={scheduleMode} onValueChange={(next) => setScheduleMode(next as typeof scheduleMode)} aria-label="Schedule mode">
           {[
             { key: "immediate", label: "Immediate" },
             { key: "datetime", label: "At date & time" },
             { key: "recurring", label: "Recurring (daily)" },
-          ].map((opt) => {
-            const active = scheduleMode === opt.key;
-            return (
-              <button
+          ].map((opt) => (
+              <GlassToggleItem
                 key={opt.key}
-                type="button"
-                onClick={() => setScheduleMode(opt.key as typeof scheduleMode)}
+                value={opt.key}
                 data-schedule-mode={opt.key}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                  active ? "border-cyan-500 bg-cyan-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                }`}
+                className="px-3 py-1.5 text-xs font-semibold"
               >
                 {opt.label}
-              </button>
-            );
-          })}
+              </GlassToggleItem>
+          ))}
+          </GlassToggleGroup>
         </div>
         {scheduleMode !== "immediate" ? (
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -687,32 +690,32 @@ function StepSchedule({
               type="date"
               value={dateStr}
               onChange={(e) => setDateStr(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-cyan-500"
+              className="dc-field rounded-full border px-3 py-1.5 text-sm text-white outline-none"
             />
             <input
               type="time"
               value={timeStr}
               onChange={(e) => setTimeStr(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-cyan-500"
+              className="dc-field rounded-full border px-3 py-1.5 text-sm text-white outline-none"
             />
           </div>
         ) : null}
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-2">
-        <button
-          type="button"
+        <GlassButton
+          variant="capsule"
           onClick={onBack}
-          className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          className="[&>span>div]:h-10 [&>span>div]:px-3 [&>span>div]:text-sm [&>span>div]:font-semibold"
         >
           Back
-        </button>
+        </GlassButton>
         <button
           type="button"
           onClick={onAddToQueue}
           disabled={!canAddToQueue}
           data-add-to-queue
-          className="h-10 rounded-lg bg-cyan-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-cyan-500 disabled:opacity-40"
+          className="h-10 rounded-full bg-cyan-600 px-4 text-sm font-black text-white transition hover:bg-cyan-500 disabled:opacity-40"
         >
           <Plus className="mr-1 inline h-3.5 w-3.5" /> Add to queue
         </button>

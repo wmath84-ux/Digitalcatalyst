@@ -51,7 +51,7 @@ export default function App({
 
   return (
     <div className="dc-app-shell min-h-screen sm:py-6">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200 md:max-w-none md:rounded-none md:border-0 md:shadow-none md:bg-transparent">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] md:max-w-none md:rounded-none">
         <Header
           cartCount={cartCount}
           notifCount={1}
@@ -76,11 +76,10 @@ export default function App({
           )}
         </main>
 
-        {toast && (
-          <div className="pointer-events-none absolute bottom-20 left-1/2 z-40 w-max -translate-x-1/2 rounded-full bg-slate-900/95 px-4 py-2 text-xs font-semibold text-white shadow-lg">
-            {toast}
-          </div>
-        )}
+        {/* Wave 14: the store toast is rendered by the pack's GlassToaster
+            (src/main.tsx); the `toast` prop stays for the contract but paints
+            nothing here. */}
+        {toast ? <span className="sr-only" role="status">{toast}</span> : null}
 
         <BottomNav
           active={activeTab === "purchases" ? "purchases" : "store"}

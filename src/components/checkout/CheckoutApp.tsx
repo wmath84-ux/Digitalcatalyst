@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
+import { GlassButton } from "../ui/glass-button";
 import StepIndicator from "../StepIndicator";
 import PaymentGateway, { type VerifiedPayment } from "../PaymentGateway";
 import Header from "../Header";
@@ -134,11 +135,11 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
   const quoteId = quote?.quoteId || "";
 
   return (
-    <div className="min-h-screen bg-white sm:py-6" data-checkout-app>
+    <div className="min-h-screen sm:py-6" data-checkout-app>
       <div
         data-checkout-shell
         data-app-frame
-        className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200"
+        className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem]"
       >
         <Header
           cartCount={cartIds.size}
@@ -154,25 +155,25 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
           }}
         />
 
-        <div data-checkout-toolbar className="border-b border-slate-200 bg-white/90 backdrop-blur-md">
+        <div data-checkout-toolbar className="border-b border-white/10">
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
-            <button
+            <GlassButton
               type="button"
               onClick={checkout.goBack}
-              className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-600"
+              className="[&_.size-12]:size-9"
               aria-label="Back to source"
             >
               <ArrowLeft size={16} />
-            </button>
-            <h1 className="text-base font-extrabold tracking-tight text-slate-900">Checkout</h1>
-            <span className="text-[10px] font-mono text-slate-400">Step {step}/3</span>
+            </GlassButton>
+            <h1 className="text-base font-extrabold tracking-tight text-white">Checkout</h1>
+            <span className="text-[10px] font-mono text-white/55">Step {step}/3</span>
           </div>
           <div className="px-4 pb-2">
             <StepIndicator currentStep={step} steps={STEPS} />
           </div>
         </div>
 
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto bg-white px-4 pt-4 pb-8">
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-8">
           {step === 1 ? (
             <CheckoutReviewStep onProceed={handleProceedToPayment} onEdit={handleEditSelection} />
           ) : null}

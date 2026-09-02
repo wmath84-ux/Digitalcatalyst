@@ -16,6 +16,9 @@ import {
 import { collection, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import Header from "./Header";
+import { GlassButton } from "./ui/glass-button";
+import { GlassCard } from "./ui/GlassCard";
+import { GlassToggleGroup, GlassToggleItem } from "./ui/glass-toggle-group";
 import BottomNav, { type TabKey } from "./BottomNav";
 import {
   filterNotifications,
@@ -67,28 +70,28 @@ function notificationIcon(notification: SiteNotification): IconStyle {
   // My Day reminders carry the section on the target — show the matching icon.
   if (target === "mayday" || category === "mayday") {
     const section = notification.target && notification.target.type === "mayday" ? notification.target.section : undefined;
-    if (section === "schedule") return { Icon: CalendarClock, bg: "bg-cyan-50", color: "text-cyan-600" };
-    if (section === "reminders") return { Icon: BellRing, bg: "bg-amber-50", color: "text-amber-600" };
-    return { Icon: CheckSquare, bg: "bg-teal-50", color: "text-teal-600" };
+    if (section === "schedule") return { Icon: CalendarClock, bg: "bg-cyan-500/15", color: "text-cyan-300" };
+    if (section === "reminders") return { Icon: BellRing, bg: "bg-amber-500/15", color: "text-amber-300" };
+    return { Icon: CheckSquare, bg: "bg-teal-500/15", color: "text-teal-300" };
   }
 
   switch (category) {
     case "store":
-      return { Icon: ShoppingBag, bg: "bg-indigo-50", color: "text-indigo-600" };
+      return { Icon: ShoppingBag, bg: "bg-indigo-500/15", color: "text-indigo-300" };
     case "unlock":
-      return { Icon: Unlock, bg: "bg-emerald-50", color: "text-emerald-600" };
+      return { Icon: Unlock, bg: "bg-emerald-500/15", color: "text-emerald-300" };
     case "course":
-      return { Icon: BookOpen, bg: "bg-sky-50", color: "text-sky-600" };
+      return { Icon: BookOpen, bg: "bg-sky-500/15", color: "text-sky-300" };
     case "reading":
-      return { Icon: Newspaper, bg: "bg-blue-50", color: "text-blue-600" };
+      return { Icon: Newspaper, bg: "bg-blue-500/15", color: "text-blue-300" };
     case "community":
-      return { Icon: Users, bg: "bg-fuchsia-50", color: "text-fuchsia-600" };
+      return { Icon: Users, bg: "bg-fuchsia-500/15", color: "text-fuchsia-300" };
     case "announcement":
-      return { Icon: Megaphone, bg: "bg-violet-50", color: "text-violet-600" };
+      return { Icon: Megaphone, bg: "bg-violet-500/15", color: "text-violet-300" };
     case "subscription":
-      return { Icon: CreditCard, bg: "bg-purple-50", color: "text-purple-600" };
+      return { Icon: CreditCard, bg: "bg-purple-500/15", color: "text-purple-300" };
     default:
-      return { Icon: Sparkles, bg: "bg-slate-50", color: "text-slate-600" };
+      return { Icon: Sparkles, bg: "bg-indigo-500/15", color: "text-indigo-200" };
   }
 }
 
@@ -213,8 +216,8 @@ export default function NotificationsPage({
   };
 
   return (
-    <div className="min-h-screen bg-white sm:py-6">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200 md:max-w-none md:rounded-none md:border-0 md:shadow-none md:bg-transparent">
+    <div className="min-h-screen sm:py-6">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] md:max-w-none md:rounded-none">
         <Header
           cartCount={cartCount}
           notifCount={unread}
@@ -226,45 +229,47 @@ export default function NotificationsPage({
           subtitle={unread > 0 ? `${unread} unread update${unread === 1 ? "" : "s"}` : "You're all caught up"}
           action={
             unread > 0 ? (
-              <button
+              <GlassButton
                 type="button"
                 onClick={markAllRead}
                 aria-label="Mark all read"
-                title="Mark all read"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm shadow-indigo-200 transition hover:bg-indigo-700 active:scale-95"
+                className="shrink-0 [&_.size-12]:size-10 [&_svg]:text-indigo-200"
               >
                 <CheckIcon className="h-5 w-5" />
-              </button>
+              </GlassButton>
             ) : null
           }
         >
           {items.length > 0 && (
-            <div className="mt-3 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="mt-3 flex overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {/* Wave 12: the filter strip is the pack GlassToggleGroup. */}
+              <GlassToggleGroup
+                className="dc-segment shrink-0"
+                value={activeFilter}
+                onValueChange={(next) => setActiveFilter(next as NotificationFilterKey)}
+                aria-label="Filter notifications"
+              >
               {NOTIFICATION_FILTER_ORDER.map((key) => {
                 const isActive = activeFilter === key;
                 const label = key === "all" ? "All" : FILTER_META[key].label;
                 return (
-                  <button
+                  <GlassToggleItem
                     key={key}
-                    type="button"
-                    onClick={() => setActiveFilter(key)}
-                    className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition ${
-                      isActive
-                        ? "border-indigo-500 bg-indigo-600 text-white shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
+                    value={key}
+                    className="whitespace-nowrap px-3.5 py-1.5 text-sm font-semibold"
                   >
                     {label}
                     <span
-                      className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
-                        isActive ? "bg-white/20 text-white" : "bg-indigo-50 text-indigo-600"
+                      className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full border px-1.5 text-[11px] font-bold ${
+                        isActive ? "border-white/30 text-white" : "border-white/15 text-white/70"
                       }`}
                     >
                       {filterCounts[key]}
                     </span>
-                  </button>
+                  </GlassToggleItem>
                 );
               })}
+              </GlassToggleGroup>
             </div>
           )}
         </Header>
@@ -272,71 +277,80 @@ export default function NotificationsPage({
         <main data-notifications-content className="flex-1 overflow-y-auto md:px-8">
 
           {pushPermission === "default" && (
-            <div className="mx-4 mt-1 flex items-center justify-between gap-3 rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-100">
+            <GlassCard className="mx-4 mt-1" contentClassName="flex items-center justify-between gap-3 p-4">
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-900">Get alerts on your phone</p>
-                <p className="mt-0.5 text-xs text-slate-500">Allow notifications to receive purchase unlocks and reminders as system alerts.</p>
+                <p className="text-sm font-bold text-white">Get alerts on your phone</p>
+                <p className="mt-0.5 text-xs text-white/55">Allow notifications to receive purchase unlocks and reminders as system alerts.</p>
               </div>
               <button
                 type="button"
                 onClick={() => void enableNotifications()}
-                className="shrink-0 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white"
+                className="shrink-0 rounded-full bg-indigo-600 px-3 py-2 text-xs font-black text-white transition hover:bg-indigo-500"
               >
                 Enable
               </button>
-            </div>
+            </GlassCard>
           )}
           {pushPermission === "denied" && (
-            <div className="mx-4 mt-1 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-100">
-              <p className="text-sm font-bold text-slate-900">Notifications are blocked</p>
-              <p className="mt-0.5 text-xs text-slate-500">Enable them in your browser's site settings (usually under App info → Notifications) to receive system alerts.</p>
+            <div className="mx-4 mt-1 rounded-2xl border border-amber-400/30 bg-amber-500/15 p-4">
+              <p className="text-sm font-bold text-amber-100">Notifications are blocked</p>
+              <p className="mt-0.5 text-xs text-amber-200/80">Enable them in your browser's site settings (usually under App info → Notifications) to receive system alerts.</p>
             </div>
           )}
 
           {visibleItems.length === 0 ? (
             <div className="flex flex-col items-center gap-3 px-6 pb-10 pt-14 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/15 text-indigo-200">
                 <BellIcon className="h-7 w-7" />
               </div>
-              <h3 className="text-xl font-extrabold text-slate-900">
+              <h3 className="text-xl font-extrabold text-white">
                 {activeFilter === "all" ? "No notifications yet" : `No ${FILTER_META[activeFilter as Exclude<NotificationFilterKey, "all">].label} notifications`}
               </h3>
-              <p className="max-w-xs text-sm text-slate-500">
+              <p className="max-w-xs text-sm text-white/55">
                 {activeFilter === "all"
                   ? "Store updates, course unlocks, and study reminders will show up here."
                   : FILTER_META[activeFilter as Exclude<NotificationFilterKey, "all">].hint}
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 px-2 pb-6">
+            <div className="space-y-2 px-4 pb-6">
               {visibleItems.map((notification) => {
                 return (
-                  <button
+                  <GlassCard
                     key={notification.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => openNotification(notification)}
-                    className={`flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition ${
-                      notification.read ? "bg-white" : "bg-indigo-50/70"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openNotification(notification);
+                      }
+                    }}
+                    data-notification-read={notification.read ? "true" : "false"}
+                    className={`w-full cursor-pointer text-left transition active:scale-[0.99] ${
+                      notification.read ? "" : "ring-1 ring-indigo-400/40"
                     }`}
+                    contentClassName="flex items-start gap-3 px-3 py-3"
                   >
                     {(() => {
                       const { Icon, bg, color } = notificationIcon(notification);
                       return (
                         <span
                           data-notification-icon
-                          className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-slate-200 ${bg} ${color}`}
+                          className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bg} ${color}`}
                         >
                           <Icon className="h-5 w-5" />
                         </span>
                       );
                     })()}
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-bold text-slate-900">{notification.title}</span>
-                      <span className="mt-0.5 block text-xs leading-5 text-slate-500">{notification.body}</span>
-                      <span className="mt-1 block text-[11px] font-semibold text-slate-400">{timeAgo(notification.createdAt)}</span>
+                      <span className="block text-sm font-bold text-white">{notification.title}</span>
+                      <span className="mt-0.5 block text-xs leading-5 text-white/55">{notification.body}</span>
+                      <span className="mt-1 block text-[11px] font-semibold text-white/55">{timeAgo(notification.createdAt)}</span>
                     </span>
-                    {!notification.read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-indigo-600" />}
-                  </button>
+                    {!notification.read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-indigo-400" />}
+                  </GlassCard>
                 );
               })}
             </div>

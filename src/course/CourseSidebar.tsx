@@ -23,6 +23,9 @@ import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, PlayCircle, RefreshCw, ShoppingBag, Sparkles } from "lucide-react";
 import type { CourseAccessSource } from "../../utils/courseAccess";
 import type { CourseFile, CourseModule, PaidCourseUpdate } from "../types/course";
+import { GlassSurface } from "../components/ui/glass";
+import { GlassButton } from "../components/ui/glass-button";
+import { GlassTile } from "../components/ui/glass-tile";
 
 interface SidebarProps {
   modules: CourseModule[];
@@ -149,13 +152,13 @@ export default function CourseSidebar(props: SidebarProps) {
   const toggle = (id: string) => setOpenModules((current) => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; });
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#11111d] text-white" data-course-sidebar>
+    <div className="flex h-full min-h-0 flex-col text-white" data-course-sidebar>
       {props.updates.length > 0 && (
         <div className="shrink-0 border-b border-white/10 p-3">
-          <button onClick={() => setUpdatesOpen((value) => !value)} className="flex w-full items-center gap-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/10 p-3 text-left ring-1 ring-amber-400/20">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-amber-400 text-slate-950"><RefreshCw size={17} /></span><span className="min-w-0 flex-1"><span className="block text-xs font-black text-amber-200">{props.updates.length} update{props.updates.length === 1 ? "" : "s"} available</span><span className="block truncate text-[10px] text-white/45">View new modules, files and individual prices</span></span>{updatesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          </button>
-          {updatesOpen && <div className="mt-2 space-y-2">{props.updates.map((update) => <div key={update.id} className="rounded-xl border border-white/10 bg-white/5 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-black">{update.title}</p><p className="mt-1 text-[10px] leading-4 text-white/45">{update.contentNames.slice(0, 3).join(" · ")}</p></div><span className="shrink-0 text-xs font-black text-amber-300">₹{update.price.toLocaleString("en-IN")}</span></div><button onClick={() => props.onBuyUpdate(update)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-400 py-2 text-[11px] font-black text-slate-950" data-course-sidebar-buy-update={update.id}><ShoppingBag size={13} /> Buy this update</button></div>)}</div>}
+          <GlassTile onClick={() => setUpdatesOpen((value) => !value)} selected={updatesOpen} className="aspect-auto w-full border-amber-400/30 p-3 text-left text-white [&>span]:w-full [&>span]:justify-start [&>span]:gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-400/20 text-amber-200"><RefreshCw size={17} /></span><span className="min-w-0 flex-1"><span className="block text-xs font-black text-amber-200">{props.updates.length} update{props.updates.length === 1 ? "" : "s"} available</span><span className="block truncate text-[10px] text-white/60">View new modules, files and individual prices</span></span>{updatesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </GlassTile>
+          {updatesOpen && <div className="mt-2 space-y-2">{props.updates.map((update) => <GlassSurface key={update.id} radius={16} className="text-white" contentClassName="p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-black">{update.title}</p><p className="mt-1 text-[10px] leading-4 text-white/60">{update.contentNames.slice(0, 3).join(" · ")}</p></div><span className="shrink-0 text-xs font-black text-amber-300">₹{update.price.toLocaleString("en-IN")}</span></div><GlassButton variant="capsule" onClick={() => props.onBuyUpdate(update)} className="mt-3 w-full text-[11px] font-black [&>span>div]:h-9 [&>span>div]:w-full [&>span>div]:px-4 [&>span>div]:text-amber-200" data-course-sidebar-buy-update={update.id}><span className="flex items-center justify-center gap-1.5"><ShoppingBag size={13} /> Buy this update</span></GlassButton></GlassSurface>)}</div>}
         </div>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
@@ -176,17 +179,17 @@ function ModuleGroup({ module, index, depth, inheritedLocked, openModules, toggl
   return (
     <div className={`${depth ? "ml-3 border-l border-white/10 pl-2" : "mb-2"}`} data-course-module-group data-module-id={module.id} data-locked={moduleLocked ? "true" : "false"}>
       <div className={`flex items-center gap-2 rounded-xl px-3 py-3 text-left ${moduleLocked ? "bg-amber-400/5" : "hover:bg-white/5"}`}>
-        <button onClick={() => toggle(module.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/5 text-[10px] font-black text-white/45">{index + 1}</span>
+        <GlassTile onClick={() => toggle(module.id)} selected={open} className="aspect-auto min-w-0 flex-1 rounded-xl px-2 py-1.5 text-left text-white [&>span]:w-full [&>span]:justify-start [&>span]:gap-2">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/10 text-[10px] font-black text-white/70">{index + 1}</span>
           <span className="min-w-0 flex-1 truncate text-xs font-black">{module.title}</span>
-        </button>
+        </GlassTile>
         {state.preview ? <Eye size={13} className="text-sky-300" data-course-module-preview /> : null}
         {state.dependencyBlocked ? <Sparkles size={13} className="text-rose-300" /> : null}
         {moduleLocked && !state.preview ? <LockKeyhole size={13} className="text-amber-400" data-course-module-lock /> : null}
         {hasChildren ? (
-          <button onClick={() => toggle(module.id)} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-white/40 hover:bg-white/5" aria-label={open ? "Collapse module" : "Expand module"}>
+          <GlassButton onClick={() => toggle(module.id)} className="shrink-0 [&_.size-12]:size-7" aria-label={open ? "Collapse module" : "Expand module"}>
             {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-          </button>
+          </GlassButton>
         ) : null}
       </div>
       {state.dependencyBlocked && state.dependencyHint ? (
@@ -195,10 +198,10 @@ function ModuleGroup({ module, index, depth, inheritedLocked, openModules, toggl
         </p>
       ) : null}
       {moduleLocked && state.paidUpdateNotOwned ? (
-        <div className="mx-3 mb-2 flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 p-2 ring-1 ring-amber-400/20">
+        <GlassSurface radius={16} className="mx-3 mb-2 border border-amber-400/30 text-white" contentClassName="flex items-center justify-between gap-2 p-2">
           <p className="text-[10px] font-bold text-amber-200">Unlock with this update</p>
-          <button
-            type="button"
+          <GlassButton
+            variant="capsule"
             onClick={() => {
               if (props.onBuyModule) {
                 props.onBuyModule({ id: module.id, paidUpdateId: module.paidUpdateId, paidUpdateTitle: module.paidUpdateTitle, paidUpdatePrice: module.paidUpdatePrice });
@@ -207,12 +210,12 @@ function ModuleGroup({ module, index, depth, inheritedLocked, openModules, toggl
                 if (update) props.onBuyUpdate(update);
               }
             }}
-            className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-400 px-2.5 py-1 text-[10px] font-black text-slate-950"
+            className="shrink-0 text-[10px] font-black [&>span>div]:h-8 [&>span>div]:px-2.5 [&>span>div]:text-amber-200"
             data-course-sidebar-buy-module={module.id}
           >
-            <ShoppingBag size={11} /> {module.paidUpdateTitle || "Buy update"}
-          </button>
-        </div>
+            <span className="flex items-center gap-1"><ShoppingBag size={11} /> {module.paidUpdateTitle || "Buy update"}</span>
+          </GlassButton>
+        </GlassSurface>
       ) : null}
       {open && (
         <div className="space-y-1 pb-2">
@@ -220,12 +223,13 @@ function ModuleGroup({ module, index, depth, inheritedLocked, openModules, toggl
             const Icon = iconFor(file);
             const fileLocked = moduleLocked || (file.accessLevel === "paidUpdate" && !props.ownedUpdateIds.has(updateId(file)));
             return (
-              <button
+              <GlassTile
                 key={file.id}
                 disabled={fileLocked}
                 onClick={() => props.onSelect(file)}
-                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[11px] transition ${
-                  props.selectedId === file.id ? "bg-violet-500 text-white" : fileLocked ? "cursor-not-allowed bg-amber-400/5 text-white/35" : "text-white/65 hover:bg-white/5 hover:text-white"
+                selected={props.selectedId === file.id}
+                className={`aspect-auto w-full rounded-xl px-3 py-2.5 text-left text-[11px] [&>span]:w-full [&>span]:justify-start [&>span]:gap-2 ${
+                  props.selectedId === file.id ? "text-white" : fileLocked ? "cursor-not-allowed border-amber-400/20 text-white/45" : "text-white/75 hover:text-white"
                 }`}
                 data-course-sidebar-file
                 data-file-id={file.id}
@@ -234,7 +238,7 @@ function ModuleGroup({ module, index, depth, inheritedLocked, openModules, toggl
                 <Icon size={15} className="shrink-0" />
                 <span className="min-w-0 flex-1 truncate">{file.name}</span>
                 {fileLocked ? <LockKeyhole size={12} className="text-amber-400" /> : null}
-              </button>
+              </GlassTile>
             );
           })}
           {(module.modules || []).map((child, childIndex) => (

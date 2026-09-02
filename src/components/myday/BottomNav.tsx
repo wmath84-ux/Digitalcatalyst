@@ -1,6 +1,4 @@
 import { Bell, CalendarClock, ClipboardList, Home, LayoutGrid, NotebookPen } from "lucide-react";
-import { useHomeHold } from "../../hooks/useHomeHold";
-import { HoldRing } from "../ui/HoldRing";
 import GlassDock, { type GlassDockItem } from "../glass-dock/GlassDock";
 
 interface BottomNavProps {
@@ -21,32 +19,21 @@ const items = [
  * Same glass-dock footer as the main app footer (src/components/BottomNav.tsx):
  * nearby icons magnify and lift as the pointer moves across the dock.
  *
- * The Home button shares the main footer's 1-second long-press shortcut:
- * holding it opens the FlowPath / task-planning dashboard.
+ * The Home button is a plain tap (the old long-press → FlowPath shortcut was
+ * removed on the owner's direction).
  *
  * The previous white-pill markup is stored at
  * src/components/glass-dock/stored/MyDayBottomNav.original.txt.
  */
 export default function BottomNav({ active, onNavigate }: BottomNavProps) {
-  const homeHold = useHomeHold(() => {
-    window.location.hash = "#/flowpath";
-  });
 
   const dockItems: GlassDockItem[] = items.map((item) => {
-    const isHome = item.id === "home";
     return {
       id: item.id,
       label: item.label,
       icon: item.icon,
       color: item.color,
       active: active === item.id,
-      buttonProps: isHome
-        ? {
-            ...homeHold.handlers,
-            className: homeHold.holding ? "[touch-action:none]" : "",
-          }
-        : undefined,
-      extra: isHome && homeHold.holding ? <HoldRing holding={homeHold.holding} durationMs={homeHold.durationMs} /> : undefined,
     };
   });
 
@@ -61,7 +48,6 @@ export default function BottomNav({ active, onNavigate }: BottomNavProps) {
           siteFooter
           items={dockItems}
           onSelect={(id) => {
-            if (id === "home" && homeHold.consumeSuppressedClick()) return;
             onNavigate(id);
           }}
         />

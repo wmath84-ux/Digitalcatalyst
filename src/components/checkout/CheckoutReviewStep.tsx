@@ -15,6 +15,9 @@
 //   - safe recovery UI when the quote is invalid / expired / failed
 
 import { useEffect, useMemo, useState } from "react";
+import { GlassCard } from "../ui/glass-card";
+import { GlassButton } from "../ui/glass-button";
+import { GlassInput } from "../ui/glass-input";
 import {
   AlertCircle,
   ArrowLeft,
@@ -152,11 +155,11 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
     <div className="flex flex-col gap-3" data-checkout-review-step>
       {/* Purchase type chip */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-3 py-1 text-xs font-black text-indigo-700">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-black text-indigo-200">
           <PurchaseTypeIcon size={12} />
           {purchaseTypeLabel}
         </span>
-        <span className="text-[10px] font-mono text-slate-400">quote {quote.quoteId}</span>
+        <span className="text-[10px] font-mono text-white/55">quote {quote.quoteId}</span>
       </div>
 
       {/* Buyer card */}
@@ -175,20 +178,20 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           buyer unlocks, and the price section below shows the money. Rendering
           both repeated the same names on the review page. */}
       {isSubscriptionPurchase ? null : (
-      <section data-checkout-line-items className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      <GlassCard data-checkout-line-items>
         <header className="mb-2 flex items-center justify-between">
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">
+          <h2 className="text-xs font-black uppercase tracking-wider text-white/55">
             Items ({lineItemsForDisplay.length + ownedLineItems.length})
           </h2>
           {lineItemsForDisplay.length > 0 ? (
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-white/55">
               {lineItemsForDisplay.length} new · {ownedLineItems.length} already owned
             </p>
           ) : null}
         </header>
         <div className="space-y-2">
           {lineItemsForDisplay.length === 0 && ownedLineItems.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
+            <p className="rounded-2xl border border-dashed border-white/10 p-4 text-center text-xs text-white/55">
               No items to charge for. This quote is fully covered by your existing library.
             </p>
           ) : null}
@@ -199,7 +202,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
             <CheckoutLineItemCard key={line.id} line={line} />
           ))}
         </div>
-      </section>
+      </GlassCard>
       )}
 
       {/* Part 7 — Coupon input card (server-validated, with verified savings).
@@ -221,10 +224,10 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
       ) : null}
 
       {/* Price section */}
-      <section data-checkout-price-section className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      <GlassCard data-checkout-price-section>
         <header className="mb-2 flex items-center justify-between">
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">Price breakdown</h2>
-          <p className="text-[10px] text-slate-400">GST inclusive</p>
+          <h2 className="text-xs font-black uppercase tracking-wider text-white/55">Price breakdown</h2>
+          <p className="text-[10px] text-white/55">GST inclusive</p>
         </header>
         <dl className="space-y-1.5 text-sm">
           <PriceRow label="Regular subtotal" value={regularSubtotal} />
@@ -242,24 +245,24 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
             <PriceRow label="Minimum payable" value={minimumPayable} muted />
           ) : null}
         </dl>
-        <div className="mt-3 border-t border-slate-100 pt-3">
+        <div className="mt-3 border-t border-white/10 pt-3">
           <div className="flex items-center justify-between">
-            <span className="text-base font-black text-slate-900">Final total</span>
-            <span className="text-2xl font-black text-slate-900 sm:text-3xl">{formatRupee(finalTotal)}</span>
+            <span className="text-base font-black text-white">Final total</span>
+            <span className="text-2xl font-black text-white sm:text-3xl">{formatRupee(finalTotal)}</span>
           </div>
-          <p className="mt-1 text-[11px] text-slate-400">Payable amount is the maximum of cash-payable and minimum-payable floors.</p>
+          <p className="mt-1 text-[11px] text-white/55">Payable amount is the maximum of cash-payable and minimum-payable floors.</p>
         </div>
-      </section>
+      </GlassCard>
 
       {/* Selection details */}
       {showDetails ? (
-        <section data-checkout-selection-details className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <GlassCard data-checkout-selection-details>
           <header className="mb-2 flex items-center justify-between">
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">Selection details</h2>
+            <h2 className="text-xs font-black uppercase tracking-wider text-white/55">Selection details</h2>
             <button
               type="button"
               onClick={() => setShowDetails(false)}
-              className="text-[11px] font-bold text-slate-500 hover:text-slate-700"
+              className="text-[11px] font-bold text-white/55 hover:text-white/85"
             >
               Hide
             </button>
@@ -286,10 +289,10 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
                 lines={updateLines}
               />
               {updateLines.flatMap((line) => line.detailItems || []).length > 0 ? (
-                <div className="rounded-2xl bg-violet-50 p-3 ring-1 ring-violet-100">
-                  <p className="text-xs font-black uppercase tracking-wider text-violet-700">New content included</p>
-                  <ul className="mt-2 space-y-1.5">{updateLines.flatMap((line) => line.detailItems || []).map((item) => <li key={item} className="flex items-center gap-2 text-xs font-semibold text-violet-900"><BadgeCheck size={12} className="shrink-0" />{item}</li>)}</ul>
-                  <p className="mt-2 text-[10px] text-violet-600">Your existing course stays owned; this checkout adds only the listed upgrade content.</p>
+                <div className="rounded-2xl bg-violet-500/15 p-3 ring-1 ring-violet-400/30">
+                  <p className="text-xs font-black uppercase tracking-wider text-violet-200">New content included</p>
+                  <ul className="mt-2 space-y-1.5">{updateLines.flatMap((line) => line.detailItems || []).map((item) => <li key={item} className="flex items-center gap-2 text-xs font-semibold text-violet-200"><BadgeCheck size={12} className="shrink-0" />{item}</li>)}</ul>
+                  <p className="mt-2 text-[10px] text-violet-300">Your existing course stays owned; this checkout adds only the listed upgrade content.</p>
                 </div>
               ) : null}
             </div>
@@ -297,7 +300,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           {kind === "subscription" || kind === "subscription_features" ? (
             <div className="space-y-3">
               {quote.subscriptionAddOn ? (
-                <div className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold leading-5 text-emerald-900">
+                <div className="flex items-start gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 p-3 text-xs font-semibold leading-5 text-emerald-200">
                   <span aria-hidden="true">⬆️</span>
                   <span>
                     Upgrading your current membership — you are only charged for
@@ -332,29 +335,30 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
               lines={productLines}
             />
           ) : null}
-        </section>
+        </GlassCard>
       ) : (
-        <button
+        <GlassButton
+          variant="capsule"
           type="button"
           onClick={() => setShowDetails(true)}
-          className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          className="[&>span>div]:h-9 [&>span>div]:px-4 [&>span>div]:text-xs [&>span>div]:font-bold"
         >
           Show selection details
-        </button>
+        </GlassButton>
       )}
 
       {/* Refresh banner */}
       {showError ? (
-        <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 sm:text-sm">
+        <div className="flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-500/15 p-3 text-xs text-amber-200 sm:text-sm">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="flex-1">
             <p className="font-black">We couldn't refresh the price.</p>
-            <p className="mt-0.5 text-amber-700/80">{checkout.errorMessage || "Please try again, or edit the selection."}</p>
+            <p className="mt-0.5 text-amber-200">{checkout.errorMessage || "Please try again, or edit the selection."}</p>
           </div>
           <button
             type="button"
             onClick={() => void checkout.refresh()}
-            className="text-amber-700 underline"
+            className="text-amber-200 underline"
             disabled={showLoading}
           >
             Retry
@@ -368,41 +372,46 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           type="button"
           onClick={onProceed}
           disabled={showLoading}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-violet-200 transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 py-4 text-base font-black text-white transition hover:bg-indigo-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {showLoading ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <ShoppingBag className="h-5 w-5" />}
           {finalTotal === 0 ? "Get free access" : `Proceed to payment — ${formatRupee(finalTotal)}`}
         </button>
         <div className="grid grid-cols-2 gap-2">
-          <button
+          <GlassButton
+            variant="capsule"
             type="button"
             onClick={checkout.goBack}
-            className="flex items-center justify-center gap-1.5 rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-700"
+            className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:px-3 [&>span>div]:font-bold"
           >
-            <ArrowLeft size={14} /> Back to source
-          </button>
-          <button
+            <span className="flex items-center gap-1.5"><ArrowLeft size={14} /> Back to source</span>
+          </GlassButton>
+          <GlassButton
+            variant="capsule"
             type="button"
             onClick={() => void checkout.refresh()}
             disabled={showLoading}
-            className="flex items-center justify-center gap-1.5 rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-700 disabled:opacity-60"
+            className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:px-3 [&>span>div]:font-bold disabled:opacity-60"
           >
-            {showLoading && checkout.quoteStatus === "refreshing" ? (
-              <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw size={14} />
-            )}
-            Refresh quote
-          </button>
+            <span className="flex items-center gap-1.5">
+              {showLoading && checkout.quoteStatus === "refreshing" ? (
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw size={14} />
+              )}
+              Refresh quote
+            </span>
+          </GlassButton>
         </div>
-        <button
+        <GlassButton
+          variant="capsule"
           type="button"
           onClick={onEdit}
-          className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700"
+          className="w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold"
         >
-          Edit selection <ChevronRight size={14} />
-        </button>
-        <p className="px-1 text-center text-[10px] font-medium text-slate-400">
+          <span className="flex items-center gap-1.5">Edit selection <ChevronRight size={14} /></span>
+        </GlassButton>
+        <p className="px-1 text-center text-[10px] font-medium text-white/55">
           Quote expires at {new Date(quote.expiresAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · Prices are verified server-side before payment.
         </p>
       </div>
@@ -575,36 +584,33 @@ export function SubscriptionUnlocksCard({
   };
 
   return (
-    <section
-      data-checkout-subscription-unlocks
-      className="rounded-3xl border border-violet-200 bg-gradient-to-br from-white via-violet-50/70 to-indigo-50 p-4 shadow-sm"
-    >
+    <GlassCard data-checkout-subscription-unlocks>
       <header className="flex items-center gap-2">
         <span className="grid h-8 w-8 place-items-center rounded-xl bg-violet-600 text-white">
           <Unlock size={14} />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-black text-slate-900">What you&apos;ll get</h2>
-          <p className="text-[11px] text-slate-500">Unlocks after your payment is verified.</p>
+          <h2 className="text-sm font-black text-white">What you&apos;ll get</h2>
+          <p className="text-[11px] text-white/55">Unlocks after your payment is verified.</p>
         </div>
-        <span className="shrink-0 rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-violet-700">
+        <span className="shrink-0 rounded-full bg-violet-500/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-violet-200">
           {cycleLabel ? `${cycleLabel} membership` : "Membership"}
         </span>
       </header>
 
       {/* Membership row */}
-      <div className="mt-3 rounded-2xl border border-violet-100 bg-white/80 p-3">
+      <div className="mt-3 rounded-2xl border border-violet-400/30 bg-violet-500/15 p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-black text-slate-900" data-checkout-subscription-plan-name>
+            <p className="text-sm font-black text-white" data-checkout-subscription-plan-name>
               {planName}
             </p>
             {planDescription ? (
-              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">{planDescription}</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-white/55">{planDescription}</p>
             ) : null}
           </div>
           {quote.subscriptionAddOn ? (
-            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+            <span className="shrink-0 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-200">
               Add-on
             </span>
           ) : null}
@@ -612,7 +618,7 @@ export function SubscriptionUnlocksCard({
         {expiryLabel ? (
           <p
             data-checkout-subscription-expiry
-            className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-violet-700"
+            className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-violet-200"
           >
             <CalendarDays size={12} />
             {quote.subscriptionAddOn
@@ -625,30 +631,30 @@ export function SubscriptionUnlocksCard({
       {/* Features unlocked */}
       <div className="mt-3">
         <h3
-          className="text-[11px] font-black uppercase tracking-wider text-slate-400"
+          className="text-[11px] font-black uppercase tracking-wider text-white/55"
           data-checkout-subscription-features-count={featureRows.length}
         >
           Features ({featureRows.length})
         </h3>
         {featureRows.length === 0 ? (
-          <p className="mt-1.5 text-xs italic text-slate-400">No features in this selection.</p>
+          <p className="mt-1.5 text-xs italic text-white/55">No features in this selection.</p>
         ) : (
           <ul className="mt-2 space-y-2">
             {featureRows.map((row) => (
               <li
                 key={`feature:${row.id}`}
                 data-checkout-subscription-feature={row.id}
-                className="flex items-start justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-2.5"
+                className="flex items-start justify-between gap-3 rounded-2xl border border-white/10 p-2.5"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-black text-slate-900">{row.name}</p>
+                  <p className="text-xs font-black text-white">{row.name}</p>
                   {row.description ? (
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">{row.description}</p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-white/55">{row.description}</p>
                   ) : null}
                 </div>
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
-                    row.included || row.alreadyOwned ? "bg-emerald-100 text-emerald-700" : "bg-violet-100 text-violet-700"
+                    row.included || row.alreadyOwned ? "bg-emerald-500/20 text-emerald-200" : "bg-violet-500/20 text-violet-200"
                   }`}
                 >
                   {featureLabel(row)}
@@ -662,28 +668,28 @@ export function SubscriptionUnlocksCard({
       {/* Products included */}
       <div className="mt-3">
         <h3
-          className="text-[11px] font-black uppercase tracking-wider text-slate-400"
+          className="text-[11px] font-black uppercase tracking-wider text-white/55"
           data-checkout-subscription-products-count={selectedProductRows.length}
         >
           Products ({selectedProductRows.length}{planUnlockRows.length > 0 ? ` + ${planUnlockRows.length} included` : ""})
         </h3>
         {selectedProductRows.length === 0 && planUnlockRows.length === 0 ? (
-          <p className="mt-1.5 text-xs italic text-slate-400">No products in this selection.</p>
+          <p className="mt-1.5 text-xs italic text-white/55">No products in this selection.</p>
         ) : (
           <ul className="mt-2 space-y-2">
             {selectedProductRows.map((row) => (
               <li
                 key={row.id}
                 data-checkout-subscription-product={row.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-2.5"
+                className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 p-2.5"
               >
-                <span className="min-w-0 flex-1 text-xs font-bold text-slate-800">{row.name}</span>
+                <span className="min-w-0 flex-1 text-xs font-bold text-white/85">{row.name}</span>
                 {row.alreadyOwned ? (
-                  <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                  <span className="shrink-0 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-200">
                     Already purchased
                   </span>
                 ) : (
-                  <span className="shrink-0 text-xs font-black text-violet-700">{formatRupee(row.pricePaise)}</span>
+                  <span className="shrink-0 text-xs font-black text-violet-200">{formatRupee(row.pricePaise)}</span>
                 )}
               </li>
             ))}
@@ -691,10 +697,10 @@ export function SubscriptionUnlocksCard({
               <li
                 key={row.id}
                 data-checkout-subscription-plan-unlock={row.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-2.5"
+                className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 p-2.5"
               >
-                <span className="min-w-0 flex-1 text-xs font-bold text-emerald-900">{row.name}</span>
-                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                <span className="min-w-0 flex-1 text-xs font-bold text-emerald-200">{row.name}</span>
+                <span className="shrink-0 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-200">
                   Included with plan
                 </span>
               </li>
@@ -703,32 +709,32 @@ export function SubscriptionUnlocksCard({
         )}
       </div>
 
-      <p className="mt-3 text-[10px] leading-relaxed text-slate-400">
+      <p className="mt-3 text-[10px] leading-relaxed text-white/55">
         This list matches the plan, features and products you selected on the
         subscription page. Renewal always requires your confirmation.
       </p>
-    </section>
+    </GlassCard>
   );
 }
 
 function BuyerCard({ buyer, authUid }: { buyer: ReturnType<typeof useCheckout>["buyer"]; authUid?: string }) {
   if (!buyer) {
     return (
-      <section data-checkout-buyer className="rounded-3xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+      <GlassCard data-checkout-buyer className="text-sm text-amber-200">
         <p className="font-black">Buyer identity missing</p>
-        <p className="mt-0.5 text-xs text-amber-700/80">Please sign in again to load the verified buyer details.</p>
-      </section>
+        <p className="mt-0.5 text-xs text-amber-200">Please sign in again to load the verified buyer details.</p>
+      </GlassCard>
     );
   }
   const verified = buyer.tokenVerified && (!authUid || authUid === buyer.uid);
   return (
-    <section data-checkout-buyer className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+    <GlassCard data-checkout-buyer>
       <header className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">Buyer</h2>
+        <h2 className="text-xs font-black uppercase tracking-wider text-white/55">Buyer</h2>
         <span
           data-firebase-verified={verified ? "true" : "false"}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 ${
-            verified ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-amber-50 text-amber-700 ring-amber-200"
+            verified ? "bg-emerald-500/15 text-emerald-200 ring-emerald-400/30" : "bg-amber-500/15 text-amber-200 ring-amber-400/30"
           }`}
         >
           {verified ? <ShieldCheck size={10} /> : <Info size={10} />}
@@ -736,12 +742,12 @@ function BuyerCard({ buyer, authUid }: { buyer: ReturnType<typeof useCheckout>["
         </span>
       </header>
       <div className="space-y-1 text-sm">
-        <p className="truncate text-base font-black text-slate-900">{buyer.name || "Unnamed buyer"}</p>
-        <p className="truncate text-xs text-slate-500">{buyer.email || "No email on file"}</p>
-        {buyer.mobile ? <p className="truncate text-xs text-slate-500">📱 {buyer.mobile}</p> : null}
-        <p className="truncate text-[11px] text-slate-400">UID: {buyer.uid}</p>
+        <p className="truncate text-base font-black text-white">{buyer.name || "Unnamed buyer"}</p>
+        <p className="truncate text-xs text-white/55">{buyer.email || "No email on file"}</p>
+        {buyer.mobile ? <p className="truncate text-xs text-white/55">📱 {buyer.mobile}</p> : null}
+        <p className="truncate text-[11px] text-white/55">UID: {buyer.uid}</p>
       </div>
-    </section>
+    </GlassCard>
   );
 }
 
@@ -749,11 +755,11 @@ function PriceRow({ label, value, negative, muted, note }: { label: string; valu
   const display = negative ? `− ${formatRupee(Math.abs(value))}` : formatRupee(value);
   return (
     <div className="flex items-baseline justify-between">
-      <dt className={muted ? "text-xs text-slate-400" : "text-sm text-slate-500"}>
+      <dt className={muted ? "text-xs text-white/55" : "text-sm text-white/55"}>
         {label}
-        {note ? <span className="ml-1 text-[10px] text-slate-400">{note}</span> : null}
+        {note ? <span className="ml-1 text-[10px] text-white/55">{note}</span> : null}
       </dt>
-      <dd className={`font-bold ${negative ? "text-emerald-600" : muted ? "text-slate-500" : "text-slate-700"}`}>{display}</dd>
+      <dd className={`font-bold ${negative ? "text-emerald-300" : muted ? "text-white/55" : "text-white/85"}`}>{display}</dd>
     </div>
   );
 }
@@ -762,23 +768,23 @@ function SelectionList({ title, emptyLabel, lines }: { title: string; emptyLabel
   if (lines.length === 0) {
     return (
       <div>
-        <h3 className="text-xs font-bold text-slate-500">{title}</h3>
-        <p className="mt-1 text-xs italic text-slate-400">{emptyLabel}</p>
+        <h3 className="text-xs font-bold text-white/55">{title}</h3>
+        <p className="mt-1 text-xs italic text-white/55">{emptyLabel}</p>
       </div>
     );
   }
   return (
     <div>
-      <h3 className="text-xs font-bold text-slate-500">{title}</h3>
+      <h3 className="text-xs font-bold text-white/55">{title}</h3>
       <ul className="mt-2 space-y-1.5">
         {lines.map((line) => (
-          <li key={line.id} className="flex items-start gap-2 text-xs text-slate-700">
-            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+          <li key={line.id} className="flex items-start gap-2 text-xs text-white/85">
+            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-white/40" />
             <span className="min-w-0 flex-1">
-              <span className="font-bold text-slate-900 line-clamp-1">{line.title}</span>
-              {line.parentTitle ? <span className="ml-1 text-slate-400">· {line.parentTitle}</span> : null}
+              <span className="font-bold text-white line-clamp-1">{line.title}</span>
+              {line.parentTitle ? <span className="ml-1 text-white/55">· {line.parentTitle}</span> : null}
             </span>
-            <span className="shrink-0 font-bold text-slate-900">{formatRupee(line.effectivePrice)}</span>
+            <span className="shrink-0 font-bold text-white">{formatRupee(line.effectivePrice)}</span>
           </li>
         ))}
       </ul>
@@ -807,44 +813,50 @@ function SafeRecoveryUI({
         ? reason || "The selection was rejected by the server. Please return to the product page and try again."
         : reason || "Network or server error. Please refresh, or return to the product page.";
   return (
-    <div data-checkout-recovery-ui className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 shadow-sm">
+    <GlassCard data-checkout-recovery-ui className="text-sm text-amber-100">
       <div className="flex items-start gap-3">
-        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" />
         <div className="flex-1">
-          <h2 className="text-base font-black text-amber-900">{title}</h2>
-          <p className="mt-1 text-xs text-amber-800/90 sm:text-sm">{detail}</p>
+          <h2 className="text-base font-black text-amber-200">{title}</h2>
+          <p className="mt-1 text-xs text-amber-200 sm:text-sm">{detail}</p>
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <button
+        <GlassButton
           type="button"
+          variant="capsule"
           onClick={onGoBack}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-amber-600 py-3 text-sm font-bold text-white hover:bg-amber-700"
+          className="flex-1 [&>span]:w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:rounded-full [&>span>div]:px-4"
         >
-          <ArrowLeft size={14} /> Return to source
-        </button>
+          <span className="flex items-center justify-center gap-1.5 text-sm font-bold"><ArrowLeft size={14} /> Return to source</span>
+        </GlassButton>
         {kind !== "empty" ? (
-          <button
+          <GlassButton
+            variant="capsule"
             type="button"
             onClick={onRefresh}
             disabled={refreshPending}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white py-3 text-sm font-bold text-amber-700 ring-1 ring-amber-300 disabled:opacity-60"
+            className="flex-1 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-bold [&>span>div]:text-amber-200 disabled:opacity-60"
           >
-            {refreshPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw size={14} />}
-            Try again
-          </button>
+            <span className="flex items-center gap-1.5">
+              {refreshPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw size={14} />}
+              Try again
+            </span>
+          </GlassButton>
         ) : null}
       </div>
-    </div>
+    </GlassCard>
   );
 }
 
 function LoadingShell({ message }: { message: string }) {
   return (
-    <div data-checkout-loading className="flex flex-col items-center gap-3 rounded-3xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
-      <LoaderCircle className="h-6 w-6 animate-spin text-violet-600" />
-      <p className="font-semibold">{message}</p>
-    </div>
+    <GlassCard data-checkout-loading className="text-center text-sm text-white/70">
+      <div className="flex flex-col items-center gap-3">
+        <LoaderCircle className="h-6 w-6 animate-spin text-violet-300" />
+        <p className="font-semibold">{message}</p>
+      </div>
+    </GlassCard>
   );
 }
 
@@ -882,19 +894,15 @@ function CouponCard({
   const isApplied = Boolean(appliedCode) && appliedDiscount > 0;
   const applying = status === "applying";
   return (
-    <section
-      data-checkout-coupon
-      data-applied={isApplied ? "true" : "false"}
-      className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
-    >
+    <GlassCard data-checkout-coupon data-applied={isApplied ? "true" : "false"}>
       <header className="mb-2 flex items-center justify-between">
-        <h2 className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-slate-400">
+        <h2 className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-white/55">
           <TicketPercent size={12} /> Coupon
         </h2>
         {isApplied ? (
           <span
             data-checkout-coupon-applied
-            className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-200"
+            className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-200 ring-1 ring-emerald-400/30"
           >
             <BadgeCheck size={10} /> Verified savings
           </span>
@@ -902,9 +910,9 @@ function CouponCard({
       </header>
 
       {isApplied ? (
-        <div className="flex items-center justify-between gap-2 rounded-2xl bg-emerald-50/60 p-2.5 ring-1 ring-emerald-200">
+        <div className="flex items-center justify-between gap-2 rounded-2xl bg-emerald-500/15 p-2.5 ring-1 ring-emerald-400/30">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-black text-emerald-900">
+            <p className="truncate text-sm font-black text-emerald-200">
               {appliedCode}
               {appliedType === "percent" && appliedValue !== null
                 ? ` (${appliedValue}% off)`
@@ -912,19 +920,20 @@ function CouponCard({
                   ? ` (${formatRupee(appliedValue)} off)`
                   : ""}
             </p>
-            <p className="text-[11px] text-emerald-800/80">
+            <p className="text-[11px] text-emerald-200">
               You saved {formatRupee(appliedDiscount)} on this order.
             </p>
           </div>
-          <button
+          <GlassButton
+            variant="capsule"
             type="button"
             onClick={() => void onRemove()}
             disabled={disabled || applying}
-            className="shrink-0 rounded-xl bg-white px-3 py-2 text-xs font-bold text-emerald-700 ring-1 ring-emerald-300 transition active:scale-[0.98] disabled:opacity-60"
+            className="shrink-0 [&>span>div]:h-9 [&>span>div]:px-3 [&>span>div]:text-xs [&>span>div]:font-bold [&>span>div]:text-emerald-200 disabled:opacity-60"
             data-checkout-coupon-remove
           >
             {applying ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : "Remove"}
-          </button>
+          </GlassButton>
         </div>
       ) : (
         <form
@@ -936,7 +945,7 @@ function CouponCard({
           className="space-y-2"
         >
           <div className="flex items-stretch gap-2">
-            <input
+            <GlassInput
               type="text"
               inputMode="text"
               autoCapitalize="characters"
@@ -947,13 +956,13 @@ function CouponCard({
               placeholder="Enter coupon code"
               disabled={applying || disabled}
               data-checkout-coupon-input
-              className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold uppercase tracking-wider text-slate-900 placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400 disabled:opacity-60"
+              className="min-w-0 flex-1 [&_input]:font-bold [&_input]:uppercase [&_input]:tracking-wider [&_input]:placeholder:font-normal [&_input]:placeholder:tracking-normal"
             />
             <button
               type="submit"
               disabled={applying || disabled || !input.trim()}
               data-checkout-coupon-apply
-              className="flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-violet-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-violet-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-violet-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {applying ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Apply"}
             </button>
@@ -962,19 +971,19 @@ function CouponCard({
             <p
               data-checkout-coupon-error
               role="alert"
-              className="flex items-start gap-1.5 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-semibold leading-5 text-rose-700"
+              className="flex items-start gap-1.5 rounded-xl bg-rose-500/15 px-3 py-2 text-[11px] font-semibold leading-5 text-rose-200"
             >
               <AlertCircle size={12} className="mt-0.5 shrink-0" />
               {errorMessage}
             </p>
           ) : (
-            <p className="px-1 text-[10px] font-medium text-slate-400">
+            <p className="px-1 text-[10px] font-medium text-white/55">
               Coupons are validated server-side; the discount appears in your price breakdown once applied.
             </p>
           )}
         </form>
       )}
-    </section>
+    </GlassCard>
   );
 }
 

@@ -21,6 +21,8 @@ import Reminders from "./components/myday/Reminders";
 import SideNav from "./components/myday/SideNav";
 import BottomNav from "./components/myday/BottomNav";
 import ConfirmDialog from "./components/ui/ConfirmDialog";
+import { GlassInput } from "./components/ui/glass-input";
+import { GlassButton } from "./components/ui/glass-button";
 import Toast from "./components/ui/Toast";
 import type { ToastMessage } from "./components/ui/Toast";
 import { OverlayBoundsProvider } from "./components/ui/overlayBounds";
@@ -31,7 +33,6 @@ import { useAuth } from "./context/AuthContext";
 import { useMyDayAccess } from "./hooks/useMyDayAccess";
 import { usePublishFeatureVisibility } from "./context/FeatureVisibilityContext";
 import PremiumGate from "./components/subscription/PremiumGate";
-import { GlassBackdrop } from "./components/ui/GlassBackdrop";
 import { playSfxAdd, playSfxComplete, playSfxRemove, playSfxSuccess, playSfxToggle } from "./utils/sfx";
 
 const NOTE_COLORS: NoteColor[] = ["amber", "sky", "rose", "emerald", "violet"];
@@ -592,10 +593,8 @@ export default function App() {
 
   return (
     <OverlayBoundsProvider value={contentColumnRef}>
-    {/* Black Ice backdrop — one fixed layer behind the My Day shell. */}
-    <GlassBackdrop />
     <div className="dc-app-shell min-h-screen">
-      <div data-app-frame data-myday-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0 lg:max-w-7xl lg:rounded-[2rem] lg:bg-white lg:shadow-xl lg:border lg:border-slate-200">
+      <div data-app-frame data-myday-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0 lg:max-w-7xl">
         <StoreHeader
           cartCount={cartIds.size}
           notifCount={1}
@@ -610,23 +609,26 @@ export default function App() {
         />
 
         {showMobileSearch && (
-          <div className="animate-slideUp dc-glass-toolbar border-b border-white/60 px-4 pb-3 pt-2">
-            <div className="dc-glass-input flex items-center gap-2 rounded-xl px-3.5 py-2.5 ring-2 ring-indigo-100/60">
-              <Search className="h-4 w-4 shrink-0 text-indigo-500" />
-              <input
+          <div className="animate-slideUp border-b border-white/10 bg-[var(--dc-chrome-glass)] px-4 pb-3 pt-2 [backdrop-filter:var(--dc-chrome-glass-blur)]">
+            <div className="flex items-center gap-2">
+              <GlassInput
+                type="search"
                 autoFocus
+                className="w-full"
+                icon={<Search className="h-4 w-4" aria-hidden="true" />}
                 value={globalSearch}
                 onChange={(e) => setGlobalSearch(e.target.value)}
                 placeholder="Search tasks, notes..."
-                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
               />
               {globalSearch && (
-                <button
+                <GlassButton
+                  type="button"
+                  aria-label="Clear search"
                   onClick={() => { setGlobalSearch(""); setShowMobileSearch(false); }}
-                  className="shrink-0 rounded-full p-1 text-slate-400 transition hover:bg-white/80 hover:text-slate-600"
+                  className="shrink-0 [&_.size-12]:size-10"
                 >
                   <X className="h-4 w-4" />
-                </button>
+                </GlassButton>
               )}
             </div>
           </div>
@@ -649,7 +651,7 @@ export default function App() {
                 the allowance at the exact moment a creation is blocked. */}
             {(!cloudLoaded || savingMyDay || cloudSyncFailed) && (
               <div className="mb-3 text-center">
-                <p className={cloudSyncFailed ? "text-[11px] font-bold text-amber-700" : "text-[11px] font-semibold text-slate-400"}>
+                <p className={cloudSyncFailed ? "text-[11px] font-bold text-amber-200" : "text-[11px] font-semibold text-white/55"}>
                   {savingMyDay
                     ? "Saving My Day…"
                     : cloudSyncFailed

@@ -89,12 +89,12 @@ export default function Header({
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/30">
             {customLogo ? <BrandMark className="h-11 w-11" /> : <LogoIcon className="h-6 w-6" />}
           </div>
           <div className="min-w-0 leading-tight pt-0.5">
-            <h1 className="truncate text-[1.125rem] font-black tracking-tight text-slate-900 drop-shadow-sm">{headerTitle}</h1>
-            <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-widest text-slate-400">{subtitle}</p>
+            <h1 className="truncate text-[1.125rem] font-black tracking-tight text-white">{headerTitle}</h1>
+            <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-widest text-white/55">{subtitle}</p>
           </div>
         </div>
 
@@ -212,10 +212,10 @@ function HeaderIconButton({
   const resolved: HeaderIconTone = active ? "active" : tone;
   const surface =
     resolved === "accent"
-      ? { tint: 0.6, rgb: "196,181,253", label: "text-violet-700 hover:text-violet-900" }
+      ? { label: "text-violet-200 hover:text-violet-100" }
       : resolved === "active"
-        ? { tint: 0.62, rgb: "224,231,255", label: "text-indigo-700" }
-        : { tint: 0.6, rgb: "255,255,255", label: "text-slate-600 hover:text-slate-900" };
+        ? { label: "text-indigo-200" }
+        : { label: "text-white/85 hover:text-white" };
 
   return (
     <Tooltip>
@@ -227,10 +227,6 @@ function HeaderIconButton({
         {/* the material sits under the glyph; pointer-events-none so the button
             keeps owning every click and the 40px hit area */}
         <GlassSurface
-          tint={surface.tint}
-          tintColor={surface.rgb}
-          blur={12}
-          saturation={1.35}
           radius={999}
           className="dc-chrome-disc pointer-events-none absolute inset-0"
           aria-hidden="true"
@@ -239,7 +235,7 @@ function HeaderIconButton({
         {badge ? (
           <span
             aria-label={badgeAriaLabel}
-            className={`absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white ring-2 ring-white ${
+            className={`absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white ring-2 ring-[#0a0c12] ${
               badgeTone === "rose" ? "bg-rose-500" : "bg-indigo-600"
             }`}
           >
@@ -251,7 +247,7 @@ function HeaderIconButton({
           is set on the child span: `text-white` lives on the surface root and
           would win on that element, not on ours. */}
       <TooltipContent side="bottom" tint={0.85}>
-        <span className="text-slate-800">{hint ?? ariaLabel}</span>
+        <span>{hint ?? ariaLabel}</span>
       </TooltipContent>
     </Tooltip>
   );

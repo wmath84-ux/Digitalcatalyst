@@ -1,4 +1,6 @@
 import { GlassSlider } from "../ui/glass-slider";
+import { GlassSurface } from "../ui/glass";
+import { GlassButton } from "../ui/glass-button";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { GitBranch, RotateCcw, X } from "lucide-react";
@@ -28,17 +30,17 @@ export function CurveSettingsModal({ open, onClose, value, onChange }: CurveSett
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <div className="fp-overlay absolute inset-0" onClick={onClose} />
+          <div className="absolute inset-0 bg-black/55" onClick={onClose} />
           <motion.div
             initial={{ opacity: 0, y: 60, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 260, damping: 26 }}
-            className="glass-panel-strong relative z-10 w-full max-w-sm rounded-t-3xl p-5 sm:rounded-3xl sm:p-6"
-            style={{
-              boxShadow: "0 0 60px -14px rgba(139,123,255,0.45), 0 40px 90px -30px rgba(0,0,0,0.85)",
-            }}
+            className="relative z-10 w-full max-w-sm"
           >
+          {/* Wave 13c: pack GlassSurface (Dialog values) replaces the
+              `.glass-panel-strong` gradient plate + violet glow shadow. */}
+          <GlassSurface radius={24} className="text-fp-text" contentClassName="p-5 sm:p-6">
             <div className="mb-4 flex items-center gap-3">
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500/15 text-violet-400">
                 <GitBranch className="h-5 w-5" />
@@ -47,14 +49,13 @@ export function CurveSettingsModal({ open, onClose, value, onChange }: CurveSett
                 <p className="text-[11px] uppercase tracking-wider text-fp-muted">Customize</p>
                 <h2 className="font-display text-lg font-semibold text-fp-text">Flow Curve</h2>
               </div>
-              <button
-                type="button"
+              <GlassButton
                 onClick={onClose}
-                className="ml-auto grid h-8 w-8 place-items-center rounded-full text-fp-muted transition hover:bg-fp-surface hover:text-fp-text"
+                className="ml-auto [&_.size-12]:size-8"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </GlassButton>
             </div>
 
             <div className="space-y-5">
@@ -88,22 +89,22 @@ export function CurveSettingsModal({ open, onClose, value, onChange }: CurveSett
             </div>
 
             <div className="mt-6 flex gap-2.5">
-              <button
-                type="button"
+              <GlassButton
+                variant="capsule"
                 onClick={() => onChange(DEFAULT_CURVE_OVERRIDE)}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-fp-border bg-fp-surface py-2.5 text-sm font-medium text-fp-muted transition hover:bg-fp-surface-hover"
+                className="[&>span>div]:h-11 [&>span>div]:rounded-full [&>span>div]:px-4"
               >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reset
-              </button>
+                <span className="inline-flex items-center gap-1.5"><RotateCcw className="h-3.5 w-3.5" /> Reset</span>
+              </GlassButton>
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition hover:brightness-110"
+                className="flex-1 rounded-full bg-indigo-600 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500"
               >
                 Done
               </button>
             </div>
+          </GlassSurface>
           </motion.div>
         </motion.div>
       )}

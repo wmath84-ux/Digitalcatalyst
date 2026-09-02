@@ -15,25 +15,22 @@ import fs from "node:fs";
 
 const page = fs.readFileSync("src/revision/pages/RevisionProfilePage.tsx", "utf8");
 
-test("AI cards use the website brand gradient with glassmorphism + shadow", () => {
-  // The redesign consolidated the two AI cards into a single launchpad
-  // hero on the profile page, with a glass surface + branded shadow
-  // stack. Assert that the brand gradient + glassmorphism are still
-  // present in some form on the AI / Configure sections.
+test("AI cards are the pack's glass surfaces (Phase A4)", () => {
+  // The launchpad hero is a GlassSurface at pack defaults; the Configure AI and
+  // Bulk Import cards are GlassCards; the brand tile is solid indigo (no
+  // gradient anywhere) and nothing hand-rolls a backdrop-blur any more.
   assert.match(page, /dc-glass-hero/);
+  assert.match(page, /<GlassSurface className="dc-glass-hero/);
   assert.match(page, /Generate Questions with AI/);
-  // The Configure AI card uses the indigo→violet brand icon tile.
-  assert.match(page, /from-indigo-500 to-violet-600/);
-  // The Bulk Import card keeps a branded surface with shadow.
-  assert.match(page, /from-sky-50 to-indigo-50/);
-  // Glassmorphism / branded shadow are still used on the hero.
-  assert.match(page, /backdrop-blur-xl/);
-  assert.match(page, /shadow-\[0_20px_40px_-26px_rgba\(79,70,229,0\.55\)\]/);
+  assert.match(page, /<GlassCard/);
+  assert.match(page, /bg-indigo-600 text-white/);
+  assert.doesNotMatch(page, /from-indigo-500 to-violet-600|from-sky-50 to-indigo-50/);
+  assert.doesNotMatch(page, /backdrop-blur-xl/);
 });
 
 test("snapshot cards below Import use the stable rev-card surface (no glitch)", () => {
   // The Import section's cards were `dc-glass` (backdrop-filter) which caused
   // a white-flash glitch while scrolling; they now use the opaque rev-card.
-  assert.match(page, /rev-card flex flex-col items-center gap-1 rounded-2xl py-3/);
+  assert.match(page, /className="rev-card text-white" contentClassName="flex flex-col items-center gap-1 rounded-2xl py-3/);
   assert.doesNotMatch(page, /dc-glass flex flex-col items-center gap-1 rounded-2xl py-3/);
 });

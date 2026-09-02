@@ -8,6 +8,8 @@
 import { useMemo, useState } from "react";
 import PageShell from "../components/PageShell";
 import { Card, PrimaryButton, SecondaryButton } from "../components/ui";
+import { GlassCard } from "../../components/ui/GlassCard";
+import { GlassButton } from "../../components/ui/glass-button";
 import { BookOpenIcon, CheckIcon, ChevronRightIcon, SparklesIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { parseQuestionText, type ParsedQuestion } from "../engine/bulkParser";
@@ -136,16 +138,16 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
     <PageShell route={route} title="Bulk Import" subtitle="Paste a full revision plan" backHref="#/revision/profile">
       <div data-rev-layout="bulkimport" className="animate-fade-in space-y-4 px-4 py-4 pb-10 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
         {ready ? (
-          <Card className="overflow-hidden border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+          <Card className="overflow-hidden border-emerald-400/30">
             <div className="flex flex-col items-center gap-3 py-4 text-center">
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-200">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg">
                 <CheckIcon className="h-8 w-8" />
               </span>
               <div>
-                <h2 className="text-lg font-bold text-slate-900">Test created! 🎉</h2>
-                <p className="mt-1 text-xs text-slate-600">{ready.count} questions imported — saved to your Test Bank and live on your dashboard.</p>
+                <h2 className="text-lg font-bold text-white">Test created! 🎉</h2>
+                <p className="mt-1 text-xs text-white/75">{ready.count} questions imported — saved to your Test Bank and live on your dashboard.</p>
                 {ready.pendingSync && (
-                  <p className="mt-1 text-[11px] font-semibold text-amber-700">
+                  <p className="mt-1 text-[11px] font-semibold text-amber-200">
                     Saved on this device. Cloud sync will finish automatically when you are online.
                   </p>
                 )}
@@ -153,21 +155,17 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
               <button
                 type="button"
                 onClick={() => navigate("#/revision")}
-                className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-[15px] font-bold text-white shadow-lg shadow-emerald-200 transition active:scale-[0.98]"
+                className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[15px] font-bold text-white transition hover:bg-emerald-500 active:scale-[0.98]"
               >
                 Click & submit your score <ChevronRightIcon className="h-5 w-5" />
               </button>
-              <button
-                type="button"
-                onClick={() => navigate("#/revision/bank")}
-                className="flex min-h-[44px] w-full items-center justify-center rounded-2xl bg-white text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
-              >
-                Open Test Bank
-              </button>
+              <SecondaryButton onClick={() => navigate("#/revision/bank")}>
+                <span className="text-xs text-emerald-200">Open Test Bank</span>
+              </SecondaryButton>
               <button
                 type="button"
                 onClick={() => setReady(null)}
-                className="text-xs font-semibold text-slate-500 underline-offset-2 hover:underline"
+                className="text-xs font-semibold text-white/55 underline-offset-2 hover:underline"
               >
                 Import more questions
               </button>
@@ -177,12 +175,12 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
           <>
             <Card>
               <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white">
                   <BookOpenIcon className="h-6 w-6" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-[15px] font-bold text-slate-900">Paste your revision plan</h2>
-                  <p className="text-xs text-slate-600">
+                  <h2 className="text-[15px] font-bold text-white">Paste your revision plan</h2>
+                  <p className="text-xs text-white/75">
                     Drop in a complete test — questions, options and correct answers. Generate them in ChatGPT,
                     Claude or anywhere else, then paste here to create a revision plan in one go.
                   </p>
@@ -191,19 +189,19 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
 
               <div className="mt-4 space-y-3">
                 <input
-                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 outline-none focus:border-indigo-500"
+                  className="dc-field h-11 w-full rounded-xl border px-3 text-sm font-medium outline-none"
                   placeholder="Test name (optional)"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
                 <textarea
                   rows={9}
-                  className="w-full rounded-xl border border-slate-300 bg-white p-3 font-mono text-xs leading-relaxed text-slate-800 outline-none focus:border-indigo-500"
+                  className="dc-field w-full rounded-xl border p-3 font-mono text-xs leading-relaxed outline-none"
                   placeholder={SAMPLE}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                 />
-                <p className="text-[11px] leading-relaxed text-slate-500">
+                <p className="text-[11px] leading-relaxed text-white/55">
                   Format: “1. Question?” then “A. …”, “B. …”. Mark the right answer with ✓ / * / (correct) or an
                   “Answer: B” line.
                 </p>
@@ -221,7 +219,7 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
               {notice && (
                 <div
                   className={`mt-3 rounded-xl px-3 py-2.5 text-xs font-medium leading-relaxed ${
-                    noticeTone === "err" ? "bg-rose-50 text-rose-700" : "bg-sky-50 text-sky-700"
+                    noticeTone === "err" ? "bg-rose-500/15 text-rose-200" : "bg-sky-500/15 text-sky-200"
                   }`}
                 >
                   {notice}
@@ -232,29 +230,30 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
             {preview.length > 0 && (
               <Card>
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-900">Preview ({preview.length})</h3>
-                  <span className="text-[11px] font-medium text-slate-500">Tap the correct answer where needed</span>
+                  <h3 className="text-sm font-bold text-white">Preview ({preview.length})</h3>
+                  <span className="text-[11px] font-medium text-white/55">Tap the correct answer where needed</span>
                 </div>
                 <div className="space-y-3">
                   {preview.map((q, qi) => (
-                    <div key={q.key} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3 shadow-sm">
+                    <GlassCard key={q.key} contentClassName="p-3">
                       <div className="flex items-start gap-2">
-                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/20 text-[11px] font-bold text-white">
                           {qi + 1}
                         </span>
                         <textarea
                           rows={2}
-                          className="w-full resize-none rounded-lg border border-transparent bg-transparent px-1 text-sm font-medium text-slate-900 outline-none focus:border-slate-300 focus:bg-white"
+                          className="w-full resize-none rounded-lg border border-transparent bg-transparent px-1 text-sm font-medium text-white outline-none focus:border-white/15"
                           value={q.prompt}
                           onChange={(e) => patch(q.key, { prompt: e.target.value })}
                         />
-                        <button
+                        <GlassButton
                           type="button"
                           onClick={() => removeItem(q.key)}
-                          className="h-7 w-7 shrink-0 rounded-lg text-slate-500 active:bg-slate-100"
+                          aria-label="Remove question"
+                          className="shrink-0 [&_.size-12]:size-7 text-white/70"
                         >
                           ✕
-                        </button>
+                        </GlassButton>
                       </div>
                       <div className="mt-2 space-y-1.5">
                         {q.options.map((opt, i) => (
@@ -266,12 +265,12 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                               onChange={() => patch(q.key, { correctIndex: i, detected: true })}
                               className="h-4 w-4 shrink-0 accent-emerald-600"
                             />
-                            <span className="w-5 shrink-0 text-xs font-bold text-slate-600">{OPTION_LETTERS[i]}</span>
+                            <span className="w-5 shrink-0 text-xs font-bold text-white/75">{OPTION_LETTERS[i]}</span>
                             <input
                               className={`w-full rounded-lg border px-2 py-1 text-sm outline-none ${
                                 i === q.correctIndex
-                                  ? "border-emerald-300 bg-emerald-50 text-emerald-900"
-                                  : "border-slate-300 bg-white text-slate-800 focus:border-slate-500"
+                                  ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-200"
+                                  : "dc-field"
                               }`}
                               value={opt}
                               onChange={(e) => {
@@ -284,11 +283,11 @@ export default function BulkImportPage({ uid, route, hasAccess = true, onRequire
                         ))}
                       </div>
                       {q.correctIndex < 0 && (
-                        <p className="mt-1.5 text-[11px] font-semibold text-amber-600">
+                        <p className="mt-1.5 text-[11px] font-semibold text-amber-300">
                           Correct answer not detected — tap it above.
                         </p>
                       )}
-                    </div>
+                    </GlassCard>
                   ))}
                 </div>
                 <PrimaryButton className="mt-3" disabled={preview.length === 0 || saving} onClick={() => void createTest()}>

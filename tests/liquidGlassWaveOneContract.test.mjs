@@ -139,18 +139,20 @@ test("the sheet-vs-card corner shape stays a CSS decision", () => {
   assert.match(read("src/components/ui/Modal.tsx"), /borderRadius: "var\(--glass-sheet-radius\)"/);
 });
 
-test("toasts: one material, two entry points, error stays readable", () => {
+test("toasts: one material, two entry points (Wave 14: the vendored pack glass-toast)", () => {
   const wrapper = read("src/components/ui/Toast.tsx");
   const card = read("src/components/ui/glass-toast.tsx");
   // The app's prop-driven API survives unchanged.
   assert.match(wrapper, /interface ToastProps \{\n  toasts: ToastMessage\[\];\n  onRemove: \(id: string\) => void;\n\}/);
-  assert.match(wrapper, /<GlassToastCard/);
-  // The singleton is there for call sites that have no state of their own.
-  assert.match(card, /export const toast = \{/);
-  assert.match(card, /export function ToastViewport/);
-  // Error copy must not become white-on-red: a solid red pill reads as an
-  // empty box on some devices, which this app has already fixed once.
-  assert.match(card, /error: \{ tint: 0\.78, tintRgb: "255,255,255", label: "text-rose-700"/);
+  // …but it forwards into the pack store instead of painting its own card.
+  assert.match(wrapper, /pushGlassToast\(\{ title: t\.text, variant: variantOf\[t\.type\] \}\)/);
+  // The singleton + viewport are the registry item's own exports.
+  assert.match(card, /^\/\/ Vendored from the website-glass shadcn registry:/m);
+  assert.match(card, /export function toast\(input: string \| Omit<ToastData, "id">\): number/);
+  assert.match(card, /export function GlassToaster\(/);
+  // Pack material, untouched: tint 0.6, radius 16, white ink, accent dot.
+  assert.match(card, /<GlassSurface tint=\{0\.6\} radius=\{16\} className="w-full" contentClassName="flex items-start gap-3 p-3\.5">/);
+  assert.match(card, /data\.variant === "success" \? "#30d158" : data\.variant === "error" \? "#ff453a" : null/);
 });
 
 test("the primary button keeps its hooks while the material becomes glass", () => {

@@ -232,28 +232,26 @@ export default function App({
         />
 
         <main className="flex-1 overflow-y-auto pb-2">
-          <div aria-hidden className="pointer-events-none absolute left-4 top-44 h-32 w-32 rounded-full bg-violet-200/20 blur-3xl" />
-          <div aria-hidden className="pointer-events-none absolute right-0 top-72 h-40 w-40 rounded-full bg-sky-200/20 blur-3xl" />
           {isSearching ? (
             <section data-home-grid className="px-5 pt-6 md:px-8">
               <div className="flex items-center justify-between">
-                <h2 className="text-base font-bold text-slate-900 md:text-lg">
+                <h2 className="text-base font-bold text-white md:text-lg">
                   Results for “{searchQuery}”
                 </h2>
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="text-xs font-semibold text-indigo-600"
+                  className="text-xs font-semibold text-indigo-300 hover:text-indigo-200"
                 >
                   Clear
                 </button>
               </div>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-white/55">
                 {searchResults.length} item{searchResults.length !== 1 ? "s" : ""} found
               </p>
 
               {searchResults.length === 0 ? (
-                <div className="mt-10 flex flex-col items-center gap-2 text-center text-slate-400">
+                <div className="mt-10 flex flex-col items-center gap-2 text-center text-white/55">
                   <span className="text-4xl">🔎</span>
                   <p className="text-sm">
                     We couldn't find anything for "{searchQuery}".<br />
@@ -306,7 +304,7 @@ export default function App({
 
               <section data-home-trending className="px-5 pt-6 md:px-8">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold text-slate-900 md:text-lg">
+                  <h2 className="text-base font-bold text-white md:text-lg">
                     {activeCategory === "all"
                       ? "Trending Now"
                       : categories.find((c) => c.id === activeCategory)?.label}
@@ -314,14 +312,14 @@ export default function App({
                   <button
                     type="button"
                     onClick={() => onNavigateToStore()}
-                    className="text-xs font-semibold text-slate-400"
+                    className="text-xs font-semibold text-white/55 hover:text-white/85"
                   >
                     View All
                   </button>
                 </div>
 
                 {categoryFiltered.length === 0 ? (
-                  <p className="mt-8 text-center text-sm text-slate-400">
+                  <p className="mt-8 text-center text-sm text-white/55">
                     No products in this category yet.
                   </p>
                 ) : (
@@ -350,9 +348,6 @@ export default function App({
           active="home"
           onChange={handleFooterChange}
           purchasesBadge={purchasedIds.size}
-          onLongPressHome={() => {
-            window.location.hash = "#/flowpath";
-          }}
         />
       </div>
     </div>

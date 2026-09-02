@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type TouchEvent as ReactTouchEvent } from "react";
 import PageShell from "../components/PageShell";
+import { GlassTile } from "../../components/ui/glass-tile";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { Badge, ErrorState, FullScreenLoader, PrimaryButton, ProgressBar, SecondaryButton } from "../components/ui";
 import { CheckIcon, ChevronRightIcon } from "../components/icons";
@@ -67,7 +68,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
       <PageShell route={route} title="Revision Session" backHref="#/revision/bank" hideNav>
         {isInvalidState ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-            <p className="text-sm text-slate-600">This session has already finished.</p>
+            <p className="text-sm text-white/75">This session has already finished.</p>
             <PrimaryButton className="w-auto px-6" onClick={() => navigate(`#/revision/session/${sessionId}/result`)}>
               View Results
             </PrimaryButton>
@@ -150,49 +151,50 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
             <div key={question.id} className="animate-fade-in">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge tone={question.difficulty}>{question.difficulty}</Badge>
-                <span className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-semibold text-white/85">
                   {question.subjectIcon} {question.subjectName} · {question.topicName}
                 </span>
               </div>
-              <h2 className="text-[19px] font-semibold leading-snug text-slate-900">{question.prompt}</h2>
+              <h2 className="text-[19px] font-semibold leading-snug text-white">{question.prompt}</h2>
 
               <div className="mt-5 space-y-3">
                 {question.options.map((opt, idx) => {
                   const selected = selections[question.id] === idx;
                   return (
-                    <button
+                    /* Wave 13: answer options are the pack GlassTile — the
+                       selected state (ring + tint) comes from the pack; indigo
+                       ink marks the chosen answer. */
+                    <GlassTile
                       key={idx}
-                      type="button"
                       onClick={() => selectOption(idx)}
-                      className={`flex min-h-[56px] w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-[15px] font-medium transition active:scale-[0.99] ${
-                        selected
-                          ? "border-indigo-600 bg-indigo-50 text-indigo-900"
-                          : "border-slate-300 bg-white text-slate-800 active:bg-slate-100"
+                      selected={selected}
+                      className={`dc-tile aspect-auto min-h-[56px] w-full px-4 py-3 text-left text-[15px] font-medium [&>span]:w-full [&>span]:justify-start [&>span]:gap-3 ${
+                        selected ? "text-indigo-200" : "text-white/85"
                       }`}
                     >
                       <span
                         className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          selected ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-600"
+                          selected ? "bg-indigo-600 text-white" : "border border-white/20 text-white/75"
                         }`}
                       >
                         {OPTION_LETTERS[idx]}
                       </span>
                       <span className="flex-1">{opt}</span>
-                    </button>
+                    </GlassTile>
                   );
                 })}
               </div>
               <button
                 type="button"
                 onClick={goNext}
-                className="mt-4 flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-slate-500 active:text-slate-600"
+                className="mt-4 flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-white/55 active:text-white/75"
               >
                 Skip this question
               </button>
             </div>
           )}
         </div>
-        <div className="flex gap-3 border-t border-slate-200 bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+        <div className="flex gap-3 border-t border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
           <SecondaryButton onClick={goPrev} disabled={currentIndex === 0} className="flex-[1]">
             Previous
           </SecondaryButton>
@@ -210,7 +212,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
             )}
           </PrimaryButton>
         </div>
-        <p className="pb-2 text-center text-[11px] font-medium text-slate-500">{answeredCount} of {total} answered</p>
+        <p className="pb-2 text-center text-[11px] font-medium text-white/55">{answeredCount} of {total} answered</p>
       </div>
     </PageShell>
   );

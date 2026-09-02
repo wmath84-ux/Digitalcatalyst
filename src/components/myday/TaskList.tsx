@@ -3,6 +3,11 @@ import { ClipboardList, ListFilter, Plus, Search, X } from "lucide-react";
 import type { Task, TaskStatus } from "../../types";
 import TaskItem from "./TaskItem";
 import { cn } from "../../utils/cn";
+import { GlassSurface } from "../ui/glass";
+import { GlassButton } from "../ui/glass-button";
+import { GlassInput } from "../ui/glass-input";
+import { GlassCard } from "../ui/GlassCard";
+import { GlassToggleGroup, GlassToggleItem } from "../ui/glass-toggle-group";
 
 interface TaskListProps {
   tasks: Task[];
@@ -75,71 +80,63 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
   }, [filtered, highlightId]);
 
   return (
-    <div className="dc-glass rounded-3xl shadow-[0_22px_48px_-28px_rgba(79,70,229,0.46)]">
+    <GlassSurface radius={24} className="text-white" contentClassName="flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-5 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-300/50">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-white">
             <ClipboardList className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-slate-900 sm:text-lg">Today's Tasks</h2>
-            <p className="text-xs font-medium text-slate-500">
+            <h2 className="text-base font-extrabold text-white sm:text-lg">Today's Tasks</h2>
+            <p className="text-xs font-medium text-white/55">
               {counts.completed} of {counts.all} completed
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <GlassButton
+            type="button"
+            aria-label="Search tasks"
+            aria-pressed={showSearch}
             onClick={() => setShowSearch((s) => !s)}
-            className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-xl transition sm:hidden",
-              showSearch ? "bg-indigo-100 text-indigo-600" : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            )}
+            className={cn("sm:hidden [&_.size-12]:size-9", showSearch && "text-indigo-300")}
           >
             <Search className="h-[18px] w-[18px]" />
-          </button>
-          <button
-            onClick={onAdd}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-2 text-xs font-semibold text-white shadow-lg shadow-indigo-200/50 transition hover:shadow-xl hover:shadow-indigo-200/70 sm:px-4 sm:text-sm"
-          >
+          </GlassButton>
+          <GlassButton variant="capsule" type="button" onClick={onAdd} className="[&>span>div]:h-10 [&>span>div]:gap-1.5 [&>span>div]:px-3.5 [&>span>div]:text-xs [&>span>div]:font-bold sm:[&>span>div]:px-4 sm:[&>span>div]:text-sm">
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Add Task</span>
-          </button>
+          </GlassButton>
         </div>
       </div>
 
       {/* Search bar - show when global search active or local search toggled */}
       <div className={cn("px-4 pt-3 sm:px-6", (showSearch || isSearchActive) ? "block" : "hidden sm:block")}>
-        <div className={cn(
-          "dc-glass-input flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all",
-          isSearchActive
-            ? "ring-2 ring-indigo-100/70"
-            : "focus-within:ring-2 focus-within:ring-indigo-100/70"
-        )}>
-          <Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-indigo-500" : "text-slate-400")} />
-          <input
+        {/* Wave 13: the search field is the pack GlassInput (icon slot); the
+            "n found" chip and the clear disc sit beside it. */}
+        <div className="flex items-center gap-2">
+          <GlassInput
+            icon={<Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-indigo-300" : "text-white/55")} />}
             value={globalSearch || localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             placeholder="Search tasks by title or subject..."
             disabled={!!globalSearch}
-            className={cn(
-              "w-full bg-transparent text-sm outline-none placeholder:text-slate-400",
-              globalSearch ? "text-indigo-700" : "text-slate-700"
-            )}
+            className={cn("min-w-0 flex-1", isSearchActive && "ring-2 ring-indigo-400/30 rounded-full")}
           />
           {isSearchActive && (
-            <div className="flex items-center gap-1.5">
-              <span className="rounded-md bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600">
+            <div className="flex shrink-0 items-center gap-1.5">
+              <span className="rounded-md bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-bold text-indigo-300">
                 {filtered.length} found
               </span>
               {!globalSearch && (
-                <button
+                <GlassButton
                   onClick={() => setLocalSearch("")}
-                  className="shrink-0 rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                  aria-label="Clear search"
+                  className="[&_.size-12]:size-8 [&_svg]:text-white/70"
                 >
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </GlassButton>
               )}
             </div>
           )}
@@ -148,44 +145,45 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
 
       {/* Filter tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto px-4 pt-3.5 pb-1 sm:px-6 hide-scrollbar">
-        <ListFilter className="h-4 w-4 shrink-0 text-slate-400 mr-1" />
+        <ListFilter className="h-4 w-4 shrink-0 text-white/55 mr-1" />
+        <GlassToggleGroup
+          className={cn("dc-segment shrink-0", globalSearch && "opacity-50")}
+          value={filter}
+          onValueChange={(next) => { if (!globalSearch) setFilter(next as typeof filter); }}
+          aria-label="Filter tasks"
+        >
         {filters.map((f) => (
-          <button
+          <GlassToggleItem
             key={f.key}
-            onClick={() => setFilter(f.key)}
+            value={f.key}
             disabled={!!globalSearch}
-            className={cn(
-              "relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all",
-              filter === f.key
-                ? "border border-indigo-300/70 bg-indigo-500/15 text-indigo-700 shadow-[0_14px_30px_-18px_rgba(79,70,229,0.65)] backdrop-blur-xl"
-                : "dc-glass-chip text-slate-500 hover:bg-white/80 hover:text-slate-700",
-              globalSearch && "opacity-50 cursor-not-allowed"
-            )}
+            className={cn("whitespace-nowrap px-3.5 py-1.5 text-xs font-semibold", globalSearch && "cursor-not-allowed")}
           >
             {f.label}
             <span className={cn(
-              "ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold",
-              filter === f.key ? "bg-white/20 text-white" : "bg-slate-200/60 text-slate-400",
+              "ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full border px-1 text-[10px] font-bold",
+              filter === f.key ? "border-white/30 text-white" : "border-white/15 text-white/55",
             )}>
               {counts[f.key]}
             </span>
-          </button>
+          </GlassToggleItem>
         ))}
+        </GlassToggleGroup>
       </div>
 
       {/* Task list */}
       <div ref={listRef} className="space-y-2 p-4 sm:p-6 sm:pt-4">
         {filtered.length === 0 ? (
-          <div className="dc-glass flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-indigo-200/70 bg-white/45 py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 shadow-inner">
+          <GlassCard contentClassName="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-500/15">
               {isSearchActive ? (
-                <Search className="h-6 w-6 text-slate-400" />
+                <Search className="h-6 w-6 text-white/55" />
               ) : (
-                <ClipboardList className="h-6 w-6 text-slate-400" />
+                <ClipboardList className="h-6 w-6 text-white/55" />
               )}
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-500">
+              <p className="text-sm font-bold text-white/55">
                 {isSearchActive
                   ? `No tasks match "${searchQuery}"`
                   : "No tasks in this category"}
@@ -193,19 +191,19 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
               {!isSearchActive && (
                 <button
                   onClick={onAdd}
-                  className="mt-2 text-sm font-semibold text-indigo-600 hover:text-indigo-700 hover:underline"
+                  className="mt-2 text-sm font-semibold text-indigo-300 hover:text-indigo-200 hover:underline"
                 >
                   + Create a new task
                 </button>
               )}
             </div>
-          </div>
+          </GlassCard>
         ) : (
           filtered.map((task, idx) => (
             <div
               key={task.id}
               data-highlight={task.id}
-              className={cn("animate-slideUp", task.id === highlightId && "rounded-2xl ring-2 ring-indigo-400 ring-offset-2 ring-offset-white")}
+              className={cn("animate-slideUp", task.id === highlightId && "rounded-[20px] ring-2 ring-indigo-400")}
               style={{ animationDelay: `${idx * 30}ms` }}
             >
               <TaskItem
@@ -220,6 +218,6 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
           ))
         )}
       </div>
-    </div>
+    </GlassSurface>
   );
 }

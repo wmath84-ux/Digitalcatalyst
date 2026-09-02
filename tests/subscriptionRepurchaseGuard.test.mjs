@@ -325,7 +325,7 @@ test("the subscribe bar renders the owned tone from the shared helper", () => {
   assert.match(bar, /resolveSubscribeCta/);
   assert.match(bar, /data-subscription-owned=/);
   assert.match(bar, /data-subscription-cta-tone=\{cta\.tone\}/);
-  assert.match(bar, /from-emerald-500 to-teal-600/, "owned CTA must use a distinct colour");
+  assert.match(bar, /\? "bg-emerald-600 text-white/, "owned CTA must use a distinct colour");
 });
 
 test("the plan picker marks which plan and cycle are already active", () => {

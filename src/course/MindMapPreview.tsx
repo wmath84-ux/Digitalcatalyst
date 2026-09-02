@@ -7,6 +7,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import MindMapPanel from "./MindMapPanel";
+import { GlassToggleGroup, GlassToggleItem } from "../components/ui/glass-toggle-group";
+import { GlassButton } from "../components/ui/glass-button";
 import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
 import { addChildNode, createMindMap, countNodes, rootId, type MindMap } from "../../utils/mindMapTree";
 
@@ -81,47 +83,41 @@ export default function MindMapPreview() {
   }, []);
 
   return (
-    <div className="min-h-[100dvh] bg-slate-950 p-6 text-slate-100">
+    <div className="min-h-[100dvh] p-6 text-white">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 text-xs font-bold">
-        <span className="uppercase tracking-widest text-slate-400">Mind map toolbar preview</span>
-        {FRAMES.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            onClick={() => setFrame(entry.id)}
-            className={`rounded-lg px-3 py-1.5 ${frame === entry.id ? "bg-violet-500 text-white" : "bg-slate-800 text-slate-300"}`}
-          >
-            {entry.label} · {entry.width}
-          </button>
-        ))}
-        <button
-          type="button"
+        <span className="uppercase tracking-widest text-white/55">Mind map toolbar preview</span>
+        <GlassToggleGroup className="dc-segment" value={frame} onValueChange={(next) => setFrame(next as typeof frame)} aria-label="Frame">
+          {FRAMES.map((entry) => (
+            <GlassToggleItem key={entry.id} value={entry.id} className="px-3 py-1.5 text-xs">
+              {entry.label} · {entry.width}
+            </GlassToggleItem>
+          ))}
+        </GlassToggleGroup>
+        <GlassButton
+          variant="capsule"
           onClick={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
-          className="rounded-lg bg-slate-800 px-3 py-1.5 text-slate-300"
+          className="[&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-xs"
         >
           Player theme: {theme}
-        </button>
-        <span className="ml-2 text-slate-400">Save status:</span>
-        {STATUSES.map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setStatus(value)}
-            className={`rounded-lg px-2.5 py-1.5 ${status === value ? "bg-emerald-500 text-white" : "bg-slate-800 text-slate-300"}`}
-          >
-            {value}
-          </button>
-        ))}
+        </GlassButton>
+        <span className="ml-2 text-white/55">Save status:</span>
+        <GlassToggleGroup className="dc-segment" value={status} onValueChange={(next) => setStatus(next as typeof status)} aria-label="Save status">
+          {STATUSES.map((value) => (
+            <GlassToggleItem key={value} value={value} className="px-2.5 py-1.5 text-xs">
+              {value}
+            </GlassToggleItem>
+          ))}
+        </GlassToggleGroup>
       </div>
 
       <div ref={stageRef} className="mt-6 flex flex-wrap items-start gap-6">
         {FRAMES.map((entry) => (
           <div key={entry.id} style={{ width: entry.width }} className="shrink-0">
-            <p className="mb-2 text-[11px] font-black uppercase tracking-widest text-slate-400">
+            <p className="mb-2 text-[11px] font-black uppercase tracking-widest text-white/55">
               {entry.label} · {entry.width}px
             </p>
             <div
-              className="overflow-hidden rounded-3xl border border-slate-800"
+              className="overflow-hidden rounded-3xl border border-white/10"
               style={{ width: entry.width, height: entry.height }}
             >
               <MindMapPanel
@@ -146,7 +142,7 @@ export default function MindMapPreview() {
           </div>
         ))}
       </div>
-      <p className="mt-6 text-[11px] text-slate-500">
+      <p className="mt-6 text-[11px] text-white/55">
         Rendered frame: {active.label}. All three frames share one map, so edits show up everywhere.
       </p>
     </div>

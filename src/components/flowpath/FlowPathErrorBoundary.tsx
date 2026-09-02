@@ -1,4 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { GlassSurface } from "../ui/glass";
+import { GlassButton } from "../ui/glass-button";
 
 /**
  * Error boundary for the FlowPath route.
@@ -80,8 +82,10 @@ export class FlowPathErrorBoundary extends Component<
     if (!error) return this.props.children;
 
     return (
-      <main className="flowpath-error-screen grid min-h-[100dvh] place-items-center bg-[var(--fp-bg-0)] px-6 text-center">
-        <div className="w-full max-w-sm">
+      <main className="flowpath-error-screen grid min-h-[100dvh] place-items-center px-6 text-center text-fp-text">
+        {/* Wave 13c: sits on the blurred backdrop (no `--fp-bg-0` page fill);
+            the panel is the pack GlassSurface. */}
+        <GlassSurface radius={24} className="w-full max-w-sm" contentClassName="p-6">
           <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-violet-500/15 text-2xl">
             🌀
           </span>
@@ -92,35 +96,35 @@ export class FlowPathErrorBoundary extends Component<
             Something went wrong while drawing your flow. Your data is safe —
             retry below or head back to the home page.
           </p>
-          <p className="mt-3 break-words rounded-lg border border-fp-text-15 bg-fp-text-5 px-3 py-2 text-[11px] text-fp-muted">
+          <p className="mt-3 break-words rounded-lg border border-white/10 px-3 py-2 text-[11px] text-fp-muted">
             {error.message || "Unknown error"}
           </p>
           <div className="mt-5 flex flex-col gap-2">
             <button
               type="button"
               onClick={this.handleRetry}
-              className="w-full rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_-10px_rgba(139,123,255,0.85)] transition hover:brightness-110"
+              className="w-full rounded-full bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500"
             >
               Try again
             </button>
             <div className="flex gap-2">
-              <button
-                type="button"
+              <GlassButton
+                variant="capsule"
                 onClick={this.handleGoBack}
-                className="flex-1 rounded-xl border border-fp-border bg-fp-surface px-4 py-2.5 text-sm font-medium text-fp-muted transition hover:bg-fp-surface-hover hover:text-fp-text"
+                className="flex-1 [&>span]:w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:rounded-full [&>span>div]:px-4"
               >
                 Go back
-              </button>
-              <button
-                type="button"
+              </GlassButton>
+              <GlassButton
+                variant="capsule"
                 onClick={this.handleGoHome}
-                className="flex-1 rounded-xl border border-fp-border bg-fp-surface px-4 py-2.5 text-sm font-medium text-fp-muted transition hover:bg-fp-surface-hover hover:text-fp-text"
+                className="flex-1 [&>span]:w-full [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:rounded-full [&>span>div]:px-4"
               >
                 Go to Home
-              </button>
+              </GlassButton>
             </div>
           </div>
-        </div>
+        </GlassSurface>
       </main>
     );
   }

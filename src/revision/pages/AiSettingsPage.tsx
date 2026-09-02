@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import PageShell from "../components/PageShell";
 import AiConfigForm from "../components/AiConfigForm";
 import { Card } from "../components/ui";
+import { GlassTile } from "../../components/ui/glass-tile";
 import { CheckIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { fetchRemoteCatalog, type RevisionCatalog } from "../engine/catalogService";
@@ -49,34 +50,32 @@ function SourceOption({
   onSelect: (v: AiSource) => void;
 }) {
   return (
-    <button
-      type="button"
+    /* Wave 13: the source option is the pack GlassTile (selected state comes
+       from the pack); the radio dot is drawn on the tile, not a plate. */
+    <GlassTile
       disabled={disabled}
       onClick={() => onSelect(value)}
       data-ai-source={value}
-      className={`flex w-full items-start gap-3 rounded-2xl border p-3.5 text-left transition ${
-        selected
-          ? "border-indigo-300 bg-indigo-50/70 ring-2 ring-indigo-200"
-          : "border-slate-300 bg-white hover:border-slate-400"
-      } ${disabled ? "opacity-50" : "active:scale-[0.99]"}`}
+      selected={selected}
+      className={`dc-tile aspect-auto w-full p-3.5 text-left [&>span]:w-full [&>span]:items-start [&>span]:justify-start [&>span]:gap-3 ${disabled ? "opacity-50" : ""}`}
     >
       <span
         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-          selected ? "border-indigo-600 bg-indigo-600" : "border-slate-300 bg-white"
+          selected ? "border-indigo-500 bg-indigo-500" : "border-white/25"
         }`}
       >
         {selected && <span className="h-2 w-2 rounded-full bg-white" />}
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[13px] font-bold text-slate-900">{title}</span>
+          <span className="text-[13px] font-bold text-white">{title}</span>
           {badge && (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{badge}</span>
+            <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-200">{badge}</span>
           )}
         </span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-slate-600">{description}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-white/75">{description}</span>
       </span>
-    </button>
+    </GlassTile>
   );
 }
 
@@ -179,30 +178,30 @@ export default function AiSettingsPage({ uid, route }: Props) {
       <div data-rev-layout="aisettings" className="animate-fade-in space-y-4 px-4 py-4 pb-10 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
         <Card>
           <div className="flex items-center justify-between">
-            <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">Current setup</h3>
+            <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">Current setup</h3>
             {savedFlash && (
-              <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+              <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-300">
                 <CheckIcon className="h-3.5 w-3.5" /> Saved automatically
               </span>
             )}
           </div>
-          <div className="mt-2.5 flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
+          <div className="mt-2.5 flex items-center gap-3 rounded-2xl border border-white/10 p-3">
             <span
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-black text-white ${
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white ${
                 userCfg.source === "default" && schoolProvider
                   ? schoolProvider.gradient
-                  : (effProvider?.gradient ?? "from-slate-400 to-slate-600")
+                  : (effProvider?.gradient ?? "bg-slate-600")
               }`}
             >
               {userCfg.source === "default" && schoolProvider ? schoolProvider.mark : (effProvider?.mark ?? "▦")}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-bold text-slate-900">{currentTitle}</p>
-              <p className="text-xs text-slate-600">{currentLabel}</p>
+              <p className="truncate text-[13px] font-bold text-white">{currentTitle}</p>
+              <p className="text-xs text-white/75">{currentLabel}</p>
             </div>
             <span
               className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                effective.config ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
+                effective.config ? "bg-emerald-500/20 text-emerald-200" : "border border-white/15 text-white/75"
               }`}
             >
               {effective.config ? "AI on" : "No AI"}
@@ -211,7 +210,7 @@ export default function AiSettingsPage({ uid, route }: Props) {
         </Card>
 
         <Card>
-          <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">1 · Where should AI come from?</h3>
+          <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">1 · Where should AI come from?</h3>
           <div className="mt-3 space-y-2">
             <SourceOption
               value="default"
@@ -241,21 +240,21 @@ export default function AiSettingsPage({ uid, route }: Props) {
 
         {userCfg.source === "default" && schoolReady && adminSettings && schoolProvider && (
           <Card data-school-ai-preview>
-            <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">2 · School AI</h3>
-            <p className="mt-1 text-xs text-slate-600">
+            <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">2 · School AI</h3>
+            <p className="mt-1 text-xs text-white/75">
               This is the configuration published from the admin panel. You don't need an API key.
             </p>
-            <div className="mt-3 flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
+            <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/10 p-3">
               <span
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-black text-white ${schoolProvider.gradient}`}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white ${schoolProvider.gradient}`}
               >
                 {schoolProvider.mark}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-bold text-slate-900">{schoolProvider.name}</p>
-                <p className="truncate font-mono text-xs text-slate-600">{adminSettings.model}</p>
+                <p className="truncate text-[13px] font-bold text-white">{schoolProvider.name}</p>
+                <p className="truncate font-mono text-xs text-white/75">{adminSettings.model}</p>
               </div>
-              <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
+              <span className="shrink-0 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[10px] font-bold text-emerald-200">
                 Shared key
               </span>
             </div>
@@ -264,8 +263,8 @@ export default function AiSettingsPage({ uid, route }: Props) {
 
         {userCfg.source === "own" && (
           <Card>
-            <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">2 · Connect your provider</h3>
-            <p className="mt-1 text-xs text-slate-600">
+            <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">2 · Connect your provider</h3>
+            <p className="mt-1 text-xs text-white/75">
               Pick a provider → paste your API key → models appear after the key loads. The API box starts empty.
             </p>
             <div className="mt-3">

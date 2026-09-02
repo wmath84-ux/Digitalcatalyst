@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { GlassCard } from "./components/ui/glass-card";
+import { Tabs, TabsList, TabsTrigger } from "./components/ui/glass-tabs";
+import { GlassButton } from "./components/ui/glass-button";
 import { doc, getDoc } from "firebase/firestore";
 import { BadgeCheck, Check, Copy, Crown, LoaderCircle, Trophy, Users } from "lucide-react";
 import Header from "./components/Header";
@@ -135,8 +138,8 @@ export default function LeaderboardApp() {
   const listedSubscribers = view === "unused" ? unusedSubscribers : subscribers;
 
   return (
-    <div className="min-h-screen bg-white sm:py-6">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200 md:max-w-none md:rounded-none md:border-0 md:shadow-none md:bg-transparent">
+    <div className="min-h-screen sm:py-6">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] md:max-w-none md:rounded-none">
         <Header
           cartCount={cartIds.size}
           notifCount={1}
@@ -144,10 +147,10 @@ export default function LeaderboardApp() {
           onNavigateToCart={() => { window.location.hash = "#/cart"; }}
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
         />
-        <main className="flex-1 overflow-y-auto bg-slate-50 px-4 py-5">
-          <div className="rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-5 text-white shadow-xl shadow-violet-200">
+        <main className="flex-1 overflow-y-auto px-4 py-5">
+          <GlassCard>
             <div className="flex items-center gap-3">
-              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/15"><Trophy /></span>
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-500/15 text-amber-300"><Trophy /></span>
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-white/70">Community</p>
                 <h1 className="text-xl font-black">Leaderboard</h1>
@@ -160,63 +163,41 @@ export default function LeaderboardApp() {
                   ? "Only subscribers whose referral ID has not been used yet. Each ID works once."
                   : "Every verified subscriber receives a unique referral ID. Each ID can be used only once for ₹250 off."}
             </p>
-          </div>
+          </GlassCard>
 
-          <div className="mt-4 grid grid-cols-3 gap-1 rounded-2xl bg-slate-200/70 p-1">
-            <button
-              type="button"
-              onClick={() => setView("all")}
-              className={`flex items-center justify-center gap-1 rounded-xl px-1 py-2.5 text-[11px] font-black transition ${
-                view === "all" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-              }`}
-            >
-              <Users size={13} /> All users
-            </button>
-            <button
-              type="button"
-              onClick={() => setView("subscribers")}
-              className={`flex items-center justify-center gap-1 rounded-xl px-1 py-2.5 text-[11px] font-black transition ${
-                view === "subscribers" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-              }`}
-            >
-              <Crown size={13} /> Subscribers
-            </button>
-            <button
-              type="button"
-              onClick={() => setView("unused")}
-              className={`flex items-center justify-center gap-1 rounded-xl px-1 py-2.5 text-[11px] font-black transition ${
-                view === "unused" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-              }`}
-            >
-              <BadgeCheck size={13} /> Unused IDs
-            </button>
-          </div>
+          <Tabs value={view} onValueChange={(v) => setView(v as typeof view)} className="mt-4">
+            <TabsList className="w-full">
+              <TabsTrigger value="all" className="flex-1 gap-1 text-[11px] font-black"><Users size={13} /> All users</TabsTrigger>
+              <TabsTrigger value="subscribers" className="flex-1 gap-1 text-[11px] font-black"><Crown size={13} /> Subscribers</TabsTrigger>
+              <TabsTrigger value="unused" className="flex-1 gap-1 text-[11px] font-black"><BadgeCheck size={13} /> Unused IDs</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           {loading ? (
-            <div className="grid place-items-center py-16"><LoaderCircle className="animate-spin text-violet-600" /></div>
+            <div className="grid place-items-center py-16"><LoaderCircle className="animate-spin text-violet-300" /></div>
           ) : error ? (
-            <p className="mt-5 rounded-2xl bg-rose-50 p-4 text-sm font-semibold text-rose-700">{error}</p>
+            <p className="mt-5 rounded-2xl border border-rose-400/30 bg-rose-500/15 p-4 text-sm font-semibold text-rose-200">{error}</p>
           ) : view === "all" ? (
             allUsers.length === 0 ? (
-              <p className="py-16 text-center text-sm text-slate-400">No users are listed yet.</p>
+              <p className="py-16 text-center text-sm text-white/55">No users are listed yet.</p>
             ) : (
               <div className="mt-4 space-y-3">
                 {allUsers.map((row, index) => (
-                  <article key={row.uid} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <GlassCard key={row.uid}>
                     <div className="flex items-center gap-3">
-                      <span className="w-6 text-center text-sm font-black text-slate-400">#{index + 1}</span>
+                      <span className="w-6 text-center text-sm font-black text-white/55">#{index + 1}</span>
                       <Avatar name={row.name} photoURL={row.photoURL} />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-black text-slate-900">{row.name}</p>
-                        <p className="text-[10px] font-semibold uppercase text-slate-400">Learner</p>
+                        <p className="truncate text-sm font-black text-white">{row.name}</p>
+                        <p className="text-[10px] font-semibold uppercase text-white/55">Learner</p>
                       </div>
                     </div>
-                  </article>
+                  </GlassCard>
                 ))}
               </div>
             )
           ) : listedSubscribers.length === 0 ? (
-            <p className="py-16 text-center text-sm text-slate-400">
+            <p className="py-16 text-center text-sm text-white/55">
               {view === "unused" ? "No unused referral IDs are available right now." : "No subscribers are listed yet."}
             </p>
           ) : (
@@ -224,37 +205,35 @@ export default function LeaderboardApp() {
               {listedSubscribers.map((row, index) => {
                 const used = row.usedCount > 0 || !row.available;
                 return (
-                <article key={row.uid} className={`rounded-2xl border p-4 shadow-sm ${used ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"}`}>
+                <GlassCard key={row.uid} data-referral-used={used ? "true" : "false"}>
                   <div className="flex items-center gap-3">
-                    <span className="w-6 text-center text-sm font-black text-slate-400">#{index + 1}</span>
+                    <span className="w-6 text-center text-sm font-black text-white/55">#{index + 1}</span>
                     <Avatar name={row.name} photoURL={row.photoURL} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-black text-slate-900">{row.name}</p>
-                      <p className="flex items-center gap-1 text-[10px] font-semibold uppercase text-violet-600"><Crown size={11} /> {row.planId}</p>
+                      <p className="truncate text-sm font-black text-white">{row.name}</p>
+                      <p className="flex items-center gap-1 text-[10px] font-semibold uppercase text-violet-300"><Crown size={11} /> {row.planId}</p>
                     </div>
-                    <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase ${used ? "bg-amber-200 text-amber-800" : "bg-emerald-100 text-emerald-700"}`}>
+                    <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase ${used ? "bg-amber-500/20 text-amber-200" : "bg-emerald-500/20 text-emerald-200"}`}>
                       {used ? "Used" : "Use now"}
                     </span>
                   </div>
-                  <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2">
-                    <span className="shrink-0 text-[10px] font-bold uppercase text-slate-400">Referral ID</span>
+                  <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
+                    <span className="shrink-0 text-[10px] font-bold uppercase text-white/55">Referral ID</span>
                     <div className="flex min-w-0 items-center gap-1.5">
-                      <code className={`min-w-0 max-w-[190px] truncate text-xs font-black ${used ? "text-slate-400 line-through decoration-2 decoration-rose-400" : "text-slate-800"}`}>{row.referralCode}</code>
-                      <button
-                        type="button"
+                      <code className={`min-w-0 max-w-[190px] truncate text-xs font-black ${used ? "text-white/40 line-through decoration-2 decoration-rose-400" : "text-white"}`}>{row.referralCode}</code>
+                      <GlassButton
                         onClick={() => void copyReferralCode(row.referralCode)}
-                        className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition hover:text-violet-700 active:scale-95"
+                        className="shrink-0 [&_.size-12]:size-8"
                         aria-label={`Copy referral ID ${row.referralCode}`}
-                        title="Copy referral ID"
                       >
-                        {copiedReferralCode === row.referralCode ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-                      </button>
+                        {copiedReferralCode === row.referralCode ? <Check size={13} className="text-emerald-300" /> : <Copy size={13} />}
+                      </GlassButton>
                     </div>
                   </div>
                   {used ? (
-                    <p className="mt-2 text-[10px] font-semibold text-amber-700">This referral ID has been used and is discontinued.</p>
+                    <p className="mt-2 text-[10px] font-semibold text-amber-200">This referral ID has been used and is discontinued.</p>
                   ) : null}
-                </article>
+                </GlassCard>
                 );
               })}
             </div>

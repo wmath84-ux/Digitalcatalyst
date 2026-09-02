@@ -107,7 +107,7 @@ export default function ImageViewer({ url, name, initialScale, initialOffset, on
 
   return (
     <div
-      className="relative h-full w-full overflow-hidden course-image-surface bg-[var(--course-bg)] touch-none"
+      className="relative h-full w-full overflow-hidden touch-none"
       data-course-image-viewer
       data-pinch-zoom="enabled"
       onWheel={(event) => {
@@ -211,7 +211,7 @@ export default function ImageViewer({ url, name, initialScale, initialOffset, on
           }}
         />
       </div>
-      <p className="pointer-events-none absolute left-3 top-3 rounded-full bg-[var(--course-surface-translucent)] px-3 py-1.5 text-[10px] font-bold text-[var(--course-muted)]">
+      <p className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/50 px-3 py-1.5 text-[10px] font-bold text-white/70">
         Pinch/wheel to zoom · double-click zoom · drag to pan
       </p>
     </div>

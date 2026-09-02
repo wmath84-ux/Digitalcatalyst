@@ -25,6 +25,7 @@
 // ever reachable without an explicit second tap on the red button.
 
 import { GlassSurface } from "../components/ui/glass";
+import { GlassButton } from "../components/ui/glass-button";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, Trash2 } from "lucide-react";
@@ -87,7 +88,7 @@ export default function CourseConfirmDialog({
     >
       {/* Backdrop — tap anywhere outside the card cancels. */}
       <div
-        className="fixed inset-0 bg-slate-950/70 backdrop-blur-[2px]"
+        className="fixed inset-0 bg-black/50 backdrop-blur-[2px]"
         aria-hidden="true"
         onClick={onCancel}
         data-course-confirm-backdrop
@@ -97,25 +98,24 @@ export default function CourseConfirmDialog({
         role="alertdialog"
         aria-modal="true"
         aria-label={title}
-        tint={0.9}
-        radius={16}
-        className="relative z-10 w-[min(100%,26rem)] shrink-0 overflow-hidden rounded-2xl shadow-2xl shadow-slate-950/40 animate-scaleIn"
+        radius={24}
+        className="relative z-10 w-[min(100%,26rem)] shrink-0 overflow-hidden text-white animate-scaleIn"
         style={{ maxHeight: "max(18rem, min(70vh, 70dvh))" }}
         data-course-confirm-card
       >
         <div className="max-h-[inherit] overflow-y-auto overscroll-contain p-4 sm:p-6">
           <div className="flex items-start gap-3">
             <span
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose-100 text-rose-600 sm:h-12 sm:w-12"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/30 sm:h-12 sm:w-12"
               data-course-confirm-icon
             >
               <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />
             </span>
             <div className="min-w-0 flex-1">
-              <h3 className="text-base font-black leading-snug text-slate-900 sm:text-lg" data-course-confirm-title>
+              <h3 className="text-base font-black leading-snug text-white sm:text-lg" data-course-confirm-title>
                 {title}
               </h3>
-              <p className="mt-1 text-[13px] leading-relaxed text-slate-500 sm:text-sm" data-course-confirm-message>
+              <p className="mt-1 text-[13px] leading-relaxed text-white/70 sm:text-sm" data-course-confirm-message>
                 {message}
               </p>
             </div>
@@ -123,7 +123,7 @@ export default function CourseConfirmDialog({
 
           {detail ? (
             <p
-              className="mt-3 rounded-xl bg-slate-100/80 px-3 py-2 text-[11px] font-semibold leading-relaxed text-slate-600"
+              className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-[11px] font-semibold leading-relaxed text-white/75"
               data-course-confirm-detail
             >
               {detail}
@@ -131,19 +131,19 @@ export default function CourseConfirmDialog({
           ) : null}
 
           <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:gap-3">
-            <button
-              type="button"
+            <GlassButton
+              variant="capsule"
               autoFocus
               onClick={onCancel}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99]"
+              className="flex-1 text-sm font-bold [&>span>div]:h-12 [&>span>div]:w-full [&>span>div]:px-4"
               data-course-confirm-cancel
             >
               Cancel
-            </button>
+            </GlassButton>
             <button
               type="button"
               onClick={onConfirm}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-rose-200 transition hover:bg-rose-700 active:scale-[0.99]"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-rose-600 px-4 py-3 text-sm font-black text-white transition hover:bg-rose-500 active:scale-[0.99]"
               aria-label={confirmTitle}
               data-course-confirm-delete
             >

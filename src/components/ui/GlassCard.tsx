@@ -33,16 +33,14 @@ export type AppGlassCardProps = ComponentProps<typeof RegistryGlassCard> & {
 };
 
 export function GlassCard({
-  tint = 0.5,
   className,
   ...props
 }: AppGlassCardProps) {
   return (
     <RegistryGlassCard
-      tint={tint}
-      /* `dc-glass-card` is the hook `glass.css` uses to brighten the rim on a
-         white page; the label colour is handled here. */
-      className={cn("dc-glass-card text-slate-900", className)}
+      /* Phase A6: the pack's own tint (0.4) and white ink — no app-side
+         material. `dc-glass-card` only carries the rim hook in glass.css. */
+      className={cn("dc-glass-card text-white", className)}
       {...props}
     />
   );
@@ -53,15 +51,15 @@ export function GlassCardHeader({ className, ...props }: ComponentProps<"div">) 
 }
 
 export function GlassCardTitle({ className, ...props }: ComponentProps<"h3">) {
-  return <RegistryGlassCardTitle className={cn("text-[15px] font-extrabold text-slate-900", className)} {...props} />;
+  return <RegistryGlassCardTitle className={cn("text-[15px] font-extrabold text-white", className)} {...props} />;
 }
 
 export function GlassCardDescription({ className, ...props }: ComponentProps<"p">) {
-  return <RegistryGlassCardDescription className={cn("text-slate-500", className)} {...props} />;
+  return <RegistryGlassCardDescription className={cn("text-white/60", className)} {...props} />;
 }
 
 export function GlassCardContent({ className, ...props }: ComponentProps<"div">) {
-  return <RegistryGlassCardContent className={cn("text-slate-600", className)} {...props} />;
+  return <RegistryGlassCardContent className={cn("text-white/80", className)} {...props} />;
 }
 
 export function GlassCardFooter({ className, ...props }: ComponentProps<"div">) {

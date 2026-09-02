@@ -192,19 +192,28 @@ test("store surfaces use frosted glass, colour and depth", () => {
   // — every store surface is frosted, translucent and has depth — is unchanged,
   // so the markers now accept either implementation. Anything that still paints
   // its own frost (StorePage, Hero) is checked exactly as before.
+  // Phase A6 (2026-09-02): every store surface is a pack component (GlassCard /
+  // GlassSurface / GlassButton / GlassToggleGroup) on the pack's own material —
+  // no app-side `bg-white/NN` frost, tint override or page-assuming shadow.
   for (const [name, source] of [["StorePage", storePage], ["ProductCard", productCard], ["FilterChips", filterChips], ["Hero", hero]]) {
-    assert.match(source, /backdrop-blur|<GlassSurface|<GlassCard|GlassToggleGroup/, `${name} should use backdrop blur (or the pack's refraction layer)`);
-    assert.match(source, /bg-white\/\d|tint=\{/, `${name} should use translucent surfaces`);
-    assert.match(source, /shadow-|<GlassSurface|<GlassCard/, `${name} should carry shadows (or the pack's rim)`);
+    assert.match(source, /<GlassSurface|<GlassCard|<GlassToggleGroup|<GlassButton/, `${name} should render the pack's glass`);
+    assert.doesNotMatch(source, /className="[^"]*\bbg-white\/(?:[4-9]\d|100)\b/, `${name} must not paint an opaque white plate`);
+    assert.doesNotMatch(source, /bg-gradient-to-(?:br|b|r|t|l|bl|tr)\b(?![^"]*bg-clip-text)/, `${name} must not paint a gradient plate`);
   }
-  // Ambient colour behind the frosted layers.
-  assert.match(storePage, /blur-3xl/);
+  // Phase A (2026-09-02): the page paints NO ambient wash or orbs of its own —
+  // the single fixed Black Ice backdrop is the only page background.
+  assert.doesNotMatch(storePage, /data-glass-ambient[^>]*blur-3xl/, "store must not paint its own ambient orbs");
+  assert.doesNotMatch(storePage, /from-indigo-50 via-slate-50 to-white/, "store must not paint a page wash");
   assert.match(hero, /from-indigo-600 via-violet-600 to-fuchsia-600/);
 });
 
 test("product detail uses the same glass treatment", () => {
+  // Phase A6: PDP sections are pack GlassSurfaces (own material); the sticky
+  // tab bar keeps a real blur so content scrolling under it stays legible.
+  assert.match(pdp, /<GlassSurface\b/);
   assert.match(pdp, /backdrop-blur-xl/);
-  assert.match(pdp, /backdrop-blur-2xl/);
-  assert.match(pdp, /bg-gradient-to-b from-indigo-50 via-slate-50 to-white/);
-  assert.match(pdp, /shadow-\[0_16px_45px_-20px_rgba\(49,46,129,0\.55\)\]/);
+  // Phase A: no page wash on the PDP root either — the backdrop is the page.
+  assert.doesNotMatch(pdp, /min-h-screen bg-white/);
+  assert.doesNotMatch(pdp, /data-pdp-root className="[^"]*bg-gradient-to-b from-indigo-50/);
+  assert.doesNotMatch(pdp, /shadow-\[0_16px_45px_-20px_rgba\(49,46,129,0\.55\)\]/, "no page-assuming drop shadow on glass");
 });

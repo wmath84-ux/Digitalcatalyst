@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { openApp } from "@/utils/pwaInstall";
 import BrandMark from "@/components/BrandMark";
 import { useBranding } from "@/context/BrandingContext";
+import { GlassSurface } from "@/components/ui/glass";
 
 export default function Header() {
   const { appName, tagline } = useBranding();
@@ -19,26 +20,30 @@ export default function Header() {
           tablet-landscape no longer stretch the brand and the button to
           opposite screen edges. Below 1280px the container is full width,
           so mobile and small tablets render exactly as before. */}
-      <div className="glass-panel w-full rounded-b-2xl border-x-0 border-t-0 px-4 py-3 sm:px-6">
+      {/* Wave 12: the strip is the pack GlassSurface (landing.css `.glass-panel`
+          paint retired); the wrapper only clips the bottom corners. */}
+      <div className="w-full overflow-hidden rounded-b-2xl">
+      <GlassSurface radius={0} className="w-full text-white" contentClassName="px-4 py-3 sm:px-6">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3">
         <a href="#/landing" className="flex items-center gap-2 shrink-0">
-          <BrandMark className="h-9 w-9 rounded-xl shadow-lg shadow-fuchsia-500/30" fallbackLetter />
+          <BrandMark className="h-9 w-9 rounded-xl" fallbackLetter />
           <span className="hidden text-lg font-bold tracking-tight text-white sm:block">
             {appName}
-            {tagline ? <span className="text-slate-400 font-medium"> | {tagline}</span> : null}
+            {tagline ? <span className="text-white/55 font-medium"> | {tagline}</span> : null}
           </span>
         </a>
 
         <button
           type="button"
           onClick={openApp}
-          className="pulse-glow flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 px-3 py-2 text-xs font-bold text-white shadow-lg shadow-fuchsia-500/30 transition hover:brightness-110 sm:px-4 sm:text-sm"
+          className="flex items-center gap-2 rounded-full bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-indigo-500 sm:px-4 sm:text-sm"
         >
           <span aria-hidden>🚀</span>
           <span className="hidden sm:inline">Open App</span>
           <span className="sm:hidden">Open</span>
         </button>
         </div>
+      </GlassSurface>
       </div>
     </motion.header>
   );

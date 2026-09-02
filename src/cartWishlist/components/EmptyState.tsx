@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { GlassSurface } from "../../components/ui/glass";
 
 interface EmptyStateProps {
   icon: ReactNode;
@@ -15,32 +16,27 @@ export default function EmptyState({
   subtitle,
   actionLabel,
   onAction,
-  accent = "from-violet-500 to-indigo-600",
+  accent = "bg-indigo-600",
 }: EmptyStateProps) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-5 py-10 text-center">
-      <div className="dc-glass flex w-full max-w-[280px] flex-col items-center rounded-[2rem] px-6 py-10 shadow-[0_20px_48px_-28px_rgba(79,70,229,0.45)]">
+      <GlassSurface radius={32} className="w-full max-w-[280px] text-white" contentClassName="flex flex-col items-center px-6 py-10">
       <div className="relative mb-6">
-        <div
-          className={`absolute inset-0 -z-10 scale-150 rounded-full bg-gradient-to-br ${accent} opacity-10 blur-2xl`}
-        />
-        <div
-          className={`flex h-28 w-28 items-center justify-center rounded-[2rem] bg-gradient-to-br ${accent} shadow-xl shadow-indigo-200/60`}
-        >
+        <div className={`flex h-28 w-28 items-center justify-center rounded-[2rem] ${accent}`}>
           <div className="text-white">{icon}</div>
         </div>
       </div>
-      <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-      <p className="mt-2 max-w-[240px] text-sm leading-relaxed text-slate-500">
+      <h2 className="text-xl font-bold text-white">{title}</h2>
+      <p className="mt-2 max-w-[240px] text-sm leading-relaxed text-white/55">
         {subtitle}
       </p>
       <button
         onClick={onAction}
-        className={`mt-8 w-full max-w-[220px] rounded-2xl bg-gradient-to-r ${accent} px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-300/50 transition active:scale-95`}
+        className={`mt-8 w-full max-w-[220px] rounded-full ${accent} px-6 py-3.5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95`}
       >
         {actionLabel}
       </button>
-      </div>
+      </GlassSurface>
     </div>
   );
 }

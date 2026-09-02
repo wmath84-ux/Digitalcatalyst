@@ -430,7 +430,7 @@ export default function GlassPreviewPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <GlassSelect value={commerceSort} onValueChange={setCommerceSort}>
                   <GlassSelectTrigger aria-label="Sort" className="dc-glass-select h-9 w-auto min-w-[11rem] text-xs font-bold" />
-                  <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Sort options">
+                  <GlassSelectContent className="dc-glass-select-pop" aria-label="Sort options">
                     {["recommended", "price-low", "top-rated"].map((id) => (
                       <GlassSelectItem key={id} value={id}>{id}</GlassSelectItem>
                     ))}
@@ -606,7 +606,7 @@ export default function GlassPreviewPage() {
           <Row label="listbox">
             <GlassSelect value={sortDemo} onValueChange={setSortDemo}>
               <GlassSelectTrigger aria-label="Sort results" className="dc-glass-select h-9 min-w-[11rem] text-xs font-bold" />
-              <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Sort options">
+              <GlassSelectContent className="dc-glass-select-pop" aria-label="Sort options">
                 {["recommended", "newest", "price-low", "rating"].map((v) => (
                   <GlassSelectItem key={v} value={v}>{v}</GlassSelectItem>
                 ))}

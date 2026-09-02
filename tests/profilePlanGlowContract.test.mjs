@@ -47,16 +47,16 @@ test("profile page is clean: no legacy orbs or animated gradients", () => {
   assert.doesNotMatch(styles, /conic-gradient\(/);
 });
 
-test("profile reuses the store's brand gradient for actions and accents", () => {
-  // The Store's CTA gradient (indigo → violet → fuchsia) is the only
-  // gradient on the redesigned profile — buttons, progress and small icon
-  // chips carry it, exactly like the Store page's Add-to-Cart button.
-  assert.match(profilePage, /from-indigo-600 via-violet-600 to-fuchsia-600/);
+test("profile actions and cards are the pack components, not the old brand gradient (Phase A / A3)", () => {
+  assert.doesNotMatch(profilePage, /from-indigo-600 via-violet-600 to-fuchsia-600/);
+  assert.match(profilePage, /<GlassCard data-profile-hero/);
+  assert.match(profilePage, /<GlassButton variant="capsule"/);
 });
 
-test("profile page background is a clean static wash, not a glow field", () => {
-  // The page root now uses a simple two-stop indigo wash (the same family
-  // as the Store page background) instead of layered radial glows.
-  assert.match(styles, /\[data-profile-page\]\s*\{/);
-  assert.match(styles, /background-image: linear-gradient\(180deg, #eef2ff 0%, #f8fafc 55%, #ffffff 100%\);/);
+test("profile page paints no background of its own (Phase A)", () => {
+  // Phase A (2026-09-02): the profile root is transparent — the single fixed
+  // Black Ice backdrop is the page. No wash, no glow field, no gradient.
+  assert.match(styles, /\[data-profile-page\]\s*\{[^}]*background:\s*transparent/);
+  assert.doesNotMatch(styles, /\[data-profile-page\]\s*\{[^}]*linear-gradient\(180deg, #eef2ff/);
+  assert.doesNotMatch(profilePage, /from-indigo-50 via-slate-50 to-white/);
 });

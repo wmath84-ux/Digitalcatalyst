@@ -22,6 +22,9 @@
 //      surface for every kind.
 
 import { GlassSelect, GlassSelectContent, GlassSelectItem, GlassSelectTrigger } from "../../components/ui/glass-select";
+import { GlassSurface } from "../../components/ui/glass";
+import { GlassButton } from "../../components/ui/glass-button";
+import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, Clock, Repeat, X } from "lucide-react";
@@ -100,7 +103,7 @@ function FieldSelect({
         aria-label={label}
         className={`dc-glass-select mt-1 h-9 w-full text-sm ${className ?? ""}`}
       />
-      <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label={label}>
+      <GlassSelectContent className="dc-glass-select-pop" aria-label={label}>
         {options.map((option) => (
           <GlassSelectItem key={option.value} value={option.value}>
             {option.label}
@@ -211,7 +214,7 @@ export function ActivityEditor({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4"
           role="dialog"
           aria-modal="true"
           data-activity-editor
@@ -223,27 +226,29 @@ export function ActivityEditor({
             initial={{ scale: 0.96, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.96, opacity: 0, y: 20 }}
-            className="relative flex max-h-[88vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl shadow-slate-900/20 dark:border-slate-700 dark:bg-slate-900"
+            className="relative w-full max-w-[640px]"
           >
+          {/* Wave 13: the editor is the pack GlassSurface (Dialog values:
+              tint 0.5, radius 24) — no white panel, no header gradient. */}
+          <GlassSurface radius={24} className="text-white" contentClassName="flex max-h-[88vh] flex-col overflow-hidden p-0">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white px-5 py-3 dark:border-slate-800 dark:from-slate-900 dark:to-slate-800">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
               <div>
-                <h3 className="text-base font-black tracking-tight text-slate-900 dark:text-slate-100">
+                <h3 className="text-base font-black tracking-tight text-white">
                   {mode === "create" ? "Create" : "Edit"} activity
                 </h3>
-                <p className="mt-0.5 text-xs font-medium text-slate-500">
+                <p className="mt-0.5 text-xs font-medium text-white/55">
                   {mode === "create" ? "Add a new task, reminder, schedule, note, or test." : "Update the activity details and schedule."}
                 </p>
               </div>
-              <button
-                type="button"
+              <GlassButton
                 onClick={onClose}
                 disabled={submitting}
                 aria-label="Close"
-                className="grid h-9 w-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 disabled:opacity-40"
+                className="disabled:opacity-40 [&_.size-12]:size-9"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </GlassButton>
             </div>
 
             {/* Body */}
@@ -251,67 +256,64 @@ export function ActivityEditor({
               {/* Kind tabs */}
               {mode === "create" ? (
                 <div className="mb-4 flex flex-wrap gap-1.5">
+                  <GlassToggleGroup className="dc-segment" value={kind} onValueChange={(next) => setKind(next as FlowPathActivityKind)} aria-label="Activity kind">
                   {KIND_TABS.map((tab) => (
-                    <button
+                    <GlassToggleItem
                       key={tab.key}
-                      type="button"
-                      onClick={() => setKind(tab.key)}
+                      value={tab.key}
                       data-kind-tab={tab.key}
                       data-kind-active={kind === tab.key ? "true" : "false"}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
-                        kind === tab.key
-                          ? "border-indigo-500 bg-indigo-600 text-white shadow-sm"
-                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                      }`}
+                      className="px-3 py-1.5 text-xs font-bold"
                     >
                       {tab.label}
-                    </button>
+                    </GlassToggleItem>
                   ))}
+                  </GlassToggleGroup>
                 </div>
               ) : null}
 
               {/* Title + description */}
               <div className="space-y-3">
                 <label className="block">
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Title</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-white/55">Title</span>
                   <input
                     type="text"
                     value={form.title || ""}
                     onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                     placeholder={`${FLOW_PATH_KIND_META[kind].label} title`}
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+                    className="dc-field mt-1 w-full rounded-full border px-3 py-2 text-sm text-white outline-none transition"
                     data-field="title"
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Description (optional)</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-white/55">Description (optional)</span>
                   <textarea
                     value={form.description || ""}
                     onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                     rows={2}
                     placeholder="Add notes, links or extra context."
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+                    className="dc-field mt-1 w-full rounded-xl border px-3 py-2 text-sm text-white outline-none transition"
                     data-field="description"
                   />
                 </label>
               </div>
 
               {/* Kind-specific fields */}
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+              <div className="mt-4 rounded-xl border border-white/10 p-3">
                 {kind === "task" ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <label className="block">
-                      <span className="text-[11px] font-semibold text-slate-600">Subject</span>
+                      <span className="text-[11px] font-semibold text-white/75">Subject</span>
                       <input
                         type="text"
                         value={form.taskSubject || ""}
                         onChange={(e) => setForm((f) => ({ ...f, taskSubject: e.target.value }))}
                         placeholder="Mathematics"
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                        className="dc-field mt-1 w-full rounded-full border px-3 py-1.5 text-sm text-white outline-none"
                       />
                     </label>
                     <label className="block">
-                      <span className="text-[11px] font-semibold text-slate-600">Priority</span>
+                      <span className="text-[11px] font-semibold text-white/75">Priority</span>
                       <FieldSelect
                         label="Priority"
                         value={form.taskPriority || "medium"}
@@ -324,7 +326,7 @@ export function ActivityEditor({
                       />
                     </label>
                     <label className="block">
-                      <span className="text-[11px] font-semibold text-slate-600">Status</span>
+                      <span className="text-[11px] font-semibold text-white/75">Status</span>
                       <FieldSelect
                         label="Status"
                         value={form.taskStatus || "pending"}
@@ -341,12 +343,12 @@ export function ActivityEditor({
 
                 {kind === "reminder" ? (
                   <label className="block">
-                    <span className="text-[11px] font-semibold text-slate-600">Reminder time (HH:MM)</span>
+                    <span className="text-[11px] font-semibold text-white/75">Reminder time (HH:MM)</span>
                     <input
                       type="time"
                       value={form.reminderTime || ""}
                       onChange={(e) => setForm((f) => ({ ...f, reminderTime: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                      className="dc-field mt-1 w-full rounded-full border px-3 py-1.5 text-sm text-white outline-none"
                     />
                   </label>
                 ) : null}
@@ -354,25 +356,25 @@ export function ActivityEditor({
                 {kind === "schedule" ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <label className="block">
-                      <span className="text-[11px] font-semibold text-slate-600">Start (HH:MM)</span>
+                      <span className="text-[11px] font-semibold text-white/75">Start (HH:MM)</span>
                       <input
                         type="time"
                         value={form.scheduleStartTime || ""}
                         onChange={(e) => setForm((f) => ({ ...f, scheduleStartTime: e.target.value }))}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                        className="dc-field mt-1 w-full rounded-full border px-3 py-1.5 text-sm text-white outline-none"
                       />
                     </label>
                     <label className="block">
-                      <span className="text-[11px] font-semibold text-slate-600">End (HH:MM)</span>
+                      <span className="text-[11px] font-semibold text-white/75">End (HH:MM)</span>
                       <input
                         type="time"
                         value={form.scheduleEndTime || ""}
                         onChange={(e) => setForm((f) => ({ ...f, scheduleEndTime: e.target.value }))}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                        className="dc-field mt-1 w-full rounded-full border px-3 py-1.5 text-sm text-white outline-none"
                       />
                     </label>
                     <label className="block">
-                      <span className="text-[11px] font-semibold text-slate-600">Type</span>
+                      <span className="text-[11px] font-semibold text-white/75">Type</span>
                       <FieldSelect
                         label="Schedule type"
                         value={form.scheduleType || "personal"}
@@ -392,7 +394,7 @@ export function ActivityEditor({
                 {kind === "note" ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <label className="block">
-                      <span className="text-[11px] font-semibold text-slate-600">Color</span>
+                      <span className="text-[11px] font-semibold text-white/75">Color</span>
                       <FieldSelect
                         label="Note colour"
                         value={form.noteColor || "amber"}
@@ -407,18 +409,18 @@ export function ActivityEditor({
                   <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                       <label className="block">
-                        <span className="text-[11px] font-semibold text-slate-600">Questions</span>
+                        <span className="text-[11px] font-semibold text-white/75">Questions</span>
                         <input
                           type="number"
                           min={1}
                           max={100}
                           value={form.testConfig?.totalQuestions || 10}
                           onChange={(e) => setForm((f) => ({ ...f, testConfig: { ...(f.testConfig || DEFAULT_FORM_STATE.testConfig!), totalQuestions: Number(e.target.value || 0) } }))}
-                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                          className="dc-field mt-1 w-full rounded-full border px-3 py-1.5 text-sm text-white outline-none"
                         />
                       </label>
                       <label className="block">
-                        <span className="text-[11px] font-semibold text-slate-600">Difficulty</span>
+                        <span className="text-[11px] font-semibold text-white/75">Difficulty</span>
                         <FieldSelect
                           label="Difficulty"
                           value={form.testConfig?.difficulty || "medium"}
@@ -432,7 +434,7 @@ export function ActivityEditor({
                         />
                       </label>
                       <label className="block">
-                        <span className="text-[11px] font-semibold text-slate-600">Mode</span>
+                        <span className="text-[11px] font-semibold text-white/75">Mode</span>
                         <FieldSelect
                           label="Question mode"
                           value={form.testConfig?.questionMode || "mixed"}
@@ -445,18 +447,18 @@ export function ActivityEditor({
                         />
                       </label>
                       <label className="block">
-                        <span className="text-[11px] font-semibold text-slate-600">Time (min)</span>
+                        <span className="text-[11px] font-semibold text-white/75">Time (min)</span>
                         <input
                           type="number"
                           min={1}
                           max={240}
                           value={form.testConfig?.estimatedMinutes || 15}
                           onChange={(e) => setForm((f) => ({ ...f, testConfig: { ...(f.testConfig || DEFAULT_FORM_STATE.testConfig!), estimatedMinutes: Number(e.target.value || 0) } }))}
-                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                          className="dc-field mt-1 w-full rounded-full border px-3 py-1.5 text-sm text-white outline-none"
                         />
                       </label>
                     </div>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-white/55">
                       The test bank will draft questions using the curriculum planner. Difficulty and mode apply to every question; the engine picks the actual topic mix from the user's My Day subjects.
                     </p>
                   </div>
@@ -464,55 +466,52 @@ export function ActivityEditor({
               </div>
 
               {/* Schedule picker */}
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Schedule</p>
+              <div className="mt-4 rounded-xl border border-white/10 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-white/55">Schedule</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
+                  <GlassToggleGroup className="dc-segment" value={scheduleMode} onValueChange={(next) => setScheduleMode(next as "immediate" | "datetime" | "recurring")} aria-label="Schedule mode">
                   {[
                     { key: "immediate", label: "Immediate", icon: Clock },
                     { key: "datetime", label: "At date & time", icon: Calendar },
                     { key: "recurring", label: "Recurring", icon: Repeat },
                   ].map((opt) => {
                     const Icon = opt.icon;
-                    const active = scheduleMode === opt.key;
                     return (
-                      <button
+                      <GlassToggleItem
                         key={opt.key}
-                        type="button"
-                        onClick={() => setScheduleMode(opt.key as "immediate" | "datetime" | "recurring")}
+                        value={opt.key}
                         data-schedule-mode={opt.key}
-                        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                          active ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                        }`}
+                        className="px-3 py-1.5 text-xs font-semibold"
                       >
-                        <Icon className="h-3.5 w-3.5" />
-                        {opt.label}
-                      </button>
+                        <span className="flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" />{opt.label}</span>
+                      </GlassToggleItem>
                     );
                   })}
+                  </GlassToggleGroup>
                 </div>
                 {scheduleMode !== "immediate" ? (
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <label className="block">
-                      <span className="text-[11px] font-semibold text-slate-600">Date</span>
+                      <span className="text-[11px] font-semibold text-white/75">Date</span>
                       <input
                         type="date"
                         value={dateStr}
                         onChange={(e) => setDateStr(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                        className="dc-field mt-1 w-full rounded-full border px-3 py-1.5 text-sm text-white outline-none"
                       />
                     </label>
                     <label className="block">
-                      <span className="text-[11px] font-semibold text-slate-600">Time</span>
+                      <span className="text-[11px] font-semibold text-white/75">Time</span>
                       <input
                         type="time"
                         value={timeStr}
                         onChange={(e) => setTimeStr(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+                        className="dc-field mt-1 w-full rounded-full border px-3 py-1.5 text-sm text-white outline-none"
                       />
                     </label>
                     {scheduleMode === "recurring" ? (
                       <label className="col-span-2 block">
-                        <span className="text-[11px] font-semibold text-slate-600">Repeat</span>
+                        <span className="text-[11px] font-semibold text-white/75">Repeat</span>
                         <FieldSelect
                           label="Repeats"
                           value={form.recurrence?.freq || "daily"}
@@ -531,32 +530,33 @@ export function ActivityEditor({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/60 px-5 py-3">
-              <span className="text-[11px] text-slate-500">
+            <div className="flex items-center justify-between gap-2 border-t border-white/10 px-5 py-3">
+              <span className="text-[11px] text-white/55">
                 {computedScheduledFor
                   ? `Will fire on ${new Date(computedScheduledFor).toLocaleString()}`
                   : "Fires immediately on save."}
               </span>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
+                <GlassButton
+                  variant="capsule"
                   onClick={onClose}
                   disabled={submitting}
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-40"
+                  className="disabled:opacity-40 [&>span>div]:h-10 [&>span>div]:px-3 [&>span>div]:text-sm [&>span>div]:font-semibold"
                 >
                   Cancel
-                </button>
+                </GlassButton>
                 <button
                   type="button"
                   onClick={handleSubmit}
                   disabled={!isValid || submitting}
                   data-submit-activity
-                  className="h-10 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-40"
+                  className="h-10 rounded-full bg-indigo-600 px-4 text-sm font-black text-white transition hover:bg-indigo-500 disabled:opacity-40"
                 >
                   {submitting ? "Saving…" : mode === "create" ? `Create ${FLOW_PATH_KIND_META[kind].label}` : "Save changes"}
                 </button>
               </div>
             </div>
+          </GlassSurface>
           </motion.div>
         </motion.div>
       ) : null}

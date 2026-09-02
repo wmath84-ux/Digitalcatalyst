@@ -37,6 +37,9 @@
 
 import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
+import { GlassButton } from "../components/ui/glass-button";
+import { GlassCard } from "../components/ui/glass-card";
+import { GlassSurface } from "../components/ui/glass";
 import type { CoursePlayerNote } from "../types/course";
 import RichTextEditor from "./RichTextEditor";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
@@ -239,19 +242,19 @@ export default function NotesPanel({
               type="button"
               onClick={editing ? submitEdit : submitAdd}
               disabled={empty}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-violet-500 py-2 text-[11px] font-black text-white disabled:opacity-40"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-indigo-600 py-2 text-[11px] font-black text-white transition hover:bg-indigo-500 disabled:opacity-40"
               {...(editing ? { "data-course-note-edit-save": true } : { "data-course-notes-save": true })}
             >
               <Check size={13} /> Save
             </button>
-            <button
-              type="button"
+            <GlassButton
+              variant="capsule"
               onClick={cancel}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[var(--course-soft-hover)] py-2 text-[11px] font-black text-[var(--course-muted)]"
+              className="flex-1 text-[11px] font-black [&>span>div]:h-9 [&>span>div]:w-full [&>span>div]:px-4"
               {...(editing ? { "data-course-note-edit-cancel": true } : { "data-course-notes-cancel": true })}
             >
-              <X size={13} /> Cancel
-            </button>
+              <span className="flex items-center justify-center gap-1.5"><X size={13} /> Cancel</span>
+            </GlassButton>
           </div>
         </div>
       </div>
@@ -268,20 +271,21 @@ export default function NotesPanel({
           underneath and shown again the moment the note is reopened. */}
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {notes.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-[var(--course-border)] bg-[var(--course-soft)] p-4 text-center text-xs font-semibold text-[var(--course-muted)]">
+          <GlassSurface radius={16} className="border border-dashed border-[var(--course-border)] text-white" contentClassName="p-4 text-center text-xs font-semibold text-[var(--course-muted)]">
+            {/* The empty pill is the pack surface — no bg-[var(--course-soft)] plate any more. */}
             No notes yet — tap + to add one.
-          </p>
+          </GlassSurface>
         ) : (
           <ul className="grid grid-cols-2 gap-3.5 sm:grid-cols-3" data-course-notes-list data-course-notes-grid="true">
             {notes.map((note) => {
               const preview = notePreview(note);
               return (
-                <li
-                  key={note.id}
-                  className="relative aspect-square overflow-visible rounded-2xl p-2.5"
-                  data-course-note
-                  data-note-id={note.id}
-                >
+                <li key={note.id} className="relative aspect-square">
+                  <GlassCard
+                    className="h-full w-full overflow-visible [&>div:last-child]:h-full [&>div:last-child]:p-2.5"
+                    data-course-note
+                    data-note-id={note.id}
+                  >
                   <div className="flex h-full flex-col overflow-hidden">
                     <div
                       className="course-note-card-preview min-h-0 w-full flex-1"
@@ -290,26 +294,25 @@ export default function NotesPanel({
                       dangerouslySetInnerHTML={{ __html: noteCardHtml(note) }}
                     />
                     <div className="mt-1.5 flex shrink-0 items-center justify-end gap-1.5">
-                      <button
-                        type="button"
+                      <GlassButton
                         onClick={() => startEdit(note)}
-                        className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-md shadow-blue-200/50 transition hover:brightness-110"
+                        className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-sky-300"
                         aria-label="Edit note"
                         data-course-note-edit
                       >
                         <PremiumEditIcon />
-                      </button>
-                      <button
-                        type="button"
+                      </GlassButton>
+                      <GlassButton
                         onClick={() => setPendingDeleteId(note.id)}
-                        className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-rose-400 to-rose-600 text-white shadow-md shadow-rose-200/50 transition hover:brightness-110"
+                        className="shrink-0 [&_.size-12]:size-7 [&_svg]:text-rose-300"
                         aria-label="Delete note"
                         data-course-note-delete
                       >
                         <PremiumDeleteIcon />
-                      </button>
+                      </GlassButton>
                     </div>
                   </div>
+                  </GlassCard>
                 </li>
               );
             })}

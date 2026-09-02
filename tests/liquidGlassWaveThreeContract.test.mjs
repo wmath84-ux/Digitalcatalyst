@@ -55,8 +55,8 @@ test("every Wave 3 registry item is vendored with its provenance banner", () => 
     assert.match(source, /^"use client";$/m, `${item} keeps the registry's client directive`);
   }
 
-  // 22 items in the pack: 18 vendored + `glass-toast` hand-ported, 3 left
-  // (switch, slider, popover) and `glass-dock` (the repo's own dock stays).
+  // 22 items in the pack: all vendored (Wave 14 replaced the hand-ported
+  // `glass-toast` with the registry copy); `glass-dock` stays the repo's own.
   const checker = read("scripts/verify-glass-registry.mjs");
   const ported = checker.match(/const PORTED = new Set\(\[([^\]]*)\]\)/)[1];
   for (const item of VENDORED_WAVE3) {
@@ -220,13 +220,11 @@ test("the dev preview exercises every Wave 3 control", () => {
   assert.match(preview, /press ⌘K \/ Ctrl\+K/);
 });
 
-test("the deferred commerce files are untouched, and said so", () => {
-  // Home's own header/cards carry their own collapse + branding contracts and
-  // land in Wave 5; admin is excluded from the rollout entirely.
-  for (const file of ["src/home/components/ProductCard.tsx", "src/home/components/Header.tsx", "src/home/components/Reviews.tsx"]) {
-    const source = read(file);
-    assert.doesNotMatch(source, /glass-(card|toggle-group|select|command|accordion)/, `${file} is deliberately not converted yet`);
-  }
+test("the deferred commerce files landed in Wave 12; admin stays out", () => {
+  // Home's own header/cards carried their own collapse + branding contracts and
+  // were converted in Phase B · Wave 12; admin is excluded from the rollout entirely.
+  assert.match(read("src/home/components/Reviews.tsx"), /from "\.\.\/\.\.\/components\/ui\/glass-card"/);
+  assert.match(read("src/home/components/ProductCard.tsx"), /from "\.\.\/\.\.\/components\/ui\/glass-button"/);
   const admin = fs.readdirSync("src/components/admin").filter((f) => f.endsWith(".tsx"));
   for (const file of admin) {
     assert.doesNotMatch(read(`src/components/admin/${file}`), /@\/components\/ui\/glass-/, "admin stays out of the pack");

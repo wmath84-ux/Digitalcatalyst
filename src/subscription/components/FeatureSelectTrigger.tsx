@@ -6,6 +6,7 @@
 
 import { ChevronRight, Sparkles } from "lucide-react";
 import type { SubscriptionFeatureDoc } from "../utils/subscriptionCatalog";
+import { GlassButton } from "../../components/ui/glass-button";
 
 type FeatureWithResolvedPrice = SubscriptionFeatureDoc & {
   resolvedPricePaise?: number;
@@ -38,34 +39,36 @@ export default function FeatureSelectTrigger({ features, selectedIds, onOpen, pu
   );
   return (
     <div className="px-5 pt-3">
-      <button
+      <GlassButton
+        variant="capsule"
         type="button"
         onClick={onOpen}
         data-subscription-features-trigger
-        className="flex w-full items-center justify-between rounded-2xl border border-slate-100 bg-white p-4 shadow-sm shadow-slate-200/60 active:scale-[0.99] transition-transform"
+        className="w-full text-left [&>span>div]:h-auto [&>span>div]:w-full [&>span>div]:rounded-2xl [&>span>div]:p-4 [&>span>div>span]:w-full"
       >
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50">
-            <Sparkles className="h-5 w-5 text-amber-500" />
-          </div>
-          <div className="text-left">
-            <p className="text-sm font-bold text-slate-800">Select features</p>
+        <span className="flex w-full items-center justify-between">
+        <span className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/15">
+            <Sparkles className="h-5 w-5 text-amber-300" />
+          </span>
+          <span className="block text-left">
+            <span className="block text-sm font-bold text-white/85">Select features</span>
             {selectedFeatures.length === 0 ? (
-              <p className="text-xs text-slate-400">Add premium features to your plan</p>
+              <span className="block text-xs font-normal text-white/55">Add premium features to your plan</span>
             ) : (
-              <p className="text-xs font-medium text-amber-600">
+              <span className="block text-xs font-medium text-amber-300">
                 {addableFeatures.length} feature
                 {addableFeatures.length !== 1 ? "s" : ""} · +{formatRupee(totalPaise)}
                 {purchasedCount > 0 ? (
-                  <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                  <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-200">
                     {purchasedCount} purchased
                   </span>
                 ) : null}
-              </p>
+              </span>
             )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+          </span>
+        </span>
+        <span className="flex items-center gap-2">
           {purchasedCount > 0 ? (
             <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-emerald-600 px-2 text-[11px] font-bold text-white">
               {purchasedCount}
@@ -76,9 +79,10 @@ export default function FeatureSelectTrigger({ features, selectedIds, onOpen, pu
               {addableFeatures.length}
             </span>
           ) : null}
-          <ChevronRight className="h-4.5 w-4.5 text-slate-300" />
-        </div>
-      </button>
+          <ChevronRight className="h-4.5 w-4.5 text-white/40" />
+        </span>
+        </span>
+      </GlassButton>
     </div>
   );
 }

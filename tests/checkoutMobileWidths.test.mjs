@@ -72,12 +72,17 @@ for (const width of widths) {
 // Review step: per-section structure
 // ---------------------------------------------------------------------------
 
-test("Checkout Review uses p-3 sm:p-4 so cards keep 12px breathing room on 320px", () => {
-  assert.match(reviewSource, /p-3[^"]*sm:p-4/);
+// Phase A (2026-09-02): review cards are the pack's <GlassCard> (its own p-5
+// content padding, radius 20). 320 - 2*16 gutter - 2*20 padding = 248px of
+// content, which is what the min-w-0 / line-clamp rules below are sized for.
+test("Checkout Review sections are GlassCards (pack padding, no hand-painted card)", () => {
+  assert.match(reviewSource, /<GlassCard data-checkout-line-items>/);
+  assert.match(reviewSource, /<GlassCard data-checkout-price-section>/);
+  assert.doesNotMatch(reviewSource, /rounded-3xl border border-slate-200 bg-white/);
 });
 
-test("Checkout Review uses p-3 sm:p-4 for the price section so the total doesn't get clipped on 320px", () => {
-  assert.match(reviewSource, /p-3[^"]*sm:p-4/);
+test("Checkout Review price section is a GlassCard so the total is never clipped on 320px", () => {
+  assert.match(reviewSource, /<GlassCard data-checkout-price-section>[\s\S]*?Final total[\s\S]*?<\/GlassCard>/);
 });
 
 test("Checkout Review uses min-w-0 + line-clamp on the line-item title so 320px doesn't overflow", () => {
@@ -97,10 +102,10 @@ test("Checkout Review uses p-1 text-center helper text for safe 320px wrapping",
 // Success step: per-section structure
 // ---------------------------------------------------------------------------
 
-test("Checkout Success uses p-3 sm:p-4 on every section card", () => {
-  // At least 4 occurrences of p-3 ... sm:p-4
-  const matches = successSource.match(/p-3[^"]*sm:p-4/g) || [];
-  assert.ok(matches.length >= 3, `expected ≥ 3 p-3 sm:p-4 sections, got ${matches.length}`);
+test("Checkout Success renders every section as a GlassCard (Phase A)", () => {
+  const matches = successSource.match(/<GlassCard/g) || [];
+  assert.ok(matches.length >= 3, `expected ≥ 3 GlassCard sections, got ${matches.length}`);
+  assert.doesNotMatch(successSource, /rounded-3xl border border-slate-200 bg-white/);
 });
 
 test("Checkout Success uses truncate on the receipt row values to avoid horizontal scroll", () => {

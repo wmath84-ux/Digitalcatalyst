@@ -98,7 +98,7 @@ test("FlowPath's inline toast became the shared glass toast host", () => {
   assert.match(v, /from "\.\.\/ui\/glass-toast"/);
   // one host for every route, mounted next to the palette in the same provider tree
   const main = read("src/main.tsx");
-  assert.match(main, /<ToastViewport \/>/);
+  assert.match(main, /<GlassToaster position="bottom-right" \/>/);
   assert.match(main, /<GlassCommandPalette \/>/);
 });
 
@@ -122,7 +122,10 @@ test("revision and My Day pickers use the pack's selectable components", () => {
 
   const notes = read("src/components/myday/QuickNotes.tsx");
   assert.match(notes, /from "\.\.\/ui\/glass-tooltip"/);
-  assert.match(notes, /<TooltipContent side="top" tint=\{0\.85\}>/);
+  // Phase A5: the tooltip runs on the pack's own default tint (0.55) — no
+  // app-side 0.85 white wash, and the label inherits the pack's white ink.
+  assert.match(notes, /<TooltipContent side="top">/);
+  assert.doesNotMatch(notes, /<TooltipContent[^>]*tint=/, "tooltip must use the pack's own tint");
   assert.doesNotMatch(notes, /title="[^"]*"/, "a native title bubble is still shipping");
   // the pinned editor hooks survive
   assert.match(notes, /data-myday-note-editor-cancel/);
@@ -146,16 +149,15 @@ test("Wave 4 is exercised in the glass preview page", () => {
 
 /* ── deliberate non-changes, pinned so nobody "fixes" them ───────────────── */
 
-test("revision cards keep the stable non-blurred surface on purpose", () => {
-  // tests/revisionProgressStableCardsContract.test.mjs asserts that Card renders
-  // `.rev-card` and *not* a blurred surface: a study app scrolls long cards all
-  // day, and the repo chose a stable painted surface for that. Wave 4 respects
-  // it — the learning surfaces got pack controls, not a glass backdrop.
+test("revision cards ARE the pack surface (Phase A4)", () => {
+  // Phase A4 reversed the earlier "stable painted surface" decision on the
+  // owner's direction: every element is a websiteglass component. `Card` renders
+  // GlassSurface at Glass Card's values; `.rev-card` stays as a sizing hook only.
   const ui = read("src/revision/components/ui.tsx");
   const cardFn = ui.slice(ui.indexOf("export function Card"), ui.indexOf("export function PrimaryButton"));
   assert.ok(cardFn.length > 40, "Card/PrimaryButton order changed — update this contract");
-  assert.match(cardFn, /rev-card rounded-3xl p-4/);
-  assert.doesNotMatch(cardFn, /dc-glass|GlassSurface|GlassCard/);
+  assert.match(cardFn, /<GlassSurface tint=\{0\.4\} radius=\{20\} className=\{`rev-card p-4 text-white/);
+  assert.doesNotMatch(cardFn, /dc-glass/);
 });
 
 test("My Day's Create menu keeps its pinned drop-up instead of the pack popover", () => {

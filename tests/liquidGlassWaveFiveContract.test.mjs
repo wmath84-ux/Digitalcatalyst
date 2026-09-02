@@ -74,15 +74,16 @@ test("profile + settings preference rows use the registry switch", () => {
   // brand identity lives in CSS, not in a forked component
   const css = read("src/glass.css");
   assert.match(css, /\.dc-switch\[aria-checked="true"\] > span:first-child/);
-  assert.match(css, /linear-gradient\(90deg, #4f46e5, #7c3aed\)/);
+  assert.match(css, /\.dc-switch\[aria-checked="true"\] > span:first-child \{\s*background: #4f46e5;/, "Phase A: solid accent, no gradient");
 });
 
 test("profile dialogs and fields take the pack surface and field ink", () => {
   const s = read("src/profile/ProfileLayout.tsx");
   const modal = s.slice(s.indexOf("export function BaseModal"), s.indexOf("export function PreferenceRow"));
-  assert.match(modal, /<GlassSurface/);
-  assert.match(modal, /rounded-t-3xl/);
-  assert.match(modal, /sm:rounded-3xl/);
+  // Phase A / A3: the pack's Dialog (glass-dialog) at its defaults.
+  assert.match(modal, /<Dialog open onOpenChange/);
+  assert.match(modal, /<DialogContent/);
+  assert.match(modal, /<DialogTitle/);
   assert.doesNotMatch(modal, /bg-white p-6/, "the flat card is back");
   // `.dc-field` — the pack's frost on a real form field, because glass-input is a
   // search pill and the profile form needs `required`, `inputMode` and a textarea
@@ -95,7 +96,9 @@ test("profile dialogs and fields take the pack surface and field ink", () => {
 test("the course delete confirmation is a pack surface with every hook", () => {
   const s = read("src/course/ConfirmDeleteDialog.tsx");
   assert.match(s, /<GlassSurface/);
-  assert.match(s, /tint=\{0\.9\}/);
+  // Phase B wave 8: the dialog renders the pack surface at its published
+  // defaults (tint 0.5) — no app-side tint override.
+  assert.doesNotMatch(s, /tint=\{/);
   for (const hook of ["data-course-confirm-dialog", "data-course-confirm-backdrop", "data-course-confirm-card", "data-course-confirm-cancel", "data-course-confirm-delete", "data-course-confirm-detail"]) {
     assert.ok(s.includes(hook), hook);
   }

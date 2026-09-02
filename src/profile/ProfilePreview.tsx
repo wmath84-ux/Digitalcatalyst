@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { GlassCard } from "../components/ui/glass-card";
+import { GlassToggleGroup, GlassToggleItem } from "../components/ui/glass-toggle-group";
 import ProfileLayout, { type MembershipTier } from "./ProfileLayout";
 
 /**
@@ -34,58 +36,53 @@ export default function ProfilePreview() {
 
   // Mock slots to represent the account cards that live in the real app.
   const mockMyDayCard = (
-    <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-[0_14px_40px_-24px_rgba(49,46,129,0.35)] lg:rounded-2xl">
+    <GlassCard>
       <div className="flex items-center gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">☀️</span>
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/30">☀️</span>
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-600">My Day</p>
-          <h3 className="mt-0.5 text-base font-black text-slate-950">3 free creations left today</h3>
-          <p className="mt-0.5 text-xs font-medium text-slate-500">Resets at midnight.</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">My Day</p>
+          <h3 className="mt-0.5 text-base font-black text-white">3 free creations left today</h3>
+          <p className="mt-0.5 text-xs font-medium text-white/55">Resets at midnight.</p>
         </div>
       </div>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full w-1/4 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500" />
+      <div className="mt-4 h-2 overflow-hidden rounded-full border border-white/15">
+        <div className="h-full w-1/4 rounded-full bg-emerald-600" />
       </div>
-    </section>
+    </GlassCard>
   );
 
   const mockAiQuotaCard = subscriber ? (
-    <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-[0_14px_40px_-24px_rgba(49,46,129,0.35)] lg:rounded-2xl">
+    <GlassCard>
       <div className="flex items-center gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-600 ring-1 ring-violet-100">🤖</span>
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30">🤖</span>
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-600">AI quota</p>
-          <h3 className="mt-0.5 text-base font-black text-slate-950">9 AI questions remaining</h3>
-          <p className="mt-0.5 text-xs font-medium text-slate-500">Resets weekly.</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-300">AI quota</p>
+          <h3 className="mt-0.5 text-base font-black text-white">9 AI questions remaining</h3>
+          <p className="mt-0.5 text-xs font-medium text-white/55">Resets weekly.</p>
         </div>
       </div>
-    </section>
+    </GlassCard>
   ) : null;
 
   const tierLabel = tier === "normal" ? "Free learner" : tier === "premium" ? "Premium" : "Premium";
   const planLabel = tier === "normal" ? "Free plan" : "Premium Plan";
 
   return (
-    <div data-profile-page className="min-h-screen bg-gradient-to-b from-indigo-50 via-slate-50 to-white text-slate-900">
+    <div data-profile-page className="min-h-screen text-white">
       {/* Dev toolbar */}
-      <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur">
+      <div className="sticky top-0 z-40 border-b border-white/10 px-4 py-3">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">Dev preview</span>
-            <span className="text-xs font-semibold text-slate-500">Profile layout · no data</span>
+            <span className="rounded-md border border-white/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">Dev preview</span>
+            <span className="text-xs font-semibold text-white/55">Profile layout · no data</span>
           </div>
-          <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1">
+          <GlassToggleGroup className="dc-segment" value={scenario} onValueChange={(next) => setScenario(next as Scenario)} aria-label="Preview scenario">
             {(["free", "premium", "expired"] as Scenario[]).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setScenario(s)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-black capitalize transition ${scenario === s ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-              >
+              <GlassToggleItem key={s} value={s} className="px-3 py-1.5 text-xs font-black capitalize">
                 {s}
-              </button>
+              </GlassToggleItem>
             ))}
-          </div>
+          </GlassToggleGroup>
         </div>
       </div>
 
@@ -110,7 +107,7 @@ export default function ProfilePreview() {
             membershipBadge={subscriber && plan ? (
               <span
                 data-profile-membership-status={active ? "active" : "expired"}
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${active ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "bg-rose-50 text-rose-600 ring-1 ring-rose-200"}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${active ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30" : "bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/30"}`}
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-rose-500"}`} />
                 {active ? "Active" : "Expired"}

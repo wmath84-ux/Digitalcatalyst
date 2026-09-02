@@ -82,7 +82,7 @@ export default function PageTabs({
         // by src/index.css, because which header is on screen depends on the
         // app's tablet / desktop bands (768 / 960 + tablet landscape), not on
         // a Tailwind breakpoint.
-        "dc-page-tabs hidden w-full shrink-0 border-b border-slate-200/70 bg-white/70 backdrop-blur-xl md:block",
+        "dc-page-tabs hidden w-full shrink-0 border-b border-white/10 md:block",
         className,
       )}
     >
@@ -91,10 +91,9 @@ export default function PageTabs({
             indicator springs to the right place on navigation too. */}
         <Tabs value={activeId ?? ""} onValueChange={onSelect}>
           <TabsList
-            tint={0.55}
             role="tablist"
             aria-orientation="horizontal"
-            className="dc-page-tabs-list border border-slate-200/60 bg-white/45 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
+            className="dc-page-tabs-list py-0.5"
           >
             {items.map((item) => (
               <TabsTrigger
@@ -105,8 +104,8 @@ export default function PageTabs({
                 className={cn(
                   "px-3 py-1.5 text-sm font-semibold transition-colors duration-200",
                   item.id === activeId
-                    ? "text-indigo-600"
-                    : "text-slate-500 hover:text-slate-900",
+                    ? "text-white"
+                    : "text-white/55 hover:text-white",
                 )}
               >
                 {item.label}
@@ -120,7 +119,7 @@ export default function PageTabs({
             type="button"
             onClick={onHome}
             title={`Back to ${homeLabel}`}
-            className="ml-auto shrink-0 rounded-xl px-2 py-3 text-sm font-semibold text-slate-400 outline-none transition-colors duration-200 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-300/70"
+            className="ml-auto shrink-0 rounded-xl px-2 py-3 text-sm font-semibold text-white/55 outline-none transition-colors duration-200 hover:text-white focus-visible:ring-2 focus-visible:ring-indigo-300/70"
           >
             {homeLabel}
           </button>

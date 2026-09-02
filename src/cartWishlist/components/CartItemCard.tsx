@@ -2,6 +2,7 @@ import { Trash2 } from "lucide-react";
 import { Product } from "../types";
 import { formatINR } from "../utils/format";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { GlassButton } from "@/components/ui/glass-button";
 
 interface CartItemCardProps {
   product: Product;
@@ -14,14 +15,13 @@ export default function CartItemCard({ product, onRemove, onOpen }: CartItemCard
     /* Wave 3 (commerce): the row is a `glass-card` — the pack's surface already
        paints the specular sheen this file was faking with its own gradient div. */
     <GlassCard
-      tint={0.5}
       contentClassName="flex gap-3 p-2.5"
       className="group relative overflow-hidden"
     >
       <button
         type="button"
         onClick={() => onOpen?.(product.id)}
-        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] bg-slate-100 ring-1 ring-white/60"
+        className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] ring-1 ring-white/10"
         aria-label={`View ${product.title}`}
       >
         <img
@@ -33,31 +33,31 @@ export default function CartItemCard({ product, onRemove, onOpen }: CartItemCard
       <div className="relative flex min-w-0 flex-1 flex-col justify-between py-0.5">
         <div>
           <button type="button" onClick={() => onOpen?.(product.id)} className="text-left">
-            <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-500">
+            <span className="text-[9px] font-semibold uppercase tracking-wide text-indigo-300">
               {product.category}
             </span>
-            <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-slate-900">
+            <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-white">
               {product.title}
             </h3>
-            <p className="text-[11px] text-slate-400">{product.author}</p>
+            <p className="text-[11px] text-white/55">{product.author}</p>
           </button>
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-[14px] font-extrabold text-slate-900">
+            <span className="text-[14px] font-extrabold text-white">
               {formatINR(product.price)}
             </span>
-            <span className="text-[10px] text-slate-400 line-through">
+            <span className="text-[10px] text-white/55 line-through">
               {formatINR(product.originalPrice)}
             </span>
           </div>
-          <button
+          <GlassButton
             onClick={() => onRemove(product.id)}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-rose-50/85 text-rose-500 shadow-md shadow-rose-100/60 backdrop-blur transition active:scale-90"
+            className="[&_.size-12]:size-8 [&_svg]:text-rose-300"
             aria-label="Remove item"
           >
             <Trash2 size={15} />
-          </button>
+          </GlassButton>
         </div>
       </div>
     </GlassCard>

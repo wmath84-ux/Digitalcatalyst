@@ -1,4 +1,9 @@
+import { GlassButton } from "../../components/ui/glass-button";
+import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 import { GlassTile } from "../../components/ui/glass-tile";
+import { GlassSurface } from "../../components/ui/glass";
+import { GlassCheckbox } from "../../components/ui/glass-checkbox";
+import { GlassCard } from "../../components/ui/GlassCard";
 // Student-facing AI test generator.
 //
 // The learner picks Class → Subject → Chapter → Topic from four cascading
@@ -19,7 +24,7 @@ import { GlassTile } from "../../components/ui/glass-tile";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import PageShell from "../components/PageShell";
-import { Card, PrimaryButton } from "../components/ui";
+import { Card, PrimaryButton, SecondaryButton } from "../components/ui";
 import { CheckIcon, ChevronRightIcon, ClockIcon, SparklesIcon } from "../components/icons";
 import { useExitGuard } from "../components/ExitGuardContext";
 import { CURRICULUM, type CurriculumClass } from "../data/curriculum";
@@ -133,35 +138,32 @@ function PickerButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    /* Wave 13: pack GlassTile — `open` is the pack's selected state; a
+       non-empty pick keeps an indigo meaning ring. */
+    <GlassTile
       disabled={disabled}
       onClick={onClick}
-      className={`flex min-h-[54px] flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-1.5 text-center transition ${
-        open
-          ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200"
-          : count > 0
-            ? "border-indigo-300 bg-indigo-50"
-            : "border-slate-300 bg-white"
-      } ${disabled ? "opacity-40" : "active:scale-[0.97]"}`}
+      selected={open}
+      aria-expanded={open}
+      className={`dc-tile aspect-auto min-h-[54px] rounded-xl px-1 py-1.5 text-center [&>span]:flex-col [&>span]:gap-0.5 ${
+        !open && count > 0 ? "ring-1 ring-indigo-400/40" : ""
+      } ${disabled ? "opacity-40" : ""}`}
     >
-      <span className="text-[11px] font-bold text-slate-700">{label}</span>
-      <span className={`text-[10px] font-semibold ${count > 0 ? "text-indigo-700" : "text-slate-500"}`}>
+      <span className="text-[11px] font-bold text-white/85">{label}</span>
+      <span className={`text-[10px] font-semibold ${count > 0 ? "text-indigo-200" : "text-white/55"}`}>
         {count > 0 ? `${count}/${total}` : "Select ▾"}
       </span>
-    </button>
+    </GlassTile>
   );
 }
 
 function CheckBox({ checked, partial }: { checked: boolean; partial?: boolean }) {
+  /* Wave 13: the pack GlassCheckbox, purely presentational inside the row
+     button (the row itself toggles), so it is inert for pointer + a11y. */
   return (
-    <span
-      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition ${
-        checked || partial ? "border-indigo-600 bg-indigo-600" : "border-slate-300 bg-white"
-      }`}
-    >
-      {checked && <CheckIcon className="h-3.5 w-3.5 text-white" />}
-      {!checked && partial && <span className="h-0.5 w-2.5 rounded bg-white" />}
+    <span className="relative flex shrink-0 items-center" aria-hidden>
+      <GlassCheckbox checked={checked || Boolean(partial)} tabIndex={-1} className="pointer-events-none" />
+      {!checked && partial && <span className="pointer-events-none absolute left-1/2 top-1/2 h-0.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded bg-white" />}
     </span>
   );
 }
@@ -186,25 +188,25 @@ function PickerPanel({
   const allSelected = options.length > 0 && options.every((o) => selected.has(o.key));
   const someSelected = options.some((o) => selected.has(o.key));
   return (
-    <div className="animate-fade-in mt-2 overflow-hidden rounded-2xl border border-indigo-200 bg-white shadow-lg shadow-indigo-100/60">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-3 py-2.5">
-        <span className="text-xs font-bold uppercase tracking-wide text-slate-600">{title}</span>
-        <button type="button" onClick={onDone} className="rounded-lg bg-indigo-600 px-3 py-1 text-[11px] font-bold text-white active:scale-95">
+    <GlassSurface radius={20} className="animate-fade-in mt-2 ring-1 ring-indigo-400/30" contentClassName="overflow-hidden p-0">
+      <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
+        <span className="text-xs font-bold uppercase tracking-wide text-white/75">{title}</span>
+        <button type="button" onClick={onDone} className="rounded-full bg-indigo-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-indigo-500 active:scale-95">
           Done
         </button>
       </div>
       {options.length === 0 ? (
-        <p className="px-3 py-4 text-center text-xs text-slate-500">{emptyHint}</p>
+        <p className="px-3 py-4 text-center text-xs text-white/55">{emptyHint}</p>
       ) : (
         <div className="max-h-60 overflow-y-auto">
           {/* Select-all master checkbox */}
           <button
             type="button"
             onClick={onToggleAll}
-            className="flex w-full items-center gap-2.5 border-b border-slate-200 bg-indigo-50/40 px-3 py-2.5 text-left active:bg-indigo-50"
+            className="flex w-full items-center gap-2.5 border-b border-white/10 bg-indigo-500/15 px-3 py-2.5 text-left hover:bg-indigo-500/20"
           >
             <CheckBox checked={allSelected} partial={!allSelected && someSelected} />
-            <span className="text-[13px] font-bold text-indigo-700">
+            <span className="text-[13px] font-bold text-indigo-200">
               Select all <span className="font-medium text-indigo-400">({options.length})</span>
             </span>
           </button>
@@ -213,10 +215,10 @@ function PickerPanel({
               key={o.key}
               type="button"
               onClick={() => onToggle(o.key)}
-              className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left active:bg-slate-50"
+              className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-white/10"
             >
               <CheckBox checked={selected.has(o.key)} />
-              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-slate-700">
+              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white/85">
                 {o.icon ? `${o.icon} ` : ""}
                 {o.name}
               </span>
@@ -224,7 +226,7 @@ function PickerPanel({
           ))}
         </div>
       )}
-    </div>
+    </GlassSurface>
   );
 }
 
@@ -628,15 +630,15 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
     <PageShell route={route} title="AI Revision Generator" subtitle="Build a focused revision plan" backHref="#/revision/profile">
       <div data-rev-layout="aigenerate" className="animate-fade-in space-y-4 px-4 py-4 pb-10 lg:space-y-3 lg:px-0 lg:py-0 lg:pb-6 lg:max-w-[900px] lg:mx-auto">
         {/* Provider strip */}
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_1px_3px_rgba(15,23,42,0.07),0_8px_20px_-10px_rgba(15,23,42,0.12)]">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white">
+        <GlassCard contentClassName="flex items-center gap-3 p-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white">
             <SparklesIcon className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-bold text-slate-900">
+            <p className="text-[13px] font-bold text-white">
               {activeConfig ? `${providerMeta?.name} · ${activeConfig.model}` : "No AI connected"}
             </p>
-            <p className="truncate text-[11px] text-slate-600">
+            <p className="truncate text-[11px] text-white/75">
               {effective.mode === "own"
                 ? "Your provider account is used · school/plan AI allowance is not deducted"
                 : effective.mode === "default"
@@ -644,14 +646,14 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   : "Questions will use the built-in engine — connect AI for better results"}
             </p>
           </div>
-          <button
-            type="button"
+          <GlassButton
+            variant="capsule"
             onClick={() => navigate("#/revision/ai-settings")}
-            className="shrink-0 rounded-full bg-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-700 active:bg-slate-300"
+            className="shrink-0 [&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-[11px] [&>span>div]:font-bold"
           >
             Configure
-          </button>
-        </div>
+          </GlassButton>
+        </GlassCard>
 
         {phase !== "ready" && (
           <>
@@ -667,15 +669,15 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
             {aiNotConfigured && (
               <Card
                 data-rev-no-ai-gate
-                className="overflow-hidden border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50"
+                className="overflow-hidden border-amber-400/30"
               >
                 <div className="flex items-start gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md shadow-amber-200">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md">
                     <SparklesIcon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-[14px] font-bold text-slate-900">No AI is configured</h3>
-                    <p className="mt-1 text-[12px] leading-relaxed text-slate-700">
+                    <h3 className="text-[14px] font-bold text-white">No AI is configured</h3>
+                    <p className="mt-1 text-[12px] leading-relaxed text-white/85">
                       Connect an AI provider to generate fresh, syllabus-aligned questions for the
                       topic you picked. Without an AI, the test can&apos;t be generated here — pick one
                       of the two options below.
@@ -686,25 +688,25 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   <button
                     type="button"
                     onClick={() => navigate("#/revision/ai-settings")}
-                    className="flex min-h-[56px] flex-col items-start justify-center gap-0.5 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 px-4 py-2 text-left text-white shadow-md shadow-indigo-200 active:scale-[0.98]"
+                    className="flex min-h-[56px] flex-col items-start justify-center gap-0.5 rounded-2xl bg-indigo-600 px-4 py-2 text-left text-white hover:bg-indigo-500 active:scale-[0.98]"
                   >
                     <span className="text-[13px] font-bold">Configure AI →</span>
                     <span className="text-[10px] font-medium opacity-90">
                       School-provided key or paste your own
                     </span>
                   </button>
-                  <button
-                    type="button"
+                  <GlassButton
+                    variant="capsule"
                     onClick={() => navigate("#/revision/bulk-import")}
-                    className="flex min-h-[56px] flex-col items-start justify-center gap-0.5 rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-left text-emerald-700 active:scale-[0.98]"
+                    className="w-full [&>span>div]:h-auto [&>span>div]:min-h-[56px] [&>span>div]:w-full [&>span>div]:justify-start [&>span>div]:px-4 [&>span>div]:py-2"
                   >
-                    <span className="text-[13px] font-bold">Use Bulk Import →</span>
-                    <span className="text-[10px] font-medium text-emerald-600">
-                      Paste a full revision plan with answers
+                    <span className="flex flex-col items-start gap-0.5 text-left text-emerald-200">
+                      <span className="text-[13px] font-bold">Use Bulk Import →</span>
+                      <span className="text-[10px] font-medium text-emerald-300">Paste a full revision plan with answers</span>
                     </span>
-                  </button>
+                  </GlassButton>
                 </div>
-                <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+                <p className="mt-3 text-[11px] leading-relaxed text-white/55">
                   After configuration, come back here and your saved selections (class, subject,
                   chapter, topic, question type) will be used to generate the test automatically.
                 </p>
@@ -713,17 +715,17 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
 
             {/* Step 1 — the 4-dropdown selection row */}
             <Card>
-              <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">1 · What to test</h3>
-              <p className="mt-0.5 text-[11px] text-slate-500">
+              <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">1 · What to test</h3>
+              <p className="mt-0.5 text-[11px] text-white/55">
                 Each list filters the next: Class → Subject → Chapter → Topic
               </p>
               {curriculumMeta && (
-                <p className="mt-1 text-[11px] font-semibold text-indigo-600">
+                <p className="mt-1 text-[11px] font-semibold text-indigo-300">
                   {curriculumMeta.board} · {curriculumMeta.yearLabel} included syllabus
                 </p>
               )}
               {!curriculumMeta && syllabusSource === "builtin" && (
-                <p className="mt-1 text-[11px] font-medium text-amber-600">
+                <p className="mt-1 text-[11px] font-medium text-amber-300">
                   Using the built-in syllabus — the school has not published a custom syllabus yet.
                 </p>
               )}
@@ -779,43 +781,39 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
 
             {/* Step 2 — difficulty and question type are separate settings */}
             <Card>
-              <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">2 · Difficulty</h3>
-              <p className="mt-0.5 text-[11px] text-slate-500">
+              <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">2 · Difficulty</h3>
+              <p className="mt-0.5 text-[11px] text-white/55">
                 Difficulty controls level only. Question type is selected separately below.
               </p>
               <div data-rev-choice-grid className="mt-3 grid grid-cols-4 gap-1.5">
                 {DIFFICULTY_OPTIONS.map((d) => (
-                  <button
+                  <GlassTile
                     key={d.value}
-                    type="button"
                     disabled={phase === "generating"}
                     onClick={() => setDifficulty(d.value)}
-                    className={`flex min-h-[58px] flex-col items-center justify-center gap-0.5 rounded-xl border px-1 text-center transition active:scale-[0.97] ${
+                    selected={difficulty === d.value}
+                    className={`dc-tile aspect-auto min-h-[58px] rounded-xl px-1 text-center [&>span]:flex-col [&>span]:gap-0.5 ${
                       phase === "generating" ? "opacity-40" : ""
-                    } ${
-                      difficulty === d.value
-                        ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200"
-                        : "border-slate-300 bg-white"
                     }`}
                   >
                     <span className="text-sm">{d.emoji}</span>
-                    <span className={`text-[11px] font-bold ${difficulty === d.value ? "text-indigo-700" : "text-slate-600"}`}>
+                    <span className={`text-[11px] font-bold ${difficulty === d.value ? "text-indigo-200" : "text-white/75"}`}>
                       {d.label}
                     </span>
-                    <span className="line-clamp-1 text-[9px] font-medium text-slate-500">{d.desc}</span>
-                  </button>
+                    <span className="line-clamp-1 text-[9px] font-medium text-white/55">{d.desc}</span>
+                  </GlassTile>
                 ))}
               </div>
 
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+              <div className="mt-4 rounded-2xl border border-white/10 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h4 className="text-[12px] font-bold uppercase tracking-wide text-slate-600">Question type</h4>
-                    <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
+                    <h4 className="text-[12px] font-bold uppercase tracking-wide text-white/75">Question type</h4>
+                    <p className="mt-0.5 text-[11px] leading-snug text-white/55">
                       Default is Mixed. The AI tags every question by type and the server re-checks each one — wrong-type questions are regenerated automatically. (Offline built-in questions are not dynamically transformed.)
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-indigo-600 shadow-sm">
+                  <span className="shrink-0 rounded-full border border-indigo-400/30 px-2.5 py-1 text-[10px] font-bold text-indigo-300">
                     {modeOption.label}
                   </span>
                 </div>
@@ -836,7 +834,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                       <span className="flex flex-col items-center gap-1">
                         <span className="text-base">{m.emoji}</span>
                         <span className="text-[11px] font-extrabold leading-tight">{m.label}</span>
-                        <span className="line-clamp-2 text-[9px] font-medium leading-tight text-slate-500">{m.desc}</span>
+                        <span className="line-clamp-2 text-[9px] font-medium leading-tight text-white/55">{m.desc}</span>
                       </span>
                     </GlassTile>
                   ))}
@@ -846,40 +844,31 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
 
             {/* Step 3 — questions & time */}
             <Card>
-              <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-500">3 · Questions & time</h3>
+              <h3 className="text-[13px] font-bold uppercase tracking-wide text-white/55">3 · Questions & time</h3>
               <div className="mt-3 space-y-3">
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-700">Total questions</span>
+                    <span className="text-xs font-semibold text-white/85">Total questions</span>
                     <input
                       type="number"
                       min={1}
                       max={20}
                       value={totalQuestions}
                       onChange={(e) => setTotalQuestions(Math.max(1, Math.min(20, Math.round(Number(e.target.value) || 1))))}
-                      className="h-9 w-20 rounded-lg border border-slate-300 bg-white px-2 text-center text-sm font-bold text-slate-900 outline-none focus:border-indigo-500"
+                      className="dc-field h-9 w-20 rounded-lg border px-2 text-center text-sm font-bold outline-none"
                     />
                   </div>
-                  <div className="mt-2 flex gap-1.5">
+                  <GlassToggleGroup className="dc-segment mt-2 flex w-full" data-stretch value={String(totalQuestions)} onValueChange={(v) => setTotalQuestions(Number(v))} aria-label="Question presets">
                     {QUESTION_PRESETS.map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() => setTotalQuestions(n)}
-                        className={`flex-1 rounded-lg border py-1.5 text-xs font-bold transition ${
-                          totalQuestions === n
-                            ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                            : "border-slate-300 bg-white text-slate-600"
-                        }`}
-                      >
+                      <GlassToggleItem key={n} value={String(n)} className="flex-1 justify-center py-1.5 text-xs font-bold">
                         {n}
-                      </button>
+                      </GlassToggleItem>
                     ))}
-                  </div>
+                  </GlassToggleGroup>
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                    <span className="flex items-center gap-1 text-xs font-semibold text-white/85">
                       <ClockIcon className="h-3.5 w-3.5" /> Total time (minutes)
                     </span>
                     <input
@@ -888,48 +877,39 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                       max={240}
                       value={totalMinutes}
                       onChange={(e) => setTotalMinutes(Math.max(1, Math.min(240, Math.round(Number(e.target.value) || 1))))}
-                      className="h-9 w-20 rounded-lg border border-slate-300 bg-white px-2 text-center text-sm font-bold text-slate-900 outline-none focus:border-indigo-500"
+                      className="dc-field h-9 w-20 rounded-lg border px-2 text-center text-sm font-bold outline-none"
                     />
                   </div>
-                  <div className="mt-2 flex gap-1.5">
+                  <GlassToggleGroup className="dc-segment mt-2 flex w-full" data-stretch value={String(totalMinutes)} onValueChange={(v) => setTotalMinutes(Number(v))} aria-label="Time presets">
                     {TIME_PRESETS.map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() => setTotalMinutes(n)}
-                        className={`flex-1 rounded-lg border py-1.5 text-xs font-bold transition ${
-                          totalMinutes === n
-                            ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                            : "border-slate-300 bg-white text-slate-600"
-                        }`}
-                      >
+                      <GlassToggleItem key={n} value={String(n)} className="flex-1 justify-center py-1.5 text-xs font-bold">
                         {n}m
-                      </button>
+                      </GlassToggleItem>
                     ))}
-                  </div>
+                  </GlassToggleGroup>
                 </div>
               </div>
             </Card>
 
             {notice && (
-              <div className="rounded-xl bg-amber-50 px-3 py-2.5 text-xs font-medium leading-relaxed text-amber-700">
+              <div className="rounded-xl bg-amber-500/15 px-3 py-2.5 text-xs font-medium leading-relaxed text-amber-200">
                 {notice}
               </div>
             )}
 
             {/* Generate button / animation */}
             {phase === "generating" ? (
-              <Card className="overflow-hidden border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-violet-50">
+              <Card className="overflow-hidden border-indigo-400/30">
                 <div className="flex flex-col items-center gap-4 py-6">
                   <div className="relative flex h-20 w-20 items-center justify-center">
                     <span className="absolute inset-0 animate-ping rounded-full bg-indigo-200/60" />
-                    <span className="absolute inset-2 animate-pulse rounded-full bg-indigo-100" />
-                    <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-300">
+                    <span className="absolute inset-2 animate-pulse rounded-full bg-indigo-500/20" />
+                    <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg">
                       <SparklesIcon className="h-7 w-7 animate-pulse" />
                     </span>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-bold text-slate-900">Generating your exam…</p>
+                    <p className="text-sm font-bold text-white">Generating your exam…</p>
                     <p className="mt-1 animate-pulse text-xs font-medium text-indigo-500">{genMessage}</p>
                   </div>
                   <div className="flex gap-1.5">
@@ -952,12 +932,12 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   <SparklesIcon className="h-5 w-5" /> Generate revision plan
                 </PrimaryButton>
                 {!canGenerate && (
-                  <p className="text-center text-[11px] text-slate-500">
+                  <p className="text-center text-[11px] text-white/55">
                     Select at least one class, subject, chapter and topic to generate.
                   </p>
                 )}
                 {canGenerate && generateBlockedByNoAi && (
-                  <p className="text-center text-[11px] font-semibold text-amber-700">
+                  <p className="text-center text-[11px] font-semibold text-amber-200">
                     Configure AI or use Bulk Import above to continue.
                   </p>
                 )}
@@ -968,19 +948,19 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
 
         {/* Ready state */}
         {phase === "ready" && readyInfo && (
-          <Card className="overflow-hidden border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+          <Card className="overflow-hidden border-emerald-400/30">
             <div className="flex flex-col items-center gap-3 py-4 text-center">
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-200">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg">
                 <CheckIcon className="h-8 w-8" />
               </span>
               <div>
-                <h2 className="text-lg font-bold text-slate-900">Your revision plan is ready! 🎉</h2>
-                <p className="mt-1 text-xs text-slate-600">
+                <h2 className="text-lg font-bold text-white">Your revision plan is ready! 🎉</h2>
+                <p className="mt-1 text-xs text-white/75">
                   {readyInfo.count} questions saved to your Test Bank · ~{totalMinutes} min ·{" "}
                   {readyInfo.usedAi ? `generated by ${providerMeta?.name ?? "AI"}` : "built-in engine"}
                 </p>
                 {readyInfo.pendingSync && (
-                  <p className="mt-1 text-[11px] font-semibold text-amber-700">
+                  <p className="mt-1 text-[11px] font-semibold text-amber-200">
                     Saved on this device. Cloud sync will finish automatically when you are online.
                   </p>
                 )}
@@ -988,17 +968,13 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
               <button
                 type="button"
                 onClick={() => navigate("#/revision")}
-                className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 text-[15px] font-bold text-white shadow-lg shadow-emerald-200 transition active:scale-[0.98]"
+                className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-[15px] font-bold text-white transition hover:bg-emerald-500 active:scale-[0.98]"
               >
                 Go to Revision Dashboard <ChevronRightIcon className="h-5 w-5" />
               </button>
-              <button
-                type="button"
-                onClick={() => navigate("#/revision/bank")}
-                className="flex min-h-[44px] w-full items-center justify-center rounded-2xl bg-white text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
-              >
-                Open Test Bank
-              </button>
+              <SecondaryButton onClick={() => navigate("#/revision/bank")}>
+                <span className="text-xs text-emerald-200">Open Test Bank</span>
+              </SecondaryButton>
               <button
                 type="button"
                 onClick={() => {
@@ -1006,7 +982,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   setReadyInfo(null);
                   setNotice(null);
                 }}
-                className="text-xs font-semibold text-slate-500 underline-offset-2 hover:underline"
+                className="text-xs font-semibold text-white/55 underline-offset-2 hover:underline"
               >
                 Create another revision plan
               </button>

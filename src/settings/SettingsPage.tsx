@@ -30,6 +30,8 @@ import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
 import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
 import { BaseModal, PreferenceRow } from "../profile/ProfileLayout";
+import { GlassCard } from "../components/ui/glass-card";
+import { GlassButton } from "../components/ui/glass-button";
 import { DEFAULT_PREFERENCES, type Preferences } from "../profile/App";
 
 export default function SettingsPage() {
@@ -67,23 +69,19 @@ export default function SettingsPage() {
 
   if (!user) {
     return (
-      <div data-settings-page className="min-h-screen bg-gradient-to-b from-indigo-50 via-slate-50 to-white text-slate-900">
+      <div data-settings-page className="min-h-screen text-white">
         <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col">
           <main data-settings-content className="flex flex-1 flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-12 text-center">
-            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
+            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-400/30">
               <ShieldCheck size={24} />
             </span>
-            <h1 className="text-2xl font-black tracking-tight text-slate-950">Sign in to change settings</h1>
-            <p className="max-w-xs text-sm font-medium text-slate-500">
+            <h1 className="text-2xl font-black tracking-tight text-white">Sign in to change settings</h1>
+            <p className="max-w-xs text-sm font-medium text-white/55">
               Notifications and privacy switches are saved to your account, so they need a signed-in learner.
             </p>
-            <button
-              type="button"
-              onClick={() => { window.location.hash = "#/auth?mode=login"; }}
-              className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-500/25"
-            >
+            <GlassButton variant="capsule" onClick={() => { window.location.hash = "#/auth?mode=login"; }}>
               Sign in
-            </button>
+            </GlassButton>
           </main>
         </div>
       </div>
@@ -134,7 +132,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div data-settings-page className="min-h-screen bg-gradient-to-b from-indigo-50 via-slate-50 to-white text-slate-900">
+    <div data-settings-page className="min-h-screen text-white">
       <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-screen sm:overflow-hidden sm:rounded-none sm:border-0 lg:max-w-full">
         <Header
           cartCount={cartIds.size}
@@ -150,31 +148,31 @@ export default function SettingsPage() {
           <div data-settings-layout className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <header className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <button
-                  type="button"
+                <GlassButton
+                  variant="capsule"
                   onClick={() => { window.location.hash = "#/profile"; }}
-                  className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black text-slate-600 transition hover:border-indigo-200 hover:text-indigo-600"
+                  className="mb-2 [&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-[11px] [&>span>div]:font-black"
                 >
-                  <ArrowLeft size={13} /> Back to Profile
-                </button>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Your space</p>
-                <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">Settings</h1>
-                <p className="mt-0.5 text-xs font-medium text-slate-500">
+                  <span className="inline-flex items-center gap-1.5 text-white/85"><ArrowLeft size={13} /> Back to Profile</span>
+                </GlassButton>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Your space</p>
+                <h1 className="mt-1 text-2xl font-black tracking-tight text-white">Settings</h1>
+                <p className="mt-0.5 text-xs font-medium text-white/55">
                   Saved securely to your account — changes apply on every device.
                 </p>
               </div>
-              {saving ? <span className="text-[11px] font-black text-violet-600">Saving…</span> : null}
+              {saving ? <span className="text-[11px] font-black text-violet-300">Saving…</span> : null}
             </header>
 
             {message ? (
-              <div role="status" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+              <div role="status" className="rounded-2xl border border-rose-400/30 bg-rose-500/15 px-4 py-3 text-sm font-semibold text-rose-200">
                 {message}
               </div>
             ) : null}
 
-            <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_18px_40px_-32px_rgba(49,46,129,0.6)]">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Preferences</p>
-              <h2 className="mt-1 text-lg font-black text-slate-950">Notifications & privacy</h2>
+            <GlassCard>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Preferences</p>
+              <h2 className="mt-1 text-lg font-black text-white">Notifications & privacy</h2>
               <div className="mt-4 space-y-2">
                 <PreferenceRow
                   icon={<Bell />}
@@ -207,7 +205,7 @@ export default function SettingsPage() {
                   onChange={(checked) => void savePreferences({ ...preferences, shareActivity: checked })}
                 />
               </div>
-            </section>
+            </GlassCard>
           </div>
         </main>
 
@@ -216,17 +214,13 @@ export default function SettingsPage() {
 
       {pushHelpOpen ? (
         <BaseModal title="Notifications are blocked" onClose={() => setPushHelpOpen(false)}>
-          <p className="text-sm font-medium text-slate-600">
+          <p className="text-sm font-medium text-white/75">
             Your browser is blocking notifications for this site, so the switch was turned back off.
             Open the site settings (the lock icon in the address bar), allow notifications, then try again.
           </p>
-          <button
-            type="button"
-            onClick={() => setPushHelpOpen(false)}
-            className="mt-5 w-full rounded-xl bg-slate-900 py-3 text-sm font-black text-white"
-          >
+          <GlassButton variant="capsule" onClick={() => setPushHelpOpen(false)} className="mt-5 w-full [&>span>div]:w-full">
             Got it
-          </button>
+          </GlassButton>
         </BaseModal>
       ) : null}
     </div>

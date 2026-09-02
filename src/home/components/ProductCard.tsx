@@ -1,4 +1,6 @@
 import type { Product } from "../types";
+import { GlassSurface } from "../../components/ui/glass";
+import { GlassButton } from "../../components/ui/glass-button";
 
 interface ProductCardProps {
   product: Product;
@@ -26,11 +28,12 @@ export default function ProductCard({
   const meta = typeMeta[product.type];
 
   return (
-    <div
+    <GlassSurface
       onClick={() => onOpen?.(product)}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-md shadow-slate-300/70 ring-1 ring-slate-200/80 transition-transform duration-200 active:scale-[0.98] ${className}`}
+      className={`group relative overflow-hidden text-white transition-transform duration-200 active:scale-[0.98] ${className}`}
+      contentClassName="flex flex-col"
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
+      <div className="relative aspect-[4/3] w-full overflow-hidden">
         <img
           src={product.image}
           alt={product.title}
@@ -42,44 +45,44 @@ export default function ProductCard({
           {meta.label}
         </span>
         {product.trending && (
-          <span className="absolute left-2 bottom-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+          <span className="absolute left-2 bottom-2 rounded-md bg-[var(--dc-chrome-glass)] px-1.5 py-0.5 text-[10px] font-semibold text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
             🔥 Trending
           </span>
         )}
-        <button
+        <GlassButton
           type="button"
           aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
           onClick={(event) => {
             event.stopPropagation();
             onToggleFavorite(product.id);
           }}
-          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur-sm transition active:scale-90"
+          className="absolute right-2 top-2 [&_.size-12]:size-7"
         >
-          <span className={isFavorite ? "text-rose-500" : "text-slate-400"}>
+          <span className={isFavorite ? "text-rose-500" : "text-white/55"}>
             {isFavorite ? "❤️" : "🤍"}
           </span>
-        </button>
+        </GlassButton>
       </div>
 
       <div className="flex flex-1 flex-col gap-1 p-3">
-        <h4 className="line-clamp-2 min-h-[2.5rem] text-[13px] font-semibold leading-tight text-slate-800">
+        <h4 className="line-clamp-2 min-h-[2.5rem] text-[13px] font-semibold leading-tight text-white/85">
           {product.title}
         </h4>
-        <p className="text-[11px] text-slate-400">{product.author}</p>
+        <p className="text-[11px] text-white/55">{product.author}</p>
 
-        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-amber-500">
+        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-amber-300">
           <span>⭐ {product.rating}</span>
-          <span className="text-slate-300">({product.ratingCount.toLocaleString()})</span>
+          <span className="text-white/40">({product.ratingCount.toLocaleString()})</span>
         </div>
 
         <div className="mt-1.5 flex items-center justify-between">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-sm font-bold text-slate-900">₹{product.price}</span>
-            <span className="text-[11px] text-slate-400 line-through">₹{product.mrp}</span>
+            <span className="text-sm font-bold text-white">₹{product.price}</span>
+            <span className="text-[11px] text-white/55 line-through">₹{product.mrp}</span>
           </div>
-          <span className="text-[10px] font-bold text-emerald-600">{discount}% off</span>
+          <span className="text-[10px] font-bold text-emerald-300">{discount}% off</span>
         </div>
       </div>
-    </div>
+    </GlassSurface>
   );
 }

@@ -52,8 +52,10 @@ test("PDP curriculum is filtered through the shared visibility helper", () => {
 });
 
 test("paid curriculum rows use a distinct amber appearance", () => {
-  assert.match(pdp, /from-amber-50 via-orange-50/);
-  assert.match(pdp, /from-amber-500 to-orange-600/);
+  // Phase A6: no gradient plates anywhere — the paid row is a translucent
+  // amber tone over the glass, the index disc a solid amber.
+  assert.match(pdp, /border-amber-400\/30 bg-amber-500\/15/);
+  assert.match(pdp, /paid \? "bg-amber-500" : "bg-indigo-600"/);
   assert.match(pdp, /LockKeyhole/);
   assert.match(pdp, /data-pdp-curriculum-upgrade-hint/);
 });

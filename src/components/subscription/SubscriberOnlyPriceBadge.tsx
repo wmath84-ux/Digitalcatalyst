@@ -31,24 +31,24 @@ function SubscriberOnlyPriceBadgeImpl({ price, basePrice, currency, cycleLabel, 
       data-subscriber-only-price-badge="true"
       role="note"
       className={
-        "inline-flex flex-col items-start gap-0.5 rounded-2xl border border-emerald-200/80 bg-emerald-50/80 px-3 py-1.5 " +
+        "inline-flex flex-col items-start gap-0.5 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-1.5 " +
         (className || "")
       }
     >
-      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700">
+      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-200">
         Your subscriber price
       </span>
       <span className="flex items-baseline gap-2">
-        <span className="text-base font-extrabold text-emerald-900">
+        <span className="text-base font-extrabold text-emerald-200">
           {isFree ? "Free" : formatRupees(price)}
         </span>
         {isDiscounted ? (
-          <span className="text-[11px] font-medium text-slate-500 line-through">
+          <span className="text-[11px] font-medium text-white/55 line-through">
             {formatRupees(basePrice)}
           </span>
         ) : null}
         {cycleLabel ? (
-          <span className="text-[11px] font-medium text-emerald-800/80">/ {cycleLabel}</span>
+          <span className="text-[11px] font-medium text-emerald-200">/ {cycleLabel}</span>
         ) : null}
       </span>
       {currency ? null : null}

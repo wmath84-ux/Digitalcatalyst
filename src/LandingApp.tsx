@@ -42,7 +42,7 @@ export default function LandingApp() {
           initial={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -60, scale: 0.96 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="min-h-screen bg-[#05060f]"
+          className="min-h-screen"
         >
           <Header />
           <Hero />

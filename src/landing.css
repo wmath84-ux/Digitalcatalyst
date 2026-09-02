@@ -1,10 +1,6 @@
-.glass-panel {
-  background: rgba(15, 17, 34, 0.55);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
+/* Wave 14: `.glass-panel` / `.pulse-glow` / `.bg-grid` removed — every landing
+   surface is a pack component now. Only the Hero word-mark gradient text and
+   the float keyframe remain. */
 .gradient-text {
   background: linear-gradient(90deg, #a78bfa, #22d3ee, #f472b6);
   background-size: 200% auto;
@@ -27,20 +23,4 @@
 
 .float-anim {
   animation: float-y 5s ease-in-out infinite;
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.55); }
-  50% { box-shadow: 0 0 0 14px rgba(124, 58, 237, 0); }
-}
-
-.pulse-glow {
-  animation: pulse-glow 2.4s ease-out infinite;
-}
-
-.bg-grid {
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
-  background-size: 44px 44px;
 }

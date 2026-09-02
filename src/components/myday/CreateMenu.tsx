@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Plus, type LucideIcon } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { GlassSurface } from "../ui/glass";
 
 export interface CreateMenuOption {
   id: string;
@@ -86,13 +87,13 @@ export default function CreateMenu({ options, onSelect }: CreateMenuProps) {
           aria-haspopup="menu"
           onClick={() => setOpen((value) => !value)}
           className={cn(
-            "relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-300/60 transition active:scale-95 md:h-24 md:w-24",
+            "relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600 text-white transition active:scale-95 md:h-24 md:w-24",
             open && "rotate-45",
           )}
         >
           <Plus className="h-10 w-10 md:h-12 md:w-12" strokeWidth={2.5} />
         </button>
-        <p className="mt-3 text-sm font-semibold text-slate-500 md:text-base">Add to your day</p>
+        <p className="mt-3 text-sm font-semibold text-white/55 md:text-base">Add to your day</p>
 
         {open && (
           /* Fixed-width anchor, centred on the button. The dedicated
@@ -103,11 +104,16 @@ export default function CreateMenu({ options, onSelect }: CreateMenuProps) {
             className="dc-create-menu-anchor absolute left-1/2 z-20 w-56 -translate-x-1/2 sm:w-64"
             style={{ bottom: "calc(100% + 0.9rem)" }}
           >
-            <div
+            {/* Wave 13: the drop-up panel is the pack GlassSurface (dropdown
+                material, radius 20); `dc-create-menu` only carries the pop
+                keyframe, no material. */}
+            <GlassSurface
+              radius={20}
               data-myday-create-menu
               role="menu"
               aria-label="Create"
-              className="dc-create-menu dc-glass relative mx-auto w-full max-w-[calc(100vw-2rem)] rounded-2xl p-1.5"
+              className="dc-create-menu relative mx-auto w-full max-w-[calc(100vw-2rem)]"
+              contentClassName="p-1.5"
             >
               {options.map((option, index) => {
                 const Icon = option.icon;
@@ -120,25 +126,20 @@ export default function CreateMenu({ options, onSelect }: CreateMenuProps) {
                       setOpen(false);
                       onSelect(option.id);
                     }}
-                    className="dc-create-item group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-white/70 active:bg-white/90"
+                    className="dc-create-item group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-white/10 active:bg-white/10"
                     style={{ animationDelay: `${40 + index * 35}ms` }}
                   >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-100">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-300 transition-colors group-hover:bg-indigo-500/20">
                       <Icon className="h-4 w-4" />
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-slate-800">
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-white/85">
                       {option.label}
                     </span>
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300 transition-all group-hover:translate-x-0.5 group-hover:text-indigo-400" />
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/40 transition-all group-hover:translate-x-0.5 group-hover:text-indigo-400" />
                   </button>
                 );
               })}
-              {/* Little tail that ties the drop-up to the + button. */}
-              <span
-                aria-hidden="true"
-                className="absolute -bottom-1 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 rounded-[3px] bg-white/85 shadow-sm"
-              />
-            </div>
+            </GlassSurface>
           </div>
         )}
       </div>

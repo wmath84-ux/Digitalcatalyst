@@ -21,6 +21,8 @@
 import { GlassSelect, GlassSelectContent, GlassSelectItem, GlassSelectTrigger } from "../ui/glass-select";
 import { GlassSlider } from "../ui/glass-slider";
 import { GlassCheckbox } from "../ui/glass-checkbox";
+import { GlassButton } from "../ui/glass-button";
+import { GlassToggleGroup, GlassToggleItem } from "../ui/glass-toggle-group";
 import { useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -89,36 +91,36 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
   const NotifIcon = view ? ICONS[view.icon as keyof typeof ICONS] || Bell : Bell;
 
   return (
-    <div className="min-h-screen bg-white sm:py-6">
-      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:rounded-[2rem] sm:border sm:border-slate-200 md:max-w-none md:rounded-none md:border-0 md:shadow-none md:bg-transparent">
+    <div className="min-h-screen sm:py-6">
+      <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:rounded-[2rem] md:max-w-none md:rounded-none">
         {/* Header */}
-        <header className="flex items-center gap-3 border-b border-slate-100 px-4 py-4">
+        <header className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
           {onBack ? (
-            <button
+            <GlassButton
               type="button"
               onClick={onBack}
               aria-label="Back"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 active:scale-90"
+              className="[&_.size-12]:size-9"
             >
               <ArrowLeft className="h-4 w-4" />
-            </button>
+            </GlassButton>
           ) : null}
           <div className="min-w-0">
-            <h1 className="text-base font-black text-slate-900">Renewal preview</h1>
-            <p className="text-[11px] font-medium text-slate-400">Sandbox · no data is written</p>
+            <h1 className="text-base font-black text-white">Renewal preview</h1>
+            <p className="text-[11px] font-medium text-white/55">Sandbox · no data is written</p>
           </div>
         </header>
 
         <main className="flex-1 overflow-y-auto pb-10">
           {/* ---------------- Controls ---------------- */}
-          <section className="border-b border-slate-100 bg-slate-50/70 px-4 py-4">
+          <section className="border-b border-white/10 px-4 py-4">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-black uppercase tracking-wider text-slate-500">
+              <label className="text-xs font-black uppercase tracking-wider text-white/55">
                 Days to expiry
               </label>
               <span
                 data-preview-offset
-                className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-black text-white"
+                className="rounded-full bg-violet-600 px-2.5 py-1 text-[11px] font-black text-white"
               >
                 {offsetDays > 0 ? `+${offsetDays}d` : offsetDays === 0 ? "today" : `${offsetDays}d`}
               </span>
@@ -135,29 +137,31 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
               className="mt-3 w-full"
             />
 
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className="mt-3 max-w-full overflow-x-auto [scrollbar-width:none]">
+              <GlassToggleGroup
+                className="dc-segment shrink-0"
+                value={String(offsetDays)}
+                onValueChange={(next) => setOffsetDays(Number(next))}
+                aria-label="Days to expiry presets"
+              >
               {PRESETS.map((preset) => (
-                <button
+                <GlassToggleItem
                   key={preset.label}
-                  type="button"
-                  onClick={() => setOffsetDays(preset.days)}
-                  className={`rounded-full px-2.5 py-1.5 text-[11px] font-bold transition active:scale-95 ${
-                    offsetDays === preset.days
-                      ? "bg-violet-600 text-white"
-                      : "bg-white text-slate-600 ring-1 ring-slate-200"
-                  }`}
+                  value={String(preset.days)}
+                  className="whitespace-nowrap px-2.5 py-1.5 text-[11px] font-bold"
                 >
                   {preset.label}
-                </button>
+                </GlassToggleItem>
               ))}
+              </GlassToggleGroup>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <label className="block">
-                <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-400">Plan</span>
+                <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-white/55">Plan</span>
                 <GlassSelect value={planName} onValueChange={setPlanName}>
                   <GlassSelectTrigger aria-label="Plan" className="dc-glass-select h-9 w-full text-xs font-bold" />
-                  <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Plan options">
+                  <GlassSelectContent className="dc-glass-select-pop" aria-label="Plan options">
                     {["Basic", "Premium", "Pro"].map((name) => (
                       <GlassSelectItem key={name} value={name}>{name}</GlassSelectItem>
                     ))}
@@ -165,10 +169,10 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
                 </GlassSelect>
               </label>
               <label className="block">
-                <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-400">Cycle</span>
+                <span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-white/55">Cycle</span>
                 <GlassSelect value={cycle} onValueChange={(v) => setCycle(v as "monthly" | "yearly")}>
                   <GlassSelectTrigger aria-label="Cycle" className="dc-glass-select h-9 w-full text-xs font-bold" />
-                  <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Cycle options">
+                  <GlassSelectContent className="dc-glass-select-pop" aria-label="Cycle options">
                     <GlassSelectItem value="monthly">Monthly</GlassSelectItem>
                     <GlassSelectItem value="yearly">Yearly</GlassSelectItem>
                   </GlassSelectContent>
@@ -177,7 +181,7 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
             </div>
 
             <div className="mt-3 flex items-center gap-3">
-              <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
+              <label className="flex items-center gap-2 text-[11px] font-bold text-white/75">
                 <GlassCheckbox checked={optOut} onCheckedChange={setOptOut} ariaLabel="Reminder opt-out" />
                 Reminder opt-out
               </label>
@@ -185,7 +189,7 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
                 <button
                   type="button"
                   onClick={() => setDismissed([])}
-                  className="flex items-center gap-1 text-[11px] font-bold text-violet-600"
+                  className="flex items-center gap-1 text-[11px] font-bold text-violet-300"
                 >
                   <RefreshCw className="h-3 w-3" /> Reset dismissals
                 </button>
@@ -197,10 +201,10 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
           {!view ? (
             <div
               data-preview-empty
-              className="mx-4 mt-5 rounded-2xl border border-dashed border-slate-200 p-6 text-center"
+              className="mx-4 mt-5 rounded-2xl border border-dashed border-white/10 p-6 text-center"
             >
-              <p className="text-sm font-black text-slate-700">No reminder at this point</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
+              <p className="text-sm font-black text-white/85">No reminder at this point</p>
+              <p className="mt-1 text-xs leading-5 text-white/55">
                 {optOut
                   ? "Reminders are switched off for this subscriber."
                   : "Renewal notices begin 7 days before expiry, then continue every morning for 10 days after it ends."}
@@ -221,7 +225,7 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
                     className="mx-0"
                   />
                 ) : (
-                  <p className="rounded-2xl bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">
+                  <p className="rounded-2xl border border-dashed border-white/15 px-3 py-4 text-center text-xs font-semibold text-white/55">
                     Dismissed for this stage. The next stage will show again.
                   </p>
                 )}
@@ -234,15 +238,15 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
               >
                 <div
                   data-preview-notification
-                  className="flex w-full items-start gap-3 rounded-2xl bg-indigo-50/70 px-3 py-3 text-left"
+                  className="flex w-full items-start gap-3 rounded-2xl bg-indigo-500/15 px-3 py-3 text-left"
                 >
-                  <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                  <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-300">
                     <NotifIcon className="h-5 w-5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-bold text-slate-900">{reminder?.title}</span>
-                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">{view.body}</span>
-                    <span className="mt-1 block text-[11px] font-semibold text-slate-400">just now</span>
+                    <span className="block text-sm font-bold text-white">{reminder?.title}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-white/55">{view.body}</span>
+                    <span className="mt-1 block text-[11px] font-semibold text-white/55">just now</span>
                   </span>
                   <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-indigo-600" />
                 </div>
@@ -269,7 +273,7 @@ export default function RenewalPreviewPage({ onBack }: { onBack?: () => void }) 
               >
                 <pre
                   data-preview-payload
-                  className="overflow-x-auto rounded-2xl bg-slate-900 p-3 text-[10px] leading-relaxed text-emerald-300"
+                  className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40 p-3 text-[10px] leading-relaxed text-emerald-300"
                 >
 {JSON.stringify(
   {
@@ -312,8 +316,8 @@ function PreviewSection({
   return (
     <section className="px-4 pt-5">
       <div className="mb-2">
-        <h2 className="text-xs font-black uppercase tracking-wider text-slate-400">{title}</h2>
-        <p className="mt-0.5 text-[11px] text-slate-400">{caption}</p>
+        <h2 className="text-xs font-black uppercase tracking-wider text-white/55">{title}</h2>
+        <p className="mt-0.5 text-[11px] text-white/55">{caption}</p>
       </div>
       {children}
     </section>

@@ -33,13 +33,16 @@ test("PDP module picker is a viewport-capped overlay, not a full-black sheet", (
   assert.match(modal, /data-pdp-module-select-overlay/);
   assert.match(modal, /createPortal/);
   assert.match(modal, /document\.body/);
-  assert.match(modal, /bg-indigo-950\/30/);
-  assert.doesNotMatch(modal, /bg-black\/55/);
+  // Wave 14: the scrim is the pack sheet/dialog scrim (`bg-black/50` +
+  // `backdrop-blur-[2px]`), the same one the subscription gate's GlassSheet
+  // paints — no hand-mixed indigo wash in JSX or CSS.
+  assert.match(modal, /bg-black\/50 p-3 backdrop-blur-\[2px\]/);
+  assert.doesNotMatch(modal, /bg-indigo-950\/30|bg-black\/55/);
   assert.match(modal, /min-h-0/);
-  assert.match(
+  assert.doesNotMatch(
     css,
     /\[data-pdp-module-select-overlay\][\s\S]{0,240}rgba\(49,\s*46,\s*129,\s*0\.28\)/,
-    "PDP overlay scrim must be the same translucent indigo as the subscription gate",
+    "PDP overlay must not paint its own indigo scrim over the pack one",
   );
   assert.match(
     css,

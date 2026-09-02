@@ -21,7 +21,9 @@
       @keyframes eduvora-logo-in { 0% { opacity: 0; transform: scale(.82) translateY(8px); } 65% { opacity: 1; transform: scale(1.04) translateY(0); } 100% { opacity: 1; transform: scale(1); } }
       @keyframes eduvora-logo-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
       @keyframes eduvora-progress { 0% { transform: translateX(-105%) scaleX(.35); } 55% { transform: translateX(25%) scaleX(.75); } 100% { transform: translateX(210%) scaleX(.35); } }
-      .app-boot-splash { min-height: 100dvh; display: grid; place-items: center; padding: 24px; color: #fff; background: radial-gradient(circle at 50% 35%, #312e81 0, #11132f 35%, #05060f 75%); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      /* Boot splash paints the same Black Ice backdrop as src/glass-theme.css (§2) so the pre-React frame and the app share one background — no white/indigo flash. */
+      html { background-color: #0a0c12; }
+      .app-boot-splash { min-height: 100dvh; display: grid; place-items: center; padding: 24px; color: #fff; background-color: #0a0c12; background-image: radial-gradient(58% 72% at 12% 30%, rgb(44 53 126 / 0.95) 0%, rgb(37 48 143 / 0.42) 38%, transparent 68%), radial-gradient(52% 60% at 40% 80%, rgb(18 117 106 / 0.72) 0%, rgb(15 95 87 / 0.3) 40%, transparent 70%), radial-gradient(46% 56% at 90% 15%, rgb(109 33 132 / 0.8) 0%, rgb(122 36 136 / 0.34) 42%, transparent 72%), radial-gradient(70% 40% at 45% 5%, rgb(58 33 89 / 0.6) 0%, transparent 70%), radial-gradient(120% 90% at 50% 100%, rgb(6 7 12 / 0.85) 0%, transparent 55%); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
       .app-boot-content { width: min(280px, 82vw); text-align: center; animation: eduvora-logo-in .55s cubic-bezier(.2,.8,.2,1) both; }
       .app-boot-icon { width: 88px; height: 88px; margin: 0 auto; display: block; filter: drop-shadow(0 16px 25px rgba(79,70,229,.38)); animation: eduvora-logo-float 1.8s ease-in-out .55s infinite; }
       .app-boot-title { margin: 18px 0 4px; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }

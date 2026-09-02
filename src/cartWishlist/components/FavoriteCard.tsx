@@ -3,6 +3,7 @@ import { Product } from "../types";
 import { formatINR } from "../utils/format";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { LiquidMetalButton } from "@/components/ui/LiquidMetalButton";
+import { GlassButton } from "@/components/ui/glass-button";
 
 interface FavoriteCardProps {
   product: Product;
@@ -25,11 +26,10 @@ export default function FavoriteCard({
 
   return (
     <GlassCard
-      tint={0.5}
       contentClassName="p-0"
       className="group relative flex flex-col overflow-hidden"
     >
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
+      <div className="relative aspect-[16/10] w-full overflow-hidden">
         <button
           type="button"
           onClick={() => onOpen?.(product.id)}
@@ -42,40 +42,40 @@ export default function FavoriteCard({
             className="h-full w-full object-cover"
           />
         </button>
-        <button
+        <GlassButton
           onClick={() => onRemove(product.id)}
-          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-white/78 shadow-lg shadow-slate-900/10 backdrop-blur-md transition active:scale-90"
+          className="absolute right-2 top-2 [&_.size-12]:size-8"
           aria-label="Remove from favorites"
         >
           <Heart size={16} className="fill-rose-500 text-rose-500" />
-        </button>
-        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-semibold text-white backdrop-blur">
+        </GlassButton>
+        <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-[var(--dc-chrome-glass)] px-2 py-0.5 text-[9px] font-semibold text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
           {product.hours} • {product.lessons} lessons
         </span>
       </div>
       <div className="relative flex flex-1 flex-col gap-1.5 p-3">
         <button type="button" onClick={() => onOpen?.(product.id)} className="text-left">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-300">
             {product.category}
           </span>
-          <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-slate-900">
+          <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-white">
             {product.title}
           </h3>
         </button>
-        <p className="text-[11px] text-slate-400">{product.author}</p>
-        <div className="flex items-center gap-1 text-[11px] text-slate-500">
+        <p className="text-[11px] text-white/55">{product.author}</p>
+        <div className="flex items-center gap-1 text-[11px] text-white/55">
           <Star size={12} className="fill-amber-400 text-amber-400" />
-          <span className="font-semibold text-slate-700">{product.rating}</span>
+          <span className="font-semibold text-white/85">{product.rating}</span>
           <span>({product.reviewsCount.toLocaleString("en-IN")})</span>
         </div>
         <div className="mt-0.5 flex items-center gap-1.5">
-          <span className="text-[15px] font-extrabold text-slate-900">
+          <span className="text-[15px] font-extrabold text-white">
             {formatINR(product.price)}
           </span>
-          <span className="text-[11px] text-slate-400 line-through">
+          <span className="text-[11px] text-white/55 line-through">
             {formatINR(product.originalPrice)}
           </span>
-          <span className="text-[11px] font-semibold text-emerald-600">
+          <span className="text-[11px] font-semibold text-emerald-300">
             {discount}% off
           </span>
         </div>

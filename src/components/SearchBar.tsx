@@ -1,4 +1,5 @@
 import { GlassSurface } from "@/components/ui/glass";
+import { GlassButton } from "@/components/ui/glass-button";
 import {
   GlassSelect,
   GlassSelectContent,
@@ -22,6 +23,10 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
   // search experience with live filtering, sort, and category chips.
   // The current `value` is passed across as a `?q=` deep link so the
   // search page opens with the same query already typed.
+  // Owner (post Wave 14): a tap on the store's search box always opens the
+  // dedicated `#/search` page (the full glass search experience), carrying
+  // any draft across as `?q=`. The ⌘K palette stays reachable from the
+  // keyboard shortcut and the home header.
   const openSearchPage = () => {
     const trimmed = value.trim();
     window.location.hash = trimmed ? `#/search?q=${encodeURIComponent(trimmed)}` : "#/search";
@@ -30,7 +35,7 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
   return (
     <div className="space-y-2 px-4">
       {/* Wave 2 (global chrome): the capsule used to be an ad-hoc
-          `bg-white/60 border-white/70 shadow-lg backdrop-blur-xl` div. It is
+          `bg-white/[0.08] border-white/10 backdrop-blur-xl` div. It is
           now a `GlassSurface` lens, i.e. the same refraction layer the header
           discs and the desktop top bar use, so the store's search reads as one
           material with the rest of the chrome. The interaction contract is
@@ -38,7 +43,8 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
           that hands its draft query to `#/search?q=`, still keyboard-operable,
           still clearable. */}
       <div
-        className="group relative block w-full cursor-pointer overflow-hidden rounded-2xl text-left outline-none transition focus-visible:ring-2 focus-visible:ring-indigo-400/70 active:scale-[0.99]"
+        data-search-launcher
+        className="group relative block w-full cursor-pointer overflow-hidden rounded-2xl text-left outline-none transition active:scale-[0.99]"
         onClick={openSearchPage}
         role="button"
         tabIndex={0}
@@ -51,38 +57,35 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
         data-store-search-trigger
       >
         <GlassSurface
-          tint={0.62}
-          tintColor="255,255,255"
-          blur={18}
-          saturation={1.4}
+          tint={0.4}
           radius={18}
           className="pointer-events-none absolute inset-0 transition duration-200 group-hover:brightness-[1.02]"
         />
         <div className="relative flex items-center gap-2 px-4 py-3.5">
-          <SearchIcon className="h-5 w-5 shrink-0 text-slate-500" />
+          <SearchIcon className="h-5 w-5 shrink-0 text-white/55" />
           <input
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onFocus={openSearchPage}
             placeholder="Search courses, notes, class, subject..."
             aria-label="Search the catalogue"
-            className="w-full min-w-0 cursor-pointer bg-transparent text-[15px] font-medium text-slate-900 placeholder:text-slate-500 focus:outline-none"
+            className="w-full min-w-0 cursor-pointer bg-transparent text-[15px] font-medium text-white placeholder:text-white/55 focus:outline-none"
             readOnly
           />
           {value ? (
-            <button
+            <GlassButton
               type="button"
               aria-label="Clear search"
               onClick={(e) => {
                 e.stopPropagation();
                 onChange("");
               }}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+              className="shrink-0 [&_.size-12]:size-7"
             >
               <XIcon className="h-4 w-4" />
-            </button>
+            </GlassButton>
           ) : (
-            <span className="hidden shrink-0 rounded-md bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 sm:inline">
+            <span className="hidden shrink-0 rounded-md border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/85 sm:inline">
               Tap to search
             </span>
           )}
@@ -100,7 +103,7 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
             aria-label="Sort products"
             className="dc-glass-select h-9 w-auto min-w-[11rem] text-xs font-bold"
           />
-          <GlassSelectContent tint={0.9} className="dc-glass-select-pop" aria-label="Sort options">
+          <GlassSelectContent className="dc-glass-select-pop" aria-label="Sort options">
             {SORT_OPTIONS.map((option) => (
               <GlassSelectItem key={option} value={option}>
                 {option}

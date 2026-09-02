@@ -7,6 +7,7 @@ import {
   type PanInfo,
 } from "framer-motion";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { GlassButton } from "../../components/ui/glass-button";
 import type { ShowcaseCard } from "../data/showcase";
 
 const SWIPE_THRESHOLD = 90;
@@ -82,7 +83,7 @@ function TopCard({ card, onSwipe, activeIndex, total }: TopCardProps) {
         </motion.div>
 
         <div className="absolute inset-x-0 bottom-0 p-5">
-          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 backdrop-blur-md">
+          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1 [backdrop-filter:var(--dc-chrome-glass-blur)]">
             <Sparkles className="h-3 w-3 text-amber-300" />
             <span className="text-[11px] font-bold tracking-wider text-white">
               {card.eyebrow}
@@ -178,23 +179,23 @@ export default function StackedCards({ cards }: { cards: ShowcaseCard[] }) {
       </div>
 
       <div className="mt-4 flex items-center justify-center gap-4">
-        <button
+        <GlassButton
           onClick={() => rotate("left")}
           aria-label="Previous card"
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 shadow-md shadow-slate-300/60 ring-1 ring-slate-100 active:scale-90 transition-transform"
+          className="[&_.size-12]:size-11"
         >
           <ChevronLeft className="h-5 w-5" />
-        </button>
-        <span className="text-xs font-medium text-slate-400">
+        </GlassButton>
+        <span className="text-xs font-medium text-white/55">
           Swipe the cards to explore
         </span>
-        <button
+        <GlassButton
           onClick={() => rotate("right")}
           aria-label="Next card"
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white shadow-md shadow-slate-400/50 active:scale-90 transition-transform"
+          className="[&_.size-12]:size-11"
         >
           <ChevronRight className="h-5 w-5" />
-        </button>
+        </GlassButton>
       </div>
     </div>
   );

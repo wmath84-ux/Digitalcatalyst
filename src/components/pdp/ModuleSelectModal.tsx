@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { BadgeCheck, Check, Search, Sparkles, X } from "lucide-react";
+import { BadgeCheck, Search, Sparkles, X } from "lucide-react";
 import type { CanonicalCourseModule } from "../../types/commerce";
 import { getModuleEffectivePrice } from "../../../utils/pdpSelection";
 import { lockBodyScroll, unlockBodyScroll } from "../ui/overlayBounds";
+import { GlassSurface } from "../ui/glass";
+import { GlassButton } from "../ui/glass-button";
+import { GlassInput } from "../ui/glass-input";
+import { GlassCard } from "../ui/GlassCard";
+import { GlassCheckbox } from "../ui/glass-checkbox";
 
 const formatPrice = (value: number | null) => {
   if (value === null || !Number.isFinite(value)) return "Included";
@@ -77,74 +82,85 @@ export default function ModuleSelectModal({
   // so the sheet stays fully visible on phone, every tablet size, and desktop.
   const overlay = (
     <div
-      className="fixed inset-0 z-[90] flex items-end justify-center bg-indigo-950/30 p-3 backdrop-blur-md sm:items-center sm:p-6"
+      className="fixed inset-0 z-[90] flex items-end justify-center bg-black/50 p-3 backdrop-blur-[2px] sm:items-center sm:p-6"
       data-pdp-module-select-overlay
       onClick={onClose}
     >
-      <div
+      <GlassSurface
         onClick={(event) => event.stopPropagation()}
         data-pdp-module-select-modal
-        className="flex min-h-0 w-full max-w-md flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-3xl"
+        radius={0}
+        style={{ borderRadius: "var(--glass-sheet-radius)" }}
+        className="flex min-h-0 w-full max-w-md flex-col overflow-hidden text-white"
+        contentClassName="flex min-h-0 flex-1 flex-col"
       >
         <div className="flex justify-center pb-1 pt-3 sm:hidden">
-          <div className="h-1.5 w-12 rounded-full bg-slate-200" />
+          <div className="h-1.5 w-12 rounded-full bg-white/30" />
         </div>
         <div className="flex items-center justify-between px-5 pb-3 pt-1">
           <div className="min-w-0">
-            <h2 className="text-lg font-extrabold text-slate-900">Select modules</h2>
-            <p className="text-xs text-slate-400">
+            <h2 className="text-lg font-extrabold text-white">Select modules</h2>
+            <p className="text-xs text-white/55">
               {selectedIds.length} of {modules.length} selected · {formatPrice(selectedTotal)}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500" aria-label="Close">
+          <GlassButton type="button" onClick={onClose} className="[&_.size-12]:size-9" aria-label="Close">
             <X className="h-4 w-4" />
-          </button>
+          </GlassButton>
         </div>
 
         {modules.length > 0 ? <div className="px-5 pb-3">
-          <div className="flex items-center gap-2 rounded-2xl bg-slate-100 px-3.5 py-2.5">
-            <Search className="h-4 w-4 shrink-0 text-slate-400" />
-            <input
+          <div className="flex items-center gap-2">
+            <GlassInput
+              type="search"
+              className="w-full"
+              icon={<Search className="h-4 w-4" aria-hidden="true" />}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search modules..."
-              className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
             />
             {query ? (
-              <button type="button" onClick={() => setQuery("")} className="text-slate-400" aria-label="Clear search">
+              <GlassButton type="button" onClick={() => setQuery("")} className="shrink-0 [&_.size-12]:size-9" aria-label="Clear search">
                 <X className="h-4 w-4" />
-              </button>
+              </GlassButton>
             ) : null}
           </div>
         </div> : null}
 
-        {modules.length > 0 ? <button
-          type="button"
+        {/* Wave 10: the "Select all" row is a pack GlassCard carrying the checkbox
+            role, with the pack GlassCheckbox as its indicator. */}
+        {modules.length > 0 ? <GlassCard
           role="checkbox"
           aria-checked={allFilteredSelected}
+          tabIndex={0}
           onClick={toggleSelectAll}
-          className="mx-5 mb-2 flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              toggleSelectAll();
+            }
+          }}
+          className="mx-5 mb-2 cursor-pointer"
+          contentClassName="flex items-center justify-between px-4 py-3"
         >
           <div className="flex items-center gap-2.5">
-            <span className={`flex h-5 w-5 items-center justify-center rounded-md border-2 ${allFilteredSelected ? "border-violet-600 bg-violet-600" : "border-slate-300 bg-white"}`}>
-              {allFilteredSelected ? <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} /> : null}
-            </span>
-            <span className="text-sm font-bold text-slate-700">Select all {query ? "(filtered)" : ""}</span>
+            <GlassCheckbox checked={allFilteredSelected} tabIndex={-1} aria-hidden="true" onCheckedChange={toggleSelectAll} onClick={(event) => event.stopPropagation()} className="shrink-0" />
+            <span className="text-sm font-bold text-white/85">Select all {query ? "(filtered)" : ""}</span>
           </div>
-          <span className="text-xs font-medium text-violet-600">{filtered.length} modules</span>
-        </button> : null}
+          <span className="text-xs font-medium text-violet-300">{filtered.length} modules</span>
+        </GlassCard> : null}
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4">
           {modules.length === 0 ? (
-            <div data-pdp-no-modules className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-16 text-center">
+            <div data-pdp-no-modules className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/15 px-6 py-16 text-center">
               <PackageOpenIcon />
-              <p className="mt-3 text-base font-black text-slate-900">No modules</p>
-              <p className="mt-1 text-sm leading-relaxed text-slate-500">This course has no modules yet. Check back when the instructor publishes them.</p>
+              <p className="mt-3 text-base font-black text-white">No modules</p>
+              <p className="mt-1 text-sm leading-relaxed text-white/55">This course has no modules yet. Check back when the instructor publishes them.</p>
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-14 text-center">
-              <Sparkles className="mb-2 h-8 w-8 text-slate-300" />
-              <p className="text-sm font-medium text-slate-400">No modules match “{query}”</p>
+              <Sparkles className="mb-2 h-8 w-8 text-white/40" />
+              <p className="text-sm font-medium text-white/55">No modules match “{query}”</p>
             </div>
           ) : (
             <ul className="space-y-2.5">
@@ -154,36 +170,46 @@ export default function ModuleSelectModal({
                 const price = getModuleEffectivePrice(module, fallbackPrice);
                 return (
         <li key={module.id}>
-            <button
-              type="button"
+            <GlassCard
               role="checkbox"
               aria-checked={owned ? true : checked}
               aria-label={`${module.title} — ${owned ? "already owned" : `${formatPrice(price)}`}`}
-              disabled={owned}
-              onClick={() => toggleModule(module.id)}
+              aria-disabled={owned || undefined}
+              tabIndex={owned ? -1 : 0}
+              onClick={() => { if (!owned) toggleModule(module.id); }}
+              onKeyDown={(event) => {
+                if (owned) return;
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  toggleModule(module.id);
+                }
+              }}
                       data-pdp-module-pick={module.id}
-                      className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors ${
-                        owned ? "border-emerald-100 bg-emerald-50/70 opacity-80" : checked ? "border-violet-200 bg-violet-50" : "border-slate-100 bg-white"
+                      className={`w-full text-left ${
+                        owned ? "opacity-80" : checked ? "cursor-pointer ring-2 ring-violet-400/50" : "cursor-pointer"
                       }`}
+                      contentClassName="flex items-center gap-3 p-3"
                     >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-300">
                         <LayoutIcon />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-slate-800">{module.title}</p>
-                        <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-slate-400">
+                        <p className="truncate text-sm font-bold text-white/85">{module.title}</p>
+                        <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-white/55">
                           {module.description || `${module.resources?.length || 0} resource${(module.resources?.length || 0) === 1 ? "" : "s"} included.`}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <span className={`text-sm font-extrabold ${owned ? "text-emerald-700" : "text-slate-800"}`}>{owned ? "Purchased" : `+${formatPrice(price)}`}</span>
-                        <span aria-label={owned ? "Purchased" : undefined} className={`flex h-5 w-5 items-center justify-center rounded-md border-2 ${
-                          owned ? "border-emerald-500 bg-emerald-500 text-white" : checked ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300 bg-white"
-                        }`}>
-                          {owned ? <BadgeCheck className="h-3.5 w-3.5" strokeWidth={2.5} /> : checked ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
-                        </span>
+                        <span className={`text-sm font-extrabold ${owned ? "text-emerald-200" : "text-white/85"}`}>{owned ? "Purchased" : `+${formatPrice(price)}`}</span>
+                        {owned ? (
+                          <span aria-label="Purchased" className="flex h-[22px] w-[22px] items-center justify-center rounded-[7px] bg-emerald-500/80 text-white">
+                            <BadgeCheck className="h-3.5 w-3.5" strokeWidth={2.5} />
+                          </span>
+                        ) : (
+                          <GlassCheckbox checked={checked} tabIndex={-1} aria-hidden="true" onCheckedChange={() => toggleModule(module.id)} onClick={(event) => event.stopPropagation()} className="shrink-0" />
+                        )}
                       </div>
-                    </button>
+                    </GlassCard>
                   </li>
                 );
               })}
@@ -191,16 +217,16 @@ export default function ModuleSelectModal({
           )}
         </div>
 
-        <div className="border-t border-slate-100 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div className="border-t border-white/10 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           <button
             type="button"
             onClick={onClose}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3.5 text-sm font-bold text-white"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-indigo-600 py-3.5 text-sm font-bold text-white transition hover:bg-indigo-500"
           >
             Done · {selectedIds.length} modules · {formatPrice(selectedTotal)}
           </button>
         </div>
-      </div>
+      </GlassSurface>
     </div>
   );
 
@@ -210,7 +236,7 @@ export default function ModuleSelectModal({
 
 function PackageOpenIcon() {
   return (
-    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-slate-200/70 text-slate-400">
+    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-violet-500/15 text-violet-300">
       <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8">
         <path d="M3 9.5 12 4l9 5.5" />
         <path d="M3 9.5v6L12 21l9-5.5v-6" />

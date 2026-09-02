@@ -37,30 +37,23 @@ const MacWindowModal: React.FC<MacWindowModalProps> = ({ title, subtitle, childr
 
   return (
     <div
-      className={`fixed inset-0 ${zIndex} flex items-center justify-center p-4 bg-slate-900/25 backdrop-blur-[3px] animate-fade-in`}
+      className={`fixed inset-0 ${zIndex} flex items-center justify-center p-4 bg-black/55 animate-fade-in`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="mac-modal-title"
       onMouseDown={onClose}
     >
       <GlassSurface
-        tint={0.9}
-        tintColor="255,255,255"
-        blur={28}
-        saturation={1.4}
-        radius={0}
-        /* the window keeps its 1.75rem radius; GlassSurface writes radius
-           inline first, so the var wins here and stays overridable per theme */
-        style={{ borderRadius: "1.75rem" }}
-        className={`glass-dialog-in w-full ${maxWidth} max-h-[92vh] overflow-hidden shadow-[0_24px_70px_-20px_rgba(15,23,42,0.45)] ${className}`}
+        radius={24}
+        className={`glass-dialog-in w-full ${maxWidth} max-h-[92vh] overflow-hidden text-white ${className}`}
         contentClassName="flex max-h-[92vh] min-h-0 flex-col"
         onMouseDown={(event: React.MouseEvent) => event.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex shrink-0 items-center gap-4 border-b border-white/60 px-5 py-4">
+        <div className="sticky top-0 z-10 flex shrink-0 items-center gap-4 border-b border-white/10 px-5 py-4">
           <TrafficLights onClose={onClose} />
           <div className="min-w-0">
-            <h2 id="mac-modal-title" className="truncate text-lg font-black text-slate-900">{title}</h2>
-            {subtitle && <p className="truncate text-xs font-medium text-slate-600">{subtitle}</p>}
+            <h2 id="mac-modal-title" className="truncate text-lg font-black text-white">{title}</h2>
+            {subtitle && <p className="truncate text-xs font-medium text-white/55">{subtitle}</p>}
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">{children}</div>

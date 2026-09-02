@@ -16,23 +16,23 @@ import { startRevisionSession, ServiceError } from "../engine/revisionService";
 function TrendBadge({ trend }: { trend: string }) {
   if (trend === "improving")
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-200">
         <TrendUpIcon className="h-3 w-3" /> Improving
       </span>
     );
   if (trend === "declining")
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">
+      <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-200">
         <TrendDownIcon className="h-3 w-3" /> Declining
       </span>
     );
   if (trend === "stable")
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+      <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-bold text-white/85">
         <MinusIcon className="h-3 w-3" /> Stable
       </span>
     );
-  return <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800">New</span>;
+  return <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-200">New</span>;
 }
 
 type Props = {
@@ -95,7 +95,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
           {errorMsg && (
             <div
               data-rev-banner
-              className="order-first flex items-center gap-2 rounded-2xl bg-rose-100/70 px-4 py-3 text-sm font-medium text-rose-800 lg:col-span-12"
+              className="order-first flex items-center gap-2 rounded-2xl bg-rose-500/20 px-4 py-3 text-sm font-medium text-rose-200 lg:col-span-12"
             >
               <AlertIcon className="h-4 w-4 shrink-0" /> {errorMsg}
             </div>
@@ -104,26 +104,26 @@ export default function WeakTopicsPage({ uid, route }: Props) {
           <div data-rev-col="weak-primary" className="contents lg:col-span-7 lg:flex lg:flex-col lg:gap-3">
             {data.recommendedTopics.length > 0 && (
               <section className="order-1">
-                <h2 className="mb-2 text-[15px] font-bold text-slate-900 lg:text-[14px]">Recommended for you</h2>
+                <h2 className="mb-2 text-[15px] font-bold text-white lg:text-[14px]">Recommended for you</h2>
                 <div className="grid gap-3 min-[960px]:grid-cols-2">
                   {data.recommendedTopics.map((t) => (
-                    <Card key={t.topicId} className="border-indigo-200 bg-indigo-50/70">
+                    <Card key={t.topicId} className="border-indigo-400/30 bg-indigo-500/15">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">{t.subjectIcon}</span>
                           <div>
-                            <p className="text-sm font-semibold text-slate-900">{t.topicName}</p>
-                            <p className="text-xs text-slate-600">{t.subjectName}</p>
+                            <p className="text-sm font-semibold text-white">{t.topicName}</p>
+                            <p className="text-xs text-white/75">{t.subjectName}</p>
                           </div>
                         </div>
-                        <span className="text-sm font-bold text-rose-600">{t.accuracy}%</span>
+                        <span className="text-sm font-bold text-rose-300">{t.accuracy}%</span>
                       </div>
                       <ProgressBar value={t.accuracy} className="mt-2" />
                       <button
                         type="button"
                         onClick={() => handleRevise(t.topicId)}
                         disabled={revisingTopicId === t.topicId}
-                        className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-sm font-bold text-white shadow-md shadow-indigo-200 transition hover:brightness-105 active:scale-[0.98] disabled:opacity-60 disabled:shadow-none"
+                        className="mt-3 flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-full bg-indigo-600 text-sm font-bold text-white transition hover:bg-indigo-500 active:scale-[0.98] disabled:opacity-60"
                       >
                         <SparklesIcon className="h-4 w-4" />
                         {revisingTopicId === t.topicId ? "Starting…" : "Revise Now"}
@@ -135,7 +135,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
             )}
 
             <section className="order-3">
-              <h2 className="mb-2 text-[15px] font-bold text-slate-900 lg:text-[14px]">All Weak Topics</h2>
+              <h2 className="mb-2 text-[15px] font-bold text-white lg:text-[14px]">All Weak Topics</h2>
               <Card>
                 <div className="flex flex-col gap-4 lg:gap-2.5">
                   {data.weakestTopics.map((t) => (
@@ -143,11 +143,11 @@ export default function WeakTopicsPage({ uid, route }: Props) {
                       <div className="flex items-center justify-between">
                         <div className="flex min-w-0 items-center gap-2">
                           <span>{t.subjectIcon}</span>
-                          <p className="truncate text-sm font-medium text-slate-800">{t.topicName}</p>
+                          <p className="truncate text-sm font-medium text-white/85">{t.topicName}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <TrendBadge trend={t.trend} />
-                          <span className="text-xs font-bold text-slate-600">{t.accuracy}%</span>
+                          <span className="text-xs font-bold text-white/75">{t.accuracy}%</span>
                         </div>
                       </div>
                       <ProgressBar value={t.accuracy} className="mt-1.5" />
@@ -161,13 +161,13 @@ export default function WeakTopicsPage({ uid, route }: Props) {
           <div data-rev-col="weak-secondary" className="contents lg:col-span-5 lg:flex lg:flex-col lg:gap-3">
             {data.weakestSubjects.length > 0 && (
               <section className="order-2">
-                <h2 className="mb-2 text-[15px] font-bold text-slate-900 lg:text-[14px]">Weakest Subjects</h2>
+                <h2 className="mb-2 text-[15px] font-bold text-white lg:text-[14px]">Weakest Subjects</h2>
                 <div className="grid grid-cols-2 gap-3">
                   {data.weakestSubjects.map((s) => (
                     <Card key={s.subjectId} className="text-center">
                       <p className="text-2xl">{s.icon}</p>
-                      <p className="mt-1 truncate text-sm font-semibold text-slate-800">{s.name}</p>
-                      <p className="mt-0.5 text-lg font-bold text-slate-900">{s.accuracy}%</p>
+                      <p className="mt-1 truncate text-sm font-semibold text-white/85">{s.name}</p>
+                      <p className="mt-0.5 text-lg font-bold text-white">{s.accuracy}%</p>
                       <ProgressBar value={s.accuracy} className="mt-1.5" />
                     </Card>
                   ))}
@@ -177,15 +177,15 @@ export default function WeakTopicsPage({ uid, route }: Props) {
 
             {data.mostMissedTopics.length > 0 && (
               <section className="order-4">
-                <h2 className="mb-2 text-[15px] font-bold text-slate-900 lg:text-[14px]">Most Missed Topics</h2>
+                <h2 className="mb-2 text-[15px] font-bold text-white lg:text-[14px]">Most Missed Topics</h2>
                 <Card>
-                  <div className="divide-y divide-slate-200">
+                  <div className="divide-y divide-white/10">
                     {data.mostMissedTopics.map((t) => (
                       <div key={t.topicId} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-                        <span className="flex items-center gap-2 text-sm text-slate-700">
+                        <span className="flex items-center gap-2 text-sm text-white/85">
                           {t.subjectIcon} {t.topicName}
                         </span>
-                        <span className="text-xs font-bold text-rose-600">{t.wrong} missed</span>
+                        <span className="text-xs font-bold text-rose-300">{t.wrong} missed</span>
                       </div>
                     ))}
                   </div>
@@ -195,15 +195,15 @@ export default function WeakTopicsPage({ uid, route }: Props) {
 
             {data.frequentlySkippedTopics.length > 0 && (
               <section className="order-5">
-                <h2 className="mb-2 text-[15px] font-bold text-slate-900 lg:text-[14px]">Frequently Skipped</h2>
+                <h2 className="mb-2 text-[15px] font-bold text-white lg:text-[14px]">Frequently Skipped</h2>
                 <Card>
-                  <div className="divide-y divide-slate-200">
+                  <div className="divide-y divide-white/10">
                     {data.frequentlySkippedTopics.map((t) => (
                       <div key={t.topicId} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-                        <span className="flex items-center gap-2 text-sm text-slate-700">
+                        <span className="flex items-center gap-2 text-sm text-white/85">
                           {t.subjectIcon} {t.topicName}
                         </span>
-                        <span className="text-xs font-bold text-slate-600">{t.skipped} skipped</span>
+                        <span className="text-xs font-bold text-white/75">{t.skipped} skipped</span>
                       </div>
                     ))}
                   </div>

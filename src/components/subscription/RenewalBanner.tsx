@@ -9,6 +9,7 @@
 // notification row and the profile card stay perfectly in sync.
 
 import { AlertTriangle, CalendarClock, Clock, Lock, X } from "lucide-react";
+import { GlassButton } from "../ui/glass-button";
 import type { RenewalView } from "../../../utils/renewalPresentation";
 
 const ICONS = {
@@ -20,31 +21,31 @@ const ICONS = {
 
 const TONE_STYLES = {
   info: {
-    shell: "border-sky-200 bg-sky-50",
-    badge: "bg-sky-100 text-sky-700",
-    icon: "bg-sky-100 text-sky-600",
+    shell: "border-sky-400/30 bg-sky-500/15",
+    badge: "bg-sky-500/20 text-sky-200",
+    icon: "bg-sky-500/20 text-sky-300",
     title: "text-sky-950",
-    body: "text-sky-900/70",
+    body: "text-sky-200",
     cta: "bg-sky-600 text-white",
-    dismiss: "text-sky-500 hover:bg-sky-100",
+    dismiss: "text-sky-500 hover:bg-sky-500/20",
   },
   warning: {
-    shell: "border-amber-200 bg-amber-50",
-    badge: "bg-amber-100 text-amber-800",
-    icon: "bg-amber-100 text-amber-600",
+    shell: "border-amber-400/30 bg-amber-500/15",
+    badge: "bg-amber-500/20 text-amber-200",
+    icon: "bg-amber-500/20 text-amber-300",
     title: "text-amber-950",
-    body: "text-amber-900/70",
+    body: "text-amber-200",
     cta: "bg-amber-600 text-white",
-    dismiss: "text-amber-600 hover:bg-amber-100",
+    dismiss: "text-amber-300 hover:bg-amber-500/20",
   },
   critical: {
-    shell: "border-rose-200 bg-rose-50",
-    badge: "bg-rose-100 text-rose-700",
-    icon: "bg-rose-100 text-rose-600",
+    shell: "border-rose-400/30 bg-rose-500/15",
+    badge: "bg-rose-500/20 text-rose-200",
+    icon: "bg-rose-500/20 text-rose-300",
     title: "text-rose-950",
-    body: "text-rose-900/70",
+    body: "text-rose-200",
     cta: "bg-rose-600 text-white",
-    dismiss: "text-rose-500 hover:bg-rose-100",
+    dismiss: "text-rose-500 hover:bg-rose-500/20",
   },
 } as const;
 
@@ -66,7 +67,7 @@ export default function RenewalBanner({ view, onRenew, onDismiss, className = ""
       data-stage={view.stage}
       data-tone={view.tone}
       role={view.urgency >= 3 ? "alert" : "status"}
-      className={`mx-4 mt-3 rounded-2xl border p-3.5 shadow-sm ${tone.shell} ${className}`}
+      className={`mx-4 mt-3 rounded-2xl border p-3.5  ${tone.shell} ${className}`}
     >
       <div className="flex items-start gap-3">
         <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone.icon}`}>
@@ -78,7 +79,7 @@ export default function RenewalBanner({ view, onRenew, onDismiss, className = ""
             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${tone.badge}`}>
               {view.label}
             </span>
-            <span data-renewal-remaining className="text-[11px] font-bold text-slate-500">
+            <span data-renewal-remaining className="text-[11px] font-bold text-white/55">
               {view.remainingLabel}
             </span>
           </div>
@@ -96,33 +97,34 @@ export default function RenewalBanner({ view, onRenew, onDismiss, className = ""
                 type="button"
                 onClick={onRenew}
                 data-renewal-cta
-                className={`rounded-xl px-3.5 py-2 text-xs font-black shadow-sm transition active:scale-[0.98] ${tone.cta}`}
+                className={`rounded-full px-3.5 py-2 text-xs font-black transition active:scale-[0.98] ${tone.cta}`}
               >
                 {view.cta}
               </button>
             ) : null}
             {view.dismissible && onDismiss ? (
-              <button
+              <GlassButton
+                variant="capsule"
                 type="button"
                 onClick={() => onDismiss(view.stage)}
-                className="rounded-xl px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-white/60"
+                className="[&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-xs [&>span>div]:font-bold"
               >
                 Later
-              </button>
+              </GlassButton>
             ) : null}
           </div>
         </div>
 
         {view.dismissible && onDismiss ? (
-          <button
+          <GlassButton
             type="button"
             onClick={() => onDismiss(view.stage)}
             aria-label="Dismiss renewal notice"
             data-renewal-dismiss
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition ${tone.dismiss}`}
+            className={`shrink-0 [&_.size-12]:size-7 ${tone.dismiss}`}
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </GlassButton>
         ) : null}
       </div>
     </div>

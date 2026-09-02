@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { GlassSurface } from "../ui/glass";
 import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 
@@ -29,7 +30,7 @@ export function RadialMenu({ anchor, items, onClose, onSelect }: RadialMenuProps
           exit={{ opacity: 0 }}
           onClick={onClose}
         >
-          <div className="fp-overlay absolute inset-0" />
+          <div className="absolute inset-0 bg-black/55" />
           <MenuItems anchor={anchor} items={items} onSelect={onSelect} />
         </motion.div>
       )}
@@ -82,11 +83,11 @@ function MenuItems({
               e.stopPropagation();
               onSelect(item.id);
             }}
-            className="glass-panel-strong fixed z-[75] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 rounded-2xl px-2.5 py-2 text-fp-text"
-            style={{
-              boxShadow: `0 0 22px -6px ${item.color}88, 0 14px 30px -14px rgba(0,0,0,0.8)`,
-            }}
+            className="fixed z-[75] -translate-x-1/2 -translate-y-1/2 rounded-2xl text-fp-text"
           >
+          {/* Wave 13c: each radial item is the pack GlassSurface — no
+              `.glass-panel-strong` plate, no coloured glow shadow. */}
+          <GlassSurface radius={16} contentClassName="flex flex-col items-center gap-1 px-2.5 py-2">
             <span
               className="grid h-8 w-8 place-items-center rounded-full"
               style={{ background: `${item.color}2a`, color: item.color }}
@@ -96,6 +97,7 @@ function MenuItems({
             <span className="whitespace-nowrap text-[9.5px] font-medium tracking-wide text-fp-text-85">
               {item.label}
             </span>
+          </GlassSurface>
           </motion.button>
         );
       })}

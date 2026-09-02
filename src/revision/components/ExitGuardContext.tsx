@@ -1,3 +1,5 @@
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from "../../components/ui/glass-dialog";
+import { SecondaryButton } from "./ui";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 type GuardState = {
@@ -52,20 +54,15 @@ export function ExitGuardProvider({
   return (
     <ExitGuardContext.Provider value={{ setGuard, navigate }}>
       {children}
-      {pendingHref && guard && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/50 backdrop-blur-sm sm:items-center">
-          <div className="mx-auto w-full max-w-[480px] rounded-t-3xl bg-white p-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] shadow-2xl sm:rounded-3xl">
-            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200 sm:hidden" />
-            <h3 className="text-lg font-semibold text-slate-900">Leave this screen?</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">{guard.message}</p>
-            <div className="mt-5 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setPendingHref(null)}
-                className="min-h-[48px] flex-1 rounded-2xl border border-slate-300 bg-white text-sm font-bold text-slate-800 shadow-sm active:bg-slate-100"
-              >
+      <Dialog open={Boolean(pendingHref && guard)} onOpenChange={(v) => { if (!v) setPendingHref(null); }}>
+        {guard && (
+          <DialogContent aria-label="Leave this screen?">
+            <DialogTitle>Leave this screen?</DialogTitle>
+            <DialogDescription>{guard.message}</DialogDescription>
+            <DialogFooter className="mt-5 flex gap-3">
+              <SecondaryButton className="flex-1" onClick={() => setPendingHref(null)}>
                 Stay
-              </button>
+              </SecondaryButton>
               <button
                 type="button"
                 onClick={() => {
@@ -74,14 +71,14 @@ export function ExitGuardProvider({
                   setPendingHref(null);
                   if (href) onNavigateRef.current(href);
                 }}
-                className="min-h-[48px] flex-1 rounded-2xl bg-rose-600 text-sm font-bold text-white shadow-md shadow-rose-200 active:bg-rose-700"
+                className="min-h-[48px] flex-1 rounded-full bg-rose-600 text-sm font-bold text-white hover:bg-rose-500 active:bg-rose-700"
               >
                 {guard.confirmLabel}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
     </ExitGuardContext.Provider>
   );
 }
