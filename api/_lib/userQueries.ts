@@ -19,6 +19,8 @@
 
 import { connect as tlsConnect, type TLSSocket } from "node:tls";
 import { adminDb, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./firebaseAdmin.js";
+import { getBranding } from "./branding.js";
+import { buildReplyEmail } from "./emailTemplate.js";
 
 const COLLECTION = "userQueries";
 
@@ -56,7 +58,14 @@ const readBody = (req: VercelRequest): Record<string, unknown> => {
 const encodeHeader = (value: string) =>
   /^[\x20-\x7E]*$/.test(value) ? value : `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
 
-async function sendMail(input: { to: string; subject: string; text: string; replyTo?: string }): Promise<{ ok: boolean; reason?: string }> {
+async function sendMail(input: {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+  fromName?: string;
+  replyTo?: string;
+}): Promise<{ ok: boolean; reason?: string }> {
   const host = String(process.env.SMTP_HOST || "").trim();
   const user = String(process.env.SMTP_USER || "").trim();
   const pass = String(process.env.SMTP_PASS || "").trim();
@@ -75,16 +84,51 @@ async function sendMail(input: { to: string; subject: string; text: string; repl
       return;
     }
 
+    const b64 = (value: string) =>
+      Buffer.from(value, "utf8").toString("base64").replace(/(.{76})/g, "$1\r\n");
+    // A friendly display name ("Eduvora Support <noreply@…>") instead of a
+    // bare address — this is what makes the mail read as professional in the
+    // recipient's inbox list.
+    const fromHeader = input.fromName ? `${encodeHeader(input.fromName)} <${from}>` : from;
+    const boundary = `dc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+
+    // multipart/alternative: text part first (fallback), HTML second — mail
+    // clients render the LAST part they understand.
+    const mimeBody = input.html
+      ? [
+          `Content-Type: multipart/alternative; boundary="${boundary}"`,
+          "",
+          `--${boundary}`,
+          'Content-Type: text/plain; charset="utf-8"',
+          "Content-Transfer-Encoding: base64",
+          "",
+          b64(input.text),
+          "",
+          `--${boundary}`,
+          'Content-Type: text/html; charset="utf-8"',
+          "Content-Transfer-Encoding: base64",
+          "",
+          b64(input.html),
+          "",
+          `--${boundary}--`,
+        ].join("\r\n")
+      : [
+          'Content-Type: text/plain; charset="utf-8"',
+          "Content-Transfer-Encoding: base64",
+          "",
+          b64(input.text),
+        ].join("\r\n");
+
+    const messageId = `<${Date.now().toString(36)}.${Math.random().toString(36).slice(2)}@${host}>`;
     const body = [
-      `From: ${from}`,
+      `From: ${fromHeader}`,
       `To: ${input.to}`,
       input.replyTo ? `Reply-To: ${input.replyTo}` : "",
       `Subject: ${encodeHeader(input.subject)}`,
+      `Message-ID: ${messageId}`,
+      `Date: ${new Date().toUTCString()}`,
       "MIME-Version: 1.0",
-      'Content-Type: text/plain; charset="utf-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      Buffer.from(input.text, "utf8").toString("base64").replace(/(.{76})/g, "$1\r\n"),
+      mimeBody,
     ]
       .filter(Boolean)
       .join("\r\n");
@@ -97,7 +141,8 @@ async function sendMail(input: { to: string; subject: string; text: string; repl
       `MAIL FROM:<${from}>`,
       `RCPT TO:<${input.to}>`,
       "DATA",
-      `${body}\r\n.`,
+      // Dot-stuffing: a line that is just "." would end DATA early.
+      `${body.replace(/\r\n\./g, "\r\n..")}\r\n.`,
       "QUIT",
     ];
     let step = -1;
@@ -110,7 +155,7 @@ async function sendMail(input: { to: string; subject: string; text: string; repl
     };
 
     socket.setEncoding("utf8");
-    socket.setTimeout(15000, () => finish({ ok: false, reason: "The mail server timed out." }));
+    socket.setTimeout(20000, () => finish({ ok: false, reason: "The mail server timed out." }));
     socket.on("error", (error) => finish({ ok: false, reason: error.message }));
 
     socket.on("data", (chunk: string) => {
@@ -220,11 +265,30 @@ export async function handleReplyQuery(req: VercelRequest, res: VercelResponse) 
   let emailed = false;
   let emailStatus = "No email address on the query.";
   if (existing.email) {
+    // Branded HTML email (api/_lib/emailTemplate.ts) using the live brand
+    // name + logo, with a plain-text alternative for text-only clients.
+    const branding = await getBranding().catch(() => null);
+    const appName = branding?.appName || "Support";
+    const siteOrigin = String(process.env.PUBLIC_SITE_ORIGIN || "https://eduvora.shop").replace(/\/$/, "");
+    const logoUrl = branding?.logoUrl && /^https:\/\//.test(branding.logoUrl)
+      ? branding.logoUrl
+      : `${siteOrigin}/icons/icon-192x192.png`;
+    const mail = buildReplyEmail({
+      name: existing.name,
+      question: existing.message,
+      reply,
+      appName,
+      logoUrl,
+      actionUrl: `${siteOrigin}/#/queries`,
+      supportEmail: String(process.env.SUPPORT_EMAIL || "") || undefined,
+    });
     const result = await sendMail({
       to: existing.email,
-      subject: "Reply to your query",
-      text: `Hi ${existing.name},\n\nYou asked:\n"${existing.message}"\n\nOur reply:\n${reply}\n\n— The team`,
-      replyTo: String(user.email || "") || undefined,
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+      fromName: `${appName} Support`,
+      replyTo: String(process.env.SUPPORT_EMAIL || user.email || "") || undefined,
     });
     emailed = result.ok;
     emailStatus = result.ok ? "Reply emailed." : String(result.reason || "Could not send the email.");

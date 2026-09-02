@@ -137,3 +137,46 @@ likhi aayegi, jaise:
 - Sirf shuru karna hai, jaldi chahiye → **Gmail** (5 minute me ho jayega).
 - Proper product jaisa, zyada volume, logs/webhooks chahiye → **Brevo**.
 - Apna domain hai aur professional `noreply@domain.com` chahiye → **Resend**.
+
+
+---
+
+## Professional look — kya kya set karna chahiye
+
+Reply ab **branded HTML email** ke roop me jaati hai (`api/_lib/emailTemplate.ts`):
+purple gradient header + logo, "You asked" quoted card, "Our reply" body,
+CTA button aur footer. Preview: `docs/email-reply-preview.html` (browser me kholo).
+
+Inbox me professional dikhne ke liye ye 3 optional env vars bhi set kar do:
+
+| Variable | Example | Kya karta hai |
+|---|---|---|
+| `PUBLIC_SITE_ORIGIN` | `https://eduvora.shop` | CTA button ka link + fallback logo URL |
+| `SUPPORT_EMAIL` | `support@eduvora.shop` | Footer me dikhta hai aur `Reply-To` banta hai |
+| `SMTP_FROM` | `noreply@eduvora.shop` | Sender address (Brevo me verified hona chahiye) |
+
+Sender ka display name apne aap `"<AppName> Support"` ban jata hai, yaani inbox me
+`Eduvora Support` dikhega — bare email address nahi.
+
+### Brevo me domain authenticate karo (sabse zaroori step)
+
+Sirf sender verify karne se mail "via brevo.com" / spam me ja sakti hai.
+Domain authenticate karne par ye problem khatam ho jaati hai:
+
+1. Brevo → **Senders, Domains & Dedicated IPs** → **Domains** → **Add a domain**.
+2. Apna domain daalo (jaise `eduvora.shop`).
+3. Brevo 3 DNS records dega — apne domain provider (GoDaddy / Cloudflare / Hostinger) me add karo:
+   - **DKIM** (TXT, `mail._domainkey`)
+   - **Brevo code** (TXT verification record)
+   - **DMARC** (TXT, `_dmarc` → `v=DMARC1; p=none;`)
+4. 15–60 minute baad Brevo pe **Verify** dabao — green tick aa jayega.
+5. Ab `SMTP_FROM` ko us domain ka address bana do, jaise `noreply@eduvora.shop`.
+
+Iske baad emails Gmail ke Primary inbox me, "via" tag ke bina, tumhare brand naam se aayengi.
+
+### Design kaisa dikhega
+
+- 600px card, mobile pe automatically full-width (media query + fluid table).
+- Sab CSS inline hai, table layout hai — Gmail, Outlook, Apple Mail sab me theek render hoga.
+- `multipart/alternative`: HTML na chale to plain-text version dikh jayega.
+- Preheader text set hai, to inbox list me subject ke baad reply ki pehli line dikhegi.
