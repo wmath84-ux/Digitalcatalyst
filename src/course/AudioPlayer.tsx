@@ -1,22 +1,35 @@
 // src/course/AudioPlayer.tsx
 //
-// Course Player audio — rebuilt on the aicanvas.me "Upload Progress" widget
-// (https://aicanvas.me/components/upload-progress). The old glass transport
-// card is gone; the track now plays inside the reference's collapsible light
-// card: title + status subtitle on the left, circular actions top-right, and
-// a 6px shimmer progress bar flush along the card's bottom edge — indigo with
-// a continuous shimmer sweep while playing, amber (shimmer frozen) while
-// paused. The bottom bar doubles as the seek control (tap / drag anywhere on
-// it). Expanding the card reveals the track row with its own 3px bar plus the
-// loop and mute toggles.
+// Course Player audio — the AI Canvas "Glass Music Player"
+// (https://aicanvas.me/components/glass-music-player), colour / look /
+// animation exact:
+//   · card: w-320 rounded-[32px], background rgba(12,10,14,0.55), hairline
+//     border, `0 24px 64px rgba(0,0,0,0.55)` + inset top-light, a SEPARATE
+//     z-[-1] blur layer (blur 48 / saturate 1.6) and the left-12/right-12
+//     top highlight line,
+//   · entrance {y:24, scale:0.95} → {y:0, scale:1}, spring 200/22,
+//   · spinning vinyl: ambient colour glow (blur 28, opacity .18, scale 1.15),
+//     176 px disc with the radial-gradient face, four rings at
+//     [1, .78, .58, .38] and the glowing centre hole; the inner disc rotates
+//     360° on a 4 s linear infinite loop only while playing,
+//   · track info swaps with the blur-fade spring, progress bar is a 3 px
+//     track with a `${color}70 → ${color}dd` gradient fill,
+//   · controls row: shuffle · skip-back · 52 px radial play/pause with the
+//     colour-matched glow · skip-forward · queue, with the exact hover/tap
+//     springs and the AnimatePresence play/pause icon swap.
+//
+// The colour accent is derived per track so each lesson gets its own hue,
+// exactly like the reference's per-track colour.
 //
 // All playback behaviour is unchanged: resume position, progress reporting,
-// pause-when-hidden (`active` prop) and the `data-course-audio-*` contract
-// attributes all carry over.
+// pause-when-hidden (`active` prop), loop / mute, and every
+// `data-course-audio-*` contract attribute carries over. Skip-back/forward
+// are wired to −15 s / +15 s seeks (there is one track in a lesson), and the
+// pagination dots became a 3-segment position indicator for the same reason.
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronsDownUp, ChevronsUpDown, Pause, Play, Repeat, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { AnimatePresence, motion, useMotionValue, useTransform } from "framer-motion";
+import { ArrowLeft, Heart, Pause, Play, Repeat, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
 
 interface AudioPlayerProps {
   url: string;
@@ -41,43 +54,15 @@ const formatTime = (value: number) => {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
-const FILL_PLAYING = "#6366f1"; // indigo while playing
-const FILL_PAUSED = "#f59e0b"; // amber on pause
-const CARD_SHADOW = "0px 16px 56px rgba(0,0,0,0.25)";
-const heightSpring = { type: "spring", stiffness: 380, damping: 38 } as const;
+/** The reference's track palette — one hue per track, picked from the name. */
+const TRACK_COLORS = ["#FF6BF5", "#06D6A0", "#FF7B54"] as const;
+const colorForTrack = (key: string) => {
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return TRACK_COLORS[hash % TRACK_COLORS.length];
+};
 
-/** 36px circle action — bg #ededea, icon #6c6c6c, spring hover/tap. */
-function CircleButton({
-  label,
-  onClick,
-  children,
-  activeTint = false,
-  dataAttrs,
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-  activeTint?: boolean;
-  dataAttrs?: Record<string, string | undefined>;
-}) {
-  return (
-    <motion.button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      whileHover={{ scale: 1.12 }}
-      whileTap={{ scale: 0.88 }}
-      transition={{ type: "spring", stiffness: 420, damping: 22 }}
-      className={`grid size-9 shrink-0 cursor-pointer place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-        activeTint ? "bg-indigo-100 text-indigo-600" : "bg-[#ededea] text-[#6c6c6c]"
-      }`}
-      {...(dataAttrs ?? {})}
-    >
-      {children}
-    </motion.button>
-  );
-}
+const SKIP_SECONDS = 15;
 
 export default function AudioPlayer({ url, name, active = true, resumeAt = 0, onProgress }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -86,12 +71,22 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [loop, setLoop] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [liked, setLiked] = useState(false);
+
+  const color = useMemo(() => colorForTrack(url || name), [url, name]);
 
   const resumeRef = useRef(resumeAt);
   const resumeApplied = useRef(false);
   const progressRef = useRef(onProgress);
   progressRef.current = onProgress;
+
+  // Progress is a motion value so the bar's fill animates on its own
+  // timeline (same as the reference) instead of re-rendering per frame.
+  const progressMV = useMotionValue(0);
+  const barWidth = useTransform(progressMV, (v: number) => `${Math.max(0, Math.min(1, v)) * 100}%`);
+  useEffect(() => {
+    progressMV.set(duration > 0 ? currentTime / duration : 0);
+  }, [currentTime, duration, progressMV]);
 
   useEffect(() => {
     setPlaying(false);
@@ -118,19 +113,14 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
   const seek = (value: number) => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.currentTime = value;
-    setCurrentTime(value);
+    const next = Math.max(0, Math.min(duration || audio.duration || 0, value));
+    audio.currentTime = next;
+    setCurrentTime(next);
   };
 
-  const restart = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.currentTime = 0;
-    setCurrentTime(0);
-    if (!playing) void audio.play();
-  };
+  const skipTo = (dir: -1 | 1) => seek(currentTime + dir * SKIP_SECONDS);
 
-  // ── Seek by pointer on the bottom bar (tap or drag) ─────────────────────
+  // ── Seek by pointer on the progress bar (tap or drag) ───────────────────
   const seekZoneRef = useRef<HTMLDivElement>(null);
   const seekDragRef = useRef<number | null>(null);
   const seekFromPointer = (clientX: number) => {
@@ -155,177 +145,297 @@ export default function AudioPlayer({ url, name, active = true, resumeAt = 0, on
     try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
   };
 
-  const percent = duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0;
-  const remaining = Math.max(0, duration - currentTime);
-  const fillColor = playing ? FILL_PLAYING : FILL_PAUSED;
-  const status = playing ? "Playing" : "Paused";
+  const ratio = duration > 0 ? currentTime / duration : 0;
+  // The reference's pagination dots become a 3-segment position indicator:
+  // a lesson has one track, so the dots show which third is playing.
+  const segment = Math.min(2, Math.floor(ratio * 3));
 
   return (
     <div
-      className="grid h-full min-h-0 w-full min-w-0 place-items-center overflow-hidden p-3 sm:p-5"
+      className="grid h-full min-h-0 w-full min-w-0 place-items-center overflow-auto p-3 sm:p-5"
       data-course-viewer-audio
       data-compact="false"
     >
-      <div
-        className="relative w-full max-w-[480px] overflow-hidden bg-[#f1f1f0] text-[#1a1a19]"
-        style={{ borderRadius: 28, boxShadow: CARD_SHADOW }}
+      <motion.div
+        initial={{ y: 24, scale: 0.95 }}
+        animate={{ y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 200, damping: 22 }}
+        className="relative isolate w-[320px] max-w-full overflow-hidden rounded-[32px]"
+        style={{
+          background: "rgba(12,10,14,0.55)",
+          border: "1px solid rgba(255,255,255,0.09)",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07)",
+        }}
         data-course-audio-player
         data-playing={playing ? "true" : "false"}
       >
-        {/* ── Header row: title + subtitle left, circular actions right ── */}
-        <div className="flex items-start justify-between gap-3 px-5 pb-4 pt-5 sm:px-6">
-          <div className="min-w-0">
-            <h3 className="truncate text-[17px] font-bold leading-snug" title={name}>{name}</h3>
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.p
-                key={status}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.16 }}
-                className="mt-0.5 whitespace-nowrap text-sm font-medium text-[#6c6c6c]"
-              >
-                <span data-course-audio-current>{formatTime(currentTime)}</span>
-                {" / "}
-                <span data-course-audio-duration>{formatTime(duration)}</span>
-                {" · "}
-                {status}
-              </motion.p>
-            </AnimatePresence>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <CircleButton
-              label={playing ? "Pause" : "Play"}
-              onClick={togglePlay}
-              dataAttrs={{ "data-course-audio-play": "", "data-playing": playing ? "true" : "false" }}
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.span
-                  key={playing ? "pause" : "play"}
-                  initial={{ opacity: 0, scale: 0.6 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.6 }}
-                  transition={{ duration: 0.14 }}
-                  className="grid place-items-center"
-                >
-                  {playing ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
-                </motion.span>
-              </AnimatePresence>
-            </CircleButton>
-            <CircleButton label="Restart" onClick={restart} dataAttrs={{ "data-course-audio-restart": "" }}>
-              <RotateCcw size={15} />
-            </CircleButton>
-            <CircleButton
-              label={expanded ? "Collapse" : "Expand"}
-              onClick={() => setExpanded((value) => !value)}
-              dataAttrs={{ "data-course-audio-expand": "", "data-expanded": expanded ? "true" : "false" }}
-            >
-              {expanded ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}
-            </CircleButton>
-          </div>
-        </div>
+        {/* Separate blur layer — never re-blurs while the disc spins. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-[-1]"
+          style={{ backdropFilter: "blur(48px) saturate(1.6)", WebkitBackdropFilter: "blur(48px) saturate(1.6)" }}
+        />
+        {/* Top highlight line. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-12 right-12 top-0 h-[1px]"
+          style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)" }}
+        />
 
-        {/* ── Expanded: track row + loop / mute toggles ── */}
-        <AnimatePresence initial={false}>
-          {expanded ? (
-            <motion.div
-              key="expanded"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ height: heightSpring, opacity: { duration: 0.16 } }}
+        <div className="flex flex-col items-center px-7 pb-7 pt-6">
+          {/* 1) Top bar */}
+          <div className="mb-6 flex w-full items-center justify-between">
+            <motion.button
+              type="button"
+              aria-label="Rewind 15 seconds"
+              onClick={() => skipTo(-1)}
+              whileHover={{ scale: 1.15, color: "rgba(255,255,255,0.8)" }}
+              whileTap={{ scale: 0.85 }}
+              style={{ color: "rgba(255,255,255,0.35)" }}
             >
-              <div className="mx-6 h-px bg-black/[0.07]" aria-hidden="true" />
-              <div className="px-5 py-4 sm:px-6">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="min-w-0 truncate text-sm font-bold" title={name}>{name}</p>
-                  <p className="shrink-0 whitespace-nowrap text-xs font-medium text-[#6c6c6c]">
-                    {Math.round(percent)}% · {formatTime(remaining)} left
-                  </p>
-                </div>
-                <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[#e4e4dc]">
-                  <motion.div
-                    className="h-full rounded-full"
-                    initial={false}
-                    animate={{ width: `${percent}%`, backgroundColor: fillColor }}
-                    transition={{ width: { duration: 0.2, ease: "linear" }, backgroundColor: { duration: 0.35 } }}
-                  />
-                </div>
-                <div className="mt-4 flex items-center gap-2">
-                  <CircleButton
-                    label="Toggle loop"
-                    onClick={() => setLoop((value) => !value)}
-                    activeTint={loop}
-                    dataAttrs={{ "data-course-audio-loop": "", "data-active": loop ? "true" : "false" }}
-                  >
-                    <Repeat size={15} />
-                  </CircleButton>
-                  <CircleButton
-                    label="Toggle mute"
-                    onClick={() => {
-                      const audio = audioRef.current;
-                      if (!audio) return;
-                      audio.muted = !audio.muted;
-                      setMuted(audio.muted);
+              <ArrowLeft size={20} />
+            </motion.button>
+            <span
+              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+              style={{ color: "rgba(255,255,255,0.4)" }}
+            >
+              Now Playing
+            </span>
+            <motion.button
+              type="button"
+              aria-label="Like"
+              aria-pressed={liked}
+              onClick={() => setLiked((value) => !value)}
+              animate={{ color: liked ? color : "rgba(255,255,255,0.35)" }}
+              transition={{ duration: 0.2 }}
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.85 }}
+            >
+              <Heart size={20} fill={liked ? color : "transparent"} />
+            </motion.button>
+          </div>
+
+          {/* 2) Album disc */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={url}
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ type: "spring", stiffness: 260, damping: 26 }}
+              className="relative mb-7"
+            >
+              <div
+                aria-hidden
+                className="absolute inset-0 rounded-full"
+                style={{ background: color, opacity: 0.18, filter: "blur(28px)", transform: "scale(1.15)" }}
+              />
+              <div
+                className="relative flex h-44 w-44 items-center justify-center rounded-full"
+                style={{
+                  background: `radial-gradient(circle at 38% 35%, ${color}28, ${color}08 60%, transparent)`,
+                  border: `1.5px solid ${color}25`,
+                  boxShadow: `0 0 0 8px rgba(255,255,255,0.03), 0 12px 40px rgba(0,0,0,0.5)`,
+                }}
+                data-course-audio-disc
+              >
+                <motion.div
+                  animate={{ rotate: playing ? 360 : 0 }}
+                  transition={playing ? { duration: 4, repeat: Infinity, ease: "linear" } : { duration: 0.3 }}
+                  className="relative h-28 w-28"
+                >
+                  {[1, 0.78, 0.58, 0.38].map((scale, index) => (
+                    <div
+                      key={scale}
+                      aria-hidden
+                      className="absolute inset-0 rounded-full"
+                      style={{
+                        transform: `scale(${scale})`,
+                        border: `1px solid ${color}${index === 0 ? "30" : index === 1 ? "1e" : "14"}`,
+                      }}
+                    />
+                  ))}
+                  <div
+                    aria-hidden
+                    className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                    style={{
+                      background: `radial-gradient(circle, ${color}cc, ${color}66)`,
+                      boxShadow: `0 0 10px ${color}55`,
                     }}
-                    activeTint={muted}
-                    dataAttrs={{ "data-course-audio-mute": "", "data-muted": muted ? "true" : "false" }}
-                  >
-                    {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-                  </CircleButton>
-                  <span className="ml-auto text-[11px] font-semibold uppercase tracking-wider text-[#9a9a94]">
-                    {loop ? "Loop on" : "Loop off"} · {muted ? "Muted" : "Sound on"}
-                  </span>
-                </div>
+                  />
+                </motion.div>
               </div>
             </motion.div>
-          ) : null}
-        </AnimatePresence>
+          </AnimatePresence>
 
-        {/* ── Bottom shimmer bar — the seek control ──
-            6px, full width, flush at the card bottom. Indigo + shimmer while
-            playing, amber with a frozen shimmer when paused. The invisible
-            zone above it widens the touch target for scrubbing. */}
-        <div
-          ref={seekZoneRef}
-          className="relative mt-1 h-6 w-full cursor-pointer touch-none select-none"
-          role="slider"
-          aria-label="Seek"
-          aria-valuemin={0}
-          aria-valuemax={Math.round(duration) || 1}
-          aria-valuenow={Math.round(currentTime)}
-          tabIndex={0}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowRight") seek(Math.min(duration, currentTime + 5));
-            if (event.key === "ArrowLeft") seek(Math.max(0, currentTime - 5));
-          }}
-          onPointerDown={onSeekPointerDown}
-          onPointerMove={onSeekPointerMove}
-          onPointerUp={onSeekPointerUp}
-          onPointerCancel={onSeekPointerUp}
-          data-course-audio-seek
-        >
-          <div className="absolute inset-x-0 bottom-0 h-1.5 bg-[#e4e4dc]">
+          {/* 3) Track info */}
+          <AnimatePresence mode="wait">
             <motion.div
-              className="relative h-full overflow-hidden"
-              initial={false}
-              animate={{ width: `${percent}%`, backgroundColor: fillColor }}
-              transition={{ width: { duration: 0.18, ease: "linear" }, backgroundColor: { duration: 0.35 } }}
-              data-course-audio-seek-fill
+              key={url}
+              initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
+              transition={{ type: "spring", duration: 0.4, bounce: 0 }}
+              className="mb-4 flex w-full flex-col items-center gap-1"
             >
-              <motion.span
-                aria-hidden="true"
-                className="absolute inset-0"
-                style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.35), transparent)" }}
-                animate={playing ? { x: ["-100%", "100%"] } : { x: "-100%" }}
-                transition={playing
-                  ? { duration: 1.6, ease: "easeInOut", repeat: Infinity, repeatDelay: 0.8 }
-                  : { duration: 0.2 }}
-              />
+              <h3 className="max-w-full truncate text-lg font-bold tracking-tight text-white/95" title={name}>
+                {name}
+              </h3>
+              <p className="text-[13px] font-medium" style={{ color: "rgba(255,255,255,0.38)" }}>
+                {playing ? "Playing" : "Paused"}
+              </p>
             </motion.div>
+          </AnimatePresence>
+
+          {/* 4) Position dots */}
+          <div className="mb-5 flex items-center gap-[7px]">
+            {[0, 1, 2].map((index) => (
+              <motion.button
+                key={index}
+                type="button"
+                aria-label={`Jump to part ${index + 1}`}
+                onClick={() => seek(((index + 0.001) / 3) * duration)}
+                animate={{
+                  width: index === segment ? 20 : 5,
+                  opacity: index === segment ? 0.5 : 0.22,
+                  backgroundColor: index === segment ? color : "#ffffff",
+                }}
+                transition={{ type: "spring", stiffness: 400, damping: 28 }}
+                className="h-[5px] cursor-pointer rounded-full"
+                style={{ minWidth: 5 }}
+              />
+            ))}
+          </div>
+
+          {/* 5) Progress bar — also the seek control */}
+          <div className="mb-5 w-full">
+            <div
+              ref={seekZoneRef}
+              role="slider"
+              aria-label="Seek"
+              aria-valuemin={0}
+              aria-valuemax={Math.round(duration) || 1}
+              aria-valuenow={Math.round(currentTime)}
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowRight") seek(currentTime + 5);
+                if (event.key === "ArrowLeft") seek(currentTime - 5);
+              }}
+              onPointerDown={onSeekPointerDown}
+              onPointerMove={onSeekPointerMove}
+              onPointerUp={onSeekPointerUp}
+              onPointerCancel={onSeekPointerUp}
+              className="relative h-[3px] w-full cursor-pointer touch-none select-none overflow-hidden rounded-full"
+              style={{ background: "rgba(255,255,255,0.07)" }}
+              data-course-audio-seek
+            >
+              <motion.div
+                className="absolute left-0 top-0 h-full rounded-full"
+                style={{ width: barWidth, background: `linear-gradient(90deg, ${color}70, ${color}dd)` }}
+                data-course-audio-seek-fill
+              />
+            </div>
+            <div className="mt-2 flex justify-between">
+              <span className="text-[10px] font-medium tabular-nums" style={{ color: "rgba(255,255,255,0.28)" }} data-course-audio-current>
+                {formatTime(currentTime)}
+              </span>
+              <span className="text-[10px] font-medium tabular-nums" style={{ color: "rgba(255,255,255,0.28)" }} data-course-audio-duration>
+                {formatTime(duration)}
+              </span>
+            </div>
+          </div>
+
+          {/* 6) Controls */}
+          <div className="flex w-full items-center justify-between">
+            <motion.button
+              type="button"
+              aria-label="Toggle loop"
+              aria-pressed={loop}
+              onClick={() => setLoop((value) => !value)}
+              animate={{ color: loop ? color : "rgba(255,255,255,0.35)" }}
+              transition={{ duration: 0.2 }}
+              whileHover={{ scale: 1.15, color: loop ? color : "rgba(255,255,255,0.75)" }}
+              whileTap={{ scale: 0.85 }}
+              data-course-audio-loop
+              data-active={loop ? "true" : "false"}
+            >
+              <Repeat size={19} />
+            </motion.button>
+
+            <motion.button
+              type="button"
+              aria-label="Back 15 seconds"
+              onClick={() => skipTo(-1)}
+              style={{ color: "rgba(255,255,255,0.65)" }}
+              whileHover={{ scale: 1.12, color: "rgba(255,255,255,0.95)" }}
+              whileTap={{ scale: 0.9 }}
+              data-course-audio-restart
+            >
+              <SkipBack size={26} fill="currentColor" />
+            </motion.button>
+
+            <motion.button
+              type="button"
+              aria-label={playing ? "Pause" : "Play"}
+              onClick={togglePlay}
+              animate={{
+                background: `radial-gradient(circle at 38% 35%, ${color}ee, ${color}99)`,
+                boxShadow: `0 4px 20px ${color}55, 0 0 0 1px ${color}33`,
+              }}
+              transition={{ duration: 0.3 }}
+              whileHover={{ scale: 1.07 }}
+              whileTap={{ scale: 0.92 }}
+              className="flex h-[52px] w-[52px] items-center justify-center rounded-full"
+              data-course-audio-play
+              data-playing={playing ? "true" : "false"}
+            >
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={playing ? "pause" : "play"}
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.6, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="grid place-items-center text-white"
+                >
+                  {playing ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" className="ml-0.5" />}
+                </motion.span>
+              </AnimatePresence>
+            </motion.button>
+
+            <motion.button
+              type="button"
+              aria-label="Forward 15 seconds"
+              onClick={() => skipTo(1)}
+              style={{ color: "rgba(255,255,255,0.65)" }}
+              whileHover={{ scale: 1.12, color: "rgba(255,255,255,0.95)" }}
+              whileTap={{ scale: 0.9 }}
+            >
+              <SkipForward size={26} fill="currentColor" />
+            </motion.button>
+
+            <motion.button
+              type="button"
+              aria-label="Toggle mute"
+              aria-pressed={muted}
+              onClick={() => {
+                const audio = audioRef.current;
+                if (!audio) return;
+                audio.muted = !audio.muted;
+                setMuted(audio.muted);
+              }}
+              animate={{ color: muted ? color : "rgba(255,255,255,0.35)" }}
+              transition={{ duration: 0.2 }}
+              whileHover={{ scale: 1.15, color: muted ? color : "rgba(255,255,255,0.75)" }}
+              whileTap={{ scale: 0.85 }}
+              data-course-audio-mute
+              data-muted={muted ? "true" : "false"}
+            >
+              {muted ? <VolumeX size={19} /> : <Volume2 size={19} />}
+            </motion.button>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       <audio
         ref={audioRef}

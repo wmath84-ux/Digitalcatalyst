@@ -5889,3 +5889,18 @@ html.light {
 .course-player-shell[data-course-theme="light"] [data-course-overlay][data-solid-panel="true"] {
   background: rgba(36, 39, 52, 0.97) !important;
 }
+
+
+/* ── Compact side-panel band (<=1023px): AI Canvas Glass Sidebar ──────────
+   The wide 260 px rail is swapped for the 64 px glass rail (it springs open
+   to 220 px over the content, so the layout width stays 64 px + gutters).
+   Any rule that positioned things against `--desktop-rail-width` follows. */
+@media (max-width: 1023px) {
+  .dc-desktop-shell:has([data-desktop-rail-variant="glass-sidebar"]) {
+    --desktop-rail-width: 88px;
+  }
+}
+[data-desktop-rail-variant="glass-sidebar"] {
+  /* Expanded rail paints over the page instead of reflowing it. */
+  overflow: visible;
+}
