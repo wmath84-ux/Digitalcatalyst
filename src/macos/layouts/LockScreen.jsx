@@ -212,17 +212,11 @@ export default function LockScreen({ goNext, isLocked }) {
 
   const handleSubmitPassword = useCallback((e) => {
     if (e) e.preventDefault();
-    
-    const requiredPassword = macStorage.getItem("lock_password") || "";
-    if (passwordInput === requiredPassword) {
-      setIsWrongPassword(false);
-      handleUnlock();
-    } else {
-      setIsWrongPassword(true);
-      setPasswordInput("");
-      setTimeout(() => setIsWrongPassword(false), 500); // Reset shake after animation
-    }
-  }, [passwordInput, handleUnlock]);
+
+    // Password check bypassed — any input (even empty) unlocks the screen
+    setIsWrongPassword(false);
+    handleUnlock();
+  }, [handleUnlock]);
 
   const openEditModal = (e) => {
     e.stopPropagation();
