@@ -449,8 +449,13 @@ export function SplitDeck({
   }, []);
   const specFloor = splitFloorFor(axis, phone);
 
-  /** The deck's measured width, so a phone in landscape gets a floor that is
-   *  genuinely wide enough for the dock rather than a guessed percentage. */
+  /** The deck's measured width, so a short/narrow landscape stage gets a floor
+   *  that is genuinely wide enough for the dock rather than a guessed
+   *  percentage. This applies to EVERY landscape device, not just phones:
+   *  on a tablet landscape (or a narrow desktop window) the study pane could
+   *  otherwise settle to the 15% band — far narrower than the six-icon dock's
+   *  ~344 px — so the freshly-visible footer dock would be clipped by the
+   *  pane's overflow-hidden. Collapse-to-rail still bypasses the floor. */
   const [deckWidth, setDeckWidth] = useState(0);
   useEffect(() => {
     const node = sectionRef.current;
@@ -465,7 +470,7 @@ export function SplitDeck({
     return () => observer.disconnect();
   }, []);
   const dockFloor =
-    phone && axis === "row" && deckWidth > 0 ? clampSplitRatio((SPLIT_DOCK_MIN_PX / deckWidth) * 100) : 0;
+    axis === "row" && deckWidth > 0 ? clampSplitRatio((SPLIT_DOCK_MIN_PX / deckWidth) * 100) : 0;
   const floor = Math.max(specFloor, dockFloor);
 
   /** The study pane's percent — the one number the whole deck animates. It

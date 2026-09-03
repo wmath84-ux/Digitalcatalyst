@@ -51,10 +51,12 @@ export const SPLIT_SMALL_SCREEN_MIN = 30;
 export const SPLIT_SMALL_SCREEN_PX = 430;
 /** A phone in landscape has a short viewport; it gets the same treatment. */
 export const SPLIT_SHORT_VIEWPORT_PX = 500;
-/** The six-icon glass dock's natural width. On a phone in landscape the study
- *  pane never *settles* narrower than this, or the dock would sit inside the
- *  pane yet be clipped by it — which defeats the point of putting it there.
- *  Tablets and desktops keep the 15% floor, and collapse-to-rail bypasses it. */
+/** The six-icon glass dock's natural width. In landscape (axis "row") the
+ *  study pane never *settles* narrower than this on ANY device — phones,
+ *  tablets and desktops alike — or the dock would sit inside the pane yet be
+ *  clipped by it, which defeats the point of putting it there (the pane
+ *  already starts well above this width on wide stages, so the floor only
+ *  bites on short/narrow landscape windows). Collapse-to-rail bypasses it. */
 export const SPLIT_DOCK_MIN_PX = 344;
 /** Magnetic snap points, in study-pane percent. */
 export const SPLIT_SNAP_POINTS = [20, 35, 50, 65, 80] as const;
