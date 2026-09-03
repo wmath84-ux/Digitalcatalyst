@@ -6253,3 +6253,29 @@ html.light {
 @media (hover: hover) {
   .dc-glass-card:hover { box-shadow: var(--dc-elev-3); }
 }
+
+
+/* ── Subscription plan comparison table ────────────────────────────────────
+   The table scrolls horizontally on phones, so the feature-name column is
+   pinned: without it the rows lose their labels the moment the user scrolls to
+   the third plan, which is the classic failure of responsive comparison
+   tables. The pinned column carries its own material (not transparent) so the
+   scrolling cells pass behind it cleanly. */
+.dc-compare-table .dc-compare-rowhead {
+  background: color-mix(in srgb, #101321 92%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.08);
+}
+html.light .dc-compare-table .dc-compare-rowhead {
+  background: color-mix(in srgb, #ffffff 92%, transparent);
+  box-shadow: 1px 0 0 rgba(15, 18, 34, 0.08);
+}
+.dc-compare-scroll {
+  scrollbar-width: thin;
+}
+.dc-compare-scroll::-webkit-scrollbar { height: 6px; }
+.dc-compare-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 9999px;
+}
