@@ -1618,7 +1618,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    of the viewport, min(24rem, 90vw) wide), so the note grid tiles by the
    width the sheet actually gives it instead of the fixed viewport columns:
    a narrow phone sheet gets 2 comfortable columns, a wider one gets more. */
-[data-course-overlay] [data-course-notes-grid] {
+[data-course-overlay] [data-course-notes-grid],
+[data-course-study-pane] [data-course-notes-grid] {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 
@@ -1821,6 +1822,116 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   --course-soft-hover: rgb(255 255 255 / 0.18);
   --course-strong: rgb(255 255 255 / 0.32);
   --course-loading: rgb(10 12 18 / 0.5);
+}
+
+/* ── Course Player glass — blur discipline (Phase 2) ─────────────────────
+   Every glass surface in the player (header, landscape rail, footer dock,
+   the Split Deck's panes, divider, grabber and peek rails) reads the same
+   three tokens: --dc-chrome-glass / -blur / -rim. The blur is re-scoped
+   HERE, for the player only — a deeper frost than the site header, STATIC
+   per theme, and cheaper on touch devices. Nothing in the player ever
+   animates a blur; the animated properties are transform, opacity,
+   box-shadow and flex-grow only. */
+.course-player-shell {
+  --dc-chrome-glass-blur: blur(18px) saturate(1.4);
+  /* The soft inner edge the smaller pane leans on while the divider drags. */
+  --course-split-compress-ink: rgb(2 4 10 / 0.85);
+}
+
+.course-player-shell[data-course-theme="light"] {
+  --dc-chrome-glass-blur: blur(14px) saturate(1.2);
+  --course-split-compress-ink: rgb(15 23 42 / 0.4);
+}
+
+@media (pointer: coarse) {
+  /* Mid-range phones get the same material with a lighter frost. */
+  .course-player-shell,
+  .course-player-shell[data-course-theme="light"] {
+    --dc-chrome-glass-blur: blur(12px) saturate(1.2);
+  }
+}
+
+/* ── Course Player — Split Deck ──────────────────────────────────────────
+   Two glass panes with one draggable glass divider between them: the lesson
+   (the player's lossless viewer stack) and the study pane (the same five tabs
+   the footer dock has, WITH the footer dock itself inside it). See
+   src/course/studyPanels.tsx + src/course/splitMotion.ts. */
+
+/* Keyboard: the divider's focus ring is the ACTIVE TAB's colour, which the
+   deck writes inline as --split-accent — the ring says which tab you are on. */
+[data-course-split-divider]:focus-visible {
+  outline: 2px solid var(--split-accent, #3a86ff);
+  outline-offset: -2px;
+  border-radius: 999px;
+}
+
+/* Desktop hover: the core line brightens and the grabber's dots come up.
+   Touch devices get no hover state at all. */
+@media (hover: hover) and (pointer: fine) {
+  [data-course-split-divider]:hover [data-course-split-line] {
+    filter: brightness(1.28);
+  }
+}
+
+/* While the divider drags, the % bubble takes the grabber's place — the dots
+   step out of the way instead of reading through the glass pill. */
+[data-course-split-divider][data-dragging="true"] [data-course-split-grabber] span > span {
+  opacity: 0;
+}
+
+/* While the divider drags, the pane that is being COMPRESSED leans on its
+   divider-side edge. "End" is the lesson pane's divider edge (bottom in
+   portrait, right in landscape); "start" is the study pane's. */
+[data-course-split-deck][data-split-axis="column"] {
+  --course-split-compress-end: inset 0 -22px 26px -22px var(--course-split-compress-ink);
+  --course-split-compress-start: inset 0 22px 26px -22px var(--course-split-compress-ink);
+}
+[data-course-split-deck][data-split-axis="row"] {
+  --course-split-compress-end: inset -22px 0 26px -22px var(--course-split-compress-ink);
+  --course-split-compress-start: inset 22px 0 26px -22px var(--course-split-compress-ink);
+}
+[data-course-lesson-pane],
+[data-course-study-pane] {
+  transition: box-shadow 180ms ease;
+}
+[data-course-split-deck][data-split-compressed="lesson"] [data-course-lesson-pane] {
+  box-shadow: var(--course-split-compress-end);
+}
+[data-course-split-deck][data-split-compressed="study"] [data-course-study-pane] {
+  box-shadow: var(--course-split-compress-start);
+}
+
+/* Notes + Mind map sit on a deeper plate in the study pane too, exactly like
+   the sheet's `data-solid-panel` treatment, so the writing surface reads the
+   same in both homes (a touch less opaque: nothing overlaps it here). */
+.course-player-shell [data-course-study-pane][data-solid-panel="true"] {
+  background: rgba(13, 15, 24, 0.9);
+}
+.course-player-shell[data-course-theme="light"] [data-course-study-pane][data-solid-panel="true"] {
+  background: rgba(36, 39, 52, 0.92);
+}
+
+/* The collapsed pane's 28px glass strip: a 2px edge glow in the tab colour
+   (painted inline) plus the breathing icon framer-motion drives. Coarse
+   pointers and reduced-motion users get the strip without the pulse ring. */
+[data-course-peek-rail] {
+  -webkit-tap-highlight-color: transparent;
+}
+@media (pointer: coarse) {
+  [data-course-split-pulse] {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-course-split-pulse],
+  [data-course-peek-rail] [data-peek-icon] {
+    animation: none !important;
+    transition: none !important;
+  }
+  [data-course-split-deck] [data-course-lesson-pane],
+  [data-course-split-deck] [data-course-study-pane] {
+    transition: none !important;
+  }
 }
 
 /* Course audio card: never clip on tablet `* { max-width: 100% }` or short
