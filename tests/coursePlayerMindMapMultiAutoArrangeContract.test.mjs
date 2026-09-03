@@ -376,11 +376,11 @@ test("the map library re-uses the notes grid's own tiling function", () => {
   assert.doesNotMatch(libraryRule[0], /minmax\(min\(160px/, "cards never shrink below 160 px during a drag-close");
 });
 
-test("the library is still mounted inside the sheet the split rule targets", () => {
-  // Parity depends on the panel living under the element that reports which
-  // sheet is open — the same ancestor the notes grid hangs its rule off.
+test("the library is still mounted inside the right-side sheet", () => {
+  // Parity depends on the panel living under the overlay element — the same
+  // ancestor the notes grid hangs its tiling rule off.
   assert.match(overlay, /data-course-overlay\b/);
-  assert.match(overlay, /data-split-kind=\{mindMapSplit \? "mindmap" : splitMode \? "notes" : "none"\}/);
+  assert.match(overlay, /data-course-overlay-tab=\{tab\}/);
   assert.match(panel, /data-course-mindmap-library/);
 });
 

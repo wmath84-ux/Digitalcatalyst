@@ -1,25 +1,25 @@
 // tests/coursePlayerDockMagneticNotesKeyboardContract.test.mjs
 //
-// Contract for four Course Player improvements:
+// Contract for the Course Player footer + sheet redesign (owner's direction):
 //
-//   1. DRAGGABLE, MAGNETIC DOCK INDICATOR — the sliding accent pill on the
-//      bottom footer can be grabbed and dragged between the four tabs
-//      (Module / Resource / Note / Paid). It follows the finger with a
-//      magnetic lock near each tab centre, the overlay content swaps LIVE as
-//      the pill crosses each tab, and on release it snaps to the nearest tab.
-//      Tab buttons stay fully clickable; a tap on the indicator still toggles.
+//   1. SIMPLE HOME-STYLE FOOTER — the course player's footer navigation is
+//      the EXACT home page footer navigation (src/components/glass-dock/
+//      GlassDock.tsx, the same component src/components/BottomNav.tsx uses):
+//      same frosted panel, entrance spring, magnification, tinted plates,
+//      tooltips. The old draggable magnetic pill, grab handle, live content
+//      swap on slide and landscape split are REMOVED.
 //   2. RESUME LAST OPENED MODULE — reopening any purchased course lands the
 //      learner back on the exact module they left off in. (The resume guard
 //      is covered in coursePlayerUx.test.mjs; this file asserts the helper.)
-//   3. DOCK FLUID + GLOW — the footer gets the same breathing "magic" glow as
-//      the home-page footer plus a slow liquid sheen that drifts inside the
-//      capsule.
-//   4. LANDSCAPE NOTES SPLIT IS KEYBOARD-AWARE — in landscape the lesson and
-//      the notes editor stay side by side (60/40); when the soft keyboard
-//      rises the editor shrinks to sit above it instead of being hidden.
-//      The four-tab dock rail STAYS pinned to the far-right edge while the
-//      split is on (a flex spacer under the 40% sheet keeps the in-flow
-//      dock from sliding toward the middle of the screen).
+//   3. RIGHT-SIDE GLASS SHEET — the overlay is the websiteglass Glass Sheet
+//      (https://websiteglass.com/docs/components/glass-sheet), right side,
+//      opening ONLY in the window between the player header and the footer
+//      dock (measured `bounds` inset both the sheet and its scrim), so it
+//      never overlaps either.
+//   4. SCROLL-RELEASE CLICK LIST — inside the sheet, list tabs render a
+//      vertical column of dock-style buttons, scroll-snapped: scroll and
+//      lift the finger and the button the finger settled on (closest to the
+//      list centre) is clicked.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -33,66 +33,41 @@ const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const overlay = readSource("src/course/CourseOverlay.tsx");
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
-const styles = readSource("src/index.css");
+const bottomNav = readSource("src/components/BottomNav.tsx");
+const glassSheet = readSource("src/components/ui/glass-sheet.tsx");
 
 // ---------------------------------------------------------------------------
-// 1. Draggable, magnetic dock indicator
+// 1. Simple home-style footer navigation
 // ---------------------------------------------------------------------------
 
-test("The dock exposes a dedicated grab handle over the active slot", () => {
-  assert.match(overlay, /data-course-dock-handle/);
-  // The handle is the grab affordance and disables browser panning while
-  // dragging so the indicator is the only thing that moves.
-  assert.match(overlay, /touch-none cursor-grab active:cursor-grabbing/);
+test("The course footer IS the home footer component (same GlassDock)", () => {
+  // The overlay imports the exact dock the home page renders…
+  assert.match(overlay, /import GlassDock, \{ type GlassDockItem \} from "\.\.\/components\/glass-dock\/GlassDock"/);
+  // …and mounts it the same way BottomNav does (site footer variant).
+  assert.match(overlay, /<GlassDock[\s\S]*?siteFooter[\s\S]*?items=\{dockItems\}[\s\S]*?onSelect=\{\(id\) => props\.onTabChange\(id as DockTab\)\}/);
+  assert.match(bottomNav, /<GlassDock\s+siteFooter/);
 });
 
-test("Dragging uses pointer capture so the finger can wander off the pill", () => {
-  assert.match(overlay, /onHandlePointerDown = \(event: ReactPointerEvent<HTMLSpanElement>\)/);
-  assert.match(overlay, /event\.currentTarget\.setPointerCapture\(event\.pointerId\)/);
-  assert.match(overlay, /releasePointerCapture\?\.\(event\.pointerId\)/);
+test("The dock tabs keep their data hooks and select through onTabChange", () => {
+  assert.match(overlay, /data-course-dock/);
+  assert.match(overlay, /"data-course-dock-tab": ""/);
+  assert.match(overlay, /"data-tab": key/);
 });
 
-test("The indicator follows the finger through a magnetic easing curve", () => {
-  // Near a tab centre (within the band) it locks; outside it follows ~1:1.
-  assert.match(overlay, /const DOCK_MAGNETIC_BAND = 0\.18/);
-  assert.match(overlay, /if \(adist <= DOCK_MAGNETIC_BAND\) return nearest;/);
-  // The displayed position is the magnetic curve while dragging, the active
-  // index at rest.
-  assert.match(overlay, /const displayedIndex = dragging \? magneticIndex\(dragIndex as number\) : activeIndex;/);
-  // Both the visual indicator and the handle ride on displayedIndex.
-  assert.match(overlay, /translateX\(\$\{displayedIndex \* 100\}%\)/);
-  assert.match(overlay, /data-display-index=\{displayedIndex\.toFixed\(3\)\}/);
-});
-
-test("The overlay content swaps LIVE as the pill is dragged across tabs", () => {
-  // In the move handler, the moment the rounded position changes the tab is
-  // switched immediately — no waiting for release.
-  assert.match(overlay, /const nearest = Math\.round\(raw\);/);
-  assert.match(overlay, /if \(key && nearest !== activeIndex\) props\.onTabChange\(key\);/);
-});
-
-test("On release the pill magnetically snaps to the nearest tab", () => {
-  // The release handler rounds the live fractional position to the nearest
-  // tab and commits it.
-  assert.match(overlay, /const snapped = current == null \? activeIndex : Math\.round\(current\);/);
-  assert.match(overlay, /if \(key && snapped !== activeIndex\) props\.onTabChange\(key\);/);
-});
-
-test("A pure tap on the indicator still behaves like tapping the active tab", () => {
-  // The handle covers the active slot, so a tap (no movement) must forward to
-  // the active-tab toggle instead of stealing the original button behaviour.
-  assert.match(overlay, /if \(!st\.moved\) \{/);
-  assert.match(overlay, /const key = TABS\[activeIndex\]\?\.key;/);
-});
-
-test("The other three tab buttons stay fully clickable", () => {
-  // The grab handle overlays ONLY the active quarter, so the remaining tabs'
-  // select wiring keeps firing. The buttons keep their data hook + wiring
-  // (the tap now routes through DockTabButton's onSelect so a finger-slide
-  // selection can suppress the synthetic click that follows it).
-  assert.match(overlay, /data-course-dock-tab/);
-  assert.match(overlay, /onSelect=\{\(\) => props\.onTabChange\(key\)\}/);
-  assert.match(overlay, /if \(skipSelectRef\.current\) return;/);
+test("The old slide/drag machinery is gone (no magnetic pill, no live swap)", () => {
+  // Draggable indicator + grab handle
+  assert.doesNotMatch(overlay, /data-course-dock-handle/);
+  assert.doesNotMatch(overlay, /data-course-dock-indicator/);
+  assert.doesNotMatch(overlay, /magneticIndex/);
+  assert.doesNotMatch(overlay, /DOCK_MAGNETIC_BAND/);
+  // Live content swap while the finger slides across the dock
+  assert.doesNotMatch(overlay, /onHandlePointerDown/);
+  assert.doesNotMatch(overlay, /onDockPointerDown/);
+  // Landscape split mode (60/40 lesson + panel, edge reopen handle)
+  assert.doesNotMatch(overlay, /data-course-split-handle/);
+  assert.doesNotMatch(overlay, /data-course-dock-spacer/);
+  assert.doesNotMatch(coursePlayer, /data-course-dock-spacer/);
+  assert.doesNotMatch(coursePlayer, /data-course-mindmap-dock-spacer/);
 });
 
 // ---------------------------------------------------------------------------
@@ -116,63 +91,58 @@ test("A manual navigation flags the selection so resume never clobbers it", () =
 });
 
 // ---------------------------------------------------------------------------
-// 3. Dock fluid sheen + breathing glow
+// 3. Right-side glass sheet between header and footer dock
 // ---------------------------------------------------------------------------
 
-test("The dock pill has a slow drifting fluid sheen inside the capsule", () => {
-  assert.match(styles, /\.dc-dock-fluid\s*\{/);
-  assert.match(styles, /@keyframes dc-dock-fluid \{/);
-  // The sheen is painted behind the indicator + buttons (z-index 0) so it
-  // never washes out an icon.
-  assert.match(styles, /\.dc-dock-fluid \{[\s\S]*?z-index: 0;/);
-  // Rendered as the first child of the dock pill.
-  assert.match(overlay, /<span className="dc-dock-fluid" aria-hidden="true" \/>/);
+test("The sheet is the websiteglass Glass Sheet pinned to the right edge", () => {
+  assert.match(overlay, /import \{ GlassSheet, GlassSheetContent, type SheetBounds \} from "\.\.\/components\/ui\/glass-sheet"/);
+  assert.match(overlay, /<GlassSheetContent[\s\S]*?side="right"/);
+  assert.match(glassSheet, /right: "right-0 top-0 h-full w-\[min\(24rem,90vw\)\]"/);
 });
 
-test("The dock's resting glow is tuned brighter so the breathe reads on the dark stage", () => {
-  assert.match(styles, /\[data-course-dock\] \.dc-footer-glow \{/);
-  assert.match(styles, /opacity: calc\(0\.55 \+ var\(--dc-footer-glow, 0\) \* 0\.45\)/);
-  // The dock still reuses the shared footer glow + pill classes.
-  assert.match(overlay, /data-course-dock[\s\S]*?dc-footer-glow/);
-  assert.match(overlay, /dc-footer-pill/);
+test("The sheet is bounded to the window between the header and the dock", () => {
+  // The inset is measured from the real layout: the player header's bottom
+  // edge (portrait) / right edge (landscape rail) and the dock's top edge.
+  assert.match(overlay, /const \[sheetBounds, setSheetBounds\] = useState<SheetBounds \| null>\(null\);/);
+  assert.match(overlay, /\[data-course-landscape-header\]" : "\[data-course-header\]"/);
+  assert.match(overlay, /bottom: Math\.max\(0, Math\.round\(window\.innerHeight - dockRect\.top\)\)/);
+  // …and handed to the sheet + scrim via the `bounds` prop.
+  assert.match(overlay, /bounds=\{sheetBounds \?\? undefined\}/);
+  // The shared component insets BOTH scrim and panel when bounds is given.
+  assert.match(glassSheet, /export interface SheetBounds/);
+  assert.match(glassSheet, /style=\{bounds \? boundsInset\(bounds\) : undefined\}/);
 });
 
-test("The active pill glows harder while it is being dragged", () => {
-  assert.match(styles, /\[data-course-dock-indicator\]\[data-dragging="true"\] > span \{/);
-  assert.match(overlay, /data-dragging=\{dragging \? "true" : "false"\}/);
+test("The sheet content swaps per tab without a slide animation", () => {
+  assert.match(overlay, /key=\{tab\} className="min-h-0 flex-1 overflow-hidden" data-course-overlay-tab=\{tab\}/);
+  // The old tab-content slide-in is gone.
+  assert.doesNotMatch(overlay, /animate-course-overlay-in/);
 });
 
 // ---------------------------------------------------------------------------
-// 4. Landscape notes split is keyboard-aware
+// 4. Scroll-release click list
 // ---------------------------------------------------------------------------
 
-test("The overlay measures the soft-keyboard height from the visual viewport", () => {
-  assert.match(overlay, /const \[keyboardInset, setKeyboardInset\] = useState\(0\);/);
-  assert.match(overlay, /window\.visualViewport/);
-  assert.match(overlay, /setKeyboardInset\(Math\.max\(0, Math\.round\(\(window\.innerHeight \?\? 0\) - vv\.height - vv\.offsetTop\)\)\)/);
+test("List rows are dock-style buttons (same 44px tinted plates + magnify)", () => {
+  assert.match(overlay, /const ROW_ICON_SIZE = 44;/);
+  assert.match(overlay, /const ROW_MAG_SCALE = 1\.55;/);
+  assert.match(overlay, /background: spec\.selected \? `\$\{color\}30` : `\$\{color\}18`/);
+  assert.match(overlay, /borderRadius: 12/);
+  assert.match(overlay, /data-course-sheet-row/);
 });
 
-test("While the keyboard is up over the notes editor the sheet lifts above it", () => {
-  assert.match(overlay, /const keyboardActive = tab === "notes" && notesEditorOpen && keyboardInset > 0;/);
-  // The sheet reserves the keyboard height at its bottom edge (landscape uses
-  // the raw inset; portrait keeps at least the 4rem dock clearance).
-  assert.match(overlay, /bottom: landscape \? `\$\{keyboardInset\}px` : `\$\{Math\.max\(64, keyboardInset\)\}px`/);
-});
-
-test("The landscape split keeps lesson + notes side by side (60/40)", () => {
-  assert.match(overlay, /const DEFAULT_NOTES_SPLIT = 40;/);
-  assert.match(coursePlayer, /100 - \(splitPanelPercent \?\? \(mindMapSplitMode \? 50 : 40\)\)/);
-  assert.match(overlay, /onSplitModeChange/);
-  assert.match(overlay, /data-course-split-handle/);
-});
-
-test("The landscape dock rail stays pinned to the far-right edge in split mode", () => {
-  // The dock renders as the section's last IN-FLOW child, so the moment the
-  // lesson shrinks to 60% for the notes editor the rail would slide toward
-  // the middle of the screen with it. A flex spacer eats the gap under the
-  // 40% notes sheet, pinning the dock back to the far-right edge — exactly
-  // where it sits when the sheet is closed. The absolute sheet (z-40)
-  // covers the spacer completely.
-  assert.match(coursePlayer, /data-course-dock-spacer/);
-  assert.match(coursePlayer, /\{notesSplitMode \? <div className="min-h-0 flex-1" aria-hidden="true" data-course-dock-spacer \/> : null\}/);
+test("Scrolling the list and lifting the finger clicks the settled button", () => {
+  // The list is snap-scrollable…
+  assert.match(overlay, /snap-y snap-proximity/);
+  assert.match(overlay, /snap-center/);
+  // …and the browser's own "settle" signal (plus an idle fallback) fires the
+  // row closest to the list centre.
+  assert.match(overlay, /el\.addEventListener\("scrollend", activate\)/);
+  assert.match(overlay, /idleTimerRef\.current = window\.setTimeout\(activate, 140\)/);
+  assert.match(overlay, /const dist = Math\.abs\(rect\.top \+ rect\.height \/ 2 - center\);/);
+  // A reflow caused by the fired press (expand / sheet close) must not
+  // immediately fire a second row.
+  assert.match(overlay, /lockedUntilRef\.current = Date\.now\(\) \+ 800;/);
+  // A plain tap never triggers the scroll path.
+  assert.match(overlay, /if \(!scrolledRef\.current \|\| Date\.now\(\) < lockedUntilRef\.current\) return;/);
 });

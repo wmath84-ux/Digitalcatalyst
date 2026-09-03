@@ -55,10 +55,10 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     // ⚙ Player settings popover (the home of every former quick-toggle)
     "data-course-settings-trigger",
     "data-course-setting",
-    // Bottom dock + overlay
+    // Bottom dock (home GlassDock as-is — no course-specific indicator) + overlay
     "data-course-dock",
     "data-course-dock-tab",
-    "data-course-dock-indicator",
+    "data-course-sheet-row",
     "data-course-overlay",
     "data-course-overlay-tab",
     "data-course-overlay-close",

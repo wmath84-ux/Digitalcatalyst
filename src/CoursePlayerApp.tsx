@@ -762,6 +762,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // mind map canvas) is still exactly where the learner left it on return.
   const handleDockTabChange = (next: DockTab) => {
     if (next === dockTab) {
+      // Tapping the active tab closes the sheet — a debounced mind map write
+      // left pending must be flushed on this close path too (X / scrim /
+      // Escape already flush through onClose).
+      if (dockOpen && dockTab === "mindmap") mindMap.flush();
       setDockOpen((open) => !open);
     } else {
       setDockTab(next);
@@ -799,35 +803,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const selectedEmbedKind = selectedFile ? getCourseEmbed(selectedFile).kind : "none";
   const showViewportToggle = VIEWPORT_AWARE_KINDS.includes(selectedEmbedKind);
 
-  // ── Notes split mode (landscape) ────────────────────────────────────────
-  // CourseOverlay reports when the notes editor is open in landscape — that
-  // is the moment the lesson can be split into a 60/40 layout: course on
-  // the left, the editor + soft keyboard on the right. Tracking it here
-  // lets the content area shrink to 60vw instead of staying hidden behind
-  // the editor sheet.
-  const [notesSplitMode, setNotesSplitMode] = useState(false);
-  const handleSplitModeChange = useCallback((active: boolean) => setNotesSplitMode(active), []);
-  // Reset split state when the notes tab closes OR when the overlay closes,
-  // so the lesson expands back to full width without a white gap.
-  useEffect(() => {
-    if ((dockTab !== "notes" || !dockOpen) && notesSplitMode) setNotesSplitMode(false);
-  }, [dockTab, dockOpen, notesSplitMode]);
-
-  // ── Mind map split mode (landscape) ─────────────────────────────────────
-  // Tracked separately from `notesSplitMode` because the two sheets claim
-  // DIFFERENT widths: the notes editor takes 40% of the landscape screen and
-  // the mind map takes 50%. The lesson has to shrink to the matching
-  // complement, so the parent needs to know which sheet is the open one.
-  const [mindMapSplitMode, setMindMapSplitMode] = useState(false);
-  const handleMindMapSplitChange = useCallback((active: boolean) => setMindMapSplitMode(active), []);
-  // Live landscape split ratio (panel percent). Defaults: notes 40, mind map 50.
-  // The overlay reports every drag frame so the lesson and the sheet stay
-  // glued to the same centre handle.
-  const [splitPanelPercent, setSplitPanelPercent] = useState<number | null>(null);
-  const handleSplitRatioChange = useCallback((percent: number | null) => setSplitPanelPercent(percent), []);
-  useEffect(() => {
-    if (dockTab !== "mindmap" && mindMapSplitMode) setMindMapSplitMode(false);
-  }, [dockTab, mindMapSplitMode]);
   // Leaving the Mind map tab flushes any pending debounced write immediately,
   // so a branch added a moment before switching away is never left unsaved.
   // Guarded by the previous tab: flushing on mount (the player opens on
@@ -1071,7 +1046,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onEditNote={(id, text) => editNote(id, text)}
       onDeleteNote={(id) => deleteNote(id)}
       onLinkNote={(id, links) => linkNote(id, links)}
-      onSplitModeChange={handleSplitModeChange}
       // The mind map editor is owned here (not inside the overlay) so its
       // Firestore hook and canvas state survive the sheet being closed and
       // reopened — the learner never loses an unsaved branch to a tab switch.
@@ -1108,13 +1082,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           }}
         />
       )}
-      onMindMapSplitChange={handleMindMapSplitChange}
-      onSplitRatioChange={handleSplitRatioChange}
     />
   );
 
-  // The landscape layout keeps the header rail on the left and the dock
-  // navigation on the right instead of dropping all navigation in fullscreen.
+  // The landscape layout keeps the header rail on the left. The footer
+  // navigation is the SAME home-style dock the portrait layout uses (bottom
+  // of the section in both orientations); the sheet opens between the header
+  // and the dock from the right and never overlaps either.
   const landscapeLayout = () => (
     <>
       {playerChromeHidden ? null : (
@@ -1157,55 +1131,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       </header>
       )}
 
-      {/* Content is strictly bounded between both rails, preventing embedded
-          players from extending underneath the right-side navigation.
-          When notes-split mode is on, the content area shrinks to the
-          left 60% of the available landscape section so the editor (40%)
-          and the lesson (60%) sit side-by-side — exactly like a notepad
-          next to a video. The dock still rides along the far right at
-          its own 4rem slot, and the editor overlays the right portion
-          absolutely so the dock stays where the user expects it.
-
-          Implementation note: the overlay is `position: absolute`, so it
-          does not consume flex space. The content's `basis` is set to
-          `calc(60% - 4rem)` so it stops exactly where the overlay's
-          left edge begins; otherwise the overlay would overlap the
-          content by 4rem (the dock's width). */}
+      {/* Content fills everything between the header rail (left) and the
+          footer dock (bottom of this column). The sheet portals to <body>
+          with measured bounds, so it sits in exactly this window without
+          overlapping the header or the dock. */}
       <section
         id="course-viewer"
-        className="relative flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden"
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
         data-course-landscape-content
-        data-split-mode={notesSplitMode || mindMapSplitMode ? "true" : "false"}
-        data-split-kind={mindMapSplitMode ? "mindmap" : notesSplitMode ? "notes" : "none"}
-        data-split-percent={splitPanelPercent == null ? undefined : String(splitPanelPercent)}
       >
-        <div
-          className={`flex min-h-0 flex-col overflow-hidden ${
-            notesSplitMode || mindMapSplitMode ? "shrink-0 grow-0" : "basis-full max-w-full flex-1"
-          }`}
-          style={
-            notesSplitMode || mindMapSplitMode
-              ? {
-                  flexBasis: `calc(${100 - (splitPanelPercent ?? (mindMapSplitMode ? 50 : 40))}% - 4rem)`,
-                  maxWidth: `calc(${100 - (splitPanelPercent ?? (mindMapSplitMode ? 50 : 40))}% - 4rem)`,
-                }
-              : undefined
-          }
-          data-course-landscape-content-inner
-        >
-          <div className="min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
-        </div>
-        {/* Split-mode spacer. The dock (rendered by the overlay as this
-            section's last in-flow child) sits in normal flex flow, so when
-            the lesson shrinks to 60% for the notes editor the rail used to
-            slide with it toward the middle of the screen. The spacer eats
-            the gap under the 40% notes sheet and pins the dock back to the
-            far-right edge — exactly where it sits when the sheet is closed.
-            The sheet (absolute, z-40) covers the spacer completely. */}
-        {notesSplitMode ? <div className="min-h-0 flex-1" aria-hidden="true" data-course-dock-spacer /> : null}
-        {/* Same dock-pinning spacer for the mind map's own 50% sheet. Only
-            ever one of the two is mounted, since only one tab is open. */}
-        {mindMapSplitMode ? <div className="min-h-0 flex-1" aria-hidden="true" data-course-mindmap-dock-spacer /> : null}
+        <div className="relative min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
         {playerChromeHidden ? null : overlay}
         {chromeRestoreButton}
       </section>
