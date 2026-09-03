@@ -133,20 +133,26 @@ function ProductCardList({
 
       {/* Content — right side */}
       <div className="relative flex flex-1 flex-col gap-1.5 p-3 sm:p-4">
-        <div className="flex items-center gap-1 text-sm">
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-amber-400 text-amber-400"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-          <span className="text-xs font-bold text-white">{product.rating.toFixed(1)}</span>
-          <span className="text-xs text-white/55">({product.reviews})</span>
+        {/* Same hierarchy contract as the grid card: title leads, proof
+            follows, byline is the quietest line — so switching layouts never
+            changes what the eye reads first. */}
+        <h3 className="text-sm font-extrabold leading-[1.35] dc-ink-1 sm:text-[15px]">{product.title}</h3>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="inline-flex items-center gap-1">
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-amber-400 text-amber-400"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+            <span className="text-xs font-bold dc-ink-1">{product.rating.toFixed(1)}</span>
+            <span className="text-xs dc-ink-3">({product.reviews})</span>
+          </span>
+          {product.reviews >= 25 ? <span className="dc-proof">🔥 Popular</span> : null}
         </div>
-        <h3 className="text-sm font-extrabold leading-snug text-white sm:text-[15px]">{product.title}</h3>
-        <p className="text-xs font-medium text-white/75">by {product.instructor}</p>
-        <div className="mt-auto flex items-center gap-2 pt-1">
+        <p className="text-xs font-medium dc-ink-3">by {product.instructor}</p>
+        <div className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-1">
           {product.originalPrice > product.price && (
-            <span className="text-xs text-white/55 line-through">₹{product.originalPrice}</span>
+            <span className="text-xs dc-anchor-price">₹{product.originalPrice}</span>
           )}
-          <span className="text-base font-extrabold text-white">₹{product.price}</span>
+          <span className="text-lg dc-hero-price">₹{product.price}</span>
           {discount > 0 && (
-            <span className="rounded-md bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-300">-{discount}%</span>
+            <span className="dc-save-pill">Save ₹{product.originalPrice - product.price} · {discount}%</span>
           )}
         </div>
         {/* Wave 10: terminal states are flat meaning-colour plates (amber /
@@ -164,9 +170,9 @@ function ProductCardList({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onAddToCart(product.id); }}
-            className="mt-1 flex w-full items-center justify-center rounded-full bg-indigo-600 px-3 py-2.5 text-xs font-extrabold uppercase tracking-wide text-white transition hover:bg-indigo-500 active:scale-[0.98]"
+            className="dc-focusable mt-1 flex w-full items-center justify-center rounded-full bg-indigo-600 px-3 py-2.5 text-xs font-extrabold uppercase tracking-wide text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500 active:scale-[0.98]"
           >
-            Add to Cart
+            Add to my cart
           </button>
         )}
       </div>
@@ -258,7 +264,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
           automatically whenever the catalog snapshot changes; the source
           demo's default cards fill the fan until seven products exist. */}
       <section aria-label="Top rated" className="pt-1">
-        <p className="px-4 text-[10px] font-black uppercase tracking-widest text-indigo-300">Top rated</p>
+        <p className="dc-section-label px-4">Top rated</p>
         <TiltedCoverflow products={products} onOpenProduct={onView} />
       </section>
 
@@ -320,10 +326,29 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
       ) : loading ? (
         <div className="mx-4 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">{[0, 1, 2, 3].map((item) => <GlassCard key={item} className="h-72 animate-pulse" aria-hidden="true" />)}</div>
       ) : filtered.length === 0 ? (
-        <GlassCard className="mx-4 mt-6" contentClassName="flex flex-col items-center gap-2 py-14 text-center">
-          <BookOpenIcon className="h-8 w-8 text-indigo-400" />
-          <p className="text-sm font-bold text-white/85">No resources match your search</p>
-          <p className="text-xs font-medium text-white/55">Try a different keyword or clear filters</p>
+        /* Educational empty state: says what happened, why, and gives the
+           user a one-tap way out instead of a dead end. */
+        <GlassCard className="mx-4 mt-6" contentClassName="dc-empty">
+          <span className="dc-empty-art" aria-hidden="true">
+            <BookOpenIcon className="h-7 w-7 text-indigo-300" />
+          </span>
+          <p className="dc-empty-title">
+            {search.trim() ? `Nothing matched “${search.trim()}”` : "No resources in this filter yet"}
+          </p>
+          <p className="dc-empty-body">
+            {search.trim()
+              ? "We search titles, subjects, instructors and tags. Try a shorter keyword, or reset the filter to see the full catalog."
+              : "This category has no published resources right now. Switch back to All to browse everything available today."}
+          </p>
+          {(search.trim() || activeFilter.id !== ALL_STORE_FILTER.id) ? (
+            <button
+              type="button"
+              onClick={() => { setSearch(""); setActiveFilterId(ALL_STORE_FILTER.id); }}
+              className="dc-focusable mt-1 rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500"
+            >
+              Show all resources
+            </button>
+          ) : null}
         </GlassCard>
       ) : viewMode === "list" ? (
         /* ── Rectangular cards / list view ── */
