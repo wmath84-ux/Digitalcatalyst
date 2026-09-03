@@ -119,7 +119,7 @@ Rules posture after deployment (unchanged from intent):
 ### Verifying admin product writes in production
 
 After deploying the rules, prove the end-to-end path with the client SDK (so the real deployed rules are enforced on every probe):
-
+- deploy trigger
 ```bash
 ADMIN_EMAIL="wmath84@gmail.com" ADMIN_PASSWORD="..." npm run verify:admin-access
 ```
