@@ -198,16 +198,15 @@ test("The single + button lives in the overlay's main header, not the panel", ()
   assert.doesNotMatch(notesPanel, /sync across devices/);
 });
 
-test("The overlay hides its main header + grab handle while the writing box is open", () => {
+test("The overlay hides its main header while the writing box is open", () => {
   // Writing mode = notes tab + editor open. In that mode the sheet keeps no
   // chrome at all: toolbar / writing surface / Save + Cancel only, so the
-  // box gets maximum space in both portrait and landscape. The mind map tab
-  // does the same in LANDSCAPE (clean split canvas flush against the top of
-  // the sheet), but in PORTRAIT it keeps the standard header (title +
-  // close X) like every other sheet, so the grab pill gives way to it there.
+  // box gets every pixel of the right-side sheet in both orientations.
+  // There is no grab handle at all anymore — the sheet closes via its
+  // header X, the scrim or Escape.
   assert.match(overlay, /const notesWriting = tab === "notes" && notesEditorOpen;/);
-  assert.match(overlay, /\{!landscape && !notesWriting && tab !== "mindmap" \? \(/);
-  assert.match(overlay, /\{notesWriting \|\| \(tab === "mindmap" && landscape\) \? null : \(/);
+  assert.match(overlay, /\{notesWriting \? null : \(/);
+  assert.doesNotMatch(overlay, /Collapse panel/);
 });
 
 test("CourseOverlay wires NotesPanel into the notes tab", () => {
@@ -338,9 +337,12 @@ test("CoursePlayer replaces the side panel with a four-toggle bottom dock", () =
   for (const tab of ["modules", "resources", "notes", "paid"]) {
     assert.match(overlay, new RegExp(`key: "${tab}"`), `missing dock tab ${tab}`);
   }
+  // The footer is the home page's GlassDock itself — no course-specific
+  // pill / indicator anymore.
+  assert.match(overlay, /import GlassDock, \{ type GlassDockItem \} from "\.\.\/components\/glass-dock\/GlassDock"/);
   assert.match(overlay, /data-course-dock/);
   assert.match(overlay, /data-course-dock-tab/);
-  assert.match(overlay, /data-course-dock-indicator/);
+  assert.doesNotMatch(overlay, /data-course-dock-indicator/);
   assert.match(coursePlayer, /data-course-player/);
   assert.doesNotMatch(coursePlayer, /data-course-side-panel/);
 });
@@ -353,7 +355,7 @@ test("CourseOverlay reuses a single sheet whose content swaps per tab", () => {
 
 test("Modules overlay lists available modules, Resources lists only files", () => {
   assert.match(overlay, /data-course-overlay-list/);
-  assert.match(overlay, /data-mode=\{mode\}/);
+  assert.match(overlay, /"data-mode": listModeAttr/);
   assert.match(overlay, /data-course-overlay-module/);
   assert.match(overlay, /data-course-overlay-file/);
   assert.match(overlay, /mode === "resources"/);
@@ -378,11 +380,14 @@ test("Modules overlay only lists unlocked modules — locked/paid modules live i
   assert.match(overlay, /unlocked\.has\(String\(module\.id\)\)/);
 });
 
-test("Course overlay draws modules and files as a left-side connected wire tree", () => {
-  assert.match(overlay, /data-course-overlay-wire/);
-  assert.match(overlay, /data-course-wire-rail/);
-  assert.match(overlay, /data-course-wire-node/);
-  assert.match(overlay, /function WireRail/);
+test("Course overlay lists modules and files as dock-style buttons (home footer look)", () => {
+  // The old connected wire tree is gone; rows use the footer navigation's
+  // exact icon plates (44 px, tinted, magnifying) + label, in a plain
+  // scroll-snapped column.
+  assert.match(overlay, /data-course-sheet-row/);
+  assert.match(overlay, /const ROW_ICON_SIZE = 44;/);
+  assert.match(overlay, /data-row-kind=\{spec\.kind\}/);
+  assert.doesNotMatch(overlay, /function WireRail/, "the wire tree is gone");
 });
 
 test("Paid overlay lists only paid modules with a buy CTA", () => {
@@ -392,9 +397,13 @@ test("Paid overlay lists only paid modules with a buy CTA", () => {
   assert.match(overlay, /data-course-overlay-buy-update/);
 });
 
-test("Notes overlay is half the screen", () => {
-  assert.match(overlay, /50dvh/);
-  assert.match(overlay, /tab === "notes"/);
+test("Notes tab fills the right-side sheet (NotesPanel mounted in the sheet content)", () => {
+  // No fixed half-screen heights any more — the sheet is the websiteglass
+  // Glass Sheet bounded between the header and the dock; the notes panel
+  // simply fills whatever the sheet gives it.
+  assert.match(overlay, /tab === "notes" \? \(/);
+  assert.match(overlay, /<NotesPanel[\s\S]*?composerOpenSignal=\{composerSignal\}/);
+  assert.doesNotMatch(overlay, /50dvh/, "fixed half-screen heights are gone");
 });
 
 test("Custom AudioPlayer replaces the native audio element with a transport", () => {

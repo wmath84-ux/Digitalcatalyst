@@ -56,83 +56,41 @@ test("Mind map is a dock tab declared immediately after Note", () => {
   assert.deepEqual(order, ["modules", "resources", "notes", "mindmap", "paid"], "Mind map must sit right after Note");
 });
 
-test("the dock indicator and grab handle size themselves for five tabs", () => {
-  // Both were hardcoded to a quarter when there were four tabs; with five they
-  // must be a fifth, or the accent pill lands between two buttons.
-  assert.doesNotMatch(overlay, /h-1\/4|w-1\/4/, "a stale four-tab slot size would misalign the pill");
-  assert.match(overlay, /h-\[20%\]/);
-  assert.match(overlay, /w-\[20%\]/);
-  // The drag maths derives its slot from the tab count at runtime.
-  assert.match(overlay, /\/ TABS\.length/);
-});
-
 test("the overlay renders the mind map panel for its tab and degrades without one", () => {
   assert.match(overlay, /tab === "mindmap"/);
   assert.match(overlay, /props\.mindMapPanel \?\?/, "a missing panel must fall back, not render a blank sheet");
 });
 
 // ---------------------------------------------------------------------------
-// Sheet sizing — the mind map claims half the screen
+// Sheet — one right-side glass sheet, identical for every tab
 // ---------------------------------------------------------------------------
 
-test("in landscape the mind map sheet claims 50% and splits while the sheet is open", () => {
-  assert.match(overlay, /const DEFAULT_MINDMAP_SPLIT = 50;/);
-  // The split follows `open` ON PURPOSE: tapping the same Mind map dock button
-  // closes the sheet but keeps the tab selected, and an un-gated split would
-  // leave the lesson shrunk to 50% with a blank half of the screen behind a
-  // sheet that is no longer there. On the next open the split is already true,
-  // so the sheet lands straight back in the swipe-and-adjust layout.
-  assert.match(overlay, /const mindMapSplit = landscape && mindMapActive && open;/);
-  assert.match(overlay, /mindMapSplit \? mindMapSplitWidth : splitMode \? splitEditorWidth : sheetHeight/);
+test("every tab (mind map included) opens the same right-side glass sheet", () => {
+  // The owner's direction: no per-tab sheet sizing, no landscape split — the
+  // websiteglass Glass Sheet (right side) opens in the window between the
+  // header and the footer dock for ALL tabs, mind map included.
+  assert.match(overlay, /import \{ GlassSheet, GlassSheetContent, type SheetBounds \} from "\.\.\/components\/ui\/glass-sheet"/);
+  assert.match(overlay, /<GlassSheetContent[\s\S]*?side="right"/);
+  assert.doesNotMatch(overlay, /DEFAULT_MINDMAP_SPLIT|DEFAULT_NOTES_SPLIT/, "per-tab split widths are gone");
+  assert.doesNotMatch(overlay, /data-course-split-handle/, "the split drag handle is gone");
 });
 
-test("dragging the split to full screen can never strand the sheet with no reachable handle", () => {
-  // The sheet is anchored `4rem` (the dock's slot) in from the section's
-  // right edge, so on a phone it hits its physical maximum (left edge flush
-  // with the section's left edge) before 100% of the section width. Without
-  // the cap, dragging the centre handle to full screen pushed the sheet's
-  // left edge — and the split handle on it — out of the section's
-  // overflow-hidden box: the mind map sat "full screen" with no way to drag
-  // it back (the mind map tab hides its header row, so there was no other
-  // visible close affordance either), and the persisted ratio reopened the
-  // same stuck state every time. The width must therefore be capped at the
-  // usable width between the section's left edge and the dock.
-  assert.match(overlay, /const splitWidthCss = \(percent: number\) =>/);
-  assert.match(overlay, /min\(\$\{percent\}%, calc\(100% - 4rem - env\(safe-area-inset-right, 0px\)\)\)/);
-  // Both split sheets (notes + mind map) render through the capped width,
-  // and the edge-drag preview does too.
-  assert.match(overlay, /const splitEditorWidth = splitWidthCss\(notesSplitPercent\);/);
-  assert.match(overlay, /const mindMapSplitWidth = splitWidthCss\(mindMapSplitPercent\);/);
-  assert.match(overlay, /width: edgeDragging \? splitWidthCss\(splitPercent\)/);
-  // The handle stays on the sheet's left edge and the sheet's own right
-  // offset keeps matching the cap.
-  assert.match(overlay, /right: "calc\(4rem \+ env\(safe-area-inset-right, 0px\)\)"/);
-  assert.match(overlay, /data-course-split-handle/);
-});
-
-test("in portrait the mind map sheet takes the bottom half", () => {
-  assert.match(overlay, /const mindMapHeight = "50dvh"/);
-  assert.match(overlay, /const sheetHeight = mindMapActive\s*\?\s*mindMapHeight/);
-});
-
-test("the mind map sheet gets the standard header in portrait but stays chrome-free in landscape", () => {
-  // In landscape the split sheet is a clean diagram canvas next to the
-  // lesson — the header row is omitted there. In portrait the sheet keeps
-  // the standard header (title + hint + close X) like every other tab, so
-  // the map is identifiable and one-tap closeable.
-  assert.match(overlay, /\{notesWriting \|\| \(tab === "mindmap" && landscape\) \? null : \(/);
+test("the sheet keeps its standard header (title + close X) for the mind map tab", () => {
+  // One header row for every tab; it is hidden ONLY while the notes writing
+  // box is open (the editor needs every pixel of the sheet).
+  assert.match(overlay, /\{notesWriting \? null : \(/);
   assert.match(overlay, /data-course-overlay-close/);
-  // The small grab pill gives way to the header for this tab in portrait.
-  assert.match(overlay, /!landscape && !notesWriting && tab !== "mindmap"/);
+  assert.match(overlay, /data-course-overlay-title/);
 });
 
-test("the portrait full-height sheet clears the dock's bottom margin, not just the pill", () => {
-  // The dock pill (4rem) sits on a bottom margin of max(safe-area-inset,
-  // 10px). The old class-based `bottom-16` (4rem) cleared only the pill's
-  // height, so the sheet's bottom row slid under the pill — the mind map's
-  // bottom toolbar was half-covered ("footer ke neeche dab gaya"). The
-  // bottom edge must anchor at the pill's exact top.
-  assert.match(overlay, /bottom: "calc\(4rem \+ max\(env\(safe-area-inset-bottom, 0px\), 10px\)\)"/);
+test("the sheet is measured to the window between the header and the footer dock", () => {
+  // The bounds come from the live layout: the header's bottom edge (portrait)
+  // / right edge (landscape rail) and the dock's top edge — so the sheet
+  // (and its scrim) never overlap the header or the footer navigation.
+  assert.match(overlay, /top: landscape \? 0 : Math\.round\(headerRect \? headerRect\.bottom : 0\)/);
+  assert.match(overlay, /bottom: Math\.max\(0, Math\.round\(window\.innerHeight - dockRect\.top\)\)/);
+  assert.match(overlay, /left: landscape \? Math\.round\(headerRect \? headerRect\.right : 0\) : 0/);
+  assert.match(overlay, /bounds=\{sheetBounds \?\? undefined\}/);
 });
 
 test("closing the overlay flushes the mind map's pending save", () => {
@@ -143,24 +101,16 @@ test("closing the overlay flushes the mind map's pending save", () => {
   assert.match(coursePlayer, /if \(dockTab === "mindmap"\) mindMap\.flush\(\);/);
 });
 
-test("the notes split keeps its own 40% so the two sheets never fight", () => {
-  // The notes editor and the mind map take DIFFERENT default widths, so the
-  // parent has to be told which one is open. Both are now live-resizable.
-  assert.match(overlay, /const DEFAULT_NOTES_SPLIT = 40;/);
-  assert.match(overlay, /onSplitModeChange\?\.\(splitMode\)/);
-  assert.match(overlay, /onMindMapSplitChange\?\.\(mindMapSplit\)/);
-});
-
-test("the lesson shrinks to the complement of whichever sheet is open", () => {
-  assert.match(coursePlayer, /100 - \(splitPanelPercent \?\? \(mindMapSplitMode \? 50 : 40\)\)/);
-  assert.match(overlay, /data-course-split-handle/);
-  assert.match(overlay, /onSplitRatioChange/);
-  assert.match(coursePlayer, /onSplitRatioChange=\{handleSplitRatioChange\}/);
-});
-
-test("each split sheet keeps the dock pinned to the far-right edge", () => {
-  assert.match(coursePlayer, /data-course-dock-spacer/, "the notes spacer must remain");
-  assert.match(coursePlayer, /data-course-mindmap-dock-spacer/, "the mind map needs its own spacer");
+test("the old landscape split machinery is gone — the lesson keeps full width", () => {
+  // Owner's direction: no 60/40 lesson+panel split, no live-resizable edge
+  // handle, no dock-pinning spacers. The sheet overlays the content between
+  // the header and the footer dock in BOTH orientations.
+  assert.doesNotMatch(overlay, /onSplitModeChange/);
+  assert.doesNotMatch(overlay, /onMindMapSplitChange/);
+  assert.doesNotMatch(overlay, /onSplitRatioChange/);
+  assert.doesNotMatch(coursePlayer, /notesSplitMode/);
+  assert.doesNotMatch(coursePlayer, /mindMapSplitMode/);
+  assert.doesNotMatch(coursePlayer, /splitPanelPercent/);
 });
 
 // ---------------------------------------------------------------------------

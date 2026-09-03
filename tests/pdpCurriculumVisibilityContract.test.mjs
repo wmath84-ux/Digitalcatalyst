@@ -124,5 +124,5 @@ test("resolvePaidUpdateForModule reads the catalogue by id or includedModuleIds"
 test("course player overlay still locks paidUpdate modules the PDP now hides before purchase", () => {
   assert.match(overlay, /accessLevel === "paidUpdate"/);
   assert.match(overlay, /data-course-overlay-buy-module/);
-  assert.match(overlay, /data-course-overlay-wire/);
+  assert.match(overlay, /data-course-overlay-paid/);
 });

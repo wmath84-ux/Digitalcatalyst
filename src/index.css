@@ -1614,12 +1614,11 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   animation: eq 0.8s ease-in-out infinite;
 }
 
-/* Course Player — the notes LIST now opens as a landscape split exactly
-   like the note editor. Inside the split sheet (which can be dragged
-   anywhere from ~10% to 95% wide) the note grid tiles by available width
-   instead of the fixed 2/3 phone columns, so a narrow 40% sheet gets 2
-   comfortable columns and a dragged-out wide sheet gets more. */
-[data-course-overlay][data-split-kind="notes"] [data-course-notes-grid] {
+/* Course Player — the notes tab lives inside the right-side sheet (a slice
+   of the viewport, min(24rem, 90vw) wide), so the note grid tiles by the
+   width the sheet actually gives it instead of the fixed viewport columns:
+   a narrow phone sheet gets 2 comfortable columns, a wider one gets more. */
+[data-course-overlay] [data-course-notes-grid] {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 

@@ -41,11 +41,13 @@ test("the library cards themselves are width-independent boxes", () => {
   assert.match(indexCss, /\[data-course-mindmap-map-grid\]\s*\{[\s\S]*?\}/);
 });
 
-test("the sheet still closes with the direct invisible hide", () => {
-  // The overlay's transition list stays transform+opacity only — the closed
-  // sheet gains `invisible` immediately, matching the Note Library's direct
-  // hide (no width animation that would make content shrink on the way out).
+test("the sheet still closes without a width animation", () => {
+  // The overlay is the websiteglass Glass Sheet: closing unmounts it directly
+  // and the entrance/exit is a transform-only slide from the right edge —
+  // no width animation that would make content shrink on the way out.
   const overlay = fs.readFileSync("src/course/CourseOverlay.tsx", "utf8");
-  assert.match(overlay, /transition-\[transform,opacity\]/);
-  assert.match(overlay, /invisible opacity-0/);
+  const sheet = fs.readFileSync("src/components/ui/glass-sheet.tsx", "utf8");
+  assert.match(overlay, /import \{ GlassSheet, GlassSheetContent, type SheetBounds \} from "\.\.\/components\/ui\/glass-sheet"/);
+  assert.match(sheet, /if \(!mounted \|\| !open\) return null;/);
+  assert.match(sheet, /animation: "glass-sheet-in 0\.34s cubic-bezier\(0\.22,1,0\.36,1\) both"/);
 });

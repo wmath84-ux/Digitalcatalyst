@@ -71,12 +71,40 @@ const posClass: Record<Side, string> = {
 };
 const radius: Record<Side, number> = { right: 24, left: 24, top: 24, bottom: 24 };
 
+/**
+ * [digitalcatalyst] Optional viewport insets. When provided, BOTH the scrim
+ * and the panel are constrained to the window inside these bounds, so the
+ * sheet opens in the space BETWEEN pinned chrome (e.g. the Course Player's
+ * top header and bottom footer dock) instead of spanning the full viewport.
+ * Omitted → the original full-viewport behaviour (every other call site).
+ */
+export interface SheetBounds {
+  top?: number | string;
+  right?: number | string;
+  bottom?: number | string;
+  left?: number | string;
+}
+
+const px = (value: number | string) => (typeof value === "number" ? `${value}px` : value);
+
+const boundsInset = (bounds: SheetBounds): CSSProperties => ({
+  top: px(bounds.top ?? 0),
+  right: px(bounds.right ?? 0),
+  bottom: px(bounds.bottom ?? 0),
+  left: px(bounds.left ?? 0),
+});
+
 interface SheetContentProps extends ComponentProps<"div"> {
   side?: Side;
   tint?: number;
+  bounds?: SheetBounds;
+  /** [digitalcatalyst] Override the inner content box's classes (the default
+   *  `h-full overflow-auto p-6` is a padded scroller; call sites that lay
+   *  out their own header + list can swap it for a flex column). */
+  contentClassName?: string;
 }
 
-export function GlassSheetContent({ side = "right", tint = 0.5, className, children, ...props }: SheetContentProps) {
+export function GlassSheetContent({ side = "right", tint = 0.5, className, children, bounds, style, contentClassName, ...props }: SheetContentProps) {
   const { open, setOpen } = useContext(SheetContext);
   const [mounted, setMounted] = useState(false);
 
@@ -92,11 +120,31 @@ export function GlassSheetContent({ side = "right", tint = 0.5, className, child
 
   if (!mounted || !open) return null;
 
+  // A side sheet that is bounded top AND bottom stretches between the two
+  // instead of keeping `h-full`; a right sheet that is bounded on the left
+  // keeps its right edge pinned and caps its width so its left edge never
+  // slides under the left chrome.
+  const boundsStyle: CSSProperties | undefined = bounds
+    ? {
+        ...boundsInset(bounds),
+        ...((side === "right" || side === "left") && bounds.top != null && bounds.bottom != null
+          ? { height: "auto" }
+          : null),
+        ...(bounds.left != null && side === "right"
+          ? { maxWidth: `calc(100vw - ${px(bounds.left)})` }
+          : null),
+      }
+    : undefined;
+
   return createPortal(
-    <div className="fixed inset-0 z-[100]">
+    // pointer-events-none: the fixed layer itself must not swallow taps aimed
+    // at pinned chrome OUTSIDE the (possibly inset) window — only the scrim
+    // and the panel are interactive.
+    <div className="pointer-events-none fixed inset-0 z-[100]">
       <style>{`@keyframes glass-sheet-in{from{transform:var(--sheet-from)}to{transform:translate(0,0)}}`}</style>
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in-0 duration-200"
+        className="pointer-events-auto absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in-0 duration-200"
+        style={bounds ? boundsInset(bounds) : undefined}
         onClick={() => setOpen(false)}
       />
       <GlassSurface
@@ -104,11 +152,13 @@ export function GlassSheetContent({ side = "right", tint = 0.5, className, child
         aria-modal="true"
         tint={tint}
         radius={radius[side]}
-        className={cn("absolute", posClass[side], className)}
-        contentClassName="h-full overflow-auto p-6"
+        className={cn("pointer-events-auto absolute", posClass[side], className)}
+        contentClassName={contentClassName ?? "h-full overflow-auto p-6"}
         style={{
           ["--sheet-from" as string]: hidden[side],
           animation: "glass-sheet-in 0.34s cubic-bezier(0.22,1,0.36,1) both",
+          ...boundsStyle,
+          ...style,
         } as CSSProperties}
         {...props}
       >

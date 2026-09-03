@@ -169,9 +169,10 @@ test("The notes editor is a large rich-text surface", () => {
   // The composer takes over the whole panel.
   assert.match(notesPanel, /if \(editorOpen\) \{/);
   assert.match(notesPanel, /className="flex min-h-0 flex-1 flex-col p-3"/);
-  // …and the sheet itself grows while it's open.
-  assert.match(overlay, /const notesEditorHeight = landscape \? "min\(92vw, 620px\)" : "88dvh"/);
-  assert.match(overlay, /notesEditorOpen \? notesEditorHeight : notesHeight/);
+  // …and the sheet gives it every pixel while it's open: the sheet header is
+  // hidden entirely so the writing surface fills the whole right-side sheet.
+  assert.match(overlay, /const notesWriting = tab === "notes" && notesEditorOpen;/);
+  assert.match(overlay, /\{notesWriting \? null : \(/);
   assert.match(overlay, /onEditorOpenChange=\{setNotesEditorOpen\}/);
 });
 
