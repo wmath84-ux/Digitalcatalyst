@@ -7,12 +7,12 @@
 //   2. Scrolling inside the rotated ("immersive") mobile view follows the
 //      axis the user actually sees, instead of the browser's screen-space
 //      guess which made a horizontal swipe scroll the wrong way.
-//   3. A desktop/mobile switch beside the theme toggle re-renders embedded
-//      documents at phone width so they are readable on a phone.
-//   4. Two separate chrome toggle buttons sit in the header (and the
-//      landscape rail): one hides the file's own header + mark-complete
-//      footer, the other hides the Course Player's own header + dock.
-//      Content takes the freed space, and there is always a way back.
+//   3. Desktop/mobile view is a Player-tab preference (the Player tab is
+//      the dock's 6th tab that replaced the whole header + ⚙ settings
+//      popover): it re-renders embedded documents at phone width.
+//   4. The old chrome (header, file bar, complete footer, hide toggles,
+//      ⚙ popover) is GONE — there is no header anywhere, and nothing left
+//      to hide.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -25,6 +25,7 @@ const repoRoot = path.join(__dirname, "..");
 const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
+const playerPanel = readSource("src/course/PlayerPanel.tsx");
 const resourceViewer = readSource("src/course/ResourceViewer.tsx");
 const courseEmbed = readSource("src/utils/courseEmbed.ts");
 const rotatedScroll = readSource("src/course/useRotatedScroll.ts");
@@ -54,7 +55,7 @@ test("Every download carries a filename with the matching extension", () => {
   assert.match(courseEmbed, /const baseName = \(name: string\) =>/);
   assert.match(courseEmbed, /replace\(\/\\\.\[a-z0-9\]\{1,8\}\$\/i, ""\)/);
   // The viewer downloads under that exact name.
-  assert.match(resourceViewer, /download=\{download\.downloadable \? download\.fileName : undefined\}/);
+  assert.match(playerPanel, /downloadableFileName=\{fileActions\.download\.downloadable \? fileActions\.download\.fileName : undefined\}/);
 });
 
 // ---------------------------------------------------------------------------
@@ -93,18 +94,23 @@ test("the rotate-to-fullscreen button and immersive view are removed", () => {
 // 3. Desktop <-> mobile document view
 // ---------------------------------------------------------------------------
 
-test("A desktop/mobile switch sits beside the theme toggle", () => {
-  // Both preferences are rows of the one ⚙ Player settings popover now —
-  // every former header quick-toggle lives there.
-  assert.match(coursePlayer, /settingsRow\("Desktop view", desktopView, \(next\) => setDesktopView\(next\), "viewport"\)/);
-  assert.match(coursePlayer, /settingsRow\("Light theme", theme === "light"/);
-  // Only meaningful for documents — a video looks the same either way. The
-  // list is shared with the viewer so both sides can never drift apart.
-  assert.match(coursePlayer, /const showViewportToggle = VIEWPORT_AWARE_KINDS\.includes\(selectedEmbedKind\)/);
-  assert.match(courseEmbed, /export const VIEWPORT_AWARE_KINDS: CourseEmbedKind\[\] = \["doc", "sheet", "slides", "form", "drive", "pdf", "embed", "mindmap"\]/);
-  // The preference is remembered.
-  assert.match(coursePlayer, /dc\.coursePlayerDesktopView/);
+test("Desktop/mobile view is one Player-tab preference, gated on the active embed", () => {
+  // The row only renders while the ACTIVE file's embed kind is
+  // viewport-aware — for YouTube / video / audio viewers it disappears.
+  assert.match(playerPanel, /settingsRow\("Desktop view", desktopView, \(next\) => onDesktopViewChange\(next\), "viewport"\)/);
+  assert.match(playerPanel, /data-course-setting=\{attr\}/);
+  assert.match(coursePlayer, /showViewportToggle = VIEWPORT_AWARE_KINDS\.includes\(selectedEmbedKind\)/);
+  assert.match(coursePlayer, /selectedEmbedKind = selectedFile \? getCourseEmbed\(selectedFile\)\.kind : "none"/);
+  // The choice flows straight into the viewers; every embed URL is rebuilt
+  // with the matching viewport, so a flip re-renders the document.
+  assert.match(coursePlayer, /desktopView=\{desktopView\}/);
+  assert.match(resourceViewer, /getCourseEmbed\(file, \{ viewport: desktopView \? "desktop" : "mobile"/);
+  assert.match(courseEmbed, /options\.viewport === "mobile"/);
+  assert.match(courseEmbed, /mobile \? "mobilebasic" : "preview"/);
+  // Embedded documents are also marked for the document-mobile switch.
+  assert.match(resourceViewer, /const documentKind = VIEWPORT_AWARE_KINDS\.includes\(embed\.kind\);/);
 });
+
 
 test("Mobile view re-renders the embed at phone width", () => {
   assert.match(resourceViewer, /const MOBILE_VIEWPORT_WIDTH = 420/);
@@ -125,41 +131,42 @@ test("Mobile view re-renders the embed at phone width", () => {
 // 4. Two separate chrome toggle buttons
 // ---------------------------------------------------------------------------
 
-test("Two separate toggle buttons hide the file bars and the player chrome", () => {
-  // One settings row hides the file's own header/footer, the other hides the
-  // Course Player's header + dock — each is an independent Glass Switch in
-  // the ⚙ popover (rendered in both the portrait header and landscape rail).
-  assert.match(coursePlayer, /settingsRow\("File bars", !fileBarsHidden, \(next\) => setFileBarsHidden\(!next\), "file-bars"\)/);
-  assert.match(coursePlayer, /settingsRow\("Player bars", !playerChromeHidden, \(next\) => setPlayerChromeHidden\(!next\), "player-chrome"\)/);
-  assert.match(coursePlayer, /settingsPopover\("bottom"\)/);
-  assert.match(coursePlayer, /settingsPopover\("right"\)/);
+test("The player chrome hide toggles are gone — there IS no chrome to hide", () => {
+  // No course header, no file bar, no footer complete row, no popover: the
+  // whole old chrome layer was deleted along with the toggles that hid it.
+  assert.doesNotMatch(coursePlayer, /data-course-filebars-toggle|data-course-chrome-toggle/);
+  assert.doesNotMatch(coursePlayer, /settingsRow\("File bars"|settingsRow\("Player bars"/);
+  assert.doesNotMatch(coursePlayer, /<CompleteBar/);
+  // And none of the old hide flags / chrome keys survive anywhere in src.
+  for (const rel of [
+    "src/CoursePlayerApp.tsx",
+    "src/course/PlayerPanel.tsx",
+    "src/course/CourseOverlay.tsx",
+    "src/course/ResourceViewer.tsx",
+  ]) {
+    const source = readSource(rel);
+    assert.doesNotMatch(source, /fileBarsHidden/, rel);
+    assert.doesNotMatch(source, /courseChromeHidden/, rel);
+  }
+  // The Player panel keeps exactly ONE hide preference: the status bar.
+  assert.match(playerPanel, /Hide status bar/);
 });
 
-test("Hiding the file bars removes the download header and the complete footer", () => {
-  assert.match(coursePlayer, /chromeHidden=\{fileBarsHidden\}/);
-  assert.match(resourceViewer, /\{chromeHidden \? null : \(\s*<ViewerHeader/);
+test("Mark-complete and the active file's actions live in the Player tab", () => {
+  // The charging button — gesture, reversal, update arrow and double-tap —
+  // is the Player panel's progress row now.
+  assert.match(playerPanel, /<ChargingCompleteButton/);
+  assert.match(coursePlayer, /isDone=\{isDone\}/);
+  assert.match(coursePlayer, /onToggleComplete=\{\(\) => void toggleComplete\(\)\}/);
+  // So are the active file's download / open-external / media-fullscreen
+  // buttons, reported live by the mounted viewer.
+  assert.match(playerPanel, /data-course-viewer-kind/);
+  assert.match(playerPanel, /data-course-viewer-download/);
+  assert.match(playerPanel, /data-course-viewer-external/);
+  assert.match(playerPanel, /data-course-viewer-fullscreen/);
+  assert.match(resourceViewer, /onFileActions\(file\.id, \{/);
+  assert.match(resourceViewer, /onFileActions\(file\.id, null\)/);
+  assert.match(coursePlayer, /onFileActions=\{handleFileActions\}/);
+  assert.match(coursePlayer, /fileActions=\{fileActions\?\.model \?\? null\}/);
 });
 
-test("Hiding the player chrome removes the course header and the dock", () => {
-  // Both the portrait header and the landscape rail are gated.
-  assert.ok((coursePlayer.match(/\{playerChromeHidden \? null : \(/g) || []).length >= 2, "header not gated in both layouts");
-  assert.ok((coursePlayer.match(/\{playerChromeHidden \? null : overlay\}/g) || []).length >= 2, "dock not gated in both layouts");
-});
-
-test("The two hides are independent and always reversible", () => {
-  // File bars start HIDDEN for mobile users (both portrait and landscape) so
-  // the content keeps the full screen; desktop users still see them. Either
-  // way the same toggle flips the state, so it stays fully reversible.
-  assert.match(coursePlayer, /const \[fileBarsHidden, setFileBarsHidden\] = useState<boolean>\(\(\) => isMobileDevice\(\)\)/);
-  assert.match(coursePlayer, /const \[playerChromeHidden, setPlayerChromeHidden\] = useState\(false\)/);
-  // A floating pill is the way back once the header itself is gone.
-  assert.match(coursePlayer, /data-course-chrome-restore/);
-  // Escape restores everything.
-  assert.match(coursePlayer, /if \(playerChromeHidden \|\| fileBarsHidden\) \{ setPlayerChromeHidden\(false\); setFileBarsHidden\(false\); \}/);
-  // Each preference is an AI Canvas glass-toggle row that reflects its state
-  // (owner direction 2026-09-02: GlassSwitch → GlassPrefToggle, the
-  // spring-driven aicanvas.me glass-toggle, keeping the same 4-arg
-  // settingsRow(label, checked, onChange, attr) contract).
-  assert.match(coursePlayer, /data-course-setting=\{attr\}/);
-  assert.match(coursePlayer, /<GlassPrefToggle\b[\s\S]*?on=\{checked\}[\s\S]*?onChange=\{/);
-});

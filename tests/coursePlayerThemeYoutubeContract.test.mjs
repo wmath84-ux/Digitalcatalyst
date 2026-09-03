@@ -4,15 +4,18 @@ import test from "node:test";
 import { getCourseEmbed, getYouTubeWatchUrl } from "../src/utils/courseEmbed.ts";
 
 const coursePlayer = fs.readFileSync("src/CoursePlayerApp.tsx", "utf8");
+const playerPanel = fs.readFileSync("src/course/PlayerPanel.tsx", "utf8");
 const resourceViewer = fs.readFileSync("src/course/ResourceViewer.tsx", "utf8");
 const courseEmbed = fs.readFileSync("src/utils/courseEmbed.ts", "utf8");
 const styles = fs.readFileSync("src/index.css", "utf8");
 
-test("Course Player header exposes a persisted light/dark theme toggle", () => {
-  // The toggle is the "Light theme" Glass Switch row of the ⚙ Player
-  // settings popover (the header quick-button was removed on purpose).
-  assert.match(coursePlayer, /settingsRow\("Light theme", theme === "light", \(next\) => setTheme\(next \? "light" : "dark"\), "theme"\)/);
-  assert.match(coursePlayer, /data-course-theme=\{theme\}/);
+test("The Player tab exposes a persisted light/dark theme toggle", () => {
+  // The toggle is the FIRST "Light theme" Glass Switch row of the Player
+  // tab's settings section (the old header quick-button is long gone, and
+  // the header itself is gone too — owner's direction).
+  assert.match(playerPanel, /settingsRow\("Light theme", theme === "light", \(next\) => onThemeChange\(next \? "light" : "dark"\), "theme"\)/);
+  assert.match(playerPanel, /data-course-theme=\{theme\}/);
+  assert.match(coursePlayer, /onThemeChange=\{\(next\) => setTheme\(next\)\}/);
   assert.match(coursePlayer, /dc\.coursePlayerTheme/);
   assert.match(coursePlayer, /localStorage\.setItem\(courseThemeStorageKey, theme\)/);
 });
@@ -25,11 +28,15 @@ test("Course Player theme is scoped and supplies both palette variants", () => {
   }
 });
 
-test("landscape keeps the left header and right navigation rails", () => {
+test("landscape flips the single split deck into a row — no header rails", () => {
   assert.match(coursePlayer, /const useLandscapeRails = isLandscape;/);
   assert.match(coursePlayer, /orientation=\{useLandscapeRails \? "landscape" : "portrait"\}/);
-  assert.match(coursePlayer, /data-course-landscape-header/);
-  assert.match(coursePlayer, /\{landscapeLayout\(\)\}/);
+  assert.match(coursePlayer, /axis=\{useLandscapeRails \? "row" : "column"\}/);
+  assert.match(coursePlayer, /useLandscapeRails \? "flex-row" : "flex-col"/);
+  // There is no header, portrait or landscape.
+  assert.doesNotMatch(coursePlayer, /data-course-landscape-header/);
+  assert.doesNotMatch(coursePlayer, /data-course-header\b/);
+  assert.doesNotMatch(coursePlayer, /landscapeLayout\(\)/);
   // The quarter-turned immersive ("rotated") view and its exit button were
   // removed along with the header's rotate-to-fullscreen button.
   assert.doesNotMatch(coursePlayer, /data-course-mobile-landscape-header/);

@@ -1,12 +1,15 @@
 // tests/coursePlayerFormChromeViewportContract.test.mjs
 //
-// Contract for three Course Player fixes:
+// Contract for three Course Player behaviours (updated 2026-09-03 for the
+// headerless, always-split player):
 //
-//   1. Submitting a Google Form keeps the learner INSIDE the player, with the
-//      course header and the mark-complete footer still on screen.
-//   2. The two chrome toggle buttons stay reachable in mobile landscape /
-//      rotated mode, where the header becomes a narrow rail on the LEFT edge.
-//   3. The header's document button behaves like the browser's own
+//   1. Submitting a Google Form keeps the learner INSIDE the player — the
+//      content + footer-navigation shell (no header anywhere, owner's
+//      direction) stays mounted.
+//   2. The Player tab (the panel that replaced the header + ⚙ popover)
+//      carries everything header-adjacent: course identity, progress,
+//      mark-complete, the active file's buttons and every preference.
+//   3. The Player tab's "Desktop view" row behaves like the browser's own
 //      "Desktop site" switch: it drives the layout viewport AND loads the
 //      host's mobile rendering, so a phone in desktop-site mode stops
 //      showing unreadably small Google Docs text.
@@ -25,6 +28,8 @@ const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
 const resourceViewer = readSource("src/course/ResourceViewer.tsx");
+const playerPanel = readSource("src/course/PlayerPanel.tsx");
+const overlay = readSource("src/course/CourseOverlay.tsx");
 const viewportMode = readSource("src/utils/documentViewportMode.ts");
 
 const formFile = (url) => ({ id: "f1", name: "Quiz", type: "google_form", url });
@@ -83,12 +88,13 @@ test("a non-https or junk form url yields no embed rather than a broken frame", 
   assert.equal(getGoogleFormEmbedUrl(""), "");
 });
 
-test("the form renders in the normal viewer stack, so the chrome stays mounted", () => {
-  // The header and the mark-complete footer are siblings of the viewer, and
-  // the form is just another embed inside it — nothing about submitting can
-  // unmount them.
-  assert.match(coursePlayer, /chromeHidden=\{fileBarsHidden\}/);
-  assert.match(resourceViewer, /\{chromeHidden \? null : \(\s*<ViewerHeader/);
+test("the form renders in the normal viewer stack — the shell never unmounts", () => {
+  // Nothing about a form submission can unmount the player's shell: the Sp
+  // split deck and the footer dock are the only chrome, and the form is
+  // just one more iframe embed inside the lesson pane.
+  assert.match(coursePlayer, /<SplitDeck/);
+  assert.match(coursePlayer, /study=\{studyOverlay\}/);
+  assert.match(resourceViewer, /data-course-viewer data-file-id/);
   // Popups/top-navigation are NOT granted, so the frame cannot escape.
   assert.doesNotMatch(resourceViewer, /allow-top-navigation/);
 });
@@ -97,17 +103,18 @@ test("the form renders in the normal viewer stack, so the chrome stays mounted",
 // 2. The chrome toggles are reachable in landscape too
 // ---------------------------------------------------------------------------
 
-test("the two chrome toggle buttons are present in the landscape rail", () => {
-  // In landscape the header becomes a 56px rail pinned to the left edge; the
-  // ⚙ Player settings popover (home of both chrome switches) still rides it.
-  assert.match(coursePlayer, /data-course-landscape-header/);
-  assert.match(coursePlayer, /settingsPopover\("right"\)/);
-});
-
-test("each toggle reflects its hidden state", () => {
-  // Each chrome preference is a Glass Switch row that mirrors its state.
-  assert.match(coursePlayer, /settingsRow\("File bars", !fileBarsHidden, \(next\) => setFileBarsHidden\(!next\), "file-bars"\)/);
-  assert.match(coursePlayer, /settingsRow\("Player bars", !playerChromeHidden, \(next\) => setPlayerChromeHidden\(!next\), "player-chrome"\)/);
+test("the landscape shell is the same split deck — no toggle chrome to reach", () => {
+  // The header → rail swap is gone entirely: landscape keeps the SAME shell,
+  // only the deck axis flips to a row.
+  assert.match(coursePlayer, /axis=\{useLandscapeRails \? "row" : "column"\}/);
+  assert.match(coursePlayer, /data-orientation=\{useLandscapeRails \? "landscape" : "portrait"\}/);
+  assert.doesNotMatch(coursePlayer, /data-course-landscape-header/);
+  assert.doesNotMatch(coursePlayer, /data-course-header\b/);
+  // The only two settings rows the header's ⚙ popover mixed in are gone.
+  assert.doesNotMatch(coursePlayer, /settingsRow\("File bars"/);
+  assert.doesNotMatch(coursePlayer, /settingsRow\("Player bars"/);
+  // Every remaining preference lives in the footer dock's Player tab.
+  assert.match(overlay, /key: "player"/);
 });
 
 // ---------------------------------------------------------------------------

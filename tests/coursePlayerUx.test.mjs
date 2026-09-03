@@ -17,10 +17,14 @@
 //   - Progress persists last opened file, completed files,
 //     access source, preview state.
 //   - The Course Player feeds the resolver's access state
-//     into the sidebar (locked / preview / dependency).
-//   - The sidebar exposes "Buy this module" / "Buy this
-//     update" CTAs for locked paid-update modules and
-//     available updates.
+//     into the overlay's Module / Paid tabs (locked / preview).
+//   - The Paid tab exposes the buy CTAs for locked paid-update
+//     modules and available updates.
+//   - The player has NO header: the footer dock's Player tab
+//     (src/course/PlayerPanel.tsx) carries the course identity,
+//     progress, mark-complete, the ACTIVE file's action buttons
+//     (reported live by the ResourceViewer) and every player
+//     preference.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -35,8 +39,8 @@ const repoRoot = path.join(__dirname, "..");
 const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
-const sidebar = readSource("src/course/CourseSidebar.tsx");
 const overlay = readSource("src/course/CourseOverlay.tsx");
+const playerPanel = readSource("src/course/PlayerPanel.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
 const notesStore = readSource("src/course/notesStore.ts");
@@ -105,13 +109,16 @@ test("ResourceViewer uses a sandboxed iframe with fullscreen / clipboard permiss
   assert.match(resourceViewer, /allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-read; clipboard-write"/);
 });
 
-test("ResourceViewer always renders the open-in-new-tab escape hatch", () => {
-  assert.match(resourceViewer, /aria-label="Open preview in new tab"/);
-  assert.match(resourceViewer, /data-course-viewer-external/);
+test("The active file's open-in-new-tab escape hatch lives in the Player tab", () => {
+  // The file's own header is gone from the stage; the ACTIVE viewer reports
+  // its actions and the Player panel lists them (they follow the module).
+  assert.match(playerPanel, /aria-label": "Open preview in new tab"/);
+  assert.match(playerPanel, /data-course-viewer-external/);
 });
 
-test("ResourceViewer renders a download button when the file is downloadable", () => {
-  assert.match(resourceViewer, /data-course-viewer-download/);
+test("The active file's download button lives in the Player tab", () => {
+  assert.match(playerPanel, /data-course-viewer-download/);
+  assert.match(playerPanel, /downloadableFileName=\{fileActions\.download\.downloadable/);
   assert.match(resourceViewer, /getCourseDownload/);
 });
 
@@ -198,14 +205,12 @@ test("The single + button lives in the overlay's main header, not the panel", ()
   assert.doesNotMatch(notesPanel, /sync across devices/);
 });
 
-test("The overlay hides its main header while the writing box is open", () => {
-  // Writing mode = notes tab + editor open. In that mode the sheet keeps no
-  // chrome at all: toolbar / writing surface / Save + Cancel only, so the
-  // box gets every pixel of the right-side sheet in both orientations.
-  // There is no grab handle at all anymore — the sheet closes via its
-  // header X, the scrim or Escape.
+test("The overlay hides its chrome row while the writing box is open", () => {
+  // Writing mode = notes tab + editor open. In that mode the pane keeps no
+  // chrome row at all: toolbar / writing surface / Save + Cancel only, so
+  // the box gets every pixel of the study pane in both orientations.
   assert.match(overlay, /const notesWriting = tab === "notes" && notesEditorOpen;/);
-  assert.match(overlay, /\{notesWriting \? null : \(/);
+  assert.match(overlay, /\{notesWriting \? null : chromeRow\}/);
   assert.doesNotMatch(overlay, /Collapse panel/);
 });
 
@@ -276,45 +281,20 @@ test("CoursePlayer excludes preview-only modules from the progress denominator",
 });
 
 test("CoursePlayer shows the preview-mode badge when preview modules are present", () => {
-  assert.match(coursePlayer, /data-course-preview-badge/);
-  assert.match(coursePlayer, /Preview mode/);
+  // The badge rides the Player tab now (the header that carried it is gone).
+  assert.match(playerPanel, /data-course-preview-badge/);
+  assert.match(playerPanel, /Preview mode/);
+  assert.match(coursePlayer, /showPreviewBadge=\{resolution\.previewModuleIds\.size > 0\}/);
 });
 
 // ---------------------------------------------------------------------------
-// Sidebar access state + CTAs
+// Overlay access state + CTAs (the old CourseSidebar is deleted — the
+// footer dock's Module / Paid tabs carry the same contract now)
 // ---------------------------------------------------------------------------
 
-test("CourseSidebar consumes the resolver's accessible / preview / locked / dependency data", () => {
-  for (const prop of [
-    "accessibleModuleIds",
-    "previewModuleIds",
-    "moduleAccessSources",
-    "unmetDependencies",
-    "moduleTitleById",
-    "onBuyModule",
-  ]) {
-    assert.match(sidebar, new RegExp(`\\b${prop}\\b`), `missing prop ${prop}`);
-  }
-});
-
-test("CourseSidebar shows the 'Buy this update' CTA inside the available-updates panel", () => {
-  assert.match(sidebar, /Buy this update/);
-  assert.match(sidebar, /data-course-sidebar-buy-update/);
-});
-
-test("CourseSidebar shows the per-module 'Buy this module' CTA on locked paid-update modules", () => {
-  assert.match(sidebar, /data-course-sidebar-buy-module/);
-  assert.match(sidebar, /Unlock with this update/);
-});
-
-test("CourseSidebar surfaces dependency hints inline", () => {
-  assert.match(sidebar, /data-course-module-dependency/);
-  assert.match(sidebar, /Requires: \{state\.dependencyHint\}/);
-});
-
-test("CourseSidebar marks preview-only modules with the preview icon", () => {
-  assert.match(sidebar, /data-course-module-preview/);
-  assert.match(sidebar, /<Eye size=\{13\} className="text-sky-300"/);
+test("CourseOverlay marks preview-only modules with the preview icon", () => {
+  assert.match(overlay, /data-preview/);
+  assert.match(overlay, /<Eye size=\{13\} className="text-sky-300"/);
 });
 
 test("CoursePlayer wires the resolver's accessible/owned state into CourseOverlay", () => {
@@ -333,8 +313,8 @@ test("CoursePlayer routes a single module's 'buy' click back to the parent's onP
 // Bottom dock + overlay (redesign)
 // ---------------------------------------------------------------------------
 
-test("CoursePlayer replaces the side panel with a four-toggle bottom dock", () => {
-  for (const tab of ["modules", "resources", "notes", "paid"]) {
+test("CoursePlayer's footer dock carries the six study tabs (Player included)", () => {
+  for (const tab of ["modules", "resources", "notes", "mindmap", "paid", "player"]) {
     assert.match(overlay, new RegExp(`key: "${tab}"`), `missing dock tab ${tab}`);
   }
   // The footer is the home page's GlassDock itself — no course-specific
@@ -347,8 +327,8 @@ test("CoursePlayer replaces the side panel with a four-toggle bottom dock", () =
   assert.doesNotMatch(coursePlayer, /data-course-side-panel/);
 });
 
-test("CourseOverlay reuses a single sheet whose content swaps per tab", () => {
-  assert.match(overlay, /data-course-overlay/);
+test("The study pane swaps the active tab's content in place", () => {
+  assert.match(overlay, /data-course-study-chrome="pane"/);
   assert.match(overlay, /data-course-overlay-tab=\{tab\}/);
   assert.match(overlay, /key=\{tab\}/);
 });
@@ -397,10 +377,9 @@ test("Paid overlay lists only paid modules with a buy CTA", () => {
   assert.match(overlay, /data-course-overlay-buy-update/);
 });
 
-test("Notes tab fills the right-side sheet (NotesPanel mounted in the sheet content)", () => {
-  // No fixed half-screen heights any more — the sheet is the websiteglass
-  // Glass Sheet bounded between the header and the dock; the notes panel
-  // simply fills whatever the sheet gives it.
+test("Notes tab fills the study pane (NotesPanel mounted in the pane)", () => {
+  // No fixed half-screen heights — the Split Deck's study pane simply gives
+  // the notes panel whatever room the divider leaves it.
   assert.match(overlay, /tab === "notes" \? \(/);
   assert.match(overlay, /<NotesPanel[\s\S]*?composerOpenSignal=\{composerSignal\}/);
   assert.doesNotMatch(overlay, /50dvh/, "fixed half-screen heights are gone");
@@ -417,35 +396,44 @@ test("Custom AudioPlayer replaces the native audio element with a transport", ()
   assert.match(resourceViewer, /<AudioPlayer/);
 });
 
-test("CoursePlayer header uses the website logo in the back slot and keeps onBack", () => {
+test("The Player tab uses the website logo in the back slot and keeps onBack", () => {
   // The logo comes from BrandingContext (logoUrl) so admin can swap it
   // without a redeploy — the hardcoded `/icons/icon-192x192.svg` is the
   // pre-JS boot-screen fallback only. The onClick is wrapped in a
   // long-press-aware handler (the logo doubles as the Home opener when
   // held), so a regex for the raw `onBack` doesn't match — assert the
   // call inside the handler instead.
-  assert.match(coursePlayer, /data-course-back/);
-  assert.match(coursePlayer, /data-course-logo-back/);
-  assert.match(coursePlayer, /data-course-logo/);
-  assert.match(coursePlayer, /src=\{logoUrl\}/);
-  assert.match(coursePlayer, /onClick=\{\(\) => \{[\s\S]*onBack\(\)/);
-  assert.doesNotMatch(coursePlayer, /<ArrowLeft/);
+  assert.match(playerPanel, /data-course-back/);
+  assert.match(playerPanel, /data-course-logo-back/);
+  assert.match(playerPanel, /data-course-logo/);
+  assert.match(playerPanel, /src=\{logoUrl\}/);
+  assert.match(playerPanel, /onClick=\{\(\) => \{[\s\S]*onBack\(\)/);
+  assert.match(coursePlayer, /onBack=\{onBack\}/);
+  assert.doesNotMatch(playerPanel, /<ArrowLeft/);
 });
 
-test("CoursePlayer uses a landscape layout with vertical header + toggles", () => {
+test("CoursePlayer uses a landscape split with no header rails", () => {
   assert.match(coursePlayer, /matchMedia\("\(orientation: landscape\)"\)/);
-  assert.match(coursePlayer, /data-orientation="landscape"/);
-  assert.match(coursePlayer, /data-course-landscape-header/);
-  assert.match(overlay, /orientation === "landscape"/);
+  assert.match(coursePlayer, /data-orientation=\{useLandscapeRails \? "landscape" : "portrait"\}/);
+  // The deck fills the whole shell: the divider is vertical, lesson left,
+  // study pane (tabs + footer dock) right.
+  assert.match(coursePlayer, /axis=\{useLandscapeRails \? "row" : "column"\}/);
+  assert.match(coursePlayer, /data-course-landscape-content/);
+  // There is NO header anywhere in the player.
+  assert.doesNotMatch(coursePlayer, /data-course-landscape-header/);
+  assert.doesNotMatch(coursePlayer, /data-course-header\b/);
   // The old quarter-turned immersive view (rotate(90deg)) was removed along
   // with the header's rotate-to-fullscreen button, so no rotation transform
   // should remain.
   assert.doesNotMatch(coursePlayer, /rotate\(90deg\)/);
 });
 
-test("ResourceViewer offers a fullscreen toggle for media", () => {
-  assert.match(resourceViewer, /data-course-viewer-fullscreen/);
+test("The active file's media fullscreen toggle lives in the Player tab", () => {
+  // The viewer still performs the fullscreen switch (it owns the stage
+  // element), but the button itself is a Player panel row.
+  assert.match(playerPanel, /data-course-viewer-fullscreen/);
   assert.match(resourceViewer, /requestFullscreen/);
+  assert.match(resourceViewer, /onToggleFullscreen/);
 });
 
 // ---------------------------------------------------------------------------

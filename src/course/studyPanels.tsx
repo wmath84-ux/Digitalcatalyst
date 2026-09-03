@@ -23,7 +23,8 @@
 //
 // Axis follows the player's orientation: portrait = a horizontal divider with
 // the lesson on top; landscape = a vertical divider with the lesson on the
-// left (the landscape header rail stays exactly where it always was).
+// left. The deck is the player's ONLY layout — there is no header anywhere
+// (and no non-split variant) for it to share the shell with.
 //
 // Performance rules honoured here: only transform / opacity / box-shadow /
 // flex-grow are animated, the live drag writes straight to the DOM (no React
@@ -138,36 +139,6 @@ const useKeyboardInset = (scopeRef: RefObject<HTMLElement | null>): number => {
     };
   }, [scopeRef]);
   return inset;
-};
-
-// ── Dock FLIP ───────────────────────────────────────────────────────────────
-// The footer dock changes home when Split Deck mode flips: from the shell's
-// last in-flow child to the study pane's last child (and back). React unmounts
-// one and mounts the other, so the move is animated by hand: measure the dock
-// BEFORE the reflow, then after it play the delta back to zero on the new
-// element — the pack's own 380ms ease, transform only.
-
-/** Measure the dock where it is right now (call BEFORE the mode flips). */
-export const captureDockRect = (): DOMRect | null => {
-  if (typeof document === "undefined") return null;
-  const dock = document.querySelector<HTMLElement>("[data-course-dock]");
-  return dock ? dock.getBoundingClientRect() : null;
-};
-
-/** Glide the dock from a previously captured rect into its new home. */
-export const flipDockFrom = (from: DOMRect | null): void => {
-  if (!from || typeof document === "undefined") return;
-  const dock = document.querySelector<HTMLElement>("[data-course-dock]");
-  if (!dock) return;
-  const to = dock.getBoundingClientRect();
-  const dx = from.left - to.left;
-  const dy = from.top - to.top;
-  if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-  animate(
-    dock,
-    { transform: [`translate3d(${dx}px, ${dy}px, 0)`, "translate3d(0px, 0px, 0)"] },
-    { duration: 0.38, ease: EASE_OUT_MOTION },
-  );
 };
 
 // ── Peek rail ───────────────────────────────────────────────────────────────
@@ -424,17 +395,14 @@ export interface SplitDeckProps {
   studyIcon: ComponentType<{ size?: number; className?: string; style?: CSSProperties }>;
   /** The player's lossless viewer stack — never unmounted, only resized. */
   lesson: ReactNode;
-  /** <CourseOverlay variant="pane" /> — tabs + footer dock inside the pane. */
+  /** <CourseOverlay /> — tabs + footer dock inside the pane. */
   study: ReactNode;
   /**
-   * Notes / Mind map are on screen: the pane gets the same deeper plate the
-   * sheet's `data-solid-panel` treatment gives them, so the writing surface
-   * reads identically in both homes.
+   * Notes / Mind map / Player are on screen: the pane gets the deeper plate
+   * the solid-panel treatment gives them, so the writing surface reads
+   * identically in both themes.
    */
   solid?: boolean;
-  /** false = play the reverse animation, then call `onExited`. */
-  active: boolean;
-  onExited?: () => void;
   handleRef?: RefObject<SplitDeckHandle | null>;
 }
 
@@ -458,8 +426,6 @@ export function SplitDeck({
   lesson,
   study,
   solid = false,
-  active,
-  onExited,
   handleRef,
 }: SplitDeckProps) {
   const sectionRef = useRef<HTMLDivElement | null>(null);
@@ -519,7 +485,6 @@ export function SplitDeck({
   const dragPointerRef = useRef<number | null>(null);
   const lastPulseRef = useRef<number | null>(null);
   const controlsRef = useRef<AnimationPlaybackControls | null>(null);
-  const exitedRef = useRef(false);
 
   const stopAnimation = useCallback(() => {
     controlsRef.current?.stop();
@@ -554,6 +519,9 @@ export function SplitDeck({
   });
 
   // ── Entry: divider draws, study pane grows open ────────────────────────
+  // The deck is the player's ONLY layout now (there is no off state), so the
+  // entry choreography runs once on mount: the study pane grows from ~0 with
+  // the entry spring while the lesson pane shrinks in the very same tick.
   useLayoutEffect(() => {
     const stored = loadSplitRatio(courseId, axis, floor);
     const storedCollapsed = loadSplitCollapsed(courseId, axis);
@@ -563,13 +531,9 @@ export function SplitDeck({
     setAriaNow(Math.round(100 - (storedCollapsed ? (storedCollapsed === "study" ? 0 : 100) : stored)));
     if (storedCollapsed) {
       ratio.set(storedCollapsed === "study" ? 0 : 100);
-    } else if (active) {
-      // Grow from ~0 with the entry spring; the lesson pane shrinks in the
-      // very same tick, so there is no layout jump and the dock rides in.
+    } else {
       ratio.set(ENTRY_START);
       animateRatio(stored, SPRING_ENTRY);
-    } else {
-      ratio.set(stored);
     }
     // Mount only — the axis effect below owns every later change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -594,36 +558,6 @@ export function SplitDeck({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [axis, courseId, floor]);
-
-  // ── Exit: the exact reverse, then the parent unmounts the deck ─────────
-  // `onExited` is read through a ref so a parent re-render can never clear the
-  // hand-over timer, and re-enabling mid-exit simply grows the pane back.
-  const onExitedRef = useRef(onExited);
-  onExitedRef.current = onExited;
-  useEffect(() => {
-    const handOver = () => {
-      const timer = window.setTimeout(() => onExitedRef.current?.(), 280);
-      return () => window.clearTimeout(timer);
-    };
-    if (active) {
-      if (!exitedRef.current) return undefined;
-      // Split mode came back while the deck was shrinking away: grow open
-      // again to the ratio the learner had (no unmount, no remount).
-      exitedRef.current = false;
-      const target = clampSplitRatio(lastRatioRef.current || DEFAULT_SPLIT_RATIO[axis], floor);
-      animateRatio(target, SPRING_ENTRY);
-      commit(target);
-      return undefined;
-    }
-    if (exitedRef.current) return handOver();
-    exitedRef.current = true;
-    animateRatio(0, SPRING_ENTRY);
-    const clearTimer = handOver();
-    return () => {
-      stopAnimation();
-      clearTimer();
-    };
-  }, [active, animateRatio, axis, commit, floor, stopAnimation]);
 
   useEffect(() => () => stopAnimation(), [stopAnimation]);
 

@@ -25,6 +25,7 @@ const repoRoot = path.join(__dirname, "..");
 const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const overlay = readSource("src/course/CourseOverlay.tsx");
+const studyPanels = readSource("src/course/studyPanels.tsx");
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
 const panel = readSource("src/course/MindMapPanel.tsx");
 const hook = readSource("src/course/useCourseMindMap.ts");
@@ -50,10 +51,11 @@ test("the editor is built on React Flow, which is the only candidate with touch 
 // Dock integration — the tab sits next to Note
 // ---------------------------------------------------------------------------
 
-test("Mind map is a dock tab declared immediately after Note", () => {
-  assert.match(overlay, /export type DockTab = "modules" \| "resources" \| "notes" \| "mindmap" \| "paid";/);
-  const order = [...overlay.matchAll(/\{ key: "(modules|resources|notes|mindmap|paid)"/g)].map((m) => m[1]);
-  assert.deepEqual(order, ["modules", "resources", "notes", "mindmap", "paid"], "Mind map must sit right after Note");
+test("Mind map is a dock tab declared immediately after Note (Player closes the list)", () => {
+  assert.match(overlay, /export type DockTab = "modules" \| "resources" \| "notes" \| "mindmap" \| "paid" \| "player";/);
+  const order = [...overlay.matchAll(/\{ key: "(modules|resources|notes|mindmap|paid|player)"/g)].map((m) => m[1]);
+  assert.deepEqual(order.slice(0, 5), ["modules", "resources", "notes", "mindmap", "paid"], "Mind map must sit right after Note");
+  assert.equal(order[5], "player", "the Player settings tab closes the dock");
 });
 
 test("the overlay renders the mind map panel for its tab and degrades without one", () => {
@@ -62,43 +64,43 @@ test("the overlay renders the mind map panel for its tab and degrades without on
 });
 
 // ---------------------------------------------------------------------------
-// Sheet — one right-side glass sheet, identical for every tab
+// Study pane — the footprint every tab (mind map included) renders inside
 // ---------------------------------------------------------------------------
 
-test("every tab (mind map included) opens the same right-side glass sheet", () => {
-  // The owner's direction: no per-tab sheet sizing, no landscape split — the
-  // websiteglass Glass Sheet (right side) opens in the window between the
-  // header and the footer dock for ALL tabs, mind map included.
-  assert.match(overlay, /import \{ GlassSheet, GlassSheetContent, type SheetBounds \} from "\.\.\/components\/ui\/glass-sheet"/);
-  assert.match(overlay, /<GlassSheetContent[\s\S]*?side="right"/);
+test("every tab (mind map included) renders in the Split Deck's study pane", () => {
+  // The owner's direction changed: there is no sheet variant at all — the
+  // same study pane (permanent, beside the lesson) hosts ALL tabs.
+  assert.match(coursePlayer, /study=\{studyOverlay\}/);
+  assert.match(overlay, /data-course-study-chrome="pane"/);
+  assert.match(overlay, /data-course-overlay-tab=\{tab\}/);
   assert.doesNotMatch(overlay, /DEFAULT_MINDMAP_SPLIT|DEFAULT_NOTES_SPLIT/, "per-tab split widths are gone");
   assert.doesNotMatch(overlay, /data-course-split-handle/, "the split drag handle is gone");
+  assert.doesNotMatch(overlay, /glass-sheet/, "no right-side sheet variant");
 });
 
-test("the sheet keeps its standard header (title + close X) for the mind map tab", () => {
-  // One header row for every tab; it is hidden ONLY while the notes writing
-  // box is open (the editor needs every pixel of the sheet).
-  assert.match(overlay, /\{notesWriting \? null : \(/);
-  assert.match(overlay, /data-course-overlay-close/);
+test("the pane's chrome row (title + notes +) also serves the mind map tab", () => {
+  // One chrome row for every tab; it is hidden ONLY while the notes writing
+  // box is open (the editor needs every pixel of the pane).
+  assert.match(overlay, /\{notesWriting \? null : chromeRow\}/);
   assert.match(overlay, /data-course-overlay-title/);
+  assert.doesNotMatch(overlay, /data-course-overlay-close/);
 });
 
-test("the sheet is measured to the window between the header and the footer dock", () => {
-  // The bounds come from the live layout: the header's bottom edge (portrait)
-  // / right edge (landscape rail) and the dock's top edge — so the sheet
-  // (and its scrim) never overlap the header or the footer navigation.
-  assert.match(overlay, /top: landscape \? 0 : Math\.round\(headerRect \? headerRect\.bottom : 0\)/);
-  assert.match(overlay, /bottom: Math\.max\(0, Math\.round\(window\.innerHeight - dockRect\.top\)\)/);
-  assert.match(overlay, /left: landscape \? Math\.round\(headerRect \? headerRect\.right : 0\) : 0/);
-  assert.match(overlay, /bounds=\{sheetBounds \?\? undefined\}/);
+test("the study pane is bounded by the divider, not by header/dock strips", () => {
+  // The old sheet measured itself against header + dock pixels. The pane is
+  // simply the Split Deck's second pane — the divider is the boundary.
+  assert.doesNotMatch(overlay, /SheetBounds/);
+  assert.doesNotMatch(overlay, /sheetBounds/);
+  assert.match(studyPanels, /data-course-study-pane=""/);
 });
 
-test("closing the overlay flushes the mind map's pending save", () => {
-  // The header X, scrim tap, Escape and dock tap all go through onToggle /
-  // onClose — a 700ms-debounced write left pending must be flushed there,
-  // the same way the mind map toolbar's own X flushes via onFlush.
-  assert.match(coursePlayer, /if \(dockOpen && dockTab === "mindmap"\) mindMap\.flush\(\);/);
+test("leaving the mind map tab flushes its pending save", () => {
+  // There is no sheet to close — the flush hooks are: switching away to any
+  // other dock tab, the map panel's own close (peek-collapse), and leaving
+  // the player. A 700ms-debounced write must never be lost on any of them.
   assert.match(coursePlayer, /if \(dockTab === "mindmap"\) mindMap\.flush\(\);/);
+  assert.match(coursePlayer, /const previousDockTab = useRef<DockTab>\(dockTab\);/);
+  assert.match(coursePlayer, /const previous = previousDockTab\.current;/);
 });
 
 test("the old landscape split machinery is gone — the lesson keeps full width", () => {
@@ -405,12 +407,12 @@ test("the mind map follows the Course Player theme and can be flipped for the ma
   assert.match(styles, /\.course-mindmap-shell\[data-mindmap-theme="light"\]/);
 });
 
-test("the mind map toolbar has a close button that shuts the sheet", () => {
+test("the mind map toolbar has a close button that peek-collapses the pane", () => {
   assert.match(panel, /data-course-mindmap-close/);
   assert.match(panel, /onClose\(\);/);
   assert.match(coursePlayer, /onClose=\{\(\) => \{/);
   assert.match(coursePlayer, /mindMap\.flush\(\);/);
-  assert.match(coursePlayer, /setDockOpen\(false\);/);
+  assert.match(coursePlayer, /splitDeckRef\.current\?\.collapse\("study"\)/);
 });
 
 test("the toolbar slot is replaced by a slim status strip in both orientations", () => {

@@ -41,13 +41,16 @@ test("the library cards themselves are width-independent boxes", () => {
   assert.match(indexCss, /\[data-course-mindmap-map-grid\]\s*\{[\s\S]*?\}/);
 });
 
-test("the sheet still closes without a width animation", () => {
-  // The overlay is the websiteglass Glass Sheet: closing unmounts it directly
-  // and the entrance/exit is a transform-only slide from the right edge —
-  // no width animation that would make content shrink on the way out.
+test("the mind map pane never slides a sheet in or out", () => {
+  // The course overlay no longer uses the right-edge Glass Sheet at all —
+  // the split pane swaps tabs in place with a 150ms crossfade, so there is
+  // no transform slide and no width animation anywhere near the mind map.
   const overlay = fs.readFileSync("src/course/CourseOverlay.tsx", "utf8");
+  assert.doesNotMatch(overlay, /glass-sheet/);
+  assert.match(overlay, /key=\{tab\}/);
+  assert.match(overlay, /duration: 0\.15, ease: EASE_OUT_MOTION/);
+  // The shared sheet component (screens outside the player) stays intact.
   const sheet = fs.readFileSync("src/components/ui/glass-sheet.tsx", "utf8");
-  assert.match(overlay, /import \{ GlassSheet, GlassSheetContent, type SheetBounds \} from "\.\.\/components\/ui\/glass-sheet"/);
   assert.match(sheet, /if \(!mounted \|\| !open\) return null;/);
   assert.match(sheet, /animation: "glass-sheet-in 0\.34s cubic-bezier\(0\.22,1,0\.36,1\) both"/);
 });

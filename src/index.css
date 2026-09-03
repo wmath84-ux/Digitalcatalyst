@@ -396,21 +396,6 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   height: auto;
   background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.06) 100%);
 }
-[data-course-overlay][data-open="true"] {
-  border-bottom: 0 !important;
-  border-bottom-left-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
-}
-[data-course-overlay][data-open="true"][data-orientation="portrait"] {
-  /* The last 22 px of the sheet sit behind the dock — keep content clear of
-     that overlap instead of letting the dock cover it. */
-  padding-bottom: 22px;
-}
-[data-course-overlay][data-open="true"][data-orientation="landscape"] {
-  border-right: 0 !important;
-  padding-right: 22px;
-}
-
 /* While the indicator is being dragged, the active pill glows a little harder
    so it feels "alive" as it travels between tabs. */
 [data-course-dock-indicator][data-dragging="true"] > span {
@@ -1767,13 +1752,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 
 /* Course Player — overlay content swap (tab switch) */
-@keyframes course-overlay-in {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.animate-course-overlay-in {
-  animation: course-overlay-in 0.22s ease both;
-}
 
 /* Course Player — left wire tree that connects modules to their files. */
 [data-course-overlay-wire] [data-course-wire-rail] {
@@ -2183,6 +2161,7 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 .course-player-shell[data-course-landscape-scroll="vertical"] :is(
   [data-course-overlay-list],
   [data-course-overlay-paid],
+  [data-course-player-panel],
   [data-course-notes-panel],
   [data-course-rich-editor],
   [data-course-viewer-iframe]
@@ -5780,9 +5759,7 @@ html.light {
   to { opacity: 1; transform: none; }
 }
 
-[data-page-enter] [data-site-header],
-[data-page-enter] [data-course-header],
-[data-page-enter] [data-course-landscape-header] {
+[data-page-enter] [data-site-header] {
   animation: dc-page-enter-header 0.7s ease-out both;
 }
 
@@ -5810,8 +5787,6 @@ html.light {
 
 @media (prefers-reduced-motion: reduce) {
   [data-page-enter] [data-site-header],
-  [data-page-enter] [data-course-header],
-  [data-page-enter] [data-course-landscape-header],
   [data-page-enter] [data-app-frame] > *:not([data-site-header]):not([data-site-footer-nav]):not([data-site-footer]):not(nav):not([data-revision-content]):not([data-myday-content]):not(.dc-page-tabs),
   [data-page-enter] [data-course-player] > section,
   [data-page-enter] [data-course-landscape-content],
@@ -6034,33 +6009,6 @@ html.light {
    COURSE PLAYER — light-mode scoping + solid study panels (owner request)
    ══════════════════════════════════════════════════════════════════════ */
 
-/* Light theme must touch ONLY the buttons and the overlay — never the
-   player's own chrome. While the Course Player syncs `html.light`, the
-   site-wide `--dc-chrome-glass` token flips to the white material and the
-   header/rail used to turn white with it. Re-pinning the token ON the header
-   elements keeps them on the dark chrome in both themes, while every
-   GlassButton / GlassSurface / overlay inside the player still follows the
-   learner's light/dark pick. */
-.course-player-shell[data-course-theme="light"] [data-course-header],
-.course-player-shell[data-course-theme="light"] [data-course-landscape-header] {
-  --dc-chrome-glass: rgba(60, 62, 68, 0.30);
-  --dc-chrome-glass-rim:
-    inset 0 1px 1px rgba(255, 255, 255, 0.5),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-}
-
-/* Notes library + Mind map sheets: the glass sheet was translucent enough
-   that the lesson (and a previously drawn map / written notes) stayed
-   visible THROUGH the panel — both layers read at once. These two study
-   surfaces now sit on a near-opaque plate in BOTH themes; the ink inside
-   them is white in both course themes, so the plate stays dark. */
-.course-player-shell [data-course-overlay][data-solid-panel="true"] {
-  background: rgba(13, 15, 24, 0.96) !important;
-}
-.course-player-shell[data-course-theme="light"] [data-course-overlay][data-solid-panel="true"] {
-  background: rgba(36, 39, 52, 0.97) !important;
-}
 
 
 /* ── Compact side-panel band (<=1023px): AI Canvas Glass Sidebar ──────────
