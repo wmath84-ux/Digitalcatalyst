@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { Minimize } from "lucide-react";
 import { GlassButton } from "./components/ui/glass-button";
@@ -12,7 +12,9 @@ import ChargingCompleteButton from "./course/ChargingCompleteButton";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer from "./course/ResourceViewer";
-import CourseOverlay, { type DockTab } from "./course/CourseOverlay";
+import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, type DockTab, type OverlayVariant } from "./course/CourseOverlay";
+import { SplitDeck, captureDockRect, flipDockFrom, type SplitDeckHandle } from "./course/studyPanels";
+import { loadSplitEnabled, saveSplitEnabled } from "./course/splitMotion";
 import SnowOverlay from "./course/SnowOverlay";
 import MindMapPanel from "./course/MindMapPanel";
 import useCourseMindMap from "./course/useCourseMindMap";
@@ -308,6 +310,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Bottom dock state — the single overlay is reused across the four toggles.
   const [dockTab, setDockTab] = useState<DockTab>("modules");
   const [dockOpen, setDockOpen] = useState(false);
+  // ── Split Deck ──────────────────────────────────────────────────────────
+  // ONE global player preference (⚙ Player settings → "Split mode"): the whole
+  // player reorganises into two glass panes with a draggable divider between
+  // them, and the footer navigation moves INSIDE the study pane — module panel,
+  // footer and content all live in the split. Off, the player is exactly the
+  // home-footer + right-side-sheet contract it was before.
+  const [splitMode, setSplitMode] = useState<boolean>(loadSplitEnabled);
+  // The deck stays mounted while it plays its reverse (shrink-away) animation,
+  // so the sheet only takes over once the study pane is actually gone.
+  const [splitRendered, setSplitRendered] = useState<boolean>(splitMode);
+  const splitDeckRef = useRef<SplitDeckHandle | null>(null);
+  // The dock's rect from BEFORE a mode flip — the FLIP's "first" measurement.
+  const dockFlipFromRef = useRef<DOMRect | null>(null);
+  const playerShellRef = useRef<HTMLDivElement | null>(null);
   const [isLandscape, setIsLandscape] = useState(false);
   // True while the document is actually in fullscreen — i.e. the Android
   // status bar is really hidden. Mirrors the live document state so the rail
@@ -451,6 +467,18 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       /* private mode / storage disabled — keep the in-memory preference */
     }
   }, [theme]);
+
+  // Split Deck is remembered the same way the theme and the snow are.
+  useEffect(() => { saveSplitEnabled(splitMode); }, [splitMode]);
+
+  // The footer dock changes home when the mode flips (shell bottom ⇄ study
+  // pane), so it FLIPs: the rect captured before the reflow plays back to zero
+  // on the new element — portrait rises into the pane, landscape glides in
+  // from the right. Transform only, the pack's own 380ms ease.
+  useLayoutEffect(() => {
+    flipDockFrom(dockFlipFromRef.current);
+    dockFlipFromRef.current = null;
+  }, [splitRendered]);
 
   // Snow mode is remembered the same way the theme is.
   useEffect(() => {
@@ -773,6 +801,65 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     }
   };
 
+  /**
+   * Flip Split Deck mode. The dock is measured BEFORE React reflows so it can
+   * FLIP into (or out of) the study pane; enabling mounts the deck at once and
+   * the deck plays its own entry spring, disabling lets the deck shrink away
+   * first and unmounts it through `onExited`.
+   */
+  const requestSplitMode = (next: boolean) => {
+    dockFlipFromRef.current = captureDockRect();
+    setSplitMode(next);
+    if (next) {
+      setSplitRendered(true);
+      // The sheet has no business being "open" behind the study pane; when the
+      // mode is switched off again the learner starts from a closed sheet.
+      setDockOpen(false);
+      return;
+    }
+    // Leaving split mode unmounts the study pane, so a debounced mind map
+    // write is flushed on the way out — the same rule as every sheet close.
+    if (dockTab === "mindmap") mindMap.flush();
+  };
+
+  /**
+   * Split Deck's dock: a DIFFERENT tab swaps the study pane's content in place
+   * (the pane never closes — it is the layout now), while the tab you are
+   * already on peek-collapses the study pane, so the footer stays reachable
+   * even when it has become a 28px rail.
+   */
+  const handleSplitDockTabChange = (next: DockTab) => {
+    if (next === dockTab) {
+      // Same flush rule as every sheet close path: a debounced mind map write
+      // left pending is never dropped on the way out.
+      if (dockTab === "mindmap") mindMap.flush();
+      splitDeckRef.current?.toggleStudy();
+      return;
+    }
+    setDockTab(next);
+  };
+
+  // ⌘/Ctrl+1…5 walks the study tabs while the Split Deck is up — a desktop
+  // shortcut, so it stays out of the way of any text field and of anything
+  // outside the player.
+  useEffect(() => {
+    if (!splitRendered) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      const index = Number.parseInt(event.key, 10);
+      if (!Number.isFinite(index) || index < 1 || index > STUDY_TAB_ORDER.length) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName))) return;
+      const shell = playerShellRef.current;
+      if (shell && target && target !== document.body && !shell.contains(target)) return;
+      event.preventDefault();
+      const next = STUDY_TAB_ORDER[index - 1];
+      if (next !== dockTab) setDockTab(next);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [dockTab, splitRendered]);
+
   const totalEligibleFiles = useMemo(() => {
     const inaccessibleModuleIds = resolution.lockedModuleIds;
     return files.filter((file) => {
@@ -919,6 +1006,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const SETTING_ACCENTS: Record<string, { color: string; delay: number; divider: boolean }> = {
     theme: { color: "#FF6BF5", delay: 0.1, divider: false },
     snow: { color: "#3A86FF", delay: 0.15, divider: true },
+    split: { color: "#22D3EE", delay: 0.15, divider: true },
     viewport: { color: "#06D6A0", delay: 0.2, divider: true },
     "file-bars": { color: "#FFBE0B", delay: 0.25, divider: false },
     "player-chrome": { color: "#FF7B54", delay: 0.3, divider: true },
@@ -960,6 +1048,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         <p className={`px-4 pb-1 pt-1 text-[10px] font-black uppercase tracking-[0.14em] ${settingsInkSoft}`}>Player settings</p>
         {settingsRow("Light theme", theme === "light", (next) => setTheme(next ? "light" : "dark"), "theme")}
         {settingsRow("Snowfall", snowMode, (next) => setSnowMode(next), "snow")}
+        {settingsRow("Split mode", splitMode, (next) => requestSplitMode(next), "split")}
         {showViewportToggle ? settingsRow("Desktop view", desktopView, (next) => setDesktopView(next), "viewport") : null}
         <PopoverSeparator />
         {settingsRow("File bars", !fileBarsHidden, (next) => setFileBarsHidden(!next), "file-bars")}
@@ -1011,11 +1100,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     </div>
   );
 
-  const overlay = (
+  /**
+   * The study tabs — ONE element builder for both homes. `variant="sheet"` is
+   * the right-side Glass Sheet + the shell's footer dock; `variant="pane"` is
+   * the very same content rendered in-flow inside the Split Deck's study pane,
+   * footer dock included (so the dock lives INSIDE the split).
+   */
+  const renderStudyOverlay = (variant: OverlayVariant) => (
     <CourseOverlay
+      variant={variant}
       orientation={useLandscapeRails ? "landscape" : "portrait"}
       tab={dockTab}
-      onTabChange={handleDockTabChange}
+      chromeHidden={variant === "pane" ? playerChromeHidden : false}
+      onExitSplitMode={() => requestSplitMode(false)}
+      onTabChange={variant === "pane" ? handleSplitDockTabChange : handleDockTabChange}
       open={dockOpen}
       onToggle={() => {
         // Flush the mind map's pending debounced write when closing, so a
@@ -1071,17 +1169,45 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           // until the learner flips the map's own sun/moon toolbar button.
           playerTheme={theme}
           landscape={useLandscapeRails}
-          // True only while the mind map sheet is actually open. Within one
+          // True only while the mind map surface is actually on screen (the
+          // sheet in sheet mode, the study pane in Split Deck mode). Within one
           // player visit the panel restores the learner's last view
           // (library or canvas) from the panel session; leaving the player
           // resets it back to the library home screen.
-          open={dockOpen && dockTab === "mindmap"}
+          open={variant === "pane" ? dockTab === "mindmap" : dockOpen && dockTab === "mindmap"}
           onClose={() => {
             mindMap.flush();
             setDockOpen(false);
           }}
         />
       )}
+    />
+  );
+
+  const overlay = renderStudyOverlay("sheet");
+  // The active tab drives the divider's colour, its glow and the study peek
+  // rail's icon — the deck never keeps its own copy of the tab list.
+  const activeStudyTab = dockTabRecord(dockTab);
+  const studyPane = renderStudyOverlay("pane");
+
+  /**
+   * The Split Deck region: lesson pane + draggable glass divider + study pane
+   * (tabs AND footer dock inside). `active` false plays the reverse animation
+   * and reports back through `onExited`, which is when the sheet takes over.
+   */
+  const splitDeck = (axis: "row" | "column", deckOrientation: "portrait" | "landscape") => (
+    <SplitDeck
+      axis={axis}
+      orientation={deckOrientation}
+      courseId={product.id}
+      accent={activeStudyTab.color}
+      studyIcon={activeStudyTab.icon}
+      lesson={viewerStack}
+      study={studyPane}
+      solid={dockTab === "notes" || dockTab === "mindmap"}
+      active={splitMode}
+      onExited={() => setSplitRendered(false)}
+      handleRef={splitDeckRef}
     />
   );
 
@@ -1139,9 +1265,19 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         id="course-viewer"
         className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
         data-course-landscape-content
+        data-course-split={splitRendered ? "on" : "off"}
       >
-        <div className="relative min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
-        {playerChromeHidden ? null : overlay}
+        {splitRendered ? (
+          // Split Deck in landscape: the header rail stays on the left, the
+          // split region is everything right of it, and the divider is
+          // VERTICAL (lesson left, study right).
+          splitDeck("row", "landscape")
+        ) : (
+          <>
+            <div className="relative min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
+            {playerChromeHidden ? null : overlay}
+          </>
+        )}
         {chromeRestoreButton}
       </section>
     </>
@@ -1150,7 +1286,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // ── Landscape: header rail left, content centre, toggle rail right ──
   if (isLandscape) {
     return (
-      <div className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" data-course-statusbar-hidden={courseFullscreen ? "true" : "false"} style={{ colorScheme: browserColorScheme }}>
+      <div ref={playerShellRef} className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-row overflow-hidden text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="landscape" data-course-landscape-scroll="vertical" data-course-statusbar-hidden={courseFullscreen ? "true" : "false"} style={{ colorScheme: browserColorScheme }}>
         {landscapeLayout()}
         {snowMode ? <SnowOverlay theme={theme} /> : null}
       </div>
@@ -1159,7 +1295,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   // ── Portrait: sticky header top, content full-bleed, sticky dock bottom ──
   return (
-    <div className="course-player-shell fixed inset-0 flex h-[100dvh] flex-col overflow-hidden text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="portrait" style={{ colorScheme: browserColorScheme }}>
+    <div ref={playerShellRef} className="course-player-shell fixed inset-0 flex h-[100dvh] flex-col overflow-hidden text-[var(--course-text)]" data-course-player data-course-theme={theme} data-orientation="portrait" style={{ colorScheme: browserColorScheme }}>
       {playerChromeHidden ? null : (
       <header
         className="sticky top-0 z-50 flex shrink-0 flex-col overflow-hidden border-b border-[var(--course-border)] bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]"
@@ -1192,9 +1328,21 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       )}
 
       {/* Everything between the pinned header and the pinned dock. */}
-      <section id="course-viewer" className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
-        {playerChromeHidden ? null : overlay}
+      <section
+        id="course-viewer"
+        className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
+        data-course-split={splitRendered ? "on" : "off"}
+      >
+        {splitRendered ? (
+          // Split Deck in portrait: a HORIZONTAL divider, lesson on top and
+          // the study pane (tabs + footer dock) below.
+          splitDeck("column", "portrait")
+        ) : (
+          <>
+            <div className="min-h-0 flex-1 overflow-hidden">{viewerStack}</div>
+            {playerChromeHidden ? null : overlay}
+          </>
+        )}
         {chromeRestoreButton}
       </section>
       {snowMode ? <SnowOverlay theme={theme} /> : null}
