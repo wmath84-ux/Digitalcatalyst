@@ -89,24 +89,36 @@ export default function ProductCard({
       </div>
 
       <div className="relative z-20 flex flex-1 flex-col gap-2 p-4">
-        <div className="flex items-center gap-1.5 text-sm">
-          <StarIcon className="h-4 w-4 text-amber-400" />
-          <span className="font-bold text-white">{product.rating.toFixed(1)}</span>
-          <span className="text-white/55">({product.reviews} review{product.reviews === 1 ? "" : "s"})</span>
+        {/* Visual hierarchy: title first (largest, heaviest), then the proof
+            row, then the quiet byline — instead of three same-weight lines. */}
+        <h3 className="text-[15px] font-extrabold leading-[1.35] dc-ink-1">{product.title}</h3>
+
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+          <span className="inline-flex items-center gap-1">
+            <StarIcon className="h-3.5 w-3.5 text-amber-400" />
+            <span className="font-bold dc-ink-1">{product.rating.toFixed(1)}</span>
+            <span className="dc-ink-3">({product.reviews})</span>
+          </span>
+          {/* Social proof / scarcity — only shown when it is real (a
+              well-reviewed item), never as decoration. */}
+          {product.reviews >= 25 ? (
+            <span className="dc-proof">🔥 Popular</span>
+          ) : null}
         </div>
 
-        <h3 className="text-[15px] font-extrabold leading-snug text-white">{product.title}</h3>
-        <p className="text-sm font-medium text-white/75">by {product.instructor}</p>
+        <p className="text-[12.5px] font-medium dc-ink-3">by {product.instructor}</p>
 
-        <div className="mt-auto flex items-center gap-2 pt-1">
+        {/* Anchoring + contrast effect: the struck reference price is quiet
+            and set BEFORE the payable price, so the eye lands on the smaller
+            number last. Loss aversion: the saving is framed as rupees the
+            user keeps, not as an abstract percentage alone. */}
+        <div className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-1">
           {product.originalPrice > product.price && (
-            <span className="text-sm text-white/55 line-through">₹{product.originalPrice}</span>
+            <span className="text-[13px] dc-anchor-price">₹{product.originalPrice}</span>
           )}
-          <span className="text-lg font-extrabold text-white">₹{product.price}</span>
+          <span className="text-xl dc-hero-price">₹{product.price}</span>
           {discount > 0 && (
-            <span className="rounded-md bg-rose-500/20 px-1.5 py-0.5 text-[11px] font-bold text-rose-300">
-              -{discount}%
-            </span>
+            <span className="dc-save-pill">Save ₹{product.originalPrice - product.price} · {discount}%</span>
           )}
         </div>
 
@@ -136,7 +148,7 @@ export default function ProductCard({
             }}
           >
             <span className="flex w-full items-center justify-between gap-2 text-[12px] font-extrabold uppercase tracking-wide">
-              <span>Add to Cart</span>
+              <span>Add to my cart</span>
               <span>₹{product.price}</span>
             </span>
           </LiquidMetalButton>

@@ -180,7 +180,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
       {isSubscriptionPurchase ? null : (
       <GlassCard data-checkout-line-items>
         <header className="mb-2 flex items-center justify-between">
-          <h2 className="text-xs font-black uppercase tracking-wider text-white/55">
+          <h2 className="dc-section-label">
             Items ({lineItemsForDisplay.length + ownedLineItems.length})
           </h2>
           {lineItemsForDisplay.length > 0 ? (
@@ -226,10 +226,12 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
       {/* Price section */}
       <GlassCard data-checkout-price-section>
         <header className="mb-2 flex items-center justify-between">
-          <h2 className="text-xs font-black uppercase tracking-wider text-white/55">Price breakdown</h2>
-          <p className="text-[10px] text-white/55">GST inclusive</p>
+          <h2 className="dc-section-label">Price breakdown</h2>
+          <p className="text-[10px] dc-ink-3">GST inclusive</p>
         </header>
         <dl className="space-y-1.5 text-sm">
+          {/* Anchoring: the pre-discount subtotal is the quiet reference the
+              final total is judged against. */}
           <PriceRow label="Regular subtotal" value={regularSubtotal} />
           {saleDiscount > 0 ? (
             <PriceRow label="Sale discount" value={-saleDiscount} negative />
@@ -246,11 +248,19 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           ) : null}
         </dl>
         <div className="mt-3 border-t border-white/10 pt-3">
-          <div className="flex items-center justify-between">
-            <span className="text-base font-black text-white">Final total</span>
-            <span className="text-2xl font-black text-white sm:text-3xl">{formatRupee(finalTotal)}</span>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-base font-black dc-ink-1">Final total</span>
+            <span className="text-2xl dc-hero-price sm:text-3xl">{formatRupee(finalTotal)}</span>
           </div>
-          <p className="mt-1 text-[11px] text-white/55">Payable amount is the maximum of cash-payable and minimum-payable floors.</p>
+          {/* Loss aversion: total savings restated in rupees, not just as
+              individual negative rows the buyer has to add up themselves. */}
+          {regularSubtotal - finalTotal > 0 ? (
+            <div className="mt-1.5 flex items-center justify-end gap-2">
+              <span className="text-[12px] dc-anchor-price">{formatRupee(regularSubtotal)}</span>
+              <span className="dc-save-pill">You save {formatRupee(regularSubtotal - finalTotal)}</span>
+            </div>
+          ) : null}
+          <p className="mt-2 text-[11px] dc-ink-3">Verified server-side before payment. No amount can change after this screen without a fresh quote.</p>
         </div>
       </GlassCard>
 
@@ -258,7 +268,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
       {showDetails ? (
         <GlassCard data-checkout-selection-details>
           <header className="mb-2 flex items-center justify-between">
-            <h2 className="text-xs font-black uppercase tracking-wider text-white/55">Selection details</h2>
+            <h2 className="dc-section-label">Selection details</h2>
             <button
               type="button"
               onClick={() => setShowDetails(false)}
@@ -372,11 +382,16 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           type="button"
           onClick={onProceed}
           disabled={showLoading}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 py-4 text-base font-black text-white transition hover:bg-indigo-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+          className="dc-focusable flex w-full items-center justify-center gap-2 rounded-full bg-indigo-600 px-5 py-4 text-base font-black text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {showLoading ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <ShoppingBag className="h-5 w-5" />}
-          {finalTotal === 0 ? "Get free access" : `Proceed to payment — ${formatRupee(finalTotal)}`}
+          {finalTotal === 0 ? "Get free access" : `Pay ${formatRupee(finalTotal)} securely`}
         </button>
+        {/* Transparency bias, placed at the exact point of commitment. */}
+        <p className="flex items-center justify-center gap-1.5 pb-1 text-[11px] font-semibold dc-ink-2">
+          <ShieldCheck size={13} className="shrink-0 text-emerald-400" aria-hidden="true" />
+          {finalTotal === 0 ? "No card needed — access unlocks instantly." : "Razorpay secure checkout · nothing is charged until you confirm."}
+        </p>
         <div className="grid grid-cols-2 gap-2">
           <GlassButton
             variant="capsule"
@@ -411,7 +426,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
         >
           <span className="flex items-center gap-1.5">Edit selection <ChevronRight size={14} /></span>
         </GlassButton>
-        <p className="px-1 text-center text-[10px] font-medium text-white/55">
+        <p className="px-1 text-center text-[10px] font-medium dc-ink-3">
           Quote expires at {new Date(quote.expiresAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · Prices are verified server-side before payment.
         </p>
       </div>

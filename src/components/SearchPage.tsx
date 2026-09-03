@@ -24,7 +24,7 @@ import { GlassToggleGroup, GlassToggleItem } from "./ui/glass-toggle-group";
 import { GlassButton } from "./ui/glass-button";
 import { GlassCard } from "./ui/GlassCard";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Search as SearchIcon, X } from "lucide-react";
+import { ArrowLeft, Clock, Search as SearchIcon, Sparkles, TrendingUp, X } from "lucide-react";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
 import StoreHeader from "./Header";
@@ -39,6 +39,32 @@ import {
 import { BookOpenIcon, FilterIcon } from "./icons";
 
 type SortKey = "relevance" | "price-asc" | "price-desc" | "rating" | "newest";
+
+/* Smarter search: a blank query must never be a dead end. Recent searches are
+   persisted locally, popular/for-you terms are derived from the live catalog,
+   so the "zero state" always carries three ways forward. */
+const RECENT_KEY = "dc.search.recent";
+const RECENT_MAX = 6;
+
+const readRecent = (): string[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(RECENT_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string").slice(0, RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeRecent = (list: string[]) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)));
+  } catch {
+    /* storage disabled — recents degrade to session-only, never a crash */
+  }
+};
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "relevance", label: "Most relevant" },
@@ -93,6 +119,7 @@ export default function SearchPage({
   const [activeFilterId, setActiveFilterId] = useState<string>(ALL_STORE_FILTER.id);
   const [sort, setSort] = useState<SortKey>("relevance");
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [recent, setRecent] = useState<string[]>(() => readRecent());
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus the search input on mount and on every remount (so when
@@ -132,6 +159,21 @@ export default function SearchPage({
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
+  // Remember what was actually searched (debounced, so a term is only stored
+  // once the user stops typing — not once per keystroke).
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 3) return undefined;
+    const id = window.setTimeout(() => {
+      setRecent((current) => {
+        const next = [trimmed, ...current.filter((t) => t.toLowerCase() !== trimmed.toLowerCase())].slice(0, RECENT_MAX);
+        writeRecent(next);
+        return next;
+      });
+    }, 900);
+    return () => window.clearTimeout(id);
+  }, [query]);
+
   const chips: StoreFilter[] = useMemo(() => {
     const derived = derivedStoreFilters(products);
     return [ALL_STORE_FILTER, ...derived];
@@ -169,6 +211,46 @@ export default function SearchPage({
     if (sort === "newest") sorted.reverse();
     return sorted;
   }, [products, query, activeFilter, sort]);
+
+  // Popular = the highest-reviewed subjects in the catalog. For-you = the
+  // categories the catalog leads with. Both are derived, never hardcoded, so
+  // the zero state stays true as the catalog grows.
+  const popularTerms = useMemo(() => {
+    const byReviews = [...products].sort((a, b) => b.reviews - a.reviews);
+    const seen = new Set<string>();
+    const terms: string[] = [];
+    for (const product of byReviews) {
+      const term = (product.subject || product.category || "").trim();
+      if (!term || seen.has(term.toLowerCase())) continue;
+      seen.add(term.toLowerCase());
+      terms.push(term);
+      if (terms.length === 6) break;
+    }
+    return terms;
+  }, [products]);
+
+  const suggestedForYou = useMemo(() => {
+    const seen = new Set<string>();
+    const terms: string[] = [];
+    for (const product of products) {
+      const term = (product.category || "").trim();
+      if (!term || seen.has(term.toLowerCase())) continue;
+      seen.add(term.toLowerCase());
+      terms.push(term);
+      if (terms.length === 5) break;
+    }
+    return terms;
+  }, [products]);
+
+  const runSearch = (term: string) => {
+    setQuery(term);
+    inputRef.current?.focus();
+  };
+
+  const clearRecent = () => {
+    setRecent([]);
+    writeRecent([]);
+  };
 
   const queryIsLive = query.trim().length > 0;
   const showEmpty = !loading && results.length === 0;
@@ -329,25 +411,85 @@ export default function SearchPage({
               ))}
             </div>
           ) : showEmpty ? (
-            <GlassCard className="mt-10" contentClassName="flex flex-col items-center gap-3 px-6 py-14 text-center">
-              <BookOpenIcon className="h-8 w-8 text-indigo-400" />
-              <p className="text-sm font-bold text-white/85">No results</p>
-              <p className="max-w-xs text-xs font-medium text-white/55">
-                {queryIsLive
-                  ? `We couldn't find anything for "${query.trim()}". Try a different keyword or clear the filter.`
-                  : "Start typing to search the catalog. The list updates live as you type."}
-              </p>
-              {queryIsLive ? (
-                <GlassButton
-                  variant="capsule"
-                  type="button"
-                  onClick={handleClear}
-                  className="mt-1 [&>span>div]:h-9 [&>span>div]:px-4 [&>span>div]:text-xs [&>span>div]:font-bold"
-                >
-                  Clear search
-                </GlassButton>
+            /* No dead ends. With no query we teach + suggest (recent,
+               popular, for-you); with a query that missed we explain what
+               happened and hand back an escape route. */
+            <div data-search-zero className="mt-4 flex flex-col gap-4">
+              <GlassCard contentClassName="dc-empty">
+                <span className="dc-empty-art" aria-hidden="true">
+                  <BookOpenIcon className="h-7 w-7 text-indigo-300" />
+                </span>
+                <p className="dc-empty-title">
+                  {queryIsLive ? `Nothing matched “${query.trim()}”` : "What do you want to learn today?"}
+                </p>
+                <p className="dc-empty-body">
+                  {queryIsLive
+                    ? "Try a shorter keyword, check the spelling, or clear the active filter — the catalog searches titles, subjects, instructors and tags."
+                    : "Search across every course, PDF and e-book by title, subject or instructor. Results update live as you type."}
+                </p>
+                {queryIsLive ? (
+                  <GlassButton
+                    variant="capsule"
+                    type="button"
+                    onClick={handleClear}
+                    className="mt-1 [&>span>div]:h-9 [&>span>div]:px-4 [&>span>div]:text-xs [&>span>div]:font-bold"
+                  >
+                    Clear search
+                  </GlassButton>
+                ) : null}
+              </GlassCard>
+
+              {recent.length > 0 ? (
+                <section aria-label="Recent searches" className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="dc-section-label inline-flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" aria-hidden="true" /> Recent
+                    </span>
+                    <button type="button" onClick={clearRecent} className="dc-focusable text-[11px] font-bold uppercase tracking-wide dc-ink-3">
+                      Clear
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {recent.map((term) => (
+                      <button key={term} type="button" className="dc-suggest-chip dc-focusable" onClick={() => runSearch(term)}>
+                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                        {term}
+                      </button>
+                    ))}
+                  </div>
+                </section>
               ) : null}
-            </GlassCard>
+
+              {popularTerms.length > 0 ? (
+                <section aria-label="Popular searches" className="flex flex-col gap-2">
+                  <span className="dc-section-label inline-flex items-center gap-1.5">
+                    <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" /> Popular right now
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {popularTerms.map((term) => (
+                      <button key={term} type="button" className="dc-suggest-chip dc-focusable" onClick={() => runSearch(term)}>
+                        {term}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {suggestedForYou.length > 0 ? (
+                <section aria-label="Suggested for you" className="flex flex-col gap-2">
+                  <span className="dc-section-label inline-flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Browse by category
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestedForYou.map((term) => (
+                      <button key={term} type="button" className="dc-suggest-chip dc-focusable" onClick={() => runSearch(term)}>
+                        {term}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </div>
           ) : (
             <div
               data-search-grid

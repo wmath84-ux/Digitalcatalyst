@@ -565,12 +565,15 @@ function PremiumProductContent({
                 {product.tags.slice(0, 2).map((tag) => <span key={tag} className="rounded-full bg-orange-500/15 px-2.5 py-1 text-[10px] font-semibold text-orange-300">{tag}</span>)}
                 <span className="text-[11px] text-white/55">by <span className="font-medium text-white/85">{product.instructor}</span></span>
               </div>
-              <h1 className="text-2xl font-bold leading-tight tracking-tight text-white">{product.title}</h1>
-              <p className="text-sm leading-relaxed text-white/55">{product.description || `A focused ${product.category.toLowerCase()} resource for practical learning and measurable progress.`}</p>
+              <h1 className="text-2xl font-black leading-[1.2] tracking-tight dc-ink-1">{product.title}</h1>
+              {/* Body copy steps down to ink-2 (readable) instead of ink-3 —
+                  the description is content, not a caption. */}
+              <p className="text-sm leading-relaxed dc-ink-2">{product.description || `A focused ${product.category.toLowerCase()} resource for practical learning and measurable progress.`}</p>
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <RatingStars rating={product.rating} />
-                <span className="font-semibold text-white">{product.rating.toFixed(1)}</span>
-                <a href="#product-reviews" className="text-white/55 underline underline-offset-2">({product.reviews.toLocaleString("en-IN")} ratings)</a>
+                <span className="font-bold dc-ink-1">{product.rating.toFixed(1)}</span>
+                <a href="#product-reviews" className="dc-ink-3 underline underline-offset-2">({product.reviews.toLocaleString("en-IN")} ratings)</a>
+                {product.reviews >= 25 ? <span className="dc-proof">🔥 {product.reviews.toLocaleString("en-IN")} learners rated this</span> : null}
               </div>
             </div>
 
@@ -609,17 +612,33 @@ function PremiumProductContent({
               ) : null
             ) : (
               <GlassSurface radius={24} className="relative overflow-visible text-white" contentClassName="p-5">
-                <div className="relative flex flex-wrap items-end gap-2">
-                  <span className="text-4xl font-extrabold tracking-tight text-white">{formatPrice(product.price)}</span>
-                  {product.originalPrice > product.price && <span className="mb-1 text-base text-white/55 line-through">{formatPrice(product.originalPrice)}</span>}
-                  {discount > 0 && <span className="mb-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-bold text-emerald-200">-{discount}%</span>}
+                {/* Anchoring: the struck reference price is read first and
+                    quietly, so the payable figure lands as the relief. The
+                    saving is stated in rupees (loss aversion) rather than as a
+                    bare percentage. */}
+                <div className="relative flex flex-wrap items-end gap-x-2 gap-y-1">
+                  {product.originalPrice > product.price && <span className="mb-1.5 text-base dc-anchor-price">{formatPrice(product.originalPrice)}</span>}
+                  <span className="text-4xl tracking-tight dc-hero-price">{formatPrice(product.price)}</span>
+                  {discount > 0 && <span className="dc-save-pill mb-1.5">Save {formatPrice(product.originalPrice - product.price)} · {discount}%</span>}
                 </div>
+                {/* Transparency bias: state exactly what the money buys before
+                    asking for the tap. */}
+                <ul className="relative mt-3 flex flex-col gap-1.5" aria-label="What you get">
+                  <li className="flex items-center gap-2 text-[11.5px] font-semibold dc-ink-2">
+                    <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
+                    One-time payment — lifetime access from your purchases library.
+                  </li>
+                  <li className="flex items-center gap-2 text-[11.5px] font-semibold dc-ink-2">
+                    <Zap className="h-3.5 w-3.5 shrink-0 text-indigo-300" aria-hidden="true" />
+                    Unlocks instantly after checkout, on mobile and desktop.
+                  </li>
+                </ul>
                 <div className="relative mt-5 flex gap-3">
-                  <button disabled={unavailable} onClick={primaryAction} className="group flex flex-1 items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-amber-500/30 disabled:text-amber-200 active:scale-[0.98]">
-                    <Zap className="h-4 w-4 fill-current" /> {unavailable ? "Coming soon" : "Buy Now"}
+                  <button disabled={unavailable} onClick={primaryAction} className="dc-focusable group flex flex-1 items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-3.5 text-sm font-bold text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-amber-500/30 disabled:text-amber-200 active:scale-[0.98]">
+                    <Zap className="h-4 w-4 fill-current" /> {unavailable ? "Coming soon" : `Get it for ${formatPrice(product.price)}`}
                   </button>
                   <GlassButton variant="capsule" type="button" disabled={inCart || unavailable} onClick={() => !unavailable && onAddToCart?.(product.id)} className="flex-1 disabled:opacity-60 [&>span>div]:h-12 [&>span>div]:w-full [&>span>div]:gap-2 [&>span>div]:px-3 [&>span>div]:text-sm [&>span>div]:font-bold">
-                    <ShoppingCart className="h-4 w-4" /> {unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to Cart"}
+                    <ShoppingCart className="h-4 w-4" /> {unavailable ? "Not for sale" : inCart ? "In Cart" : "Add to my cart"}
                   </GlassButton>
                 </div>
                 <div className="relative mt-3 flex justify-end">
@@ -638,6 +657,27 @@ function PremiumProductContent({
                 </div>
               </GlassSurface>
             )}
+
+            {/* Thumb zone: once the buy box scrolls away the primary action
+                follows the user down the page, parked where the thumb rests
+                and clear of the (unchanged) footer dock. */}
+            {!isProductOwned && !unavailable ? (
+              <div data-pdp-thumb-bar className="dc-thumb-bar flex items-center gap-3 md:hidden">
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[15px] dc-hero-price">{formatPrice(product.price)}</span>
+                  {product.originalPrice > product.price ? (
+                    <span className="text-[10.5px] dc-anchor-price">{formatPrice(product.originalPrice)}</span>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={primaryAction}
+                  className="dc-focusable flex flex-1 items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-3 text-sm font-extrabold text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500 active:scale-[0.98]"
+                >
+                  <Zap className="h-4 w-4 fill-current" /> Get it now
+                </button>
+              </div>
+            ) : null}
 
             {unavailable && (
               <div className="rounded-2xl border border-amber-400/30 bg-amber-500/15 p-4 text-sm text-amber-200 backdrop-blur-xl">
@@ -664,7 +704,7 @@ function PremiumProductContent({
 
           {!isProductOwned && !unavailable && (
             <section id="pdp-purchase-options" className="scroll-mt-32">
-              <div className="mb-3 px-1"><h2 className="text-lg font-bold text-white">Select course modules</h2><p className="text-xs text-white/55">Same as subscription extras: tick the modules you need, see the price beside each one, then checkout.</p></div>
+              <div className="mb-3 px-1"><h2 className="text-lg font-black dc-ink-1">Build your purchase</h2><p className="text-xs dc-ink-3">Same as subscription extras: tick the modules you need, see the price beside each one, then checkout.</p></div>
               <PdpPurchaseBuilder
                 product={product}
                 isProductOwned={isProductOwned}
@@ -924,7 +964,7 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
 function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavigate?: (product: Product) => void }) {
   return (
     <GlassSurface radius={24} className="text-white" contentClassName="p-5">
-      <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-bold text-white">You may also like</h2><p className="text-[10px] text-white/55">Matched from the live catalog</p></div><ArrowUpRight className="h-4 w-4 text-white/55" /></div>
+      <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-black dc-ink-1">You may also like</h2><p className="dc-section-label">Matched from the live catalog</p></div><ArrowUpRight className="h-4 w-4 text-white/55" /></div>
       <div className="space-y-3">{products.map((item) => <GlassCard key={item.id} role="button" tabIndex={0} onClick={() => onNavigate?.(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate?.(item); } }} aria-label={`View ${item.title}`} className="group w-full cursor-pointer overflow-hidden text-left transition hover:-translate-y-0.5" contentClassName="flex p-0"><img src={item.image} alt={item.title} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-white">{item.title}</span><span className="flex items-center gap-1 text-xs text-white/55"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-white">{formatPrice(item.price)}</span></span></GlassCard>)}</div>
     </GlassSurface>
   );

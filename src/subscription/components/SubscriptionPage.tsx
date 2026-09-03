@@ -46,6 +46,9 @@ import {
   sumSelectedFeaturePaise,
 } from "../../../utils/featurePricing";
 import FeaturePricingTiers from "./FeaturePricingTiers";
+import PlanComparisonTable from "./PlanComparisonTable";
+import LiveSelectionCard from "./LiveSelectionCard";
+import GlassModal from "../../components/ui/glass-modal";
 import ActiveMemberView from "./ActiveMemberView";
 import OwnedPlanCard from "./OwnedPlanCard";
 import {
@@ -134,6 +137,10 @@ export default function SubscriptionPage({
   const [isCourseModalOpen, setCourseModalOpen] = useState(false);
   const [isFeatureModalOpen, setFeatureModalOpen] = useState(false);
   const [isHelpOpen, setHelpOpen] = useState(false);
+  // Final confirmation, rendered in the AI Canvas Glass Modal. The modal body
+  // is the SAME LiveSelectionCard the page shows, so review and page can never
+  // disagree about what is being bought.
+  const [isConfirmOpen, setConfirmOpen] = useState(false);
 
   // Coupon (server-validated through the Part 5 CheckoutContext).
   // The input is held locally; the Part 7 `applyCoupon` action in
@@ -552,6 +559,47 @@ export default function SubscriptionPage({
   const minPayablePaise = isAddOnUpgrade ? 0 : plan?.minPayablePaise || 0;
   const totalPaise = Math.max(subtotalPaise - couponDiscountPaise, minPayablePaise);
   const totalRupees = (totalPaise / 100).toFixed(2);
+
+  // ---------------------------------------------------------------------------
+  // The single source of truth the live card + confirmation modal both render.
+  // Every field is derived from the same values the payable total is built
+  // from, so changing the plan, the billing duration or any add-on updates the
+  // card in the same render — there is no second copy of this state to drift.
+  // ---------------------------------------------------------------------------
+  const liveSelection = useMemo(
+    () => ({
+      planName: plan?.name ?? null,
+      planBadge: plan?.badge ?? null,
+      cycle,
+      planPricePaise,
+      planAlreadyOwned: isAddOnUpgrade,
+      featureNames: chargeableFeatureRecords.map((feature) => feature.name),
+      includedFeatureNames: includedFeatureRecords.map((feature) => feature.name),
+      featuresTotalPaise,
+      courseNames: chargeableProductRecords.map((product) => String(product.title || "")),
+      coursesTotalPaise: productsTotalPaise,
+      discountPaise: couponDiscountPaise,
+      discountLabel: appliedReferral ? "Referral discount" : appliedCoupon ? "Coupon discount" : null,
+      subtotalPaise,
+      totalPaise,
+    }),
+    [
+      plan,
+      cycle,
+      planPricePaise,
+      isAddOnUpgrade,
+      chargeableFeatureRecords,
+      includedFeatureRecords,
+      featuresTotalPaise,
+      chargeableProductRecords,
+      productsTotalPaise,
+      couponDiscountPaise,
+      appliedReferral,
+      appliedCoupon,
+      subtotalPaise,
+      totalPaise,
+    ],
+  );
 
   // "Zero means free": when the admin priced the plan (and every selected
   // add-on) at ₹0 and no minimum-payable floor applies, this selection is a
@@ -1077,6 +1125,16 @@ export default function SubscriptionPage({
         )}
         <StackedCards cards={SHOWCASE_CARDS} />
 
+        {/* ── STEP 1 — plan + billing duration ─────────────────────────────
+            Everything downstream (feature prices, course prices, the live
+            card, the total) is resolved from these two values, so they are
+            the first and most prominent decision on the page. */}
+        <Step
+          index={1}
+          title="Choose your plan and duration"
+          hint="Compare what each plan includes, then pick monthly or yearly. Prices below update instantly."
+          done={Boolean(plan)}
+        >
         {/* Plan + cycle card. Members only see their own plan + HIGHER plans
             (pickerPlans) — lower plans are hidden, not merely disabled, so a
             downgrade can never even be selected. */}
@@ -1098,6 +1156,20 @@ export default function SubscriptionPage({
           subscriberPriceRupees={subscriberPriceRupees}
         />
 
+        {/* The comparison table — the single answer to "what is actually
+            different between these plans?". Columns are the selection target,
+            rows are the features, cells state the real outcome (Included /
+            exact add-on price / not offered) for the active cycle. */}
+        <PlanComparisonTable
+          plans={pickerPlans}
+          features={rawFeatures}
+          cycle={cycle}
+          selectedPlanId={selectedPlanId}
+          ownedPlanId={isActiveMember ? ownedPlanId || null : null}
+          onSelectPlan={setSelectedPlanId}
+        />
+        </Step>
+
         {/* Already-owned selection: the entire buy flow below is replaced by
             a single statement of what is active. Nothing purchasable is
             rendered, so the same subscription type cannot be bought twice —
@@ -1118,6 +1190,16 @@ export default function SubscriptionPage({
           />
         ) : (
         <>
+        {/* ── STEP 2 — optional add-ons ───────────────────────────────────
+            Clearly framed as optional so the buyer knows the plan alone is a
+            complete purchase; every price here is already resolved for the
+            plan + cycle chosen in step 1. */}
+        <Step
+          index={2}
+          title="Add courses and features"
+          hint="Optional. Anything included with your plan is marked and never charged twice."
+          done={selectedCourseIds.length > 0 || selectedFeatureIds.length > 0}
+        >
         {/* Course (product) selector trigger */}
         <CourseSelectTrigger
           selectedIds={selectedCourseIds}
@@ -1150,9 +1232,18 @@ export default function SubscriptionPage({
           }}
         />
 
+        </Step>
+
+        {/* ── STEP 3 — discounts ──────────────────────────────────────────── */}
+        <Step
+          index={3}
+          title="Apply a code"
+          hint="Optional. Coupons and referral codes are verified by the server before payment."
+          done={Boolean(appliedCoupon || appliedReferral)}
+        >
         {/* Coupon section — server-validated via the Part 7 engine.
             The coupon field is hidden when nothing is payable. */}
-        <div className="space-y-3 px-5 pt-5">
+        <div className="space-y-3 px-5">
           {canShowCouponInput ? (
             <PromoCodeInput
               kind="coupon"
@@ -1192,7 +1283,26 @@ export default function SubscriptionPage({
           )}
         </div>
 
-        {/* Order summary */}
+        </Step>
+
+        {/* ── STEP 4 — review ─────────────────────────────────────────────
+            The live card restates plan + duration + every selection and the
+            money in one surface. It is the same component the confirmation
+            modal renders, driven by the same props, so the two can never
+            disagree. */}
+        <Step
+          index={4}
+          title="Review what you're buying"
+          hint="This card updates the moment you change the plan, the duration or any add-on."
+          done={Boolean(plan)}
+        >
+        <div className="px-5">
+          <LiveSelectionCard {...liveSelection} />
+        </div>
+
+        {/* Full itemised breakdown stays available underneath for buyers who
+            want every line rather than the summary. */}
+        <div className="pt-3">
         <PriceSummary
           plan={plan}
           cycle={cycle}
@@ -1217,8 +1327,10 @@ export default function SubscriptionPage({
           minPayablePaise={minPayablePaise}
           totalPaise={totalPaise}
         />
+        </div>
+        </Step>
 
-        <p className="px-5 pt-5 text-center text-[11px] leading-relaxed text-white/55">
+        <p className="px-5 pt-5 text-center text-[11px] leading-relaxed dc-ink-3">
           By subscribing you agree to the{" "}
           <a href="/terms-of-service.html" className="font-semibold text-violet-300 underline underline-offset-2 hover:text-violet-200">
             Terms of Service
@@ -1249,7 +1361,7 @@ export default function SubscriptionPage({
         couponDiscountPaise={couponDiscountPaise}
         loading={isSubmitting}
         disabled={!plan || isSubmitting}
-        onSubscribe={() => void handleSubscribe()}
+        onSubscribe={() => setConfirmOpen(true)}
         totalRupees={totalRupees}
         ownershipState={ownershipState}
       />
@@ -1273,6 +1385,37 @@ export default function SubscriptionPage({
         includedIds={Array.from(includedFeatureIds)}
         purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
       />
+
+      {/* AI Canvas Glass Modal — the final confirmation. Its body is the same
+          LiveSelectionCard the page renders, so the modal always reflects the
+          current plan, duration and selection at the moment it opens. */}
+      <GlassModal
+        open={isConfirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        data-testid="subscription-confirm-modal"
+        accent="#8B7CF6"
+        widthClassName="w-[380px] max-w-[calc(100vw-2rem)]"
+        title={plan ? `Confirm ${plan.name}` : "Confirm your subscription"}
+        description={
+          isFreeSelection
+            ? "Nothing to pay — this selection activates instantly."
+            : `You're paying ${totalPaise <= 0 ? "nothing" : `₹${Math.round(totalPaise / 100).toLocaleString("en-IN")}`} for the ${cycle === "yearly" ? "yearly" : "monthly"} cycle.`
+        }
+        features={[
+          isFreeSelection ? "No payment required" : "One payment for this cycle — no silent auto-charges",
+          "Reminder before the cycle ends, never after",
+          "Cancel anytime from Profile — access stays till the last day",
+        ]}
+        primaryLabel={isSubmitting ? "Processing…" : isFreeSelection ? "Activate now" : "Confirm and pay"}
+        primaryDisabled={isSubmitting || !plan}
+        onPrimary={() => {
+          setConfirmOpen(false);
+          void handleSubscribe();
+        }}
+        secondaryLabel="Keep editing"
+      >
+        <LiveSelectionCard {...liveSelection} compact />
+      </GlassModal>
 
       <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
       </>
@@ -1344,4 +1487,46 @@ async function preflightSubscriptionCoupon(selection: {
     throw new Error(data.error || "This coupon could not be applied.");
   }
   return Number(data.discountPaise || 0);
+}
+
+// ---------------------------------------------------------------------------
+// Section shell. The page previously ran as one undifferentiated column of
+// cards, banners and pickers, so a buyer had no idea how many decisions were
+// left or which one they were on. Every purchase step is now a numbered
+// section with a title and a one-line purpose, which is the cheapest possible
+// form of progress feedback (goal-gradient effect) and makes the page
+// scannable instead of scattered.
+// ---------------------------------------------------------------------------
+function Step({
+  index,
+  title,
+  hint,
+  done = false,
+  children,
+}: {
+  index: number;
+  title: string;
+  hint?: string;
+  done?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section data-subscription-step={index} className="pt-6">
+      <div className="mb-2 flex items-start gap-2.5 px-5">
+        <span
+          className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-black ${
+            done ? "bg-emerald-500/25 text-emerald-200" : "bg-indigo-500/25 text-indigo-200"
+          }`}
+          aria-hidden="true"
+        >
+          {done ? "\u2713" : index}
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-black leading-tight dc-ink-1">{title}</h2>
+          {hint ? <p className="mt-0.5 text-[11.5px] leading-snug dc-ink-3">{hint}</p> : null}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
 }
