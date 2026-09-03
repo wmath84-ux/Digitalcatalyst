@@ -1912,6 +1912,28 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   }
 }
 
+/* ── Course Player dock: NEVER hidden by the site's desktop/tablet rules ──
+   The study pane's tab dock (Modules / Resources / Notes / Mind map / Paid /
+   Player) is the course player's PRIMARY navigation — not site chrome. It
+   mounts the exact same <GlassDock siteFooter /> as the home footer, so its
+   capsule carries `data-site-footer`. The "hide the mobile footer pill"
+   rules — the desktop `@media (min-width: 960px)`, the tablet-as-desktop
+   (`html[data-tablet-landscape-desktop]`), and the `.dc-desktop-shell` /
+   `body.is-desktop` HARD RULES — all match that attribute, so on desktop and
+   tablet (including tablets that render as desktop) they set the PLAYER dock
+   to `display: none` too, leaving split-mode learners with no visible
+   navigation. Phones never match those queries, which is why the dock
+   survived there.
+   The dock only ever lives inside `[data-course-dock]` in the player shell,
+   so this rule restores it there and nowhere else; higher specificity +
+   `!important` wins the cascade against every hiding rule above regardless
+   of source order. (The HARD-RULE comment's claim that the course dock does
+   not carry `data-site-footer` was the stale assumption behind the bug.) */
+.course-player-shell [data-course-dock] [data-site-footer],
+.course-player-shell [data-course-dock] [data-glass-dock] {
+  display: flex !important;
+}
+
 /* Course audio card: never clip on tablet `* { max-width: 100% }` or short
    landscape stages. The player measures its stage and switches layout; these
    rules keep every control inside the visible box on phone / tablet / desktop. */
@@ -3739,8 +3761,10 @@ html[data-tablet-landscape-desktop="true"] nav:has([data-site-footer]) {
      • tablet landscape treated as desktop
      • any page inside `.dc-desktop-shell`
      • body.is-desktop
-   Course-player dock is excluded because it does not carry
-   data-site-footer. */
+   The Course Player's study-pane dock DOES carry data-site-footer (it
+   mounts the same <GlassDock siteFooter />), so it would be hidden too —
+   the higher-specificity `.course-player-shell [data-course-dock] …` rule
+   in the Course Player Split Deck section below restores it there. */
 @media (min-width: 960px) {
   [data-site-footer-nav],
   [data-site-footer],

@@ -470,7 +470,7 @@ test("Switching tabs inside the pane crossfades the content", () => {
   assert.equal(overlay.match(/\{studyBody\}/g)?.length, 1);
 });
 
-test("A phone in landscape never settles the pane narrower than the dock inside it", () => {
+test("A landscape pane never settles narrower than the dock inside it, on any device", () => {
   // The six-icon glass dock's natural width is the floor's reason to exist.
   assert.match(splitMotion, /export const SPLIT_DOCK_MIN_PX = 344;/);
   assert.match(splitMotion, /export const SPLIT_SHORT_VIEWPORT_PX = 500;/);
@@ -482,9 +482,13 @@ test("A phone in landscape never settles the pane narrower than the dock inside 
   // The floor is measured from the deck's real width, not guessed.
   assert.match(studyPanels, /const observer = new ResizeObserver\(\(entries\) => \{/);
   assert.match(studyPanels, /observer\.observe\(node\);/);
+  // The measured dock floor governs EVERY landscape stage — phones AND
+  // tablets/desktops — so the now-always-visible dock is never clipped on a
+  // narrow landscape tablet / desktop window (wide stages are unaffected,
+  // since 344 px is below their 15 % band). Collapse-to-rail bypasses it.
   assert.match(
     studyPanels,
-    /const dockFloor =\s+phone && axis === "row" && deckWidth > 0 \? clampSplitRatio\(\(SPLIT_DOCK_MIN_PX \/ deckWidth\) \* 100\) : 0;/,
+    /const dockFloor =\s+axis === "row" && deckWidth > 0 \? clampSplitRatio\(\(SPLIT_DOCK_MIN_PX \/ deckWidth\) \* 100\) : 0;/,
   );
   assert.match(studyPanels, /const floor = Math\.max\(specFloor, dockFloor\);/);
   // The spec's percentage floor still governs everywhere else…
@@ -493,4 +497,16 @@ test("A phone in landscape never settles the pane narrower than the dock inside 
   // …and the clamp still caps it, so collapse-to-rail stays reachable.
   assert.match(splitMotion, /export const clampSplitRatio = \(value: number, floor: number = SPLIT_MIN\): number =>/);
   assert.match(studyPanels, /data-course-peek-rail/);
+});
+
+test("The course dock is never hidden by the site footer's desktop/tablet rules", () => {
+  // The study pane's dock mounts the same <GlassDock siteFooter />, so its
+  // capsule carries data-site-footer — the attribute the site-wide desktop
+  // and tablet-as-desktop rules use to `display: none` the mobile footer
+  // pill. A player-scoped rule with higher specificity + !important must
+  // restore it, or split mode loses its ONLY navigation on desktop/tablet.
+  assert.match(
+    styles,
+    /\.course-player-shell \[data-course-dock\] \[data-site-footer\],\s*\n\s*\.course-player-shell \[data-course-dock\] \[data-glass-dock\]\s*\{\s*\n\s*display: flex !important;\s*\n\s*\}/,
+  );
 });
