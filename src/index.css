@@ -3,6 +3,68 @@
    utilities (`animate-in fade-in-0 slide-in-from-bottom-2 …`). */
 @import "tw-animate-css";
 
+/* ── macOS Web Simulator (src/macos/**) ───────────────────────────────────────
+   The vendored simulator is a full shadcn/Tailwind-v4 app. Tailwind only
+   processes the CSS root that imports it, so the two at-rules the simulator
+   needs from Tailwind's own pipeline have to live HERE, not in
+   src/macos/macos.css:
+
+     · `@custom-variant dark` teaches Tailwind the simulator's class-based dark
+       mode (the store/learning app has no `dark:` utilities of its own, so
+       this cannot regress it);
+     · `@theme inline` maps the shadcn tokens onto `bg-background`,
+       `text-muted-foreground`, `rounded-lg`, … which the simulator's UI kit
+       uses everywhere.
+
+   The token VALUES stay scoped to `.macos-sim-root` in src/macos/macos.css, so
+   these utilities resolve to nothing outside the simulator subtree. */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Upstream also remaps --radius-sm/md/lg/xl onto its own `--radius`. That is
+     deliberately NOT copied: `rounded-lg` / `rounded-md` / `rounded-xl` are
+     used ~420 times across the store, learning and admin surfaces, and
+     `--radius` only exists inside `.macos-sim-root`, so the remap would
+     collapse every one of those corners to an invalid value. Both apps keep
+     Tailwind's stock radii, which differ from shadcn's by 2px at most. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* The simulator's `font-syne` utility (upstream tailwind.config.js). */
+@theme {
+  --font-syne: "Syne", sans-serif;
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;

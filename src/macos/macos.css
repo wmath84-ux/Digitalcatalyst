@@ -1,0 +1,367 @@
+/* ---------------------------------------------------------------------------
+ * macOS Web Simulator — vendored stylesheet
+ *
+ * Upstream: https://github.com/LikhithSP/MacOS-Web-Simulator (MIT, see
+ * src/macos/LICENSE). This is the upstream `src/index.css`, with three
+ * mechanical changes so it can live inside the Digital Catalyst app instead of
+ * owning the whole page:
+ *
+ *   1. `@import "tailwindcss"` is dropped — the host imports Tailwind once in
+ *      src/index.css and Tailwind v4 already scans `src/macos/**`, so every
+ *      utility the simulator uses is emitted there.
+ *   2. The bare-global rules (`*`, `html`, `body`, `:root`, `a`, `h1`) are
+ *      scoped to `.macos-sim-root`, the wrapper the simulator mounts inside.
+ *      Un-scoped they would restyle the entire store/learning app.
+ *   3. `@apply` is expanded by hand and `@custom-variant dark` / `@theme
+ *      inline` moved to src/index.css — Tailwind only processes the CSS root
+ *      that imports it, so those at-rules are inert in this file.
+ *
+ * Everything else (keyframes, scrollbars, component classes) is verbatim.
+ * ------------------------------------------------------------------------- */
+
+/* Upstream opens with an `@import url(fonts.googleapis.com/…)`. CSS `@import`
+   is hoisted to the top of the bundle by the build, so leaving it here would
+   make every visitor to the store fetch the simulator's webfonts even if they
+   never open Mac mode. The same families are instead injected as a <link> by
+   src/components/macmode/MacModeHost.tsx when Mac mode actually opens. */
+
+
+/* Ensure all messages app child controls inherit Apple/Inter fonts */
+.messages-container,
+.messages-container input,
+.messages-container button,
+.messages-container textarea {
+  font-family: "SF Pro", "SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+}
+
+/* Hide scrollbars globally for Notes app */
+.notes-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.notes-no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Reminders: subtask row delete button on hover (avoids nested group conflict) */
+.subtask-row:hover .subtask-delete-btn {
+  opacity: 1 !important;
+}
+
+/* Hide scrollbar for widget gallery */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* macOS Style Scrollbar */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-button {
+  display: none;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 9999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+/* MacOS Style Scrollbar - Light (for dark containers) */
+.scrollbar-light::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-light::-webkit-scrollbar-button {
+  display: none;
+}
+
+.scrollbar-light::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-light::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+}
+
+.scrollbar-light::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* macOS Style Cursor — scoped to the simulator subtree so the host app's
+   own cursor rules are untouched. */
+.macos-sim-root,
+.macos-sim-root * {
+  cursor: default;
+}
+
+.macos-sim-root a,
+.macos-sim-root button,
+.macos-sim-root [role="button"],
+.macos-sim-root input[type="submit"],
+.macos-sim-root input[type="button"],
+.macos-sim-root .cursor-pointer,
+.macos-sim-root [onclick],
+.macos-sim-root label[for],
+.macos-sim-root select,
+.macos-sim-root summary {
+  cursor: pointer;
+}
+
+.macos-sim-root input[type="text"],
+.macos-sim-root input[type="password"],
+.macos-sim-root input[type="email"],
+.macos-sim-root input[type="number"],
+.macos-sim-root input[type="search"],
+.macos-sim-root input[type="url"],
+.macos-sim-root input[type="tel"],
+.macos-sim-root textarea,
+.macos-sim-root [contenteditable="true"] {
+  cursor: text;
+}
+
+.macos-sim-root {
+  scroll-behavior: smooth;
+}
+
+@keyframes pulse-slow {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 25px 8px rgba(0, 255, 100, 0.7);
+  }
+  50% {
+    transform: scale(1.07);
+    box-shadow: 0 0 45px 15px rgba(0, 255, 100, 1);
+  }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 2.6s ease-in-out infinite;
+}
+/* Hover Tooltip Animation */
+@keyframes fadeSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fadeSlide {
+  animation: fadeSlide 0.25s ease-out forwards;
+}
+
+@keyframes bounceOnce {
+  0% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-8px);
+  }
+  70% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+.animate-bounceOnce {
+  animation: bounceOnce 0.22s ease-out;
+}
+
+@keyframes fadeSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+
+.animate-fadeSlide {
+  animation: fadeSlide 0.4s ease-out;
+}
+
+/* custom range slider */
+.slider {
+  accent-color: #1db954; /* Spotify green */
+  outline: none;
+  border: none;
+}
+.skill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: rgb(255 255 255 / 0.8);
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  background-color: rgb(0 0 0 / 0.05);
+  border: 1px solid currentColor;
+}
+.skill-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: cover;
+}
+.highlight-tag {
+  color: rgb(255 255 255 / 0.8);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  background-color: rgb(0 0 0 / 0.05);
+  border: 1px solid currentColor;
+}
+
+/* ----------------------------------------------------------------- */
+
+
+/* ── shadcn design tokens (upstream `:root` / `.dark`) ──────────────────────
+   Scoped to the simulator wrapper. `@theme inline` and `@custom-variant dark`
+   live in src/index.css, next to the `@import "tailwindcss"` that Tailwind
+   actually processes; only the variable values belong here. */
+@layer base {
+.macos-sim-root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  /* EMBED: upstream is a dark full-page app, so its Vite boilerplate sets
+     `color-scheme: light dark` plus a white-on-#242424 default here. Both are
+     dropped: the simulator's own screens paint themselves, `color-scheme`
+     would additionally repaint form controls and scrollbars, and the
+     white default is what made the Create Account fields render white text on
+     a white card. The real defaults are the shadcn tokens further down. */
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+}
+
+@layer base {
+.macos-sim-root.dark,
+.dark .macos-sim-root {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+}
+
+@layer base {
+.macos-sim-root a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+.macos-sim-root a:hover {
+  color: #535bf2;
+}
+
+.macos-sim-root h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+/* EMBED: upstream's `@media (prefers-color-scheme: light)` also repainted the
+   whole page (`color: #213547; background: #fff`). Dropped for the same reason
+   as the block above — the simulator's dark mode is driven by the `.dark`
+   class on its wrapper, never by the OS preference, and honouring the OS here
+   flipped text colours underneath screens that paint their own background. */
+@media (prefers-color-scheme: light) {
+  .macos-sim-root a:hover {
+    color: #747bff;
+  }
+}
+
+/* Upstream `@layer base { * { @apply border-border outline-ring/50 } body {
+   @apply bg-background text-foreground } }`, hand-expanded and scoped. */
+.macos-sim-root *,
+.macos-sim-root *::before,
+.macos-sim-root *::after {
+  border-color: var(--border);
+}
+.macos-sim-root *:focus-visible {
+  outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
+}
+.macos-sim-root {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+}

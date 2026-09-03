@@ -62,6 +62,11 @@ import { cn } from "../utils/cn";
 import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";
 import ExpandingTabs from "./ui/ExpandingTabs";
 import GlassSidebar, { type GlassSidebarItem } from "./glass-dock/GlassSidebar";
+// Mac mode — the vendored macOS Web Simulator, launched from the top bar.
+// `MacModeHost` is the portal + lazy-loading seam; the simulator chunk itself
+// is only fetched once the button is pressed.
+import MacModeButton from "./macmode/MacModeButton";
+import MacModeHost from "./macmode/MacModeHost";
 
 // Wave 2 (global chrome) — the website-glass pack. `glass-tooltip` and
 // `glass-input` are vendored registry items; `GlassSurface` is the shared
@@ -228,6 +233,12 @@ export default function DesktopShell({
 }: DesktopShellProps) {
   const { user, logout } = useAuth();
   const screenSize = useScreenSize();
+
+  // Mac mode is a modal takeover, so the shell simply owns a boolean. It is
+  // deliberately NOT a route: the simulator keeps its own internal state
+  // (open windows, boot stage) and a hash change would remount the app
+  // underneath it for no benefit.
+  const [macMode, setMacMode] = useState(false);
 
   // Set a body class for CSS-based theming based on screen size + tablet landscape
   useEffect(() => {
@@ -653,6 +664,7 @@ export default function DesktopShell({
                 that morph into an icon-and-label pill for the active route. */}
             <div className="flex items-center gap-1.5" data-desktop-topbar-actions>
               {topBarRight}
+              <MacModeButton onClick={() => setMacMode(true)} />
               <ExpandingTabs
                 ariaLabel="Quick actions"
                 itemSize={36}
@@ -748,6 +760,10 @@ export default function DesktopShell({
           bottom centre of the PAGE column reveals the dock; leaving
           hides it. The left rail stays visible. */}
       <DesktopPeekDock active={active} purchasesBadge={ownedCount} />
+
+      {/* Mac mode. Rendered last and portalled to <body>, so it sits above the
+          rail, the top bar and the peek dock regardless of their z-indexes. */}
+      {macMode ? <MacModeHost onExit={() => setMacMode(false)} /> : null}
     </div>
   );
 }
