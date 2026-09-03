@@ -12,7 +12,7 @@
 // helper `resolveSubscribeCta`, so the bar can never disagree with the server
 // guard that refuses the same order.
 
-import { BadgeCheck, Lock, ShieldCheck, Loader2 } from "lucide-react";
+import { BadgeCheck, BellRing, Lock, ShieldCheck, Loader2, XCircle } from "lucide-react";
 import { resolveSubscribeCta, type SubscriptionSelectionState } from "../../../utils/subscriptionOwnership";
 
 interface Props {
@@ -82,9 +82,15 @@ export default function SubscribeBar({
                 {isFreeSelection ? "FREE" : totalRupees || formatRupee(totalPaise)}
               </span>
               {hasDiscount ? (
-                <span className="text-xs font-semibold text-white/55 line-through">
-                  {formatRupee(subtotalPaise)}
-                </span>
+                <>
+                  {/* Anchoring: the pre-coupon price is set as the quiet
+                      reference next to the loud payable total, and the saving
+                      is spelled out in rupees (loss aversion beats "-20%"). */}
+                  <span className="text-xs font-semibold dc-anchor-price">
+                    {formatRupee(subtotalPaise)}
+                  </span>
+                  <span className="dc-save-pill">Save {formatRupee(couponDiscountPaise)}</span>
+                </>
               ) : null}
             </>
           )}
@@ -110,6 +116,25 @@ export default function SubscribeBar({
             "This change isn't available while your current membership is active."}
         </p>
       ) : null}
+      {/* Transparency bias: before the commitment we state exactly what will
+          and will not happen. Removing the "hidden charge" fear is the single
+          highest-leverage change on a paywall. */}
+      {!isOwned && !isDowngradeBlocked ? (
+        <ul data-subscription-transparency className="mb-2.5 flex flex-col gap-1.5" aria-label="What happens next">
+          <li className="flex items-center gap-2 text-[11.5px] font-semibold dc-ink-2">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
+            {isFreeSelection ? "Access unlocks instantly — nothing to pay." : "Pay once for this cycle — no silent auto-charges."}
+          </li>
+          <li className="flex items-center gap-2 text-[11.5px] font-semibold dc-ink-2">
+            <BellRing className="h-3.5 w-3.5 shrink-0 text-indigo-300" aria-hidden="true" />
+            We remind you before the cycle ends, never after.
+          </li>
+          <li className="flex items-center gap-2 text-[11.5px] font-semibold dc-ink-3">
+            <XCircle className="h-3.5 w-3.5 shrink-0 dc-ink-3" aria-hidden="true" />
+            Cancel any time from Profile — access stays till the last day.
+          </li>
+        </ul>
+      ) : null}
       <button
         type="button"
         onClick={onSubscribe}
@@ -121,7 +146,7 @@ export default function SubscribeBar({
             ? "bg-emerald-600 text-white disabled:opacity-100"
             : isDowngradeBlocked
               ? "border border-white/15 text-white/55 disabled:opacity-100"
-              : "bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-70"
+              : "bg-indigo-600 text-white shadow-[var(--dc-elev-accent)] hover:bg-indigo-500 disabled:opacity-70"
         }`}
       >
         {loading ? (

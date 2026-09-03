@@ -6046,3 +6046,210 @@ html.light {
     padding-right: 12px;
   }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM PASS — "Conversion & Clarity" tokens
+   ---------------------------------------------------------------------------
+   Applies the agreed UX/UI principles as reusable primitives instead of
+   per-screen one-offs:
+
+     · Visual hierarchy  — a 3-step ink scale + a price/anchor scale so no
+                           screen has to invent `text-white/55` again.
+     · Soft tinted shadow— shadows are tinted with the surface hue (never a
+                           flat gray), in three elevation steps.
+     · Contrast/anchoring— `.dc-anchor-price` (struck reference) vs
+                           `.dc-hero-price` (the number we want read first).
+     · Thumb zone        — `.dc-thumb-bar` pins primary CTAs to the reachable
+                           bottom band, above the (untouched) footer dock.
+     · Empty states      — `.dc-empty` gives roadblocks a consistent, taught
+                           layout instead of a bare "No results" line.
+
+   The site footer dock (`[data-site-footer-nav]`) is deliberately NOT targeted
+   by anything below — its design is frozen by owner direction.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Ink scale — three legible steps, replaces ad-hoc white/NN opacities. */
+  --dc-ink-1: rgba(255, 255, 255, 0.96); /* titles, prices */
+  --dc-ink-2: rgba(255, 255, 255, 0.78); /* body */
+  --dc-ink-3: rgba(255, 255, 255, 0.56); /* meta, captions */
+
+  /* Brand + semantic accents (single source of truth for optimisation). */
+  --dc-accent: #6366f1;
+  --dc-accent-soft: rgba(99, 102, 241, 0.16);
+  --dc-accent-ink: #c7d2fe;
+  --dc-success: #10b981;
+  --dc-success-soft: rgba(16, 185, 129, 0.16);
+  --dc-success-ink: #6ee7b7;
+  --dc-urgent: #f43f5e;
+  --dc-urgent-soft: rgba(244, 63, 94, 0.16);
+  --dc-urgent-ink: #fda4af;
+  --dc-warn-soft: rgba(245, 158, 11, 0.16);
+  --dc-warn-ink: #fcd34d;
+
+  /* Soft, tinted elevation — hue-matched to the glass, never neutral gray. */
+  --dc-elev-1: 0 1px 2px rgba(24, 26, 48, 0.14), 0 6px 18px -10px rgba(60, 66, 120, 0.35);
+  --dc-elev-2: 0 2px 6px rgba(24, 26, 48, 0.16), 0 14px 34px -16px rgba(60, 66, 120, 0.45);
+  --dc-elev-3: 0 4px 10px rgba(24, 26, 48, 0.18), 0 26px 60px -22px rgba(60, 66, 120, 0.55);
+  --dc-elev-accent: 0 10px 28px -14px rgba(99, 102, 241, 0.65);
+}
+
+html.light {
+  --dc-ink-1: rgba(15, 18, 34, 0.94);
+  --dc-ink-2: rgba(15, 18, 34, 0.72);
+  --dc-ink-3: rgba(15, 18, 34, 0.52);
+  --dc-elev-1: 0 1px 2px rgba(15, 18, 34, 0.06), 0 6px 18px -10px rgba(99, 102, 241, 0.22);
+  --dc-elev-2: 0 2px 6px rgba(15, 18, 34, 0.07), 0 14px 34px -16px rgba(99, 102, 241, 0.26);
+  --dc-elev-3: 0 4px 10px rgba(15, 18, 34, 0.08), 0 26px 60px -22px rgba(99, 102, 241, 0.32);
+}
+
+@layer utilities {
+  .dc-ink-1 { color: var(--dc-ink-1); }
+  .dc-ink-2 { color: var(--dc-ink-2); }
+  .dc-ink-3 { color: var(--dc-ink-3); }
+
+  .dc-elev-1 { box-shadow: var(--dc-elev-1); }
+  .dc-elev-2 { box-shadow: var(--dc-elev-2); }
+  .dc-elev-3 { box-shadow: var(--dc-elev-3); }
+
+  /* Anchoring / contrast effect: the reference price is quiet and struck,
+     the payable price is the loudest number in the card. */
+  .dc-anchor-price {
+    color: var(--dc-ink-3);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    font-variant-numeric: tabular-nums;
+  }
+  .dc-hero-price {
+    color: var(--dc-ink-1);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Loss-aversion pill: frames the discount as money that would be lost. */
+  .dc-save-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 9999px;
+    background: var(--dc-success-soft);
+    color: var(--dc-success-ink);
+    padding: 0.125rem 0.5rem;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
+  /* Social proof / scarcity strip (fire icon, live stats). */
+  .dc-proof {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 9999px;
+    background: var(--dc-urgent-soft);
+    color: var(--dc-urgent-ink);
+    padding: 0.125rem 0.5rem;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
+  /* Thumb-zone action bar: sits above the frozen footer dock. */
+  .dc-thumb-bar {
+    position: sticky;
+    bottom: calc(var(--dc-footer-nav-h, 0px) + 8px);
+    z-index: 25;
+    padding: 0.625rem 0.75rem;
+    border-radius: 1.25rem;
+    background: var(--dc-chrome-glass);
+    backdrop-filter: var(--dc-chrome-glass-blur);
+    -webkit-backdrop-filter: var(--dc-chrome-glass-blur);
+    box-shadow: var(--dc-elev-2);
+  }
+
+  /* Educational empty state. */
+  .dc-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    text-align: center;
+    padding: 2.5rem 1.5rem;
+  }
+  .dc-empty-art {
+    display: grid;
+    place-items: center;
+    width: 4rem;
+    height: 4rem;
+    border-radius: 1.25rem;
+    background: var(--dc-accent-soft);
+    box-shadow: var(--dc-elev-1);
+  }
+  .dc-empty-title { color: var(--dc-ink-1); font-weight: 800; font-size: 15px; }
+  .dc-empty-body { color: var(--dc-ink-3); font-size: 12.5px; font-weight: 500; max-width: 22rem; line-height: 1.6; }
+
+  /* Suggestion chip used by smarter-search (recent / popular / for you). */
+  .dc-suggest-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--dc-ink-2);
+    padding: 0.375rem 0.75rem;
+    font-size: 12px;
+    font-weight: 600;
+    transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+  }
+  .dc-suggest-chip:hover {
+    background: var(--dc-accent-soft);
+    border-color: rgba(99, 102, 241, 0.45);
+    color: var(--dc-ink-1);
+    transform: translateY(-1px);
+  }
+
+  /* Section label — restores typographic hierarchy on dense screens. */
+  .dc-section-label {
+    color: var(--dc-ink-3);
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  /* Goal-gradient progress rail (onboarding / checkout momentum). */
+  .dc-goal-rail {
+    height: 6px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.10);
+    overflow: hidden;
+  }
+  .dc-goal-fill {
+    height: 100%;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, var(--dc-accent), #22d3ee);
+    box-shadow: var(--dc-elev-accent);
+    transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Consistent focus ring (accessibility + perceived polish). */
+  .dc-focusable:focus-visible {
+    outline: 2px solid var(--dc-accent);
+    outline-offset: 2px;
+    border-radius: 0.75rem;
+  }
+}
+
+/* Card elevation is tinted, not gray — applied to the shared glass card only,
+   so every product / list / panel surface inherits the same shadow language. */
+.dc-glass-card {
+  box-shadow: var(--dc-elev-2);
+  transition: box-shadow 240ms ease, transform 240ms ease;
+}
+@media (hover: hover) {
+  .dc-glass-card:hover { box-shadow: var(--dc-elev-3); }
+}
