@@ -33,6 +33,7 @@ const repoRoot = path.join(__dirname, "..");
 const read = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const resourceViewer = read("src/course/ResourceViewer.tsx");
+const playerPanel = read("src/course/PlayerPanel.tsx");
 
 const gdoc = { id: "d1", name: "Notes", type: "doc", url: "https://docs.google.com/document/d/DOC123/edit" };
 const gsheet = { id: "s1", name: "Marks", type: "sheet", url: "https://docs.google.com/spreadsheets/d/SHEET123/edit" };
@@ -106,10 +107,14 @@ test("edit mode never leaks onto forms or drive files", () => {
 // 4. Viewer wiring — the ADMIN switch decides what learners get
 // ---------------------------------------------------------------------------
 
-test("the viewer header carries the edit toggle for editable Google files", () => {
-  assert.match(resourceViewer, /data-course-viewer-edit-toggle/);
+test("the Player tab carries the edit toggle for editable Google files", () => {
+  // The header row that held the button is gone — the ACTIVE viewer reports
+  // the toggle through its action model and the Player panel lists it.
+  assert.match(playerPanel, /data-course-viewer-edit-toggle/);
+  assert.match(playerPanel, /fileActions\.canEditInline \? \(/);
   assert.match(resourceViewer, /isEditableGoogleFile\(file\)/);
-  assert.match(resourceViewer, /canEditInline \? \(/);
+  assert.match(resourceViewer, /canEditInline: canEditInline && !showPersonalCopy/);
+  assert.match(resourceViewer, /onToggleEditMode: toggleEditMode/);
 });
 
 test("editable Google files open DIRECTLY in the editor (toolbar + header)", () => {

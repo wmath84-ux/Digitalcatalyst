@@ -51,11 +51,11 @@ export const SPLIT_SMALL_SCREEN_MIN = 30;
 export const SPLIT_SMALL_SCREEN_PX = 430;
 /** A phone in landscape has a short viewport; it gets the same treatment. */
 export const SPLIT_SHORT_VIEWPORT_PX = 500;
-/** The five-icon glass dock's natural width. On a phone in landscape the study
+/** The six-icon glass dock's natural width. On a phone in landscape the study
  *  pane never *settles* narrower than this, or the dock would sit inside the
  *  pane yet be clipped by it — which defeats the point of putting it there.
  *  Tablets and desktops keep the 15% floor, and collapse-to-rail bypasses it. */
-export const SPLIT_DOCK_MIN_PX = 288;
+export const SPLIT_DOCK_MIN_PX = 344;
 /** Magnetic snap points, in study-pane percent. */
 export const SPLIT_SNAP_POINTS = [20, 35, 50, 65, 80] as const;
 /** Released within this many percent of a snap point → animate onto it. */
@@ -84,33 +84,16 @@ export const KEY_STEP = 5;
 export const KEY_STEP_FINE = 1;
 
 // ── Persistence ─────────────────────────────────────────────────────────────
-// The enabled flag is global (one learner preference); the ratio + collapse
-// are remembered PER COURSE and PER AXIS, so rotating the phone mid-session
-// comes back to the split the learner had arranged on that axis, and a second
-// course never inherits the first one's layout.
+// The Split Deck is the player's ONLY layout now (the old on/off preference
+// is gone — split is simply how the player always looks). What is remembered
+// is the learner's ARRANGEMENT, per course and per axis, so rotating the
+// phone mid-session comes back to the split the learner had set up on that
+// axis, and a second course never inherits the first one's layout.
 
-export const SPLIT_ENABLED_KEY = "dc.splitDeck.enabled";
 export const splitRatioKey = (courseId: string, axis: SplitAxis) => `dc.splitDeck.ratio.v1:${courseId}:${axis}`;
 export const splitCollapsedKey = (courseId: string, axis: SplitAxis) => `dc.splitDeck.collapsed.v1:${courseId}:${axis}`;
 
 const clampPercent = (value: number) => (Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0);
-
-/** Split Deck on/off — one global preference, `"1"` / `"0"`. */
-export const loadSplitEnabled = (): boolean => {
-  try {
-    return localStorage.getItem(SPLIT_ENABLED_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
-
-export const saveSplitEnabled = (enabled: boolean): void => {
-  try {
-    localStorage.setItem(SPLIT_ENABLED_KEY, enabled ? "1" : "0");
-  } catch {
-    /* private mode / storage disabled — keep the in-memory preference */
-  }
-};
 
 /**
  * The stored study-pane percent for one course + axis. Any parse problem

@@ -146,12 +146,18 @@ test("firestore.rules restrict driveCopies to the owner", () => {
 // 6. Viewer + admin wiring
 // ---------------------------------------------------------------------------
 
-test("the viewer shows the My copy toggle only when the admin enabled the family", () => {
+test("the Player tab shows the My copy toggle only when the admin enabled the family", () => {
+  // The toggle moved off the file's own header (which no longer exists) into
+  // the footer dock's Player tab; the ACTIVE viewer still owns the flow and
+  // reports the toggle through its action model.
   const viewer = read("src/course/ResourceViewer.tsx");
-  assert.match(viewer, /data-course-viewer-copy-toggle/);
+  const panel = read("src/course/PlayerPanel.tsx");
+  assert.match(panel, /data-course-viewer-copy-toggle/);
+  assert.match(panel, /fileActions\.personalCopyEnabled \? \(/);
+  assert.match(viewer, /personalCopyEnabled,\s*\n\s*personalCopyActive: showPersonalCopy/);
   assert.match(viewer, /personalCopySettings\.clientId && personalCopySettings\.byType\[copyKind\]/);
   assert.match(viewer, /usePersonalDriveCopy/);
-  // Busy + error surfaces for the copy flow.
+  // Busy + error surfaces for the copy flow stay above the preview.
   assert.match(viewer, /data-course-personal-copy-busy/);
   assert.match(viewer, /data-course-personal-copy-error/);
 });

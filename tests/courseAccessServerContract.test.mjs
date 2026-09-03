@@ -31,6 +31,7 @@ const resolverDts = readSource("utils/courseAccess.d.ts");
 const hook = readSource("src/hooks/useCourseAccess.ts");
 const routeGuard = readSource("src/components/CourseRouteGuard.tsx");
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
+const playerPanel = readSource("src/course/PlayerPanel.tsx");
 const pdpApp = readSource("src/PdpApp.tsx");
 const profileApp = readSource("src/profile/App.tsx");
 const otherTabs = readSource("src/components/OtherTabs.tsx");
@@ -178,9 +179,11 @@ test("CoursePlayerApp uses useCourseAccess + resolver.accessibleModuleIds (singl
   assert.match(coursePlayer, /firstAccessibleFile\(modules, resolution\.accessibleModuleIds\)/);
 });
 
-test("CoursePlayerApp shows the active-subscription badge when the subscription is active", () => {
+test("The Player tab shows the active-subscription badge when the subscription is active", () => {
+  // The badge rides the footer dock's Player tab now (the header is gone).
   assert.match(coursePlayer, /hasActiveSubscription/);
-  assert.match(coursePlayer, /data-course-subscription-badge="active"/);
+  assert.match(playerPanel, /data-course-subscription-badge="active"/);
+  assert.match(playerPanel, /Active subscription/);
 });
 
 // ---------------------------------------------------------------------------

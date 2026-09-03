@@ -35,8 +35,8 @@
 // is missing or unreachable, and a "Try original" link that
 // opens the source in a new tab as a fallback.
 
-import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Download, ExternalLink, Eye, FileQuestion, FileStack, Maximize2, PencilLine, RefreshCw, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Download, ExternalLink, FileQuestion, RefreshCw, X } from "lucide-react";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassSurface } from "../components/ui/glass";
 import type { CourseFile } from "../types/course";
@@ -47,6 +47,33 @@ import { useDocsEditorAccess } from "../hooks/useDocsEditorAccess";
 import { usePersonalDriveCopy } from "../hooks/usePersonalDriveCopy";
 import { useAuth } from "../context/AuthContext";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
+
+/**
+ * The ACTIVE file's action model, reported live to the Course Player so the
+ * footer dock's Player panel can render the buttons the file's own top bar
+ * used to carry (the viewer no longer paints any header of its own — the
+ * player is content + footer navigation only). Everything learner-facing
+ * stays exactly as it was; only the ROW that held the buttons moved.
+ */
+export interface CourseFileActions {
+  fileId: string;
+  fileName: string;
+  /** e.g. "doc preview" / "youtube editor" — the old header's kind line. */
+  kindLabel: string;
+  /** Top-level source URL for the "Open original / YouTube" escape hatch. */
+  externalUrl: string;
+  isYouTube: boolean;
+  isMedia: boolean;
+  download: CourseDownload;
+  onToggleFullscreen: () => void;
+  canEditInline: boolean;
+  editMode: boolean;
+  onToggleEditMode: () => void;
+  personalCopyEnabled: boolean;
+  personalCopyActive: boolean;
+  personalCopyBusy: boolean;
+  onTogglePersonalCopy: () => void;
+}
 
 const SUPPORTED_KINDS = new Set([
   "youtube",
@@ -75,10 +102,12 @@ interface ResourceViewerProps {
   /** Report a new position / zoom / scroll for this file. */
   onPlaybackChange?: (fileId: string, patch: CoursePlaybackPatch) => void;
   /**
-   * Hides the file's own header (download / open) so the content itself can
-   * use the full stage. The viewer stretches into the freed space.
+   * The viewer owns no visible chrome — its action buttons (open / download /
+   * fullscreen / editor / personal copy) are reported through this callback
+   * so the Course Player's Player panel can list them for the ACTIVE file.
+   * `null` unregisters when this viewer stops being the active one.
    */
-  chromeHidden?: boolean;
+  onFileActions?: (fileId: string, actions: CourseFileActions | null) => void;
   /**
    * Embedded documents render at desktop width by default. `false` requests
    * the host's mobile rendering, which is far easier to read on a phone.
@@ -86,7 +115,7 @@ interface ResourceViewerProps {
   desktopView?: boolean;
 }
 
-export default function ResourceViewer({ file, active = true, playback, onPlaybackChange, chromeHidden = false, desktopView = true }: ResourceViewerProps) {
+export default function ResourceViewer({ file, active = true, playback, onPlaybackChange, onFileActions, desktopView = true }: ResourceViewerProps) {
   // No file selected — show the empty state.
   if (!file) {
     return (
@@ -107,7 +136,7 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
       active={active}
       playback={playback}
       onPlaybackChange={onPlaybackChange}
-      chromeHidden={chromeHidden}
+      onFileActions={onFileActions}
       desktopView={desktopView}
     />
   );
@@ -118,7 +147,7 @@ export default function ResourceViewer({ file, active = true, playback, onPlayba
  * state — like the Google Docs edit-mode toggle — never leaks between
  * documents.
  */
-function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, chromeHidden = false, desktopView = true }: ResourceViewerProps & { file: CourseFile }) {
+function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, onFileActions, desktopView = true }: ResourceViewerProps & { file: CourseFile }) {
   // ── Google in-frame editor (admin-controlled, PER FILE TYPE) ────────
   // The admin decides in Admin → Content → Course Player what learners
   // get — separately for Docs, Sheets and Slides:
@@ -188,7 +217,7 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
     setCopyMode(false);
   }, [desktopView]);
 
-  const handleToggleCopyMode = () => {
+  const handleToggleCopyMode = useCallback(() => {
     if (copyMode) { setCopyMode(false); return; }
     setEditMode(false);
     if (copyState.copyFileId) { setCopyMode(true); return; }
@@ -198,7 +227,7 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
       // copying; that flip exits editor modes, so don't drag them back in.
       if (viewportFlipRef.current === flip) setCopyMode(true);
     }).catch(() => undefined);
-  };
+  }, [copyMode, copyState.copyFileId, copyState.createCopy]);
 
   // A non-blocking note must never overstay: it fades out on its own and
   // can be dismissed immediately.
@@ -213,7 +242,7 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
   const baseEmbed = getCourseEmbed(file, { viewport: desktopView ? "desktop" : "mobile", mode: canEditInline && editMode && !showPersonalCopy ? "edit" : "preview", editorChrome });
   // The personal copy takes over the stage when active — same kind, own URL.
   const embed = showPersonalCopy ? { url: personalCopyUrl, kind: baseEmbed.kind } : baseEmbed;
-  const download = getCourseDownload(file);
+  const download = useMemo(() => getCourseDownload(file), [file]);
   const isSupported = SUPPORTED_KINDS.has(embed.kind);
   const isImage = file.type === "image" && embed.kind === "direct";
   const isVideo = file.type === "video" && embed.kind === "direct";
@@ -234,23 +263,56 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, c
   const isEditingInline = (canEditInline && editMode && !showPersonalCopy) || showPersonalCopy;
   const mobileDocument = documentKind && !desktopView && !hasNativeMobileRendering(embed.kind) && !isEditingInline;
 
+  // ── The action rows live in the Player panel, not on an on-screen bar ──
+  // The Course Player shows NO header anywhere: whatever this viewer could
+  // do from its old top bar (open the original, download, go fullscreen,
+  // flip preview ⇄ Google editor, open a personal Drive copy) is reported
+  // to the player while this file is ACTIVE, so the footer dock's Player
+  // tab always lists the active module's own buttons.
+  const toggleFullscreen = useCallback(() => {
+    const root = document.querySelector("[data-course-viewer][data-active=\"true\"]") || document.querySelector("[data-course-viewer]");
+    if (!root) return;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void (root as HTMLElement).requestFullscreen?.();
+  }, []);
+  const toggleEditMode = useCallback(() => {
+    setCopyMode(false);
+    setEditMode((value) => !value);
+  }, []);
+  const fileKindLabel = embed.kind === "none" ? "No preview" : embed.kind === "direct" ? file.type : embed.kind;
+  const isYouTube = embed.kind === "youtube";
+  const isMedia = isYouTube || file.type === "video" || file.type === "audio";
+  const externalUrl = isYouTube ? getYouTubeWatchUrl(file) : embed.url;
+  useEffect(() => {
+    if (!active || !onFileActions) return undefined;
+    onFileActions(file.id, {
+      fileId: file.id,
+      fileName: file.name,
+      kindLabel: `${fileKindLabel} ${showPersonalCopy ? "my copy" : isEditingInline ? "editor" : "preview"}`,
+      externalUrl,
+      isYouTube,
+      isMedia,
+      download,
+      onToggleFullscreen: toggleFullscreen,
+      canEditInline: canEditInline && !showPersonalCopy,
+      editMode: canEditInline && editMode && !showPersonalCopy,
+      onToggleEditMode: toggleEditMode,
+      personalCopyEnabled,
+      personalCopyActive: showPersonalCopy,
+      personalCopyBusy: copyBusy,
+      onTogglePersonalCopy: handleToggleCopyMode,
+    });
+    return () => onFileActions(file.id, null);
+  }, [
+    active, onFileActions, file.id, file.name, fileKindLabel, externalUrl,
+    isYouTube, isMedia, download, toggleFullscreen, canEditInline, editMode,
+    showPersonalCopy, isEditingInline, personalCopyEnabled, copyBusy,
+    toggleEditMode, handleToggleCopyMode,
+  ]);
+
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-chrome-hidden={chromeHidden ? "true" : "false"} data-doc-mode={canEditInline || personalCopyEnabled ? (showPersonalCopy ? "personal-copy" : isEditingInline ? "edit" : "preview") : undefined} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>
-      {chromeHidden ? null : (
-        <ViewerHeader
-          file={file}
-          embed={embed}
-          externalUrl={embed.kind === "youtube" ? getYouTubeWatchUrl(file) : embed.url}
-          download={download}
-          canEditInline={canEditInline && !showPersonalCopy}
-          editMode={canEditInline && editMode && !showPersonalCopy}
-          onToggleEditMode={() => { setCopyMode(false); setEditMode((value) => !value); }}
-          personalCopyEnabled={personalCopyEnabled}
-          personalCopyActive={showPersonalCopy}
-          personalCopyBusy={copyBusy}
-          onTogglePersonalCopy={handleToggleCopyMode}
-        />
-      )}
+    <div className="flex h-full min-h-0 flex-col overflow-hidden text-[var(--course-text)]" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind} data-active={active ? "true" : "false"} data-doc-mode={canEditInline || personalCopyEnabled ? (showPersonalCopy ? "personal-copy" : isEditingInline ? "edit" : "preview") : undefined} data-viewport-mode={documentKind ? (desktopView ? "desktop" : "mobile") : undefined}>
+
       {personalCopyEnabled && copyState.status === "error" && copyState.errorMessage ? (
         <div className="border-b border-amber-300/40 bg-amber-500/15 px-4 py-2 text-xs font-semibold text-amber-200" role="alert" data-course-personal-copy-error>
           {copyState.errorMessage}
@@ -531,105 +593,6 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
         </div>
       ) : null}
       <div ref={hostRef} className="absolute inset-0 h-full w-full bg-black" data-course-viewer-iframe title={title} />
-    </div>
-  );
-}
-
-function ViewerHeader({ file, embed, externalUrl = embed.url, download, canEditInline = false, editMode = false, onToggleEditMode, personalCopyEnabled = false, personalCopyActive = false, personalCopyBusy = false, onTogglePersonalCopy }: { file: CourseFile; embed: { url: string; kind: string }; externalUrl?: string; download: CourseDownload; canEditInline?: boolean; editMode?: boolean; onToggleEditMode?: () => void; personalCopyEnabled?: boolean; personalCopyActive?: boolean; personalCopyBusy?: boolean; onTogglePersonalCopy?: () => void }) {
-  const kindLabel = embed.kind === "none" ? "No preview" : embed.kind === "direct" ? file.type : embed.kind;
-  const isYouTube = embed.kind === "youtube";
-  const isMedia = isYouTube || file.type === "video" || file.type === "audio";
-  const toggleFullscreen = () => {
-    const root = document.querySelector("[data-course-viewer][data-active=\"true\"]") || document.querySelector("[data-course-viewer]");
-    if (!root) return;
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void (root as HTMLElement).requestFullscreen?.();
-  };
-  return (
-    <div className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-[var(--course-border)] bg-[var(--dc-chrome-glass)] px-3 py-2.5 text-[var(--course-text)] [backdrop-filter:var(--dc-chrome-glass-blur)] sm:gap-3 sm:px-4">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-black" title={file.name}>{file.name}</p>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--course-muted)]" data-course-viewer-kind>{kindLabel} {personalCopyActive ? "my copy" : editMode ? "editor" : "preview"}</p>
-      </div>
-      {personalCopyEnabled ? (
-        <GlassButton
-          variant="capsule"
-          onClick={onTogglePersonalCopy}
-          disabled={personalCopyBusy}
-          className={`text-xs font-bold disabled:cursor-wait disabled:opacity-60 [&>span>div]:h-9 [&>span>div]:px-3 ${
-            personalCopyActive ? "[&>span>div]:text-emerald-300" : ""
-          }`}
-          aria-pressed={personalCopyActive}
-          aria-label={personalCopyActive ? "Back to the course master file" : "Open your own personal copy of this file"}
-          title={personalCopyActive ? "Back to the master file" : "Get your own editable copy in your Google Drive"}
-          data-course-viewer-copy-toggle
-          data-copy-active={personalCopyActive ? "true" : "false"}
-        >
-          <span className="flex items-center gap-1.5">
-            {personalCopyBusy ? <RefreshCw size={14} className="animate-spin" /> : <FileStack size={14} />}
-            <span className="hidden sm:inline">{personalCopyActive ? "Master" : "My copy"}</span>
-          </span>
-        </GlassButton>
-      ) : null}
-      {canEditInline ? (
-        <GlassButton
-          variant="capsule"
-          onClick={onToggleEditMode}
-          className={`text-xs font-bold [&>span>div]:h-9 [&>span>div]:px-3 ${editMode ? "[&>span>div]:text-violet-300" : ""}`}
-          aria-pressed={editMode}
-          aria-label={editMode ? "Switch back to preview" : "Open the full Google editor with the complete toolbar"}
-          title={editMode ? "Back to preview" : "Edit in Google Docs (full toolbar)"}
-          data-course-viewer-edit-toggle
-          data-doc-mode={editMode ? "edit" : "preview"}
-        >
-          <span className="flex items-center gap-1.5">
-            {editMode ? <Eye size={14} /> : <PencilLine size={14} />}
-            <span className="hidden sm:inline">{editMode ? "Preview" : "Edit"}</span>
-          </span>
-        </GlassButton>
-      ) : null}
-      {isMedia ? (
-        <GlassButton
-          onClick={toggleFullscreen}
-          className="shrink-0 [&_.size-12]:size-9"
-          aria-label="Toggle fullscreen"
-          title="Fullscreen"
-          data-course-viewer-fullscreen
-        >
-          <Maximize2 size={15} />
-        </GlassButton>
-      ) : null}
-      {download.url ? (
-        <a
-          href={download.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          download={download.downloadable ? download.fileName : undefined}
-          className="block shrink-0 rounded-full text-xs font-bold outline-none focus-visible:brightness-110"
-          data-course-viewer-download
-        >
-          <GlassSurface radius={999} className="h-9 text-white" contentClassName="flex h-full items-center gap-1.5 px-3">
-            {download.downloadable ? <Download size={14} /> : <ExternalLink size={14} />}
-            <span className="hidden sm:inline">{download.label}</span>
-          </GlassSurface>
-        </a>
-      ) : null}
-      {embed.url ? (
-        <a
-          href={externalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block shrink-0 rounded-full text-[11px] font-bold outline-none focus-visible:brightness-110 sm:text-xs"
-          aria-label="Open preview in new tab"
-          title={isYouTube ? "Open in YouTube (use this if embedded playback is blocked)" : "Open preview in new tab"}
-          data-course-viewer-external
-        >
-          <GlassSurface radius={999} className="h-9 text-white" contentClassName="flex h-full items-center gap-1.5 px-2.5 sm:px-3">
-            <ExternalLink size={15} />
-            <span className={isYouTube ? "inline" : "hidden sm:inline"}>{isYouTube ? "YouTube" : "Open"}</span>
-          </GlassSurface>
-        </a>
-      ) : null}
     </div>
   );
 }

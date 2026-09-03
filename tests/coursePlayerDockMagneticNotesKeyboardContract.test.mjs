@@ -104,43 +104,34 @@ test("A manual navigation flags the selection so resume never clobbers it", () =
 });
 
 // ---------------------------------------------------------------------------
-// 3. Right-side glass sheet between header and footer dock (Split mode OFF)
+// 3. There is NO sheet / sidebar variant — the Split Deck is the only layout
 // ---------------------------------------------------------------------------
 
-test("The sheet is the websiteglass Glass Sheet pinned to the right edge", () => {
-  assert.match(overlay, /import \{ GlassSheet, GlassSheetContent, type SheetBounds \} from "\.\.\/components\/ui\/glass-sheet"/);
-  assert.match(overlay, /<GlassSheetContent[\s\S]*?side="right"/);
-  assert.match(glassSheet, /right: "right-0 top-0 h-full w-\[min\(24rem,90vw\)\]"/);
-});
+// ── The right-side Glass Sheet "sidebar" is GONE (owner's direction): ────
 
-test("The sheet is bounded to the window between the header and the dock", () => {
-  // The inset is measured from the real layout: the player header's bottom
-  // edge (portrait) / right edge (landscape rail) and the dock's top edge.
-  assert.match(overlay, /const \[sheetBounds, setSheetBounds\] = useState<SheetBounds \| null>\(null\);/);
-  assert.match(overlay, /\[data-course-landscape-header\]" : "\[data-course-header\]"/);
-  assert.match(overlay, /bottom: Math\.max\(0, Math\.round\(window\.innerHeight - dockRect\.top\)\)/);
-  // …and handed to the sheet + scrim via the `bounds` prop.
-  assert.match(overlay, /bounds=\{sheetBounds \?\? undefined\}/);
-  // The shared component insets BOTH scrim and panel when bounds is given.
+test("The right-side Glass Sheet variant is gone entirely", () => {
+  // No import, no bounds measurement, no variant prop, no open/onClose plumbing.
+  assert.doesNotMatch(overlay, /glass-sheet/);
+  assert.doesNotMatch(overlay, /SheetBounds/);
+  assert.doesNotMatch(overlay, /OverlayVariant/);
+  assert.doesNotMatch(overlay, /props\.variant/);
+  // The shared sheet component itself is untouched (other screens use it).
   assert.match(glassSheet, /export interface SheetBounds/);
-  assert.match(glassSheet, /style=\{bounds \? boundsInset\(bounds\) : undefined\}/);
 });
 
-test("Split mode ON never renders the sheet — the study pane replaces it", () => {
-  // One component, two homes: the pane variant returns in-flow content and
-  // skips the sheet entirely (no portal, no scrim, no bounds measurement).
-  assert.match(overlay, /export type OverlayVariant = "sheet" \| "pane";/);
-  assert.match(overlay, /const pane = props\.variant === "pane";/);
-  assert.match(overlay, /if \(pane\) \{[\s\S]*?\{studyBody\}[\s\S]*?\}/);
-  // The bounds measurement is skipped while the pane is up.
-  assert.match(overlay, /if \(pane\) return undefined;/);
+test("The player renders the Split Deck directly — no wrapper to remove", () => {
+  // One section around the deck, marked as always split.
+  assert.match(coursePlayer, /data-course-split="on"/);
+  assert.match(coursePlayer, /<SplitDeck[\s\S]*?lesson=\{viewerStack\}/);
+  assert.match(coursePlayer, /study=\{studyOverlay\}/);
+  // The old sheet state (dock open, split enabled persistence) is gone.
+  assert.doesNotMatch(coursePlayer, /dockOpen/);
+  assert.doesNotMatch(coursePlayer, /splitMode/);
+  assert.doesNotMatch(coursePlayer, /splitRendered/);
 });
 
-test("The sheet content swaps per tab without a slide animation", () => {
-  assert.match(overlay, /key=\{tab\} className="min-h-0 flex-1 overflow-hidden" data-course-overlay-tab=\{tab\}/);
-  // The old tab-content slide-in is gone.
-  assert.doesNotMatch(overlay, /animate-course-overlay-in/);
-});
+
+
 
 // ---------------------------------------------------------------------------
 // 4. Scroll-release click list
@@ -171,27 +162,20 @@ test("Scrolling the list and lifting the finger clicks the settled button", () =
 });
 
 // ---------------------------------------------------------------------------
-// 5. Split Deck — the settings toggle
+// 5. Split Deck — always on, no enable/disable toggle anywhere
 // ---------------------------------------------------------------------------
 
-test("Split mode is one row in ⚙ Player settings, in both popover variants", () => {
-  // The row sits right after Snowfall and uses the same GlassPrefToggle helper
-  // as every other preference, so it also fires the settings toast.
-  assert.match(coursePlayer, /settingsRow\("Snowfall", snowMode, \(next\) => setSnowMode\(next\), "snow"\)\}\s*\n\s*\{settingsRow\("Split mode", splitMode, \(next\) => requestSplitMode\(next\), "split"\)/);
-  assert.match(coursePlayer, /split: \{ color: "#22D3EE", delay: 0\.15, divider: true \}/);
-  assert.match(coursePlayer, /data-course-setting=\{attr\}/);
-  // ONE popover builder serves both the portrait ("bottom") and the landscape
-  // ("right") trigger, so the row exists in both.
-  assert.match(coursePlayer, /settingsPopover\("bottom"\)/);
-  assert.match(coursePlayer, /settingsPopover\("right"\)/);
+test("There is no Split-mode enable row: split is simply the player's layout", () => {
+  // Neither the player nor the Player panel carries a "Split mode" row, and
+  // the old persisted enabled-flag is gone from the motion file.
+  assert.doesNotMatch(coursePlayer, /requestSplitMode/);
+  assert.doesNotMatch(coursePlayer, /loadSplitEnabled|saveSplitEnabled/);
+  assert.doesNotMatch(coursePlayer, /settingsPopover/);
+  assert.doesNotMatch(splitMotion, /SPLIT_ENABLED_KEY/);
+  assert.doesNotMatch(splitMotion, /loadSplitEnabled/);
+  assert.doesNotMatch(splitMotion, /dc\.splitDeck\.enabled/);
 });
 
-test("The Split Deck preference persists across reloads", () => {
-  assert.match(coursePlayer, /const \[splitMode, setSplitMode\] = useState<boolean>\(loadSplitEnabled\);/);
-  assert.match(coursePlayer, /useEffect\(\(\) => \{ saveSplitEnabled\(splitMode\); \}, \[splitMode\]\);/);
-  assert.match(splitMotion, /SPLIT_ENABLED_KEY = "dc\.splitDeck\.enabled"/);
-  assert.match(splitMotion, /localStorage\.getItem\(SPLIT_ENABLED_KEY\) === "1"/);
-});
 
 // ---------------------------------------------------------------------------
 // 5b. Split Deck — the two panes and the dock INSIDE the study pane
@@ -205,35 +189,32 @@ test("The deck lays out a lesson pane, a divider and a study pane", () => {
   // The axis follows the player's orientation: portrait = lesson on top,
   // landscape = lesson on the left.
   assert.match(studyPanels, /axis === "row" \? "flex-row" : "flex-col"/);
-  assert.match(coursePlayer, /splitDeck\("row", "landscape"\)/);
-  assert.match(coursePlayer, /splitDeck\("column", "portrait"\)/);
+  assert.match(coursePlayer, /axis=\{useLandscapeRails \? "row" : "column"\}/);
+  assert.match(coursePlayer, /orientation=\{useLandscapeRails \? "landscape" : "portrait"\}/);
   // The player marks the split region on the section that owns it.
-  assert.match(coursePlayer, /data-course-split=\{splitRendered \? "on" : "off"\}/);
+  assert.match(coursePlayer, /data-course-split="on"/);
 });
 
-test("The footer dock lives INSIDE the study pane in split mode", () => {
+test("The footer dock lives INSIDE the study pane", () => {
   // The pane is the deck's `[data-course-study-pane]` element and its content
-  // is `<CourseOverlay variant="pane" />` — whose LAST child is the very same
-  // home-footer dock (`[data-course-dock]`), i.e. the DOM is
+  // is `<CourseOverlay />` — whose LAST child is the very same home-footer
+  // dock (`[data-course-dock]`), i.e. the DOM is
   // `[data-course-study-pane] [data-course-dock]`.
   assert.match(studyPanels, /data-course-study-pane=""[\s\S]*?\{study\}/);
-  assert.match(coursePlayer, /const renderStudyOverlay = \(variant: OverlayVariant\) => \(/);
-  assert.match(coursePlayer, /study=\{studyPane\}/);
-  assert.match(coursePlayer, /const studyPane = renderStudyOverlay\("pane"\);/);
-  // The overlay's pane branch ends with the dock (module panel, footer
-  // navigation and content all live in the split).
-  assert.match(overlay, /if \(pane\) \{[\s\S]*?\{studyBody\}[\s\S]*?dock[\s\S]*?\}/);
-  assert.match(overlay, /data-in-split=\{pane \? "true" : "false"\}/);
-  // And the sheet's own bounds still measure from that same dock element.
-  assert.match(overlay, /<div ref=\{dockShellRef\} className="mx-auto w-max max-w-full">/);
+  assert.match(coursePlayer, /const studyOverlay = \(/);
+  assert.match(coursePlayer, /study=\{studyOverlay\}/);
+  // The overlay ends with the dock (module panel, footer navigation and
+  // content all live in the split).
+  assert.match(overlay, /\{studyBody\}[\s\S]*?\{dock\}/);
+  assert.match(overlay, /data-in-split="true"/);
 });
 
 test("Tapping the active dock tab peek-collapses the study pane", () => {
-  assert.match(coursePlayer, /const handleSplitDockTabChange = \(next: DockTab\) => \{/);
+  assert.match(coursePlayer, /const handleDockTabChange = \(next: DockTab\) => \{/);
   assert.match(coursePlayer, /splitDeckRef\.current\?\.toggleStudy\(\);/);
   assert.match(studyPanels, /toggleStudy: \(\) => \(collapsedRef\.current === "study" \? restore\(\) : collapseTo\("study"\)\)/);
   // A different tab swaps the pane's content in place — the pane never closes.
-  assert.match(coursePlayer, /onTabChange=\{variant === "pane" \? handleSplitDockTabChange : handleDockTabChange\}/);
+  assert.match(coursePlayer, /onTabChange=\{handleDockTabChange\}/);
 });
 
 test("The lesson pane is the lossless viewer stack, only ever resized", () => {
@@ -338,7 +319,7 @@ test("The divider is fully keyboard driven", () => {
   assert.match(styles, /\[data-course-split-divider\]:focus-visible \{\s*outline: 2px solid var\(--split-accent/);
 });
 
-test("⌘/Ctrl+1…5 walks the study tabs while the deck is up", () => {
+test("⌘/Ctrl+1…6 walks the study tabs while the deck is up", () => {
   assert.match(coursePlayer, /if \(!\(event\.metaKey \|\| event\.ctrlKey\) \|\| event\.altKey\) return;/);
   assert.match(coursePlayer, /index > STUDY_TAB_ORDER\.length\) return;/);
   // Never hijack a browser shortcut aimed at a text field…
@@ -382,7 +363,7 @@ test("The soft keyboard lifts the study pane's content box only", () => {
 // 5e. Split Deck — entry / exit, the dock FLIP and the divider's tab colour
 // ---------------------------------------------------------------------------
 
-test("Enabling grows the study pane open and FLIPs the dock into it", () => {
+test("Mounting the player grows the study pane open with the entry spring", () => {
   assert.match(splitMotion, /export const ENTRY_START = 5;/);
   assert.match(studyPanels, /ratio\.set\(ENTRY_START\);/);
   assert.match(studyPanels, /animateRatio\(stored, SPRING_ENTRY\)/);
@@ -392,22 +373,20 @@ test("Enabling grows the study pane open and FLIPs the dock into it", () => {
   // The study content fades in and rises 8px behind it (150ms, 60ms delay).
   assert.match(studyPanels, /initial=\{\{ opacity: 0, y: 8 \}\}/);
   assert.match(studyPanels, /transition=\{\{ duration: 0\.15, delay: 0\.06, ease: EASE_OUT_MOTION \}\}/);
-  // The dock FLIPs: measured before the reflow, played back to zero after it.
-  assert.match(studyPanels, /export const captureDockRect = \(\): DOMRect \| null =>/);
-  assert.match(studyPanels, /export const flipDockFrom = \(from: DOMRect \| null\): void =>/);
-  assert.match(studyPanels, /\{ transform: \[`translate3d\(\$\{dx\}px, \$\{dy\}px, 0\)`, "translate3d\(0px, 0px, 0\)"\] \}/);
-  assert.match(studyPanels, /\{ duration: 0\.38, ease: EASE_OUT_MOTION \}/);
-  assert.match(coursePlayer, /dockFlipFromRef\.current = captureDockRect\(\);/);
-  assert.match(coursePlayer, /flipDockFrom\(dockFlipFromRef\.current\);/);
 });
 
-test("Disabling plays the exact reverse before the sheet takes over", () => {
-  assert.match(coursePlayer, /const \[splitRendered, setSplitRendered\] = useState<boolean>\(splitMode\);/);
-  assert.match(coursePlayer, /onExited=\{\(\) => setSplitRendered\(false\)\}/);
-  assert.match(studyPanels, /animateRatio\(0, SPRING_ENTRY\);/);
-  assert.match(studyPanels, /onExitedRef\.current\?\.\(\), 280/);
-  // Re-enabling mid-exit grows back instead of unmounting the lesson.
-  assert.match(studyPanels, /if \(!exitedRef\.current\) return undefined;/);
+test("The deck never unmounts — there is no off state to hand over to", () => {
+  // No active/onExited props and no reverse (shrink-away) animation: split
+  // cannot be turned off, so there is nothing to exit into.
+  assert.doesNotMatch(studyPanels, /onExited/);
+  assert.doesNotMatch(studyPanels, /exitedRef/);
+  assert.doesNotMatch(coursePlayer, /onExited/);
+  assert.doesNotMatch(coursePlayer, /setSplitRendered/);
+  // The dock-FLIP helpers that moved the dock between two homes are gone —
+  // the dock has exactly ONE home now (inside the study pane).
+  assert.doesNotMatch(studyPanels, /captureDockRect/);
+  assert.doesNotMatch(studyPanels, /flipDockFrom/);
+  assert.doesNotMatch(coursePlayer, /captureDockRect|flipDockFrom/);
 });
 
 test("The divider, its glow and the peek rail all wear the active tab colour", () => {
@@ -447,10 +426,8 @@ test("The split surfaces are built from the player's own glass tokens", () => {
   assert.match(studyPanels, /background: "var\(--dc-chrome-glass\)"/);
   assert.match(studyPanels, /backdropFilter: "var\(--dc-chrome-glass-blur\)"/);
   assert.match(studyPanels, /boxShadow: "var\(--dc-chrome-glass-rim\)"/);
-  // The study pane keeps its tint at ≤ 0.35 so text stays readable…
+  // The study pane keeps its tint at ≤ 0.35 so text stays readable.
   assert.match(studyPanels, /tint=\{0\.3\}/);
-  // …while the non-split sheet keeps its 0.5.
-  assert.match(overlay, /tint=\{0\.5\}/);
   // Blur is static per theme and cheaper on touch — never animated.
   assert.match(styles, /\.course-player-shell \{\s*--dc-chrome-glass-blur: blur\(18px\) saturate\(1\.4\);/);
   assert.match(styles, /\.course-player-shell\[data-course-theme="light"\] \{\s*--dc-chrome-glass-blur: blur\(14px\) saturate\(1\.2\);/);
@@ -458,10 +435,10 @@ test("The split surfaces are built from the player's own glass tokens", () => {
   assert.doesNotMatch(studyPanels, /transition[^;]*backdrop-filter/);
 });
 
-test("Notes and mind map keep their container-width tiling inside the pane", () => {
+test("Notes, mind map and the Player panel keep their tiling inside the pane", () => {
   assert.match(styles, /\[data-course-overlay\] \[data-course-notes-grid\],\s*\n\[data-course-study-pane\] \[data-course-notes-grid\] \{/);
   assert.match(studyPanels, /data-solid-panel=\{solid \? "true" : "false"\}/);
-  assert.match(coursePlayer, /solid=\{dockTab === "notes" \|\| dockTab === "mindmap"\}/);
+  assert.match(coursePlayer, /solid=\{dockTab === "notes" \|\| dockTab === "mindmap" \|\| dockTab === "player"\}/);
 });
 
 test("Coarse pointers and reduced motion get the cheap deck", () => {
@@ -479,7 +456,7 @@ test("Coarse pointers and reduced motion get the cheap deck", () => {
 // 8. Pane tab-switch crossfade + the phone-landscape dock floor
 // ---------------------------------------------------------------------------
 
-test("Switching tabs inside the pane crossfades the content — and only there", () => {
+test("Switching tabs inside the pane crossfades the content", () => {
   // The pane body is keyed by tab and fades in over 150ms with a 6px rise.
   assert.match(
     overlay,
@@ -489,16 +466,13 @@ test("Switching tabs inside the pane crossfades the content — and only there",
   assert.match(overlay, /import \{ EASE_OUT_MOTION \} from "\.\/splitMotion";/);
   assert.match(overlay, /const paneCrossfade = useReducedMotion\(\) !== true;/);
   assert.match(splitMotion, /export const EASE_OUT_MOTION = \[0\.22, 1, 0\.36, 1\]/);
-  // Phase 0's sheet keeps its animation-free in-place swap: the file holds two
-  // `{studyBody}` mounts — the pane's, wrapped in the crossfade above, and the
-  // sheet's, a direct child of the sheet content with no motion in between.
-  assert.equal(overlay.match(/\{studyBody\}/g)?.length, 2);
-  assert.match(overlay, /<GlassSheetContent(?:(?!motion\.div)[\s\S])*?\{studyBody\}/);
+  // The pane is the only home now, so there is exactly one studyBody mount.
+  assert.equal(overlay.match(/\{studyBody\}/g)?.length, 1);
 });
 
 test("A phone in landscape never settles the pane narrower than the dock inside it", () => {
-  // The five-icon glass dock's natural width is the floor's reason to exist.
-  assert.match(splitMotion, /export const SPLIT_DOCK_MIN_PX = 288;/);
+  // The six-icon glass dock's natural width is the floor's reason to exist.
+  assert.match(splitMotion, /export const SPLIT_DOCK_MIN_PX = 344;/);
   assert.match(splitMotion, /export const SPLIT_SHORT_VIEWPORT_PX = 500;/);
   // "Phone" = a narrow viewport OR a short one (turned sideways).
   assert.match(

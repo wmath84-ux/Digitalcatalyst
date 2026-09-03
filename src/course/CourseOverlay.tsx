@@ -2,62 +2,49 @@
 //
 // Course Player footer navigation + study tabs.
 //
-// ONE component, TWO homes (`variant`):
-//
-//   · "sheet" — the tabs open in the right-side Glass Sheet below and the
-//     footer dock is the shell's last in-flow child (the default).
-//   · "pane"  — Split Deck mode: the same chrome row, the same tab body and
-//     the same footer dock render in-flow inside the study pane that
-//     src/course/studyPanels.tsx lays out, so the module panel, the footer
-//     navigation and the content ALL live inside the split.
-//
-// Everything the two homes share (the five TABS, the dock items, the row
-// builders in `useStudyRows`, the tab body in `StudyContent`) is exported from
-// here so there is exactly one source of truth for the study content.
+// The player is SPLIT-ONLY now (owner's direction): the old right-side Glass
+// Sheet "sidebar" mode is gone and there is no enable/disable toggle — the
+// whole player is two glass panes (lesson + study) with the footer dock
+// living INSIDE the study pane. This component is exactly that study pane's
+// content: the chrome row, the active tab's body and the footer dock.
 //
 // The footer IS the home page footer navigation (src/components/glass-dock/
 // GlassDock.tsx, the same component src/components/BottomNav.tsx renders):
 // identical frosted AI-Canvas panel, identical entrance spring, identical
 // per-item stagger, identical distance-based magnification, identical tinted
-// icon plates + frosted tooltips. A tap on a tab button opens the sheet; a
-// touch release on a tab selects it — exactly like the home footer. There is
-// NO sliding indicator and NO live content swap while the finger moves: the
-// old "scroll on the dock and the overlay content updates live" behaviour is
-// gone by the owner's direction.
+// icon plates + frosted tooltips. A tap on a different tab swaps the pane's
+// content in place; a tap on the ACTIVE tab peek-collapses the pane (the
+// Split Deck's own toggleStudy gesture). There is NO sliding indicator and
+// NO live content swap while the finger moves.
 //
-// The sheet is the websiteglass Glass Sheet (src/components/ui/glass-sheet.tsx,
-// https://websiteglass.com/docs/components/glass-sheet) pinned to the RIGHT
-// edge. It slides in from the right and occupies ONLY the space between the
-// player's header and the footer dock — it never overlaps either (the
-// `bounds` prop insets the sheet and its scrim to that window).
-//
-// Inside the sheet each list tab (Modules / Resources / Paid) is a vertical
+// Inside the pane each list tab (Modules / Resources / Paid) is a vertical
 // column of dock-style buttons (same 44 px tinted plates, same magnify wave,
 // same active glow). The list is scroll-snapped to the buttons: after the
-// user taps open the sheet, scrolling and lifting the finger fires the
-// button the finger settled on (the one closest to the list centre). A plain
-// tap clicks the button under it as usual. No sliding content animations.
+// user has scrolled, lifting the finger fires the button the finger settled
+// on (the one closest to the list centre). A plain tap clicks the button
+// under it as usual. No sliding content animations.
 //
 //   - Modules   → every unlocked module (expandable to its files).
 //   - Resources → only non-paid files, grouped under modules that have them.
 //   - Notes     → the notes panel.
 //   - Mind map  → the per-module mind map panel.
 //   - Paid      → purchasable updates + locked paid modules.
+//   - Player    → the course identity, progress / mark-complete, the ACTIVE
+//                 file's own buttons (open / download / fullscreen / editor /
+//                 personal copy) and every player preference — everything the
+//                 old player header + ⚙ settings popover carried, in one list.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
-import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Plus, ShoppingBag, Sparkles, X } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Plus, Settings, ShoppingBag, Sparkles } from "lucide-react";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
 import { GlassButton } from "../components/ui/glass-button";
-import { GlassSheet, GlassSheetContent, type SheetBounds } from "../components/ui/glass-sheet";
 import { EASE_OUT_MOTION } from "./splitMotion";
 
-export type DockTab = "modules" | "resources" | "notes" | "mindmap" | "paid";
+export type DockTab = "modules" | "resources" | "notes" | "mindmap" | "paid" | "player";
 export type DockOrientation = "portrait" | "landscape";
-/** "sheet" = the right-side Glass Sheet; "pane" = the Split Deck study pane. */
-export type OverlayVariant = "sheet" | "pane";
 
 const updateKey = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
 
@@ -314,32 +301,9 @@ function SnapList({
 interface CourseOverlayProps {
   orientation: DockOrientation;
   tab: DockTab;
+  /** Tap a different tab: swap the pane's content in place. Tap the ACTIVE
+   *  tab: the Split Deck peek-collapses the study pane (its toggleStudy). */
   onTabChange: (tab: DockTab) => void;
-  open: boolean;
-  onToggle: () => void;
-  onClose: () => void;
-  /**
-   * Where the study tabs live.
-   *
-   *   · "sheet" (default) — the tabs open in the right-side websiteglass Glass
-   *     Sheet, strictly between the header and the footer dock, and the dock
-   *     itself is the shell's last in-flow child.
-   *   · "pane" — Split Deck mode (src/course/studyPanels.tsx): the SAME tabs,
-   *     the SAME rows and the SAME dock render in-flow inside the split's
-   *     study pane — no sheet, no scrim. The pane's chrome row then carries an
-   *     X that exits split mode (`onExitSplitMode`).
-   *
-   * One component renders both so the two modes can never drift apart.
-   */
-  variant?: OverlayVariant;
-  /** Split Deck only: the study pane's chrome-row X leaves split mode. */
-  onExitSplitMode?: () => void;
-  /**
-   * Split Deck only: "Player bars" is hidden, so the pane drops its chrome row
-   * AND its footer dock — the tab content stays (hiding the bars must never
-   * tear the lesson pane down, that would remount every open file).
-   */
-  chromeHidden?: boolean;
   modules: CourseModule[];
   selectedFileId?: string;
   ownedUpdateIds: Set<string>;
@@ -357,13 +321,17 @@ interface CourseOverlayProps {
   onDeleteNote: (id: string) => void;
   onLinkNote: (id: string, links: string[]) => void;
   // Mind map wiring. The panel itself is owned by the parent (it holds the
-  // Firestore hook), so the sheet only hosts it — this keeps the sheet
+  // Firestore hook), so the pane only hosts it — this keeps the overlay
   // presentational and lets the map survive tab switches.
   mindMapPanel?: ReactNode;
+  // The Player tab's panel (course identity, progress, the ACTIVE file's own
+  // buttons and every player preference). Owned by the parent for the same
+  // reason as the mind map panel.
+  playerPanel?: ReactNode;
 }
 
 /**
- * The five study tabs, in dock order. Exported because the Split Deck
+ * The six study tabs, in dock order. Exported because the Split Deck
  * (src/course/studyPanels.tsx) needs the active tab's colour for the divider
  * line and its icon for the study peek rail — the deck must never keep its own
  * copy of the list.
@@ -373,13 +341,16 @@ export const TABS: Array<{ key: DockTab; label: string; heading: string; hint: s
   { key: "resources", label: "Resource", heading: "Resources", hint: "Course files (paid modules live in Paid)", color: "#06D6A0", icon: FileText },
   { key: "notes", label: "Note", heading: "Notes", hint: "Your private writing pad", color: "#3A86FF", icon: NotebookPen },
   // Mind Map sits immediately after Note, so the two private-study tools are
-  // neighbours in the dock. It opens the same way — the right-side sheet —
-  // and hosts the per-module map library + canvas.
+  // neighbours in the dock. It hosts the per-module map library + canvas.
   { key: "mindmap", label: "Mind map", heading: "Mind map", hint: "Is module ka apna diagram banayein", color: "#B388FF", icon: Network },
   { key: "paid", label: "Paid", heading: "Paid content", hint: "Upgrades still locked", color: "#C9A96E", icon: ShoppingBag },
+  // The footer dock's own settings button. Everything the player header and
+  // the ⚙ popover used to offer — course details, progress, mark-complete,
+  // the ACTIVE file's buttons and every player preference — lives here.
+  { key: "player", label: "Player", heading: "Player settings", hint: "Course, active file aur controls — sab ek list mein", color: "#FF6BF5", icon: Settings },
 ];
 
-/** The dock's tab order — ⌘/Ctrl+1…5 in Split Deck mode walks this list. */
+/** The dock's tab order — ⌘/Ctrl+1…6 walks this list. */
 export const STUDY_TAB_ORDER: DockTab[] = TABS.map(({ key }) => key);
 
 /** The tab record for a key, falling back to the first one for unknown keys. */
@@ -387,11 +358,21 @@ export const dockTabRecord = (tab: DockTab) => TABS[Math.max(0, TABS.findIndex((
 
 /**
  * Rendered when a call site has no mind map panel to host: a hint instead of a
- * blank surface. Shared by the sheet and the Split Deck's study pane.
+ * blank surface.
  */
 export const MINDMAP_FALLBACK = (
   <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
     Mind map is course me abhi available nahi hai.
+  </p>
+);
+
+/**
+ * Rendered when a call site has no Player panel to host: a hint instead of a
+ * blank surface, mirroring the mind map fallback.
+ */
+export const PLAYER_FALLBACK = (
+  <p className="px-4 py-6 text-center text-[11px] font-semibold text-[var(--course-muted)]">
+    Player settings abhi available nahi hain.
   </p>
 );
 
@@ -438,13 +419,9 @@ export interface StudyRows {
 }
 
 /**
- * The five study tabs' rows — ONE builder for BOTH homes.
- *
- * The right-side Glass Sheet (variant "sheet") and the Split Deck's study pane
- * (variant "pane", laid out by src/course/studyPanels.tsx) call this same hook
- * and render its result through the same `StudyContent`, so the module list,
- * the resource list, the notes, the mind map and the paid list can never drift
- * apart between the two modes.
+ * The study tabs' rows — ONE builder for the whole pane. The module list, the
+ * resource list and the paid list render through the same `StudyContent` as
+ * the notes, mind map and player tabs.
  */
 export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
   const activeTab = dockTabRecord(tab);
@@ -635,9 +612,9 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
 }
 
 /**
- * The tab body: notes / mind map / snap list, wrapped in the one element the
- * notes-grid and map-library tiling rules hang off (`data-course-overlay-tab`).
- * Identical in the sheet and in the Split Deck's study pane.
+ * The tab body: notes / mind map / player panel / snap list, wrapped in the
+ * one element the notes-grid and map-library tiling rules hang off
+ * (`data-course-overlay-tab`).
  */
 export function StudyContent({
   tab,
@@ -646,6 +623,7 @@ export function StudyContent({
   listModeAttr,
   notesPanel,
   mindMapPanel,
+  playerPanel,
 }: {
   tab: DockTab;
   rows: SheetRowSpec[];
@@ -653,9 +631,10 @@ export function StudyContent({
   listModeAttr: string | null;
   notesPanel: ReactNode;
   mindMapPanel: ReactNode;
+  playerPanel: ReactNode;
 }) {
   return (
-    // Content swaps in place — the surface itself never closes. No slide
+    // Content swaps in place — the pane itself never closes. No slide
     // animation: the list is a plain scrollable column.
     <div key={tab} className="min-h-0 flex-1 overflow-hidden" data-course-overlay-tab={tab}>
       {tab === "notes" ? (
@@ -665,6 +644,10 @@ export function StudyContent({
         // handed down ready-rendered. A missing slot (older call sites)
         // degrades to a hint instead of a blank surface.
         mindMapPanel
+      ) : tab === "player" ? (
+        // Everything the player header used to be — course details, progress,
+        // the active file's own buttons and every player preference, one list.
+        playerPanel
       ) : (
         <SnapList
           rows={rows}
@@ -682,67 +665,19 @@ export function StudyContent({
 
 export default function CourseOverlay(props: CourseOverlayProps) {
   const { orientation, tab } = props;
-  const landscape = orientation === "landscape";
 
-  // NotesPanel reports when its big editor is open; while it is, the sheet
-  // keeps NO header at all so the writing surface gets every pixel of the
-  // sheet (both orientations).
+  // NotesPanel reports when its big editor is open; while it is, the pane
+  // keeps NO chrome row at all so the writing surface gets every pixel.
   const [notesEditorOpen, setNotesEditorOpen] = useState(false);
   const notesWriting = tab === "notes" && notesEditorOpen;
-  // The main header's "+" button lives here (the sheet header), but the
-  // composer state lives in NotesPanel. A monotonically increasing signal
-  // asks the panel to open its composer without lifting the draft state up.
+  // The chrome row's "+" button lives here, but the composer state lives in
+  // NotesPanel. A monotonically increasing signal asks the panel to open its
+  // composer without lifting the draft state up.
   const [composerSignal, setComposerSignal] = useState(0);
-
-  // ── Sheet bounds: the exact window between the header and the dock ─────
-  // The sheet portals to <body>, so its inset is measured from the real
-  // layout: the player header's bottom edge (portrait) / right edge
-  // (landscape rail) and the dock's top edge. Re-measured on resize,
-  // orientation change and any size change of either element (the soft
-  // keyboard shrinking the shell included).
-  const dockShellRef = useRef<HTMLDivElement | null>(null);
-  const [sheetBounds, setSheetBounds] = useState<SheetBounds | null>(null);
-  const pane = props.variant === "pane";
   /** Pane tab switches crossfade; the opt-out keeps them a plain swap. */
   const paneCrossfade = useReducedMotion() !== true;
-  useEffect(() => {
-    // Split Deck mode has no sheet to inset — the study pane is laid out by
-    // the deck itself (src/course/studyPanels.tsx).
-    if (pane) return undefined;
-    const headerSelector = landscape ? "[data-course-landscape-header]" : "[data-course-header]";
-    const read = () => {
-      const dock = dockShellRef.current;
-      if (!dock || typeof window === "undefined") return;
-      const dockRect = dock.getBoundingClientRect();
-      const header = document.querySelector(headerSelector);
-      const headerRect = header ? header.getBoundingClientRect() : null;
-      const next: SheetBounds = {
-        top: landscape ? 0 : Math.round(headerRect ? headerRect.bottom : 0),
-        right: 0,
-        bottom: Math.max(0, Math.round(window.innerHeight - dockRect.top)),
-        left: landscape ? Math.round(headerRect ? headerRect.right : 0) : 0,
-      };
-      setSheetBounds((prev) =>
-        prev && prev.top === next.top && prev.bottom === next.bottom && prev.left === next.left && prev.right === next.right
-          ? prev
-          : next,
-      );
-    };
-    read();
-    const ro = new ResizeObserver(read);
-    if (dockShellRef.current) ro.observe(dockShellRef.current);
-    const header = document.querySelector(headerSelector);
-    if (header) ro.observe(header);
-    window.addEventListener("resize", read);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", read);
-    };
-  }, [landscape, pane]);
 
-  // ── The five tabs' rows ────────────────────────────────────────────────
-  // Built by the ONE shared hook (`useStudyRows`) that the Split Deck's study
-  // pane calls too, so both homes render identical content from one source.
+  // ── The six tabs' rows ─────────────────────────────────────────────────
   const { activeTab, listRows, listModeAttr, emptyMessage, headerSubtitle } = useStudyRows(tab, props);
 
   // ── Footer navigation: the home footer, exactly ────────────────────────
@@ -750,15 +685,11 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // same frosted panel, entrance spring, staggered items, magnification wave,
   // tinted plates and tooltips — plus the home footer's own touch behaviour
   // (release the finger on a tab and it is selected). No slide-drag pill, no
-  // live content swap while the finger moves. In Split Deck mode this very
-  // element is the LAST CHILD OF THE STUDY PANE, so the footer navigation
-  // lives inside the split (owner's direction) instead of under it.
+  // live content swap while the finger moves. This element is the LAST CHILD
+  // OF THE STUDY PANE, so the footer navigation lives inside the split.
   const dockItems: GlassDockItem[] = buildDockItems(tab);
 
   // ── The tab body ───────────────────────────────────────────────────────
-  // ONE element tree for both homes: the sheet and the Split Deck's study pane
-  // render the exact same `StudyContent`, so notes / mind map / module list /
-  // resources / paid can never differ between the two modes.
   const studyBody = (
     <StudyContent
       tab={tab}
@@ -776,19 +707,17 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         />
       }
       mindMapPanel={props.mindMapPanel ?? MINDMAP_FALLBACK}
+      playerPanel={props.playerPanel ?? PLAYER_FALLBACK}
     />
   );
 
   // ── The one chrome row ─────────────────────────────────────────────────
-  // Heading + subtitle + the notes "+" + X. Both homes render it through the
-  // same `notesWriting` guard below — null ENTIRELY while the notes writing box
-  // is open, so the editor gets every pixel of the surface. Only the X's job
-  // differs per home: the sheet's X closes the sheet, the pane's X leaves
-  // Split Deck mode (the pane itself has no "closed" state).
+  // Heading + subtitle + the notes "+". Null ENTIRELY while the notes
+  // writing box is open, so the editor gets every pixel of the surface.
   const chromeRow = (
     <div
       className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--course-border)] px-4 py-3"
-      data-course-study-chrome={pane ? "pane" : "sheet"}
+      data-course-study-chrome="pane"
     >
       <div className="min-w-0">
         <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-[var(--course-muted)]" data-course-overlay-title>
@@ -809,16 +738,6 @@ export default function CourseOverlay(props: CourseOverlayProps) {
             <Plus size={16} />
           </GlassButton>
         ) : null}
-        <GlassButton
-          onClick={pane ? () => props.onExitSplitMode?.() : props.onClose}
-          className="shrink-0 [&_.size-12]:size-8"
-          aria-label={pane ? "Exit split mode" : "Close overlay"}
-          title={pane ? "Exit split mode" : "Close overlay"}
-          data-course-overlay-close
-          {...(pane ? { "data-course-split-exit": "" } : null)}
-        >
-          <X size={15} />
-        </GlassButton>
       </div>
     </div>
   );
@@ -826,19 +745,17 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // ── Footer navigation — exactly the home page's footer ─────────────────
   // The same GlassDock (src/components/glass-dock/GlassDock.tsx) the home page
   // uses: frosted AI-Canvas panel, y:50 → 0 spring entrance, per-item stagger,
-  // distance magnification, tinted icon plates + frosted tooltips. In sheet
-  // mode it is the section's last in-flow child, so the sheet's bounds
-  // (measured from its top edge) always land exactly above the footer and
-  // below the header. In Split Deck mode it is the study pane's last child.
+  // distance magnification, tinted icon plates + frosted tooltips. It is the
+  // study pane's last child, i.e. the DOM is
+  // `[data-course-study-pane] [data-course-dock]`.
   const dock = (
     <div
       className="relative z-50 shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2"
       data-course-dock
       data-orientation={orientation}
-      data-in-split={pane ? "true" : "false"}
-      data-sheet-open={!pane && props.open ? "true" : "false"}
+      data-in-split="true"
     >
-      <div ref={dockShellRef} className="mx-auto w-max max-w-full">
+      <div className="mx-auto w-max max-w-full">
         <GlassDock
           siteFooter
           items={dockItems}
@@ -848,62 +765,22 @@ export default function CourseOverlay(props: CourseOverlayProps) {
     </div>
   );
 
-  // ── Split Deck study pane: in-flow, no portal, no scrim, no sheet ──────
+  // ── The Split Deck study pane: in-flow, no portal, no scrim, no sheet ──
   // The pane's glass surface + sizing belong to the deck; this component only
   // fills it: chrome row, tab body, footer dock (in that order).
-  if (pane) {
-    return (
-      <>
-        {notesWriting ? null : (
-          props.chromeHidden ? null : chromeRow
-        )}
-        {/* A tab switch inside the pane crossfades (opacity 150 ms + a 6 px
-            rise). The sheet keeps its in-place swap with no animation — "no
-            sliding content animations" is sheet law, not pane law. */}
-        <motion.div
-          key={props.tab}
-          initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
-          className="flex min-h-0 flex-1 flex-col overflow-hidden"
-        >
-          {studyBody}
-        </motion.div>
-        {props.chromeHidden ? null : dock}
-      </>
-    );
-  }
-
   return (
     <>
-      {/* ── Sheet: websiteglass Glass Sheet, RIGHT edge, opening only in
-          the window between the header and the footer dock (bounds). ── */}
-      <GlassSheet
-        open={props.open}
-        onOpenChange={(next) => {
-          // Escape / scrim / GlassSheetClose all arrive here as `false`.
-          if (!next) props.onClose();
-        }}
+      {notesWriting ? null : chromeRow}
+      {/* A tab switch inside the pane crossfades (opacity 150 ms + a 6 px rise). */}
+      <motion.div
+        key={props.tab}
+        initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        <GlassSheetContent
-          side="right"
-          tint={0.5}
-          bounds={sheetBounds ?? undefined}
-          contentClassName="flex h-full min-h-0 flex-col overflow-hidden p-0"
-          data-course-overlay
-          data-open={props.open ? "true" : "false"}
-          data-orientation={orientation}
-          data-solid-panel={tab === "notes" || tab === "mindmap" ? "true" : "false"}
-        >
-          {/* Sheet header — the one chrome row, hidden entirely while the
-              notes writing box is open. */}
-          {notesWriting ? null : (
-            chromeRow
-          )}
-          {studyBody}
-        </GlassSheetContent>
-      </GlassSheet>
-
+        {studyBody}
+      </motion.div>
       {dock}
     </>
   );

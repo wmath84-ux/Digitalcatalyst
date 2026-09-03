@@ -20,31 +20,34 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const player = fs.readFileSync("src/CoursePlayerApp.tsx", "utf8");
+const playerPanel = fs.readFileSync("src/course/PlayerPanel.tsx", "utf8");
 const statusBar = fs.readFileSync("src/utils/courseStatusBar.ts", "utf8");
 
-test("status bar hiding is the explicit rail button because auto-hide cannot be gesture-less", () => {
+test("status bar hiding is an explicit Player-tab row because auto-hide cannot be gesture-less", () => {
   // Android-only switch: iOS can never hide the bar and desktop browsers
   // don't need to. The control is the "Hide status bar" Glass Switch row of
-  // the ⚙ Player settings popover — still a real user gesture per flip.
+  // the footer dock's Player tab — still a real user gesture per flip.
   assert.match(player, /isMobileDevice\(\) && !isIOSDevice\(\)/);
-  assert.match(player, /Hide status bar/);
-  assert.match(player, /canFullscreen \? settingsRow\("Hide status bar", courseFullscreen/);
-  // The switch toggles true fullscreen — one flip to hide, one to restore.
+  assert.match(playerPanel, /canFullscreen \? settingsRow\("Hide status bar", courseFullscreen/);
+  assert.match(player, /canFullscreen=\{canFullscreen\}/);
+  // The switch toggles true fullscreen through the Player tab — one flip to
+  // hide, one to restore.
   assert.match(
     player,
     /if \(next\) enterCoursePlayerFullscreen\(\);\s*else exitCoursePlayerFullscreen\(\);/,
   );
 });
 
-test("the button icon mirrors the live document fullscreen state", () => {
-  // Swipe-down / Escape exits on Android flip the icon back without a tap.
+test("the Player-tab row mirrors the live document fullscreen state", () => {
+  // Swipe-down / Escape exits on Android flip the switch back without a tap.
   assert.match(
     player,
     /const \[courseFullscreen, setCourseFullscreen\] = useState<boolean>\(\(\) => isCoursePlayerFullscreen\(\)\)/,
   );
   assert.match(player, /onCourseFullscreenChange\(sync\)/);
   // The settings row mirrors the live state the same way the old button did.
-  assert.match(player, /settingsRow\("Hide status bar", courseFullscreen/);
+  assert.match(playerPanel, /settingsRow\("Hide status bar", courseFullscreen, \(next\) => onHideStatusBarChange\(next\), "fullscreen"\)/);
+  assert.match(player, /courseFullscreen=\{courseFullscreen\}/);
 });
 
 test("no gesture-less automatic hide is left (Android rejects it anyway)", () => {
@@ -56,19 +59,20 @@ test("no gesture-less automatic hide is left (Android rejects it anyway)", () =>
   assert.doesNotMatch(player, /addEventListener\("touchstart"/);
 });
 
-test("the rotate-to-fullscreen tap was removed; the rail button is the only fullscreen path", () => {
-  // The header rotate button and its quarter-turned immersive entry were
-  // removed entirely. The Android "Hide status bar" rail button is now the
-  // sole fullscreen gesture path.
+test("the rotate-to-fullscreen tap was removed; the Player-tab switch is the only fullscreen path", () => {
+  // The header rotate button, its quarter-turned immersive entry and the
+  // whole header itself are gone. The Android "Hide status bar" switch in
+  // the Player tab is now the sole fullscreen gesture path.
   assert.doesNotMatch(player, /data-course-rotate-fullscreen/);
   assert.doesNotMatch(player, /setImmersive\(/);
   assert.doesNotMatch(player, /enterCourseLandscapeChrome/);
+  assert.doesNotMatch(player, /data-course-landscape-header/);
 });
 
 test("the landscape shell reports the live bar state for QA/integration", () => {
   // The attribute mirrors the real fullscreen state instead of claiming a
   // static hide.
-  assert.match(player, /data-course-statusbar-hidden=\{courseFullscreen \? "true" : "false"\}/);
+  assert.match(player, /"data-course-statusbar-hidden": courseFullscreen \? "true" : "false"/);
 });
 
 test("status bar hiding combines fullscreen with a blended theme-color", () => {

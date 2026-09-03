@@ -24,8 +24,8 @@ const repoRoot = path.join(__dirname, "..");
 const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 
 const coursePlayer = readSource("src/CoursePlayerApp.tsx");
-const sidebar = readSource("src/course/CourseSidebar.tsx");
 const overlay = readSource("src/course/CourseOverlay.tsx");
+const playerPanel = readSource("src/course/PlayerPanel.tsx");
 const audioPlayer = readSource("src/course/AudioPlayer.tsx");
 const chargingButton = readSource("src/course/ChargingCompleteButton.tsx");
 const notesPanel = readSource("src/course/NotesPanel.tsx");
@@ -52,16 +52,19 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-subscription-badge",
     "data-course-preview-badge",
     "data-course-mark-complete",
-    // ⚙ Player settings popover (the home of every former quick-toggle)
-    "data-course-settings-trigger",
+    // Player tab (the list that replaced the header + ⚙ settings popover)
+    "data-course-player-panel",
+    "data-course-panel-row",
     "data-course-setting",
+    "data-course-viewer-kind",
+    "data-course-viewer-external",
+    "data-course-viewer-download",
     // Bottom dock (home GlassDock as-is — no course-specific indicator) + overlay
     "data-course-dock",
     "data-course-dock-tab",
     "data-course-sheet-row",
-    "data-course-overlay",
+    "data-course-study-chrome",
     "data-course-overlay-tab",
-    "data-course-overlay-close",
     "data-course-overlay-title",
     "data-course-overlay-list",
     "data-course-overlay-module",
@@ -69,7 +72,7 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-overlay-buy-module",
     "data-course-overlay-buy-update",
     "data-course-overlay-paid",
-    "data-course-landscape-header",
+    "data-course-landscape-content",
     // Notes
     "data-course-notes-panel",
     "data-course-notes-add",
@@ -83,15 +86,6 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-note-edit-save",
     "data-course-note-edit-cancel",
     "data-course-note-delete",
-    // Sidebar
-    "data-course-sidebar",
-    "data-course-module-group",
-    "data-course-module-lock",
-    "data-course-module-preview",
-    "data-course-module-dependency",
-    "data-course-sidebar-file",
-    "data-course-sidebar-buy-update",
-    "data-course-sidebar-buy-module",
     // Resource Viewer
     "data-course-viewer",
     "data-course-viewer-empty",
@@ -101,9 +95,7 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-viewer-retry",
     "data-course-viewer-video",
     "data-course-viewer-audio",
-    "data-course-viewer-kind",
-    "data-course-viewer-download",
-    "data-course-viewer-external",
+    "data-course-viewer-fullscreen",
     // Image Viewer
     "data-course-image-viewer",
     "data-pinch-zoom",
@@ -115,7 +107,7 @@ test("Every Part 11 data-attribute hook is present in the source", () => {
     "data-course-image-download",
   ];
   for (const hook of hooks) {
-    const allSources = [coursePlayer, sidebar, overlay, audioPlayer, chargingButton, notesPanel, resourceViewer, imageViewer].join("\n");
+    const allSources = [coursePlayer, playerPanel, overlay, audioPlayer, chargingButton, notesPanel, resourceViewer, imageViewer].join("\n");
     assert.ok(allSources.includes(hook), `missing data attribute ${hook}`);
   }
 });
