@@ -26,9 +26,10 @@ test("Home header keeps brand gradient customization and frosts it", () => {
   assert.match(homeHeader, /data-home-gradient-to/);
   assert.match(homeHeader, /linear-gradient\(to bottom right/);
   // 2026-09-04: the header surface is the pack GlassSurface at the pinned
-  // docs sensitivity (websiteglass.com/docs/components/glass: tint 0.25 · blur 4).
+  // docs sensitivity (websiteglass.com/docs/components/glass: tint 0.25 · dome 0.1),
+  // with the owner's later override: background blur removed entirely (blur 0).
   assert.match(homeHeader, /tint=\{0\.25\}/);
-  assert.match(homeHeader, /blur=\{4\}/);
+  assert.match(homeHeader, /blur=\{0\}/);
 });
 
 test("Home header collapses on scroll to brand + action buttons", () => {
@@ -75,10 +76,17 @@ test("shared, desktop, revision and search headers use watercolor glass, not opa
   assert.match(css, /\[data-revision-app\] \.dc-glass-toolbar/);
   assert.match(css, /\[data-search-bar\]/);
   // 2026-09-04: the chrome token is the pack GlassSurface dark material at the
-  // PINNED docs sensitivity (websiteglass.com/docs/components/glass playground:
-  // tint 0.25 · blur 4 → rgba(60,62,68, 0.25*0.42=0.105) · blur max(3, 4*(0.4+0.25*0.6))=3px · saturate 1.15).
+  // PINNED docs sensitivity (tint 0.25 → rgba(60,62,68, 0.25*0.42=0.105)),
+  // with the owner's override: NO blur stage anywhere ("background blur
+  // ekadam hata do") — the token carries saturate only.
   assert.match(css, /--dc-chrome-glass: rgba\(60, 62, 68, 0\.105\)/);
-  assert.match(css, /--dc-chrome-glass-blur: blur\(3px\) saturate\(1\.15\)/);
+  assert.match(css, /--dc-chrome-glass-blur: saturate\(1\.15\);/);
+  // Bounded to the chrome section — the course player re-scopes the same token
+  // with its own documented blur discipline elsewhere in the file.
+  assert.doesNotMatch(
+    css.slice(css.indexOf("--dc-chrome-glass:"), css.indexOf("DESIGN SYSTEM PASS")),
+    /--dc-chrome-glass-blur:\s*blur\(/,
+  );
   assert.doesNotMatch(
     // Bounded to the chrome section itself — the "DESIGN SYSTEM PASS" ink
     // scale below it legitimately uses 0.96 white for text.

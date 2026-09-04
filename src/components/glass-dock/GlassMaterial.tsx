@@ -7,11 +7,11 @@
  * (the owner's reference screenshot, mirrored in src/lib/glass.ts GLASS_DOCS):
  *   radius 24 · strength 0.5 · blur 4 · tint 0.25 · dome 0.1
  *
- * The dock panel's frosted fallback (DOCK_PANEL_*) is the pack's GlassSurface
- * painting the same config: rgba(60,62,68, 0.25*0.42=0.105) tint,
- * blur max(3, 4*(0.4+0.25*0.6))=3px, saturate 1.15, and the pack's dark
- * rimShadow. No opaque white fill. The dock stays see-through; Chromium gets
- * rim refraction, everyone else gets frost blur on whatever is behind.
+ * The dock panel's fallback (DOCK_PANEL_*) is the pack's GlassSurface painting
+ * the same config: rgba(60,62,68, 0.25*0.42=0.105) tint, saturate 1.15, and
+ * the pack's dark rimShadow — with NO blur stage (owner override 2026-09-04:
+ * "background blur ekadam hata do"). No opaque white fill. The dock stays
+ * see-through; Chromium gets rim refraction, everyone else the tint only.
  */
 
 import { useEffect, useId, useRef, useState } from 'react'
@@ -34,7 +34,10 @@ export const DOCK_PANEL_BG = `rgba(${GLASS_TINT_RGB},${GLASS_DOCS_SURFACE.tintAl
 export const DOCK_PANEL_BORDER = '1px solid rgba(255,255,255,0.12)'
 export const DOCK_PANEL_SHADOW =
   'inset 0 1px 1px rgba(255,255,255,0.5), inset 0 0 0 1px rgba(255,255,255,0.12), 0 16px 40px -14px rgba(0,0,0,0.6)'
-export const DOCK_PANEL_BLUR = `blur(${GLASS_DOCS_SURFACE.blurPx}px) saturate(${GLASS_DOCS_SURFACE.saturate})`
+export const DOCK_PANEL_BLUR =
+  GLASS_DOCS_SURFACE.blurPx > 0
+    ? `blur(${GLASS_DOCS_SURFACE.blurPx}px) saturate(${GLASS_DOCS_SURFACE.saturate})`
+    : `saturate(${GLASS_DOCS_SURFACE.saturate})`
 
 const MAP_CACHE = new Map<string, string>()
 
@@ -150,8 +153,10 @@ export default function GlassMaterial({
 
   const backdrop =
     supported && map
-      ? `url(#${filterId}) blur(${blur}px) saturate(1.6)`
-      : `blur(${Math.max(blur, 12)}px) saturate(1.6)`
+      ? `url(#${filterId})${blur > 0 ? ` blur(${blur}px)` : ""} saturate(1.6)`
+      : blur > 0
+        ? `blur(${Math.max(blur, 12)}px) saturate(1.6)`
+        : "saturate(1.6)"
 
   return (
     <div

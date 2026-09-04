@@ -32,7 +32,7 @@ export default function ProductCard({
       onClick={() => onOpen?.(product)}
       radius={24}
       tint={0.25}
-      blur={4}
+      blur={0}
       className={`group relative overflow-hidden text-white transition-transform duration-200 active:scale-[0.98] ${className}`}
       contentClassName="flex flex-col"
     >

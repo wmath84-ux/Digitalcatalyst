@@ -529,7 +529,7 @@ function PremiumProductContent({
 
         <div className="space-y-6 px-4 pb-8 pt-4">
           <section className="flex flex-col gap-3">
-            <GlassSurface radius={24} tint={0.25} blur={4} className="group relative overflow-hidden" contentClassName="relative">
+            <GlassSurface radius={24} tint={0.25} blur={0} className="group relative overflow-hidden" contentClassName="relative">
               <img src={selectedImage} alt={product.title} className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105" />
               <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1.5 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
@@ -577,7 +577,7 @@ function PremiumProductContent({
               </div>
             </div>
 
-            <GlassSurface radius={24} tint={0.25} blur={4} className="text-white/85" contentClassName="grid grid-cols-2 gap-2 p-3 text-[11px]">
+            <GlassSurface radius={24} tint={0.25} blur={0} className="text-white/85" contentClassName="grid grid-cols-2 gap-2 p-3 text-[11px]">
               <Meta icon={Clock} text={product.classLevel} />
               <Meta icon={BarChart3} text={product.subject} />
               <Meta icon={Globe} text={product.category} />
@@ -586,7 +586,7 @@ function PremiumProductContent({
 
             {isProductOwned ? (
               availablePaidUpdates.length > 0 ? (
-                <GlassSurface data-pdp-upgrade-box radius={24} tint={0.25} blur={4} className="relative overflow-hidden text-white" contentClassName="p-5">
+                <GlassSurface data-pdp-upgrade-box radius={24} tint={0.25} blur={0} className="relative overflow-hidden text-white" contentClassName="p-5">
                   <div className="relative flex items-start gap-3">
                     <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white">
                       <Zap size={20} />
@@ -611,7 +611,7 @@ function PremiumProductContent({
                 </GlassSurface>
               ) : null
             ) : (
-              <GlassSurface radius={24} tint={0.25} blur={4} className="relative overflow-visible text-white" contentClassName="p-5">
+              <GlassSurface radius={24} tint={0.25} blur={0} className="relative overflow-visible text-white" contentClassName="p-5">
                 {/* Anchoring: the struck reference price is read first and
                     quietly, so the payable figure lands as the relief. The
                     saving is stated in rupees (loss aversion) rather than as a
@@ -686,7 +686,7 @@ function PremiumProductContent({
             )}
 
             {!isProductOwned && !unavailable && canShowCouponInput && (
-              <GlassSurface radius={24} tint={0.25} blur={4} className="text-white" contentClassName="p-4">
+              <GlassSurface radius={24} tint={0.25} blur={0} className="text-white" contentClassName="p-4">
                 <PromoCodeInput
                   kind="coupon"
                   label="Have a coupon? Enter the code below."
@@ -763,11 +763,11 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
   }, []);
 
   return (
-    <GlassSurface radius={24} tint={0.25} blur={4} className="overflow-hidden text-white" contentClassName="relative">
+    <GlassSurface radius={24} tint={0.25} blur={0} className="overflow-hidden text-white" contentClassName="relative">
       <div ref={sentinelRef} aria-hidden className="h-px" />
       <div
         data-pdp-tabbar
-        className={`sticky top-0 z-30 px-3 pb-2 pt-3 backdrop-blur-xl transition-shadow duration-200 ${tabBarStuck ? "bg-[var(--dc-chrome-glass)]" : "rounded-t-[23px]"}`}
+        className={`sticky top-0 z-30 px-3 pb-2 pt-3 transition-shadow duration-200 ${tabBarStuck ? "bg-[var(--dc-chrome-glass)]" : "rounded-t-[23px]"}`}
       >
         {/* Wave 3 (commerce): the tab strip is the pack's `glass-toggle-group`,
             the same control the store filter row uses — one sliding droplet
@@ -907,7 +907,7 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
   const visibleReviews = reviews.slice(0, visibleCount);
   const remaining = Math.max(0, reviews.length - visibleCount);
   return (
-    <GlassSurface id="product-reviews" radius={24} tint={0.25} blur={4} className="scroll-mt-36 text-white" contentClassName="p-5">
+    <GlassSurface id="product-reviews" radius={24} tint={0.25} blur={0} className="scroll-mt-36 text-white" contentClassName="p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-white">Ratings & Reviews</h2>
         <button onClick={onToggleComposer} className="rounded-full bg-indigo-600 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-indigo-500">{composerOpen ? "Cancel" : canReview ? "Write a review" : "Review eligibility"}</button>

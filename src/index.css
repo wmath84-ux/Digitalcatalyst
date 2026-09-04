@@ -5510,8 +5510,8 @@ html[data-course-player-active="true"] {
    The pinned config from websiteglass.com/docs/components/glass —
    radius 24 · strength 0.5 · blur 4 · tint 0.25 · dome 0.1 — expressed
    through the pack's own GlassSurface formulas: rgba(60,62,68,
-   0.25*0.42=0.105) tint · blur max(3, 4*(0.4+0.25*0.6))=3px · saturate
-   1.15 · dark rimShadow. No opaque strip anywhere. Home keeps its
+   0.25*0.42=0.105) tint · NO blur (owner override 2026-09-04: "background blur
+   ekadam hata do") · saturate 1.15 · dark rimShadow. No opaque strip anywhere. Home keeps its
    admin-custom gradient stops as a translucent wash over that frost, and
    shrinks to brand + action buttons as the page scroller moves. */
 
@@ -5520,7 +5520,7 @@ html[data-course-player-active="true"] {
      every header reads as the same component the cards use. Light scheme
      swaps to the light material at the same sensitivity. */
   --dc-chrome-glass: rgba(60, 62, 68, 0.105);
-  --dc-chrome-glass-blur: blur(3px) saturate(1.15);
+  --dc-chrome-glass-blur: saturate(1.15); /* blur 0 — owner: background blur removed */
   --dc-chrome-glass-rim:
     inset 0 1px 1px rgba(255, 255, 255, 0.5),
     inset 0 0 0 1px rgba(255, 255, 255, 0.12);

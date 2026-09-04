@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
-import { Bell, Lock, Moon, Sparkles, UserRound } from "lucide-react";
+import { Bell, Lock, Moon, Sparkles, UserRound, Waves } from "lucide-react";
 import { db } from "../../firebase";
 import Header from "../components/Header";
 import BottomNav, { type TabKey } from "../components/BottomNav";
@@ -9,6 +9,7 @@ import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useBranding } from "../context/BrandingContext";
 import { useGlassScheme } from "../lib/glassScheme";
+import { useBackground, setBackground } from "../lib/background";
 import { toast } from "../components/ui/glass-toast";
 import { useOwnedProducts } from "../hooks/useCourseAccess";
 import { APPROVED_ADMIN_EMAIL } from "../utils/adminSession";
@@ -99,6 +100,8 @@ export default function ProfileApp() {
   // Appearance (device preference) — the dark-mode switch moved here from the
   // home header, so it sits with the rest of the account settings.
   const [scheme, setScheme] = useGlassScheme();
+  // Universal background — classic gradient/grid vs the live Wave Lines canvas.
+  const [background] = useBackground();
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
   const [preferencesSaving, setPreferencesSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -365,6 +368,19 @@ export default function ProfileApp() {
                 onChange={(checked) => {
                   setScheme(checked ? "dark" : "light");
                   toast({ title: `Dark mode ${checked ? "on" : "off"}`, variant: checked ? "success" : "info", duration: 2200 });
+                }}
+              />
+              <PreferenceRow
+                icon={<Waves />}
+                label="Wave Lines background"
+                checked={background === "waves"}
+                onChange={(checked) => {
+                  setBackground(checked ? "waves" : "classic");
+                  toast({
+                    title: checked ? "Wave Lines background on" : "Classic background restored",
+                    variant: "info",
+                    duration: 2200,
+                  });
                 }}
               />
               <PreferenceRow icon={<Bell />} label="Push notifications" checked={preferences.push} onChange={(checked) => void handlePushToggle(checked)} />

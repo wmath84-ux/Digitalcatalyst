@@ -30,6 +30,14 @@
 // 2026-09-04 · owner direction: the v1 dither grain tile is gone — the pinned
 // reference (the websiteglass docs playground backdrop) is smooth gradients
 // plus the hairline grid, which now paints inside .dc-backdrop itself.
+//
+// 2026-09-04 · owner direction: TWO backgrounds now — "classic" (the gradient +
+// grid paint below) and "waves" (the AI Canvas Wave Lines canvas, animated
+// live). Profile → Preferences switches them (src/lib/background.ts); every
+// mount point follows because the choice is read here, in one place.
+
+import { useBackground } from "@/lib/background";
+import WaveLines from "@/components/backgrounds/WaveLines";
 
 interface GlassBackdropProps {
   /**
@@ -42,12 +50,19 @@ interface GlassBackdropProps {
 }
 
 export function GlassBackdrop({ hidden = false }: GlassBackdropProps) {
+  const [background] = useBackground();
   if (hidden) return null;
   return (
     <>
       {/* aria-hidden: a decorative fixed layer must never enter the a11y tree
           or the tab order. */}
-      <div className="dc-backdrop" data-dc-backdrop aria-hidden="true" />
+      {background === "waves" ? (
+        <div className="dc-waves" data-dc-waves aria-hidden="true">
+          <WaveLines showLabel={false} />
+        </div>
+      ) : (
+        <div className="dc-backdrop" data-dc-backdrop aria-hidden="true" />
+      )}
     </>
   );
 }

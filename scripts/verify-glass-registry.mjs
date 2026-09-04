@@ -72,6 +72,20 @@ const LOCAL_ADAPTATIONS = {
     ["  as?: keyof React.JSX.IntrinsicElements;", "  as?: ElementType;"],
     ["  const rootRef = useRef<HTMLElement>(null);", "  const rootRef = useRef<HTMLDivElement>(null);"],
     ["  const El = Tag as React.ElementType;", '  const El = Tag as "div";'], // (comment lines are stripped by normalize)
+    // 2026-09-04 · owner direction: background blur removed — blur <= 0 omits
+    // the blur() stage entirely (lens path, fallback path, GlassSurface).
+    [
+      "      ? `url(#${filterId}) blur(${blur}px) saturate(1.6)`",
+      "      ? `url(#${filterId})${blur > 0 ? ` blur(${blur}px)` : \"\"} saturate(1.6)`",
+    ],
+    [
+      "      : `blur(${Math.max(blur, 8)}px) saturate(1.6)`",
+      "      : blur > 0 ? `blur(${Math.max(blur, 8)}px) saturate(1.6)` : \"saturate(1.6)\";",
+    ],
+    [
+      "  const backdrop = `blur(${blurPx}px) saturate(${sat})`;",
+      "  const backdrop = blur > 0 ? `blur(${blurPx}px) saturate(${sat})` : `saturate(${sat})`;",
+    ],
   ],
   // Wave 3 items: this tsconfig exposes no global `React` namespace, so the
   // three items that spelled types as `React.X` import them explicitly. Nothing

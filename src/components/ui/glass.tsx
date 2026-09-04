@@ -293,10 +293,12 @@ export function Glass({
   }, [supported, lens, strength, dome, radius]);
 
   const singleLens = !lens;
+  // [digitalcatalyst] owner direction (2026-09-04): "background blur ekadam
+  // hata do" — blur <= 0 omits the blur() stage entirely on both paths.
   const backdrop =
     singleLens && supported && map
-      ? `url(#${filterId}) blur(${blur}px) saturate(1.6)`
-      : `blur(${Math.max(blur, 8)}px) saturate(1.6)`;
+      ? `url(#${filterId})${blur > 0 ? ` blur(${blur}px)` : ""} saturate(1.6)`
+      : blur > 0 ? `blur(${Math.max(blur, 8)}px) saturate(1.6)` : "saturate(1.6)";
 
   // [digitalcatalyst] a `ElementType` *variable* used as a JSX tag makes TS
   // resolve props as a union (children: never) under React 19 types, so the
@@ -546,7 +548,9 @@ export function GlassSurface({
 
   const blurPx = Math.max(3, blur * (0.4 + t * 0.6));
   const sat = 1 + (saturation - 1) * Math.max(t, 0.25);
-  const backdrop = `blur(${blurPx}px) saturate(${sat})`;
+  // [digitalcatalyst] owner direction (2026-09-04): blur <= 0 means NO frost —
+  // the 3px floor is skipped and the blur stage is omitted entirely.
+  const backdrop = blur > 0 ? `blur(${blurPx}px) saturate(${sat})` : `saturate(${sat})`;
 
   return (
     <div

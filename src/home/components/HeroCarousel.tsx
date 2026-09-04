@@ -101,7 +101,7 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
         ref={trackRef}
         radius={24}
         tint={0.25}
-        blur={4}
+        blur={0}
         className="select-none overflow-hidden touch-pan-y"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

@@ -155,7 +155,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
     <GlassSurface
       radius={0}
       tint={0.25}
-      blur={4}
+      blur={0}
       style={{ borderRadius: "0 0 32px 32px" }}
       className="overflow-hidden"
       contentClassName="px-4 pb-8 pt-[calc(1.5rem+env(safe-area-inset-top))] min-[390px]:px-5"
@@ -271,7 +271,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         </div>
 
         {query.trim().length > 0 && (
-          <GlassSurface radius={24} tint={0.25} blur={4} className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-80 overflow-y-auto text-white/85" contentClassName="p-1">
+          <GlassSurface radius={24} tint={0.25} blur={0} className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-80 overflow-y-auto text-white/85" contentClassName="p-1">
             {suggestions.length === 0 ? (
               <p className="px-3 py-4 text-center text-sm text-white/55">
                 No matches for “{query}”. Try a different keyword.
