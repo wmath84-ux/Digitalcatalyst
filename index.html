@@ -18,32 +18,29 @@
     <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
     <title>Eduvora | Digital Catalyst</title>
     <style>
-      @keyframes eduvora-logo-in { 0% { opacity: 0; transform: scale(.82) translateY(8px); } 65% { opacity: 1; transform: scale(1.04) translateY(0); } 100% { opacity: 1; transform: scale(1); } }
-      @keyframes eduvora-logo-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-      @keyframes eduvora-progress { 0% { transform: translateX(-105%) scaleX(.35); } 55% { transform: translateX(25%) scaleX(.75); } 100% { transform: translateX(210%) scaleX(.35); } }
       /* Boot splash paints the same Black Ice backdrop as src/glass-theme.css (§2) so the pre-React frame and the app share one background — no white/indigo flash. */
       html { background-color: #0a0c12; }
-      .app-boot-splash { min-height: 100dvh; display: grid; place-items: center; padding: 24px; color: #fff; background-color: #0a0c12; background-image: radial-gradient(58% 72% at 12% 30%, rgb(44 53 126 / 0.95) 0%, rgb(37 48 143 / 0.42) 38%, transparent 68%), radial-gradient(52% 60% at 40% 80%, rgb(18 117 106 / 0.72) 0%, rgb(15 95 87 / 0.3) 40%, transparent 70%), radial-gradient(46% 56% at 90% 15%, rgb(109 33 132 / 0.8) 0%, rgb(122 36 136 / 0.34) 42%, transparent 72%), radial-gradient(70% 40% at 45% 5%, rgb(58 33 89 / 0.6) 0%, transparent 70%), radial-gradient(120% 90% at 50% 100%, rgb(6 7 12 / 0.85) 0%, transparent 55%); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-      .app-boot-content { width: min(280px, 82vw); text-align: center; animation: eduvora-logo-in .55s cubic-bezier(.2,.8,.2,1) both; }
-      .app-boot-icon { width: 88px; height: 88px; margin: 0 auto; display: block; filter: drop-shadow(0 16px 25px rgba(79,70,229,.38)); animation: eduvora-logo-float 1.8s ease-in-out .55s infinite; }
-      .app-boot-title { margin: 18px 0 4px; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
-      .app-boot-label { margin: 0; color: #a5b4fc; font-size: 12px; font-weight: 600; }
-      .app-boot-track { height: 4px; margin-top: 24px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.12); }
-      .app-boot-bar { width: 46%; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#818cf8,#c084fc,#f0abfc); transform-origin: left; animation: eduvora-progress 1.35s ease-in-out infinite; }
-      @media (prefers-reduced-motion: reduce) { .app-boot-content,.app-boot-icon,.app-boot-bar { animation: none; } .app-boot-bar { width: 70%; } }
+      .app-boot-splash { position: fixed; inset: 0; z-index: 2147483000; min-height: 100dvh; display: grid; place-items: center; padding: 0; color: #fff; background-color: #0a0c12; background-image: radial-gradient(58% 72% at 12% 30%, rgb(44 53 126 / 0.95) 0%, rgb(37 48 143 / 0.42) 38%, transparent 68%), radial-gradient(52% 60% at 40% 80%, rgb(18 117 106 / 0.72) 0%, rgb(15 95 87 / 0.3) 40%, transparent 70%), radial-gradient(46% 56% at 90% 15%, rgb(109 33 132 / 0.8) 0%, rgb(122 36 136 / 0.34) 42%, transparent 72%), radial-gradient(70% 40% at 45% 5%, rgb(58 33 89 / 0.6) 0%, transparent 70%), radial-gradient(120% 90% at 50% 100%, rgb(6 7 12 / 0.85) 0%, transparent 55%); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      .app-boot-video { width: 100%; height: 100%; object-fit: contain; background-color: #000; }
+      @media (prefers-reduced-motion: reduce) { .app-boot-video { display: none; } }
     </style>
   </head>
   <body>
-    <div id="root">
-      <div class="app-boot-splash" role="status" aria-label="Loading Eduvora" style="display:none">
-        <div class="app-boot-content">
-          <img class="app-boot-icon" id="boot-brand-icon" src="/icons/icon-192x192.svg" alt="Eduvora" />
-          <p class="app-boot-title">Eduvora</p>
-          <p class="app-boot-label">Preparing your learning space…</p>
-          <div class="app-boot-track"><div class="app-boot-bar"></div></div>
-        </div>
-      </div>
+    <!-- Exact EduOS opening animation. Lives outside #root so React mount
+         cannot restart or replace the video. On by default; hidden only when
+         branding has the opening animation turned off. -->
+    <div id="app-opening-splash" class="app-boot-splash" role="status" aria-label="Loading Eduvora" style="display:none">
+      <video
+        id="app-opening-video"
+        class="app-boot-video"
+        muted
+        playsinline
+        webkit-playsinline
+        preload="auto"
+        disablepictureinpicture
+      ></video>
     </div>
+    <div id="root"></div>
     <!-- Apply cached branding to the boot splash + document title BEFORE the
          React bundle loads, so a renamed app never flashes "Eduvora" on reload.
          The live Firestore values overwrite this once BrandingProvider mounts. -->
@@ -56,20 +53,30 @@
           var name = (data.appName || "Eduvora").toString().trim().slice(0, 40);
           var tagline = (data.tagline || "Digital Catalyst").toString().trim().slice(0, 80);
           var logo = (data.logoUrl || legacy || "/icons/icon-192x192.svg").toString();
-          var openingAnimationEnabled = data.openingAnimationEnabled === true;
+          var openingAnimationEnabled = data.openingAnimationEnabled !== false;
           var hideFrameBorders = data.hideFrameBorders !== false;
           document.documentElement.dataset.hideFrameBorders = String(hideFrameBorders);
           if (!/^https?:\/\//.test(logo) && !logo.startsWith("/")) logo = "/icons/icon-192x192.svg";
           if (name) {
-            var t = document.querySelector(".app-boot-title");
-            if (t) t.textContent = name;
             document.title = tagline ? name + " | " + tagline : name;
           }
-          var icon = document.getElementById("boot-brand-icon");
-          if (icon) { icon.src = logo; if (name) icon.alt = name; }
-          var splash = document.querySelector(".app-boot-splash");
+          var splash = document.getElementById("app-opening-splash") || document.querySelector(".app-boot-splash");
           if (splash && name) splash.setAttribute("aria-label", "Loading " + name);
-          if (splash && openingAnimationEnabled) splash.style.display = "";
+          var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          var isMobile = window.innerWidth < 768;
+          var video = document.getElementById("app-opening-video");
+          if (video) {
+            video.src = isMobile
+              ? "/assets/animations/EduOS_app_opening_mobile.mp4"
+              : "/assets/animations/EduOS_app_opening_desktop.mp4";
+          }
+          if (splash && openingAnimationEnabled && !reduceMotion) {
+            splash.style.display = "";
+            if (video && video.play) {
+              var playing = video.play();
+              if (playing && playing.catch) playing.catch(function () {});
+            }
+          }
         } catch (e) { /* private mode / corrupt cache — keep static defaults */ }
       })();
     </script>

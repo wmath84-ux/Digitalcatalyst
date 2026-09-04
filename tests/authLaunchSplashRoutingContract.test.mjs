@@ -38,25 +38,50 @@ test("admin is exempt from the learner splash and landing still renders", () => 
   assert.match(main, /if \(!hash \|\| hash\.startsWith\(LANDING_HASH\)\) return <LandingApp/);
 });
 
-test("pre-JavaScript and React loading screens use the exact PWA icon", () => {
-  // The manifest lists several 192x192 entries (PNG for browsers that
-  // reject SVG icons, SVG for the rest). A bare `.find()` on the size
-  // picked whichever happened to be first, so this test broke when the
-  // PNG was added even though both screens were correct. Assert that
-  // the icon the loaders use is genuinely declared at that size.
+test("pre-JavaScript and React loading screens play the exact EduOS opening videos", () => {
+  // Opening splash is the shipped MP4s — not a CSS recreation of them.
+  assert.ok(!fs.existsSync("public/assets/animations/EduOS_app_opening.mp4"), "old opening MP4 must be removed");
+  for (const file of [
+    "public/assets/animations/EduOS_app_opening_mobile.mp4",
+    "public/assets/animations/EduOS_app_opening_desktop.mp4",
+  ]) {
+    assert.ok(fs.existsSync(file), `${file} is missing`);
+    const bytes = fs.readFileSync(file);
+    assert.ok(bytes.length > 10_000, `${file} is empty`);
+    assert.equal(bytes.subarray(4, 8).toString("latin1"), "ftyp");
+  }
+  assert.match(html, /\/assets\/animations\/EduOS_app_opening_mobile\.mp4/);
+  assert.match(html, /\/assets\/animations\/EduOS_app_opening_desktop\.mp4/);
+  assert.match(main, /APP_OPENING_VIDEO_MOBILE_SRC = "\/assets\/animations\/EduOS_app_opening_mobile\.mp4"/);
+  assert.match(main, /APP_OPENING_VIDEO_DESKTOP_SRC = "\/assets\/animations\/EduOS_app_opening_desktop\.mp4"/);
+  assert.match(main, /className="app-boot-video"/);
+  assert.match(main, /playOpening/);
+  assert.match(main, /viewportCategory === "mobile"/);
+  assert.match(html, /innerWidth < 768/);
+  // PWA icon remains declared at 192×192 for installability (not the splash).
   const icons192 = manifest.icons.filter((icon) => icon.sizes === "192x192").map((icon) => icon.src);
   assert.ok(icons192.includes("/icons/icon-192x192.svg"), `192x192 SVG missing from manifest: ${icons192.join(", ")}`);
-  // Pre-JS boot screen uses the literal SVG path; the React splash uses
-  // the live branding logo URL from BrandingContext.
-  assert.match(html, /src="\/icons\/icon-192x192\.svg"/);
-  assert.match(main, /logoUrl/);
-  assert.match(main, /className="app-boot-icon"/);
 });
 
-test("launch screen has transition, reduced-motion support and progress bar", () => {
-  assert.match(html, /eduvora-logo-in/);
-  assert.match(html, /eduvora-logo-float/);
-  assert.match(html, /eduvora-progress/);
+test("opening animation is on by default", () => {
+  const branding = fs.readFileSync("src/utils/branding.ts", "utf8");
+  assert.match(branding, /openingAnimationEnabled: true,/);
+  assert.match(branding, /openingAnimationEnabled: data\?\.openingAnimationEnabled !== false/);
+  assert.match(html, /openingAnimationEnabled !== false/);
+});
+
+test("launch screen plays the opening video and respects reduced motion", () => {
+  assert.match(html, /id="app-opening-video"/);
   assert.match(html, /prefers-reduced-motion/);
-  assert.match(main, /app-boot-bar/);
+  assert.match(main, /prefers-reduced-motion: reduce/);
+  assert.match(main, /onEnded/);
+  assert.doesNotMatch(main, /app-boot-bar/);
+  assert.doesNotMatch(html, /eduvora-logo-in/);
+});
+
+test("offline overlay is gated beside Root and does not replace the opening MP4s", () => {
+  assert.match(main, /<OfflineGate \/>/);
+  assert.match(main, /playOpening && !offline/);
+  assert.match(main, /APP_OPENING_VIDEO_MOBILE_SRC = "\/assets\/animations\/EduOS_app_opening_mobile\.mp4"/);
+  assert.match(main, /APP_OPENING_VIDEO_DESKTOP_SRC = "\/assets\/animations\/EduOS_app_opening_desktop\.mp4"/);
 });

@@ -30,7 +30,7 @@ test("DesktopAppHost passes the landing routes through without the app shell", (
 
 test("non-landing desktop routes still get the AppShell", () => {
   const host = main.slice(main.indexOf("function DesktopAppHost"), main.indexOf("function RootPage"));
-  assert.match(host, /<AppShell active=\{resolveActiveFromHash\(hash\)\}>/);
+  assert.match(host, /<AppShell[\s\S]*active=\{resolveActiveFromHash\(hash\)\}/);
 });
 
 test("landing header content is centred on the shared content column, not stretched edge-to-edge", () => {
@@ -54,4 +54,15 @@ test("smallest viewport design stays untouched (hero fills the screen, same toke
   assert.match(hero, /min-h-screen/);
   assert.match(hero, /max-w-3xl/);
   assert.match(header, /sm:hidden/);
+});
+
+test("landing uses the app WinterScene backdrop, not a private 3D canvas", () => {
+  assert.equal(hero.includes("HeroScene"), false);
+  assert.equal(hero.includes("@react-three"), false);
+  assert.equal(hero.includes("absolute inset-0 bg-gradient-to-b"), false);
+  assert.equal(fs.existsSync("src/components/landing/HeroScene.tsx"), false, "the old three.js landing scene must be deleted");
+  assert.equal(main.includes("function RouteBackdrop"), true);
+  assert.equal(main.includes("<GlassBackdrop />"), true);
+  const host = main.slice(main.indexOf("function DesktopAppHost"), main.indexOf("function RootPage"));
+  assert.equal(host.includes("hash.startsWith(LANDING_HASH)"), true, "landing still skips the shell so the shared backdrop is full-bleed");
 });

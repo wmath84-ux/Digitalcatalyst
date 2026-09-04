@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { StrictMode, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
@@ -47,7 +47,9 @@ import { GlassToaster, toast as glassToast } from "./components/ui/glass-toast";
 import { GlassBackdrop } from "./components/ui/GlassBackdrop";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BrandingProvider, useBranding } from "./context/BrandingContext";
+import { ConnectivityProvider, useConnectivity } from "./context/ConnectivityContext";
 import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
+import OfflineGate from "./components/offline/OfflineGate";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
 import { initFooterGlow } from "./utils/footerGlow";
@@ -262,16 +264,83 @@ const startCheckout = ({
   window.location.hash = CHECKOUT_HASH;
 };
 
-function AppLaunchSplash({ label = "Preparing your learning space…" }: { label?: string }) {
-  const { logoUrl, appName } = useBranding();
+/** Exact EduOS opening animations — do not recreate or restyle the frames. */
+const APP_OPENING_VIDEO_MOBILE_SRC = "/assets/animations/EduOS_app_opening_mobile.mp4";
+const APP_OPENING_VIDEO_DESKTOP_SRC = "/assets/animations/EduOS_app_opening_desktop.mp4";
+// Both shipped MP4s are 10.006s (mvhd timescale 1000 / duration 10006).
+const APP_OPENING_VIDEO_TIMEOUT_MS = 12000;
+
+function openingVideoSrc(isMobile: boolean): string {
+  return isMobile ? APP_OPENING_VIDEO_MOBILE_SRC : APP_OPENING_VIDEO_DESKTOP_SRC;
+}
+
+function AppLaunchSplash({
+  label = "Preparing your learning space…",
+  onEnded,
+  src,
+}: {
+  label?: string;
+  onEnded?: () => void;
+  src: string;
+}) {
+  const { appName } = useBranding();
+  const reactVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (!onEnded) return undefined;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      onEnded();
+      return undefined;
+    }
+    const hostVideo = document.getElementById("app-opening-video") as HTMLVideoElement | null;
+    const video = hostVideo ?? reactVideoRef.current;
+    if (!video) {
+      onEnded();
+      return undefined;
+    }
+    const file = src.slice(src.lastIndexOf("/") + 1);
+    const current = `${video.currentSrc || ""} ${video.getAttribute("src") || ""}`;
+    if (file && !current.includes(file)) {
+      video.src = src;
+    }
+    const done = () => onEnded();
+    if (video.ended) {
+      done();
+      return undefined;
+    }
+    video.addEventListener("ended", done);
+    video.addEventListener("error", done);
+    const playing = video.play();
+    if (playing && typeof playing.catch === "function") playing.catch(() => done());
+    const timeout = window.setTimeout(done, APP_OPENING_VIDEO_TIMEOUT_MS);
+    return () => {
+      video.removeEventListener("ended", done);
+      video.removeEventListener("error", done);
+      window.clearTimeout(timeout);
+    };
+  }, [onEnded, src]);
+
+  const hostVideo = typeof document !== "undefined"
+    ? document.getElementById("app-opening-video")
+    : null;
+
   return (
     <main className="app-boot-splash" role="status" aria-live="polite" aria-label={`Loading ${appName}`}>
-      <div className="app-boot-content">
-        <img className="app-boot-icon" src={logoUrl} alt={appName} />
-        <p className="app-boot-title">{appName}</p>
-        <p className="app-boot-label">{label}</p>
-        <div className="app-boot-track" aria-hidden="true"><div className="app-boot-bar" /></div>
-      </div>
+      {hostVideo ? null : (
+        <video
+          ref={reactVideoRef}
+          className="app-boot-video"
+          src={src}
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          controls={false}
+          disablePictureInPicture
+          aria-label={`${appName} opening animation`}
+        />
+      )}
+      <span className="sr-only">{label}</span>
     </main>
   );
 }
@@ -301,12 +370,15 @@ function Root() {
   // page body, but the per-page chrome (Header + BottomNav) is still
   // rendered inside each app — the desktop CSS hides it on >= 1024 px.
   // The shell (left rail + top bar) takes over from there.
+  // OfflineGate is an overlay sibling — never an early-return — so the
+  // shared WinterScene backdrop and the rest of the tree stay mounted.
   return (
     <>
       <RouteBackdrop />
       <DesktopAppHost>
         <RootPage />
       </DesktopAppHost>
+      <OfflineGate />
     </>
   );
 }
@@ -433,11 +505,18 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
 function RootPage(): ReactNode {
   const { user, loading, logout } = useAuth();
   const { openingAnimationEnabled } = useBranding();
+  const { offline } = useConnectivity();
   const { products: catalogProducts, purchasedIds, loading: catalogLoading } = useCatalog();
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
   const [installedMobilePwa, setInstalledMobilePwa] = useState(() => isInstalledMobilePwa());
+  const [openingVideoDone, setOpeningVideoDone] = useState(false);
+  const markOpeningVideoDone = useCallback(() => setOpeningVideoDone(true), []);
+  const viewportCategory = useResponsiveCategory();
+  const isMobileOpening = viewportCategory === "mobile";
+  const playOpening = openingAnimationEnabled;
+  const openingSrc = openingVideoSrc(isMobileOpening);
   // Live viewport category so the AppShell wrapper re-renders when the
   // learner resizes across the desktop / tablet / mobile boundaries.
   // Tablet + mobile get the existing per-page chrome; desktop gets the
@@ -950,7 +1029,7 @@ function RootPage(): ReactNode {
       loading
       || skipLandingForInstalledMobilePwa
       || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
-    const splashVisible = openingAnimationEnabled && launchPending;
+    const splashVisible = playOpening && (launchPending || !openingVideoDone);
     const darkScreen =
       splashVisible
       || protectedRoutePending
@@ -959,14 +1038,42 @@ function RootPage(): ReactNode {
       || hash.startsWith(AUTH_HASH)
       || hash.startsWith(ADMIN_LOGIN_HASH);
     setThemeColor(darkScreen ? THEME_COLOR_DARK : THEME_COLOR_LIGHT);
-  }, [hash, loading, skipLandingForInstalledMobilePwa, protectedRoutePending, user, catalogLoading, openingAnimationEnabled]);
+  }, [hash, loading, skipLandingForInstalledMobilePwa, protectedRoutePending, user, catalogLoading, playOpening, openingVideoDone]);
 
   const launchPending =
     loading
     || skipLandingForInstalledMobilePwa
     || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
-  if (launchPending && openingAnimationEnabled) {
-    return <AppLaunchSplash label={skipLandingForInstalledMobilePwa ? "Opening your dashboard…" : "Preparing your learning space…"} />;
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const splash = document.getElementById("app-opening-splash");
+    if (!splash) return;
+    if (!playOpening || offline) {
+      splash.style.display = "none";
+      // Offline boot skips the opening MP4 so the native overlay paints
+      // immediately. Mark it done so a later `online` event cannot replay it.
+      if (offline) setOpeningVideoDone(true);
+      return;
+    }
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      splash.style.display = "none";
+      setOpeningVideoDone(true);
+      return;
+    }
+    const video = document.getElementById("app-opening-video") as HTMLVideoElement | null;
+    if (video) {
+      const file = openingSrc.slice(openingSrc.lastIndexOf("/") + 1);
+      const current = `${video.currentSrc || ""} ${video.getAttribute("src") || ""}`;
+      if (file && !current.includes(file)) video.src = openingSrc;
+    }
+    const shouldShow = !openingVideoDone || launchPending;
+    splash.style.display = shouldShow ? "" : "none";
+  }, [playOpening, openingVideoDone, launchPending, openingSrc, offline]);
+
+  if (playOpening && !offline && (!openingVideoDone || launchPending)) {
+    return <AppLaunchSplash src={openingSrc} onEnded={markOpeningVideoDone} label={skipLandingForInstalledMobilePwa ? "Opening your dashboard…" : "Preparing your learning space…"} />;
   }
   if (launchPending && skipLandingForInstalledMobilePwa) {
     return <main className="min-h-[100dvh]" aria-busy="true" aria-label="Opening app" />;
@@ -1321,6 +1428,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
       <BrandingProvider>
+        <ConnectivityProvider>
         <CatalogProvider>
           <CommerceProvider>
             <Root />
@@ -1338,6 +1446,7 @@ createRoot(document.getElementById("root")!).render(
             <PortraitOnlyGuard />
           </CommerceProvider>
         </CatalogProvider>
+        </ConnectivityProvider>
       </BrandingProvider>
     </AuthProvider>
   </StrictMode>,
