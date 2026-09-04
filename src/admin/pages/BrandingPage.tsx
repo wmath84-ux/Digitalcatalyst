@@ -421,7 +421,7 @@ export default function BrandingPage() {
                   <span className="min-w-0 flex-1">
                     <span className="block text-xs font-bold text-slate-700">App opening animation page</span>
                     <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
-                      Play the EduOS mobile opening animation on phones while the app opens. Tablet and desktop use a separate animation. This is off by default.
+                      Play the EduOS opening animation while the app opens. Phones use the mobile clip; tablet and desktop use the landscape clip. This is off by default.
                     </span>
                   </span>
                 </label>

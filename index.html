@@ -33,7 +33,6 @@
       <video
         id="app-opening-video"
         class="app-boot-video"
-        src="/assets/animations/EduOS_app_opening_mobile.mp4"
         muted
         playsinline
         webkit-playsinline
@@ -64,11 +63,15 @@
           var splash = document.getElementById("app-opening-splash") || document.querySelector(".app-boot-splash");
           if (splash && name) splash.setAttribute("aria-label", "Loading " + name);
           var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-          // This clip is mobile-only (< 768 px). Tablet / desktop get a separate file later.
           var isMobile = window.innerWidth < 768;
-          if (splash && openingAnimationEnabled && !reduceMotion && isMobile) {
+          var video = document.getElementById("app-opening-video");
+          if (video) {
+            video.src = isMobile
+              ? "/assets/animations/EduOS_app_opening_mobile.mp4"
+              : "/assets/animations/EduOS_app_opening_desktop.mp4";
+          }
+          if (splash && openingAnimationEnabled && !reduceMotion) {
             splash.style.display = "";
-            var video = document.getElementById("app-opening-video");
             if (video && video.play) {
               var playing = video.play();
               if (playing && playing.catch) playing.catch(function () {});

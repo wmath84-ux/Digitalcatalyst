@@ -262,18 +262,24 @@ const startCheckout = ({
   window.location.hash = CHECKOUT_HASH;
 };
 
-/** Exact EduOS mobile opening animation — do not recreate or restyle the frames.
- *  Tablet / desktop get a separate file later; this MP4 is phones only. */
-const APP_OPENING_VIDEO_SRC = "/assets/animations/EduOS_app_opening_mobile.mp4";
-// The shipped mobile MP4 is 10.006s (mvhd timescale 1000 / duration 10006).
+/** Exact EduOS opening animations — do not recreate or restyle the frames. */
+const APP_OPENING_VIDEO_MOBILE_SRC = "/assets/animations/EduOS_app_opening_mobile.mp4";
+const APP_OPENING_VIDEO_DESKTOP_SRC = "/assets/animations/EduOS_app_opening_desktop.mp4";
+// Both shipped MP4s are 10.006s (mvhd timescale 1000 / duration 10006).
 const APP_OPENING_VIDEO_TIMEOUT_MS = 12000;
+
+function openingVideoSrc(isMobile: boolean): string {
+  return isMobile ? APP_OPENING_VIDEO_MOBILE_SRC : APP_OPENING_VIDEO_DESKTOP_SRC;
+}
 
 function AppLaunchSplash({
   label = "Preparing your learning space…",
   onEnded,
+  src,
 }: {
   label?: string;
   onEnded?: () => void;
+  src: string;
 }) {
   const { appName } = useBranding();
   const reactVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -290,6 +296,11 @@ function AppLaunchSplash({
       onEnded();
       return undefined;
     }
+    const file = src.slice(src.lastIndexOf("/") + 1);
+    const current = `${video.currentSrc || ""} ${video.getAttribute("src") || ""}`;
+    if (file && !current.includes(file)) {
+      video.src = src;
+    }
     const done = () => onEnded();
     if (video.ended) {
       done();
@@ -305,7 +316,7 @@ function AppLaunchSplash({
       video.removeEventListener("error", done);
       window.clearTimeout(timeout);
     };
-  }, [onEnded]);
+  }, [onEnded, src]);
 
   const hostVideo = typeof document !== "undefined"
     ? document.getElementById("app-opening-video")
@@ -317,7 +328,7 @@ function AppLaunchSplash({
         <video
           ref={reactVideoRef}
           className="app-boot-video"
-          src={APP_OPENING_VIDEO_SRC}
+          src={src}
           autoPlay
           muted
           playsInline
@@ -497,8 +508,9 @@ function RootPage(): ReactNode {
   const [openingVideoDone, setOpeningVideoDone] = useState(false);
   const markOpeningVideoDone = useCallback(() => setOpeningVideoDone(true), []);
   const viewportCategory = useResponsiveCategory();
-  // This clip is mobile-only. Tablet + desktop wait for a separate animation.
-  const playMobileOpening = openingAnimationEnabled && viewportCategory === "mobile";
+  const isMobileOpening = viewportCategory === "mobile";
+  const playOpening = openingAnimationEnabled;
+  const openingSrc = openingVideoSrc(isMobileOpening);
   // Live viewport category so the AppShell wrapper re-renders when the
   // learner resizes across the desktop / tablet / mobile boundaries.
   // Tablet + mobile get the existing per-page chrome; desktop gets the
@@ -1011,7 +1023,7 @@ function RootPage(): ReactNode {
       loading
       || skipLandingForInstalledMobilePwa
       || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
-    const splashVisible = playMobileOpening && (launchPending || !openingVideoDone);
+    const splashVisible = playOpening && (launchPending || !openingVideoDone);
     const darkScreen =
       splashVisible
       || protectedRoutePending
@@ -1020,7 +1032,7 @@ function RootPage(): ReactNode {
       || hash.startsWith(AUTH_HASH)
       || hash.startsWith(ADMIN_LOGIN_HASH);
     setThemeColor(darkScreen ? THEME_COLOR_DARK : THEME_COLOR_LIGHT);
-  }, [hash, loading, skipLandingForInstalledMobilePwa, protectedRoutePending, user, catalogLoading, playMobileOpening, openingVideoDone]);
+  }, [hash, loading, skipLandingForInstalledMobilePwa, protectedRoutePending, user, catalogLoading, playOpening, openingVideoDone]);
 
   const launchPending =
     loading
@@ -1031,7 +1043,7 @@ function RootPage(): ReactNode {
     if (typeof document === "undefined") return;
     const splash = document.getElementById("app-opening-splash");
     if (!splash) return;
-    if (!playMobileOpening) {
+    if (!playOpening) {
       splash.style.display = "none";
       return;
     }
@@ -1041,12 +1053,18 @@ function RootPage(): ReactNode {
       setOpeningVideoDone(true);
       return;
     }
+    const video = document.getElementById("app-opening-video") as HTMLVideoElement | null;
+    if (video) {
+      const file = openingSrc.slice(openingSrc.lastIndexOf("/") + 1);
+      const current = `${video.currentSrc || ""} ${video.getAttribute("src") || ""}`;
+      if (file && !current.includes(file)) video.src = openingSrc;
+    }
     const shouldShow = !openingVideoDone || launchPending;
     splash.style.display = shouldShow ? "" : "none";
-  }, [playMobileOpening, openingVideoDone, launchPending]);
+  }, [playOpening, openingVideoDone, launchPending, openingSrc]);
 
-  if (playMobileOpening && (!openingVideoDone || launchPending)) {
-    return <AppLaunchSplash onEnded={markOpeningVideoDone} label={skipLandingForInstalledMobilePwa ? "Opening your dashboard…" : "Preparing your learning space…"} />;
+  if (playOpening && (!openingVideoDone || launchPending)) {
+    return <AppLaunchSplash src={openingSrc} onEnded={markOpeningVideoDone} label={skipLandingForInstalledMobilePwa ? "Opening your dashboard…" : "Preparing your learning space…"} />;
   }
   if (launchPending && skipLandingForInstalledMobilePwa) {
     return <main className="min-h-[100dvh]" aria-busy="true" aria-label="Opening app" />;

@@ -38,17 +38,24 @@ test("admin is exempt from the learner splash and landing still renders", () => 
   assert.match(main, /if \(!hash \|\| hash\.startsWith\(LANDING_HASH\)\) return <LandingApp/);
 });
 
-test("pre-JavaScript and React loading screens play the exact EduOS mobile opening video", () => {
-  // The opening splash is the shipped mobile MP4 — not a CSS recreation of it.
+test("pre-JavaScript and React loading screens play the exact EduOS opening videos", () => {
+  // Opening splash is the shipped MP4s — not a CSS recreation of them.
   assert.ok(!fs.existsSync("public/assets/animations/EduOS_app_opening.mp4"), "old opening MP4 must be removed");
-  assert.ok(fs.existsSync("public/assets/animations/EduOS_app_opening_mobile.mp4"), "EduOS mobile opening MP4 is missing");
-  const bytes = fs.readFileSync("public/assets/animations/EduOS_app_opening_mobile.mp4");
-  assert.ok(bytes.length > 10_000, "EduOS mobile opening MP4 is empty");
-  assert.equal(bytes.subarray(4, 8).toString("latin1"), "ftyp");
-  assert.match(html, /src="\/assets\/animations\/EduOS_app_opening_mobile\.mp4"/);
-  assert.match(main, /APP_OPENING_VIDEO_SRC = "\/assets\/animations\/EduOS_app_opening_mobile\.mp4"/);
+  for (const file of [
+    "public/assets/animations/EduOS_app_opening_mobile.mp4",
+    "public/assets/animations/EduOS_app_opening_desktop.mp4",
+  ]) {
+    assert.ok(fs.existsSync(file), `${file} is missing`);
+    const bytes = fs.readFileSync(file);
+    assert.ok(bytes.length > 10_000, `${file} is empty`);
+    assert.equal(bytes.subarray(4, 8).toString("latin1"), "ftyp");
+  }
+  assert.match(html, /\/assets\/animations\/EduOS_app_opening_mobile\.mp4/);
+  assert.match(html, /\/assets\/animations\/EduOS_app_opening_desktop\.mp4/);
+  assert.match(main, /APP_OPENING_VIDEO_MOBILE_SRC = "\/assets\/animations\/EduOS_app_opening_mobile\.mp4"/);
+  assert.match(main, /APP_OPENING_VIDEO_DESKTOP_SRC = "\/assets\/animations\/EduOS_app_opening_desktop\.mp4"/);
   assert.match(main, /className="app-boot-video"/);
-  assert.match(main, /playMobileOpening/);
+  assert.match(main, /playOpening/);
   assert.match(main, /viewportCategory === "mobile"/);
   assert.match(html, /innerWidth < 768/);
   // PWA icon remains declared at 192×192 for installability (not the splash).
