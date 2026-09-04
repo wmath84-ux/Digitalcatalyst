@@ -280,7 +280,8 @@ function AppLaunchSplash({
   src,
 }: {
   label?: string;
-  onEnded?: () => void;
+  /** called with played=true only when the animation really ran to the end. */
+  onEnded?: (played: boolean) => void;
   src: string;
 }) {
   const { appName } = useBranding();
@@ -289,13 +290,14 @@ function AppLaunchSplash({
   useEffect(() => {
     if (!onEnded) return undefined;
     if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      onEnded();
+      // Deliberate skip (accessibility) — counts as handled, never replayed.
+      onEnded(true);
       return undefined;
     }
     const hostVideo = document.getElementById("app-opening-video") as HTMLVideoElement | null;
     const video = hostVideo ?? reactVideoRef.current;
     if (!video) {
-      onEnded();
+      onEnded(true);
       return undefined;
     }
     const file = src.slice(src.lastIndexOf("/") + 1);
@@ -303,19 +305,23 @@ function AppLaunchSplash({
     if (file && !current.includes(file)) {
       video.src = src;
     }
-    const done = () => onEnded();
+    // played=true ONLY on a real ending. A load error / autoplay refusal /
+    // stall timeout means the animation never actually showed, so the boot
+    // splash stays replayable (the offline-rescue effect relies on this).
+    const finished = () => onEnded(true);
+    const aborted = () => onEnded(false);
     if (video.ended) {
-      done();
+      finished();
       return undefined;
     }
-    video.addEventListener("ended", done);
-    video.addEventListener("error", done);
+    video.addEventListener("ended", finished);
+    video.addEventListener("error", aborted);
     const playing = video.play();
-    if (playing && typeof playing.catch === "function") playing.catch(() => done());
-    const timeout = window.setTimeout(done, APP_OPENING_VIDEO_TIMEOUT_MS);
+    if (playing && typeof playing.catch === "function") playing.catch(() => aborted());
+    const timeout = window.setTimeout(aborted, APP_OPENING_VIDEO_TIMEOUT_MS);
     return () => {
-      video.removeEventListener("ended", done);
-      video.removeEventListener("error", done);
+      video.removeEventListener("ended", finished);
+      video.removeEventListener("error", aborted);
       window.clearTimeout(timeout);
     };
   }, [onEnded, src]);
@@ -525,8 +531,8 @@ function RootPage(): ReactNode {
   const [installedMobilePwa, setInstalledMobilePwa] = useState(() => isInstalledMobilePwa());
   const [openingVideoDone, setOpeningVideoDone] = useState(false);
   const openingPlayed = useRef(false);
-  const markOpeningVideoDone = useCallback(() => {
-    openingPlayed.current = true;
+  const markOpeningVideoDone = useCallback((played: boolean) => {
+    if (played) openingPlayed.current = true;
     setOpeningVideoDone(true);
   }, []);
   // A false or transient offline blip at boot must not eat the brand opening

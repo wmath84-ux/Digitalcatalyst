@@ -10,145 +10,132 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getLastProbeFailure, isBrowserOfflineFlag, probeNetwork } from "@/utils/connectivity";
+
+/**
+ * Connectivity v4 — flag-only, grace-debounced.
+ *
+ * Hard-won rule: NO application fetch may ever decide that the learner is
+ * offline. The old network checks (v1–v3) were defeated by flaky proxies,
+ * CDNs, ad-blockers and service-worker races — they gated people who had
+ * perfectly working internet, sometimes minutes into a session. The browser's own connectivity
+ * flag (`navigator.onLine`) is maintained by the OS network stack and is the
+ * only signal we trust:
+ *
+ *  - Gate goes up ONLY after the flag has been down continuously for
+ *    GRACE_MS. Transient dips (wireless↔cellular handover, sleep/wake, lifts,
+ *    weak-signal moments) never reach the gate.
+ *  - Gate comes down INSTANTLY the moment the flag is back up — recovery
+ *    never waits on any network request.
+ *  - A cheap synchronous flag read runs on a watch interval and on every
+ *    online/offline/visibilitychange event, so silent flag flips (events
+ *    missed in throttled background tabs) are caught within seconds.
+ */
 
 type ConnectivityContextValue = {
-  /** True when the learner cannot reach the network. Immediate on first paint. */
+  /** True only when the browser flag has been down continuously for GRACE_MS. */
   offline: boolean;
-  /** True while Try Again / an automatic probe is in flight. */
+  /** True briefly while a Try Again press gives visible feedback. */
   checking: boolean;
-  /**
-   * Why the last probe run failed ("timeout" / "refused"), or null when the
-   * network answered. Surfaced on the gate only in the suspicious case —
-   * browser online, probe silent — so a screenshot carries the diagnosis.
-   */
-  probeDetail: string | null;
-  /** Probe the network. Resolves true when connectivity is back. */
-  retry: () => Promise<boolean>;
+  /** Re-read the browser flag now (synchronous — no network involved). */
+  retry: () => void;
 };
 
 const ConnectivityContext = createContext<ConnectivityContextValue | null>(null);
 
-/** Delay before the second (confirming) probe run gates an "online" browser. */
-const CONFIRM_DELAY_MS = 2500;
-/** Quiet re-probe cadence while the gate is up. */
-const RECOVERY_PROBE_INTERVAL_MS = 12000;
+/** Flag must stay down this long before the gate shows (transient-dip filter). */
+const GRACE_MS = 8000;
+/** Cadence of the cheap synchronous flag watch while the app runs. */
+const WATCH_INTERVAL_MS = 4000;
+/** Visible "Checking…" feedback when Try Again changes nothing. */
+const RETRY_FEEDBACK_MS = 900;
+
+/** The one source of truth: the browser/OS connectivity flag. */
+export function isBrowserOfflineFlag(): boolean {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
 
 export function ConnectivityProvider({ children }: { children: ReactNode }) {
-  const [offline, setOffline] = useState(() => isBrowserOfflineFlag());
+  // Never gate on first paint — the grace window must elapse first, even if
+  // the very first flag read says offline.
+  const [offline, setOffline] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [probeDetail, setProbeDetail] = useState<string | null>(null);
-  const inFlight = useRef<AbortController | null>(null);
-  const confirmTimer = useRef<number | null>(null);
-  const offlineRef = useRef(offline);
+  const graceTimer = useRef<number | null>(null);
+  const feedbackTimer = useRef<number | null>(null);
 
-  useEffect(() => {
-    offlineRef.current = offline;
-  }, [offline]);
-
-  const runProbe = useCallback(async (): Promise<boolean> => {
-    inFlight.current?.abort();
-    const controller = new AbortController();
-    inFlight.current = controller;
-    setChecking(true);
-    try {
-      const ok = await probeNetwork(controller.signal);
-      if (controller.signal.aborted) return !isBrowserOfflineFlag();
-      if (ok) {
-        if (confirmTimer.current !== null) {
-          window.clearTimeout(confirmTimer.current);
-          confirmTimer.current = null;
-        }
-        setProbeDetail(null);
-        setOffline(false);
-        return true;
-      }
-      if (isBrowserOfflineFlag()) {
-        // The radio itself is down — the gate is honest, show it at once.
-        setProbeDetail(null);
-        setOffline(true);
-        return false;
-      }
-      // Browser insists it is online but nothing answered. One bad run must
-      // never take the app away (congested link, flaky proxy path), so a
-      // second independent run has to agree before the gate goes up.
-      setProbeDetail(getLastProbeFailure());
-      if (offlineRef.current) return false; // already gated: recovery loop owns it
-      if (confirmTimer.current === null) {
-        confirmTimer.current = window.setTimeout(() => {
-          confirmTimer.current = null;
-          void probeNetwork().then((second) => {
-            if (second) {
-              setProbeDetail(null);
-              setOffline(false);
-              return;
-            }
-            setProbeDetail(getLastProbeFailure());
-            if (!isBrowserOfflineFlag()) setOffline(true);
-          });
-        }, CONFIRM_DELAY_MS);
-      }
-      return false;
-    } finally {
-      if (inFlight.current === controller) {
-        inFlight.current = null;
-        setChecking(false);
-      }
+  const clearGrace = useCallback(() => {
+    if (graceTimer.current !== null) {
+      window.clearTimeout(graceTimer.current);
+      graceTimer.current = null;
     }
   }, []);
+
+  /** Synchronous flag read → gate state. Zero network requests involved. */
+  const evaluate = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (!isBrowserOfflineFlag()) {
+      // Flag up → ungate instantly and cancel any pending grace.
+      clearGrace();
+      setOffline(false);
+      return;
+    }
+    // Flag down → gate only if it stays down for the whole grace window.
+    if (graceTimer.current === null) {
+      graceTimer.current = window.setTimeout(() => {
+        graceTimer.current = null;
+        if (isBrowserOfflineFlag()) setOffline(true);
+      }, GRACE_MS);
+    }
+  }, [clearGrace]);
+
+  const retry = useCallback(() => {
+    setChecking(true);
+    evaluate();
+    if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
+    feedbackTimer.current = window.setTimeout(() => {
+      feedbackTimer.current = null;
+      setChecking(false);
+    }, RETRY_FEEDBACK_MS);
+  }, [evaluate]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
-    const onOffline = () => {
-      inFlight.current?.abort();
-      if (confirmTimer.current !== null) {
-        window.clearTimeout(confirmTimer.current);
-        confirmTimer.current = null;
-      }
-      setChecking(false);
-      setOffline(true);
-    };
+    // Recovery is instant and unconditional: the moment the OS says the
+    // radio is back, the gate goes away — no fetch has to succeed first.
     const onOnline = () => {
-      void runProbe();
+      clearGrace();
+      setOffline(false);
+    };
+    const onOfflineEvent = () => evaluate();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") evaluate();
     };
 
-    window.addEventListener("offline", onOffline);
     window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOfflineEvent);
+    document.addEventListener("visibilitychange", onVisibility);
 
-    // First paint already used navigator.onLine. If the flag said we were
-    // online, still confirm — a stale `true` must not hide a real outage.
-    // If the flag said offline, stay there until Try Again / `online`.
-    if (!isBrowserOfflineFlag()) {
-      void runProbe();
-    }
+    // Boot-time read covers a radio that was already down (no event fires).
+    evaluate();
+    // The watch catches silent flag flips in throttled/background tabs.
+    const watch = window.setInterval(evaluate, WATCH_INTERVAL_MS);
 
     return () => {
-      window.removeEventListener("offline", onOffline);
       window.removeEventListener("online", onOnline);
-      inFlight.current?.abort();
-      if (confirmTimer.current !== null) {
-        window.clearTimeout(confirmTimer.current);
-        confirmTimer.current = null;
+      window.removeEventListener("offline", onOfflineEvent);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(watch);
+      clearGrace();
+      if (feedbackTimer.current !== null) {
+        window.clearTimeout(feedbackTimer.current);
+        feedbackTimer.current = null;
       }
     };
-  }, [runProbe]);
-
-  // While the gate is up, keep quietly re-probing: a learner who walks back
-  // into coverage (or whose proxy host hiccuped once) recovers on their own
-  // instead of having to find the Try Again button. A successful probe flips
-  // `offline`, which tears this interval down.
-  useEffect(() => {
-    if (!offline || typeof window === "undefined") return undefined;
-    const id = window.setInterval(() => {
-      void runProbe();
-    }, RECOVERY_PROBE_INTERVAL_MS);
-    return () => window.clearInterval(id);
-  }, [offline, runProbe]);
+  }, [evaluate, clearGrace]);
 
   const value = useMemo<ConnectivityContextValue>(
-    () => ({ offline, checking, probeDetail, retry: runProbe }),
-    [offline, checking, probeDetail, runProbe],
+    () => ({ offline, checking, retry }),
+    [offline, checking, retry],
   );
 
   return <ConnectivityContext.Provider value={value}>{children}</ConnectivityContext.Provider>;
@@ -157,7 +144,7 @@ export function ConnectivityProvider({ children }: { children: ReactNode }) {
 export function useConnectivity(): ConnectivityContextValue {
   const ctx = useContext(ConnectivityContext);
   if (!ctx) {
-    return { offline: false, checking: false, probeDetail: null, retry: async () => true };
+    return { offline: false, checking: false, retry: () => {} };
   }
   return ctx;
 }
