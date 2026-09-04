@@ -75,6 +75,18 @@ export function ConnectivityProvider({ children }: { children: ReactNode }) {
     };
   }, [runProbe]);
 
+  // While the gate is up, keep quietly re-probing: a learner who walks back
+  // into coverage (or whose proxy host hiccuped once) recovers on their own
+  // instead of having to find the Try Again button. A successful probe flips
+  // `offline`, which tears this interval down.
+  useEffect(() => {
+    if (!offline || typeof window === "undefined") return undefined;
+    const id = window.setInterval(() => {
+      void runProbe();
+    }, 12000);
+    return () => window.clearInterval(id);
+  }, [offline, runProbe]);
+
   const value = useMemo<ConnectivityContextValue>(
     () => ({ offline, checking, retry: runProbe }),
     [offline, checking, runProbe],
