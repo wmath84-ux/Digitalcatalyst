@@ -524,7 +524,19 @@ function RootPage(): ReactNode {
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
   const [installedMobilePwa, setInstalledMobilePwa] = useState(() => isInstalledMobilePwa());
   const [openingVideoDone, setOpeningVideoDone] = useState(false);
-  const markOpeningVideoDone = useCallback(() => setOpeningVideoDone(true), []);
+  const openingPlayed = useRef(false);
+  const markOpeningVideoDone = useCallback(() => {
+    openingPlayed.current = true;
+    setOpeningVideoDone(true);
+  }, []);
+  // A false or transient offline blip at boot must not eat the brand opening
+  // for the whole session: the gate marks the splash "done" so a later
+  // `online` event cannot replay it, but if it never actually PLAYED, give it
+  // back the moment connectivity recovers.
+  useEffect(() => {
+    if (offline || openingPlayed.current) return;
+    setOpeningVideoDone((done) => (done && !openingPlayed.current ? false : done));
+  }, [offline]);
   const viewportCategory = useResponsiveCategory();
   const isMobileOpening = viewportCategory === "mobile";
   const playOpening = openingAnimationEnabled;

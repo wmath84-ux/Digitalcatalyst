@@ -15,12 +15,31 @@ const CONNECTION_HOLD_MS = 1100;
 type OfflineScreenProps = {
   checking: boolean;
   onRetry: () => void;
+  /**
+   * Reachability-check failure code ("timeout" / "refused"). Only carried
+   * when the browser itself reports being online — the suspicious case —
+   * so a screenshot sent to support names the broken leg.
+   */
+  detail?: string | null;
 };
 
-export default function OfflineScreen({ checking, onRetry }: OfflineScreenProps) {
+export default function OfflineScreen({ checking, onRetry, detail = null }: OfflineScreenProps) {
   const { appName } = useBranding();
   const reduce = useReducedMotion();
   const [connection, setConnection] = useState<"live" | "lost">(reduce ? "lost" : "live");
+  const [browserOnline, setBrowserOnline] = useState(() =>
+    typeof navigator === "undefined" ? false : navigator.onLine !== false,
+  );
+
+  useEffect(() => {
+    const read = () => setBrowserOnline(navigator.onLine !== false);
+    window.addEventListener("online", read);
+    window.addEventListener("offline", read);
+    return () => {
+      window.removeEventListener("online", read);
+      window.removeEventListener("offline", read);
+    };
+  }, []);
 
   useEffect(() => {
     if (reduce) {
@@ -81,6 +100,15 @@ export default function OfflineScreen({ checking, onRetry }: OfflineScreenProps)
             Connect to the internet to continue learning.
           </p>
         </BlurFade>
+        {detail && browserOnline ? (
+          <BlurFade delay={reduce ? 0 : 0.22}>
+            <p className="mt-2 max-w-[17.5rem] text-[11px] leading-relaxed text-cyan-50/50">
+              Your device reports an active connection, but this app&apos;s reachability
+              check could not finish (code {detail}). Tap Try Again — the app also
+              re-checks on its own every few seconds.
+            </p>
+          </BlurFade>
+        ) : null}
         <BlurFade delay={reduce ? 0 : 0.28} className="mt-7 w-full">
           <GlassButton
             variant="capsule"

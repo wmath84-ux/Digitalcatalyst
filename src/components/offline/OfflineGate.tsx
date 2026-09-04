@@ -11,7 +11,7 @@ import OfflineScreen from "./OfflineScreen";
  * higher z-index; hide it while offline so this screen paints immediately.
  */
 export default function OfflineGate() {
-  const { offline, checking, retry } = useConnectivity();
+  const { offline, checking, retry, probeDetail } = useConnectivity();
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -22,5 +22,11 @@ export default function OfflineGate() {
 
   if (!offline) return null;
 
-  return <OfflineScreen checking={checking} onRetry={() => { void retry(); }} />;
+  return (
+    <OfflineScreen
+      checking={checking}
+      onRetry={() => { void retry(); }}
+      detail={probeDetail}
+    />
+  );
 }

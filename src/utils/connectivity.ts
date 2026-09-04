@@ -13,11 +13,13 @@
  * used to strand perfectly online learners behind the offline gate whenever
  * a preview / proxy host answered the probe with anything but 200.
  *
- * One attempt is also not enough evidence on a congested mobile radio: a
- * single 694-byte request can eat the whole timeout while the boot downloads
- * compete for the same link. The probe therefore retries before blaming the
- * network, and the provider keeps re-probing while the gate is up so walking
- * back into coverage recovers on its own.
+ * ONE BAD RUN IS NOT EVIDENCE: on a congested mobile radio a single 694-byte
+ * request can eat the whole timeout while boot downloads compete for the
+ * same link, and a flaky proxy path can refuse one URL while serving every
+ * other. The probe therefore (a) tries two independent static paths per
+ * attempt and (b) retries with back-off; the provider additionally demands
+ * two failed runs before it takes the app away from a learner whose browser
+ * says "online".
  */
 
 export const CONNECTIVITY_PROBE_TIMEOUT_MS = 2500;
@@ -25,6 +27,20 @@ export const CONNECTIVITY_PROBE_TIMEOUT_MS = 2500;
 const PROBE_ATTEMPTS = 3;
 /** Linear back-off between attempts (× attempt number). */
 const PROBE_RETRY_DELAY_MS = 600;
+/**
+ * Two independent same-origin static assets. If a proxy / preview host
+ * misbehaves on one path (rewrite, auth wall, dropped query string) the
+ * other still proves reachability in the same attempt.
+ */
+const PROBE_PATHS = ["/icons/icon-192x192.svg", "/sw.js"];
+
+/** Why the last probe run failed — surfaced on the offline gate so a
+ *  learner's screenshot tells support which leg broke. */
+let lastFailure: string | null = null;
+
+export function getLastProbeFailure(): string | null {
+  return lastFailure;
+}
 
 export function isBrowserOfflineFlag(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -45,32 +61,40 @@ const wait = (ms: number, signal?: AbortSignal): Promise<void> =>
   });
 
 async function probeOnce(signal?: AbortSignal): Promise<boolean> {
-  const controller = new AbortController();
-  const onAbort = () => controller.abort();
-  if (signal) {
-    if (signal.aborted) return false;
-    signal.addEventListener("abort", onAbort, { once: true });
-  }
-  const timeout = window.setTimeout(() => controller.abort(), CONNECTIVITY_PROBE_TIMEOUT_MS);
+  for (let pathIndex = 0; pathIndex < PROBE_PATHS.length; pathIndex += 1) {
+    const controller = new AbortController();
+    const onAbort = () => controller.abort();
+    if (signal) {
+      if (signal.aborted) return false;
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+    const timeout = window.setTimeout(() => controller.abort(), CONNECTIVITY_PROBE_TIMEOUT_MS);
 
-  try {
-    const url = `${window.location.origin}/icons/icon-192x192.svg?eduvos-net=${Date.now().toString(36)}`;
-    await fetch(url, {
-      method: "GET",
-      cache: "no-store",
-      credentials: "omit",
-      headers: { "Cache-Control": "no-cache" },
-      signal: controller.signal,
-    });
-    // A resolved fetch — ANY status — means a server answered: reachable.
-    return true;
-  } catch {
-    // Thrown = DNS / TLS / refused / timed out: this attempt saw no server.
-    return false;
-  } finally {
-    window.clearTimeout(timeout);
-    if (signal) signal.removeEventListener("abort", onAbort);
+    try {
+      const url = `${window.location.origin}${PROBE_PATHS[pathIndex]}?eduvos-net=${Date.now().toString(36)}`;
+      await fetch(url, {
+        method: "GET",
+        cache: "no-store",
+        credentials: "omit",
+        headers: { "Cache-Control": "no-cache" },
+        signal: controller.signal,
+      });
+      // A resolved fetch — ANY status — means a server answered: reachable.
+      lastFailure = null;
+      return true;
+    } catch {
+      // Thrown = DNS / TLS / refused / timed out: this path saw no server.
+      const timedOut = controller.signal.aborted && !signal?.aborted;
+      if (!signal?.aborted) lastFailure = timedOut ? "timeout" : "refused";
+      // A hard refusal on path one gives path two its chance inside the
+      // same attempt; a timeout already spent this attempt's budget.
+      if (timedOut || signal?.aborted) return false;
+    } finally {
+      window.clearTimeout(timeout);
+      if (signal) signal.removeEventListener("abort", onAbort);
+    }
   }
+  return false;
 }
 
 export async function probeNetwork(signal?: AbortSignal): Promise<boolean> {
