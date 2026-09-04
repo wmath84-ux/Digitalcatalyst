@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import HeroScene from "./HeroScene";
 import { openApp, openInstallPanel } from "@/utils/pwaInstall";
 import { useBranding } from "@/context/BrandingContext";
 import { GlassSurface } from "@/components/ui/glass";
@@ -11,9 +10,6 @@ export default function Hero() {
   const { appName, tagline } = useBranding();
   return (
     <section className="relative flex min-h-screen items-center overflow-hidden pt-24">
-      <HeroScene />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-[#0a0c12]/30 to-[#0a0c12]/70" />
-
       <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-10 px-6 py-16 sm:px-8">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -22,7 +18,7 @@ export default function Hero() {
           className="max-w-3xl"
         >
           <GlassSurface radius={999} className="inline-block text-cyan-300" contentClassName="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em]">
-            ✨ The Future of Learning, Rendered in 3D
+            ✨ The Future of Learning
           </GlassSurface>
 
           <h1 className="mt-6 text-[clamp(2.4rem,6vw,4.5rem)] font-black leading-[1.03] tracking-tight text-white">
