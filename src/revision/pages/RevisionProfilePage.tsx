@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import PageShell from "../components/PageShell";
 import { PrimaryButton, SecondaryButton } from "../components/ui";
 import { GlassSurface } from "../../components/ui/glass";
-import { GlassCard } from "../../components/ui/glass-card";
+import { GlassCard } from "../../components/ui/GlassCard";
 import {
   BookOpenIcon,
   ChevronRightIcon,

@@ -12,7 +12,7 @@
 // `CheckoutApp`.
 
 import { useEffect, useState } from "react";
-import { GlassCard } from "../ui/glass-card";
+import { GlassCard } from "../ui/GlassCard";
 import { GlassButton } from "../ui/glass-button";
 import { ArrowLeft, BadgeCheck, CircleCheck, Package, ShoppingBag, Sparkles } from "lucide-react";
 import { useCheckout } from "../../checkout/CheckoutContext";

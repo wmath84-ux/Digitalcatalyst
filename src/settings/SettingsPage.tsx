@@ -32,7 +32,7 @@ import { useGlassScheme } from "../lib/glassScheme";
 import { toast } from "../components/ui/glass-toast";
 import { ensureSavedWebPushSubscription, removeWebPushSubscription } from "../../utils/webPush";
 import { BaseModal, PreferenceRow } from "../profile/ProfileLayout";
-import { GlassCard } from "../components/ui/glass-card";
+import { GlassCard } from "../components/ui/GlassCard";
 import { GlassButton } from "../components/ui/glass-button";
 import { DEFAULT_PREFERENCES, type Preferences } from "../profile/App";
 

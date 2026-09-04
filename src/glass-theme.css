@@ -81,95 +81,13 @@
 }
 
 /* ══ THE BACKDROP ══════════════════════════════════════════════════════════════
-   The whole component's paint, matching the pinned reference: two hairline
-   grid layers on top (44 px cells at 5% white), then five huge, soft radial
-   glows over a near-black base; each spans 45–70% of the viewport with a long
-   falloff tail, which is where the "blur" actually comes from. Luminance stays
-   low and even so the glass cards still read as glass. No text, no lens, no
-   demo card — the reference image minus its copy, exactly.
+   2026-09-04 · owner direction: the universal gradient + grid backdrop
+   (`.dc-backdrop`) and its classic/waves preference switch are REMOVED. The
+   app's single background is now the pinned Winter Wonderland scene — see
+   `src/winter-background.css` and `src/components/backgrounds/WinterScene.tsx`.
+   Nothing paints here any more; the rules below only let that fixed layer
+   through.
    ══════════════════════════════════════════════════════════════════════ */
-
-.dc-backdrop {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: var(--dc-z-backdrop);
-  pointer-events: none;
-  /* 1. plain fallback — always survives */
-  background-color: var(--dc-bd-base);
-  /* 2. enhancement — the first listed layer paints on top */
-  background-image:
-    /* the grid — two hairline families, exactly like the reference image */
-    repeating-linear-gradient(90deg, rgb(var(--dc-bd-grid) / 0.05) 0 1px, transparent 1px var(--dc-bd-grid-size)),
-    repeating-linear-gradient(0deg, rgb(var(--dc-bd-grid) / 0.05) 0 1px, transparent 1px var(--dc-bd-grid-size)),
-    /* the glows */
-    radial-gradient(52% 58% at 10% 16%, rgb(var(--dc-bd-blue-core) / 0.6) 0%, rgb(var(--dc-bd-blue-hot) / 0.26) 40%, transparent 72%),
-    radial-gradient(56% 48% at 42% 92%, rgb(var(--dc-bd-teal-core) / 0.5) 0%, rgb(var(--dc-bd-teal-deep) / 0.24) 42%, transparent 72%),
-    radial-gradient(46% 62% at 97% 32%, rgb(var(--dc-bd-purple-core) / 0.5) 0%, rgb(var(--dc-bd-purple-hot) / 0.2) 44%, transparent 74%),
-    radial-gradient(70% 40% at 55% 0%, rgb(var(--dc-bd-violet-bridge) / 0.42) 0%, transparent 70%),
-    radial-gradient(120% 90% at 50% 100%, rgb(var(--dc-bd-vignette) / 0.6) 0%, transparent 55%);
-  /* NO filter. NO backdrop-filter. NO @keyframes. NO !important. Ever. */
-}
-
-html[data-glass="on"] .dc-backdrop {
-  display: block;
-}
-
-/* ── "waves" background (Profile → Preferences switch) ──────────────────────
-   The AI Canvas Wave Lines canvas as the fixed layer. Same contract as the
-   gradient paint: fixed, z -1, pointer-events none, no filter of its own —
-   the component's own rAF loop does the animating, always. The fold
-   interaction is tracked at window level inside the component, because a
-   z -1 layer can never receive events itself. */
-.dc-waves {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: var(--dc-z-backdrop);
-  pointer-events: none;
-}
-
-html[data-glass="on"] .dc-waves {
-  display: block;
-}
-
-/* ── Gamut probe ─────────────────────────────────────────────────────────────────────────────
-   "Har device pe same colour", precisely. Wide gamut is a bonus and never a
-   requirement: the sRGB declaration above is the fallback and is written
-   first, so a device that fails either probe simply keeps it. ─────── */
-@supports (color: color(display-p3 1 0 0)) {
-  @media (color-gamut: p3) {
-    .dc-backdrop {
-      /* Same palette, expressed in the panel's own gamut so the purple core
-         keeps its chroma instead of being clipped on the way to sRGB. */
-      background-image:
-        repeating-linear-gradient(90deg, color(display-p3 1 1 1 / 0.05) 0 1px, transparent 1px var(--dc-bd-grid-size)),
-        repeating-linear-gradient(0deg, color(display-p3 1 1 1 / 0.05) 0 1px, transparent 1px var(--dc-bd-grid-size)),
-        radial-gradient(52% 58% at 10% 16%, color(display-p3 0.184 0.227 0.58 / 0.6) 0%, color(display-p3 0.235 0.282 0.69 / 0.26) 40%, transparent 72%),
-        radial-gradient(56% 48% at 42% 92%, color(display-p3 0.063 0.549 0.431 / 0.5) 0%, color(display-p3 0.047 0.416 0.329 / 0.24) 42%, transparent 72%),
-        radial-gradient(46% 62% at 97% 32%, color(display-p3 0.62 0.227 0.698 / 0.5) 0%, color(display-p3 0.698 0.259 0.784 / 0.2) 44%, transparent 74%),
-        radial-gradient(70% 40% at 55% 0%, color(display-p3 0.314 0.173 0.486 / 0.42) 0%, transparent 70%),
-        radial-gradient(120% 90% at 50% 100%, color(display-p3 0.02 0.024 0.039 / 0.6) 0%, transparent 55%);
-    }
-  }
-}
-
-/* Flat sRGB fallback — the same palette, no widening. Restated explicitly so
-   that if a later wave widens the base declaration, sRGB devices are pinned
-   to the sampled values and still look intentional. */
-@media (color-gamut: srgb) {
-  .dc-backdrop {
-    background-color: #0a0c12;
-    background-image:
-      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px var(--dc-bd-grid-size)),
-      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px var(--dc-bd-grid-size)),
-      radial-gradient(52% 58% at 10% 16%, rgba(47, 58, 148, 0.6) 0%, rgba(60, 72, 176, 0.26) 40%, transparent 72%),
-      radial-gradient(56% 48% at 42% 92%, rgba(16, 140, 110, 0.5) 0%, rgba(12, 106, 84, 0.24) 42%, transparent 72%),
-      radial-gradient(46% 62% at 97% 32%, rgba(158, 58, 178, 0.5) 0%, rgba(178, 66, 200, 0.2) 44%, transparent 74%),
-      radial-gradient(70% 40% at 55% 0%, rgba(80, 44, 124, 0.42) 0%, transparent 70%),
-      radial-gradient(120% 90% at 50% 100%, rgba(5, 6, 10, 0.6) 0%, transparent 55%);
-  }
-}
 
 /* ══ LETTING THE BACKDROP THROUGH ════════════════════════════════════════════
    `src/index.css` paints `html, body, #root { background-color: #ffffff }`.
@@ -184,15 +102,15 @@ html[data-glass="on"] .dc-waves {
    tier to `off`.
    ════════════════════════════════════════════════════════════════════════ */
 
-html[data-glass="on"] body,
-html[data-glass="on"] #root {
+body,
+#root {
   background-color: transparent;
 }
 
 /* The desktop shell's page wash is the same story: a light grey plate that
    would sit on top of the backdrop. The rail and the content cards keep their
    own paint — re-inking those is Wave 2 and Wave 3, not here. */
-html[data-glass="on"] .dc-desktop-shell {
+.dc-desktop-shell {
   background-color: transparent;
 }
 

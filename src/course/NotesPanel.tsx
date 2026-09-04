@@ -38,7 +38,7 @@
 import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
 import { GlassButton } from "../components/ui/glass-button";
-import { GlassCard } from "../components/ui/glass-card";
+import { GlassCard } from "../components/ui/GlassCard";
 import { GlassSurface } from "../components/ui/glass";
 import type { CoursePlayerNote } from "../types/course";
 import RichTextEditor from "./RichTextEditor";

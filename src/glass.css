@@ -269,14 +269,107 @@ html[data-glass="on"] :where(.dc-chrome-disc):hover > div[aria-hidden]:nth-of-ty
 
 /* ── Wave 3 · commerce ──────────────────────────────────────────────────── */
 
-/* Cards: `glass-card` paints a dark-page rim; on a white page the card needs a
- * hairline + its own lift so the grid does not read as a sheet of nothing.
- * `GlassCard` (src/components/ui/GlassCard.tsx) carries the hook class and
- * re-inks the label colours with tailwind-merge, so only the rim is done here. */
-html[data-glass="on"] :where(.dc-glass-card) > div[aria-hidden]:nth-of-type(4) {
-  /* Phase A: the pack's own rim. */
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+/* ── CARDS ON THE WINTER BACKGROUND ─────────────────────────────────────────
+ * 2026-09-04 · owner direction: "sabhi glass card ka content/text sahi se
+ * nahin dikh raha — sabko theek karo."
+ *
+ * Why they broke: every glass card is white ink on a near-transparent white
+ * tint (GlassSurface paints `rgba(255,255,255, tint*0.42)` = ~10% white at the
+ * pinned docs sensitivity), and blur is 0 app-wide by owner direction. That
+ * was legible over the old near-black Black Ice backdrop — but the app's one
+ * background is now the Winter Wonderland scene, which is BRIGHT exactly where
+ * cards sit: the snow ground, the lit lake, the white mountain caps. White
+ * text on 10% white over snow is invisible, and the hairline rim disappears
+ * with it. That is the bug, and it is one bug in one place, not 40.
+ *
+ * The fix, applied to every `.dc-glass-card` at once (all card call sites go
+ * through src/components/ui/GlassCard.tsx, which carries this class):
+ *
+ *   1. the tint layer becomes a dark, slightly cool PLATE instead of a white
+ *      wash — the card is now guaranteed contrast against snow *and* sky, and
+ *      still reads as glass because it is translucent and the scene moves
+ *      behind it;
+ *   2. the rim is strengthened into a real edge (bright inner hairline + an
+ *      outer dark ring) so the card's shape survives on a light region;
+ *   3. a drop shadow lifts the card off the scene;
+ *   4. the sheen is toned down — over a bright backdrop the pack's 32% white
+ *      diagonal was washing the top-left corner of the copy out.
+ *
+ * These target the surface's fixed layer order (backdrop, tint, sheen, rim,
+ * content), which is why the child selectors are `nth-of-type`. Content is the
+ * one non-`aria-hidden` child, so the ink rules below cannot touch the layers.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* 1 · the contrast plate (the tint layer) */
+html[data-glass="on"] :where(.dc-glass-card) > div[aria-hidden]:nth-of-type(2) {
+  background:
+    linear-gradient(
+      160deg,
+      rgba(12, 20, 40, 0.78) 0%,
+      rgba(8, 14, 30, 0.72) 55%,
+      rgba(6, 11, 24, 0.76) 100%
+    ) !important;
 }
+
+/* 4 · the sheen — kept, but quiet enough not to bleach the first line of copy */
+html[data-glass="on"] :where(.dc-glass-card) > div[aria-hidden]:nth-of-type(3) {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    transparent 42%,
+    transparent 64%,
+    rgba(255, 255, 255, 0.05) 100%
+  ) !important;
+}
+
+/* 2 + 3 · a real edge, and lift off the scene */
+html[data-glass="on"] :where(.dc-glass-card) > div[aria-hidden]:nth-of-type(4) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(4, 8, 18, 0.55) !important;
+}
+
+html[data-glass="on"] :where(.dc-glass-card) {
+  box-shadow:
+    0 18px 44px -20px rgba(2, 6, 16, 0.85),
+    0 4px 14px -8px rgba(2, 6, 16, 0.6);
+}
+
+@media (hover: hover) {
+  html[data-glass="on"] :where(.dc-glass-card):hover {
+    box-shadow:
+      0 26px 60px -22px rgba(2, 6, 16, 0.9),
+      0 6px 18px -8px rgba(2, 6, 16, 0.65);
+  }
+}
+
+/* 5 · the ink. The plate is dark on every route now, so the three-step ink
+ * scale is pinned to its light-on-dark values INSIDE a card even when the app
+ * is in light mode — otherwise `html.light` hands `.dc-ink-*` near-black text
+ * and it vanishes into the plate. Scoped to the card so nothing outside
+ * changes. */
+html[data-glass="on"] :where(.dc-glass-card) {
+  --dc-ink-1: rgba(255, 255, 255, 0.97);
+  --dc-ink-2: rgba(255, 255, 255, 0.82);
+  --dc-ink-3: rgba(255, 255, 255, 0.64);
+  color: rgba(255, 255, 255, 0.97);
+}
+
+/* Muted copy inside a card had a floor of ~55% white, which is under 4.5:1
+ * even on the new plate. Lift the two utilities the cards actually use. */
+html[data-glass="on"] :where(.dc-glass-card) :where(.text-white\/50, .text-white\/55, .text-white\/60) {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+html[data-glass="on"] :where(.dc-glass-card) :where(.text-white\/70, .text-white\/75, .text-white\/80) {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* Media cards (`contentClassName="p-0"`) put artwork edge-to-edge and lay copy
+ * over it; the plate sits *behind* the image, so those keep their own overlay.
+ * Nothing to do here — noted so a later wave does not "fix" it twice. */
 
 /* `glass-toggle-group` used as a LIGHT segmented control (the store filter row
  * and the product page's tab strip — hence `dc-segment`): the pack's indicator is

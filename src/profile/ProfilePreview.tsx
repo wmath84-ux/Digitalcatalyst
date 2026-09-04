@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GlassCard } from "../components/ui/glass-card";
+import { GlassCard } from "../components/ui/GlassCard";
 import { GlassToggleGroup, GlassToggleItem } from "../components/ui/glass-toggle-group";
 import ProfileLayout, { type MembershipTier } from "./ProfileLayout";
 

@@ -68,19 +68,27 @@ export function GlassCard({
 }
 
 export function GlassCardHeader({ className, ...props }: ComponentProps<"div">) {
-  return <RegistryGlassCardHeader className={cn("gap-0.5", className)} {...props} />;
+  return <RegistryGlassCardHeader className={cn("mb-2 gap-1", className)} {...props} />;
 }
 
 export function GlassCardTitle({ className, ...props }: ComponentProps<"h3">) {
-  return <RegistryGlassCardTitle className={cn("text-[15px] font-extrabold text-white", className)} {...props} />;
+  /* The plate under a card is dark on every route (see glass.css · CARDS ON
+     THE WINTER BACKGROUND), so titles are near-solid white with a little
+     tracking — at 15px/extrabold that is what stays crisp over the scene. */
+  return (
+    <RegistryGlassCardTitle
+      className={cn("text-[15px] font-extrabold leading-[1.35] tracking-[-0.01em] text-white", className)}
+      {...props}
+    />
+  );
 }
 
 export function GlassCardDescription({ className, ...props }: ComponentProps<"p">) {
-  return <RegistryGlassCardDescription className={cn("text-white/60", className)} {...props} />;
+  return <RegistryGlassCardDescription className={cn("text-[12.5px] leading-[1.55] text-white/75", className)} {...props} />;
 }
 
 export function GlassCardContent({ className, ...props }: ComponentProps<"div">) {
-  return <RegistryGlassCardContent className={cn("text-white/80", className)} {...props} />;
+  return <RegistryGlassCardContent className={cn("text-[13px] leading-[1.6] text-white/85", className)} {...props} />;
 }
 
 export function GlassCardFooter({ className, ...props }: ComponentProps<"div">) {

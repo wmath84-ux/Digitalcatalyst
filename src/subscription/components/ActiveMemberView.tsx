@@ -7,7 +7,7 @@
 // replaces that with a membership dashboard: what is unlocked, when it
 // renews, and the deliberate entry points to renew or change the plan.
 
-import { GlassCard } from "../../components/ui/glass-card";
+import { GlassCard } from "../../components/ui/GlassCard";
 import { GlassButton } from "../../components/ui/glass-button";
 import {
   ArrowRight,
