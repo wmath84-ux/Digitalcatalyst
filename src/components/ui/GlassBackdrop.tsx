@@ -3,7 +3,7 @@
 // The "Black Ice" backdrop — the one fixed layer the whole v2 design sits on.
 //
 // It carries NO paint of its own: every colour, position and falloff lives in
-// `.dc-backdrop` / `.dc-grain` in src/glass-theme.css, so the palette stays
+// `.dc-backdrop` in src/glass-theme.css, so the palette stays
 // reviewable in one place and `scripts/glass-coverage.mjs` can assert the
 // layer's invariants (no filter, no animation, no !important) against real
 // CSS rather than against a component's inline styles.
@@ -25,8 +25,11 @@
 // Mount it exactly ONCE per route. `DesktopShell` is only ever rendered by
 // `AppShell` (its single call site), so AppShell mounts the backdrop on the
 // mobile/tablet-portrait branch and DesktopShell mounts it on the desktop
-// branch — one layer either way. A second mount would stack a second grain
-// tile and double its opacity.
+// branch — one layer either way.
+//
+// 2026-09-04 · owner direction: the v1 dither grain tile is gone — the pinned
+// reference (the websiteglass docs playground backdrop) is smooth gradients
+// plus the hairline grid, which now paints inside .dc-backdrop itself.
 
 interface GlassBackdropProps {
   /**
@@ -45,9 +48,6 @@ export function GlassBackdrop({ hidden = false }: GlassBackdropProps) {
       {/* aria-hidden: a decorative fixed layer must never enter the a11y tree
           or the tab order. */}
       <div className="dc-backdrop" data-dc-backdrop aria-hidden="true" />
-      {/* Static dither tile, its own fixed layer above the gradient. Breaks up
-          gradient banding on old LCD panels at 3.5% opacity. */}
-      <div className="dc-grain" data-dc-grain aria-hidden="true" />
     </>
   );
 }

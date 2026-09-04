@@ -50,21 +50,25 @@ const VIEWPORTS = [
    names for it. The exact paint is proved separately, stop for stop, by the
    EXPECTED_LAYERS comparison below. */
 const SAMPLES = [
-  { at: [12, 30], expect: [44, 53, 126], label: "blue core", hueTol: 26, glow: true },
-  { at: [40, 80], expect: [18, 117, 106], label: "teal core", hueTol: 26, glow: true },
-  { at: [45, 5], expect: [58, 33, 89], label: "violet bridge", hueTol: 30, glow: true },
-  { at: [90, 15], expect: [109, 33, 132], label: "purple core", hueTol: 30, glow: true },
-  { at: [50, 99], expect: [6, 7, 12], label: "vignette bottom", hueTol: 0, glow: false },
+  { at: [12, 30], expect: [47, 58, 148], label: "blue core", hueTol: 26, glow: true },
+  { at: [40, 80], expect: [16, 140, 110], label: "teal core", hueTol: 26, glow: true },
+  { at: [45, 5], expect: [80, 44, 124], label: "violet bridge", hueTol: 30, glow: true },
+  { at: [90, 15], expect: [158, 58, 178], label: "purple core", hueTol: 30, glow: true },
+  { at: [8, 97], expect: [5, 6, 10], label: "vignette corner", hueTol: 0, glow: false },
   { at: [70, 55], expect: [10, 12, 18], label: "base ink", hueTol: 0, glow: false },
 ];
 
-/** The reference implementation's stops, normalised, for a byte-level check. */
+/** The reference implementation's stops, normalised, for a byte-level check.
+ *  2026-09-04 · re-pinned to the owner's new reference — the websiteglass docs
+ *  playground backdrop (softer densities + the 44 px hairline grid, whose two
+ *  repeating-linear-gradient layers are intentionally NOT part of this radial
+ *  stack). */
 const EXPECTED_LAYERS = [
-  { rx: 58, ry: 72, cx: 12, cy: 30, stops: [[0, [44, 53, 126, 0.95]], [38, [37, 48, 143, 0.42]], [68, [0, 0, 0, 0]]] },
-  { rx: 52, ry: 60, cx: 40, cy: 80, stops: [[0, [18, 117, 106, 0.72]], [40, [15, 95, 87, 0.3]], [70, [0, 0, 0, 0]]] },
-  { rx: 46, ry: 56, cx: 90, cy: 15, stops: [[0, [109, 33, 132, 0.8]], [42, [122, 36, 136, 0.34]], [72, [0, 0, 0, 0]]] },
-  { rx: 70, ry: 40, cx: 45, cy: 5, stops: [[0, [58, 33, 89, 0.6]], [70, [0, 0, 0, 0]]] },
-  { rx: 120, ry: 90, cx: 50, cy: 100, stops: [[0, [6, 7, 12, 0.85]], [55, [0, 0, 0, 0]]] },
+  { rx: 52, ry: 58, cx: 10, cy: 16, stops: [[0, [47, 58, 148, 0.6]], [40, [60, 72, 176, 0.26]], [72, [0, 0, 0, 0]]] },
+  { rx: 56, ry: 48, cx: 42, cy: 92, stops: [[0, [16, 140, 110, 0.5]], [42, [12, 106, 84, 0.24]], [72, [0, 0, 0, 0]]] },
+  { rx: 46, ry: 62, cx: 97, cy: 32, stops: [[0, [158, 58, 178, 0.5]], [44, [178, 66, 200, 0.2]], [74, [0, 0, 0, 0]]] },
+  { rx: 70, ry: 40, cx: 55, cy: 0, stops: [[0, [80, 44, 124, 0.42]], [70, [0, 0, 0, 0]]] },
+  { rx: 120, ry: 90, cx: 50, cy: 100, stops: [[0, [5, 6, 10, 0.6]], [55, [0, 0, 0, 0]]] },
 ];
 
 const failures = [];
@@ -522,8 +526,20 @@ for (const vp of VIEWPORTS) {
   if (mean > 60) fail(`${vp.name}: mean luminance ${mean.toFixed(1)} is not low (§2 wants a low, even field)`);
   if (sd > 26) fail(`${vp.name}: luminance spread σ=${sd.toFixed(1)} is not even`);
   if (max > 110) fail(`${vp.name}: brightest pixel L=${max.toFixed(1)} is too hot for glass to read over`);
-  if (topBottom[4] >= topBottom[2]) {
-    fail(`${vp.name}: luminance does not fall into the bottom vignette (${topBottom.map((v) => v.toFixed(0)).join(" ")})`);
+  /* 2026-09-04 · reference re-pinned: the green/teal glow now sits LOW-CENTRE
+     (the "green line" of the websiteglass docs backdrop), so the bottom row is
+     ALLOWED to be brighter than the middle band. What must still hold is the
+     vignette's actual job: the bottom CORNERS fall darker than the bottom-
+     centre glow. */
+  const lumAtPct = (xPct, yPct) => {
+    const x = Math.min(img.w - 1, Math.floor((xPct / 100) * img.w));
+    const y = Math.min(img.h - 1, Math.floor((yPct / 100) * img.h));
+    return img.lum[y * img.w + x];
+  };
+  const cornerL = Math.max(lumAtPct(6, 96), lumAtPct(94, 96));
+  const greenL = lumAtPct(42, 92);
+  if (cornerL >= greenL) {
+    fail(`${vp.name}: bottom corners (L=${cornerL.toFixed(1)}) do not fall darker than the bottom-centre green glow (L=${greenL.toFixed(1)})`);
   }
   luminanceProfiles.push({ vp: vp.name, leftRight, topBottom, max, purpleLum });
   report.push(`    L→R mean luminance  ${leftRight.map((v) => v.toFixed(0).padStart(3)).join(" ")}`);

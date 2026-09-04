@@ -22,6 +22,7 @@ import {
   GlassCardTitle as RegistryGlassCardTitle,
 } from "@/components/ui/glass-card";
 import { cn } from "@/lib/utils";
+import { GLASS_DOCS } from "@/lib/glassDocs";
 
 export type AppGlassCardProps = ComponentProps<typeof RegistryGlassCard> & {
   /**
@@ -30,7 +31,26 @@ export type AppGlassCardProps = ComponentProps<typeof RegistryGlassCard> & {
    * media cards need `p-0` to keep the artwork edge-to-edge.
    */
   contentClassName?: string;
+  /** Material overrides — they default to the pinned docs sensitivity. */
+  tint?: number;
+  radius?: number;
+  blur?: number;
+  specular?: boolean;
+  saturation?: number;
 };
+
+/**
+ * The pinned "sensitivity" (websiteglass.com/docs/components/glass playground):
+ * radius 24 · strength 0.5 · blur 4 · tint 0.25 · dome 0.1. Cards are frosted
+ * GlassSurface surfaces, so they take the config's tint/blur/radius — the same
+ * numbers the dock and headers read from GLASS_DOCS. Callers may still override
+ * (the spread wins).
+ */
+const DOCS_MATERIAL = {
+  tint: GLASS_DOCS.tint,
+  radius: GLASS_DOCS.radius,
+  blur: GLASS_DOCS.blur,
+} as ComponentProps<typeof RegistryGlassCard>;
 
 export function GlassCard({
   className,
@@ -38,8 +58,9 @@ export function GlassCard({
 }: AppGlassCardProps) {
   return (
     <RegistryGlassCard
-      /* Phase A6: the pack's own tint (0.4) and white ink — no app-side
-         material. `dc-glass-card` only carries the rim hook in glass.css. */
+      /* The pinned docs sensitivity + white ink. `dc-glass-card` carries the
+         rim hook in glass.css. */
+      {...DOCS_MATERIAL}
       className={cn("dc-glass-card text-white", className)}
       {...props}
     />

@@ -223,7 +223,10 @@ test("the dev preview exercises every Wave 3 control", () => {
 test("the deferred commerce files landed in Wave 12; admin stays out", () => {
   // Home's own header/cards carried their own collapse + branding contracts and
   // were converted in Phase B · Wave 12; admin is excluded from the rollout entirely.
-  assert.match(read("src/home/components/Reviews.tsx"), /from "\.\.\/\.\.\/components\/ui\/glass-card"/);
+  // 2026-09-04: Reviews/ContinueLearning read the APP GlassCard wrapper (which
+  // pins the docs sensitivity: tint 0.25 · radius 24 · blur 4), not the raw registry card.
+  assert.match(read("src/home/components/Reviews.tsx"), /from "\.\.\/\.\.\/components\/ui\/GlassCard"/);
+  assert.match(read("src/home/components/ContinueLearning.tsx"), /from "\.\.\/\.\.\/components\/ui\/GlassCard"/);
   assert.match(read("src/home/components/ProductCard.tsx"), /from "\.\.\/\.\.\/components\/ui\/glass-button"/);
   const admin = fs.readdirSync("src/components/admin").filter((f) => f.endsWith(".tsx"));
   for (const file of admin) {
