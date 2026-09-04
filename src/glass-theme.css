@@ -1,18 +1,22 @@
 /*
- * Liquid Glass v2 — "Black Ice" theme tokens + the fixed backdrop.
+ * Liquid Glass v2 — theme tokens + the fixed backdrop.
  *
- * This file is the single source of truth for the v2 palette. Everything here
- * is sampled from the owner's reference screenshot; the numbers are recorded in
- * docs/liquid-glass-v2-brief.md §2 (region table) and §3 (palette rule).
+ * This file is the single source of truth for the palette. Everything here is
+ * sampled from the owner's pinned reference — the websiteglass.com docs
+ * playground backdrop (screenshot 2026-09-04): near-black field, indigo-blue
+ * glow upper-left, magenta-purple right, the green/teal glow low-centre, and
+ * a faint 44 px grid. The old v1 "Black Ice" densities and its dither grain
+ * are gone.
  *
  * Three rules govern this file:
  *
  *   1. THE BACKDROP IS THE DESIGN. It is one fixed layer, painted entirely by
- *      soft radial gradients. Blur comes from the gradients' own falloff —
- *      there is no filter, no backdrop-filter and no @keyframes on this layer,
- *      and `scripts/glass-coverage.mjs` fails the build if one ever appears.
+ *      gradients (hairline grid + soft radials). Blur comes from the gradients'
+ *      own falloff — there is no filter, no backdrop-filter and no @keyframes
+ *      on this layer, and `scripts/glass-coverage.mjs` fails the build if one
+ *      ever appears.
  *
- *   2. FALLBACK-FIRST (brief §3a). Every enhancement declaration is preceded
+ *   2. FALLBACK-FIRST. Every enhancement declaration is preceded
  *      by a plain one, so an engine that drops the enhancement degrades to a
  *      solid colour instead of losing the surface. No interpolation keyword
  *      (`in oklab` / `in oklch`) is written by hand anywhere in this file.
@@ -28,17 +32,25 @@
 :root {
   /* ── §2 backdrop palette ──────────────────────────────────────────────────
      Stored as bare channels so each gradient stop can carry its own alpha via
-     `rgb(var(--…) / a)`. Sampled from the reference screenshot; positions are
-     % of the viewport and the layer is fixed, so they do not move on scroll. */
+     `rgb(var(--…) / a)`. Sampled from the owner's pinned reference — the
+     websiteglass.com docs playground backdrop (screenshot 2026-09-04): a
+     near-black field with one soft indigo-blue glow upper-left, a magenta-
+     purple glow on the right edge, the green/teal glow low-centre, and a
+     faint 44 px grid of hairlines over everything. Densities are far lower
+     than the v1 "Black Ice" paint — the heavy saturated wash is gone.
+     Positions are % of the viewport and the layer is fixed, so they do not
+     move on scroll. */
   --dc-bd-base: #0a0c12;            /* blue-biased near-black. Never #000. */
-  --dc-bd-vignette: 6 7 12;         /* deep shade, bottom + corners */
-  --dc-bd-blue-core: 44 53 126;     /* #2c357e — dominant glow, top-left */
-  --dc-bd-blue-hot: 37 48 143;      /* #25308f — hot point inside it */
-  --dc-bd-teal-core: 18 117 106;    /* #12756a — the only green in the design */
-  --dc-bd-teal-deep: 15 95 87;      /* #0f5f57 */
-  --dc-bd-violet-bridge: 58 33 89;  /* #3a2159 — makes blue→purple continuous */
-  --dc-bd-purple-core: 109 33 132;  /* #6d2184 — brightest chroma on the page */
-  --dc-bd-purple-hot: 122 36 136;   /* #7a2488 — nothing may be brighter */
+  --dc-bd-vignette: 5 6 10;         /* deep shade, bottom + corners */
+  --dc-bd-blue-core: 47 58 148;     /* indigo-blue glow, upper-left */
+  --dc-bd-blue-hot: 60 72 176;      /* hot point inside it */
+  --dc-bd-teal-core: 16 140 110;    /* the green glow, low-centre */
+  --dc-bd-teal-deep: 12 106 84;
+  --dc-bd-violet-bridge: 80 44 124; /* keeps blue→purple continuous */
+  --dc-bd-purple-core: 158 58 178;  /* right-edge magenta-purple */
+  --dc-bd-purple-hot: 178 66 200;   /* brightest chroma on the page */
+  --dc-bd-grid: 255 255 255;        /* hairline grid colour */
+  --dc-bd-grid-size: 44px;          /* cell size of the reference grid */
 
   /* ── §3 palette rule: black + white + at most 2–3 accents ─────────────────
      Ink on paper and paper on ink are never pure, because pure black on white
@@ -68,13 +80,14 @@
   --dc-z-toast: 90;         /* always above a dialog that triggered it */
 }
 
-/* ══ THE BACKDROP ═══════════════════════════════════════════════════════════
-   The whole component's paint. Five huge, soft radial glows over a near-black
-   base; each spans 45–70% of the viewport with a long falloff tail, which is
-   where the "blur" actually comes from. Luminance stays low and even so the
-   glass cards still read as glass — nothing here is brighter than the purple
-   core.
-   ════════════════════════════════════════════════════════════════════════ */
+/* ══ THE BACKDROP ══════════════════════════════════════════════════════════════
+   The whole component's paint, matching the pinned reference: two hairline
+   grid layers on top (44 px cells at 5% white), then five huge, soft radial
+   glows over a near-black base; each spans 45–70% of the viewport with a long
+   falloff tail, which is where the "blur" actually comes from. Luminance stays
+   low and even so the glass cards still read as glass. No text, no lens, no
+   demo card — the reference image minus its copy, exactly.
+   ══════════════════════════════════════════════════════════════════════ */
 
 .dc-backdrop {
   display: none;
@@ -86,11 +99,15 @@
   background-color: var(--dc-bd-base);
   /* 2. enhancement — the first listed layer paints on top */
   background-image:
-    radial-gradient(58% 72% at 12% 30%, rgb(var(--dc-bd-blue-core) / 0.95) 0%, rgb(var(--dc-bd-blue-hot) / 0.42) 38%, transparent 68%),
-    radial-gradient(52% 60% at 40% 80%, rgb(var(--dc-bd-teal-core) / 0.72) 0%, rgb(var(--dc-bd-teal-deep) / 0.3) 40%, transparent 70%),
-    radial-gradient(46% 56% at 90% 15%, rgb(var(--dc-bd-purple-core) / 0.8) 0%, rgb(var(--dc-bd-purple-hot) / 0.34) 42%, transparent 72%),
-    radial-gradient(70% 40% at 45% 5%, rgb(var(--dc-bd-violet-bridge) / 0.6) 0%, transparent 70%),
-    radial-gradient(120% 90% at 50% 100%, rgb(var(--dc-bd-vignette) / 0.85) 0%, transparent 55%);
+    /* the grid — two hairline families, exactly like the reference image */
+    repeating-linear-gradient(90deg, rgb(var(--dc-bd-grid) / 0.05) 0 1px, transparent 1px var(--dc-bd-grid-size)),
+    repeating-linear-gradient(0deg, rgb(var(--dc-bd-grid) / 0.05) 0 1px, transparent 1px var(--dc-bd-grid-size)),
+    /* the glows */
+    radial-gradient(52% 58% at 10% 16%, rgb(var(--dc-bd-blue-core) / 0.6) 0%, rgb(var(--dc-bd-blue-hot) / 0.26) 40%, transparent 72%),
+    radial-gradient(56% 48% at 42% 92%, rgb(var(--dc-bd-teal-core) / 0.5) 0%, rgb(var(--dc-bd-teal-deep) / 0.24) 42%, transparent 72%),
+    radial-gradient(46% 62% at 97% 32%, rgb(var(--dc-bd-purple-core) / 0.5) 0%, rgb(var(--dc-bd-purple-hot) / 0.2) 44%, transparent 74%),
+    radial-gradient(70% 40% at 55% 0%, rgb(var(--dc-bd-violet-bridge) / 0.42) 0%, transparent 70%),
+    radial-gradient(120% 90% at 50% 100%, rgb(var(--dc-bd-vignette) / 0.6) 0%, transparent 55%);
   /* NO filter. NO backdrop-filter. NO @keyframes. NO !important. Ever. */
 }
 
@@ -98,48 +115,41 @@ html[data-glass="on"] .dc-backdrop {
   display: block;
 }
 
-/* ── Dither overlay ──────────────────────────────────────────────────────────
-   Large soft gradients band badly on old LCD panels. A static feTurbulence
-   tile at 3.5% breaks the steps up. It is its own fixed layer above the
-   gradient, it never animates, and it is never a `filter:` on scrolling
-   content. Inlined as a data URI (306 bytes) so the single-file build stays
-   self-contained and there is no asset path to deploy. ──────────────────── */
-.dc-grain {
+/* ── "waves" background (Profile → Preferences switch) ──────────────────────
+   The AI Canvas Wave Lines canvas as the fixed layer. Same contract as the
+   gradient paint: fixed, z -1, pointer-events none, no filter of its own —
+   the component's own rAF loop does the animating, always. The fold
+   interaction is tracked at window level inside the component, because a
+   z -1 layer can never receive events itself. */
+.dc-waves {
   display: none;
   position: fixed;
   inset: 0;
   z-index: var(--dc-z-backdrop);
   pointer-events: none;
-  opacity: 0.035;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
-  background-repeat: repeat;
-  background-size: 180px 180px;
 }
 
-html[data-glass="on"] .dc-grain {
+html[data-glass="on"] .dc-waves {
   display: block;
 }
 
-/* ── Gamut probe ─────────────────────────────────────────────────────────────
+/* ── Gamut probe ─────────────────────────────────────────────────────────────────────────────
    "Har device pe same colour", precisely. Wide gamut is a bonus and never a
    requirement: the sRGB declaration above is the fallback and is written
-   first, so a device that fails either probe simply keeps it.
-
-   (The brief sketched this as `@supports (color: color-gamut: srgb)`, which is
-   a media feature rather than a colour and would never match — the working
-   probe for a wide-gamut display is `color(display-p3 …)` support.) ─────── */
+   first, so a device that fails either probe simply keeps it. ─────── */
 @supports (color: color(display-p3 1 0 0)) {
   @media (color-gamut: p3) {
     .dc-backdrop {
       /* Same palette, expressed in the panel's own gamut so the purple core
          keeps its chroma instead of being clipped on the way to sRGB. */
       background-image:
-        radial-gradient(58% 72% at 12% 30%, color(display-p3 0.173 0.208 0.494 / 0.95) 0%, color(display-p3 0.145 0.188 0.561 / 0.42) 38%, transparent 68%),
-        radial-gradient(52% 60% at 40% 80%, color(display-p3 0.071 0.459 0.416 / 0.72) 0%, color(display-p3 0.059 0.373 0.341 / 0.3) 40%, transparent 70%),
-        radial-gradient(46% 56% at 90% 15%, color(display-p3 0.427 0.129 0.518 / 0.8) 0%, color(display-p3 0.478 0.141 0.533 / 0.34) 42%, transparent 72%),
-        radial-gradient(70% 40% at 45% 5%, color(display-p3 0.227 0.129 0.349 / 0.6) 0%, transparent 70%),
-        radial-gradient(120% 90% at 50% 100%, color(display-p3 0.024 0.027 0.047 / 0.85) 0%, transparent 55%);
+        repeating-linear-gradient(90deg, color(display-p3 1 1 1 / 0.05) 0 1px, transparent 1px var(--dc-bd-grid-size)),
+        repeating-linear-gradient(0deg, color(display-p3 1 1 1 / 0.05) 0 1px, transparent 1px var(--dc-bd-grid-size)),
+        radial-gradient(52% 58% at 10% 16%, color(display-p3 0.184 0.227 0.58 / 0.6) 0%, color(display-p3 0.235 0.282 0.69 / 0.26) 40%, transparent 72%),
+        radial-gradient(56% 48% at 42% 92%, color(display-p3 0.063 0.549 0.431 / 0.5) 0%, color(display-p3 0.047 0.416 0.329 / 0.24) 42%, transparent 72%),
+        radial-gradient(46% 62% at 97% 32%, color(display-p3 0.62 0.227 0.698 / 0.5) 0%, color(display-p3 0.698 0.259 0.784 / 0.2) 44%, transparent 74%),
+        radial-gradient(70% 40% at 55% 0%, color(display-p3 0.314 0.173 0.486 / 0.42) 0%, transparent 70%),
+        radial-gradient(120% 90% at 50% 100%, color(display-p3 0.02 0.024 0.039 / 0.6) 0%, transparent 55%);
     }
   }
 }
@@ -151,11 +161,13 @@ html[data-glass="on"] .dc-grain {
   .dc-backdrop {
     background-color: #0a0c12;
     background-image:
-      radial-gradient(58% 72% at 12% 30%, rgba(44, 53, 126, 0.95) 0%, rgba(37, 48, 143, 0.42) 38%, transparent 68%),
-      radial-gradient(52% 60% at 40% 80%, rgba(18, 117, 106, 0.72) 0%, rgba(15, 95, 87, 0.3) 40%, transparent 70%),
-      radial-gradient(46% 56% at 90% 15%, rgba(109, 33, 132, 0.8) 0%, rgba(122, 36, 136, 0.34) 42%, transparent 72%),
-      radial-gradient(70% 40% at 45% 5%, rgba(58, 33, 89, 0.6) 0%, transparent 70%),
-      radial-gradient(120% 90% at 50% 100%, rgba(6, 7, 12, 0.85) 0%, transparent 55%);
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px var(--dc-bd-grid-size)),
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px var(--dc-bd-grid-size)),
+      radial-gradient(52% 58% at 10% 16%, rgba(47, 58, 148, 0.6) 0%, rgba(60, 72, 176, 0.26) 40%, transparent 72%),
+      radial-gradient(56% 48% at 42% 92%, rgba(16, 140, 110, 0.5) 0%, rgba(12, 106, 84, 0.24) 42%, transparent 72%),
+      radial-gradient(46% 62% at 97% 32%, rgba(158, 58, 178, 0.5) 0%, rgba(178, 66, 200, 0.2) 44%, transparent 74%),
+      radial-gradient(70% 40% at 55% 0%, rgba(80, 44, 124, 0.42) 0%, transparent 70%),
+      radial-gradient(120% 90% at 50% 100%, rgba(5, 6, 10, 0.6) 0%, transparent 55%);
   }
 }
 

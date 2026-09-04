@@ -5505,30 +5505,31 @@ html[data-course-player-active="true"] {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   CHROME GLASS — MAG / WebsiteGlass frost on every header
+   CHROME GLASS — WebsiteGlass docs sensitivity on every header
    ══════════════════════════════════════════════════════════════════════
-   Same watercolor lens the dock uses (sky 186,230,253 → white sheen →
-   violet 196,181,253, frost blur 18px, saturate 160%). No opaque white
-   strip. Home keeps its admin-custom gradient stops as a translucent
-   wash over that frost, and shrinks to brand + action buttons as the
-   page scroller moves. */
+   The pinned config from websiteglass.com/docs/components/glass —
+   radius 24 · strength 0.5 · blur 4 · tint 0.25 · dome 0.1 — expressed
+   through the pack's own GlassSurface formulas: rgba(60,62,68,
+   0.25*0.42=0.105) tint · NO blur (owner override 2026-09-04: "background blur
+   ekadam hata do") · saturate 1.15 · dark rimShadow. No opaque strip anywhere. Home keeps its
+   admin-custom gradient stops as a translucent wash over that frost, and
+   shrinks to brand + action buttons as the page scroller moves. */
 
 :root {
-  /* Phase A: exactly the pack's GlassSurface dark material at its defaults
-     (websiteglass.com GlassSurface tint 0.5: rgba(60,62,68, 0.5*0.42=0.21) ·
-     blur 14*(0.4+0.5*0.6)=9.8px · saturate 1+0.6*0.5=1.3 · dark rimShadow) so every header reads as the same
-     component the cards use. Light scheme swaps to the light material. */
-  --dc-chrome-glass: rgba(60, 62, 68, 0.21);
-  --dc-chrome-glass-blur: blur(9.8px) saturate(1.3);
+  /* The pack's GlassSurface dark material at the pinned docs config, so
+     every header reads as the same component the cards use. Light scheme
+     swaps to the light material at the same sensitivity. */
+  --dc-chrome-glass: rgba(60, 62, 68, 0.105);
+  --dc-chrome-glass-blur: saturate(1.15); /* blur 0 — owner: background blur removed */
   --dc-chrome-glass-rim:
     inset 0 1px 1px rgba(255, 255, 255, 0.5),
     inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 html.light {
-  /* The pack's light material (255,255,255 at the same 0.21) when the header's
-     Dark-mode switch is off. */
-  --dc-chrome-glass: rgba(255, 255, 255, 0.21);
+  /* The pack's light material (255,255,255 at the same 0.105) when the
+     header's Dark-mode switch is off. */
+  --dc-chrome-glass: rgba(255, 255, 255, 0.105);
   --dc-chrome-glass-rim:
     inset 0 1px 1px rgba(255, 255, 255, 0.9),
     inset 0 0 0 1px rgba(255, 255, 255, 0.4);

@@ -21,7 +21,7 @@
 
 import { useRef, type CSSProperties, type ComponentType, type ReactNode, type Ref } from 'react'
 import { motion, useMotionValue, useSpring, useTransform, type MotionValue } from 'framer-motion'
-import {
+import GlassMaterial, {
   DOCK_PANEL_BG,
   DOCK_PANEL_BLUR,
   DOCK_PANEL_BORDER,
@@ -125,10 +125,10 @@ function DockItem({
           active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         }`}
         style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          background: DOCK_PANEL_BG,
+          backdropFilter: DOCK_PANEL_BLUR,
+          WebkitBackdropFilter: DOCK_PANEL_BLUR,
+          border: DOCK_PANEL_BORDER,
           transition: 'opacity 0.15s',
         }}
       >
@@ -244,13 +244,11 @@ export default function GlassDock({
       data-glass-dock=""
       data-site-footer={siteFooter ? '' : undefined}
     >
-      {/* Separate non-animating blur layer (AI Canvas): the frosted backdrop
-          never re-blurs while the magnification wave animates the icons. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-[-1] rounded-3xl"
-        style={{ backdropFilter: DOCK_PANEL_BLUR, WebkitBackdropFilter: DOCK_PANEL_BLUR }}
-      />
+      {/* The WebsiteGlass lens itself — the pinned docs sensitivity
+          (radius 24 · strength 0.5 · blur 4 · tint 0.25): rim refraction on
+          Chromium, the frosted panel material everywhere else. Static layer —
+          the magnification wave never re-blurs it. */}
+      <GlassMaterial />
       {leading}
       {items.map((item, i) => (
         <DockItem

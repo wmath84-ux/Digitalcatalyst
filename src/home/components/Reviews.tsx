@@ -1,6 +1,6 @@
 import { BadgeCheck } from "lucide-react";
 import type { PublishedProductReview } from "../../hooks/useProductReviews";
-import { GlassCard } from "../../components/ui/glass-card";
+import { GlassCard } from "../../components/ui/GlassCard";
 
 interface ReviewsProps {
   reviews: PublishedProductReview[];

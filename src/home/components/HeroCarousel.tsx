@@ -93,12 +93,15 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
 
   return (
     <div className="px-5 pt-4 md:px-8">
-      {/* A7: the carousel frame is the pack GlassSurface at its defaults; each
-          slide paints one translucent accent (the admin preset) over it — no
-          gradient plate, no glow orbs, no white wash. */}
+      {/* The carousel frame is the pack GlassSurface at the pinned docs
+          sensitivity (radius 24 · blur 4 · tint 0.25); each slide paints one
+          translucent accent (the admin preset) over it — no gradient plate,
+          no glow orbs, no white wash. */}
       <GlassSurface
         ref={trackRef}
-        radius={28}
+        radius={24}
+        tint={0.25}
+        blur={0}
         className="select-none overflow-hidden touch-pan-y"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

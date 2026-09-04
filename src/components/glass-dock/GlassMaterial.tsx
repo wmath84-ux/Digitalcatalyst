@@ -3,34 +3,41 @@
 /**
  * WebsiteGlass lens chrome for our MAG dock — look only, no extra bar.
  *
- * Defaults from websiteglass GlassDock:
- *   radius 20 · strength 0.28 · frost 0.3
- *   tint = min(0.5, frost * 0.5) = 0.15
- *   blur = 2 + frost * 8 = 4.4
+ * Defaults = the pinned sensitivity from websiteglass.com/docs/components/glass
+ * (the owner's reference screenshot, mirrored in src/lib/glass.ts GLASS_DOCS):
+ *   radius 24 · strength 0.5 · blur 4 · tint 0.25 · dome 0.1
  *
- * No opaque white fill. The dock stays see-through; Chromium gets rim
- * refraction, everyone else gets frost blur on whatever is behind.
+ * The dock panel's fallback (DOCK_PANEL_*) is the pack's GlassSurface painting
+ * the same config: rgba(60,62,68, 0.25*0.42=0.105) tint, saturate 1.15, and
+ * the pack's dark rimShadow — with NO blur stage (owner override 2026-09-04:
+ * "background blur ekadam hata do"). No opaque white fill. The dock stays
+ * see-through; Chromium gets rim refraction, everyone else the tint only.
  */
 
 import { useEffect, useId, useRef, useState } from 'react'
+import { GLASS_DOCS, GLASS_DOCS_SURFACE } from '@/lib/glassDocs'
 
-export const GLASS_RADIUS = 20
-export const GLASS_STRENGTH = 0.28
-export const GLASS_FROST = 0.3
-export const GLASS_TINT = Math.min(0.5, GLASS_FROST * 0.5)
-export const GLASS_BLUR = 2 + GLASS_FROST * 8
+export const GLASS_RADIUS = GLASS_DOCS.radius          // 24
+export const GLASS_STRENGTH = GLASS_DOCS.strength      // 0.5
+export const GLASS_TINT = GLASS_DOCS.tint              // 0.25
+export const GLASS_BLUR = GLASS_DOCS.blur              // 4
 export const GLASS_ACCENT = '#38bdf8'
 export const GLASS_PILL_RADIUS = Math.max(4, GLASS_RADIUS - 7)
-export const GLASS_TINT_RGB = '255,255,255'
+export const GLASS_TINT_RGB = '60,62,68'               // the pack's dark-scheme tint colour
 
-// ── AI Canvas glass-dock panel tokens ────────────────────────────────────────
-// (https://aicanvas.me/components/glass-dock) — the dock bar's frosted panel:
-// translucent white pane, hairline border, deep drop + inset top-light, and a
-// SEPARATE non-animating blur layer so magnification frames never re-blur.
-export const DOCK_PANEL_BG = 'rgba(255,255,255,0.06)'
-export const DOCK_PANEL_BORDER = '1px solid rgba(255,255,255,0.1)'
-export const DOCK_PANEL_SHADOW = '0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)'
-export const DOCK_PANEL_BLUR = 'blur(24px) saturate(1.8)'
+// ── Panel tokens ─────────────────────────────────────────────────────────────
+// The frosted panel behind the dock / sidebar rows: the pack GlassSurface's
+// dark material at the pinned docs config (tint 0.25 · blur 4), plus the
+// pack's dark rimShadow for depth. SEPARATE non-animating blur layer so dock
+// magnification frames never re-blur.
+export const DOCK_PANEL_BG = `rgba(${GLASS_TINT_RGB},${GLASS_DOCS_SURFACE.tintAlpha})`
+export const DOCK_PANEL_BORDER = '1px solid rgba(255,255,255,0.12)'
+export const DOCK_PANEL_SHADOW =
+  'inset 0 1px 1px rgba(255,255,255,0.5), inset 0 0 0 1px rgba(255,255,255,0.12), 0 16px 40px -14px rgba(0,0,0,0.6)'
+export const DOCK_PANEL_BLUR =
+  GLASS_DOCS_SURFACE.blurPx > 0
+    ? `blur(${GLASS_DOCS_SURFACE.blurPx}px) saturate(${GLASS_DOCS_SURFACE.saturate})`
+    : `saturate(${GLASS_DOCS_SURFACE.saturate})`
 
 const MAP_CACHE = new Map<string, string>()
 
@@ -107,7 +114,7 @@ function buildLensMap(w: number, h: number, radius: number, strength: number) {
 
 export default function GlassMaterial({
   strength = GLASS_STRENGTH,
-  frost = GLASS_FROST,
+  frost = GLASS_TINT,
   radius = GLASS_RADIUS,
 }: {
   strength?: number
@@ -119,8 +126,10 @@ export default function GlassMaterial({
   const [map, setMap] = useState<string | null>(null)
   const [supported, setSupported] = useState(false)
 
-  const tint = Math.min(0.5, frost * 0.5)
-  const blur = 2 + frost * 8
+  // The pinned docs sensitivity: tint 0.25 · blur 4, independent values —
+  // blur no longer derives from frost.
+  const tint = frost
+  const blur = GLASS_BLUR
   const displace = 8 + strength * 60
 
   useEffect(() => {
@@ -144,8 +153,10 @@ export default function GlassMaterial({
 
   const backdrop =
     supported && map
-      ? `url(#${filterId}) blur(${blur}px) saturate(1.6)`
-      : `blur(${Math.max(blur, 12)}px) saturate(1.6)`
+      ? `url(#${filterId})${blur > 0 ? ` blur(${blur}px)` : ""} saturate(1.6)`
+      : blur > 0
+        ? `blur(${Math.max(blur, 12)}px) saturate(1.6)`
+        : "saturate(1.6)"
 
   return (
     <div

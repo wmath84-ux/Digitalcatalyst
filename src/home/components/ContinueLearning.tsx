@@ -8,7 +8,7 @@
  * in the future flow through automatically.
  */
 
-import { GlassCard } from "../../components/ui/glass-card";
+import { GlassCard } from "../../components/ui/GlassCard";
 
 export interface ContinueLearningItem {
   /** Product id — used as the React key. */
