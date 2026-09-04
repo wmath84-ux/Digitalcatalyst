@@ -47,7 +47,9 @@ import { GlassToaster, toast as glassToast } from "./components/ui/glass-toast";
 import { GlassBackdrop } from "./components/ui/GlassBackdrop";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BrandingProvider, useBranding } from "./context/BrandingContext";
+import { ConnectivityProvider, useConnectivity } from "./context/ConnectivityContext";
 import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
+import OfflineGate from "./components/offline/OfflineGate";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
 import { initFooterGlow } from "./utils/footerGlow";
@@ -368,12 +370,15 @@ function Root() {
   // page body, but the per-page chrome (Header + BottomNav) is still
   // rendered inside each app — the desktop CSS hides it on >= 1024 px.
   // The shell (left rail + top bar) takes over from there.
+  // OfflineGate is an overlay sibling — never an early-return — so the
+  // shared WinterScene backdrop and the rest of the tree stay mounted.
   return (
     <>
       <RouteBackdrop />
       <DesktopAppHost>
         <RootPage />
       </DesktopAppHost>
+      <OfflineGate />
     </>
   );
 }
@@ -500,6 +505,7 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
 function RootPage(): ReactNode {
   const { user, loading, logout } = useAuth();
   const { openingAnimationEnabled } = useBranding();
+  const { offline } = useConnectivity();
   const { products: catalogProducts, purchasedIds, loading: catalogLoading } = useCatalog();
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
@@ -1043,8 +1049,11 @@ function RootPage(): ReactNode {
     if (typeof document === "undefined") return;
     const splash = document.getElementById("app-opening-splash");
     if (!splash) return;
-    if (!playOpening) {
+    if (!playOpening || offline) {
       splash.style.display = "none";
+      // Offline boot skips the opening MP4 so the native overlay paints
+      // immediately. Mark it done so a later `online` event cannot replay it.
+      if (offline) setOpeningVideoDone(true);
       return;
     }
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -1061,9 +1070,9 @@ function RootPage(): ReactNode {
     }
     const shouldShow = !openingVideoDone || launchPending;
     splash.style.display = shouldShow ? "" : "none";
-  }, [playOpening, openingVideoDone, launchPending, openingSrc]);
+  }, [playOpening, openingVideoDone, launchPending, openingSrc, offline]);
 
-  if (playOpening && (!openingVideoDone || launchPending)) {
+  if (playOpening && !offline && (!openingVideoDone || launchPending)) {
     return <AppLaunchSplash src={openingSrc} onEnded={markOpeningVideoDone} label={skipLandingForInstalledMobilePwa ? "Opening your dashboard…" : "Preparing your learning space…"} />;
   }
   if (launchPending && skipLandingForInstalledMobilePwa) {
@@ -1419,6 +1428,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
       <BrandingProvider>
+        <ConnectivityProvider>
         <CatalogProvider>
           <CommerceProvider>
             <Root />
@@ -1436,6 +1446,7 @@ createRoot(document.getElementById("root")!).render(
             <PortraitOnlyGuard />
           </CommerceProvider>
         </CatalogProvider>
+        </ConnectivityProvider>
       </BrandingProvider>
     </AuthProvider>
   </StrictMode>,

@@ -1,0 +1,27 @@
+/* EduOS offline energy field — Magic UI Ripple keyframes, EduOS palette.
+   https://magicui.design/docs/components/ripple */
+
+@keyframes eduos-ripple {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+}
+
+.eduos-ripple-ring {
+  animation: eduos-ripple var(--eduos-ripple-duration, 2.4s) ease-in-out
+    calc(var(--i, 0) * 0.18s) infinite;
+}
+
+.eduos-ripple-field[data-connection="lost"] .eduos-ripple-ring {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eduos-ripple-ring {
+    animation: none;
+  }
+}

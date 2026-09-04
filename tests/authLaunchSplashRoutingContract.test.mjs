@@ -78,3 +78,10 @@ test("launch screen plays the opening video and respects reduced motion", () => 
   assert.doesNotMatch(main, /app-boot-bar/);
   assert.doesNotMatch(html, /eduvora-logo-in/);
 });
+
+test("offline overlay is gated beside Root and does not replace the opening MP4s", () => {
+  assert.match(main, /<OfflineGate \/>/);
+  assert.match(main, /playOpening && !offline/);
+  assert.match(main, /APP_OPENING_VIDEO_MOBILE_SRC = "\/assets\/animations\/EduOS_app_opening_mobile\.mp4"/);
+  assert.match(main, /APP_OPENING_VIDEO_DESKTOP_SRC = "\/assets\/animations\/EduOS_app_opening_desktop\.mp4"/);
+});
