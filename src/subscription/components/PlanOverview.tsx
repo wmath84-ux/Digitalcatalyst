@@ -7,7 +7,7 @@
 // those are gone.
 
 import { BadgeCheck, Check, Crown, Lock, X as XIcon, ChevronDown, ChevronUp } from "lucide-react";
-import { GlassCard } from "../../components/ui/glass-card";
+import { GlassCard } from "../../components/ui/GlassCard";
 import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 import SubscriberOnlyPriceBadge from "../../components/subscription/SubscriberOnlyPriceBadge";
 import { useState } from "react";

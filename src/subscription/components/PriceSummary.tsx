@@ -10,7 +10,7 @@
 // the exact package — not just aggregate numbers — before checkout.
 
 import { Receipt } from "lucide-react";
-import { GlassCard } from "../../components/ui/glass-card";
+import { GlassCard } from "../../components/ui/GlassCard";
 import type { SubscriptionPlanDoc } from "../utils/subscriptionCatalog";
 
 export interface SummaryProduct {

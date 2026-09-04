@@ -11,7 +11,7 @@
 // and when it can next be renewed.
 
 import { BadgeCheck, CalendarClock, Check, Info, Package, PlusCircle, Sparkles } from "lucide-react";
-import { GlassCard } from "../../components/ui/glass-card";
+import { GlassCard } from "../../components/ui/GlassCard";
 import { GlassButton } from "../../components/ui/glass-button";
 import type { OwnedPlanSummary } from "../../../utils/subscriptionOwnership";
 import type { SubscriptionFeatureDoc } from "../utils/subscriptionCatalog";

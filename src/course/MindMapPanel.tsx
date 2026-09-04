@@ -177,7 +177,7 @@ import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { GlassSurface } from "../components/ui/glass";
 import { GlassButton } from "../components/ui/glass-button";
-import { GlassCard } from "../components/ui/glass-card";
+import { GlassCard } from "../components/ui/GlassCard";
 import {
   getCoursePanelSession,
   setMindMapSessionTheme,

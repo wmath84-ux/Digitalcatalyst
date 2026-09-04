@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { GlassCard } from "./components/ui/glass-card";
+import { GlassCard } from "./components/ui/GlassCard";
 import { Tabs, TabsList, TabsTrigger } from "./components/ui/glass-tabs";
 import { GlassButton } from "./components/ui/glass-button";
 import { doc, getDoc } from "firebase/firestore";
