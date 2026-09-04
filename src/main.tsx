@@ -488,8 +488,20 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
   return (
     <AppShell
       active={resolveActiveFromHash(hash)}
-      pageTitle={hash.startsWith("#/flowpath") ? "FlowPath" : undefined}
-      pageSubtitle={hash.startsWith("#/flowpath") ? "Your day. Your goals. One continuous flow." : undefined}
+      pageTitle={
+        hash.startsWith("#/flowpath")
+          ? "FlowPath"
+          : hash.startsWith(PRODUCT_HASH)
+            ? "Product details"
+            : undefined
+      }
+      pageSubtitle={
+        hash.startsWith("#/flowpath")
+          ? "Your day. Your goals. One continuous flow."
+          : hash.startsWith(PRODUCT_HASH)
+            ? "Everything about this resource, before you buy"
+            : undefined
+      }
     >
       {children}
     </AppShell>

@@ -6304,3 +6304,216 @@ html.light .dc-compare-table .dc-compare-rowhead {
   background: rgba(255, 255, 255, 0.16);
   border-radius: 9999px;
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   PRODUCT DETAIL — DESKTOP WORKSPACE LAYOUT
+   ══════════════════════════════════════════════════════════════════════
+   The PDP is built mobile-first: one vertical column of glass cards.
+   Inside the desktop shell that column used to stretch edge-to-edge of
+   the content area — on a 27" monitor the hero image became a billboard
+   and every card a very wide ribbon.
+
+   The desktop model (every rule below is scoped to `.dc-desktop-shell`,
+   so the phone band and the 640–959 tablet-portrait band can never see
+   any of it — they keep the exact existing layout):
+
+     · The breadcrumb + page body cap at a 1440 px container centred in
+       the shell's content column, so 1920 / 2560 px displays get calm
+       margins instead of stretched cards.
+     · 960–1199 px (wide tablet / small desktop): one comfortable
+       reading column (max 780 px), centred. The mobile vertical order is
+       preserved, nothing is squeezed.
+     · ≥ 1200 px: two areas. Gallery + purchase builder + details +
+       reviews + related stack on the left; the title / price / coupon
+       "purchase column" becomes a sticky right rail (320–380 px) that
+       stays with the pointer while the left column scrolls — the classic
+       commerce split, seated with the shell's own topbar-height token.
+     · The hero image swaps 4:3 for 16:10 (16:9 in the split) with a
+       viewport-height cap so the picture never eats the first screen.
+     · Lists that are vertical on a phone (related products, published
+       reviews) tile into grids once their column is wide enough.
+     · Typography steps up exactly one notch (title, price, section
+       headings, meta) — readable at arm's length, never billboard-sized.
+     · The details tab bar keeps its sticky behaviour but seats below the
+       shell's glass topbar and frosts once stuck.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* The shell already supplies the content gutters — drop the phone page's
+   own horizontal padding so breadcrumb, body and cards share one grid. */
+.dc-desktop-shell [data-pdp-scroll] {
+  padding-inline: 0;
+}
+
+/* One centred container for breadcrumb + body: header rail edge, page
+   title column and content all line up on the same axis. */
+.dc-desktop-shell nav[data-pdp-loose],
+.dc-desktop-shell [data-pdp-body] {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: 0;
+}
+
+/* Small desktop / wide tablet: a single centred reading column. Wider
+   than the phone frame, narrow enough that paragraphs and cards never
+   stretch into ribbons. */
+@media (min-width: 960px) and (max-width: 1199px) {
+  .dc-desktop-shell [data-pdp-body] {
+    max-width: 780px;
+  }
+  .dc-desktop-shell nav[data-pdp-loose] {
+    max-width: 780px;
+  }
+}
+
+/* ≥ 1200 px: the commerce split. Left column carries the media + all
+   long-form content; the purchase column pins to the right and follows
+   the scroll (its own grid area spans both rows, so sticky has room to
+   travel the whole page). */
+@media (min-width: 1200px) {
+  .dc-desktop-shell [data-pdp-body] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 24vw, 380px);
+    grid-template-areas:
+      "gallery buy"
+      "stack   buy";
+    column-gap: clamp(24px, 2.4vw, 44px);
+    row-gap: 28px;
+    align-items: start;
+  }
+  .dc-desktop-shell [data-pdp-gallery] { grid-area: gallery; }
+  .dc-desktop-shell [data-pdp-stack]   { grid-area: stack; }
+  .dc-desktop-shell [data-pdp-buy] {
+    grid-area: buy;
+    position: sticky;
+    /* The shell scroller resolves sticky insets from its content box, which
+       already starts one topbar + 1.5rem pad below the viewport top. A
+       -0.25rem inset therefore seats the rail exactly 1.25rem under the
+       glass topbar instead of 1.25rem under the content edge. */
+    top: -0.25rem;
+    align-self: start;
+    /* Short laptop viewports: the rail scrolls inside itself instead of
+       pushing the coupon out of reach. `overscroll-behavior` keeps the
+       wheel from chaining into the page while the rail still has range. */
+    max-height: calc(100dvh - var(--desktop-topbar-height, 64px) - 3rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(100 116 139 / 0.4) transparent;
+    padding-bottom: 2px;
+  }
+  /* The share sheet opens from the bottom of the price card; inside a
+     self-scrolling rail an upward sheet always stays in view. */
+  .dc-desktop-shell [data-product-share] {
+    top: auto;
+    bottom: 3.25rem;
+  }
+}
+
+/* Hero media: on a wide column 4:3 would stand taller than the whole
+   first screen. A wider crop + a viewport cap keeps the picture a hero,
+   not a wall. */
+.dc-desktop-shell [data-pdp-hero-img] {
+  aspect-ratio: 16 / 10;
+  max-height: min(62vh, 620px);
+}
+@media (min-width: 1200px) {
+  .dc-desktop-shell [data-pdp-hero-img] {
+    aspect-ratio: 16 / 9;
+    max-height: min(64vh, 660px);
+  }
+}
+
+/* Gallery thumbs: fixed, mouse-friendly tiles instead of phone-width
+   flex-grow strips; a clear hover affordance for the pointer. */
+.dc-desktop-shell [data-pdp-thumbs] button {
+  flex: 0 0 auto;
+  width: 6.75rem;
+  height: 4.25rem;
+}
+.dc-desktop-shell [data-pdp-thumbs] button:hover {
+  opacity: 1;
+  border-color: rgb(255 255 255 / 0.45);
+}
+
+/* Typography: one calm step up from the phone scale. */
+.dc-desktop-shell [data-pdp-titleblock] h1 {
+  font-size: clamp(1.55rem, 1.25rem + 0.65vw, 1.9rem);
+  line-height: 1.18;
+}
+.dc-desktop-shell [data-pdp-titleblock] p.dc-ink-2 {
+  font-size: 0.9375rem;
+  max-width: 68ch;
+}
+.dc-desktop-shell [data-pdp-buy] .dc-hero-price {
+  font-size: clamp(2.15rem, 1.8rem + 0.7vw, 2.6rem);
+}
+.dc-desktop-shell [data-pdp-meta] .grid.grid-cols-2 {
+  font-size: 12px;
+  gap: 0.625rem;
+}
+.dc-desktop-shell [data-pdp-stack] h2 {
+  font-size: 1.25rem;
+}
+.dc-desktop-shell [data-pdp-reviews] h2 {
+  font-size: 1.25rem;
+}
+
+/* Related products: a tiled grid instead of a phone-length list.
+   auto-fill keeps the cards at a sane width at every desktop size
+   (2-up in the narrow split, 3-up once the column is wide). */
+.dc-desktop-shell [data-pdp-related-list] {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 14px;
+}
+
+/* Published reviews tile two-up once the left column is genuinely wide
+   (≥ 1440 px viewports); the load-more action always spans the row. */
+@media (min-width: 1440px) {
+  .dc-desktop-shell [data-pdp-review-list] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .dc-desktop-shell [data-pdp-review-list] [data-load-more-reviews] {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Details tab bar: seat it below the shell's glass topbar (the phone
+   `top: 0` would slide it under the bar) and frost it once it sticks.
+   Same content-box sticky maths as the purchase rail: a -0.75rem inset
+   seats the bar 0.75rem under the topbar glass. */
+.dc-desktop-shell [data-pdp-tabbar] {
+  top: -0.75rem;
+}
+.dc-desktop-shell [data-pdp-tabbar][data-stuck="true"] {
+  backdrop-filter: var(--dc-chrome-glass-blur);
+  -webkit-backdrop-filter: var(--dc-chrome-glass-blur);
+}
+
+/* Mouse comfort: the two primary commerce CTAs get a slightly larger
+   type size and row height at desktop reading distance. */
+@media (min-width: 1200px) {
+  .dc-desktop-shell [data-pdp-buy] button.dc-focusable {
+    padding-block: 0.9375rem;
+    font-size: 0.9375rem;
+  }
+}
+
+/* Breadcrumb: a desktop row has room for the real product name — the
+   phone's 190 px truncate only stays on the phone. */
+.dc-desktop-shell nav[data-pdp-loose] .truncate {
+  max-width: 460px;
+}
+
+/* A stuck tab bar floats over scrolling copy — the bare chrome token is
+   too sheer to read a pill row against, so the stuck state deepens the
+   tint (and lightens it on the light scheme) behind the frost. */
+.dc-desktop-shell [data-pdp-tabbar][data-stuck="true"] {
+  background-color: rgb(12 14 28 / 0.68);
+}
+html.light .dc-desktop-shell [data-pdp-tabbar][data-stuck="true"] {
+  background-color: rgb(255 255 255 / 0.78);
+}
