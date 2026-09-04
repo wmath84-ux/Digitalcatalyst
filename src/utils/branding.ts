@@ -14,7 +14,7 @@ export type Branding = {
   logoUrl: string;
   appName: string;
   tagline: string;
-  /** Controls the animated app-opening splash screen. Default is off. */
+  /** Controls the animated app-opening splash screen. Default is on. */
   openingAnimationEnabled: boolean;
   /**
    * Hides the thin horizontal separator lines at the edges of the app chrome:
@@ -43,7 +43,7 @@ export const DEFAULT_BRANDING: Branding = {
   logoUrl: DEFAULT_LOGO_URL,
   appName: DEFAULT_APP_NAME,
   tagline: DEFAULT_TAGLINE,
-  openingAnimationEnabled: false,
+  openingAnimationEnabled: true,
   hideFrameBorders: true,
   homeGradientFrom: DEFAULT_HOME_GRADIENT_FROM,
   homeGradientTo: DEFAULT_HOME_GRADIENT_TO,
@@ -75,7 +75,9 @@ export function normalizeBranding(data: Partial<Record<keyof Branding, unknown>>
     logoUrl,
     appName: sanitize(data?.appName, DEFAULT_APP_NAME),
     tagline: sanitize(data?.tagline, DEFAULT_TAGLINE, 80),
-    openingAnimationEnabled: data?.openingAnimationEnabled === true,
+    // On by default: only an explicit `false` (toggle turned off in the
+    // admin panel) skips the opening animation.
+    openingAnimationEnabled: data?.openingAnimationEnabled !== false,
     // Hidden by default: only an explicit `false` (toggle turned off in the
     // admin panel) brings the top/bottom separator lines back.
     hideFrameBorders: data?.hideFrameBorders !== false,

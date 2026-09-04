@@ -63,6 +63,13 @@ test("pre-JavaScript and React loading screens play the exact EduOS opening vide
   assert.ok(icons192.includes("/icons/icon-192x192.svg"), `192x192 SVG missing from manifest: ${icons192.join(", ")}`);
 });
 
+test("opening animation is on by default", () => {
+  const branding = fs.readFileSync("src/utils/branding.ts", "utf8");
+  assert.match(branding, /openingAnimationEnabled: true,/);
+  assert.match(branding, /openingAnimationEnabled: data\?\.openingAnimationEnabled !== false/);
+  assert.match(html, /openingAnimationEnabled !== false/);
+});
+
 test("launch screen plays the opening video and respects reduced motion", () => {
   assert.match(html, /id="app-opening-video"/);
   assert.match(html, /prefers-reduced-motion/);

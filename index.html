@@ -27,8 +27,8 @@
   </head>
   <body>
     <!-- Exact EduOS opening animation. Lives outside #root so React mount
-         cannot restart or replace the video. Hidden unless branding has the
-         opening animation turned on. -->
+         cannot restart or replace the video. On by default; hidden only when
+         branding has the opening animation turned off. -->
     <div id="app-opening-splash" class="app-boot-splash" role="status" aria-label="Loading Eduvora" style="display:none">
       <video
         id="app-opening-video"
@@ -53,7 +53,7 @@
           var name = (data.appName || "Eduvora").toString().trim().slice(0, 40);
           var tagline = (data.tagline || "Digital Catalyst").toString().trim().slice(0, 80);
           var logo = (data.logoUrl || legacy || "/icons/icon-192x192.svg").toString();
-          var openingAnimationEnabled = data.openingAnimationEnabled === true;
+          var openingAnimationEnabled = data.openingAnimationEnabled !== false;
           var hideFrameBorders = data.hideFrameBorders !== false;
           document.documentElement.dataset.hideFrameBorders = String(hideFrameBorders);
           if (!/^https?:\/\//.test(logo) && !logo.startsWith("/")) logo = "/icons/icon-192x192.svg";
