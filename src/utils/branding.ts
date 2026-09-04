@@ -199,7 +199,7 @@ function applyBootSplash(branding: Branding) {
   if (bootIcon) bootIcon.alt = branding.appName;
   const bootTitle = document.querySelector(".app-boot-title");
   if (bootTitle) bootTitle.textContent = branding.appName;
-  const splash = document.querySelector(".app-boot-splash");
+  const splash = document.getElementById("app-opening-splash") || document.querySelector(".app-boot-splash");
   if (splash) splash.setAttribute("aria-label", `Loading ${branding.appName}`);
 }
 

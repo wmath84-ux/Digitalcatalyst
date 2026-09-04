@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { StrictMode, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
@@ -262,16 +262,72 @@ const startCheckout = ({
   window.location.hash = CHECKOUT_HASH;
 };
 
-function AppLaunchSplash({ label = "Preparing your learning space…" }: { label?: string }) {
-  const { logoUrl, appName } = useBranding();
+/** Exact EduOS opening animation — do not recreate or restyle the frames. */
+const APP_OPENING_VIDEO_SRC = "/assets/animations/EduOS_app_opening.mp4";
+// The shipped MP4 is 6.0s (mvhd timescale 1000 / duration 6000). Give a small
+// buffer so a slow decoder cannot pin the splash forever if `ended` is missed.
+const APP_OPENING_VIDEO_TIMEOUT_MS = 8000;
+
+function AppLaunchSplash({
+  label = "Preparing your learning space…",
+  onEnded,
+}: {
+  label?: string;
+  onEnded?: () => void;
+}) {
+  const { appName } = useBranding();
+  const reactVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (!onEnded) return undefined;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      onEnded();
+      return undefined;
+    }
+    const hostVideo = document.getElementById("app-opening-video") as HTMLVideoElement | null;
+    const video = hostVideo ?? reactVideoRef.current;
+    if (!video) {
+      onEnded();
+      return undefined;
+    }
+    const done = () => onEnded();
+    if (video.ended) {
+      done();
+      return undefined;
+    }
+    video.addEventListener("ended", done);
+    video.addEventListener("error", done);
+    const playing = video.play();
+    if (playing && typeof playing.catch === "function") playing.catch(() => done());
+    const timeout = window.setTimeout(done, APP_OPENING_VIDEO_TIMEOUT_MS);
+    return () => {
+      video.removeEventListener("ended", done);
+      video.removeEventListener("error", done);
+      window.clearTimeout(timeout);
+    };
+  }, [onEnded]);
+
+  const hostVideo = typeof document !== "undefined"
+    ? document.getElementById("app-opening-video")
+    : null;
+
   return (
     <main className="app-boot-splash" role="status" aria-live="polite" aria-label={`Loading ${appName}`}>
-      <div className="app-boot-content">
-        <img className="app-boot-icon" src={logoUrl} alt={appName} />
-        <p className="app-boot-title">{appName}</p>
-        <p className="app-boot-label">{label}</p>
-        <div className="app-boot-track" aria-hidden="true"><div className="app-boot-bar" /></div>
-      </div>
+      {hostVideo ? null : (
+        <video
+          ref={reactVideoRef}
+          className="app-boot-video"
+          src={APP_OPENING_VIDEO_SRC}
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          controls={false}
+          disablePictureInPicture
+          aria-label={`${appName} opening animation`}
+        />
+      )}
+      <span className="sr-only">{label}</span>
     </main>
   );
 }
@@ -438,6 +494,8 @@ function RootPage(): ReactNode {
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
   const [installedMobilePwa, setInstalledMobilePwa] = useState(() => isInstalledMobilePwa());
+  const [openingVideoDone, setOpeningVideoDone] = useState(false);
+  const markOpeningVideoDone = useCallback(() => setOpeningVideoDone(true), []);
   // Live viewport category so the AppShell wrapper re-renders when the
   // learner resizes across the desktop / tablet / mobile boundaries.
   // Tablet + mobile get the existing per-page chrome; desktop gets the
@@ -950,7 +1008,7 @@ function RootPage(): ReactNode {
       loading
       || skipLandingForInstalledMobilePwa
       || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
-    const splashVisible = openingAnimationEnabled && launchPending;
+    const splashVisible = openingAnimationEnabled && (launchPending || !openingVideoDone);
     const darkScreen =
       splashVisible
       || protectedRoutePending
@@ -959,14 +1017,33 @@ function RootPage(): ReactNode {
       || hash.startsWith(AUTH_HASH)
       || hash.startsWith(ADMIN_LOGIN_HASH);
     setThemeColor(darkScreen ? THEME_COLOR_DARK : THEME_COLOR_LIGHT);
-  }, [hash, loading, skipLandingForInstalledMobilePwa, protectedRoutePending, user, catalogLoading, openingAnimationEnabled]);
+  }, [hash, loading, skipLandingForInstalledMobilePwa, protectedRoutePending, user, catalogLoading, openingAnimationEnabled, openingVideoDone]);
 
   const launchPending =
     loading
     || skipLandingForInstalledMobilePwa
     || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
-  if (launchPending && openingAnimationEnabled) {
-    return <AppLaunchSplash label={skipLandingForInstalledMobilePwa ? "Opening your dashboard…" : "Preparing your learning space…"} />;
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const splash = document.getElementById("app-opening-splash");
+    if (!splash) return;
+    if (!openingAnimationEnabled) {
+      splash.style.display = "none";
+      return;
+    }
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      splash.style.display = "none";
+      setOpeningVideoDone(true);
+      return;
+    }
+    const shouldShow = !openingVideoDone || launchPending;
+    splash.style.display = shouldShow ? "" : "none";
+  }, [openingAnimationEnabled, openingVideoDone, launchPending]);
+
+  if (openingAnimationEnabled && (!openingVideoDone || launchPending)) {
+    return <AppLaunchSplash onEnded={markOpeningVideoDone} label={skipLandingForInstalledMobilePwa ? "Opening your dashboard…" : "Preparing your learning space…"} />;
   }
   if (launchPending && skipLandingForInstalledMobilePwa) {
     return <main className="min-h-[100dvh]" aria-busy="true" aria-label="Opening app" />;
