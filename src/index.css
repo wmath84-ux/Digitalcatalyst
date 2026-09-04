@@ -187,7 +187,7 @@ body,
   width: 100%;
   margin: 0;
   /* Phase A: the canvas is the Black Ice base ink, never white. The fixed
-     .dc-backdrop paints the gradient; body/#root stay transparent so it
+     The fixed .dc-winter scene paints the background; body/#root stay transparent so it
      shows through on every route (iOS overscroll shows this ink, not white). */
   background-color: #0a0c12;
   touch-action: pan-x pan-y;

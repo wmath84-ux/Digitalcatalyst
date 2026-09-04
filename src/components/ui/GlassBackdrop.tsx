@@ -31,40 +31,27 @@
 // reference (the websiteglass docs playground backdrop) is smooth gradients
 // plus the hairline grid, which now paints inside .dc-backdrop itself.
 //
-// 2026-09-04 · owner direction: TWO backgrounds now — "classic" (the gradient +
-// grid paint below) and "waves" (the AI Canvas Wave Lines canvas, animated
-// live). Profile → Preferences switches them (src/lib/background.ts); every
-// mount point follows because the choice is read here, in one place.
+// 2026-09-04 · owner direction: ONE background, no switch. The universal
+// gradient/grid backdrop and the classic/waves preference are gone; the
+// pinned Winter Wonderland scene (src/components/backgrounds/WinterScene.tsx,
+// ported from codepen.io/Raed-Ennab/pen/PwNdKZj) is the default and only
+// background, and its snowfall runs continuously, without pausing.
 
-import { useBackground } from "@/lib/background";
-import WaveLines from "@/components/backgrounds/WaveLines";
+import WinterScene from "@/components/backgrounds/WinterScene";
 
 interface GlassBackdropProps {
   /**
    * Escape hatch for a shell that needs to suppress the layer without
-   * unmounting the tree. Not used today; kept so a future route with its own
-   * opaque theme (the course player's light theme, say) can opt out without
-   * touching this file.
+   * unmounting the tree. Not used today.
    */
   hidden?: boolean;
 }
 
 export function GlassBackdrop({ hidden = false }: GlassBackdropProps) {
-  const [background] = useBackground();
   if (hidden) return null;
-  return (
-    <>
-      {/* aria-hidden: a decorative fixed layer must never enter the a11y tree
-          or the tab order. */}
-      {background === "waves" ? (
-        <div className="dc-waves" data-dc-waves aria-hidden="true">
-          <WaveLines showLabel={false} />
-        </div>
-      ) : (
-        <div className="dc-backdrop" data-dc-backdrop aria-hidden="true" />
-      )}
-    </>
-  );
+  // aria-hidden lives on the scene root: a decorative fixed layer must never
+  // enter the a11y tree or the tab order.
+  return <WinterScene />;
 }
 
 export default GlassBackdrop;

@@ -1,0 +1,309 @@
+/* ══ THE WINTER BACKGROUND ═══════════════════════════════════════════════════
+   The app's ONE background, ported from the owner's pinned reference pen
+   (codepen.io/Raed-Ennab/pen/PwNdKZj). Every value below is the pen's own —
+   only the selectors are namespaced (`.dc-winter__*`) and the layer is made
+   fixed / non-interactive so it can sit behind the whole app.
+
+   There is no preference and no switch: this is the default and the only
+   background. See src/components/backgrounds/WinterScene.tsx.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --dc-winter-bg-top: #0a1224;
+  --dc-winter-bg-bottom: #040812;
+  --dc-winter-ice: #9fd9ff;
+  --dc-winter-ice-deep: #4c7ea8;
+  --dc-winter-snow: #ffffff;
+  --dc-winter-accent: #ffecb3;
+}
+
+/* The fixed layer itself — behind everything, never in flow, never a tap
+   target. The pen's `body` paint lives here. */
+.dc-winter {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  background-color: var(--dc-winter-bg-bottom);
+  background-image:
+    radial-gradient(circle at 20% 0%, #3b6dd1 0, transparent 55%),
+    radial-gradient(circle at 80% 0%, #8f5ee7 0, transparent 55%),
+    linear-gradient(to bottom, var(--dc-winter-bg-top), var(--dc-winter-bg-bottom));
+}
+
+.dc-winter__scene {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  isolation: isolate; /* keep blur/filters nicely contained */
+}
+
+/* Snow canvas */
+.dc-winter__snow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Mountains */
+.dc-winter__mountains {
+  position: absolute;
+  inset: 0;
+  bottom: 25vh;
+  display: flex;
+  justify-content: center;
+  gap: 8vw;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.dc-winter__mountain {
+  position: relative;
+  width: 0;
+  height: 0;
+  border-left: 16vw solid transparent;
+  border-right: 16vw solid transparent;
+  border-bottom: 28vh solid #1b283c;
+  filter: drop-shadow(0 30px 40px rgba(0, 0, 0, 0.7));
+  opacity: 0.9;
+}
+
+.dc-winter__mountain--m2 {
+  transform: scale(0.8) translateY(4vh);
+  opacity: 0.8;
+}
+
+.dc-winter__mountain--m3 {
+  transform: scale(0.65) translateY(7vh);
+  opacity: 0.7;
+}
+
+.dc-winter__mountain::before {
+  content: "";
+  position: absolute;
+  left: -12vw;
+  top: 10vh;
+  width: 0;
+  height: 0;
+  border-left: 12vw solid transparent;
+  border-right: 12vw solid transparent;
+  border-bottom: 18vh solid #e9f4ff;
+  clip-path: polygon(0 100%, 50% 0, 100% 100%, 60% 70%, 40% 75%);
+}
+
+/* Snow ground */
+.dc-winter__ground {
+  position: absolute;
+  left: -10vw;
+  right: -10vw;
+  bottom: -20vh;
+  height: 45vh;
+  background: radial-gradient(ellipse at top, #ffffff 0, #dfe7ff 45%, #b0c5e6 100%);
+  border-radius: 50%;
+  box-shadow:
+    0 -10px 40px rgba(255, 255, 255, 0.8),
+    0 -40px 90px rgba(0, 0, 0, 0.8);
+  z-index: 2;
+}
+
+/* Icy lake / frozen pond */
+.dc-winter__lake {
+  position: absolute;
+  left: 50%;
+  bottom: 5vh;
+  transform: translateX(-50%);
+  width: min(70vw, 900px);
+  height: min(23vh, 220px);
+  background: radial-gradient(ellipse at top, var(--dc-winter-ice) 0, var(--dc-winter-ice-deep) 55%, #021320 100%);
+  border-radius: 50%;
+  box-shadow:
+    0 0 40px rgba(159, 217, 255, 0.6) inset,
+    0 0 50px rgba(159, 217, 255, 0.35),
+    0 -20px 40px rgba(0, 0, 0, 0.75);
+  overflow: hidden;
+  z-index: 3;
+}
+
+.dc-winter__lake::before {
+  content: "";
+  position: absolute;
+  inset: 10% 12%;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.05));
+  mix-blend-mode: screen;
+  opacity: 0.65;
+}
+
+.dc-winter__lake::after {
+  content: "";
+  position: absolute;
+  inset: 18% 8%;
+  border-radius: 50%;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.33) 0,
+    rgba(255, 255, 255, 0.33) 1px,
+    transparent 1px,
+    transparent 6px
+  );
+  opacity: 0.4;
+  filter: blur(0.3px);
+}
+
+/* Snowman for a bit of character */
+.dc-winter__snowman {
+  position: absolute;
+  bottom: 18vh;
+  right: 16vw;
+  z-index: 4;
+  transform: translateY(4px);
+}
+
+.dc-winter__snowman-body {
+  position: relative;
+}
+
+.dc-winter__snowman-bottom,
+.dc-winter__snowman-middle,
+.dc-winter__snowman-head {
+  background: radial-gradient(circle at 30% 20%, #ffffff, #e1e8ff 55%, #c7d2ef);
+  border-radius: 50%;
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.35);
+}
+
+.dc-winter__snowman-bottom {
+  width: 90px;
+  height: 90px;
+}
+
+.dc-winter__snowman-middle {
+  width: 65px;
+  height: 65px;
+  position: absolute;
+  left: 50%;
+  bottom: 65px;
+  transform: translateX(-50%);
+}
+
+.dc-winter__snowman-head {
+  width: 45px;
+  height: 45px;
+  position: absolute;
+  left: 50%;
+  bottom: 120px;
+  transform: translateX(-50%);
+}
+
+.dc-winter__snowman-face {
+  position: absolute;
+  inset: 0;
+}
+
+.dc-winter__snowman-eye {
+  position: absolute;
+  top: 16px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #1b222f;
+}
+
+.dc-winter__snowman-eye--left {
+  left: 12px;
+}
+
+.dc-winter__snowman-eye--right {
+  right: 12px;
+}
+
+.dc-winter__snowman-nose {
+  position: absolute;
+  top: 21px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 2px solid transparent;
+  border-right: 14px solid transparent;
+  border-top: 5px solid #f7944d;
+  transform: translateX(-40%);
+}
+
+.dc-winter__snowman-buttons {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transform: translateY(3px);
+}
+
+.dc-winter__snowman-button {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #161923;
+}
+
+.dc-winter__snowman-hat {
+  position: absolute;
+  bottom: 150px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.dc-winter__snowman-hat-rim {
+  width: 52px;
+  height: 6px;
+  border-radius: 20px;
+  background: #11151f;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.dc-winter__snowman-hat-top {
+  width: 34px;
+  height: 26px;
+  margin: -2px auto 0;
+  border-radius: 7px 7px 3px 3px;
+  background: linear-gradient(135deg, #1f2635, #06080c);
+  border: 2px solid #060912;
+  border-bottom: none;
+  position: relative;
+}
+
+.dc-winter__snowman-hat-band {
+  position: absolute;
+  bottom: 5px;
+  left: 4px;
+  right: 4px;
+  height: 5px;
+  background: linear-gradient(to right, #ff5f6c, #ffc371);
+}
+
+/* Responsiveness — the pen's own breakpoints */
+@media (max-width: 800px) {
+  .dc-winter__snowman {
+    right: 8vw;
+    transform: scale(0.9) translateY(0);
+  }
+}
+
+@media (max-width: 600px) {
+  .dc-winter__mountains {
+    bottom: 30vh;
+  }
+
+  .dc-winter__lake {
+    width: 90vw;
+  }
+
+  .dc-winter__snowman {
+    display: none;
+  }
+}

@@ -10,6 +10,8 @@ import "./landing.css";
 // Inert unless src/lib/glass.ts sets html[data-glass="on"], and admin is forced
 // to `off`, so this never leaks into the admin surface.
 import "./glass-theme.css";
+// The one app background — the pinned Winter Wonderland scene (no switch).
+import "./winter-background.css";
 // Liquid Glass material layer (website-glass). Inert until
 // src/lib/glass.ts applies a tier to <html>; see docs/liquid-glass-rollout-plan.md.
 import "./glass.css";
