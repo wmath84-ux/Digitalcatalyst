@@ -96,8 +96,8 @@
       var name = (data.appName || "Eduvora").toString().trim().slice(0, 40);
       var tagline = (data.tagline || "Digital Catalyst").toString().trim().slice(0, 80);
       var customLogo = !!data.logoUrl || !!legacy;
-      var logo = (data.logoUrl || legacy || "/icons/icon-192x192.svg").toString();
-      if (!/^https?:\/\//.test(logo) && !logo.startsWith("/")) logo = "/icons/icon-192x192.svg";
+      var logo = (data.logoUrl || legacy || "/icons/icon-192x192.png").toString();
+      if (!/^https?:\/\//.test(logo) && !logo.startsWith("/")) logo = "/icons/icon-192x192.png";
 
       if (name) {
         var nameEls = document.querySelectorAll(".brand-name");

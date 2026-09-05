@@ -52,7 +52,6 @@ const normalizePushData = (payload) => {
 
 const SHIPPED_DEFAULT_ICONS = [
   '/icons/icon-192x192.png',
-  '/icons/icon-192x192.svg',
   '/icons/icon-512x512.png',
 ];
 

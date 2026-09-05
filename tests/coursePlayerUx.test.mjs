@@ -398,7 +398,7 @@ test("Custom AudioPlayer replaces the native audio element with a transport", ()
 
 test("The Player tab uses the website logo in the back slot and keeps onBack", () => {
   // The logo comes from BrandingContext (logoUrl) so admin can swap it
-  // without a redeploy — the hardcoded `/icons/icon-192x192.svg` is the
+  // without a redeploy — the hardcoded `/icons/icon-192x192.png` is the
   // pre-JS boot-screen fallback only. The onClick is wrapped in a
   // long-press-aware handler (the logo doubles as the Home opener when
   // held), so a regex for the raw `onBack` doesn't match — assert the

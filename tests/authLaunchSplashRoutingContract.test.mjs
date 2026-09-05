@@ -69,7 +69,7 @@ test("pre-JavaScript and React loading screens play the exact EduOS opening vide
   assert.match(main, /attachOpeningSplash\(\);/);
   // PWA icon remains declared at 192×192 for installability (not the splash).
   const icons192 = manifest.icons.filter((icon) => icon.sizes === "192x192").map((icon) => icon.src);
-  assert.ok(icons192.includes("/icons/icon-192x192.svg"), `192x192 SVG missing from manifest: ${icons192.join(", ")}`);
+  assert.ok(icons192.includes("/icons/icon-192x192.png"), `192x192 icon missing from manifest: ${icons192.join(", ")}`);
 });
 
 test("a branding save can never switch the opening off by accident", () => {

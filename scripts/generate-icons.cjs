@@ -1,17 +1,28 @@
 /**
- * Generates the app's raster notification/PWA icon assets from vector specs.
+ * Generates the app's raster notification/PWA icon assets.
  *
- * Why these exist: Web Push `badge` and `icon` are rendered by the OS, not the
- * browser canvas, so they must be PNG (Android rejects SVG badges and shows a
- * solid white placeholder instead — the "white circle" bug). The `badge` is a
- * monochrome glyph on a transparent background; Android draws it using only the
- * alpha channel, so any opaque background turns into a solid white shape.
+ * The full-colour web/PWA icons (icon-192x192, icon-512x512 and the maskable
+ * icon) are produced by resizing the brand's master logo
+ * (public/branding/logo-source.png) with `sharp`. This replaces the old
+ * hand-drawn book-shaped placeholder that used to be rendered pixel-by-pixel
+ * in pure JS.
+ *
+ * The `badge` is DIFFERENT on purpose: Web Push `badge` and local-notification
+ * badges are rendered by the OS using only the alpha channel, so they must stay
+ * a monochrome white glyph on a transparent background (Android shows any
+ * opaque area as a solid white blob). We therefore keep the simple white
+ * open-book glyph for the badge and never put the full-colour logo there.
  *
  * Run: node scripts/generate-icons.cjs
  */
 const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
+const sharp = require('sharp');
+
+const ROOT = path.join(__dirname, '..');
+const SRC_MASTER = path.join(ROOT, 'public', 'branding', 'logo-source.png');
+const outDir = path.join(ROOT, 'public', 'icons');
 
 // ---------------------------------------------------------------- PNG encode
 function crc32(buf) {
@@ -86,8 +97,8 @@ const cubic = (x0, y0, x1, y1, x2, y2, x3, y3, steps = 16) => {
 };
 
 // ---------------------------------------------------------------- badge
-// Open-book outline in 192-space, shared by the app icon and the badge so the
-// notification small-icon matches the app icon instead of a plain letter.
+// Open-book outline in 192-space, shared by the badge only (kept as the simple
+// monochrome notification glyph — see header note).
 const bookOutlinePaths = () => {
   const path1 = [
     ...cubic(40, 58, 40, 48, 48, 40, 58, 40),
@@ -139,47 +150,69 @@ function makeBadge(size) {
   return encodePNG(size, size, buf);
 }
 
-// ---------------------------------------------------------------- app icon
-const GRAD_A = [79, 70, 229];  // #4f46e5
-const GRAD_B = [124, 58, 237]; // #7c3aed
-
-function makeIcon(size) {
-  const buf = Buffer.alloc(size * size * 4);
-  const s = size / 192; // scale from 192-space
-  // gradient anchors (192-space)
-  const gx0 = 24 * s; const gy0 = 16 * s; const gx1 = 168 * s; const gy1 = 176 * s;
-  const gdx = gx1 - gx0; const gdy = gy1 - gy0; const gLen2 = gdx * gdx + gdy * gdy;
-  // rounded-rect background (192-space: x8..184, y8..184, rx44)
-  const bx0 = 8 * s; const by0 = 8 * s; const bx1 = 184 * s; const by1 = 184 * s; const br = 44 * s;
-
-  // book outline paths in 192-space (stroked white, width 10)
-  const paths = bookOutlinePaths();
-  const strokeHalf = 5 * s;
-
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const px = x + 0.5;
-      const py = y + 0.5;
-      const i = (y * size + x) * 4;
-      if (!inRounded(px, py, bx0, by0, bx1, by1, br)) continue; // transparent outside
-      // linear gradient along the diagonal
-      let t = 0;
-      if (gLen2 > 0) t = Math.max(0, Math.min(1, ((px - gx0) * gdx + (py - gy0) * gdy) / gLen2));
-      const r = Math.round(GRAD_A[0] + (GRAD_B[0] - GRAD_A[0]) * t);
-      const g = Math.round(GRAD_A[1] + (GRAD_B[1] - GRAD_A[1]) * t);
-      const b = Math.round(GRAD_A[2] + (GRAD_B[2] - GRAD_A[2]) * t);
-      buf[i] = r; buf[i + 1] = g; buf[i + 2] = b; buf[i + 3] = 255;
-      if (distanceToBookOutline(px, py, s, paths) <= strokeHalf) {
-        buf[i] = 255; buf[i + 1] = 255; buf[i + 2] = 255;
-      }
-    }
-  }
-  return encodePNG(size, size, buf);
+// ---------------------------------------------------------------- main logo icons
+/**
+ * Resize the full-colour master logo into a plain square PNG at the requested
+ * size. The master already carries transparent padding around the emblem so the
+ * art is never clipped when the OS applies a rounded/square mask.
+ */
+async function makeLogoPng(size) {
+  const png = await sharp(SRC_MASTER)
+    .resize(size, size, { fit: 'cover', kernel: sharp.kernel.lanczos3 })
+    .png()
+    .toBuffer();
+  return png;
 }
 
-const outDir = path.join(__dirname, '..', 'public', 'icons');
-fs.mkdirSync(outDir, { recursive: true });
-fs.writeFileSync(path.join(outDir, 'badge-96x96.png'), makeBadge(96));
-fs.writeFileSync(path.join(outDir, 'icon-192x192.png'), makeIcon(192));
-fs.writeFileSync(path.join(outDir, 'icon-512x512.png'), makeIcon(512));
-console.log('Wrote badge-96x96.png, icon-192x192.png, icon-512x512.png');
+/**
+ * Maskable icon. `fit: cover` fills the whole canvas with the master, but OS
+ * icon masks (Circle, Squircle, Rounded-square) crop the outer ~20% of the
+ * safe zone. To keep the emblem inside the visible safe area we scale the
+ * master logo down to ~80% of the canvas and centre it on the transparent
+ * canvas, so the mask never clips the artwork.
+ */
+async function makeMaskablePng(size = 512, scale = 0.8) {
+  const inner = Math.round(size * scale);
+  const logo = await sharp(SRC_MASTER)
+    .resize(inner, inner, { fit: 'cover', kernel: sharp.kernel.lanczos3 })
+    .png()
+    .toBuffer();
+  const offset = Math.round((size - inner) / 2);
+  const composed = await sharp({
+    create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite([{ input: logo, left: offset, top: offset }])
+    .png()
+    .toBuffer();
+  return composed;
+}
+
+async function main() {
+  if (!fs.existsSync(SRC_MASTER)) {
+    console.error(`Master logo not found at ${SRC_MASTER}.`);
+    console.error('Save the brand logo there (square, transparent PNG) and re-run this script.');
+    process.exit(1);
+  }
+
+  fs.mkdirSync(outDir, { recursive: true });
+
+  // Notification badge — keep the existing monochrome white book glyph. A
+  // full-colour logo would be flattened to an opaque blob by the OS badge
+  // renderer, so we intentionally do NOT reuse the logo for this asset.
+  fs.writeFileSync(path.join(outDir, 'badge-96x96.png'), makeBadge(96));
+
+  // Full-colour web/PWA icons from the master logo.
+  fs.writeFileSync(path.join(outDir, 'icon-192x192.png'), await makeLogoPng(192));
+  fs.writeFileSync(path.join(outDir, 'icon-512x512.png'), await makeLogoPng(512));
+
+  // Maskable PNG (logo scaled to ~80% with safe padding). Replaces the old
+  // maskable SVG so the installed PWA icon shows the new brand logo.
+  fs.writeFileSync(path.join(outDir, 'maskable-icon-512x512.png'), await makeMaskablePng(512, 0.8));
+
+  console.log('Wrote badge-96x96.png, icon-192x192.png, icon-512x512.png, maskable-icon-512x512.png');
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
