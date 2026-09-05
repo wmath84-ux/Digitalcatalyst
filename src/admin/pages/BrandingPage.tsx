@@ -38,6 +38,7 @@ import { CloudinaryImageUploadField } from "@/components/admin/products/Cloudina
 import { PrimaryButton, SecondaryButton } from "@/components/admin/ui";
 import { useToast } from "@/components/admin/AdminProviders";
 import { useBranding } from "@/context/BrandingContext";
+import { attachOpeningSplash } from "@/utils/openingSplash";
 import {
   BRANDING_DOC_PATH,
   DEFAULT_BRANDING,
@@ -149,7 +150,12 @@ export default function BrandingPage() {
     const logoUrl = merged.logoUrl.trim() || DEFAULT_BRANDING.logoUrl;
     const appName = merged.appName.trim() || DEFAULT_BRANDING.appName;
     const tagline = merged.tagline.trim();
-    const openingAnimationEnabled = merged.openingAnimationEnabled === true;
+    // Fail open: only an explicit unchecked box turns the opening off. The old
+    // `=== true` coercion wrote `false` for any save where the draft value was
+    // still undefined (a branding save from another section, a stale cache),
+    // which silenced the opening on desktop AND mobile with nothing in the UI
+    // to explain it.
+    const openingAnimationEnabled = merged.openingAnimationEnabled !== false;
     const hideFrameBorders = merged.hideFrameBorders !== false;
     const homeGradientFrom = pickHex(merged.homeGradientFrom, DEFAULT_BRANDING.homeGradientFrom);
     const homeGradientTo = pickHex(merged.homeGradientTo, DEFAULT_BRANDING.homeGradientTo);
@@ -421,10 +427,36 @@ export default function BrandingPage() {
                   <span className="min-w-0 flex-1">
                     <span className="block text-xs font-bold text-slate-700">App opening animation page</span>
                     <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
-                      Play the EduOS opening animation while the app opens. Phones use the mobile clip; tablet and desktop use the landscape clip. This is on by default.
+                      Play the EduOS opening animation while the app opens. Phones use the mobile clip; tablet and
+                      desktop use the landscape clip. This is on by default. A device whose OS asks for reduced motion
+                      gets the static brand card instead of the clip (it is never skipped entirely).
                     </span>
                   </span>
                 </label>
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Replay the real overlay, from this page, without a
+                      // reload — the opening is otherwise only visible on a
+                      // cold boot, which made every report unverifiable.
+                      attachOpeningSplash()?.replay();
+                    }}
+                    className="rounded-xl bg-[#0B63FF] px-3 py-2 text-[11px] font-bold text-white"
+                  >
+                    ▶ Preview the opening now
+                  </button>
+                  <a
+                    href="#/dev/opening"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700"
+                  >
+                    Diagnostics (clips + decision)
+                  </a>
+                  <span className="text-[11px] text-slate-500">
+                    Save first — the preview plays what this browser currently has cached. Append{" "}
+                    <code>?opening=debug</code> to see the reason in the corner.
+                  </span>
+                </div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">

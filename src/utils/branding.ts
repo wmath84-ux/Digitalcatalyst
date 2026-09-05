@@ -201,6 +201,11 @@ function applyBootSplash(branding: Branding) {
   if (bootIcon) bootIcon.alt = branding.appName;
   const bootTitle = document.querySelector(".app-boot-title");
   if (bootTitle) bootTitle.textContent = branding.appName;
+  // The opening's fallback card (the picture until the MP4 proves itself, and
+  // the whole opening on reduced-motion devices) carries the brand name, so a
+  // rename must reach it too — index.html only knows the cached value.
+  const bootName = document.querySelector(".app-boot-name");
+  if (bootName) bootName.textContent = branding.appName;
   const splash = document.getElementById("app-opening-splash") || document.querySelector(".app-boot-splash");
   if (splash) splash.setAttribute("aria-label", `Loading ${branding.appName}`);
 }
