@@ -81,6 +81,7 @@ import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../
 import { collectDueMyDayItems, type MyDayDocData } from "../utils/pushScheduler";
 import { playSfxAdd, playSfxError, playSfxRemove } from "./utils/sfx";
 import {
+  ensureReminderChannel,
   isAndroidNative,
   isNativeApp,
   onLocalAlarmTap,
@@ -581,8 +582,18 @@ function RootPage(): ReactNode {
   // hash deep-link the SW uses. The TWA also installs a local-alarm
   // tap listener once so foreground + backgrounded alarms land on the
   // right page.
+  // The Android notification channel must exist before ANY alarm is
+  // posted — Android 8+ silently discards notifications whose channelId
+  // was never created. Channels persist on the device, so this runs once
+  // per app start, unconditionally (no user/login needed).
+  useEffect(() => {
+    if (!isAndroidNative()) return;
+    void ensureReminderChannel();
+  }, []);
+
   useEffect(() => {
     if (!user || !isNativeApp()) return undefined;
+    void ensureReminderChannel();
     void registerForPush(async () => {
       // The Firebase Auth id token is what /api/push/fcm-register expects.
       // The AuthContext already keeps a fresh idToken in memory; we
