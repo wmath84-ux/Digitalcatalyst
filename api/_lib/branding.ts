@@ -16,7 +16,7 @@ export const DEFAULT_DESCRIPTION =
 export const DEFAULT_ICONS = {
   192: "/icons/icon-192x192.png",
   512: "/icons/icon-512x512.png",
-  maskable: "/icons/maskable-icon-512x512.svg",
+  maskable: "/icons/maskable-icon-512x512.png",
 } as const;
 
 export type ResolvedBranding = {

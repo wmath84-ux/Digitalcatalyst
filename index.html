@@ -15,7 +15,8 @@
          leaderboard JSON. Branding still upgrades this link to /api/manifest
          after a successful installability probe. -->
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
+    <link rel="icon" type="image/png" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
     <title>Eduvora | Digital Catalyst</title>
     <style>
       /* Boot splash paints the same Black Ice backdrop as src/glass-theme.css (§2) so the pre-React frame and the app share one background — no white/indigo flash. */
@@ -119,8 +120,8 @@
           var data = raw ? JSON.parse(raw) : {};
           name = (data.appName || "Eduvora").toString().trim().slice(0, 40) || "Eduvora";
           tagline = (data.tagline || "Digital Catalyst").toString().trim().slice(0, 80);
-          var logo = (data.logoUrl || legacy || "/icons/icon-192x192.svg").toString();
-          if (!/^https?:\/\//.test(logo) && !logo.startsWith("/")) logo = "/icons/icon-192x192.svg";
+          var logo = (data.logoUrl || legacy || "/icons/icon-192x192.png").toString();
+          if (!/^https?:\/\//.test(logo) && !logo.startsWith("/")) logo = "/icons/icon-192x192.png";
           document.documentElement.dataset.hideFrameBorders = String(data.hideFrameBorders !== false);
           enabled = data.openingAnimationEnabled !== false;
           if (data.logoUrl) {

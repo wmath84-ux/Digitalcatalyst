@@ -43,7 +43,7 @@ export async function handleManifest(_req: VercelRequest, res: VercelResponse) {
         {
           src: DEFAULT_ICONS.maskable,
           sizes: "512x512",
-          type: "image/svg+xml",
+          type: "image/png",
           purpose: "maskable",
         },
       ];

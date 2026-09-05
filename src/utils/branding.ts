@@ -1,5 +1,5 @@
 export const BRANDING_DOC_PATH = { collection: "settings", id: "branding" } as const;
-export const DEFAULT_LOGO_URL = "/icons/icon-192x192.svg";
+export const DEFAULT_LOGO_URL = "/icons/icon-512x512.png";
 export const DEFAULT_APP_NAME = "Eduvora";
 export const DEFAULT_TAGLINE = "Digital Catalyst";
 export const DEFAULT_SUPPORT_EMAIL = "support@learnpro.app";

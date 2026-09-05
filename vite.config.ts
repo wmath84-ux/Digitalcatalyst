@@ -137,7 +137,7 @@ export default defineConfig({
             icons: [
               { src: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
               { src: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
-              { src: "/icons/maskable-icon-512x512.svg", sizes: "512x512", type: "image/svg+xml", purpose: "maskable" },
+              { src: "/icons/maskable-icon-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
             ],
           };
           res.setHeader("content-type", "application/manifest+json; charset=utf-8");
