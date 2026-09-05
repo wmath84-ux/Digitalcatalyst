@@ -19,6 +19,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { JSDOM } from "jsdom";
+import { DEFAULT_OPENING_TIMINGS, shouldReleaseOpening } from "../src/utils/openingSplash.ts";
 
 const RAW_HTML = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const HTML = RAW_HTML.replace(/<script type="module"[^>]*><\/script>/, "");
@@ -89,8 +90,8 @@ async function boot({ width = 390, search = "", branding = null, reducedMotion =
       return controller;
     },
     /** React's job: adopt the overlay the boot script already painted. */
-    attach() {
-      controller = opening.attachOpeningSplash();
+    attach(timings) {
+      controller = opening.attachOpeningSplash(timings);
       return controller;
     },
     fire(type, target = video) {
@@ -135,6 +136,7 @@ test("a phone boots the portrait EduOS clip over the brand card", async () => {
     assert.notEqual(controller.firstFrameMs, null, "the first frame is measured");
 
     // 4 · a clean ending releases the app — never before the visible floor.
+    t.set("ended", true);
     t.fire("ended");
     await t.settle(300);
     assert.equal(t.splash.dataset.opening, "playing", "the opening may not be cut short");
@@ -279,6 +281,92 @@ test("dismiss + replay: the opening can be shown again after it is over", async 
   } finally {
     t.restore();
   }
+});
+
+test("an advancing clip is never cut short — only `ended` releases it", async () => {
+  // The scaled-down schedule stands in for the real one (load ceiling 20 s,
+  // stall 6 s, backstop 60 s) so the *rule* is verified in milliseconds:
+  // while frames keep arriving, the opening stays up, even past the point the
+  // old fixed 12 s ceiling used to tear it away mid-clip.
+  const t = await boot({ width: 1440 });
+  try {
+    const controller = t.attach({
+      minVisibleMs: 60,
+      loadCeilingMs: 200,
+      stallTimeoutMs: 400,
+      hardCeilingMs: 10_000,
+      watchdogMs: 30,
+      holdAfterEndMs: 0,
+      fadeMs: 0,
+    });
+    t.fire("loadeddata");
+    assert.equal(controller.state, "playing");
+    // 900 ms of steady playback — over 4× the old 12 s ceiling scaled here.
+    for (let i = 1; i <= 15; i += 1) {
+      await t.settle(60);
+      t.set("currentTime", i * 0.6);
+      t.fire("timeupdate");
+    }
+    assert.equal(controller.state, "playing", "a running clip must not be dismissed");
+    assert.notEqual(t.splash.style.display, "none");
+    assert.equal(t.splash.dataset.video, "on", "the clip, not the card, is on screen");
+
+    t.set("ended", true);
+    t.fire("ended");
+    await t.settle(120);
+    assert.equal(controller.state, "done", "and it is released as soon as it ends");
+  } finally {
+    t.restore();
+  }
+});
+
+test("a clip that cannot produce a frame falls back to the card, then opens the app", async () => {
+  // 20 s of patience for frame one (a 5 MB file on a weak link still gets to
+  // play), scaled here to 240 ms: the release reason is load-timeout and the
+  // brand card carries the rest of the window.
+  const t = await boot({ width: 390 });
+  try {
+    const controller = t.attach({
+      minVisibleMs: 60,
+      loadCeilingMs: 240,
+      stallTimeoutMs: 400,
+      hardCeilingMs: 10_000,
+      watchdogMs: 30,
+      holdAfterEndMs: 0,
+      fadeMs: 0,
+    });
+    await t.settle(120);
+    assert.equal(controller.state, "pending", "still waiting for frame one — not a failure yet");
+    await t.settle(400);
+    assert.equal(controller.state, "done");
+    assert.equal(t.splash.dataset.video, "off", "the card was the picture, never a blank screen");
+  } finally {
+    t.restore();
+  }
+});
+
+test("the release rule itself: what may cut the opening, and what may not", () => {
+  const t = DEFAULT_OPENING_TIMINGS;
+  const base = { mode: "video", elapsedMs: 11_900, sinceProgressMs: 120, firstFrameMs: 400, ended: false, error: false, buffering: false, timings: t };
+  // 11.9 s into a 10 s clip with the download still trickling: the OLD code
+  // released here (hard 12 s ceiling). The clip must be allowed to finish.
+  assert.equal(shouldReleaseOpening(base), null);
+  assert.equal(shouldReleaseOpening({ ...base, elapsedMs: 30_000, sinceProgressMs: 90 }), null);
+  // A finished clip releases immediately once the floor is behind us.
+  assert.deepEqual(shouldReleaseOpening({ ...base, ended: true }), { kind: "ended", waitMs: 0 });
+  // Before the floor, `ended` waits out the remainder instead of flashing.
+  assert.equal(shouldReleaseOpening({ ...base, ended: true, elapsedMs: 200 }).waitMs, t.minVisibleMs - 200);
+  // Hard failures are the only other exit.
+  assert.equal(shouldReleaseOpening({ ...base, error: true }).kind, "media-error");
+  assert.equal(shouldReleaseOpening({ ...base, elapsedMs: t.hardCeilingMs + 1 }).kind, "hard-ceiling");
+  assert.equal(shouldReleaseOpening({ ...base, firstFrameMs: null, elapsedMs: t.loadCeilingMs + 1 }).kind, "load-timeout");
+  // …and frame one is NOT due at 3 s any more; that timeout was the truncation.
+  assert.equal(shouldReleaseOpening({ ...base, firstFrameMs: null, elapsedMs: 3_000 }), null);
+  // A dead buffer releases; a refill does not.
+  assert.equal(shouldReleaseOpening({ ...base, sinceProgressMs: t.stallTimeoutMs + 1 }).kind, "stalled");
+  assert.equal(shouldReleaseOpening({ ...base, sinceProgressMs: t.stallTimeoutMs + 1, buffering: true }), null);
+  // The static (reduced-motion) opening holds exactly the minimum window.
+  assert.equal(shouldReleaseOpening({ ...base, mode: "static", firstFrameMs: null, elapsedMs: 0 }).waitMs, t.minVisibleMs);
 });
 
 test("the shipped clips are real H.264 files that can start before they finish downloading", async () => {

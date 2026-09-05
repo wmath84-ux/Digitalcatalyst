@@ -17,8 +17,9 @@ import fs from "node:fs";
 import {
   APP_OPENING_VIDEO_DESKTOP_SRC,
   APP_OPENING_VIDEO_MOBILE_SRC,
+  DEFAULT_OPENING_TIMINGS,
+  OPENING_CLIP_DURATION_MS,
   OPENING_FADE_MS,
-  OPENING_MAX_WAIT_MS,
   OPENING_MIN_VISIBLE_MS,
   OPENING_MOBILE_MAX_WIDTH,
   openingClipForWidth,
@@ -107,12 +108,25 @@ test("override parsing: comma lists, junk, and query-before-cache", () => {
   assert.equal(readOpeningOverride("?opening=debug#/home", null), "debug");
 });
 
-test("the opening is always long enough to see and short enough to never trap the app", () => {
+test("the clip is allowed to finish: floors, backstops and what they must clear", () => {
   const decision = resolveOpeningDecision({ ...base });
-  assert.ok(decision.minVisibleMs >= 1200, "the opening must not flash by");
-  assert.ok(decision.maxWaitMs >= 10_000, "the 10.006s clips must be able to finish");
-  assert.ok(decision.maxWaitMs >= OPENING_MIN_VISIBLE_MS + OPENING_FADE_MS);
-  assert.equal(OPENING_MAX_WAIT_MS, 12_006);
+  const t = decision.timings;
+  assert.deepEqual(t, DEFAULT_OPENING_TIMINGS);
+  assert.ok(t.minVisibleMs >= 1200, "the opening must not flash by");
+  // Frame one may take a while on a phone connection — a 5 MB file is the
+  // product's own choice — so patience, not a deadline, governs the start.
+  assert.ok(t.loadCeilingMs >= 15_000, "the first frame gets real time to arrive");
+  assert.ok(t.stallTimeoutMs >= 5_000, "a buffer refill is not a finished clip");
+  // The backstop must sit far above the whole clip plus the patience above, or
+  // it becomes the thing that cuts the animation off.
+  assert.ok(
+    t.hardCeilingMs >= OPENING_CLIP_DURATION_MS + t.loadCeilingMs + 2_000,
+    "the backstop must never fire during a full clip",
+  );
+  assert.ok(t.holdAfterEndMs > 0 && t.holdAfterEndMs < 1_000, "the last frame is held, briefly");
+  assert.ok(t.fadeMs > 100 && t.fadeMs < 1_000, "the hand-over is a fade, not a jump");
+  assert.equal(OPENING_CLIP_DURATION_MS, 10_006, "both shipped clips are 10.006s");
+  assert.ok(OPENING_MIN_VISIBLE_MS + OPENING_FADE_MS < t.hardCeilingMs);
 });
 
 test("index.html's pre-React mirror agrees with the module", () => {

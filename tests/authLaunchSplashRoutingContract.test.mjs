@@ -99,9 +99,19 @@ test("the opening always paints something: card first, clip on top", () => {
   assert.match(html, /#app-opening-splash\[data-opening="skipped"\][^}]*display: none !important/);
   // …and a stale cached shell cannot leave it hanging forever.
   assert.match(html, /app-boot-failsafe/);
+  // The clip gets the whole screen until `ended`; every number below is a
+  // backstop for a dead clip, not a deadline for a slow one. The old
+  // `OPENING_FIRST_FRAME_GRACE_MS = 3_000` + 12 s ceiling are what truncated
+  // the animation on real devices.
   assert.match(opening, /OPENING_MIN_VISIBLE_MS = 1_400/);
-  assert.match(opening, /OPENING_FIRST_FRAME_GRACE_MS = 3_000/);
-  assert.match(opening, /OPENING_MAX_WAIT_MS = CLIP_DURATION_MS \+ 2_000/);
+  assert.match(opening, /OPENING_LOAD_CEILING_MS = 20_000/);
+  assert.match(opening, /OPENING_STALL_TIMEOUT_MS = 6_000/);
+  assert.match(opening, /OPENING_HARD_CEILING_MS = 60_000/);
+  assert.match(opening, /OPENING_HOLD_AFTER_END_MS = 260/);
+  assert.doesNotMatch(opening, /OPENING_MAX_WAIT_MS|OPENING_FIRST_FRAME_GRACE_MS/);
+  // `ended` (or a hard failure) is the only normal exit.
+  assert.match(opening, /if \(input\.ended\) return \{ kind: "ended"/);
+  assert.match(opening, /window\.setInterval\(evaluate, decision\.timings\.watchdogMs\)/);
 });
 
 test("reduced motion swaps the clip for the static card — it never hides the opening", () => {
@@ -122,7 +132,7 @@ test("a refused or failed play() cannot end the opening", () => {
   // error BEFORE the first frame falls back to the card instead of hiding.
   assert.match(opening, /AbortError" \|\| errorName === "NotAllowedError/);
   assert.match(opening, /retrying on first gesture/);
-  assert.match(opening, /if \(firstFrameAt === null\) setState\("fallback"\)/);
+  assert.match(opening, /if \(firstFrameAt === null && release\.kind !== "ended"\) \{/);
   assert.match(opening, /window\.addEventListener\(\s*"pointerdown"/);
   // React keeps a screen-reader announcement and nothing else.
   assert.match(main, /function OpeningAnnouncer\(\)/);

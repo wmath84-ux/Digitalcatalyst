@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   APP_OPENING_VIDEO_DESKTOP_SRC,
+  OPENING_CLIP_DURATION_MS,
   APP_OPENING_VIDEO_MOBILE_SRC,
   OPENING_DEBUG_ID,
   OPENING_SPLASH_ID,
@@ -188,6 +189,7 @@ export default function OpeningAnimationPreview() {
     }`,
     `controller note: ${controller?.mediaSnapshot ?? "n/a"}`,
     `first frame after: ${controller?.firstFrameMs ?? "never"}ms · note: ${controller?.lastError ?? "none"}`,
+    `release rule: the app opens on "ended" (${OPENING_CLIP_DURATION_MS}ms clip); load ceiling ${decision.timings.loadCeilingMs}ms, stall ${decision.timings.stallTimeoutMs}ms, backstop ${decision.timings.hardCeilingMs}ms, hold after end ${decision.timings.holdAfterEndMs}ms + fade ${decision.timings.fadeMs}ms`,
     `clip probe: ${probe ? `${probe.label} — ${probe.detail}` : "…"}`,
   ].join("\n");
 
@@ -218,6 +220,11 @@ export default function OpeningAnimationPreview() {
           <Row label="reduced motion" value={reducedMotion ? "on" : "off"} tone={reducedMotion ? "warn" : "default"} />
           <Row label="clip probe" value={probe ? probe.detail : "probing…"} tone={probe ? (probe.ok ? "ok" : "warn") : "default"} />
           <Row label="first frame" value={controller?.firstFrameMs === null || controller?.firstFrameMs === undefined ? "never" : `${controller.firstFrameMs}ms`} />
+          <Row
+            label="app opens when"
+            value={`the clip reaches its end — ${OPENING_CLIP_DURATION_MS}ms — patience ${decision.timings.loadCeilingMs}ms, stall ${decision.timings.stallTimeoutMs}ms, backstop ${decision.timings.hardCeilingMs}ms`}
+            tone={controller?.state === "playing" ? "ok" : "default"}
+          />
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
@@ -228,7 +235,7 @@ export default function OpeningAnimationPreview() {
               refresh();
             }}
           >
-            ▶ Replay the real opening (full screen)
+            ▶ Replay the real opening (plays in full, then opens the app)
           </button>
           <button
             type="button"

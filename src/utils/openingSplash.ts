@@ -43,8 +43,9 @@ import { useEffect, useState } from "react";
 export const APP_OPENING_VIDEO_MOBILE_SRC = "/assets/animations/EduOS_app_opening_mobile.mp4";
 export const APP_OPENING_VIDEO_DESKTOP_SRC = "/assets/animations/EduOS_app_opening_desktop.mp4";
 
-/** Both shipped MP4s are 10.006 s (mvhd timescale 1000 / duration 10006). */
-const CLIP_DURATION_MS = 10_006;
+/** Both shipped MP4s are 10.006 s (mvhd timescale 1000 / duration 10006) —
+ *  the number every ceiling below is measured against. */
+export const OPENING_CLIP_DURATION_MS = 10_006;
 
 export const OPENING_SPLASH_ID = "app-opening-splash";
 export const OPENING_VIDEO_ID = "app-opening-video";
@@ -54,10 +55,25 @@ export const OPENING_MOBILE_MAX_WIDTH = 768;
 
 /** Never let the opening flash by — the card / first frame is held this long. */
 export const OPENING_MIN_VISIBLE_MS = 1_400;
-/** How long a zero-frame clip may hold on before it is declared unplayable. */
-export const OPENING_FIRST_FRAME_GRACE_MS = 3_000;
-/** Hard ceiling — the app always opens, even if `ended` never fires. */
-export const OPENING_MAX_WAIT_MS = CLIP_DURATION_MS + 2_000;
+/** How long the clip may take to produce its FIRST frame before it is declared
+ *  unplayable. Generous on purpose: the whole clip has to be watchable on a
+ *  slow mobile connection, and a genuinely dead file (404 / unsupported codec)
+ *  reports `error` within milliseconds — so nothing was gained by cutting the
+ *  attempt at 3 s, and that timeout is exactly what truncated the animation. */
+export const OPENING_LOAD_CEILING_MS = 20_000;
+/** While the clip runs, how long without a single advance of `currentTime`
+ *  counts as a dead buffer (as opposed to "still playing"). */
+export const OPENING_STALL_TIMEOUT_MS = 6_000;
+/** Absolute backstop: the app is never held behind the opening longer than
+ *  this, whatever the media element does. Deliberately far above the clip's
+ *  10.006 s plus a slow download — a backstop that fires mid-clip is
+ *  indistinguishable from the bug this file exists to kill. */
+export const OPENING_HARD_CEILING_MS = 60_000;
+/** `ended` holds the final frame this long before the fade starts, so the
+ *  clip's last beat is not swallowed by the transition. */
+export const OPENING_HOLD_AFTER_END_MS = 260;
+/** Watchdog period while the opening is on screen. */
+export const OPENING_WATCHDOG_MS = 500;
 /** Fade-out length before the splash leaves the layout. */
 export const OPENING_FADE_MS = 380;
 
@@ -80,6 +96,70 @@ export interface OpeningInput {
   reducedMotion: boolean;
   offline: boolean;
   override: OpeningOverride | null;
+  /** The clip the pre-React boot script already started, if any. Adopting it
+   *  instead of re-deriving it is what stops a mid-clip viewport change from
+   *  reloading the file and restarting the animation. */
+  lockedClip?: OpeningClip | null;
+  timings?: Partial<OpeningTimings>;
+}
+
+/** The release schedule. Overridable for tests / the dev sandbox only. */
+export interface OpeningTimings {
+  minVisibleMs: number;
+  loadCeilingMs: number;
+  stallTimeoutMs: number;
+  hardCeilingMs: number;
+  holdAfterEndMs: number;
+  watchdogMs: number;
+  fadeMs: number;
+}
+
+export const DEFAULT_OPENING_TIMINGS: OpeningTimings = {
+  minVisibleMs: OPENING_MIN_VISIBLE_MS,
+  loadCeilingMs: OPENING_LOAD_CEILING_MS,
+  stallTimeoutMs: OPENING_STALL_TIMEOUT_MS,
+  hardCeilingMs: OPENING_HARD_CEILING_MS,
+  holdAfterEndMs: OPENING_HOLD_AFTER_END_MS,
+  watchdogMs: OPENING_WATCHDOG_MS,
+  fadeMs: OPENING_FADE_MS,
+};
+
+export type OpeningReleaseKind = "ended" | "media-error" | "load-timeout" | "stalled" | "hard-ceiling";
+export type OpeningRelease = { kind: OpeningReleaseKind; waitMs: number };
+
+/**
+ * When may the app be revealed? `null` means "let the opening keep playing".
+ *
+ * This is the rule the product asks for — **the clip runs to the end and only
+ * then does the app open** — kept as a pure function so it is testable as a
+ * table instead of by sleeping 12 s in a test runner. The only things that cut
+ * it short are a media error and the two backstops; a slow download is NOT one
+ * of them, which is the whole point.
+ */
+export function shouldReleaseOpening(input: {
+  mode: OpeningMode;
+  elapsedMs: number;
+  sinceProgressMs: number;
+  firstFrameMs: number | null;
+  ended: boolean;
+  error: boolean;
+  /** Downloading more data (paused, not yet decodable): a buffer refill is not
+   *  a dead clip, so the stall clock must not fire while it is happening. */
+  buffering?: boolean;
+  timings: OpeningTimings;
+}): OpeningRelease | null {
+  const t = input.timings;
+  const floor = () => (input.elapsedMs < t.minVisibleMs ? t.minVisibleMs - input.elapsedMs : 0);
+  if (input.ended) return { kind: "ended", waitMs: floor() };
+  if (input.error) return { kind: "media-error", waitMs: floor() };
+  if (input.elapsedMs >= t.hardCeilingMs) return { kind: "hard-ceiling", waitMs: 0 };
+  if (input.mode === "static") return { kind: "ended", waitMs: floor() };
+  if (input.firstFrameMs === null) {
+    // Still waiting for frame one: only the (generous) load ceiling ends it.
+    return input.elapsedMs >= t.loadCeilingMs ? { kind: "load-timeout", waitMs: 0 } : null;
+  }
+  if (input.sinceProgressMs >= t.stallTimeoutMs && !input.buffering) return { kind: "stalled", waitMs: 0 };
+  return null;
 }
 
 export interface OpeningDecision {
@@ -91,7 +171,7 @@ export interface OpeningDecision {
   /** Plain-language justification, surfaced in the debug badge and console. */
   reason: string;
   minVisibleMs: number;
-  maxWaitMs: number;
+  timings: OpeningTimings;
 }
 
 const OVERRIDES: OpeningOverride[] = ["on", "off", "force", "static", "debug"];
@@ -138,15 +218,10 @@ export function openingSrcForClip(clip: OpeningClip): string {
  * for how long. Pure — no DOM — so it is unit-tested directly.
  */
 export function resolveOpeningDecision(input: OpeningInput): OpeningDecision {
-  const clip = openingClipForWidth(input.width);
+  const clip = input.lockedClip ?? openingClipForWidth(input.width);
   const src = openingSrcForClip(clip);
-  const base = {
-    clip,
-    src,
-    debug: input.override === "debug",
-    minVisibleMs: OPENING_MIN_VISIBLE_MS,
-    maxWaitMs: OPENING_MAX_WAIT_MS,
-  };
+  const timings = { ...DEFAULT_OPENING_TIMINGS, ...(input.timings ?? {}) };
+  const base = { clip, src, debug: input.override === "debug", minVisibleMs: timings.minVisibleMs, timings };
 
   if (input.override === "off") {
     return { ...base, show: false, mode: "video", reason: "skipped by the opening=off override" };
@@ -228,8 +303,12 @@ function prefersReducedMotion(): boolean {
   return isBrowser() && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function currentInput(): OpeningInput {
+function currentInput(timings?: Partial<OpeningTimings>): OpeningInput {
+  const boot = (window as unknown as { __eduosBoot?: { clip?: OpeningClip } }).__eduosBoot;
+  const lockedClip = boot?.clip === "mobile" || boot?.clip === "desktop" ? boot.clip : null;
   return {
+    lockedClip,
+    timings,
     width: window.innerWidth,
     brandingEnabled: readStoredBrandingOpening(),
     reducedMotion: prefersReducedMotion(),
@@ -350,28 +429,30 @@ function installDebugBadge(): HTMLElement {
   return badge;
 }
 
-function createController(els: Elements): OpeningController {
+function createController(els: Elements, injectedTimings?: Partial<OpeningTimings>): OpeningController {
   const { splash, video, fallback, name } = els;
   const listeners = new Set<(c: OpeningController) => void>();
   const doneWaiters: Array<() => void> = [];
   const start = now();
 
-  let decision = resolveOpeningDecision(currentInput());
+  let decision = resolveOpeningDecision(currentInput(injectedTimings));
   let state: OpeningState = "skipped";
   let debug = decision.debug;
   let firstFrameAt: number | null = null;
+  let lastProgressAt = 0;
   let lastError: string | null = null;
   let minTimer = 0;
-  let maxTimer = 0;
-  let graceTimer = 0;
+  let watchdogTimer = 0;
   let hideTimer = 0;
-  let dismissedAt: number | null = null;
+  let releasing = false;
+  let lastTimeSeen = 0;
 
   if (name && !name.textContent) name.textContent = brandName();
 
   const clearTimers = () => {
-    for (const id of [minTimer, maxTimer, graceTimer, hideTimer]) if (id) window.clearTimeout(id);
-    minTimer = maxTimer = graceTimer = hideTimer = 0;
+    for (const id of [minTimer, hideTimer]) if (id) window.clearTimeout(id);
+    if (watchdogTimer) window.clearInterval(watchdogTimer);
+    minTimer = hideTimer = watchdogTimer = 0;
   };
 
   const emit = () => {
@@ -403,7 +484,8 @@ function createController(els: Elements): OpeningController {
       : "no <video> element";
     badge.textContent =
       `[opening] state=${state} · ${decision.show ? decision.mode : "hidden"} · ${decision.reason}\n` +
-      `clip=${decision.clip} · file=${decision.src}\n` +
+      `clip=${decision.clip} · ${OPENING_CLIP_DURATION_MS}ms · file=${decision.src}\n` +
+      `held for: ended / stall ${decision.timings.stallTimeoutMs}ms / load ceiling ${decision.timings.loadCeilingMs}ms / backstop ${decision.timings.hardCeilingMs}ms\n` +
       `${media}\n` +
       `branding.openingAnimationEnabled=${readStoredBrandingOpening()} · onLine=${navigator.onLine} · reducedMotion=${prefersReducedMotion()}\n` +
       `first frame: ${firstFrameAt === null ? "never" : `${Math.round(firstFrameAt)}ms`} · elapsed ${Math.round(now() - start)}ms\n` +
@@ -435,45 +517,82 @@ function createController(els: Elements): OpeningController {
     splash.dataset.video = "on";
   };
 
-  const finish = () => {
-    if (dismissedAt !== null) return;
-    dismissedAt = now();
+  const settle = () => {
+    // Whatever happened, the opening has been on screen: `done`, never
+    // `skipped` — `skipped` is reserved for a decision not to show it at all,
+    // and the offline-rescue path keys off that distinction.
+    splash.style.display = "none";
+    setState("done");
+    paint();
+  };
+
+  const floorRemaining = () => Math.max(0, decision.timings.minVisibleMs - (now() - start));
+
+  /**
+   * Hand the app over. The visible floor and the hold on the final frame are
+   * applied BEFORE the fade, never after it, so the last beat of the clip is
+   * never eaten by the transition.
+   */
+  const releaseNow = (release: OpeningRelease) => {
+    if (releasing) return;
+    releasing = true;
     clearTimers();
-    splash.dataset.hiding = "1";
-    const settle = () => {
-      // Whatever happened, the opening has been on screen: `done`, never
-      // `skipped` — `skipped` is reserved for a decision not to show it at all,
-      // and the offline-rescue path keys off that distinction.
-      splash.style.display = "none";
-      setState("done");
-      paint();
-    };
-    // Reduced motion gets a hard cut instead of a fade.
-    if (decision.mode === "static" || prefersReducedMotion()) {
-      settle();
-      return;
+    if (firstFrameAt === null && release.kind !== "ended") {
+      // The clip never produced a frame: the brand card carries the opening for
+      // the rest of the window instead of the screen going blank.
+      setState("fallback");
+      showCard();
     }
-    hideTimer = window.setTimeout(settle, OPENING_FADE_MS);
+    const holdAfterEnd = release.kind === "ended" && decision.mode === "video" ? decision.timings.holdAfterEndMs : 0;
+    const fade = decision.mode === "static" || prefersReducedMotion() ? 0 : decision.timings.fadeMs;
+    minTimer = window.setTimeout(() => {
+      splash.dataset.hiding = "1";
+      hideTimer = window.setTimeout(settle, fade);
+    }, Math.max(0, release.waitMs) + holdAfterEnd);
   };
 
-  /** Never let the opening be shorter than the minimum visible window. */
-  const dismissAfterFloor = () => {
-    const waited = now() - start;
-    const hold = Math.max(0, decision.minVisibleMs - waited);
-    if (hold === 0) {
-      finish();
-      return;
-    }
-    minTimer = window.setTimeout(finish, hold);
+  /**
+   * The single place that decides whether the opening may end, asked on every
+   * media event and on every watchdog tick. A clip that is advancing is never
+   * cut: `ended` (or a hard failure / dead buffer) is the only exit.
+   */
+  const evaluate = () => {
+    const elapsedMs = now() - start;
+    const release = shouldReleaseOpening({
+      mode: decision.mode,
+      elapsedMs,
+      sinceProgressMs: elapsedMs - lastProgressAt,
+      firstFrameMs: firstFrameAt,
+      ended: Boolean(video?.ended),
+      error: Boolean(video?.error),
+      buffering: Boolean(video && !video.ended && video.paused && video.readyState < 3 && navigator.onLine !== false),
+      timings: decision.timings,
+    });
+    if (release) releaseNow(release);
   };
 
-  const startVideo = () => {
+  /** Decide at the visible floor, then keep checking while the clip runs. */
+  const armWatchdog = () => {
+    clearTimers();
+    minTimer = window.setTimeout(() => {
+      evaluate();
+      if (!releasing) watchdogTimer = window.setInterval(evaluate, decision.timings.watchdogMs);
+    }, floorRemaining());
+  };
+
+  /**
+   * @param fromStart rewind to frame one (a fresh opening) — a *resume* after a
+   *  stall must never rewind, or the clip would restart instead of finishing.
+   */
+  const startVideo = (fromStart = true) => {
     if (!video) return;
     video.muted = true;
-    try {
-      if (video.currentTime > 0) video.currentTime = 0;
-    } catch {
-      /* not seekable yet */
+    if (fromStart) {
+      try {
+        if (video.currentTime > 0) video.currentTime = 0;
+      } catch {
+        /* not seekable yet */
+      }
     }
     const playing = video.play();
     if (playing && typeof playing.catch === "function") {
@@ -487,17 +606,17 @@ function createController(els: Elements): OpeningController {
           return;
         }
         lastError = `play() failed (${errorName})`;
-        if (firstFrameAt === null) setState("fallback");
-        showCard();
-        dismissAfterFloor();
+        releaseNow({ kind: "media-error", waitMs: floorRemaining() });
       });
     }
   };
 
   const run = () => {
     clearTimers();
-    dismissedAt = null;
+    releasing = false;
     firstFrameAt = null;
+    lastProgressAt = 0;
+    lastTimeSeen = 0;
     lastError = null;
     // JS is in charge — drop the CSS failsafe and any prior hide.
     splash.style.animation = "none";
@@ -520,6 +639,8 @@ function createController(els: Elements): OpeningController {
     showCard();
 
     // Static opening: the brand card alone (reduced motion, opening=static).
+    // The watchdog decides when the floor is done, so both modes share one
+    // release path.
     if (decision.mode === "static" || !video) {
       splash.dataset.motion = "reduce";
       if (video) {
@@ -529,7 +650,7 @@ function createController(els: Elements): OpeningController {
           /* ignore */
         }
       }
-      minTimer = window.setTimeout(finish, decision.minVisibleMs);
+      armWatchdog();
       paint();
       return;
     }
@@ -540,51 +661,73 @@ function createController(els: Elements): OpeningController {
       video.load();
     }
     startVideo();
-    graceTimer = window.setTimeout(() => {
-      if (firstFrameAt !== null) return;
-      lastError = `no frame within ${OPENING_FIRST_FRAME_GRACE_MS}ms`;
-      setState("fallback");
-      showCard();
-      dismissAfterFloor();
-      paint();
-    }, OPENING_FIRST_FRAME_GRACE_MS);
-    maxTimer = window.setTimeout(finish, decision.maxWaitMs);
+    armWatchdog();
     paint();
     if (debug) probeClip();
   };
 
   // Media listeners are attached ONCE, so replay() cannot stack handlers.
   if (video) {
-    const clearGraceTimer = () => {
-      if (graceTimer) {
-        window.clearTimeout(graceTimer);
-        graceTimer = 0;
+    let lastPaintAt = 0;
+    const markFrame = () => {
+      const first = firstFrameAt === null;
+      if (first) {
+        firstFrameAt = now() - start;
+        hideCard();
+        if (state === "pending" || state === "fallback") setState("playing");
+      }
+      lastProgressAt = now() - start;
+      // `requestVideoFrameCallback` is the only signal that a frame actually
+      // reached the compositor, so it is armed until frame one exists (and
+      // afterwards only while the debug badge wants live numbers). After that
+      // `timeupdate` carries the stall clock at ~4 Hz — re-arming per frame
+      // would run a 60 Hz loop for ten seconds to paint nothing new.
+      if (first || debug) watchNextFrame();
+      if (debug && now() - lastPaintAt > 240) {
+        lastPaintAt = now();
+        paint();
+      } else if (first) {
+        paint();
       }
     };
-    const markFrame = () => {
-      if (firstFrameAt === null) firstFrameAt = now() - start;
-      hideCard();
-      if (state === "pending" || state === "fallback") setState("playing");
-      clearGraceTimer();
-      paint();
+    const watchNextFrame = () => {
+      const requestFrame = (
+        video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }
+      ).requestVideoFrameCallback;
+      if (typeof requestFrame !== "function") return;
+      try {
+        requestFrame.call(video, () => markFrame());
+      } catch {
+        /* unsupported engine — loadeddata/timeupdate still drive it */
+      }
     };
+    video.addEventListener("loadstart", watchNextFrame);
     video.addEventListener("loadeddata", markFrame);
     video.addEventListener("playing", markFrame);
     video.addEventListener("timeupdate", () => {
+      if (video.currentTime > lastTimeSeen + 0.001) {
+        lastTimeSeen = video.currentTime;
+        lastProgressAt = now() - start;
+      }
       if (video.currentTime > 0.04 && firstFrameAt === null) markFrame();
     });
     video.addEventListener("ended", () => {
-      if (state === "skipped") return;
-      dismissAfterFloor();
+      if (state === "skipped" || state === "done") return;
+      evaluate();
     });
     video.addEventListener("error", () => {
       lastError = video.error ? `media error: ${mediaErrorMessage(video.error.code)}` : "media error";
-      // An error before the first frame does not end the opening — the brand
-      // card carries it. After the first frame, close out gracefully.
-      if (firstFrameAt === null) setState("fallback");
-      showCard();
-      dismissAfterFloor();
+      evaluate();
       paint();
+    });
+    // A buffer that refills must not be mistaken for a finished clip, and a
+    // paused-by-policy element must not hang the app: nudge and re-check.
+    video.addEventListener("progress", () => {
+      // Data arrived while the element sat paused (buffer refill): resume from
+      // where it stopped — `fromStart = false` is the difference between
+      // finishing the clip and replaying it from frame one.
+      if (video.paused && firstFrameAt !== null && !video.ended) startVideo(false);
+      evaluate();
     });
   }
 
@@ -600,29 +743,23 @@ function createController(els: Elements): OpeningController {
   window.addEventListener("online", () => {
     // Offline boot skipped the opening; hand it back while still booting.
     if (state === "skipped" && decision.reason.startsWith("offline")) {
-      decision = resolveOpeningDecision(currentInput());
+      decision = resolveOpeningDecision(currentInput(injectedTimings));
       run();
     }
     paint();
   });
 
-  window.addEventListener("resize", () => {
-    const next = resolveOpeningDecision(currentInput());
-    const clipChanged = next.clip !== decision.clip;
-    decision = next;
-    if (clipChanged && decision.show && decision.mode === "video" && video) {
-      // Crossing the mobile breakpoint mid-clip: swap the file, keep playing.
-      video.setAttribute("src", decision.src);
-      video.load();
-      startVideo();
-    }
-    paint();
-  });
+  // Deliberately NOT re-picking the clip on resize: the boot script already
+  // committed to the phone or the wide file, `currentInput()` locks to it, and
+  // swapping mid-play would reload the 5 MB file and restart the animation —
+  // which is exactly the "it did not finish" symptom. Only the debug badge
+  // refreshes.
+  window.addEventListener("resize", () => paint());
 
   if (typeof window.matchMedia === "function") {
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     motion.addEventListener?.("change", () => {
-      decision = resolveOpeningDecision(currentInput());
+      decision = resolveOpeningDecision(currentInput(injectedTimings));
       paint();
     });
   }
@@ -658,7 +795,7 @@ function createController(els: Elements): OpeningController {
       return new Promise<void>((resolve) => doneWaiters.push(resolve));
     },
     replay() {
-      decision = resolveOpeningDecision(currentInput());
+      decision = resolveOpeningDecision(currentInput(injectedTimings));
       if (video) {
         try {
           video.pause();
@@ -672,7 +809,7 @@ function createController(els: Elements): OpeningController {
       run();
     },
     dismiss() {
-      finish();
+      releaseNow({ kind: "hard-ceiling", waitMs: 0 });
     },
     setDebug(next: boolean) {
       debug = next;
@@ -692,13 +829,20 @@ function createController(els: Elements): OpeningController {
  * StrictMode double-mounts and HMR can never start a second driver over the
  * same <video> — the bug that made the clip abort on boot.
  */
-export function attachOpeningSplash(): OpeningController | null {
+/**
+ * Adopt (or create) the live opening controller. Idempotent: React
+ * StrictMode double-mounts and HMR reuse the same instance, so nothing can
+ * ever start a second driver over the same <video> (that abort used to be read
+ * as "the clip finished"). `timings` exists for the tests and the dev sandbox —
+ * it is ignored once a controller is live.
+ */
+export function attachOpeningSplash(timings?: Partial<OpeningTimings>): OpeningController | null {
   if (!isBrowser()) return null;
   const host = window as unknown as { __eduosOpening?: OpeningController };
   if (host.__eduosOpening) return host.__eduosOpening;
   const els = ensureElements();
   if (!els) return null;
-  const controller = createController(els);
+  const controller = createController(els, timings);
   host.__eduosOpening = controller;
   return controller;
 }

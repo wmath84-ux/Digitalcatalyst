@@ -34,8 +34,12 @@
       .app-boot-splash { position: fixed; inset: 0; z-index: 2147483000; min-height: 100dvh; display: grid; place-items: center; padding: 0; color: #fff; background-color: #0a0c12; background-image: radial-gradient(58% 72% at 12% 30%, rgb(44 53 126 / 0.95) 0%, rgb(37 48 143 / 0.42) 38%, transparent 68%), radial-gradient(52% 60% at 40% 80%, rgb(18 117 106 / 0.72) 0%, rgb(15 95 87 / 0.3) 40%, transparent 70%), radial-gradient(46% 56% at 90% 15%, rgb(109 33 132 / 0.8) 0%, rgb(122 36 136 / 0.34) 42%, transparent 72%), radial-gradient(70% 40% at 45% 5%, rgb(58 33 89 / 0.6) 0%, transparent 70%), radial-gradient(120% 90% at 50% 100%, rgb(6 7 12 / 0.85) 0%, transparent 55%); font-family: Inter, ui-sans-serif, system-ui, sans-serif; overflow: hidden; opacity: 1; transition: opacity 380ms ease; }
       .app-boot-splash[data-hiding="1"] { opacity: 0; pointer-events: none; }
       #app-opening-splash[data-opening="skipped"], #app-opening-splash[data-opening="done"] { display: none !important; }
-      /* A stale inline shell (service-worker cache) has no controller to hide
-         us with, so CSS dismisses the splash on its own after 11 s. */
+      /* JS-less backstop: if the bundle never runs (stale cached shell, blocked
+         script), the splash cannot be told to leave, so CSS leaves it after
+         11 s — just past the 10.006 s clips. When JavaScript IS alive the
+         controller cancels this immediately (`style.animation = "none"`), so
+         it never competes with the rule that the opening plays in full before
+         the app opens. */
       #app-opening-splash { animation: app-boot-failsafe 10ms linear 11s forwards; }
       @keyframes app-boot-failsafe { to { opacity: 0; visibility: hidden; display: none; } }
       .app-boot-video { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: contain; background-color: #000; opacity: 0; transition: opacity 240ms ease; }

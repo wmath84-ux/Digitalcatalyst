@@ -23,9 +23,33 @@ of the 5 MB arrives. The frames are **not** recreated in CSS anywhere — the cl
   splash `data-opening="skipped"` **only** for an explicit off / branding off / offline boot.
 * **`src/utils/openingSplash.ts`** — the decision table (`resolveOpeningDecision`, pure) and the runtime
   controller that is the **only** writer of the splash's visibility. It fades the clip in over the card when
-  the clip produces a frame, keeps the card if it does not, holds the opening for at least
-  `OPENING_MIN_VISIBLE_MS` (1.4 s), and releases the app by `OPENING_MAX_WAIT_MS` (12.006 s).
-  `window.__eduosOpening` is that controller (`replay()`, `dismiss()`, `setDebug(true)`).
+  the clip produces a frame, keeps the card if it does not, and holds the opening for at least
+  `OPENING_MIN_VISIBLE_MS` (1.4 s).
+
+### The app opens when the clip ends — nothing else
+
+The clip runs to `ended`, then the final frame is held `OPENING_HOLD_AFTER_END_MS` (260 ms) and the splash
+fades (`OPENING_FADE_MS`, 380 ms). There is **no deadline on a slow clip**, because a deadline is what made
+the animation look broken: the release rule lives in `shouldReleaseOpening()` and the only exits are
+
+| Exit | Fires when |
+|---|---|
+| `ended` | the clip reached its end (normal case, 10.006 s) |
+| `media-error` | the element reported an error (404, unsupported, decode) |
+| `load-timeout` | not one frame in `OPENING_LOAD_CEILING_MS` (20 s) — a 5 MB file on a weak link still gets to play |
+| `stalled` | `currentTime` has not advanced for `OPENING_STALL_TIMEOUT_MS` (6 s) **and** it is not refilling its buffer |
+| `hard-ceiling` | `OPENING_HARD_CEILING_MS` (60 s) — the "never trap the user" backstop, deliberately ~6× the clip |
+
+The old pair that truncated the animation is gone on purpose: `OPENING_FIRST_FRAME_GRACE_MS = 3_000` (a
+phone on 4G cannot decode a 5 MB file in 3 s) and `OPENING_MAX_WAIT_MS = 12_006` (a first frame at ~2 s
+already pushed the clip past the ceiling, so the last second was cut). `window.__eduosOpening` is the
+controller (`replay()`, `dismiss()`, `setDebug(true)`).
+
+While the opening is up the app keeps mounting **underneath** it (auth, catalogue, the winter backdrop), so
+the reveal after `ended` is instant — "opens after the animation" is a visual hand-over, not a frozen boot.
+The clip is played `muted`: unmuted autoplay is blocked by Chrome/Safari, and a blocked `play()` means no
+animation at all, which the user reads as broken. The clip choice is locked at boot (the controller adopts
+`window.__eduosBoot.clip`) so a rotation cannot reload the file and restart it halfway.
 * **`src/main.tsx`** — calls `attachOpeningSplash()` once before `createRoot`, renders
   `<OpeningAnnouncer />` (screen reader) and the status-bar colour. **React never touches the `<video>`.**
 * **`src/components/offline/OfflineGate.tsx`** — asks the controller to `dismiss()`; it no longer writes
@@ -79,5 +103,8 @@ Overrides (all of them are also accepted comma-separated, e.g. `?opening=on,debu
   be read as "finished").
 * Do **not** treat reduced motion as "hide the brand moment". Static card, no motion.
 * Do **not** let an error path hide the opening before the minimum visible window — the card exists for that.
-* `tests/openingSplashRuntime.test.mjs` boots the real `index.html` in jsdom and asserts all of this; keep it
+* Do **not** re-add a fixed "release the app at N seconds" timer. If a backstop is needed, put it in
+  `shouldReleaseOpening()` so it stays testable, and keep it far above clip length + load ceiling.
+* `tests/openingSplashRuntime.test.mjs` boots the real `index.html` in jsdom and asserts all of this —
+  including "a clip that keeps advancing is never dismissed" and the `shouldReleaseOpening` table; keep it
   green, and extend it instead of adding another "the code says X" grep when a behaviour changes.
