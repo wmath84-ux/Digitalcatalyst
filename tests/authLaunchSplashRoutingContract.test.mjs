@@ -73,10 +73,25 @@ test("opening animation is on by default", () => {
 test("launch screen plays the opening video and respects reduced motion", () => {
   assert.match(html, /id="app-opening-video"/);
   assert.match(html, /prefers-reduced-motion/);
+  assert.match(html, /#app-opening-splash \{ display: none !important; \}/);
+  assert.match(html, /position: absolute; inset: 0;/);
+  assert.match(html, /max-width: none/);
   assert.match(main, /prefers-reduced-motion: reduce/);
   assert.match(main, /onEnded/);
   assert.doesNotMatch(main, /app-boot-bar/);
   assert.doesNotMatch(html, /eduvora-logo-in/);
+});
+
+test("React does not cover the HTML opening video and does not abort on play interruption", () => {
+  // The HTML splash (outside #root) is the picture. A second .app-boot-splash
+  // inside #root paints over both clips at the same z-index.
+  assert.match(main, /if \(hostVideo\) \{/);
+  assert.match(main, /return <span className="sr-only">\{label\}<\/span>/);
+  // StrictMode remount / autoplay refusal must not mark the splash done.
+  assert.match(main, /AbortError/);
+  assert.match(main, /NotAllowedError/);
+  assert.match(main, /pointerdown/);
+  assert.match(html, /autoplay/);
 });
 
 test("offline overlay is gated beside Root and does not replace the opening MP4s", () => {

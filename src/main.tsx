@@ -305,23 +305,55 @@ function AppLaunchSplash({
     if (file && !current.includes(file)) {
       video.src = src;
     }
-    // played=true ONLY on a real ending. A load error / autoplay refusal /
-    // stall timeout means the animation never actually showed, so the boot
-    // splash stays replayable (the offline-rescue effect relies on this).
-    const finished = () => onEnded(true);
-    const aborted = () => onEnded(false);
+    // played=true ONLY on a real ending. A load error / stall timeout means
+    // the animation never actually showed, so the boot splash stays
+    // replayable (the offline-rescue effect relies on this).
+    //
+    // AbortError / NotAllowedError must NOT count as finished: React 18
+    // StrictMode remounts abort the first play(), and a muted autoplay
+    // refusal still leaves the clip on screen for a gesture retry.
+    let cancelled = false;
+    const finished = () => {
+      if (!cancelled) onEnded(true);
+    };
+    const aborted = () => {
+      if (!cancelled) onEnded(false);
+    };
     if (video.ended) {
       finished();
       return undefined;
     }
     video.addEventListener("ended", finished);
     video.addEventListener("error", aborted);
-    const playing = video.play();
-    if (playing && typeof playing.catch === "function") playing.catch(() => aborted());
-    const timeout = window.setTimeout(aborted, APP_OPENING_VIDEO_TIMEOUT_MS);
+    const tryPlay = () => {
+      video.muted = true;
+      video.playsInline = true;
+      const playing = video.play();
+      if (playing && typeof playing.catch === "function") {
+        playing.catch((err: unknown) => {
+          if (cancelled) return;
+          const name = err && typeof err === "object" && "name" in err ? String((err as { name: string }).name) : "";
+          if (name === "AbortError" || name === "NotAllowedError") return;
+          aborted();
+        });
+      }
+    };
+    tryPlay();
+    const onGesture = () => {
+      if (!cancelled) tryPlay();
+    };
+    window.addEventListener("pointerdown", onGesture);
+    const timeout = window.setTimeout(() => {
+      if (cancelled) return;
+      // Clip started — wait for `ended` instead of yanking it off screen.
+      if (video.currentTime > 0) return;
+      aborted();
+    }, APP_OPENING_VIDEO_TIMEOUT_MS);
     return () => {
+      cancelled = true;
       video.removeEventListener("ended", finished);
       video.removeEventListener("error", aborted);
+      window.removeEventListener("pointerdown", onGesture);
       window.clearTimeout(timeout);
     };
   }, [onEnded, src]);
@@ -330,22 +362,27 @@ function AppLaunchSplash({
     ? document.getElementById("app-opening-video")
     : null;
 
+  // The HTML #app-opening-splash (outside #root) is the picture. Painting a
+  // second .app-boot-splash here covers that video at the same z-index, so
+  // both the mobile and desktop clips play underneath an empty gradient.
+  if (hostVideo) {
+    return <span className="sr-only">{label}</span>;
+  }
+
   return (
     <main className="app-boot-splash" role="status" aria-live="polite" aria-label={`Loading ${appName}`}>
-      {hostVideo ? null : (
-        <video
-          ref={reactVideoRef}
-          className="app-boot-video"
-          src={src}
-          autoPlay
-          muted
-          playsInline
-          preload="auto"
-          controls={false}
-          disablePictureInPicture
-          aria-label={`${appName} opening animation`}
-        />
-      )}
+      <video
+        ref={reactVideoRef}
+        className="app-boot-video"
+        src={src}
+        autoPlay
+        muted
+        playsInline
+        preload="auto"
+        controls={false}
+        disablePictureInPicture
+        aria-label={`${appName} opening animation`}
+      />
       <span className="sr-only">{label}</span>
     </main>
   );
