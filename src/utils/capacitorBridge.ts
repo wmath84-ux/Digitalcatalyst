@@ -61,12 +61,48 @@ export const isAndroidNative = (): boolean => {
   }
 };
 
+/** Android notification channel used by every My Day alarm. Android 8+
+ *  silently drops notifications that reference a channel id which was
+ *  never created, so this MUST exist before the first schedule call. */
+export const REMINDER_CHANNEL_ID = "eduvora-reminders";
+
+let reminderChannelPromise: Promise<void> | null = null;
+
+/** Create the "My Day reminders" notification channel (idempotent —
+ *  Android ignores repeat creates for an existing channel id). Safe to
+ *  call on every app start; no-op off Android native. */
+export async function ensureReminderChannel(): Promise<void> {
+  if (!isAndroidNative()) return;
+  if (reminderChannelPromise) return reminderChannelPromise;
+  reminderChannelPromise = (async () => {
+    try {
+      await LocalNotifications.createChannel({
+        id: REMINDER_CHANNEL_ID,
+        name: "My Day reminders",
+        description: "Exact-time reminders for tasks, schedule and reminders",
+        importance: 5, // IMPORTANCE_HIGH — heads-up banner + sound
+        visibility: 1, // VISIBILITY_PUBLIC — shows on the lock screen
+        vibration: true,
+        sound: "default",
+        lights: true,
+        lightColor: "#2563eb",
+      });
+    } catch (err) {
+      console.warn("[push] ensureReminderChannel failed", err);
+      // Allow a later retry if channel creation failed transiently.
+      reminderChannelPromise = null;
+    }
+  })();
+  return reminderChannelPromise;
+}
+
 let registeredForPush = false;
 
 /** Register for FCM push on the installed Android TWA.
  *  No-op on web (the service worker flow handles that). */
 export async function registerForPush(getIdToken: () => Promise<string | null>): Promise<{ ok: boolean; reason?: string }> {
   if (!isAndroidNative()) return { ok: false, reason: "not-native" };
+  await ensureReminderChannel();
   if (registeredForPush) return { ok: true };
   try {
     let permStatus = await PushNotifications.checkPermissions();
@@ -135,6 +171,7 @@ export async function registerForPush(getIdToken: () => Promise<string | null>):
 
 async function renderForegroundPush(notification: PushNotificationSchema) {
   try {
+    await ensureReminderChannel();
     const granted = await LocalNotifications.checkPermissions();
     if (granted.display !== "granted") {
       await LocalNotifications.requestPermissions();
@@ -150,6 +187,7 @@ async function renderForegroundPush(notification: PushNotificationSchema) {
           smallIcon: "ic_stat_eduvora",
           largeIcon: data.icon,
           extra: data,
+          channelId: REMINDER_CHANNEL_ID,
         },
       ],
     });
@@ -186,6 +224,8 @@ export type LocalAlarmItem = {
 export async function scheduleLocalAlarm(item: LocalAlarmItem): Promise<boolean> {
   if (!isAndroidNative()) return false;
   try {
+    // Android 8+ drops notifications posted to a non-existent channel.
+    await ensureReminderChannel();
     let granted = await LocalNotifications.checkPermissions();
     if (granted.display !== "granted") {
       granted = await LocalNotifications.requestPermissions();
@@ -201,7 +241,7 @@ export async function scheduleLocalAlarm(item: LocalAlarmItem): Promise<boolean>
       smallIcon: item.smallIcon || "ic_stat_eduvora",
       iconColor: "#2563eb",
       extra: { url: item.url, tag: item.tag },
-      channelId: "eduvora-reminders",
+      channelId: REMINDER_CHANNEL_ID,
     };
     await LocalNotifications.schedule({ notifications: [schedule] });
     return true;
