@@ -456,6 +456,31 @@ test("the static preview is one-shot: the next opening is the clip again", async
   }
 });
 
+test("a tap anywhere unmutes the opening clip without restarting it", async () => {
+  const t = await boot({ width: 390 });
+  try {
+    const controller = t.attach();
+    assert.equal(controller.decision.show, true);
+    assert.equal(controller.decision.mode, "video");
+    // The decorative pill tells the user a tap helps — it is never a button.
+    const hint = t.splash.querySelector(".app-boot-sound-hint");
+    assert.ok(hint, "the tap-for-sound hint must be in the splash");
+    assert.match(hint.textContent ?? "", /Tap for sound/);
+    assert.equal(t.splash.dataset.soundHint, "on", "the hint shows while the muted clip plays");
+    // Clip already playing (not paused): a tap must unmute without restarting.
+    t.set("paused", false);
+    t.set("ended", false);
+    t.video.muted = true;
+    const playsBefore = t.playCalls.value;
+    t.window.dispatchEvent(new t.window.Event("pointerdown", { bubbles: true }));
+    assert.equal(t.video.muted, false, "pointerdown must unmute the clip");
+    assert.equal(t.playCalls.value, playsBefore, "unmuting must not restart the clip");
+    assert.equal(t.splash.dataset.soundHint, "off", "the first tap dismisses the hint");
+  } finally {
+    t.restore();
+  }
+});
+
 test("the shipped clips are real H.264 files that can start before they finish downloading", async () => {
   for (const file of [MOBILE, DESKTOP]) {
     const bytes = fs.readFileSync(new URL(`../public/assets/animations/${file}`, import.meta.url));

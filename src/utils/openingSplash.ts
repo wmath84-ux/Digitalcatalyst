@@ -480,6 +480,23 @@ interface Elements {
   video: HTMLVideoElement | null;
   fallback: HTMLElement | null;
   name: HTMLElement | null;
+  soundHint: HTMLElement | null;
+}
+
+/** The decorative “tap for sound” pill. Purely a hint — tapping anywhere
+ *  unmutes via the window pointerdown listener, never via this element
+ *  (it is `pointer-events: none` by CSS). Created on demand so a stale
+ *  cached shell without the markup still gets one. */
+function ensureSoundHint(splash: HTMLElement): HTMLElement {
+  let hint = splash.querySelector(".app-boot-sound-hint") as HTMLElement | null;
+  if (!hint) {
+    hint = document.createElement("div");
+    hint.className = "app-boot-sound-hint";
+    hint.setAttribute("aria-hidden", "true");
+    hint.innerHTML = '<span aria-hidden="true">🔇</span><span>Tap for sound</span>';
+    splash.appendChild(hint);
+  }
+  return hint;
 }
 
 /**
@@ -508,13 +525,20 @@ function ensureElements(): Elements | null {
     card.innerHTML = '<span class="app-boot-ring"></span><p class="app-boot-name"></p><span class="app-boot-shine"></span>';
     splash.appendChild(video);
     splash.appendChild(card);
+    const hint = document.createElement("div");
+    hint.className = "app-boot-sound-hint";
+    hint.setAttribute("aria-hidden", "true");
+    hint.innerHTML = '<span aria-hidden="true">🔇</span><span>Tap for sound</span>';
+    splash.appendChild(hint);
     document.body.insertBefore(splash, document.body.firstChild);
   }
+  ensureSoundHint(splash);
   return {
     splash,
     video: document.getElementById(OPENING_VIDEO_ID) as HTMLVideoElement | null,
     fallback: splash.querySelector(".app-boot-fallback"),
     name: splash.querySelector(".app-boot-name"),
+    soundHint: splash.querySelector(".app-boot-sound-hint"),
   };
 }
 
@@ -548,10 +572,28 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
   let minTimer = 0;
   let watchdogTimer = 0;
   let hideTimer = 0;
+  let soundHintTimer = 0;
   let releasing = false;
   let lastTimeSeen = 0;
 
   if (name && !name.textContent) name.textContent = brandName();
+
+  /** Hide the decorative “tap for sound” pill (it is never a button). */
+  const hideSoundHint = () => {
+    if (soundHintTimer) {
+      window.clearTimeout(soundHintTimer);
+      soundHintTimer = 0;
+    }
+    splash.dataset.soundHint = "off";
+  };
+
+  /** Show the pill briefly while the clip plays muted, then fade it out. */
+  const showSoundHint = () => {
+    if (!splash.querySelector(".app-boot-sound-hint")) ensureSoundHint(splash);
+    splash.dataset.soundHint = "on";
+    if (soundHintTimer) window.clearTimeout(soundHintTimer);
+    soundHintTimer = window.setTimeout(hideSoundHint, 2000);
+  };
 
   const clearTimers = () => {
     for (const id of [minTimer, hideTimer]) if (id) window.clearTimeout(id);
@@ -625,6 +667,7 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
     // A one-shot preview override (`static`, `force`, …) is spent the moment
     // this opening ends, so a tap on the dev page can never strand the device.
     clearOpeningRuntimeOverride();
+    hideSoundHint();
     // Whatever happened, the opening has been on screen: `done`, never
     // `skipped` — `skipped` is reserved for a decision not to show it at all,
     // and the offline-rescue path keys off that distinction.
@@ -736,6 +779,7 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
 
     if (!decision.show) {
       clearOpeningRuntimeOverride();
+      hideSoundHint();
       // `data-opening` (not a `display` inline style) is what hides the splash.
       // React re-renders the document in other places, and an inline
       // `display:none` survived a later re-show, which is exactly how the
@@ -755,6 +799,7 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
     // release path.
     if (decision.mode === "static" || !video) {
       splash.dataset.motion = "reduce";
+      hideSoundHint();
       if (video) {
         try {
           video.pause();
@@ -773,6 +818,7 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
       video.load();
     }
     startVideo();
+    showSoundHint();
     armWatchdog();
     paint();
     if (debug) probeClip();
@@ -848,11 +894,15 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
     });
   }
 
-  // First tap rescues a deferred autoplay (iOS/Safari, data-saver Chrome).
+  // First tap rescues a deferred autoplay (iOS/Safari, data-saver Chrome)
+  // and unmutes the clip: autoplay starts muted, so sound needs the gesture.
+  // Unmuting never restarts or interrupts the video — it only turns sound on.
   window.addEventListener(
     "pointerdown",
     () => {
       if (decision.show && decision.mode === "video" && video && video.paused && !video.ended) startVideo(firstFrameAt === null);
+      if (decision.show && decision.mode === "video" && video && video.muted) video.muted = false;
+      hideSoundHint();
     },
     { passive: true },
   );
