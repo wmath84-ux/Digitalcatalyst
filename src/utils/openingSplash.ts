@@ -515,8 +515,14 @@ function ensureElements(): Elements | null {
     const video = document.createElement("video");
     video.id = OPENING_VIDEO_ID;
     video.className = "app-boot-video";
-    video.muted = true;
-    video.setAttribute("muted", "");
+    // The Capacitor Android WebView is the only host that lets us autoplay
+    // with audio from a cold start — every browser (incl. mobile Chrome) will
+    // silently refuse any unmuted autoplay. Build the element unmuted on the
+    // device, muted on the website, so the website never regresses to a
+    // "playback blocked" toast the moment a user opens the URL.
+    const nativeApp = !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+    video.muted = !nativeApp;
+    if (!nativeApp) video.setAttribute("muted", "");
     video.setAttribute("playsinline", "");
     video.preload = "auto";
     const card = document.createElement("div");
@@ -736,7 +742,13 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
    */
   const startVideo = (fromStart = true) => {
     if (!video) return;
-    video.muted = true;
+    // The pre-React boot script and `ensureElements()` already set the right
+    // starting `muted` value for the host. Re-applying the platform check here
+    // (instead of a hard `video.muted = true`) is what keeps the native app
+    // playing audio from boot to fade, and what still mutes the website even
+    // when a `loadedmetadata`/buffer-refill replay happens mid-clip.
+    const nativeApp = !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+    video.muted = !nativeApp;
     if (fromStart) {
       try {
         if (video.currentTime > 0) video.currentTime = 0;
