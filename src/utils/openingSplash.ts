@@ -79,8 +79,30 @@ export const OPENING_FADE_MS = 380;
 
 export const OPENING_QUERY_KEY = "opening";
 export const OPENING_OVERRIDE_STORAGE_KEY = "eduvora.opening.override.v1";
+export const OPENING_OVERRIDE_STAMP_KEY = "eduvora.opening.override.at.v1";
+/** How long a remembered override is honoured before it is dropped silently. */
+export const OPENING_OVERRIDE_TTL_MS = 24 * 60 * 60 * 1000;
+/**
+ * The ONLY overrides that may outlive the URL. `debug` is a badge (it changes
+ * nothing the learner sees), `off` is a deliberate opt-out. Everything that
+ * changes *what plays* — `static`, `on`, `force` — is URL- or tap-only.
+ *
+ * This rule exists because it was broken: "Preview the static card" on
+ * `#/dev/opening` used to persist `static`, and from then on every boot on that
+ * device showed the 1.4 s brand card instead of the clip and opened the app —
+ * "I see a one-second frame and then the landing page".
+ */
+export const PERSISTED_OPENING_OVERRIDES: OpeningOverride[] = ["debug", "off"];
 export const OPENING_STATE_EVENT = "eduvora:opening-state";
 export const OPENING_BRAND_CACHE_KEY = "eduvora.branding.v2";
+/**
+ * An explicit device opt-in to the full clip even when the OS asks for less
+ * motion. Reduced motion means "do not show motion nobody asked for", so
+ * honoring it is right — but it should never be *silently* read as "the owner
+ * wants no opening", which is how it looked like a 1 s flash. Remembering a
+ * "show me more" choice is safe; remembering a "show me less" choice is not.
+ */
+export const OPENING_PREFER_FULL_KEY = "eduvora.opening.preferFull.v1";
 
 export type OpeningClip = "mobile" | "desktop";
 /** `video` = the shipped EduOS clip; `static` = the CSS brand card only. */
@@ -96,6 +118,8 @@ export interface OpeningInput {
   reducedMotion: boolean;
   offline: boolean;
   override: OpeningOverride | null;
+  /** This device asked (on the dev page) for the full clip despite reduced motion. */
+  preferFullClip?: boolean;
   /** The clip the pre-React boot script already started, if any. Adopting it
    *  instead of re-deriving it is what stops a mid-clip viewport change from
    *  reloading the file and restarting the animation. */
@@ -194,14 +218,48 @@ export function parseOpeningOverride(raw: string | null | undefined): OpeningOve
   return "debug";
 }
 
+/**
+ * A one-shot override: used by the very next opening and then cleared when the
+ * opening finishes, so a preview tap can never strand a device in another mode.
+ * (The persisted key is deliberately limited — see PERSISTED_OPENING_OVERRIDES.)
+ */
+let runtimeOverride: OpeningOverride | null = null;
+
+export function setOpeningRuntimeOverride(value: OpeningOverride | null): void {
+  runtimeOverride = value;
+}
+
+export function peekOpeningRuntimeOverride(): OpeningOverride | null {
+  return runtimeOverride;
+}
+
+export function clearOpeningRuntimeOverride(): void {
+  runtimeOverride = null;
+}
+
+/** The stored value, honouring the TTL and the "only these may persist" rule. */
+export function readStickyOpeningOverride(read: (key: string) => string | null): OpeningOverride | null {
+  const value = parseOpeningOverride(read(OPENING_OVERRIDE_STORAGE_KEY));
+  if (!value) return null;
+  if (!PERSISTED_OPENING_OVERRIDES.includes(value)) return null;
+  const stamp = Number(read(OPENING_OVERRIDE_STAMP_KEY) || "0");
+  if (stamp && Date.now() - stamp > OPENING_OVERRIDE_TTL_MS) return null;
+  return value;
+}
+
 /** Read the override from the URL first, then from the persisted device choice. */
-export function readOpeningOverride(search: string, stored: string | null): OpeningOverride | null {
+export function readOpeningOverride(
+  search: string,
+  stored: string | null,
+  runtime: OpeningOverride | null = null,
+): OpeningOverride | null {
   // A hash-routed app means both spellings appear in the wild:
   // `/?opening=debug#/home` and `/?opening=debug#/home?x=1`. Everything from
   // the fragment on is the app's own route, so it is dropped before parsing.
   const query = (search || "").split("#")[0];
   const params = new URLSearchParams(query.replace(/^[?&]/, ""));
-  return parseOpeningOverride(params.get(OPENING_QUERY_KEY)) ?? parseOpeningOverride(stored);
+  // URL (this tap) > one-shot preview > remembered device setting.
+  return parseOpeningOverride(params.get(OPENING_QUERY_KEY)) ?? runtime ?? parseOpeningOverride(stored);
 }
 
 /** The clip a given viewport width should use. */
@@ -242,7 +300,7 @@ export function resolveOpeningDecision(input: OpeningInput): OpeningDecision {
   if (input.override === "static") {
     return { ...base, show: true, mode: "static", reason: "forced the static opening card (opening=static)" };
   }
-  if (input.reducedMotion && input.override !== "force") {
+  if (input.reducedMotion && input.override !== "force" && !input.preferFullClip) {
     return {
       ...base,
       show: true,
@@ -285,6 +343,26 @@ export interface OpeningController {
 
 const isBrowser = (): boolean => typeof document !== "undefined" && typeof window !== "undefined";
 
+/** The remembered "play the full opening anyway" choice for this device. */
+export function readPreferFullClip(): boolean {
+  if (!isBrowser()) return false;
+  try {
+    return window.localStorage.getItem(OPENING_PREFER_FULL_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setPreferFullClip(next: boolean): void {
+  if (!isBrowser()) return;
+  try {
+    if (next) window.localStorage.setItem(OPENING_PREFER_FULL_KEY, "1");
+    else window.localStorage.removeItem(OPENING_PREFER_FULL_KEY);
+  } catch {
+    /* private mode */
+  }
+}
+
 function readStoredBrandingOpening(): boolean {
   if (!isBrowser()) return true;
   try {
@@ -312,17 +390,33 @@ function currentInput(timings?: Partial<OpeningTimings>): OpeningInput {
     width: window.innerWidth,
     brandingEnabled: readStoredBrandingOpening(),
     reducedMotion: prefersReducedMotion(),
+    preferFullClip: readPreferFullClip(),
     offline: navigator.onLine === false,
-    override: readOpeningOverride(window.location.search, readStoredOverride()),
+    override: readOpeningOverride(window.location.search, readStoredOverride(), peekOpeningRuntimeOverride()),
   };
 }
 
 function readStoredOverride(): string | null {
-  try {
-    return window.localStorage.getItem(OPENING_OVERRIDE_STORAGE_KEY);
-  } catch {
-    return null;
+  if (!isBrowser()) return null;
+  const read = (key: string) => {
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  };
+  const allowed = readStickyOpeningOverride(read);
+  // Self-healing: a value left behind by an older build (or by the static-card
+  // preview button) is dropped here so it can never strand the opening again.
+  if (!allowed && read(OPENING_OVERRIDE_STORAGE_KEY)) {
+    try {
+      window.localStorage.removeItem(OPENING_OVERRIDE_STORAGE_KEY);
+      window.localStorage.removeItem(OPENING_OVERRIDE_STAMP_KEY);
+    } catch {
+      /* private mode */
+    }
   }
+  return allowed;
 }
 
 /**
@@ -332,9 +426,19 @@ function readStoredOverride(): string | null {
  */
 export function setOpeningOverrideSticky(value: OpeningOverride | null): void {
   if (!isBrowser()) return;
+  if (value && !PERSISTED_OPENING_OVERRIDES.includes(value)) {
+    // Safe-by-default: remembered only when it cannot change what is shown.
+    runtimeOverride = value;
+    return;
+  }
   try {
-    if (value) window.localStorage.setItem(OPENING_OVERRIDE_STORAGE_KEY, value);
-    else window.localStorage.removeItem(OPENING_OVERRIDE_STORAGE_KEY);
+    if (value) {
+      window.localStorage.setItem(OPENING_OVERRIDE_STORAGE_KEY, value);
+      window.localStorage.setItem(OPENING_OVERRIDE_STAMP_KEY, String(Date.now()));
+    } else {
+      window.localStorage.removeItem(OPENING_OVERRIDE_STORAGE_KEY);
+      window.localStorage.removeItem(OPENING_OVERRIDE_STAMP_KEY);
+    }
   } catch {
     /* private mode */
   }
@@ -518,6 +622,9 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
   };
 
   const settle = () => {
+    // A one-shot preview override (`static`, `force`, …) is spent the moment
+    // this opening ends, so a tap on the dev page can never strand the device.
+    clearOpeningRuntimeOverride();
     // Whatever happened, the opening has been on screen: `done`, never
     // `skipped` — `skipped` is reserved for a decision not to show it at all,
     // and the offline-rescue path keys off that distinction.
@@ -605,8 +712,12 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
           paint();
           return;
         }
-        lastError = `play() failed (${errorName})`;
-        releaseNow({ kind: "media-error", waitMs: floorRemaining() });
+        // A rejected play() with no media error is a policy hiccup, not a
+        // broken clip: releasing here is what made the opening show one frame
+        // and hand over. The watchdog (load ceiling → fallback card) decides,
+        // and the gesture / metadata listeners retry.
+        lastError = `play() rejected (${errorName}) — waiting for the clip, not giving up`;
+        paint();
       });
     }
   };
@@ -624,6 +735,7 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
     delete splash.dataset.hiding;
 
     if (!decision.show) {
+      clearOpeningRuntimeOverride();
       // `data-opening` (not a `display` inline style) is what hides the splash.
       // React re-renders the document in other places, and an inline
       // `display:none` survived a later re-show, which is exactly how the
@@ -702,6 +814,11 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
       }
     };
     video.addEventListener("loadstart", watchNextFrame);
+    video.addEventListener("loadedmetadata", () => {
+      // The usual reason for a refused play() at boot is that the element was
+      // not ready yet; retry once the track is known.
+      if (video.paused && !video.ended && firstFrameAt === null) startVideo();
+    });
     video.addEventListener("loadeddata", markFrame);
     video.addEventListener("playing", markFrame);
     video.addEventListener("timeupdate", () => {
@@ -735,7 +852,7 @@ function createController(els: Elements, injectedTimings?: Partial<OpeningTiming
   window.addEventListener(
     "pointerdown",
     () => {
-      if (decision.show && decision.mode === "video" && video && firstFrameAt === null && video.paused) startVideo();
+      if (decision.show && decision.mode === "video" && video && video.paused && !video.ended) startVideo(firstFrameAt === null);
     },
     { passive: true },
   );

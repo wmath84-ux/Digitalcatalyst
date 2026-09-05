@@ -22,7 +22,9 @@ import {
   OPENING_FADE_MS,
   OPENING_MIN_VISIBLE_MS,
   OPENING_MOBILE_MAX_WIDTH,
+  PERSISTED_OPENING_OVERRIDES,
   openingClipForWidth,
+  readStickyOpeningOverride,
   parseOpeningOverride,
   readOpeningOverride,
   resolveOpeningDecision,
@@ -78,6 +80,19 @@ test("the four ways the opening used to disappear are each answered", () => {
   assert.equal(resolveOpeningDecision({ ...base, override: "off" }).show, false);
 });
 
+test("reduced motion may be answered by an explicit device opt-in", () => {
+  // Reduced motion must not be *silently* upgraded to "no opening": the card is
+  // the answer, and a device can ask for the full clip on top of it.
+  assert.equal(resolveOpeningDecision({ ...base, reducedMotion: true }).mode, "static");
+  assert.equal(resolveOpeningDecision({ ...base, reducedMotion: true, preferFullClip: true }).mode, "video");
+  assert.equal(resolveOpeningDecision({ ...base, reducedMotion: true, preferFullClip: true, offline: true }).show, false);
+  const html = fs.readFileSync("index.html", "utf8");
+  // …and the pre-React mirror reads the same key, so there is no 1 s card
+  // flash before React can say anything.
+  assert.match(html, /eduvora\.opening\.preferFull\.v1/);
+  assert.match(html, /override !== "force" && !preferFull/);
+});
+
 test("overrides beat the device and the branding cache", () => {
   // `on` re-arms a branding-off opening; `force` also outruns reduced motion
   // and the offline skip, so a report can always be reproduced.
@@ -129,6 +144,34 @@ test("the clip is allowed to finish: floors, backstops and what they must clear"
   assert.ok(OPENING_MIN_VISIBLE_MS + OPENING_FADE_MS < t.hardCeilingMs);
 });
 
+test("an override that changes what plays is never remembered", () => {
+  // The bug this pins: "Preview the static card" wrote `static` to
+  // localStorage, so every boot after that showed the 1.4 s card and opened
+  // the app — reported as "I see a one-second frame, then the landing page".
+  const store = (values) => (key) => values[key] ?? null;
+  const fresh = { "eduvora.opening.override.v1": "static" };
+  assert.equal(readStickyOpeningOverride(store(fresh)), null, "static must not survive the URL");
+  assert.deepEqual(PERSISTED_OPENING_OVERRIDES, ["debug", "off"]);
+
+  assert.equal(readStickyOpeningOverride(store({ "eduvora.opening.override.v1": "off" })), "off");
+  assert.equal(readStickyOpeningOverride(store({ "eduvora.opening.override.v1": "debug", "eduvora.opening.override.at.v1": String(Date.now()) })), "debug");
+  // …and even those expire.
+  const staleDay = Date.now() - 25 * 60 * 60 * 1000;
+  assert.equal(
+    readStickyOpeningOverride(store({ "eduvora.opening.override.v1": "debug", "eduvora.opening.override.at.v1": String(staleDay) })),
+    null,
+    "a week-old debug flag must not still be steering the opening",
+  );
+
+  // Priority: this tap's URL > the one-shot preview > what the device remembers.
+  assert.equal(readOpeningOverride("?opening=static", "off"), "static");
+  assert.equal(readOpeningOverride("", "off", "force"), "force");
+  assert.equal(readOpeningOverride("", "off"), "off");
+  // A remembered value the policy rejects cannot force a mode on its own.
+  assert.equal(readStickyOpeningOverride(store({ "eduvora.opening.override.v1": "force" })), null);
+  assert.equal(resolveOpeningDecision({ ...base, override: null }).mode, "video");
+});
+
 test("index.html's pre-React mirror agrees with the module", () => {
   const html = fs.readFileSync("index.html", "utf8");
   // Same breakpoint, same two files, same "missing flag means ON" rule.
@@ -143,4 +186,7 @@ test("index.html's pre-React mirror agrees with the module", () => {
   assert.doesNotMatch(html, /@media \(prefers-reduced-motion: reduce\) \{[^}]*display: none/);
   // Brand card + video are both in the served markup, before any JS runs.
   assert.ok(html.indexOf('class="app-boot-fallback"') < html.indexOf('id="root"'));
+  // …and the mirror refuses a remembered override that would change what plays.
+  assert.match(html, /stored !== "debug" && stored !== "off"/);
+  assert.match(html, /eduvora\.opening\.override\.at\.v1/);
 });

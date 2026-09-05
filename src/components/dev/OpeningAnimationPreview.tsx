@@ -22,8 +22,12 @@ import {
   OPENING_MOBILE_MAX_WIDTH,
   attachOpeningSplash,
   openingClipForWidth,
+  readPreferFullClip,
+  setPreferFullClip,
   resolveOpeningDecision,
   setOpeningOverrideSticky,
+  setOpeningRuntimeOverride,
+  isOpeningVisible,
   type OpeningController,
 } from "../../utils/openingSplash";
 
@@ -103,6 +107,7 @@ export default function OpeningAnimationPreview() {
   const width = typeof window === "undefined" ? 0 : window.innerWidth;
   const reducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
+  const preferFull = useMemo(() => readPreferFullClip(), [now]);
   const cached = useMemo(() => {
     try {
       const raw = localStorage.getItem("eduvora.branding.v2");
@@ -176,7 +181,14 @@ export default function OpeningAnimationPreview() {
     `opening state: ${controller?.state ?? "no controller"}`,
     `decision: ${decision.show ? decision.mode : "hidden"} — ${decision.reason}`,
     `clip for this width (${width}px): ${decision.clip} → ${decision.src}`,
-    `reduced motion: ${reducedMotion ? "ON (that is why the clip is replaced by the card)" : "off"}`,
+    `reduced motion: ${
+      reducedMotion
+        ? preferFull
+          ? "ON, but this device asked for the full clip anyway (opening stays the video)"
+          : "ON — the clip is replaced by the static card; use the toggle below to force the clip on this device"
+        : "off"
+    }`,
+    `opening visible now: ${controller ? (isOpeningVisible(controller.state) ? `yes (${controller.state})` : `no (${controller.state})`) : "no controller"}`,
     `navigator.onLine: ${typeof navigator !== "undefined" ? String(navigator.onLine) : "?"}`,
     `branding openingAnimationEnabled (cached): ${cached.brandingEnabled} (${cached.raw})`,
     `splash element: ${splash ? `data-opening=${splash.dataset.opening ?? "(unset → visible)"} data-video=${splash.dataset.video ?? "(unset)"}` : "MISSING (stale index.html cache)"}`,
@@ -241,19 +253,41 @@ export default function OpeningAnimationPreview() {
             type="button"
             className={BTN_GHOST}
             onClick={() => {
-              setOpeningOverrideSticky("static");
-              controller?.setDebug(true);
+              // One-shot by design: `static` is NOT written to localStorage, so
+              // previewing the card can never strand this device in card-only
+              // mode (that is exactly what a remembered override used to do).
+              setOpeningRuntimeOverride("static");
               controller?.replay();
               refresh();
             }}
           >
-            Preview the static card
+            Preview the static card (once)
+          </button>
+          <button
+            type="button"
+            className={preferFull ? BTN : BTN_GHOST}
+            onClick={() => {
+              // Reduced motion is honoured by default, which is correct — but it
+              // must never look like a broken 1 s opening. This remembers an
+              // explicit "show me the full clip anyway" for THIS device.
+              setPreferFullClip(!preferFull);
+              setOpeningRuntimeOverride(null);
+              controller?.replay();
+              refresh();
+            }}
+          >
+            {preferFull
+              ? "✓ Full opening forced on this device (tap to follow the system setting)"
+              : reducedMotion
+                ? "Play the full clip here even though my system asks for less motion"
+                : "Remember the full clip on this device (for reduced-motion days)"}
           </button>
           <button
             type="button"
             className={BTN_GHOST}
             onClick={() => {
               setOpeningOverrideSticky(null);
+              setOpeningRuntimeOverride(null);
               controller?.setDebug(false);
               refresh();
             }}
@@ -278,7 +312,8 @@ export default function OpeningAnimationPreview() {
           {summary}
         </pre>
         <p className="mt-2 text-[11px] leading-relaxed text-[#64708f]">
-          URL overrides (they also persist on this device once used): <code>?opening=on</code> ·{" "}
+          URL overrides (only <code>debug</code> and <code>off</code> are remembered on this device, and even
+          those expire after 24 h — anything that changes what plays is per-URL on purpose): <code>?opening=on</code> ·{" "}
           <code>?opening=off</code> · <code>?opening=force</code> (plays the clip even with reduced motion) ·{" "}
           <code>?opening=static</code> · <code>?opening=debug</code> (corner badge, stays after the splash). Console:{" "}
           <code>__eduosOpening.replay()</code>, <code>__eduosOpening.dismiss()</code>,{" "}
@@ -299,8 +334,10 @@ export default function OpeningAnimationPreview() {
             switch it on and clear this device’s cached copy with the button below.
           </li>
           <li>
-            <em>“reduced motion”</em> → the OS animation setting replaces the clip with the static card by design; use{" "}
-            <code>?opening=force</code> to see the clip.
+            <em>“reduced motion”</em> → the OS animation setting replaces the clip with the static card (a
+            1.4 s brand moment, which is the “one second frame then the app” you saw). Tap{" "}
+            <em>“Play the full clip here”</em> above to keep the whole animation on this device, or use{" "}
+            <code>?opening=force</code> once.
           </li>
           <li>
             <em>clip probe HTTP 404</em> → the file did not ship with this deployment (an old build, a cached

@@ -122,17 +122,37 @@
             icon.href = logo;
             document.head.appendChild(icon);
           }
-          override = (localStorage.getItem("eduvora.opening.override.v1") || "").toLowerCase();
         } catch (e) { /* private mode / corrupt cache — keep static defaults */ }
 
         try {
-          var query = new URLSearchParams(location.search).get("opening") || "";
-          var tokens = (query + "," + override).toLowerCase().split(/[,\s]+/);
-          override = tokens.indexOf("off") > -1 ? "off"
-            : tokens.indexOf("force") > -1 ? "force"
-            : tokens.indexOf("on") > -1 ? "on"
-            : tokens.indexOf("static") > -1 ? "static"
-            : tokens.indexOf("debug") > -1 ? "debug" : "";
+          var pick = function (raw) {
+            var tokens = (raw || "").toLowerCase().split(/[,\s]+/);
+            return tokens.indexOf("off") > -1 ? "off"
+              : tokens.indexOf("force") > -1 ? "force"
+              : tokens.indexOf("on") > -1 ? "on"
+              : tokens.indexOf("static") > -1 ? "static"
+              : tokens.indexOf("debug") > -1 ? "debug" : "";
+          };
+          var stored = "";
+          try {
+            stored = (localStorage.getItem("eduvora.opening.override.v1") || "").toLowerCase();
+            var at = Number(localStorage.getItem("eduvora.opening.override.at.v1") || "0");
+            // Mirror of PERSISTED_OPENING_OVERRIDES in src/utils/openingSplash.ts:
+            // only the debug badge and an explicit opt-out may outlive the URL,
+            // and only for 24 h. A remembered `static` (written by an older
+            // build) is dropped here — it is what left people with a one-second
+            // card in place of the clip on every boot.
+            if (stored !== "debug" && stored !== "off") {
+              if (stored) {
+                localStorage.removeItem("eduvora.opening.override.v1");
+                localStorage.removeItem("eduvora.opening.override.at.v1");
+              }
+              stored = "";
+            } else if (stored && at && Date.now() - at > 86400000) {
+              stored = "";
+            }
+          } catch (e) { stored = ""; }
+          override = pick(new URLSearchParams(location.search).get("opening")) || pick(stored);
         } catch (e) { override = ""; }
 
         if (name) document.title = tagline ? name + " | " + tagline : name;
@@ -147,8 +167,13 @@
           ? "/assets/animations/EduOS_app_opening_mobile.mp4"
           : "/assets/animations/EduOS_app_opening_desktop.mp4";
         var offline = navigator.onLine === false;
+        // Mirror of OPENING_PREFER_FULL_KEY: a device that opted into the full
+        // clip despite its own reduced-motion setting must not flash the card
+        // for a second before React can say so.
+        var preferFull = false;
+        try { preferFull = localStorage.getItem("eduvora.opening.preferFull.v1") === "1"; } catch (e) {}
         var show = override !== "off" && (enabled || override === "on" || override === "force") && !(offline && override !== "force");
-        var playClip = show && override !== "static" && !(REDUCE && override !== "force");
+        var playClip = show && override !== "static" && !(REDUCE && override !== "force" && !preferFull);
 
         if (splash && !show) splash.dataset.opening = "skipped";
         if (video) {

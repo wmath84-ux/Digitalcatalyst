@@ -19,7 +19,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { JSDOM } from "jsdom";
-import { DEFAULT_OPENING_TIMINGS, shouldReleaseOpening } from "../src/utils/openingSplash.ts";
+import {
+  DEFAULT_OPENING_TIMINGS,
+  setOpeningRuntimeOverride,
+  shouldReleaseOpening,
+} from "../src/utils/openingSplash.ts";
 
 const RAW_HTML = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const HTML = RAW_HTML.replace(/<script type="module"[^>]*><\/script>/, "");
@@ -33,7 +37,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * back helpers, including `attach()` which runs the controller's takeover — so
  * a test can assert what the user sees BEFORE and AFTER JavaScript takes over.
  */
-async function boot({ width = 390, search = "", branding = null, reducedMotion = false, onLine = true } = {}) {
+async function boot({ width = 390, search = "", branding = null, reducedMotion = false, onLine = true, storedOverride = null, preferFull = false, rejectPlay = null } = {}) {
   const playCalls = { value: 0 };
   const dom = new JSDOM(HTML, {
     runScripts: "dangerously",
@@ -59,6 +63,14 @@ async function boot({ width = 390, search = "", branding = null, reducedMotion =
       };
       window.HTMLMediaElement.prototype.load = function load() {};
       if (branding) window.localStorage.setItem("eduvora.branding.v2", JSON.stringify(branding));
+      if (storedOverride) window.localStorage.setItem("eduvora.opening.override.v1", storedOverride);
+      if (preferFull) window.localStorage.setItem("eduvora.opening.preferFull.v1", "1");
+      if (rejectPlay) {
+        window.HTMLMediaElement.prototype.play = function rejected() {
+          playCalls.value += 1;
+          return Promise.reject(Object.assign(new Error("play refused"), { name: rejectPlay }));
+        };
+      }
     },
   });
 
@@ -215,6 +227,26 @@ test("reduced motion swaps the clip for the static card — the opening is never
   }
 });
 
+test("a reduced-motion device that asked for the full clip gets the whole clip", async () => {
+  // Without the opt-in this is the second way to end up with "1 s of card, then
+  // the landing page" — and the only way that is *not* a code bug.
+  const plain = await boot({ width: 390, reducedMotion: true });
+  try {
+    assert.equal(plain.attach().decision.mode, "static");
+  } finally {
+    plain.restore();
+  }
+  const opted = await boot({ width: 390, reducedMotion: true, preferFull: true });
+  try {
+    const controller = opted.attach();
+    assert.equal(controller.decision.mode, "video");
+    assert.ok(opted.playCalls.value >= 1, "the clip is played from the boot script itself");
+    assert.notEqual(opted.splash.dataset.opening, "skipped");
+  } finally {
+    opted.restore();
+  }
+});
+
 test("a media error before the first frame degrades to the card instead of vanishing", async () => {
   const t = await boot({ width: 1440 });
   try {
@@ -367,6 +399,61 @@ test("the release rule itself: what may cut the opening, and what may not", () =
   assert.equal(shouldReleaseOpening({ ...base, sinceProgressMs: t.stallTimeoutMs + 1, buffering: true }), null);
   // The static (reduced-motion) opening holds exactly the minimum window.
   assert.equal(shouldReleaseOpening({ ...base, mode: "static", firstFrameMs: null, elapsedMs: 0 }).waitMs, t.minVisibleMs);
+});
+
+test("a remembered `static` preview can no longer replace the clip on boot", async () => {
+  // Exactly the reported symptom: one second of card, then the landing page.
+  const t = await boot({ width: 390, storedOverride: "static" });
+  try {
+    // Pre-React: the boot script must not have honoured the remembered `static`.
+    assert.equal(t.splash.dataset.opening, undefined, "the splash starts visible");
+    assert.ok(t.playCalls.value >= 1, "the boot script started the clip, not the card");
+    const controller = t.attach();
+    assert.equal(controller.decision.mode, "video", "the controller plays the clip too");
+    assert.equal(controller.state, "pending");
+    // the stale value is dropped so the next boot is clean too
+    assert.equal(t.window.localStorage.getItem("eduvora.opening.override.v1"), null);
+  } finally {
+    t.restore();
+  }
+});
+
+test("a refused play() waits for the clip instead of handing over the screen", async () => {
+  // The other half of that symptom: a play() rejection with no media error is a
+  // policy hiccup, so the opening keeps its window and retries.
+  const t = await boot({ width: 390, rejectPlay: "NotSupportedError" });
+  try {
+    const controller = t.attach();
+    await t.settle(1800);
+    assert.equal(controller.state, "pending", "past the floor, but the clip is not abandoned");
+    assert.notEqual(t.splash.style.display, "none");
+    assert.equal(t.splash.dataset.video, "off", "the brand card holds the screen meanwhile");
+    assert.match(controller.lastError, /play\(\) rejected/);
+    // once the element reports frames, playback resumes normally
+    t.fire("loadeddata");
+    assert.equal(controller.state, "playing");
+  } finally {
+    t.restore();
+  }
+});
+
+test("the static preview is one-shot: the next opening is the clip again", async () => {
+  const t = await boot({ width: 390 });
+  try {
+    const controller = t.attach();
+    setOpeningRuntimeOverride("static");
+    controller.replay();
+    assert.equal(controller.decision.mode, "static", "the preview plays the card once");
+    await t.settle(1800);
+    assert.equal(controller.state, "done");
+    setOpeningRuntimeOverride(null);
+    controller.replay();
+    assert.equal(controller.decision.mode, "video", "…and never again");
+    assert.match(t.video.getAttribute("src"), /mobile\.mp4$/, "the clip is pointed at again");
+  } finally {
+    setOpeningRuntimeOverride(null);
+    t.restore();
+  }
 });
 
 test("the shipped clips are real H.264 files that can start before they finish downloading", async () => {

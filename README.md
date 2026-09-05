@@ -59,8 +59,10 @@ devices get that card instead of nothing at all.
 
 `src/utils/openingSplash.ts` owns the decision, the playback and the teardown; React only mirrors it. The
 clip plays **in full** and the app is revealed only when it reaches `ended` — the only early exits are a
-media error, 20 s without a single frame, a 6 s dead buffer, and a 60 s never-trap-the-user backstop. To see
-what a device decided — without a rebuild — open `#/dev/opening` or append `?opening=debug`;
+media error, 20 s without a single frame, a 6 s dead buffer, and a 60 s never-trap-the-user backstop. Only `?opening=debug` and `?opening=off` are
+remembered on a device (24 h); an override that changes what plays is one URL or one tap, so a debug setting
+can never strand a boot — and a reduced-motion device that wants the whole clip can say so once on that page.
+To see what a device decided — without a rebuild — open `#/dev/opening` or append `?opening=debug`;
 `__eduosOpening.replay()` replays it from the console. Full record, overrides and the rules for changing it:
 `docs/app-opening-animation.md`.
 

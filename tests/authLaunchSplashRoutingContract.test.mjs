@@ -121,7 +121,9 @@ test("reduced motion swaps the clip for the static card — it never hides the o
   // "Reduce Motion". Reduced motion must mean "no motion", not "nothing".
   assert.doesNotMatch(html, /prefers-reduced-motion[^{]*\{[^}]*#app-opening-splash \{ display: none/);
   assert.match(html, /\/\* Reduced motion means "no motion", NOT "nothing"/);
-  assert.match(opening, /if \(input\.reducedMotion && input\.override !== "force"\)/);
+  assert.match(opening, /if \(input\.reducedMotion && input\.override !== "force" && !input\.preferFullClip\)/);
+  // …and a device can opt into the full clip, so the downgrade is never silent.
+  assert.match(opening, /OPENING_PREFER_FULL_KEY = "eduvora\.opening\.preferFull\.v1"/);
   assert.match(opening, /mode: "static"/);
   // and the escape hatch that makes the rule testable on a real phone
   assert.match(opening, /opening=force plays the clip anyway/);

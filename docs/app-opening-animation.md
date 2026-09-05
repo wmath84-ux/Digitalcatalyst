@@ -87,13 +87,35 @@ and a **Copy report for support** button that puts all of the above in the clipb
 
 Overrides (all of them are also accepted comma-separated, e.g. `?opening=on,debug`):
 
-| Override | Meaning |
-|---|---|
-| `?opening=on` | play it even if branding says off (this device only) |
-| `?opening=off` | never play it |
-| `?opening=force` | play the clip even under reduced motion and even offline |
-| `?opening=static` | show the brand card only — proves the non-video path |
-| `?opening=debug` | the corner badge + the `HEAD` probe |
+| Override | Meaning | Remembered? |
+|---|---|---|
+| `?opening=on` | play it even if branding says off | no — this URL only |
+| `?opening=off` | never play it | 24 h |
+| `?opening=force` | play the clip even under reduced motion (and offline) | no |
+| `?opening=static` | brand card only — proves the non-video path | no |
+| `?opening=debug` | the corner badge + the `HEAD` probe | 24 h |
+
+### An override may never quietly become someone's default
+
+Only `debug` (a badge, changes nothing the learner sees) and `off` (a deliberate
+opt-out) may outlive the URL, and both expire after 24 h. Everything that changes
+**what plays** is one tap or one URL: the dev page's "Preview the static card"
+uses `setOpeningRuntimeOverride()`, which the controller clears when the opening
+ends, and `readStoredOverride()` *deletes* a remembered value the policy rejects.
+
+This rule is a scar: the first version of that preview button persisted `static`,
+and from then on every boot showed 1.4 s of brand card and then the landing page —
+reported as "ek second ka frame dikhta hai, uske baad landing page". A debug
+affordance that changes what the user sees, and stays, is a new bug class.
+
+### Reduced motion: honoured, never silent
+
+Reduced motion still replaces the clip with the static card. Because that looks
+identical to "the opening is broken", `#/dev/opening` offers an explicit device
+opt-in — `localStorage["eduvora.opening.preferFull.v1"] = "1"` — that plays the
+whole clip despite the setting. `index.html` reads the same key pre-React, so
+there is no card flash before the controller can speak. "Do not show motion
+nobody asked for" stays intact: nothing is forced, it only remembers a request.
 
 ## Rules for future edits
 
@@ -105,6 +127,9 @@ Overrides (all of them are also accepted comma-separated, e.g. `?opening=on,debu
 * Do **not** let an error path hide the opening before the minimum visible window — the card exists for that.
 * Do **not** re-add a fixed "release the app at N seconds" timer. If a backstop is needed, put it in
   `shouldReleaseOpening()` so it stays testable, and keep it far above clip length + load ceiling.
+* Do **not** persist an override that changes what plays. Remembering "less
+  motion" is fine; remembering "static preview" strands every later boot.
 * `tests/openingSplashRuntime.test.mjs` boots the real `index.html` in jsdom and asserts all of this —
-  including "a clip that keeps advancing is never dismissed" and the `shouldReleaseOpening` table; keep it
+  including "a clip that keeps advancing is never dismissed", "a remembered
+  `static` preview must not replace the clip", "a refused play() waits instead of handing over" and the `shouldReleaseOpening` table; keep it
   green, and extend it instead of adding another "the code says X" grep when a behaviour changes.
