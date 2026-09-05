@@ -184,7 +184,13 @@
 
         if (splash && !show) splash.dataset.opening = "skipped";
         if (video) {
-          video.muted = true;
+          // Browsers (incl. mobile Chrome) silently refuse any autoplay that is
+          // NOT muted. The Capacitor Android WebView is the only host that lets
+          // us start an unmuted clip without a user gesture, so the boot is the
+          // place to decide: unmuted on the device, muted on the website.
+          var isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+          video.muted = !isNativeApp;
+          if (!isNativeApp) video.setAttribute("muted", "");
           video.playsInline = true;
           video.setAttribute("playsinline", "");
           video.setAttribute("src", src);

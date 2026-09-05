@@ -37,8 +37,9 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * back helpers, including `attach()` which runs the controller's takeover — so
  * a test can assert what the user sees BEFORE and AFTER JavaScript takes over.
  */
-async function boot({ width = 390, search = "", branding = null, reducedMotion = false, onLine = true, storedOverride = null, preferFull = false, rejectPlay = null } = {}) {
+async function boot({ width = 390, search = "", branding = null, reducedMotion = false, onLine = true, storedOverride = null, preferFull = false, rejectPlay = null, capacitor = false } = {}) {
   const playCalls = { value: 0 };
+  const didSetMutedAttribute = { value: false };
   const dom = new JSDOM(HTML, {
     runScripts: "dangerously",
     pretendToBeVisual: true,
@@ -62,6 +63,18 @@ async function boot({ width = 390, search = "", branding = null, reducedMotion =
         return Promise.resolve();
       };
       window.HTMLMediaElement.prototype.load = function load() {};
+      // The `muted` *attribute* (not the property) is what the boot script
+      // only sets on the website — on the Capacitor WebView the property is
+      // enough to start unmuted playback. Track calls on the *first* <video>
+      // in the document (the opening element) so the test can assert the
+      // platform branch fired the right one.
+      const origSetAttribute = window.HTMLElement.prototype.setAttribute;
+      window.HTMLElement.prototype.setAttribute = function patched(name, value) {
+        if (this instanceof window.HTMLVideoElement && name === "muted") {
+          didSetMutedAttribute.value = true;
+        }
+        return origSetAttribute.call(this, name, value);
+      };
       if (branding) window.localStorage.setItem("eduvora.branding.v2", JSON.stringify(branding));
       if (storedOverride) window.localStorage.setItem("eduvora.opening.override.v1", storedOverride);
       if (preferFull) window.localStorage.setItem("eduvora.opening.preferFull.v1", "1");
@@ -70,6 +83,18 @@ async function boot({ width = 390, search = "", branding = null, reducedMotion =
           playCalls.value += 1;
           return Promise.reject(Object.assign(new Error("play refused"), { name: rejectPlay }));
         };
+      }
+      // The Capacitor global is the only signal `index.html` and the
+      // controller use to decide "are we inside the Android app?". When the
+      // test asks for it, expose the same shape the runtime does: a
+      // top-level `window.Capacitor` with an `isNativePlatform()` that
+      // returns `true`. The website path simply omits this block.
+      if (capacitor) {
+        Object.defineProperty(window, "Capacitor", {
+          value: { isNativePlatform: () => true },
+          configurable: true,
+          writable: true,
+        });
       }
     },
   });
@@ -98,6 +123,9 @@ async function boot({ width = 390, search = "", branding = null, reducedMotion =
     splash,
     video,
     playCalls,
+    get didSetMutedAttribute() {
+      return didSetMutedAttribute.value;
+    },
     get controller() {
       return controller;
     },
@@ -453,6 +481,88 @@ test("the static preview is one-shot: the next opening is the clip again", async
   } finally {
     setOpeningRuntimeOverride(null);
     t.restore();
+  }
+});
+
+test("the Capacitor native shell starts the opening clip UNMUTED, the website keeps it muted", async () => {
+  // Browsers (incl. mobile Chrome) silently refuse any autoplay that is NOT
+  // muted — that is the platform rule this fix is built around. The Capacitor
+  // Android WebView is the only host where the unmuted autoplay is allowed, so
+  // the SAME <video> element must be muted on the website and unmuted on the
+  // device, and the controller must not re-mute the device mid-clip when a
+  // loadedmetadata/buffer-refill replay fires.
+  const native = await boot({ width: 390, capacitor: true });
+  try {
+    // 1 · pre-React boot script honours the native flag: the `muted` property
+    //     is false (so the WebView actually starts playback with audio) and
+    //     the boot script does NOT redundantly write `muted=""` again (which
+    //     is the visible difference between the website and the device paths
+    //     the task is fixing).
+    assert.equal(native.video.muted, false, "the boot script must not mute the native app");
+    assert.equal(
+      native.didSetMutedAttribute,
+      false,
+      "the boot script must not call setAttribute('muted', '') on the native app",
+    );
+    assert.equal(native.playCalls.value >= 1, true, "the boot script still tries to play the clip");
+
+    // 2 · the controller (createController → startVideo) must keep the
+    //     unmuted state through a fresh opening.
+    const controller = native.attach();
+    assert.equal(controller.decision.show, true);
+    assert.equal(controller.decision.mode, "video");
+    assert.equal(native.video.muted, false, "attach() must not mute the native app");
+
+    // 3 · a mid-play replay (the loadedmetadata / buffer-refill path) must
+    //     not re-mute the device — that is the exact regression the task is
+    //     fixing.
+    native.fire("progress");
+    assert.equal(native.video.muted, false, "a mid-play replay must keep audio on the device");
+    native.fire("loadedmetadata");
+    assert.equal(native.video.muted, false, "loadedmetadata must not re-mute the device");
+
+    // 4 · a tap on the device is a no-op for audio: the controller is the
+    //     source of truth, and the global pointerdown listener must not toggle
+    //     `muted` from `false` to `true` and silence the opening.
+    native.video.muted = false;
+    native.set("paused", false);
+    native.set("ended", false);
+    const playsBefore = native.playCalls.value;
+    native.window.dispatchEvent(new native.window.Event("pointerdown", { bubbles: true }));
+    assert.equal(native.video.muted, false, "a tap on the device must not change the muted state");
+    assert.equal(native.playCalls.value, playsBefore, "and it must not restart the clip");
+  } finally {
+    native.restore();
+  }
+
+  // The website (no Capacitor global at all) keeps the existing behaviour.
+  const web = await boot({ width: 390 });
+  try {
+    assert.equal(web.video.muted, true, "the website must keep the opening muted");
+    assert.equal(
+      web.didSetMutedAttribute,
+      true,
+      "the website boot script must write muted='' so the attribute matches the property",
+    );
+
+    const controller = web.attach();
+    assert.equal(controller.decision.show, true);
+    assert.equal(web.video.muted, true, "attach() must keep the website muted");
+
+    // A mid-play replay on the web must also stay muted.
+    web.fire("progress");
+    assert.equal(web.video.muted, true, "a mid-play replay on the web must stay muted");
+    web.fire("loadedmetadata");
+    assert.equal(web.video.muted, true, "loadedmetadata on the web must stay muted");
+
+    // And the legacy "tap to unmute" affordance still works on the website.
+    web.video.muted = true;
+    web.set("paused", false);
+    web.set("ended", false);
+    web.window.dispatchEvent(new web.window.Event("pointerdown", { bubbles: true }));
+    assert.equal(web.video.muted, false, "a tap still unmutes the website");
+  } finally {
+    web.restore();
   }
 });
 
