@@ -130,7 +130,7 @@ export default function ProductDetail(props: ProductDetailProps) {
           onNavigateToCart={props.onNavigateToCart || (() => undefined)}
           onNavigateToNotifications={props.onNavigateToNotifications || (() => undefined)}
         />
-        <main data-pdp-scroll data-pdp-grid className="min-h-0 flex-1 overflow-y-auto md:px-8">
+        <main data-pdp-scroll className="min-h-0 flex-1 overflow-y-auto md:px-8">
           {props.product ? <PremiumProductContent {...props} product={props.product} /> : <MissingProduct onBack={props.onBack} />}
         </main>
         <BottomNav
@@ -527,10 +527,15 @@ function PremiumProductContent({
           <span className="max-w-[190px] truncate font-medium text-white">{product.title}</span>
         </nav>
 
-        <div className="space-y-6 px-4 pb-8 pt-4">
-          <section className="flex flex-col gap-3">
+        {/* Desktop: `data-pdp-body` becomes a two-area grid (gallery + stack on
+            the left, the sticky purchase column on the right) from 1200 px up —
+            see the "PRODUCT DETAIL — DESKTOP WORKSPACE LAYOUT" block in
+            src/index.css. On phone / tablet it stays a plain vertical stack in
+            exactly the mobile order (gallery → buy → everything else). */}
+        <div data-pdp-body className="flex flex-col gap-6 px-4 pb-8 pt-4">
+          <section data-pdp-gallery className="flex flex-col gap-3">
             <GlassSurface radius={24} tint={0.25} blur={0} className="group relative overflow-hidden" contentClassName="relative">
-              <img src={selectedImage} alt={product.title} className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105" />
+              <img data-pdp-hero-img src={selectedImage} alt={product.title} className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105" />
               <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1.5 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
               </div>
@@ -548,7 +553,7 @@ function PremiumProductContent({
               <div className="absolute bottom-3 right-3 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">{activeImage + 1} / {gallery.length}</div>
             </GlassSurface>
             {gallery.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <div data-pdp-thumbs className="flex gap-2 overflow-x-auto pb-1">
                 {gallery.map((image, index) => (
                   <button key={`${image}-${index}`} onClick={() => setActiveImage(index)} className={`h-16 min-w-16 flex-1 overflow-hidden rounded-xl border-2 transition ${activeImage === index ? "border-white/80" : "border-transparent opacity-70"}`}>
                     <img src={image} alt={`${product.title} ${index + 1}`} className="h-full w-full object-cover" />
@@ -558,8 +563,8 @@ function PremiumProductContent({
             )}
           </section>
 
-          <section className="flex flex-col gap-5">
-            <div data-pdp-loose className="space-y-3">
+          <section data-pdp-buy className="flex flex-col gap-5">
+            <div data-pdp-titleblock className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-indigo-600 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">{product.category}</span>
                 {product.tags.slice(0, 2).map((tag) => <span key={tag} className="rounded-full bg-orange-500/15 px-2.5 py-1 text-[10px] font-semibold text-orange-300">{tag}</span>)}
@@ -577,7 +582,7 @@ function PremiumProductContent({
               </div>
             </div>
 
-            <GlassSurface radius={24} tint={0.25} blur={0} className="text-white/85" contentClassName="grid grid-cols-2 gap-2 p-3 text-[11px]">
+            <GlassSurface data-pdp-meta radius={24} tint={0.25} blur={0} className="text-white/85" contentClassName="grid grid-cols-2 gap-2 p-3 text-[11px]">
               <Meta icon={Clock} text={product.classLevel} />
               <Meta icon={BarChart3} text={product.subject} />
               <Meta icon={Globe} text={product.category} />
@@ -702,6 +707,7 @@ function PremiumProductContent({
 
           </section>
 
+          <div data-pdp-stack className="flex min-w-0 flex-col gap-6">
           {!isProductOwned && !unavailable && (
             <section id="pdp-purchase-options" className="scroll-mt-32">
               <div className="mb-3 px-1"><h2 className="text-lg font-black dc-ink-1">Build your purchase</h2><p className="text-xs dc-ink-3">Same as subscription extras: tick the modules you need, see the price beside each one, then checkout.</p></div>
@@ -733,6 +739,7 @@ function PremiumProductContent({
             onSubmit={() => void submitReview()}
           />
           {related.length > 0 && <RelatedProducts products={related} onNavigate={onNavigateToProduct} />}
+          </div>
         </div>
       </div>
     </div>
@@ -751,22 +758,40 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel || typeof IntersectionObserver === "undefined") return;
-    const root = sentinel.closest<HTMLElement>("[data-pdp-scroll]");
+    // Inside the desktop shell the page's own <main> no longer scrolls — the
+    // shell's [data-desktop-content] is the scrollport. Measuring against a
+    // non-scrolling ancestor would never flip the stuck styling on desktop.
+    const shellScroller = sentinel.closest<HTMLElement>("[data-desktop-content]");
+    const root = shellScroller || sentinel.closest<HTMLElement>("[data-pdp-scroll]");
+    // On desktop the bar seats one topbar + 0.75rem below the viewport top
+    // (see the PDP desktop block in index.css), so the stuck styling has to
+    // flip at that line, not at the scroller edge. On phone / tablet the bar
+    // seats at the scroller edge and the margin stays 0.
+    let rootMargin = "0px";
+    if (shellScroller) {
+      const topbar = parseFloat(getComputedStyle(shellScroller.closest("[data-desktop-shell]") || shellScroller).getPropertyValue("--desktop-topbar-height")) || 64;
+      rootMargin = `-${topbar + 12}px 0px 0px 0px`;
+    }
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) setTabBarStuck(!entry.isIntersecting);
       },
-      { root: root || null, threshold: 0 },
+      { root: root || null, threshold: 0, rootMargin },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, []);
 
+  // `overflow: clip` (with `overflow-hidden` kept in the class list as the
+  // legacy-Safari fallback) clips the rounded corners WITHOUT creating a
+  // scroll box — an `overflow-hidden` ancestor traps `position: sticky`,
+  // which is why the magnet tab bar below never seated under the header.
   return (
-    <GlassSurface radius={24} tint={0.25} blur={0} className="overflow-hidden text-white" contentClassName="relative">
+    <GlassSurface data-pdp-details radius={24} tint={0.25} blur={0} className="overflow-hidden text-white" style={{ overflow: "clip" }} contentClassName="relative">
       <div ref={sentinelRef} aria-hidden className="h-px" />
       <div
         data-pdp-tabbar
+        data-stuck={tabBarStuck ? "true" : "false"}
         className={`sticky top-0 z-30 px-3 pb-2 pt-3 transition-shadow duration-200 ${tabBarStuck ? "bg-[var(--dc-chrome-glass)]" : "rounded-t-[23px]"}`}
       >
         {/* Wave 3 (commerce): the tab strip is the pack's `glass-toggle-group`,
@@ -907,7 +932,7 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
   const visibleReviews = reviews.slice(0, visibleCount);
   const remaining = Math.max(0, reviews.length - visibleCount);
   return (
-    <GlassSurface id="product-reviews" radius={24} tint={0.25} blur={0} className="scroll-mt-36 text-white" contentClassName="p-5">
+    <GlassSurface data-pdp-reviews id="product-reviews" radius={24} tint={0.25} blur={0} className="scroll-mt-36 text-white" contentClassName="p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-white">Ratings & Reviews</h2>
         <button onClick={onToggleComposer} className="rounded-full bg-indigo-600 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-indigo-500">{composerOpen ? "Cancel" : canReview ? "Write a review" : "Review eligibility"}</button>
@@ -931,7 +956,7 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
       )}
       {notice && <p className="mt-3 rounded-xl bg-indigo-500/15 p-3 text-xs font-medium text-indigo-200">{notice}</p>}
       {reviews.length > 0 ? (
-        <div className="mt-4 space-y-3">
+        <div data-pdp-review-list className="mt-4 space-y-3">
           {visibleReviews.map((review) => (
             <GlassCard key={review.id} contentClassName="p-4">
               <article>
@@ -963,9 +988,9 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
 
 function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavigate?: (product: Product) => void }) {
   return (
-    <GlassSurface radius={24} className="text-white" contentClassName="p-5">
+    <GlassSurface data-pdp-related radius={24} className="text-white" contentClassName="p-5">
       <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-black dc-ink-1">You may also like</h2><p className="dc-section-label">Matched from the live catalog</p></div><ArrowUpRight className="h-4 w-4 text-white/55" /></div>
-      <div className="space-y-3">{products.map((item) => <GlassCard key={item.id} role="button" tabIndex={0} onClick={() => onNavigate?.(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate?.(item); } }} aria-label={`View ${item.title}`} className="group w-full cursor-pointer overflow-hidden text-left transition hover:-translate-y-0.5" contentClassName="flex p-0"><img src={item.image} alt={item.title} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-white">{item.title}</span><span className="flex items-center gap-1 text-xs text-white/55"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-white">{formatPrice(item.price)}</span></span></GlassCard>)}</div>
+      <div data-pdp-related-list className="space-y-3">{products.map((item) => <GlassCard key={item.id} role="button" tabIndex={0} onClick={() => onNavigate?.(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate?.(item); } }} aria-label={`View ${item.title}`} className="group w-full cursor-pointer overflow-hidden text-left transition hover:-translate-y-0.5" contentClassName="flex p-0"><img src={item.image} alt={item.title} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-white">{item.title}</span><span className="flex items-center gap-1 text-xs text-white/55"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-white">{formatPrice(item.price)}</span></span></GlassCard>)}</div>
     </GlassSurface>
   );
 }

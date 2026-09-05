@@ -9,6 +9,10 @@ import OfflineScreen from "./OfflineScreen";
  * WinterScene backdrop keep running underneath so the energy-field animation
  * is not a render blocker. The HTML opening splash sits outside #root at a
  * higher z-index; hide it while offline so this screen paints immediately.
+ *
+ * v4: `offline` is flag-only (browser/OS connectivity down for 8 s straight),
+ * so this overlay can no longer be triggered by a flaky fetch. Recovery is
+ * instant the moment the radio is back.
  */
 export default function OfflineGate() {
   const { offline, checking, retry } = useConnectivity();
@@ -22,5 +26,10 @@ export default function OfflineGate() {
 
   if (!offline) return null;
 
-  return <OfflineScreen checking={checking} onRetry={() => { void retry(); }} />;
+  return (
+    <OfflineScreen
+      checking={checking}
+      onRetry={() => { retry(); }}
+    />
+  );
 }
