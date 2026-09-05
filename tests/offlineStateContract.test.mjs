@@ -62,7 +62,7 @@ test("offline boot skips the opening splash so the overlay paints immediately", 
   assert.match(main, /openingPlayed/);
   assert.match(main, /if \(played\) openingPlayed\.current = true;/);
   // A load error / stall must not count as "played" — the splash stays replayable.
-  assert.match(main, /const aborted = \(\) => onEnded\(false\);/);
+  assert.match(main, /const aborted = \(\) => \{\s*if \(!cancelled\) onEnded\(false\);\s*\};/);
   assert.match(gate, /app-opening-splash/);
 });
 

@@ -20,20 +20,22 @@
     <style>
       /* Boot splash paints the same Black Ice backdrop as src/glass-theme.css (§2) so the pre-React frame and the app share one background — no white/indigo flash. */
       html { background-color: #0a0c12; }
-      .app-boot-splash { position: fixed; inset: 0; z-index: 2147483000; min-height: 100dvh; display: grid; place-items: center; padding: 0; color: #fff; background-color: #0a0c12; background-image: radial-gradient(58% 72% at 12% 30%, rgb(44 53 126 / 0.95) 0%, rgb(37 48 143 / 0.42) 38%, transparent 68%), radial-gradient(52% 60% at 40% 80%, rgb(18 117 106 / 0.72) 0%, rgb(15 95 87 / 0.3) 40%, transparent 70%), radial-gradient(46% 56% at 90% 15%, rgb(109 33 132 / 0.8) 0%, rgb(122 36 136 / 0.34) 42%, transparent 72%), radial-gradient(70% 40% at 45% 5%, rgb(58 33 89 / 0.6) 0%, transparent 70%), radial-gradient(120% 90% at 50% 100%, rgb(6 7 12 / 0.85) 0%, transparent 55%); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-      .app-boot-video { width: 100%; height: 100%; object-fit: contain; background-color: #000; }
-      @media (prefers-reduced-motion: reduce) { .app-boot-video { display: none; } }
+      .app-boot-splash { position: fixed; inset: 0; z-index: 2147483000; min-height: 100dvh; display: grid; place-items: center; padding: 0; color: #fff; background-color: #0a0c12; background-image: radial-gradient(58% 72% at 12% 30%, rgb(44 53 126 / 0.95) 0%, rgb(37 48 143 / 0.42) 38%, transparent 68%), radial-gradient(52% 60% at 40% 80%, rgb(18 117 106 / 0.72) 0%, rgb(15 95 87 / 0.3) 40%, transparent 70%), radial-gradient(46% 56% at 90% 15%, rgb(109 33 132 / 0.8) 0%, rgb(122 36 136 / 0.34) 42%, transparent 72%), radial-gradient(70% 40% at 45% 5%, rgb(58 33 89 / 0.6) 0%, transparent 70%), radial-gradient(120% 90% at 50% 100%, rgb(6 7 12 / 0.85) 0%, transparent 55%); font-family: Inter, ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
+      .app-boot-video { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: contain; background-color: #000; }
+      #app-opening-splash, #app-opening-splash * { max-width: none !important; }
+      @media (prefers-reduced-motion: reduce) { .app-boot-video { display: none; } #app-opening-splash { display: none !important; } }
     </style>
   </head>
   <body>
     <!-- Exact EduOS opening animation. Lives outside #root so React mount
          cannot restart or replace the video. On by default; hidden only when
          branding has the opening animation turned off. -->
-    <div id="app-opening-splash" class="app-boot-splash" role="status" aria-label="Loading Eduvora" style="display:none">
+    <div id="app-opening-splash" class="app-boot-splash" role="status" aria-label="Loading Eduvora">
       <video
         id="app-opening-video"
         class="app-boot-video"
         muted
+        autoplay
         playsinline
         webkit-playsinline
         preload="auto"
@@ -66,16 +68,18 @@
           var isMobile = window.innerWidth < 768;
           var video = document.getElementById("app-opening-video");
           if (video) {
+            video.muted = true;
+            video.playsInline = true;
+            video.setAttribute("playsinline", "");
             video.src = isMobile
               ? "/assets/animations/EduOS_app_opening_mobile.mp4"
               : "/assets/animations/EduOS_app_opening_desktop.mp4";
           }
-          if (splash && openingAnimationEnabled && !reduceMotion) {
-            splash.style.display = "";
-            if (video && video.play) {
-              var playing = video.play();
-              if (playing && playing.catch) playing.catch(function () {});
-            }
+          if (splash && (!openingAnimationEnabled || reduceMotion)) {
+            splash.style.display = "none";
+          } else if (splash && video && video.play) {
+            var playing = video.play();
+            if (playing && playing.catch) playing.catch(function () {});
           }
         } catch (e) { /* private mode / corrupt cache — keep static defaults */ }
       })();
