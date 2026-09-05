@@ -52,6 +52,12 @@
       @keyframes app-boot-name-in { from { opacity: 0; letter-spacing: 0.5em; filter: blur(6px); } to { opacity: 1; letter-spacing: 0.14em; filter: none; } }
       .app-boot-shine { position: absolute; inset-block: 0; left: 0; width: 42%; pointer-events: none; background-image: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.12), transparent); transform: translateX(-150%); animation: app-boot-shine 2.7s ease-in-out 0.4s infinite; }
       @keyframes app-boot-shine { 0% { transform: translateX(-150%); } 55% { transform: translateX(210%); } 100% { transform: translateX(210%); } }
+      /* Decorative “tap for sound” hint: the clip autoplays muted, so a tap
+         anywhere unmutes it (see src/utils/openingSplash.ts). The pill itself
+         is never a button — pointer-events none, tapping anywhere works. */
+      .app-boot-sound-hint { position: absolute; left: 50%; bottom: max(1.5rem, env(safe-area-inset-bottom, 0px) + 1rem); transform: translateX(-50%); z-index: 2; display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.45rem 0.9rem; border-radius: 9999px; background: rgb(8 10 20 / 0.62); border: 1px solid rgb(255 255 255 / 0.18); color: #e8ecff; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 400ms ease; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+      .app-boot-splash[data-sound-hint="on"] .app-boot-sound-hint { opacity: 1; }
+      .app-boot-splash[data-sound-hint="off"] .app-boot-sound-hint { opacity: 0; }
       #app-opening-splash, #app-opening-splash * { max-width: none !important; }
       /* Reduced motion means "no motion", NOT "nothing": the card stays and the
          clip is swapped out by src/utils/openingSplash.ts. The old
@@ -87,6 +93,7 @@
         <p class="app-boot-name"></p>
         <span class="app-boot-shine"></span>
       </div>
+      <div class="app-boot-sound-hint" aria-hidden="true"><span aria-hidden="true">🔇</span><span>Tap for sound</span></div>
     </div>
     <div id="root"></div>
     <!-- Pre-React boot: cached branding (title + splash label) and the FIRST
@@ -192,6 +199,21 @@
           if (splash && show) splash.setAttribute("data-motion", "reduce");
         }
         window.__eduosBoot = { clip: isMobile ? "mobile" : "desktop", src: playClip ? src : null, t0: Date.now(), reducedMotion: REDUCE };
+        // Decorative “tap for sound” pill: the clip autoplays muted, so the
+        // first tap anywhere unmutes it (mirrored in src/utils/openingSplash.ts
+        // once React takes over). The pill itself is not a button.
+        try {
+          if (splash) splash.dataset.soundHint = playClip ? "on" : "off";
+          if (playClip && splash) {
+            setTimeout(function () { try { splash.dataset.soundHint = "off"; } catch (e2) {} }, 2000);
+          }
+          window.addEventListener("pointerdown", function () {
+            try {
+              if (playClip && video && video.muted) video.muted = false;
+              if (splash) splash.dataset.soundHint = "off";
+            } catch (e3) {}
+          }, { passive: true });
+        } catch (e) {}
       })();
     </script>
     <script type="module" src="/src/main.tsx"></script>
