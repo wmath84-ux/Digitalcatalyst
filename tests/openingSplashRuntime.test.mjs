@@ -1,0 +1,297 @@
+// tests/openingSplashRuntime.test.mjs
+//
+// End-to-end boot test of the app opening animation, driven against the REAL
+// `index.html` (its pre-React boot script included) inside jsdom, for a phone
+// viewport and a desktop viewport, and for every state that used to swallow
+// the animation: branding off, reduced motion, offline, a media error, a clip
+// that already ended before React mounted, and a replay.
+//
+// This is the test the last three sessions were missing. Every earlier report
+// was answered by reading the code; the symptom lived in the interaction
+// between the boot script, the splash element and React, so here the DOM is
+// actually driven and the question answered is the one that matters: does the
+// opening end up on screen, and can it ever get stuck off?
+//
+// Media is stubbed (jsdom cannot decode H.264): play()/load() are counted and
+// the controller is fed the same events a real element fires.
+
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { JSDOM } from "jsdom";
+
+const RAW_HTML = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const HTML = RAW_HTML.replace(/<script type="module"[^>]*><\/script>/, "");
+const MOBILE = "EduOS_app_opening_mobile.mp4";
+const DESKTOP = "EduOS_app_opening_desktop.mp4";
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Parse index.html with the given device state (pre-React phase only) and hand
+ * back helpers, including `attach()` which runs the controller's takeover — so
+ * a test can assert what the user sees BEFORE and AFTER JavaScript takes over.
+ */
+async function boot({ width = 390, search = "", branding = null, reducedMotion = false, onLine = true } = {}) {
+  const playCalls = { value: 0 };
+  const dom = new JSDOM(HTML, {
+    runScripts: "dangerously",
+    pretendToBeVisual: true,
+    url: `http://localhost/${search}`,
+    beforeParse(window) {
+      Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
+      Object.defineProperty(window, "innerHeight", { value: width < 768 ? 844 : 900, configurable: true });
+      Object.defineProperty(window.navigator, "onLine", { value: onLine, configurable: true });
+      window.matchMedia = (query) => ({
+        matches: query.includes("prefers-reduced-motion") ? reducedMotion : false,
+        media: query,
+        addEventListener() {},
+        removeEventListener() {},
+        addListener() {},
+        removeListener() {},
+      });
+      // jsdom cannot decode a clip: count the attempts and keep them resolved,
+      // so a stub rejection can never masquerade as the bug under test.
+      window.HTMLMediaElement.prototype.play = function play() {
+        playCalls.value += 1;
+        return Promise.resolve();
+      };
+      window.HTMLMediaElement.prototype.load = function load() {};
+      if (branding) window.localStorage.setItem("eduvora.branding.v2", JSON.stringify(branding));
+    },
+  });
+
+  const { window } = dom;
+  const previous = {};
+  for (const key of ["window", "document", "navigator", "localStorage", "matchMedia"]) {
+    previous[key] = key in globalThis ? { had: true, value: globalThis[key] } : { had: false };
+  }
+  // Node exposes some of these as getter-only globals (`navigator` since 21),
+  // so every swap goes through defineProperty.
+  const setGlobal = (key, value) => Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+  setGlobal("window", window);
+  setGlobal("document", window.document);
+  setGlobal("navigator", window.navigator);
+  setGlobal("localStorage", window.localStorage);
+  setGlobal("matchMedia", window.matchMedia);
+
+  const opening = await import("../src/utils/openingSplash.ts");
+  const splash = window.document.getElementById("app-opening-splash");
+  const video = window.document.getElementById("app-opening-video");
+  let controller = null;
+
+  return {
+    window,
+    splash,
+    video,
+    playCalls,
+    get controller() {
+      return controller;
+    },
+    /** React's job: adopt the overlay the boot script already painted. */
+    attach() {
+      controller = opening.attachOpeningSplash();
+      return controller;
+    },
+    fire(type, target = video) {
+      target.dispatchEvent(new window.Event(type));
+    },
+    set(key, value) {
+      Object.defineProperty(video, key, { value, configurable: true, writable: true });
+    },
+    settle: sleep,
+    restore() {
+      for (const [key, entry] of Object.entries(previous)) {
+        if (entry.had) Object.defineProperty(globalThis, key, { value: entry.value, configurable: true, writable: true });
+        else delete globalThis[key];
+      }
+      dom.window.close();
+    },
+  };
+}
+
+test("a phone boots the portrait EduOS clip over the brand card", async () => {
+  const t = await boot({ width: 390 });
+  try {
+    // 1 · pre-React: the splash is up, the card is the picture, and the phone
+    //     clip was chosen and started before any module executed.
+    assert.equal(t.splash.dataset.preReact, "boot");
+    assert.equal(t.splash.dataset.opening, undefined, "the opening must start visible");
+    assert.match(t.video.getAttribute("src"), new RegExp(MOBILE));
+    assert.ok(t.playCalls.value >= 1, "the boot script must try to play the clip");
+    assert.ok(t.splash.querySelector(".app-boot-name").textContent.length > 0, "the card shows the brand");
+
+    // 2 · the controller keeps the card up until the clip proves itself…
+    const controller = t.attach();
+    assert.equal(controller.state, "pending");
+    assert.equal(t.splash.dataset.video, "off");
+
+    // 3 · …then hands the screen to the clip on the first real frame.
+    t.fire("loadeddata");
+    assert.equal(controller.state, "playing");
+    assert.equal(t.splash.dataset.video, "on");
+    t.set("currentTime", 0.1);
+    t.fire("timeupdate");
+    assert.notEqual(controller.firstFrameMs, null, "the first frame is measured");
+
+    // 4 · a clean ending releases the app — never before the visible floor.
+    t.fire("ended");
+    await t.settle(300);
+    assert.equal(t.splash.dataset.opening, "playing", "the opening may not be cut short");
+    await t.settle(2300);
+    assert.equal(controller.state, "done");
+    assert.equal(t.splash.dataset.opening, "done");
+    assert.equal(t.splash.style.display, "none");
+  } finally {
+    t.restore();
+  }
+});
+
+test("tablet and desktop use the wide clip, never the phone one", async () => {
+  for (const width of [768, 1024, 1440]) {
+    const t = await boot({ width });
+    try {
+      assert.match(t.video.getAttribute("src"), new RegExp(DESKTOP), `width ${width} must use the desktop clip`);
+      assert.doesNotMatch(t.video.getAttribute("src"), new RegExp(MOBILE));
+      assert.equal(t.splash.dataset.opening, undefined, "the opening is on screen at this width too");
+    } finally {
+      t.restore();
+    }
+  }
+});
+
+test("branding off hides the opening, and ?opening=on overrides it on the device", async () => {
+  const off = await boot({ width: 390, branding: { appName: "Learnbook", openingAnimationEnabled: false } });
+  try {
+    const controller = off.attach();
+    assert.equal(controller.state, "skipped");
+    assert.equal(off.splash.dataset.opening, "skipped");
+    assert.match(controller.decision.reason, /branding/);
+    // The admin is told the exact switch, and the dev sandbox link exists.
+    const preview = fs.readFileSync("src/components/dev/OpeningAnimationPreview.tsx", "utf8");
+    assert.match(preview, /App behaviour/);
+    assert.match(preview, /__eduosOpening|attachOpeningSplash/);
+  } finally {
+    off.restore();
+  }
+
+  const forced = await boot({ width: 390, search: "?opening=on", branding: { appName: "Learnbook", openingAnimationEnabled: false } });
+  try {
+    assert.equal(forced.splash.dataset.opening, undefined, "?opening=on must show the opening pre-React too");
+    assert.equal(forced.attach().state, "pending");
+  } finally {
+    forced.restore();
+  }
+});
+
+test("reduced motion swaps the clip for the static card — the opening is never deleted", async () => {
+  const t = await boot({ width: 390, reducedMotion: true });
+  try {
+    // THE regression: the old `@media (prefers-reduced-motion: reduce) {
+    // #app-opening-splash { display: none } }` deleted the opening for anyone
+    // with Android "Reduce animation" / Windows "animation effects off" / iOS
+    // "Reduce Motion" — on every screen size, which is exactly what "no
+    // animation, desktop or mobile" looked like from the outside.
+    assert.notEqual(t.splash.dataset.opening, "skipped");
+    assert.notEqual(t.splash.style.display, "none");
+    assert.equal(t.playCalls.value, 0, "no decode work on a reduced-motion device");
+    const controller = t.attach();
+    assert.equal(controller.decision.mode, "static");
+    assert.equal(t.splash.dataset.motion, "reduce");
+    assert.ok(t.splash.querySelector(".app-boot-name").textContent.length > 0, "the card is the opening");
+    await t.settle(1800);
+    assert.equal(controller.state, "done", "and the app is still released");
+  } finally {
+    t.restore();
+  }
+
+  const force = await boot({ width: 390, reducedMotion: true, search: "?opening=force" });
+  try {
+    assert.ok(force.playCalls.value >= 1, "?opening=force plays the real clip anyway");
+  } finally {
+    force.restore();
+  }
+});
+
+test("a media error before the first frame degrades to the card instead of vanishing", async () => {
+  const t = await boot({ width: 1440 });
+  try {
+    const controller = t.attach();
+    t.set("error", { code: 4, message: "MEDIA_SRC_NOT_SUPPORTED" });
+    t.fire("error");
+    assert.equal(controller.state, "fallback", "a broken clip must not hide the opening instantly");
+    assert.equal(t.splash.dataset.video, "off", "the brand card carries the opening");
+    assert.notEqual(t.splash.style.display, "none", "still on screen when the error arrives");
+    await t.settle(2300);
+    assert.equal(t.splash.style.display, "none", "…and the app is released anyway");
+    assert.match(controller.lastError, /media error/);
+  } finally {
+    t.restore();
+  }
+});
+
+test("offline boot skips the clip and connectivity hands the opening back", async () => {
+  const t = await boot({ width: 390, onLine: false });
+  try {
+    const controller = t.attach();
+    assert.equal(controller.state, "skipped");
+    assert.match(controller.decision.reason, /offline/);
+    Object.defineProperty(t.window.navigator, "onLine", { value: true, configurable: true });
+    t.fire("online", t.window);
+    await t.settle(60);
+    assert.notEqual(controller.state, "skipped", "the opening returns when the radio is up");
+    assert.ok(t.playCalls.value >= 1);
+  } finally {
+    t.restore();
+  }
+});
+
+test("a clip that already ended before React mounted is replayed, not treated as handled", async () => {
+  // The old `if (video.ended) finished()` shortcut made a resumed PWA skip the
+  // opening for the whole session — there was no reload, so nothing ever
+  // cleared it, and every refresh of the fix looked like a failed fix.
+  const t = await boot({ width: 390 });
+  try {
+    const before = t.playCalls.value;
+    t.set("ended", true);
+    t.set("currentTime", 9.8);
+    const controller = t.attach();
+    assert.equal(controller.state, "pending", "an ended clip must restart, not close the splash");
+    assert.ok(t.playCalls.value > before, "and it must actually be played again");
+    assert.notEqual(t.splash.style.display, "none");
+  } finally {
+    t.restore();
+  }
+});
+
+test("dismiss + replay: the opening can be shown again after it is over", async () => {
+  const t = await boot({ width: 1440 });
+  try {
+    const controller = t.attach();
+    controller.dismiss();
+    await t.settle(2300);
+    assert.equal(controller.state, "done");
+    assert.equal(t.splash.style.display, "none");
+    controller.replay();
+    assert.equal(controller.state, "pending", "replay() must put the splash back on screen");
+    assert.notEqual(t.splash.style.display, "none");
+    assert.equal(t.splash.dataset.hiding, undefined, "the fade-out state must be cleared");
+  } finally {
+    t.restore();
+  }
+});
+
+test("the shipped clips are real H.264 files that can start before they finish downloading", async () => {
+  for (const file of [MOBILE, DESKTOP]) {
+    const bytes = fs.readFileSync(new URL(`../public/assets/animations/${file}`, import.meta.url));
+    const text = bytes.toString("latin1");
+    assert.ok(bytes.length > 1_000_000, `${file} looks truncated`);
+    assert.equal(bytes.subarray(4, 8).toString("latin1"), "ftyp", `${file} is not an MP4`);
+    assert.ok(text.includes("avc1"), `${file} is not H.264 (Chrome/Safari/Android floor)`);
+    // Faststart: without the movie header near the front, a 5 MB clip cannot
+    // paint its first frame until the whole file has arrived — which is another
+    // way a boot splash ends up looking like "nothing happened".
+    const moov = text.indexOf("moov", text.indexOf("ftyp"));
+    assert.ok(moov > 0 && moov < 100_000, `${file} is not fast-start optimised (moov at ${moov})`);
+  }
+});

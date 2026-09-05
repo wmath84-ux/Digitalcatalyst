@@ -11,12 +11,13 @@ const gate = fs.readFileSync("src/components/offline/OfflineGate.tsx", "utf8");
 const ripple = fs.readFileSync("src/components/offline/ConnectionRipple.tsx", "utf8");
 const blur = fs.readFileSync("src/components/offline/BlurFade.tsx", "utf8");
 const css = fs.readFileSync("src/offline.css", "utf8");
+const opening = fs.readFileSync("src/utils/openingSplash.ts", "utf8");
 
 const offlineFiles = [provider, screen, gate, ripple, blur, css];
 
 test("offline overlay is a Root sibling and does not remount GlassBackdrop", () => {
   assert.match(main, /import OfflineGate from "\.\/components\/offline\/OfflineGate"/);
-  assert.match(main, /import \{ ConnectivityProvider, useConnectivity \} from "\.\/context\/ConnectivityContext"/);
+  assert.match(main, /import \{ ConnectivityProvider \} from "\.\/context\/ConnectivityContext"/);
   assert.match(main, /<ConnectivityProvider>/);
   assert.match(main, /<OfflineGate \/>/);
   assert.match(main, /<RouteBackdrop \/>/);
@@ -54,16 +55,17 @@ test("transient radio dips are ignored and recovery is instant", () => {
 });
 
 test("offline boot skips the opening splash so the overlay paints immediately", () => {
-  assert.match(main, /playOpening && !offline && \(!openingVideoDone \|\| launchPending\)/);
-  assert.match(main, /!playOpening \|\| offline/);
-  assert.match(main, /if \(offline\) setOpeningVideoDone\(true\)/);
-  // A transient blip must not eat the brand opening for the session: the
-  // splash comes back once connectivity recovers if it never actually played.
-  assert.match(main, /openingPlayed/);
-  assert.match(main, /if \(played\) openingPlayed\.current = true;/);
-  // A load error / stall must not count as "played" — the splash stays replayable.
-  assert.match(main, /const aborted = \(\) => \{\s*if \(!cancelled\) onEnded\(false\);\s*\};/);
+  // The decision table moved out of React into one controller. Offline at boot
+  // → skipped; `online` while still booting hands the opening back.
+  assert.match(opening, /if \(input\.offline && input\.override !== "force"\)/);
+  assert.match(opening, /reason: "offline at boot/);
+  assert.match(opening, /state === "skipped" && decision\.reason\.startsWith\("offline"\)/);
+  // React must never write the splash's inline display again: an inline style
+  // survived the next re-show and switched the opening off permanently.
+  assert.doesNotMatch(main, /splash\.style\.display/);
+  // The gate dismisses through the controller, not through a second owner.
   assert.match(gate, /app-opening-splash/);
+  assert.match(gate, /attachOpeningSplash\(\)\?\.dismiss\(\)/);
 });
 
 test("offline copy, Try Again, and EduOS glass — no video, GIF, Wi-Fi glyph, or red error", () => {

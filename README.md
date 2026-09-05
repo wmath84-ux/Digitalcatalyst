@@ -49,6 +49,19 @@ footer navigation and the desktop peek dock keep this repo's own material.
 
 Full wave-by-wave record: `docs/liquid-glass-rollout-plan.md`.
 
+## App opening animation
+
+Phones (`< 768px`) play `public/assets/animations/EduOS_app_opening_mobile.mp4`; tablet and desktop play
+`EduOS_app_opening_desktop.mp4`. The clip is never recreated in CSS. It lives in `#app-opening-splash`
+(outside `#root`, so a React remount cannot restart or abort it) on top of a CSS-only brand card, so a
+missing, slow or undecodable clip degrades to the card instead of to a blank screen, and reduced-motion
+devices get that card instead of nothing at all.
+
+`src/utils/openingSplash.ts` owns the decision, the playback and the teardown; React only mirrors it. To see
+what a device decided — without a rebuild — open `#/dev/opening` or append `?opening=debug`;
+`__eduosOpening.replay()` replays it from the console. Full record, overrides and the rules for changing it:
+`docs/app-opening-animation.md`.
+
 ## Secure Razorpay checkout
 
 Paid checkout is server-authoritative. `/api/razorpay/create-order` verifies the Firebase ID token, reads the product and price from Firestore, and creates the Razorpay order. `/api/razorpay/verify-payment` verifies the signature and captured amount with Razorpay before writing the purchase entitlement and order through Firebase Admin.

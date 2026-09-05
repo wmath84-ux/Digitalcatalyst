@@ -4,6 +4,9 @@ import fs from "node:fs";
 
 const main = fs.readFileSync("src/main.tsx", "utf8");
 const html = fs.readFileSync("index.html", "utf8");
+const opening = fs.readFileSync("src/utils/openingSplash.ts", "utf8");
+const brandingPage = fs.readFileSync("src/admin/pages/BrandingPage.tsx", "utf8");
+const previewPage = fs.readFileSync("src/components/dev/OpeningAnimationPreview.tsx", "utf8");
 const manifest = JSON.parse(fs.readFileSync("public/manifest.webmanifest", "utf8"));
 
 test("an installed mobile PWA skips landing and opens Home", () => {
@@ -52,15 +55,30 @@ test("pre-JavaScript and React loading screens play the exact EduOS opening vide
   }
   assert.match(html, /\/assets\/animations\/EduOS_app_opening_mobile\.mp4/);
   assert.match(html, /\/assets\/animations\/EduOS_app_opening_desktop\.mp4/);
-  assert.match(main, /APP_OPENING_VIDEO_MOBILE_SRC = "\/assets\/animations\/EduOS_app_opening_mobile\.mp4"/);
-  assert.match(main, /APP_OPENING_VIDEO_DESKTOP_SRC = "\/assets\/animations\/EduOS_app_opening_desktop\.mp4"/);
-  assert.match(main, /className="app-boot-video"/);
-  assert.match(main, /playOpening/);
-  assert.match(main, /viewportCategory === "mobile"/);
-  assert.match(html, /innerWidth < 768/);
+  assert.match(opening, /APP_OPENING_VIDEO_MOBILE_SRC = "\/assets\/animations\/EduOS_app_opening_mobile\.mp4"/);
+  assert.match(opening, /APP_OPENING_VIDEO_DESKTOP_SRC = "\/assets\/animations\/EduOS_app_opening_desktop\.mp4"/);
+  // The clip band is decided in ONE place and mirrored pre-React.
+  assert.match(opening, /width < OPENING_MOBILE_MAX_WIDTH \? "mobile" : "desktop"/);
+  assert.match(opening, /OPENING_MOBILE_MAX_WIDTH = 768/);
+  assert.match(html, /window\.innerWidth < 768/);
+  // The pre-React script must pick the same two files, never a CSS imitation.
+  assert.match(html, /EduOS_app_opening_mobile\.mp4/);
+  assert.match(html, /EduOS_app_opening_desktop\.mp4/);
+  // React must not own the <video> at all (a remount used to abort playback).
+  assert.doesNotMatch(main, /getElementById\("app-opening-video"\)/);
+  assert.match(main, /attachOpeningSplash\(\);/);
   // PWA icon remains declared at 192×192 for installability (not the splash).
   const icons192 = manifest.icons.filter((icon) => icon.sizes === "192x192").map((icon) => icon.src);
   assert.ok(icons192.includes("/icons/icon-192x192.svg"), `192x192 SVG missing from manifest: ${icons192.join(", ")}`);
+});
+
+test("a branding save can never switch the opening off by accident", () => {
+  // `=== true` persisted `false` for every save whose draft value was still
+  // undefined — the one-line cause of "no opening on desktop AND mobile".
+  assert.match(brandingPage, /const openingAnimationEnabled = merged\.openingAnimationEnabled !== false;/);
+  assert.doesNotMatch(brandingPage, /merged\.openingAnimationEnabled === true/);
+  // The admin can watch it without a cold boot.
+  assert.match(brandingPage, /attachOpeningSplash\(\)\?\.replay\(\)/);
 });
 
 test("opening animation is on by default", () => {
@@ -70,33 +88,64 @@ test("opening animation is on by default", () => {
   assert.match(html, /openingAnimationEnabled !== false/);
 });
 
-test("launch screen plays the opening video and respects reduced motion", () => {
-  assert.match(html, /id="app-opening-video"/);
-  assert.match(html, /prefers-reduced-motion/);
-  assert.match(html, /#app-opening-splash \{ display: none !important; \}/);
-  assert.match(html, /position: absolute; inset: 0;/);
-  assert.match(html, /max-width: none/);
-  assert.match(main, /prefers-reduced-motion: reduce/);
-  assert.match(main, /onEnded/);
-  assert.doesNotMatch(main, /app-boot-bar/);
-  assert.doesNotMatch(html, /eduvora-logo-in/);
+test("the opening always paints something: card first, clip on top", () => {
+  // A CSS-only brand card sits UNDER the video so a missing / slow /
+  // undecodable clip degrades to the card instead of to a blank screen.
+  assert.match(html, /class="app-boot-fallback"/);
+  assert.match(html, /\.app-boot-fallback \{[^}]*opacity: 1/);
+  assert.match(html, /\.app-boot-video \{[^}]*opacity: 0/);
+  assert.match(html, /\[data-video="on"\] \.app-boot-video \{ opacity: 1; \}/);
+  // Hiding is state-driven, never an inline `display` set by a stranger.
+  assert.match(html, /#app-opening-splash\[data-opening="skipped"\][^}]*display: none !important/);
+  // …and a stale cached shell cannot leave it hanging forever.
+  assert.match(html, /app-boot-failsafe/);
+  assert.match(opening, /OPENING_MIN_VISIBLE_MS = 1_400/);
+  assert.match(opening, /OPENING_FIRST_FRAME_GRACE_MS = 3_000/);
+  assert.match(opening, /OPENING_MAX_WAIT_MS = CLIP_DURATION_MS \+ 2_000/);
 });
 
-test("React does not cover the HTML opening video and does not abort on play interruption", () => {
-  // The HTML splash (outside #root) is the picture. A second .app-boot-splash
-  // inside #root paints over both clips at the same z-index.
-  assert.match(main, /if \(hostVideo\) \{/);
-  assert.match(main, /return <span className="sr-only">\{label\}<\/span>/);
-  // StrictMode remount / autoplay refusal must not mark the splash done.
-  assert.match(main, /AbortError/);
-  assert.match(main, /NotAllowedError/);
-  assert.match(main, /pointerdown/);
-  assert.match(html, /autoplay/);
+test("reduced motion swaps the clip for the static card — it never hides the opening", () => {
+  // The old `@media (prefers-reduced-motion: reduce) { #app-opening-splash {
+  // display: none } }` is exactly why the opening was invisible for anyone
+  // with Android "Reduce animation" / Windows "animation effects off" / iOS
+  // "Reduce Motion". Reduced motion must mean "no motion", not "nothing".
+  assert.doesNotMatch(html, /prefers-reduced-motion[^{]*\{[^}]*#app-opening-splash \{ display: none/);
+  assert.match(html, /\/\* Reduced motion means "no motion", NOT "nothing"/);
+  assert.match(opening, /if \(input\.reducedMotion && input\.override !== "force"\)/);
+  assert.match(opening, /mode: "static"/);
+  // and the escape hatch that makes the rule testable on a real phone
+  assert.match(opening, /opening=force plays the clip anyway/);
+});
+
+test("a refused or failed play() cannot end the opening", () => {
+  // Autoplay refusals stay recoverable (first gesture / retry), and a media
+  // error BEFORE the first frame falls back to the card instead of hiding.
+  assert.match(opening, /AbortError" \|\| errorName === "NotAllowedError/);
+  assert.match(opening, /retrying on first gesture/);
+  assert.match(opening, /if \(firstFrameAt === null\) setState\("fallback"\)/);
+  assert.match(opening, /window\.addEventListener\(\s*"pointerdown"/);
+  // React keeps a screen-reader announcement and nothing else.
+  assert.match(main, /function OpeningAnnouncer\(\)/);
+  assert.match(main, /role="status" aria-live="polite"/);
+  assert.doesNotMatch(main, /AppLaunchSplash/);
+});
+
+test("the opening is debuggable on the device that is complaining", () => {
+  // Every prior report needed a rebuild to be checked; these four strings are
+  // what finally makes "it does not play" answerable from a screenshot.
+  for (const token of ["on", "off", "force", "static", "debug"]) {
+    assert.ok(opening.includes(`"${token}"`), `missing ?opening=${token} override`);
+  }
+  assert.match(opening, /OPENING_QUERY_KEY = "opening"/);
+  assert.match(opening, /OPENING_OVERRIDE_STORAGE_KEY = "eduvora\.opening\.override\.v1"/);
+  assert.match(main, /OPENING_PREVIEW_HASH = "#\/dev\/opening"/);
+  assert.match(previewPage, /Replay the real opening/);
+  assert.match(previewPage, /method: "HEAD"/);
 });
 
 test("offline overlay is gated beside Root and does not replace the opening MP4s", () => {
   assert.match(main, /<OfflineGate \/>/);
-  assert.match(main, /playOpening && !offline/);
-  assert.match(main, /APP_OPENING_VIDEO_MOBILE_SRC = "\/assets\/animations\/EduOS_app_opening_mobile\.mp4"/);
-  assert.match(main, /APP_OPENING_VIDEO_DESKTOP_SRC = "\/assets\/animations\/EduOS_app_opening_desktop\.mp4"/);
+  assert.match(main, /<OpeningAnnouncer \/>/);
+  assert.match(opening, /APP_OPENING_VIDEO_MOBILE_SRC = "\/assets\/animations\/EduOS_app_opening_mobile\.mp4"/);
+  assert.match(opening, /APP_OPENING_VIDEO_DESKTOP_SRC = "\/assets\/animations\/EduOS_app_opening_desktop\.mp4"/);
 });

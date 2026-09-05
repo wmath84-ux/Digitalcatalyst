@@ -1,4 +1,4 @@
-import { StrictMode, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
@@ -46,8 +46,8 @@ import GlassCommandPalette from "./components/GlassCommandPalette";
 import { GlassToaster, toast as glassToast } from "./components/ui/glass-toast";
 import { GlassBackdrop } from "./components/ui/GlassBackdrop";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { BrandingProvider, useBranding } from "./context/BrandingContext";
-import { ConnectivityProvider, useConnectivity } from "./context/ConnectivityContext";
+import { BrandingProvider } from "./context/BrandingContext";
+import { ConnectivityProvider } from "./context/ConnectivityContext";
 import PortraitOnlyGuard from "./components/PortraitOnlyGuard";
 import OfflineGate from "./components/offline/OfflineGate";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
@@ -73,6 +73,8 @@ import { applyGlassTier, detectGlassTier } from "./lib/glass";
 import { applyGlassScheme } from "./lib/glassScheme";
 import AppShell from "./components/AppShell";
 import PageEnter, { pageEnterAppKey } from "./components/PageEnter";
+import { attachOpeningSplash, useOpeningSplashVisible } from "./utils/openingSplash";
+import OpeningAnimationPreview from "./components/dev/OpeningAnimationPreview";
 import { resolveActiveFromHash } from "./components/DesktopShell";
 import { useResponsiveCategory } from "./utils/responsive";
 import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
@@ -153,6 +155,10 @@ const MINDMAP_PREVIEW_HASH = "#/dev/mindmap-preview";
 // Renders the vendored registry components with no app data; see
 // docs/liquid-glass-rollout-plan.md.
 const GLASS_PREVIEW_HASH = "#/dev/glass-preview";
+// Developer sandbox for the app opening animation: watch both EduOS
+// clips, replay the real boot sequence, and read the decision the app
+// made on THIS device. See src/components/dev/OpeningAnimationPreview.
+const OPENING_PREVIEW_HASH = "#/dev/opening";
 const FLOWPATH_HASH = "#/flowpath";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
@@ -264,127 +270,23 @@ const startCheckout = ({
   window.location.hash = CHECKOUT_HASH;
 };
 
-/** Exact EduOS opening animations — do not recreate or restyle the frames. */
-const APP_OPENING_VIDEO_MOBILE_SRC = "/assets/animations/EduOS_app_opening_mobile.mp4";
-const APP_OPENING_VIDEO_DESKTOP_SRC = "/assets/animations/EduOS_app_opening_desktop.mp4";
-// Both shipped MP4s are 10.006s (mvhd timescale 1000 / duration 10006).
-const APP_OPENING_VIDEO_TIMEOUT_MS = 12000;
-
-function openingVideoSrc(isMobile: boolean): string {
-  return isMobile ? APP_OPENING_VIDEO_MOBILE_SRC : APP_OPENING_VIDEO_DESKTOP_SRC;
-}
-
-function AppLaunchSplash({
-  label = "Preparing your learning space…",
-  onEnded,
-  src,
-}: {
-  label?: string;
-  /** called with played=true only when the animation really ran to the end. */
-  onEnded?: (played: boolean) => void;
-  src: string;
-}) {
-  const { appName } = useBranding();
-  const reactVideoRef = useRef<HTMLVideoElement | null>(null);
-
-  useEffect(() => {
-    if (!onEnded) return undefined;
-    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      // Deliberate skip (accessibility) — counts as handled, never replayed.
-      onEnded(true);
-      return undefined;
-    }
-    const hostVideo = document.getElementById("app-opening-video") as HTMLVideoElement | null;
-    const video = hostVideo ?? reactVideoRef.current;
-    if (!video) {
-      onEnded(true);
-      return undefined;
-    }
-    const file = src.slice(src.lastIndexOf("/") + 1);
-    const current = `${video.currentSrc || ""} ${video.getAttribute("src") || ""}`;
-    if (file && !current.includes(file)) {
-      video.src = src;
-    }
-    // played=true ONLY on a real ending. A load error / stall timeout means
-    // the animation never actually showed, so the boot splash stays
-    // replayable (the offline-rescue effect relies on this).
-    //
-    // AbortError / NotAllowedError must NOT count as finished: React 18
-    // StrictMode remounts abort the first play(), and a muted autoplay
-    // refusal still leaves the clip on screen for a gesture retry.
-    let cancelled = false;
-    const finished = () => {
-      if (!cancelled) onEnded(true);
-    };
-    const aborted = () => {
-      if (!cancelled) onEnded(false);
-    };
-    if (video.ended) {
-      finished();
-      return undefined;
-    }
-    video.addEventListener("ended", finished);
-    video.addEventListener("error", aborted);
-    const tryPlay = () => {
-      video.muted = true;
-      video.playsInline = true;
-      const playing = video.play();
-      if (playing && typeof playing.catch === "function") {
-        playing.catch((err: unknown) => {
-          if (cancelled) return;
-          const name = err && typeof err === "object" && "name" in err ? String((err as { name: string }).name) : "";
-          if (name === "AbortError" || name === "NotAllowedError") return;
-          aborted();
-        });
-      }
-    };
-    tryPlay();
-    const onGesture = () => {
-      if (!cancelled) tryPlay();
-    };
-    window.addEventListener("pointerdown", onGesture);
-    const timeout = window.setTimeout(() => {
-      if (cancelled) return;
-      // Clip started — wait for `ended` instead of yanking it off screen.
-      if (video.currentTime > 0) return;
-      aborted();
-    }, APP_OPENING_VIDEO_TIMEOUT_MS);
-    return () => {
-      cancelled = true;
-      video.removeEventListener("ended", finished);
-      video.removeEventListener("error", aborted);
-      window.removeEventListener("pointerdown", onGesture);
-      window.clearTimeout(timeout);
-    };
-  }, [onEnded, src]);
-
-  const hostVideo = typeof document !== "undefined"
-    ? document.getElementById("app-opening-video")
-    : null;
-
-  // The HTML #app-opening-splash (outside #root) is the picture. Painting a
-  // second .app-boot-splash here covers that video at the same z-index, so
-  // both the mobile and desktop clips play underneath an empty gradient.
-  if (hostVideo) {
-    return <span className="sr-only">{label}</span>;
-  }
-
+/**
+ * The app opening animation (the exact EduOS clips) is owned end-to-end by
+ * `src/utils/openingSplash.ts`: index.html paints it pre-React, the controller
+ * decides whether/what to play, falls back to the CSS brand card when the MP4
+ * cannot produce a frame, and fades itself out. React never touches the
+ * <video> — a StrictMode remount used to abort playback and mark the clip as
+ * "finished", which is how the opening disappeared for whole sessions.
+ * All that is left here is the screen-reader announcement and the dark
+ * status-bar colour while the opening is on screen.
+ */
+function OpeningAnnouncer() {
+  const visible = useOpeningSplashVisible();
+  if (!visible) return null;
   return (
-    <main className="app-boot-splash" role="status" aria-live="polite" aria-label={`Loading ${appName}`}>
-      <video
-        ref={reactVideoRef}
-        className="app-boot-video"
-        src={src}
-        autoPlay
-        muted
-        playsInline
-        preload="auto"
-        controls={false}
-        disablePictureInPicture
-        aria-label={`${appName} opening animation`}
-      />
-      <span className="sr-only">{label}</span>
-    </main>
+    <span className="sr-only" role="status" aria-live="polite">
+      Preparing your learning space…
+    </span>
   );
 }
 
@@ -524,6 +426,7 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith("#/course/")
     || hash.startsWith(PROFILE_PREVIEW_HASH)
     || hash.startsWith(GLASS_PREVIEW_HASH)
+    || hash.startsWith(OPENING_PREVIEW_HASH)
   ) {
     return <>{children}</>;
   }
@@ -559,35 +462,18 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
  */
 function RootPage(): ReactNode {
   const { user, loading, logout } = useAuth();
-  const { openingAnimationEnabled } = useBranding();
-  const { offline } = useConnectivity();
   const { products: catalogProducts, purchasedIds, loading: catalogLoading } = useCatalog();
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
   const [installedMobilePwa, setInstalledMobilePwa] = useState(() => isInstalledMobilePwa());
-  const [openingVideoDone, setOpeningVideoDone] = useState(false);
-  const openingPlayed = useRef(false);
-  const markOpeningVideoDone = useCallback((played: boolean) => {
-    if (played) openingPlayed.current = true;
-    setOpeningVideoDone(true);
-  }, []);
-  // A false or transient offline blip at boot must not eat the brand opening
-  // for the whole session: the gate marks the splash "done" so a later
-  // `online` event cannot replay it, but if it never actually PLAYED, give it
-  // back the moment connectivity recovers.
-  useEffect(() => {
-    if (offline || openingPlayed.current) return;
-    setOpeningVideoDone((done) => (done && !openingPlayed.current ? false : done));
-  }, [offline]);
-  const viewportCategory = useResponsiveCategory();
-  const isMobileOpening = viewportCategory === "mobile";
-  const playOpening = openingAnimationEnabled;
-  const openingSrc = openingVideoSrc(isMobileOpening);
-  // Live viewport category so the AppShell wrapper re-renders when the
-  // learner resizes across the desktop / tablet / mobile boundaries.
-  // Tablet + mobile get the existing per-page chrome; desktop gets the
-  // new DesktopShell (persistent left rail + sticky top bar).
+  // The opening animation is decided, played and torn down by
+  // src/utils/openingSplash.ts (the pre-React overlay in index.html is the
+  // picture). React only mirrors its state — for the screen-reader
+  // announcement and the dark status bar — and deliberately does NOT gate the
+  // page tree on it: every screen renders underneath the opening, so the
+  // reveal is instant and no re-render can abort the clip.
+  const openingVisible = useOpeningSplashVisible();
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const landingRouteRequested = !hash || hash.startsWith(LANDING_HASH);
   // Mobile + installed PWA: never show landing. Everyone else on mobile
@@ -1092,11 +978,7 @@ function RootPage(): ReactNode {
   // auth and admin login) get the dark bar; every light app screen switches
   // the bar to the page background so it never shows black over light UI.
   useEffect(() => {
-    const launchPending =
-      loading
-      || skipLandingForInstalledMobilePwa
-      || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
-    const splashVisible = playOpening && (launchPending || !openingVideoDone);
+    const splashVisible = openingVisible;
     const darkScreen =
       splashVisible
       || protectedRoutePending
@@ -1105,43 +987,13 @@ function RootPage(): ReactNode {
       || hash.startsWith(AUTH_HASH)
       || hash.startsWith(ADMIN_LOGIN_HASH);
     setThemeColor(darkScreen ? THEME_COLOR_DARK : THEME_COLOR_LIGHT);
-  }, [hash, loading, skipLandingForInstalledMobilePwa, protectedRoutePending, user, catalogLoading, playOpening, openingVideoDone]);
+  }, [hash, protectedRoutePending, openingVisible]);
 
   const launchPending =
     loading
     || skipLandingForInstalledMobilePwa
     || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
 
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const splash = document.getElementById("app-opening-splash");
-    if (!splash) return;
-    if (!playOpening || offline) {
-      splash.style.display = "none";
-      // Offline boot skips the opening MP4 so the native overlay paints
-      // immediately. Mark it done so a later `online` event cannot replay it.
-      if (offline) setOpeningVideoDone(true);
-      return;
-    }
-    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (reduceMotion) {
-      splash.style.display = "none";
-      setOpeningVideoDone(true);
-      return;
-    }
-    const video = document.getElementById("app-opening-video") as HTMLVideoElement | null;
-    if (video) {
-      const file = openingSrc.slice(openingSrc.lastIndexOf("/") + 1);
-      const current = `${video.currentSrc || ""} ${video.getAttribute("src") || ""}`;
-      if (file && !current.includes(file)) video.src = openingSrc;
-    }
-    const shouldShow = !openingVideoDone || launchPending;
-    splash.style.display = shouldShow ? "" : "none";
-  }, [playOpening, openingVideoDone, launchPending, openingSrc, offline]);
-
-  if (playOpening && !offline && (!openingVideoDone || launchPending)) {
-    return <AppLaunchSplash src={openingSrc} onEnded={markOpeningVideoDone} label={skipLandingForInstalledMobilePwa ? "Opening your dashboard…" : "Preparing your learning space…"} />;
-  }
   if (launchPending && skipLandingForInstalledMobilePwa) {
     return <main className="min-h-[100dvh]" aria-busy="true" aria-label="Opening app" />;
   }
@@ -1349,6 +1201,7 @@ function RootPage(): ReactNode {
   if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return <SubscriberExperiencePage />;
   if (hash.startsWith(PROFILE_PREVIEW_HASH)) return <ProfilePreview />;
   if (hash.startsWith(GLASS_PREVIEW_HASH)) return <GlassPreviewPage />;
+  if (hash.startsWith(OPENING_PREVIEW_HASH)) return <OpeningAnimationPreview />;
   if (hash.startsWith(MINDMAP_PREVIEW_HASH)) return <MindMapPreview />;
   if (hash.startsWith(COURSE_HASH)) {
     if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;
@@ -1479,6 +1332,11 @@ function RootPage(): ReactNode {
   );
 }
 
+// Take ownership of the pre-React opening overlay BEFORE the first render, so
+// the fade-out, the minimum-visible floor and the frame-timeout fallback all
+// run even if a page component throws while mounting (that used to leave the
+// splash on screen forever, or hide it before a frame was ever painted).
+attachOpeningSplash();
 // Drive the footer's outside magic glow with the page's scroll energy
 // (see src/utils/footerGlow.ts). Runs once for the whole app shell.
 initFooterGlow();
@@ -1499,6 +1357,7 @@ createRoot(document.getElementById("root")!).render(
         <CatalogProvider>
           <CommerceProvider>
             <Root />
+            <OpeningAnnouncer />
             <RenewalNotice />
             {/* ⌘K palette (Wave 3). Mounted beside the banner host so one
                 instance survives navigation, and inside CatalogProvider because
