@@ -131,10 +131,11 @@ test("every glass surface has a keyboard path and a motion opt-out", () => {
     assert.match(s, /ariaLabel=\{label\}|ariaLabel="Progress"/);
   }
   const audio = read("src/course/AudioPlayer.tsx");
-  // CircleButton forwards `label` to both aria-label and the tooltip title.
-  assert.match(audio, /aria-label=\{label\}/);
-  assert.match(audio, /label=\{playing \? "Pause" : "Play"\}/);
-  assert.match(audio, /label="Toggle mute"/);
+  // CircleButton was inlined — each control names itself with a literal
+  // aria-label (no indirection between the tooltip and the a11y name).
+  assert.match(audio, /aria-label=\{playing \? "Pause" : "Play"\}/);
+  assert.match(audio, /aria-label="Toggle mute"/);
+  assert.match(audio, /aria-label="Toggle loop"/);
 });
 
 test("the dock keeps its own material: the plan's cleanup item was declined", () => {

@@ -86,7 +86,9 @@ test("SearchPage has its own empty state", () => {
   // a "clear" shortcut. Without it, the page would silently show
   // nothing.
   assert.match(searchPage, /showEmpty/);
-  assert.match(searchPage, /No results/);
+  // The live-query empty state echoes the query ("Nothing matched “…”");
+  // the idle state invites the first search.
+  assert.match(searchPage, /Nothing matched|What do you want to learn today\?/);
   assert.match(searchPage, /Clear search/);
 });
 

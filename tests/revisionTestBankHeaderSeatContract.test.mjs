@@ -119,6 +119,12 @@ test("the seat override comes after every band padding it beats", () => {
   const padders = rules.filter(
     (rule) =>
       !rule.selector.includes("[data-rev-bank-header]") &&
+      // AppHeader sub-page seats pad the scroller only when
+      // [data-revision-app-header] is present — Test Bank merges into the
+      // main header and never renders that element, so those rules cannot
+      // touch it (same exclusion the "nothing appended later" loop below
+      // already applies).
+      !rule.selector.includes("[data-revision-app-header]") &&
       /\[data-revision-page-main\](\s*>\s*\.animate-fade-in)?\s*$/.test(rule.selector.replace(/\s+/g, " ").trim()) &&
       /padding/.test(rule.body),
   );

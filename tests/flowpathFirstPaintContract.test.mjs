@@ -18,7 +18,10 @@ import fs from "node:fs";
 
 const useTheme = fs.readFileSync("src/flowpath/hooks/useTheme.ts", "utf8");
 const flowPathView = fs.readFileSync("src/components/flowpath/FlowPathView.tsx", "utf8");
-const header = fs.readFileSync("src/components/flowpath/Header.tsx", "utf8");
+// FlowPath's dedicated header component was retired — the page now opens
+// with the shared home greeting header (see src/FlowPathApp.tsx).
+const flowPathApp = fs.readFileSync("src/FlowPathApp.tsx", "utf8");
+const header = fs.readFileSync("src/home/components/Header.tsx", "utf8");
 const emptyState = fs.readFileSync("src/components/flowpath/EmptyState.tsx", "utf8");
 const activityCard = fs.readFileSync("src/components/flowpath/ActivityCard.tsx", "utf8");
 const plusNode = fs.readFileSync("src/components/flowpath/PlusNode.tsx", "utf8");
@@ -35,9 +38,13 @@ test("FlowPath theme is applied to <html> synchronously, before the first paint"
 });
 
 test("no FlowPath surface mounts invisible (no opacity-0 entrance dead time)", () => {
-  // Header, empty state, activity cards and plus nodes must start at their
-  // final values (`initial={false}`), so the first frame is never blank.
-  assert.match(header, /initial=\{false\}/);
+  // The shared home header is plain static markup (no motion import at all),
+  // so its first frame is never blank — FlowPathApp must keep using it.
+  assert.match(flowPathApp, /import Header from "\.\/home\/components\/Header"/);
+  assert.match(flowPathApp, /<Header\b/);
+  assert.doesNotMatch(header, /from "framer-motion"/);
+  // Empty state, activity cards and plus nodes must start at their final
+  // values (`initial={false}`), so the first frame is never blank.
   assert.match(emptyState, /initial=\{false\}/);
   assert.match(activityCard, /initial=\{false\}/);
   assert.match(plusNode, /initial=\{false\}/);
