@@ -356,7 +356,7 @@ export default function TiltedCoverflow({ products, onOpenProduct }: TiltedCover
             })}
           </div>
           {/* `dc-scene-ink` + the gated lift in src/glass.css: the source
-              component's dark-theme grey is 2.7:1 over the scene's snow band.
+              component's dark-theme grey is 2.5:1 over the scene's bright bands.
               The cards keep their own scrim, so only this line needs it. */}
           <p className="dc-scene-ink text-xs tracking-wide text-[#9E9E98]">drag, click, or use the arrow keys</p>
         </div>

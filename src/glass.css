@@ -880,21 +880,29 @@ html[data-glass="on"] :where(.dc-scene-plate):where(.text-indigo-200) {
 
 /* The store hero's brand line is a gradient-clipped heading — the
    indigo → violet → fuchsia ramp `storeFiltersAdminProductContract` pins in the
-   JSX. At the 600-weight stops that ramp measures ~1.1:1 against the scene's
-   snow band (indigo-600 and the snow are very nearly the same luminance), so
-   the largest type on the store page was its least readable. The JSX keeps the
-   pinned ramp; the lift is CSS behind the glass gate. The 300-weight stops
-   measure 3.8:1 over snow — AA for large type — and stay bright on the night
-   sky, and `.dc-scene-ink` on the heading gives them the same dark scrim the
-   white half of the line already wears. */
+   JSX. The hero is the first thing on the page, so that heading sits over the
+   TOP of the fixed winter scene: the #0a1224 sky plus its two radial glows
+   (blue at 20% 0%, violet at 80% 0%). Measured there, the ramp's leading 600
+   stop is 1.7:1 over the glows and 2.97:1 over bare sky — the largest type on
+   the store page was its least readable. The JSX keeps the pinned ramp; the
+   lift is CSS behind the glass gate. The 300 stops measure 5.2–6.2:1 over the
+   glows and 9.4–10.6:1 over sky (AA and up).
+
+   The trade, stated plainly: the one bright pixel this heading can cross is the
+   mountain's snow cap (#e9f4ff at x < 12vw), where the published dark ramp was
+   already fine (4.2–5.6:1) and a light ramp is not (1.6–1.8:1). That is what
+   `.dc-scene-ink` on the <h2> is for — the same dark scrim every white label on
+   this scene depends on, since white on snow measures 1.0:1 un-scrimmed. Both
+   numbers are pinned by tests/storeChromeDockDragScrollContract.test.mjs. */
 html[data-glass="on"] :where(.dc-scene-ink) :where(.bg-clip-text.text-transparent) {
   background-image: linear-gradient(to right, #a5b4fc 0%, #c4b5fd 50%, #f0abfc 100%) !important;
 }
 
 /* The coverflow's hint line ("drag, click, or use the arrow keys") is the
-   source component's dark-theme grey, #9E9E98: 2.7:1 over the snow, under AA
-   for 12px type, and it sits on the scene with no surface under it. The cards
-   keep their own painted scrim, so only this line is lifted. */
+   source component's dark-theme grey, #9E9E98: 2.5:1 over the scene's bright
+   bands (the mountain cap, the snow ground), under AA for 12px type, and it
+   sits on the scene with no surface under it. The cards keep their own painted
+   scrim, so only this line is lifted. */
 html[data-glass="on"] :where([data-store-coverflow]) :where(.dc-scene-ink) {
   color: rgba(255, 255, 255, 0.8);
 }

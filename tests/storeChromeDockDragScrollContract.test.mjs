@@ -294,6 +294,54 @@ test("the store's loose copy on the scene takes the ink scrim", () => {
   assert.match(indexCss, /\.dc-section-label \{\s*\n\s*color: var\(--dc-ink-3\)/);
 });
 
+test("the ramp lift is justified by the band the hero actually sits on", () => {
+  // The store hero is the first thing on the page, so its heading sits over the
+  // TOP of the fixed winter scene: the #0a1224 sky plus the two radial glows
+  // (blue at 20% 0%, violet at 80% 0%) from src/winter-background.css — never
+  // the snow ground, which starts at 75vh. Measured there, the pinned ramp's
+  // leading stop is under 3:1 (1.7:1 over the glows) and the lifted 300 stops
+  // clear AA at every stop.
+  //
+  // The one bright pixel the heading can cross is the mountain's snow cap
+  // (#e9f4ff, x < 12vw), where the published dark ramp would have been fine and
+  // the lifted ramp is not. That is what `.dc-scene-ink` is for, and it is why
+  // the scrim is pinned alongside the lift below: white ink on snow measures
+  // 1.0:1 un-scrimmed, so every light label on this scene already depends on it.
+  const channel = (v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const lum = ([r, g, b]) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  const over = (fg, a, bg) => fg.map((c, i) => a * c + (1 - a) * bg[i]);
+  const ratio = (a, b) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+  const sky = hex("#0a1224");
+  const bands = {
+    sky,
+    "sky + blue glow": over(hex("#3b6dd1"), 0.45, sky),
+    "sky + violet glow": over(hex("#8f5ee7"), 0.45, sky),
+  };
+  const publishedLead = "#4f46e5"; // indigo-600 — the ramp's first stop
+  const lifted = ["#a5b4fc", "#c4b5fd", "#f0abfc"]; // the 300 stops glass.css paints
+
+  for (const [band, bg] of Object.entries(bands)) {
+    const before = ratio(hex(publishedLead), bg);
+    assert.ok(before < 3, `${publishedLead} over ${band} measures ${before.toFixed(2)}:1 — the lift would not be needed`);
+    for (const stop of lifted) {
+      const after = ratio(hex(stop), bg);
+      assert.ok(after >= 4.5, `${stop} over ${band} measures ${after.toFixed(2)}:1, under AA`);
+    }
+  }
+
+  // And the scrim that carries the lifted ramp over the mountain's bright cap.
+  assert.match(storeHero, /<h2 className="dc-scene-ink mt-2\.5/);
+  assert.match(css, /:where\(\.dc-scene-ink\) \{\s*\n\s*text-shadow:/);
+});
+
 test("the hero's pinned gradient ramp is lifted in CSS, not rewritten in JSX", () => {
   // storeFiltersAdminProductContract pins the ramp in the JSX; it stays.
   assert.match(storeHero, /from-indigo-600 via-violet-600 to-fuchsia-600/);
