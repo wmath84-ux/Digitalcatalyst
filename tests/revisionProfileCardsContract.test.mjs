@@ -31,6 +31,6 @@ test("AI cards are the pack's glass surfaces (Phase A4)", () => {
 test("snapshot cards below Import use the stable rev-card surface (no glitch)", () => {
   // The Import section's cards were `dc-glass` (backdrop-filter) which caused
   // a white-flash glitch while scrolling; they now use the opaque rev-card.
-  assert.match(page, /className="rev-card text-white" contentClassName="flex flex-col items-center gap-1 rounded-2xl py-3/);
+  assert.match(page, /className="rev-card dc-scene-plate text-white" contentClassName="flex flex-col items-center gap-1 rounded-2xl py-3/);
   assert.doesNotMatch(page, /dc-glass flex flex-col items-center gap-1 rounded-2xl py-3/);
 });

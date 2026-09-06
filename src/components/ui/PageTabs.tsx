@@ -102,7 +102,7 @@ export default function PageTabs({
                 title={item.hint}
                 aria-current={item.id === activeId ? "page" : undefined}
                 className={cn(
-                  "px-3 py-1.5 text-sm font-semibold transition-colors duration-200",
+                  "dc-scene-ink px-3 py-1.5 text-sm font-semibold transition-colors duration-200",
                   item.id === activeId
                     ? "text-white"
                     : "text-white/55 hover:text-white",
@@ -119,7 +119,7 @@ export default function PageTabs({
             type="button"
             onClick={onHome}
             title={`Back to ${homeLabel}`}
-            className="ml-auto shrink-0 rounded-xl px-2 py-3 text-sm font-semibold text-white/55 outline-none transition-colors duration-200 hover:text-white focus-visible:ring-2 focus-visible:ring-indigo-300/70"
+            className="dc-scene-ink ml-auto shrink-0 rounded-xl px-2 py-3 text-sm font-semibold text-white/55 outline-none transition-colors duration-200 hover:text-white focus-visible:ring-2 focus-visible:ring-indigo-300/70"
           >
             {homeLabel}
           </button>

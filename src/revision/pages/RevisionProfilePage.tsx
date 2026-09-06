@@ -27,7 +27,7 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
         {/* Branded hero - full width */}
         {/* Phase A4: the hero is the pack GlassSurface at defaults; `dc-glass-hero`
             stays as a hook only (it paints nothing under the pack surface). */}
-        <GlassSurface className="dc-glass-hero relative overflow-hidden text-white lg:col-span-12" contentClassName="p-5 lg:p-4">
+        <GlassSurface className="dc-glass-hero dc-scene-plate relative overflow-hidden text-white lg:col-span-12" contentClassName="p-5 lg:p-4">
           <div className="relative lg:flex lg:items-center lg:justify-between lg:gap-4">
             <div className="lg:flex-1">
               <p className="text-[11px] font-black uppercase tracking-[0.2em] text-violet-100/80 lg:text-[10px]">Revision Studio</p>
@@ -138,7 +138,7 @@ export default function RevisionProfilePage({ uid, route, userName }: { uid: str
 
 function WidgetCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
   return (
-    <GlassSurface tint={0.4} radius={20} className="rev-card text-white" contentClassName="flex flex-col items-center gap-1 rounded-2xl py-3 text-center lg:rounded-xl lg:py-2.5 lg:gap-0.5">
+    <GlassSurface tint={0.4} radius={20} className="rev-card dc-scene-plate text-white" contentClassName="flex flex-col items-center gap-1 rounded-2xl py-3 text-center lg:rounded-xl lg:py-2.5 lg:gap-0.5">
       {icon}
       <span className="text-base font-bold text-white lg:text-sm">{value}</span>
       <span className="text-[10px] font-medium text-white/55 lg:text-[9px]">{label}</span>

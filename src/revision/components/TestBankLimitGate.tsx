@@ -21,7 +21,7 @@ export default function TestBankLimitGate({ open, bank, onClose, onManageBank, o
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent aria-label="Test Bank notice" className="max-w-[460px]">
+      <DialogContent aria-label="Test Bank notice" className="dc-scene-plate max-w-[460px]">
         <div className="flex items-start justify-between gap-4">
           <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white">
             <Archive className="h-7 w-7" />

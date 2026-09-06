@@ -36,11 +36,16 @@ export default function RevisionSessionResultPage({ uid, route, sessionId }: { u
             )}
           </Card>
 
+          {/* The result chips sit in the shared revision Card — the same pattern
+              the dashboard's Revision Bank grid uses — so the meaning washes
+              tint the plated surface instead of the bare scene. */}
+          <Card className="p-3">
           <div data-rev-result-grid className="grid grid-cols-3 gap-3">
             <ResultChip icon={<CheckIcon className="h-5 w-5 text-emerald-300" />} label="Correct" value={data.correctCount} tone="bg-emerald-500/20" />
             <ResultChip icon={<XIcon className="h-5 w-5 text-rose-300" />} label="Wrong" value={data.wrongCount} tone="bg-rose-500/20" />
             <ResultChip icon={<MinusIcon className="h-5 w-5 text-white/55" />} label="Skipped" value={data.skippedCount} tone="border border-white/15" />
           </div>
+          </Card>
 
           <Card>
             <h2 className="mb-3 text-[15px] font-bold text-white">Question Progress</h2>

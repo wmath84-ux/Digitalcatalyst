@@ -858,7 +858,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                       className="dc-field h-9 w-20 rounded-lg border px-2 text-center text-sm font-bold outline-none"
                     />
                   </div>
-                  <GlassToggleGroup className="dc-segment mt-2 flex w-full" data-stretch value={String(totalQuestions)} onValueChange={(v) => setTotalQuestions(Number(v))} aria-label="Question presets">
+                  <GlassToggleGroup className="dc-segment dc-scene-plate mt-2 flex w-full" data-stretch value={String(totalQuestions)} onValueChange={(v) => setTotalQuestions(Number(v))} aria-label="Question presets">
                     {QUESTION_PRESETS.map((n) => (
                       <GlassToggleItem key={n} value={String(n)} className="flex-1 justify-center py-1.5 text-xs font-bold">
                         {n}
@@ -880,7 +880,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                       className="dc-field h-9 w-20 rounded-lg border px-2 text-center text-sm font-bold outline-none"
                     />
                   </div>
-                  <GlassToggleGroup className="dc-segment mt-2 flex w-full" data-stretch value={String(totalMinutes)} onValueChange={(v) => setTotalMinutes(Number(v))} aria-label="Time presets">
+                  <GlassToggleGroup className="dc-segment dc-scene-plate mt-2 flex w-full" data-stretch value={String(totalMinutes)} onValueChange={(v) => setTotalMinutes(Number(v))} aria-label="Time presets">
                     {TIME_PRESETS.map((n) => (
                       <GlassToggleItem key={n} value={String(n)} className="flex-1 justify-center py-1.5 text-xs font-bold">
                         {n}m
@@ -892,7 +892,7 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
             </Card>
 
             {notice && (
-              <div className="rounded-xl bg-amber-500/15 px-3 py-2.5 text-xs font-medium leading-relaxed text-amber-200">
+              <div className="dc-scene-ink rounded-xl bg-amber-500/15 px-3 py-2.5 text-xs font-medium leading-relaxed text-amber-200">
                 {notice}
               </div>
             )}
@@ -932,12 +932,12 @@ export default function AiGeneratePage({ uid, route, hasAccess = true, onRequire
                   <SparklesIcon className="h-5 w-5" /> Generate revision plan
                 </PrimaryButton>
                 {!canGenerate && (
-                  <p className="text-center text-[11px] text-white/55">
+                  <p className="dc-scene-ink text-center text-[11px] text-white/55">
                     Select at least one class, subject, chapter and topic to generate.
                   </p>
                 )}
                 {canGenerate && generateBlockedByNoAi && (
-                  <p className="text-center text-[11px] font-semibold text-amber-200">
+                  <p className="dc-scene-ink text-center text-[11px] font-semibold text-amber-200">
                     Configure AI or use Bulk Import above to continue.
                   </p>
                 )}

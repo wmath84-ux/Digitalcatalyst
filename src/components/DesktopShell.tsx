@@ -54,6 +54,7 @@ import { useBranding } from "../context/BrandingContext";
 import { useCommerce } from "../context/CommerceContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
+import { useDragScroll } from "../hooks/useDragScroll";
 import { useFeatureVisibilityMap } from "../context/FeatureVisibilityContext";
 import BrandMark from "./BrandMark";
 import DesktopPeekDock from "./glass-dock/DesktopPeekDock";
@@ -410,7 +411,7 @@ export default function DesktopShell({
       */}
       {compactRail ? (
         <div
-          className="sticky top-0 z-40 h-[100dvh] shrink-0 py-3 pl-3"
+          className="dc-scene-plate dc-scene-plate--bar sticky top-0 z-40 h-[100dvh] shrink-0 py-3 pl-3"
           data-desktop-rail
           data-desktop-rail-variant="glass-sidebar"
         >
@@ -457,7 +458,7 @@ export default function DesktopShell({
       ) : (
       <aside
         data-desktop-rail
-        className="sticky top-0 z-40 flex h-[100dvh] w-[260px] shrink-0 flex-col border-r border-white/10 max-[1023px]:w-[clamp(200px,22vw,260px)] landscape:max-[1023px]:w-[clamp(200px,22vw,240px)]"
+        className="dc-scene-plate dc-scene-plate--bar sticky top-0 z-40 flex h-[100dvh] w-[260px] shrink-0 flex-col border-r border-white/10 max-[1023px]:w-[clamp(200px,22vw,260px)] landscape:max-[1023px]:w-[clamp(200px,22vw,240px)]"
         aria-label="Primary"
         style={{ width: 'clamp(200px, 22vw, 260px)' } as any}
       >
@@ -596,7 +597,7 @@ export default function DesktopShell({
         <header
           data-desktop-topbar
           data-topbar-tabs={topBarTabs ? topBarTabs.feature : undefined}
-          className="absolute inset-x-0 top-0 z-30 border-b border-white/10 px-6"
+          className="dc-scene-plate dc-scene-plate--bar absolute inset-x-0 top-0 z-30 border-b border-white/10 px-6"
         >
           <div data-desktop-topbar-row className="flex h-16 items-center gap-4">
             <div className="min-w-0 flex-1">
@@ -867,8 +868,14 @@ function RailStat({ label, value, highlight = false }: { label: string; value: n
  * instead of wrapping, which keeps the bar a single fixed-height strip.
  */
 function TopBarTabRow({ config }: { config: TopBarTabsConfig }) {
+  // The tab row scrolls sideways on narrow desktops with its scrollbar
+  // hidden — a mouse gets the same press-drag-release gesture a thumb gets
+  // (src/hooks/useDragScroll.ts), like every other horizontal rail.
+  const tabRail = useDragScroll<HTMLElement>();
   return (
     <nav
+      ref={tabRail.ref}
+      onPointerDown={tabRail.onPointerDown}
       data-desktop-topbar-tabs={config.feature}
       aria-label={config.ariaLabel}
       className="flex items-center gap-x-0.5 overflow-x-auto border-t border-white/10 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

@@ -64,11 +64,16 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
             </div>
           </Card>
 
+          {/* The result chips sit in the shared revision Card — the same pattern
+              the dashboard's Revision Bank grid uses — so the meaning washes
+              tint the plated surface instead of the bare scene. */}
+          <Card className="p-3">
           <div data-rev-result-grid className="grid grid-cols-3 gap-3">
             <ResultChip icon={<CheckIcon className="h-5 w-5 text-emerald-300" />} label="Correct" value={data.correctCount} tone="bg-emerald-500/20" />
             <ResultChip icon={<XIcon className="h-5 w-5 text-rose-300" />} label="Wrong" value={data.wrongCount} tone="bg-rose-500/20" />
             <ResultChip icon={<SparklesIcon className="h-5 w-5 text-white/55" />} label="Skipped" value={data.skippedCount} tone="border border-white/15" />
           </div>
+          </Card>
 
           {data.planDetails && (
             <Card>
@@ -129,7 +134,7 @@ export default function TestResultPage({ uid, route, attemptId }: { uid: string;
                 <SecondaryButton disabled={data.skippedCount === 0} onClick={() => startRetake(true)}><ListRestart className="h-4 w-4" /> Revise Skipped</SecondaryButton>
               </div>
             )}
-            {actionError && <p className="rounded-xl bg-amber-500/15 px-3 py-2 text-xs font-semibold text-amber-200">{actionError}</p>}
+            {actionError && <p className="dc-scene-ink rounded-xl bg-amber-500/15 px-3 py-2 text-xs font-semibold text-amber-200">{actionError}</p>}
             <SecondaryButton onClick={() => navigate("#/revision/bank")}>Open Test Bank & History</SecondaryButton>
           </div>
         </div>

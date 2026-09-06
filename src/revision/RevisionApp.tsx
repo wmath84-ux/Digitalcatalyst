@@ -342,7 +342,7 @@ export default function RevisionApp() {
 
             {revisionAccessLoading || revisionDataLoading ? (
               <div data-revision-access-loading data-revision-content className="grid min-h-0 flex-1 place-items-center bg-transparent px-4">
-                <GlassSurface radius={24} className="text-white/55" contentClassName="flex flex-col items-center gap-2 px-8 py-7">
+                <GlassSurface radius={24} className="dc-scene-plate text-white/55" contentClassName="flex flex-col items-center gap-2 px-8 py-7">
                   <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/10 border-t-violet-500" />
                   <p className="text-xs font-semibold">{revisionAccessLoading ? "Checking your membership…" : "Syncing your Test Bank…"}</p>
                 </GlassSurface>
