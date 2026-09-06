@@ -79,7 +79,7 @@ import OpeningAnimationPreview from "./components/dev/OpeningAnimationPreview";
 import { resolveActiveFromHash } from "./components/DesktopShell";
 import { useResponsiveCategory } from "./utils/responsive";
 import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
-import { collectDueMyDayItems, type MyDayDocData } from "../utils/pushScheduler";
+import { collectDueMyDayItems, collectUpcomingMyDayItems, MYDAY_UPCOMING_HORIZON_MS, type MyDayDocData } from "../utils/pushScheduler";
 import { playSfxAdd, playSfxError, playSfxRemove } from "./utils/sfx";
 import {
   ensureReminderChannel,
@@ -655,7 +655,7 @@ function RootPage(): ReactNode {
       if (!current) return;
       const now = Date.now();
       const shown = readShown();
-      const due = collectDueMyDayItems(current, now, new Date().getTimezoneOffset());
+      const due = collectDueMyDayItems(current, now, tzOffset());
       for (const item of due) {
         if (shown[item.key] || pending.has(item.key)) continue;
         pending.add(item.key);
@@ -690,6 +690,14 @@ function RootPage(): ReactNode {
       Object.keys(shown).forEach((key) => { if (shown[key] < cutoff) delete shown[key]; });
       try { localStorage.setItem(shownKey, JSON.stringify(shown)); } catch { /* restricted storage */ }
     };
+    // Prefer the timezone offset the doc was SAVED with (the same value the
+    // server scheduler uses) so the local alarm's dedupe key/tag always match
+    // the server's — falling back to the live device offset for docs written
+    // before the field existed.
+    const tzOffset = () => {
+      const stored = Number(current?.tzOffsetMinutes);
+      return Number.isFinite(stored) ? stored : new Date().getTimezoneOffset();
+    };
     // Schedule the upcoming alarms (the ones that haven't fired yet) the
     // moment the doc is read or updated. This is what gives the TWA its
     // exact-time guarantee: even if the server push never arrives, the
@@ -697,7 +705,12 @@ function RootPage(): ReactNode {
     const scheduleUpcoming = () => {
       if (!isAndroidNative() || !current) return;
       const now = Date.now();
-      const items = collectDueMyDayItems(current, now + 6 * 60 * 60 * 1000, new Date().getTimezoneOffset());
+      // Collect every item whose next occurrence is within the horizon and
+      // arm a local alarm for each. (The previous version reused the DUE
+      // collector with `now` shifted 6h forward, which only ever saw the
+      // 15-minute slice ~5h45m out — so most same-day tasks were never
+      // armed and produced no notification when the app was closed.)
+      const items = collectUpcomingMyDayItems(current, now, tzOffset(), MYDAY_UPCOMING_HORIZON_MS);
       // Cancel every previously-scheduled My Day alarm and re-create the
       // ones still in the future. This keeps the schedule authoritative
       // against the latest doc — adding/removing a task in the app

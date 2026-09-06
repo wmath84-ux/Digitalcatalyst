@@ -1,5 +1,6 @@
 export const MYDAY_LOOKBACK_MS: number;
 export const MYDAY_MAX_CATCHUP_MS: number;
+export const MYDAY_UPCOMING_HORIZON_MS: number;
 
 /**
  * Size the catch-up window from the previous successful run, so a
@@ -36,6 +37,9 @@ export interface MyDayDocData {
   tasks?: unknown[];
   schedule?: unknown[];
   reminders?: unknown[];
+  /** Device UTC offset (minutes, UTC − local) saved by the client so both the
+   *  server scheduler and the TWA local alarms resolve the same local day. */
+  tzOffsetMinutes?: number;
   notificationLog?: Record<string, unknown>;
 }
 
@@ -44,6 +48,17 @@ export function collectDueMyDayItems(
   nowMs: number,
   tzOffsetMinutes: number,
   lookbackMs?: number,
+): DueMyDayItem[];
+
+/**
+ * Items whose next wall-clock occurrence is still ahead of `nowMs` and within
+ * `horizonMs`. Used to pre-schedule Android local alarms for the TWA.
+ */
+export function collectUpcomingMyDayItems(
+  data: MyDayDocData,
+  nowMs: number,
+  tzOffsetMinutes: number,
+  horizonMs?: number,
 ): DueMyDayItem[];
 
 export interface CourseInventory {
