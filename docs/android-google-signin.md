@@ -92,6 +92,13 @@ ID token, so `package.json` pins the peer to the app's own firebase version via
 `overrides`, and `.npmrc` sets `legacy-peer-deps=true` so a plain `npm install`
 succeeds. A clean `rm -rf node_modules && npm install` was verified.
 
+> **Do not add a matching `pnpm.overrides` entry.** pnpm records its overrides
+> map inside `pnpm-lock.yaml`, so adding one there without regenerating the
+> lockfile makes Vercel's frozen install fail with
+> `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`. pnpm only *warns* about an unmet
+> optional peer, so it needs no override at all — the `.npmrc` flag is purely
+> for npm, which treats the same warning as a hard error.
+
 `capacitor.config.ts` enables the provider:
 
 ```ts

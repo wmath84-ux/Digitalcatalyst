@@ -24,8 +24,7 @@
   },
   "pnpm": {
     "overrides": {
-      "sharp": "^0.34.5",
-      "@capacitor-firebase/authentication>firebase": "$firebase"
+      "sharp": "^0.34.5"
     }
   },
   "scripts": {
