@@ -30,6 +30,14 @@
           }
         },
         {
+          "client_id": "930483750234-pp2aaphn49mjlqvjjno6ob5l0kdhm1gs.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.eduvora.shop",
+            "certificate_hash": "f96889e93ae9ee0bed8750314df10a81dabba3b3"
+          }
+        },
+        {
           "client_id": "930483750234-u0utgrjrg2gm6kp39o696ptsuub1esd9.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
