@@ -303,8 +303,12 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
   const editingNote = editingId ? notes.find((n) => n.id === editingId) ?? null : null;
   const editingColor = editingNote ? colorStyles[editingNote.color] : null;
 
+  // Legibility (the same pass as Home, Store and the product page):
+  // `dc-scene-plate` is the ONE shared material in src/glass.css — a dark
+  // navy backing, a real rim, blur 0 and lifted `/40 · /55 · /70 · /85` ink —
+  // so this panel reads at the same contrast as the cards inside it.
   return (
-    <GlassSurface radius={24} className="text-white" contentClassName="flex flex-col">
+    <GlassSurface radius={24} className="dc-scene-plate text-white" contentClassName="flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-5 pb-4 sm:px-6">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500 text-white">
@@ -321,13 +325,16 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
       <div className="px-4 pb-5 sm:px-6">
         {/* Search bar */}
         <div className="mb-3 flex items-center gap-2">
+          {/* `dc-scene-field`: the pack pill paints a 16.8% grey with no
+              boundary on the plated panel, and its placeholder drops under
+              3:1. The hook adds the rim + lifts the placeholder ink. */}
           <GlassInput
             icon={<Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-rose-300" : "text-white/55")} />}
             value={globalSearch || localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             placeholder="Search notes..."
             disabled={!!globalSearch}
-            className={cn("min-w-0 flex-1", isSearchActive && "rounded-full ring-2 ring-rose-400/30")}
+            className={cn("dc-scene-field min-w-0 flex-1", isSearchActive && "rounded-full ring-2 ring-rose-400/30")}
           />
           {isSearchActive && (
             <div className="flex shrink-0 items-center gap-1.5">
@@ -351,8 +358,11 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
             moment the learner starts writing, so short notes get the same
             comfortable surface as edits. Cancel collapses it back without
             losing the draft. */}
+        {/* The composer well is a GlassSurface around a bare textarea, so it
+            takes `dc-scene-field` rather than a second plate: a real rim and
+            blur 0, without stacking another navy backing inside the panel's. */}
         {composerExpanded ? (
-          <GlassSurface radius={20} className="mb-4 transition-all focus-within:ring-2 focus-within:ring-rose-400/30" contentClassName="p-2.5">
+          <GlassSurface radius={20} className="dc-scene-field mb-4 transition-all focus-within:ring-2 focus-within:ring-rose-400/30" contentClassName="p-2.5">
             <BigNoteEditor
               kind="compose"
               value={draft}
@@ -365,7 +375,7 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
             />
           </GlassSurface>
         ) : (
-          <GlassSurface radius={20} className="mb-4 transition-all focus-within:ring-2 focus-within:ring-rose-400/30" contentClassName="flex items-start gap-2 p-2">
+          <GlassSurface radius={20} className="dc-scene-field mb-4 transition-all focus-within:ring-2 focus-within:ring-rose-400/30" contentClassName="flex items-start gap-2 p-2">
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -483,8 +493,11 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
                             )}
                           </div>
                         </div>
+                        {/* Note actions — the hide-until-hover step is gated on
+                            `(hover: hover)`, so a touch tablet (no hover state)
+                            keeps Expand / Delete reachable. */}
                         <div
-                          className="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                          className="flex shrink-0 items-center gap-0.5 [@media(hover:hover)]:sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <TooltipProvider delayMs={300}>

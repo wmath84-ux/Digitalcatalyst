@@ -519,6 +519,14 @@ html[data-glass="on"] :where(.dc-scene-field) input::placeholder {
   color: rgba(255, 255, 255, 0.66);
 }
 
+/* My Day's Quick Notes composer is a WELL (a plated GlassSurface around a bare
+   `textarea`), not a Glass Input — same `/55` placeholder, same lift. Kept as
+   its own rule because the contract above pins the `input::placeholder`
+   selector exactly. */
+html[data-glass="on"] :where(.dc-scene-field) textarea::placeholder {
+  color: rgba(255, 255, 255, 0.66);
+}
+
 html[data-glass="on"] :where(.dc-scene-field) :where(.text-white\/35) {
   color: rgba(255, 255, 255, 0.66);
 }
@@ -538,6 +546,59 @@ html[data-glass="on"] :where(.dc-scene-field) :where(.text-white\/35) {
 html[data-glass="on"]:not([data-glass-tier="flat"]) :where(.dc-scene-plate, .dc-scene-field) > div[aria-hidden]:nth-of-type(1) {
   backdrop-filter: saturate(1.15) !important;
   -webkit-backdrop-filter: saturate(1.15) !important;
+}
+
+/* The tile is the one My Day control that is not a LAYERED surface: the pack
+   puts `backdrop-blur-md` on the button itself, so the layer kill above cannot
+   reach it and the owner's app-wide "background blur ekadam hata do" override
+   never did. ScheduleModal's event-type picker is a row of five of these inside
+   the plated sheet — same override, written at element level (unlayered, so it
+   outranks the pack's utility without touching the vendored file). */
+html[data-glass="on"]:not([data-glass-tier="flat"]) :where(.dc-tile) {
+  backdrop-filter: saturate(1.15);
+  -webkit-backdrop-filter: saturate(1.15);
+}
+
+/* ── THE TOAST STACK WEARS THE SAME PLATE ────────────────────────────────────
+ * My Day answers every save / delete / sync with a toast, and the vendored
+ * `glass-toast` card paints inline: `rgba(255,255,255,0.06)` over a 24px
+ * backdrop blur. Over the winter scene that is a 6 % veil — the title
+ * (`text-white/90`) survives on the blur alone, the description
+ * (`text-white/50`) does not, and the blur is exactly what the owner's
+ * app-wide override removes everywhere else.
+ *
+ * The registry file stays byte-comparable, so the plate is CSS-only and keyed
+ * off the two hooks the pack itself ships: `z-[1000]` (its viewport container —
+ * the only `z-[1000]` element in the app) and the card's `role="status"`.
+ * Descendant, not child: `AnimatePresence mode="popLayout"` owns the tree
+ * between the two, and the selector must survive whatever it wraps them in.
+ * Same navy, same rim, same blur-0 as `.dc-scene-plate`; `!important` because
+ * inline styles yield to nothing else.
+ * ────────────────────────────────────────────────────────────────────────── */
+html[data-glass="on"] :where(.z-\[1000\]) [role="status"] {
+  background: linear-gradient(
+    160deg,
+    rgba(12, 20, 40, 0.78) 0%,
+    rgba(8, 14, 30, 0.72) 55%,
+    rgba(6, 11, 24, 0.76) 100%
+  ) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 18px 44px -20px rgba(2, 6, 16, 0.85),
+    0 4px 14px -8px rgba(2, 6, 16, 0.6) !important;
+}
+
+/* The card's separate blur layer: blur 0 + the pinned saturate, like every
+   other plated surface — one sensitivity, not two. */
+html[data-glass="on"]:not([data-glass-tier="flat"]) :where(.z-\[1000\]) [role="status"] > div[aria-hidden] {
+  backdrop-filter: saturate(1.15) !important;
+  -webkit-backdrop-filter: saturate(1.15) !important;
+}
+
+/* The description's `/50` ink step, lifted to the plate's muted floor. */
+html[data-glass="on"] :where(.z-\[1000\]) [role="status"] :where(.text-white\/50) {
+  color: rgba(255, 255, 255, 0.76);
 }
 
 /* `glass-toggle-group` used as a LIGHT segmented control (the store filter row

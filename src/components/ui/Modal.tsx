@@ -48,9 +48,14 @@ interface ModalProps {
  * behind a sheet stays faintly legible, and the phone sheet scales/slides in
  * through `.glass-dialog-in` (src/glass.css). Everything the overlay maths
  * depends on is untouched: `useOverlayBox` scoping, the shared body-scroll
- * lock, Escape, the dvh height cap and the safe-area padding. Phase A5: the
- * panel uses the pack's own GlassSurface settings (tint 0.5 / blur 14 /
- * saturation 1.6, scheme-aware material) and white ink — no app-side tint.
+ * lock, Escape, the dvh height cap and the safe-area padding.
+ *
+ * My Day legibility (same pass as Home / Store / product detail): the panel
+ * also carries `dc-scene-plate`, so a sheet wears the ONE material every card
+ * and bar wears — the dark navy backing, the real rim, blur 0 and the lifted
+ * `/55 · /70 · /85` ink steps for the form copy inside. The pack's own
+ * GlassSurface settings (tint 0.5 / blur 14 / saturation 1.6) stay untouched
+ * in the JSX; the plate is CSS, so `?glass=off` still restores them.
  */
 export default function Modal({ open, onClose, title, children, maxWidth = "max-w-md", boundsRef }: ModalProps) {
   const contextBounds = useOverlayBounds();
@@ -107,7 +112,7 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
            inline style would beat it. */
         style={{ borderRadius: "var(--glass-sheet-radius)" }}
         className={cn(
-          "glass-dialog-in relative flex w-full flex-col overflow-hidden text-white",
+          "dc-scene-plate glass-dialog-in relative flex w-full flex-col overflow-hidden text-white",
           maxWidth,
           isScoped && box
             ? "max-h-full"

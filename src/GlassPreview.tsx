@@ -683,7 +683,10 @@ export default function GlassPreviewPage() {
         </section>
 
         <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Glass sheet">
-          <p className="text-sm text-slate-600">
+          {/* The sheet wears `dc-scene-plate` now (src/glass.css), so its demo
+              copy is white ink on the plate — slate-600 was authored for the
+              un-plated frosted panel and would sit at ~2:1 on the navy. */}
+          <p className="text-sm text-white/75">
             Phone width = a bottom sheet with top corners; from 640 px it becomes a centred card, and inside the
             desktop shell it stays constrained to the content column. That behaviour is the app’s existing
             overlay maths — only the panel material changed.
