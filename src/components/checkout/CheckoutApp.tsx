@@ -182,7 +182,6 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
             <PaymentGateway
               quoteId={quoteId}
               finalPrice={finalPrice}
-              currency="₹"
               productName={productName}
               onPaymentSuccess={handlePaymentSuccess}
               onGoBack={handleBackToReview}

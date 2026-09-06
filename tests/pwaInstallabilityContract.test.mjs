@@ -80,7 +80,11 @@ test("service worker install cannot abort PWA installability", () => {
 });
 
 test("the install panel shows Add-to-Home-Screen help when Chrome has no prompt", () => {
-  assert.match(overlays, /openInstallPanel/);
+  // `openInstallPanel()` moved to the shared pwaInstall util (the landing CTA
+  // / hero call it); the overlay opens on the dispatched event.
+  const pwaInstall = fs.readFileSync("src/utils/pwaInstall.ts", "utf8");
+  assert.match(pwaInstall, /export function openInstallPanel/);
+  assert.match(overlays, /PWA_INSTALL_OPEN_EVENT/);
   assert.match(overlays, /isInstallPromptReady/);
   assert.match(overlays, /setManualHelp\(!alreadyInstalled && !isInstallPromptReady\(\)\)/);
   assert.match(overlays, /Add to Home Screen/);

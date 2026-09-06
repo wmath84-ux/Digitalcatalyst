@@ -33,7 +33,10 @@ test("the side panel has no hide button and the dock does not collapse it", () =
   assert.doesNotMatch(shell, /railCollapsed/);
   assert.doesNotMatch(shell, /railHidden/);
   assert.doesNotMatch(shell, /setPeekOpen/);
-  assert.doesNotMatch(shell, /onOpenChange/);
+  // The wide-band rail is the static <aside>; the compact (<=1023 px) band
+  // uses the pack GlassSidebar with a controlled expand state instead
+  // (see liquidGlassWaveTwoContract for the pin on that).
+  assert.match(shell, /<aside\s+data-desktop-rail/);
   assert.doesNotMatch(peek, /onOpenChange/);
   assert.doesNotMatch(css, /\[data-desktop-rail-toggle\]/);
   assert.doesNotMatch(css, /\[data-rail-hidden="true"\]/);

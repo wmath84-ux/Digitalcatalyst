@@ -58,7 +58,10 @@ test("PDP module picker is a viewport-capped overlay, not a full-black sheet", (
 
 test("checkout proceed is not blocked for paid quotes", () => {
   assert.match(checkout, /disabled=\{showLoading\}/);
-  assert.doesNotMatch(checkout, /finalTotal > 0/);
+  // No disabled expression may gate on the total. (A naive `finalTotal > 0`
+  // match false-positives on the "You save" pill, which compares
+  // `regularSubtotal - finalTotal > 0`.)
+  assert.doesNotMatch(checkout, /disabled=\{[^}]*finalTotal[^}]*\}/);
 });
 
 test("quote loader resolves products by document id and public id", () => {
