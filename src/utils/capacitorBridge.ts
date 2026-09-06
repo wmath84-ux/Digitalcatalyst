@@ -112,11 +112,14 @@ export async function registerForPush(getIdToken: () => Promise<string | null>):
     if (permStatus.receive !== "granted") {
       return { ok: false, reason: "permission-denied" };
     }
-    await PushNotifications.register();
-
-    // The token listener fires once on register and again every
-    // time the token rotates. We dedupe on the server (the FCM
-    // register endpoint hashes the token into the doc id).
+    // Register the listener BEFORE calling register(). Capacitor fires the
+    // initial `registration` token event as soon as `register()` completes,
+    // and a listener attached afterwards can miss that first event — which
+    // left `users/{uid}/fcmTokens` empty (the symptom: app closed → no FCM
+    // wake-up → no notification until the app was opened and the foreground
+    // clock did the work). The listener fires again on every token rotation,
+    // and we dedupe on the server (the FCM register endpoint hashes the
+    // token into the doc id).
     await PushNotifications.addListener("registration", async (token: Token) => {
       try {
         const idToken = await getIdToken();
@@ -141,6 +144,8 @@ export async function registerForPush(getIdToken: () => Promise<string | null>):
         console.warn("[push] fcm-register failed", err);
       }
     });
+
+    await PushNotifications.register();
 
     // Tap handler — a user tapping the system notification while
     // the app is in the background re-opens with the deep link.
