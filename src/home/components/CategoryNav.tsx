@@ -11,9 +11,13 @@ export default function CategoryNav({ categories, activeCategory, onSelect }: Ca
   return (
     <div className="mt-5 flex overflow-x-auto px-5 pb-1 no-scrollbar">
       {/* Wave 12: the category strip is the pack GlassToggleGroup (segment
-          material, sliding indicator) instead of hand-frosted pills. */}
+          material, sliding indicator) instead of hand-frosted pills.
+          `dc-scene-plate` gives the pill the same dark contrast backing the
+          review cards wear (glass.css) so the unselected labels survive the
+          bright snow band they scroll through; the indigo droplet and the
+          selected white label are untouched. */}
       <GlassToggleGroup
-        className="dc-segment shrink-0"
+        className="dc-segment dc-scene-plate shrink-0"
         value={activeCategory}
         onValueChange={onSelect}
         aria-label="Browse by category"

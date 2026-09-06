@@ -34,9 +34,9 @@ export default function ContinueLearning({ items }: ContinueLearningProps) {
   return (
     <section className="px-5 pt-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-bold text-white">Continue Learning</h2>
+        <h2 className="dc-scene-ink text-base font-bold text-white">Continue Learning</h2>
         {items.length === 1 && (
-          <span className="text-xs font-semibold text-indigo-600">{Math.round(items[0].progress)}% done</span>
+          <span className="dc-scene-ink text-xs font-semibold text-indigo-300">{Math.round(items[0].progress)}% done</span>
         )}
       </div>
 

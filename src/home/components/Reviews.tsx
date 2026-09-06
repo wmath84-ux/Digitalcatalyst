@@ -17,8 +17,8 @@ export default function Reviews({ reviews, onOpenReview }: ReviewsProps) {
   return (
     <section className="mt-7 pb-4">
       <div className="flex items-center justify-between px-5">
-        <h2 className="text-base font-bold text-white">Loved by Learners</h2>
-        <span className="text-xs font-semibold text-white/55">{average.toFixed(1)} ★ average</span>
+        <h2 className="dc-scene-ink text-base font-bold text-white">Loved by Learners</h2>
+        <span className="dc-scene-ink text-xs font-semibold text-white/55">{average.toFixed(1)} ★ average</span>
       </div>
 
       <div className="mt-3 flex gap-3 overflow-x-auto px-5 pb-2 no-scrollbar snap-x-mandatory">

@@ -96,13 +96,17 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
       {/* The carousel frame is the pack GlassSurface at the pinned docs
           sensitivity (radius 24 · blur 4 · tint 0.25); each slide paints one
           translucent accent (the admin preset) over it — no gradient plate,
-          no glow orbs, no white wash. */}
+          no glow orbs, no white wash. `dc-scene-plate` is the shared contrast
+          plate the review cards wear (glass.css): a 30% accent wash over the
+          scene's snow reads as pale grey and bleaches the slide copy, so the
+          frame gets the same dark, translucent backing — the accent still
+          sets the hue, the copy stays crisp. */}
       <GlassSurface
         ref={trackRef}
         radius={24}
         tint={0.25}
         blur={0}
-        className="select-none overflow-hidden touch-pan-y"
+        className="dc-scene-plate select-none overflow-hidden touch-pan-y"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={endDrag}

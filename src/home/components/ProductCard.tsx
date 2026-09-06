@@ -33,7 +33,12 @@ export default function ProductCard({
       radius={24}
       tint={0.25}
       blur={0}
-      className={`group relative overflow-hidden text-white transition-transform duration-200 active:scale-[0.98] ${className}`}
+      /* `dc-scene-plate` — the shared contrast plate (glass.css) the review
+         cards already wear. A tile's copy sits under its artwork, and the
+         scene's snow shows straight through a 10% tint, so the title / author
+         / price need the same dark backing to read. Same pinned sensitivity
+         (tint 0.25 · blur 0 · radius 24); only the material's paint changes. */
+      className={`dc-scene-plate group relative overflow-hidden text-white transition-transform duration-200 active:scale-[0.98] ${className}`}
       contentClassName="flex flex-col"
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden">
