@@ -1025,3 +1025,67 @@ html[data-glass="off"] :where([data-glass-dock]) > [aria-hidden] * {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * 2026-09-06 · REVISION — TOPICS, SESSIONS, BANK, PROGRESS, GENERATOR
+ * ──────────────────────────────────────────────────────────────────────────
+ * Owner direction, after Home, the store, the product page, the footer dock
+ * and My Day shipped: the whole Revision feature reads the same way —
+ * revision topics, cards, sessions, the review queue (due), progress, the
+ * streak, history, topic selection (single + multi), search, filters, the
+ * revision summary, quick/start/complete/review-again, difficulty + recall
+ * status, spaced repetition, notes, card colours, statistics, completed +
+ * pending, daily activity, notifications, subscription access + Premium, the
+ * bottom nav and the desktop side nav.
+ *
+ * Revision was the last feature still wearing the pack's raw material: its
+ * shared `Card` is a GlassSurface at tint 0.4 (a ~17% white wash), the hero
+ * and stat surfaces sit at 0.4–0.5, and the toolbars + player footers wear
+ * the 10% `--dc-chrome-glass` token — all of it white ink straight over the
+ * winter scene's snow. The fix is the same one-material pass as every route
+ * before it, so this section adds exactly TWO rules to the shared recipe:
+ *
+ *   1. the score-hero guard below — the indigo / emerald result heroes keep
+ *      their solid brand paint (white on brand already clears large-text AA,
+ *      and the plate would bury the brand);
+ *   2. the plan-carousel dot shadow — the same glyph scrim Home's carousel
+ *      dots wear, keyed off `[data-rev-plan-dots]`.
+ *
+ * Everything else is the recipe Home shipped, opted into at the call site:
+ * `dc-scene-plate` on the shared Card (one edit plates every revision card),
+ * on the dashboard heroes + stats, the profile hero + widgets, the loading
+ * panel, the error toast, the three pack dialogs, the filter sheet, the
+ * premium sheet and the submit dialog; `dc-scene-plate--bar` on AppHeader,
+ * the bank's header + sticky + fixed bars, the player footers and the desktop
+ * top bar + both rail variants (which resolves the standing desktop-chrome
+ * leftover — the revision tab row and the rail entries were /55 ink on a 10%
+ * tint); `dc-segment dc-scene-plate` on the five segmented controls;
+ * `dc-scene-field` on the two bank search pills; `dc-scene-ink` on the copy
+ * with no surface under it. The question blocks, the review grid and the
+ * result-chip grids moved INSIDE the shared Card (the pattern TestReview and
+ * the dashboard bank grid already used) instead of inventing a tile plate.
+ *
+ * Deliberate non-changes, pinned by tests/revisionScenePlateContract.test.mjs:
+ * nested pack surfaces (the attempt-history overlay, the generator's picker
+ * panel) keep their lighter wash so they still read as layers ABOVE the
+ * plated card, and their copy inherits the plate's ink lifts as descendants.
+ * No vendored registry file, no dock file and no BottomNav moved.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* The score heroes (`data-rev-score-card` — TestResult's indigo card and the
+   revision-complete emerald card) keep their solid brand paint: the plate's
+   tint layer goes transparent so the published `bg-indigo-600` /
+   `bg-emerald-600` shows through, while the quiet sheen, the real rim, the
+   lift and the blur-0 backdrop kill still apply. White on either brand
+   clears large-text AA for the score numeral the card is built around. */
+html[data-glass="on"] :where(.dc-scene-plate[data-rev-score-card]) > div[aria-hidden]:nth-of-type(2) {
+  background: transparent !important;
+}
+
+/* The dashboard plan carousel's dot row paints straight onto the scene: an
+   inactive `bg-white/25` dot over snow is invisible. Shadow only — the dots
+   keep their geometry and their active/inactive step, exactly like the Home
+   hero dots above (`[data-home-hero] button[aria-label^="Go to slide"]`). */
+html[data-glass="on"] :where([data-rev-plan-dots]) > span {
+  box-shadow: 0 1px 6px rgba(4, 8, 18, 0.7);
+}

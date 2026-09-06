@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type TouchEvent as ReactTouchEvent } from 
 import PageShell from "../components/PageShell";
 import { GlassTile } from "../../components/ui/glass-tile";
 import { useExitGuard } from "../components/ExitGuardContext";
-import { Badge, ErrorState, FullScreenLoader, PrimaryButton, ProgressBar, SecondaryButton } from "../components/ui";
+import { Badge, Card, ErrorState, FullScreenLoader, PrimaryButton, ProgressBar, SecondaryButton } from "../components/ui";
 import { CheckIcon, ChevronRightIcon } from "../components/icons";
 import {
   getRevisionSessionForPlayer,
@@ -68,7 +68,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
       <PageShell route={route} title="Revision Session" backHref="#/revision/bank" hideNav>
         {isInvalidState ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-            <p className="text-sm text-white/75">This session has already finished.</p>
+            <p className="dc-scene-ink text-sm text-white/75">This session has already finished.</p>
             <PrimaryButton className="w-auto px-6" onClick={() => navigate(`#/revision/session/${sessionId}/result`)}>
               View Results
             </PrimaryButton>
@@ -148,7 +148,10 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-5" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           {question && (
-            <div key={question.id} className="animate-fade-in">
+            /* The question lives in the shared revision Card — the same pattern
+               TestReview uses — so the prompt, the answer tiles and the skip
+               action sit on the plated surface instead of bare on the scene. */
+            <Card key={question.id} className="animate-fade-in">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge tone={question.difficulty}>{question.difficulty}</Badge>
                 <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-semibold text-white/85">
@@ -191,10 +194,10 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
               >
                 Skip this question
               </button>
-            </div>
+            </Card>
           )}
         </div>
-        <div className="flex gap-3 border-t border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
+        <div className="dc-scene-plate dc-scene-plate--bar flex gap-3 border-t border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
           <SecondaryButton onClick={goPrev} disabled={currentIndex === 0} className="flex-[1]">
             Previous
           </SecondaryButton>
@@ -212,7 +215,7 @@ export default function RevisionSessionPage({ uid, route, sessionId }: { uid: st
             )}
           </PrimaryButton>
         </div>
-        <p className="pb-2 text-center text-[11px] font-medium text-white/55">{answeredCount} of {total} answered</p>
+        <p className="dc-scene-ink pb-2 text-center text-[11px] font-medium text-white/55">{answeredCount} of {total} answered</p>
       </div>
     </PageShell>
   );

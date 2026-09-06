@@ -435,7 +435,7 @@ export default function PremiumGate({
         side="bottom"
         aria-label={variant === "myday" ? "My Day Premium" : "Revision Studio subscription"}
         data-premium-gate-modal
-        className="dc-premium-modal-inner right-0 mx-auto flex h-auto min-h-0 w-full [width:min(100vw,640px)] flex-col text-white"
+        className="dc-scene-plate dc-premium-modal-inner right-0 mx-auto flex h-auto min-h-0 w-full [width:min(100vw,640px)] flex-col text-white"
       >
         <GateContent
           variant={variant}

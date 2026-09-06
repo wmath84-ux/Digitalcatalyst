@@ -27,7 +27,7 @@ type AppHeaderProps = {
 export default function AppHeader({ title, subtitle, backHref, rightSlot }: AppHeaderProps) {
   const { navigate } = useExitGuard();
   return (
-    <header data-revision-app-header className="dc-glass-toolbar sticky top-0 z-20 transition-all">
+    <header data-revision-app-header className="dc-scene-plate dc-scene-plate--bar dc-glass-toolbar sticky top-0 z-20 transition-all">
       {/* Phase A4: the bar IS the pack GlassSurface at defaults (radius 0 — it
           is an edge-to-edge strip); `.dc-glass-toolbar` stays as a hook only. */}
       <GlassSurface radius={0} className="border-b border-white/10 text-white" contentClassName="flex min-h-[56px] w-full min-w-0 flex-wrap items-center gap-2 px-3 py-2">

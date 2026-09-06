@@ -104,7 +104,7 @@ export default function ProgressPage({ uid, route }: { uid: string; route: strin
         <Card>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-[15px] font-bold text-white lg:text-[14px]">Activity</h2>
-            <GlassToggleGroup value={range} onValueChange={(next) => setRange(next as RangeTab)} aria-label="Activity range" className="text-xs font-semibold">
+            <GlassToggleGroup value={range} onValueChange={(next) => setRange(next as RangeTab)} aria-label="Activity range" className="dc-segment dc-scene-plate text-xs font-semibold">
               {RANGE_TABS.map((r) => (
                 <GlassToggleItem key={r.value} value={r.value} className="min-h-[30px] px-3">
                   {r.label}

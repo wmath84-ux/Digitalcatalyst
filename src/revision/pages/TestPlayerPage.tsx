@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type TouchEvent 
 import PageShell from "../components/PageShell";
 import { GlassTile } from "../../components/ui/glass-tile";
 import { useExitGuard } from "../components/ExitGuardContext";
-import { ErrorState, FullScreenLoader, PrimaryButton, ProgressBar, SecondaryButton, Badge } from "../components/ui";
+import { Card, ErrorState, FullScreenLoader, PrimaryButton, ProgressBar, SecondaryButton, Badge } from "../components/ui";
 import { CheckIcon, ChevronRightIcon, XIcon } from "../components/icons";
 import { lockBodyScroll, unlockBodyScroll, useOverlayBox, type OverlayBoundsRef } from "../../components/ui/overlayBounds";
 import {
@@ -237,7 +237,10 @@ export default function TestPlayerPage({
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-5" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           {question && (
-            <div key={question.id} className="animate-fade-in">
+            /* The question lives in the shared revision Card — the same pattern
+               TestReview uses — so the prompt, the answer tiles and the skip
+               action sit on the plated surface instead of bare on the scene. */
+            <Card key={question.id} className="animate-fade-in">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge tone={question.difficulty}>{question.difficulty}</Badge>
                 <span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-semibold text-white/85">
@@ -281,11 +284,11 @@ export default function TestPlayerPage({
               >
                 Skip this question
               </button>
-            </div>
+            </Card>
           )}
         </div>
 
-        <div className="flex gap-3 border-t border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
+        <div className="dc-scene-plate dc-scene-plate--bar flex gap-3 border-t border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
           <SecondaryButton onClick={goPrev} disabled={currentIndex === 0} className="flex-[1]">
             Previous
           </SecondaryButton>
@@ -315,6 +318,9 @@ function ReviewBeforeSubmit({
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto px-4 py-4">
+        {/* The review grid lives in the shared revision Card, so the answer map
+            and its legend sit on the plated surface instead of bare on the scene. */}
+        <Card>
         <p className="mb-4 text-sm text-white/75">
           Tap any question to jump back and change your answer before you submit.
         </p>
@@ -344,8 +350,9 @@ function ReviewBeforeSubmit({
             <span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Unanswered
           </span>
         </div>
+        </Card>
       </div>
-      <div className="flex gap-3 border-t border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
+        <div className="dc-scene-plate dc-scene-plate--bar flex gap-3 border-t border-white/10 bg-[var(--dc-chrome-glass)] px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] [backdrop-filter:var(--dc-chrome-glass-blur)]">
         <SecondaryButton onClick={onBack} className="flex-1">
           Back
         </SecondaryButton>
@@ -439,7 +446,7 @@ function SubmitConfirmModal({
         data-rev-submit-dialog
         tint={0.5}
         radius={24}
-        className="custom-scrollbar relative w-full max-w-[min(100%,26rem)] overflow-hidden text-white"
+        className="dc-scene-plate custom-scrollbar relative w-full max-w-[min(100%,26rem)] overflow-hidden text-white"
         contentClassName="flex flex-col p-5 sm:p-6"
         style={{
           maxHeight: isScoped && box ? "100%" : undefined,

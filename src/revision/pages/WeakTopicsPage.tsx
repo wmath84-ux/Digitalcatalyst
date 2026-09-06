@@ -95,7 +95,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
           {errorMsg && (
             <div
               data-rev-banner
-              className="order-first flex items-center gap-2 rounded-2xl bg-rose-500/20 px-4 py-3 text-sm font-medium text-rose-200 lg:col-span-12"
+              className="dc-scene-ink order-first flex items-center gap-2 rounded-2xl bg-rose-500/20 px-4 py-3 text-sm font-medium text-rose-200 lg:col-span-12"
             >
               <AlertIcon className="h-4 w-4 shrink-0" /> {errorMsg}
             </div>
@@ -104,7 +104,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
           <div data-rev-col="weak-primary" className="contents lg:col-span-7 lg:flex lg:flex-col lg:gap-3">
             {data.recommendedTopics.length > 0 && (
               <section className="order-1">
-                <h2 className="mb-2 text-[15px] font-bold text-white lg:text-[14px]">Recommended for you</h2>
+                <h2 className="dc-scene-ink mb-2 text-[15px] font-bold text-white lg:text-[14px]">Recommended for you</h2>
                 <div className="grid gap-3 min-[960px]:grid-cols-2">
                   {data.recommendedTopics.map((t) => (
                     <Card key={t.topicId} className="border-indigo-400/30 bg-indigo-500/15">
@@ -135,7 +135,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
             )}
 
             <section className="order-3">
-              <h2 className="mb-2 text-[15px] font-bold text-white lg:text-[14px]">All Weak Topics</h2>
+              <h2 className="dc-scene-ink mb-2 text-[15px] font-bold text-white lg:text-[14px]">All Weak Topics</h2>
               <Card>
                 <div className="flex flex-col gap-4 lg:gap-2.5">
                   {data.weakestTopics.map((t) => (
@@ -161,7 +161,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
           <div data-rev-col="weak-secondary" className="contents lg:col-span-5 lg:flex lg:flex-col lg:gap-3">
             {data.weakestSubjects.length > 0 && (
               <section className="order-2">
-                <h2 className="mb-2 text-[15px] font-bold text-white lg:text-[14px]">Weakest Subjects</h2>
+                <h2 className="dc-scene-ink mb-2 text-[15px] font-bold text-white lg:text-[14px]">Weakest Subjects</h2>
                 <div className="grid grid-cols-2 gap-3">
                   {data.weakestSubjects.map((s) => (
                     <Card key={s.subjectId} className="text-center">
@@ -177,7 +177,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
 
             {data.mostMissedTopics.length > 0 && (
               <section className="order-4">
-                <h2 className="mb-2 text-[15px] font-bold text-white lg:text-[14px]">Most Missed Topics</h2>
+                <h2 className="dc-scene-ink mb-2 text-[15px] font-bold text-white lg:text-[14px]">Most Missed Topics</h2>
                 <Card>
                   <div className="divide-y divide-white/10">
                     {data.mostMissedTopics.map((t) => (
@@ -195,7 +195,7 @@ export default function WeakTopicsPage({ uid, route }: Props) {
 
             {data.frequentlySkippedTopics.length > 0 && (
               <section className="order-5">
-                <h2 className="mb-2 text-[15px] font-bold text-white lg:text-[14px]">Frequently Skipped</h2>
+                <h2 className="dc-scene-ink mb-2 text-[15px] font-bold text-white lg:text-[14px]">Frequently Skipped</h2>
                 <Card>
                   <div className="divide-y divide-white/10">
                     {data.frequentlySkippedTopics.map((t) => (

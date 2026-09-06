@@ -16,7 +16,7 @@ export function FullScreenLoader({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
       <Spinner className="h-8 w-8" />
-      <p className="text-sm font-medium text-white/75">{label}</p>
+      <p className="dc-scene-ink text-sm font-medium text-white/75">{label}</p>
     </div>
   );
 }
@@ -68,8 +68,8 @@ export function EmptyState({
           {icon}
         </div>
       )}
-      <h3 className="text-base font-bold text-white">{title}</h3>
-      {description && <p className="max-w-[280px] text-sm leading-relaxed text-white/75">{description}</p>}
+      <h3 className="dc-scene-ink text-base font-bold text-white">{title}</h3>
+      {description && <p className="dc-scene-ink max-w-[280px] text-sm leading-relaxed text-white/75">{description}</p>}
       {action}
     </div>
   );
@@ -81,8 +81,8 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/20 text-rose-300">
         <AlertIcon className="h-8 w-8" />
       </div>
-      <h3 className="text-base font-bold text-white">Something went wrong</h3>
-      <p className="max-w-[280px] text-sm leading-relaxed text-white/75">{message}</p>
+      <h3 className="dc-scene-ink text-base font-bold text-white">Something went wrong</h3>
+      <p className="dc-scene-ink max-w-[280px] text-sm leading-relaxed text-white/75">{message}</p>
       {onRetry && (
         <GlassButton variant="capsule" onClick={onRetry} className="mt-1">
           Try again
@@ -134,8 +134,14 @@ export function Card({
     /* Phase A4: the card IS the pack's Glass Card material — GlassSurface at
        Glass Card's published values (tint 0.4, radius 20). Padding stays on the
        outer box (the `.rev-card` hook the responsive bands size) so the Test
-       Bank's `p-0` cards and every band rule keep working exactly as before. */
-    <GlassSurface tint={0.4} radius={20} className={`rev-card p-4 text-white ${className}`} {...rest}>
+       Bank's `p-0` cards and every band rule keep working exactly as before.
+       Revision legibility: `dc-scene-plate` is the same shared contrast plate
+       Home, the store, the product page and My Day wear (glass.css) — one edit
+       here plates every revision card at once. The two score heroes keep their
+       solid brand paint through the `[data-rev-score-card]` guard in glass.css;
+       the nested attempt overlay and the generator's picker panel keep the
+       pack's lighter wash so they still read as layers above the card. */
+    <GlassSurface tint={0.4} radius={20} className={`rev-card p-4 text-white dc-scene-plate ${className}`} {...rest}>
       {children}
     </GlassSurface>
   );

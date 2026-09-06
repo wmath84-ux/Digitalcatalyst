@@ -46,6 +46,7 @@ import {
   type RevisionBankStatus,
 } from "../engine/cloudRevisionService";
 import { questionModeLabel } from "../engine/questionMode";
+import { useDragScroll } from "../../hooks/useDragScroll";
 
 type ViewTab = "tests" | "smart";
 type StatusTab = "active" | "learning" | "improving" | "mastered" | "all";
@@ -223,7 +224,7 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
           main header, and `sticky top-0` inside the scroller means "the very
           top", not "the top plus padding". The row keeps its own `py-3`, so
           the breathing room lives inside the glass bar instead of above it. */}
-      <div data-rev-bank-header className="dc-glass-toolbar border-b border-white/10 px-4 py-3 lg:px-0 lg:max-w-[1200px] lg:mx-auto lg:rounded-2xl">
+      <div data-rev-bank-header className="dc-scene-plate dc-scene-plate--bar dc-glass-toolbar border-b border-white/10 px-4 py-3 lg:px-0 lg:max-w-[1200px] lg:mx-auto lg:rounded-2xl">
         {/* Wave 4: the two hand-rolled boxes became the registry
             `glass-toggle-group`. One droplet slides between the views instead
             of two backgrounds flickering, and the active state is now the same
@@ -233,7 +234,7 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
             surface to fill the toolbar row (see src/glass.css). */}
         <div data-rev-bank-view-switch>
           <GlassToggleGroup
-            className="dc-segment flex w-full rounded-2xl p-1"
+            className="dc-segment dc-scene-plate flex w-full rounded-2xl p-1"
             data-stretch
             tint={0.5}
             value={view}
@@ -292,7 +293,7 @@ export default function RevisionBankPage({ uid, route, hasAccess = true, onRequi
 
       {actionError && (
         <div className="fixed inset-x-0 bottom-20 z-50 mx-auto w-full max-w-[440px] px-4">
-          <GlassSurface radius={20} className="text-white ring-1 ring-rose-400/30" contentClassName="flex items-center gap-2 px-4 py-3 text-sm">
+          <GlassSurface radius={20} className="dc-scene-plate text-white ring-1 ring-rose-400/30" contentClassName="flex items-center gap-2 px-4 py-3 text-sm">
             <span className="flex-1">{actionError}</span>
             <GlassButton onClick={() => setActionError(null)} aria-label="Dismiss" className="[&_.size-12]:size-8"><XIcon className="h-4 w-4" /></GlassButton>
           </GlassSurface>
@@ -373,9 +374,9 @@ function SavedTestsView({
        px under the main header instead of flush (`index.css` zeroes it for the
        Test Bank). */
     <div className="animate-fade-in pb-24">
-      <div className="dc-glass-toolbar sticky top-0 z-10 space-y-3 border-b border-white/10 px-4 py-3">
+      <div className="dc-scene-plate dc-scene-plate--bar dc-glass-toolbar sticky top-0 z-10 space-y-3 border-b border-white/10 px-4 py-3">
         <div className="relative">
-          <GlassInput icon={<SearchIcon className="h-4 w-4" />} value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search saved tests" className="w-full" />
+          <GlassInput icon={<SearchIcon className="h-4 w-4" />} value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search saved tests" className="dc-scene-field w-full" />
           {search && <button type="button" onClick={() => onSearch("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2"><XIcon className="h-4 w-4 text-white/55" /></button>}
         </div>
         {bankStatus && limit !== -1 && (
@@ -599,23 +600,28 @@ function SmartRevisionView({ bankData, summary, search, statusTab, activeFilterC
   onStart: () => void;
   onClear: () => void;
 }) {
+  // The Due / Learning / Improving / Mastered / All strip is a horizontal rail
+  // with a hidden scrollbar — a mouse gets the same press-drag-release gesture
+  // a thumb gets (src/hooks/useDragScroll.ts), exactly like the store's filter
+  // row and My Day's task filters.
+  const statusRail = useDragScroll<HTMLDivElement>();
   return (
     /* Same seat as the Saved Tests view: a sticky row directly under a wrapper
        with no top padding, so `top-0` really is the top of the page. */
     <div className="animate-fade-in pb-28">
-      <div className="dc-glass-toolbar sticky top-0 z-10 space-y-3 border-b border-white/10 px-4 py-3">
+      <div className="dc-scene-plate dc-scene-plate--bar dc-glass-toolbar sticky top-0 z-10 space-y-3 border-b border-white/10 px-4 py-3">
         <div className="flex gap-2">
-          <div className="relative min-w-0 flex-1"><GlassInput icon={<SearchIcon className="h-4 w-4" />} value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search weak questions or topics" className="w-full" />{search && <button type="button" onClick={() => onSearch("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2"><XIcon className="h-4 w-4 text-white/55" /></button>}</div>
+          <div className="relative min-w-0 flex-1"><GlassInput icon={<SearchIcon className="h-4 w-4" />} value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search weak questions or topics" className="dc-scene-field w-full" />{search && <button type="button" onClick={() => onSearch("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2"><XIcon className="h-4 w-4 text-white/55" /></button>}</div>
           <GlassButton onClick={onFilters} aria-label="Filter and sort" className="relative shrink-0 [&_.size-12]:size-11"><FilterIcon className="h-5 w-5" />{activeFilterCount > 0 && <span className="absolute -right-1 -top-1 z-10 grid h-4 w-4 place-items-center rounded-full bg-indigo-600 text-[9px] font-bold text-white">{activeFilterCount}</span>}</GlassButton>
         </div>
-        <div className="no-scrollbar flex gap-2 overflow-x-auto"><GlassToggleGroup className="dc-segment shrink-0" value={statusTab} onValueChange={(next) => onStatus(next as StatusTab)} aria-label="Question status">{STATUS_TABS.map((tab) => <GlassToggleItem key={tab.key} value={tab.key} className="min-h-[36px] whitespace-nowrap px-3.5 text-xs font-semibold">{tab.label}{tab.key === "active" ? ` (${summary.due})` : ""}</GlassToggleItem>)}</GlassToggleGroup></div>
+        <div ref={statusRail.ref} onPointerDown={statusRail.onPointerDown} className="no-scrollbar flex gap-2 overflow-x-auto"><GlassToggleGroup className="dc-segment dc-scene-plate shrink-0" value={statusTab} onValueChange={(next) => onStatus(next as StatusTab)} aria-label="Question status">{STATUS_TABS.map((tab) => <GlassToggleItem key={tab.key} value={tab.key} className="min-h-[36px] whitespace-nowrap px-3.5 text-xs font-semibold">{tab.label}{tab.key === "active" ? ` (${summary.due})` : ""}</GlassToggleItem>)}</GlassToggleGroup></div>
       </div>
       {bankData.length === 0 ? (
         <EmptyState icon={<BankIcon className="h-8 w-8" />} title={summary.total === 0 ? "No weak questions yet" : "No matching questions"} description={summary.total === 0 ? "Questions you answer incorrectly or skip are automatically organized here for focused revision." : "Adjust the search or filters to see more questions."} action={summary.total > 0 ? <SecondaryButton className="mt-2 w-auto" onClick={onClear}>Clear filters</SecondaryButton> : undefined} />
       ) : (
         <div className="space-y-3 px-4 py-4">{bankData.map((item) => <Card key={item.id}><div className="mb-2 flex flex-wrap items-center gap-1.5"><Badge tone={item.status}>{item.status}</Badge><Badge tone={item.difficulty}>{item.difficulty}</Badge><span className="ml-auto text-[11px] text-white/55">{relativeDate(item.lastRevisedAt)}</span></div><p className="line-clamp-2 text-[15px] font-semibold leading-snug text-white">{item.prompt}</p><div className="mt-2 flex justify-between text-xs text-white/75"><span>{item.subjectIcon} {item.subjectName} · {item.topicName}</span><span>Missed {item.timesWrong}×</span></div></Card>)}</div>
       )}
-      {bankData.length > 0 && <div className="dc-glass-toolbar fixed inset-x-0 bottom-[var(--dc-footer-nav-h,56px)] z-20 mx-auto w-full max-w-[480px] border-t border-white/10 px-4 py-3"><PrimaryButton onClick={onStart} disabled={startingSession}><SparklesIcon className="h-4 w-4" />{startingSession ? "Starting…" : `Start Smart Revision (${bankData.length})`}</PrimaryButton></div>}
+      {bankData.length > 0 && <div className="dc-scene-plate dc-scene-plate--bar dc-glass-toolbar fixed inset-x-0 bottom-[var(--dc-footer-nav-h,56px)] z-20 mx-auto w-full max-w-[480px] border-t border-white/10 px-4 py-3"><PrimaryButton onClick={onStart} disabled={startingSession}><SparklesIcon className="h-4 w-4" />{startingSession ? "Starting…" : `Start Smart Revision (${bankData.length})`}</PrimaryButton></div>}
     </div>
   );
 }
@@ -623,7 +629,7 @@ function SmartRevisionView({ bankData, summary, search, statusTab, activeFilterC
 function DeleteConfirmation({ test, busy, onClose, onConfirm }: { test: CustomTestListItem; busy: boolean; onClose: () => void; onConfirm: () => void }) {
   return (
     <Dialog open onOpenChange={(v) => { if (!v && !busy) onClose(); }}>
-      <DialogContent aria-label="Delete test">
+      <DialogContent aria-label="Delete test" className="dc-scene-plate">
         <span className="grid h-14 w-14 place-items-center rounded-2xl bg-rose-500/15 text-rose-300"><Trash2 className="h-7 w-7" /></span>
         <DialogTitle className="mt-4 text-xl font-black">Permanently delete this test?</DialogTitle>
         <DialogDescription className="leading-relaxed text-white/75"><strong className="text-white/85">{test.title}</strong>, all {test.attemptCount} completed attempt{test.attemptCount === 1 ? "" : "s"}, answers and historical results will be removed from every device. This cannot be undone.</DialogDescription>
@@ -647,7 +653,7 @@ function FilterSheet({ subjects, subjectId, difficulty, sort, onApply, onClose }
   const sorts = [{ key: "recent", label: "Recently added" }, { key: "oldest", label: "Oldest first" }, { key: "most_wrong", label: "Most missed" }, { key: "difficulty", label: "Hardest first" }, { key: "alphabetical", label: "Topic A–Z" }];
   return (
     <GlassSheet open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <GlassSheetContent side="bottom" aria-label="Filter and sort" className="h-auto max-h-[85vh] pb-[env(safe-area-inset-bottom)] sm:left-1/2 sm:w-[480px] sm:-translate-x-1/2">
+      <GlassSheetContent side="bottom" aria-label="Filter and sort" className="dc-scene-plate h-auto max-h-[85vh] pb-[env(safe-area-inset-bottom)] sm:left-1/2 sm:w-[480px] sm:-translate-x-1/2">
         <div className="mb-4 flex items-center justify-between"><GlassSheetTitle>Filter & Sort</GlassSheetTitle><GlassSheetClose aria-label="Close filters" className="grid h-9 w-9 place-items-center rounded-full"><XIcon className="h-5 w-5 text-white/55" /></GlassSheetClose></div>
         <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/55">Subject</p><div className="mb-4 flex flex-wrap gap-2"><FilterChoice active={localSubject === undefined} label="All Subjects" onClick={() => setLocalSubject(undefined)} />{subjects.map((subject) => <FilterChoice key={subject.id} active={localSubject === subject.id} label={`${subject.icon} ${subject.name}`} onClick={() => setLocalSubject(subject.id)} />)}</div>
         <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/55">Difficulty</p><div className="mb-4 flex flex-wrap gap-2"><FilterChoice active={localDifficulty === undefined} label="Any" onClick={() => setLocalDifficulty(undefined)} />{["easy", "medium", "hard"].map((item) => <FilterChoice key={item} active={localDifficulty === item} label={item} onClick={() => setLocalDifficulty(item)} />)}</div>

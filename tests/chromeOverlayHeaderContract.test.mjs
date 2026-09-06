@@ -88,7 +88,8 @@ test("desktop top bar overlays the shell scroller", () => {
   assert.match(desktop, /data-desktop-main/);
   assert.match(desktop, /data-desktop-topbar/);
   assert.match(desktop, /className="relative flex min-w-0 flex-1 flex-col"/);
-  assert.match(desktop, /className="absolute inset-x-0 top-0 z-30/);
+  // The bar plate prepends its hook (Revision pass) — the overlay geometry is untouched.
+  assert.match(desktop, /className="dc-scene-plate dc-scene-plate--bar absolute inset-x-0 top-0 z-30/);
   assert.match(overlay, /\.dc-desktop-shell \[data-desktop-topbar\] \{\s*position:\s*absolute/);
   assert.match(
     overlay,

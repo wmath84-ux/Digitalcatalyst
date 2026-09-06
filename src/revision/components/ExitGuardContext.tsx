@@ -56,7 +56,7 @@ export function ExitGuardProvider({
       {children}
       <Dialog open={Boolean(pendingHref && guard)} onOpenChange={(v) => { if (!v) setPendingHref(null); }}>
         {guard && (
-          <DialogContent aria-label="Leave this screen?">
+          <DialogContent aria-label="Leave this screen?" className="dc-scene-plate">
             <DialogTitle>Leave this screen?</DialogTitle>
             <DialogDescription>{guard.message}</DialogDescription>
             <DialogFooter className="mt-5 flex gap-3">
