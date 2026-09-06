@@ -65,5 +65,13 @@ test("the unlayered CSS rule pins the same guarantees", () => {
 test("the popover still opens below the toggle, right-aligned to it", () => {
   // The anchor geometry is untouched — the popover drops below the button
   // (top-full) and stays right-aligned (right-0), just at its natural size.
-  assert.match(storePage, /className="absolute right-0 top-full z-30 mt-1\.5 flex w-max text-white"\s*\n\s*radius=\{16\}/);
+  // 2026-09-06 (store legibility): the class list now also carries
+  // `dc-scene-plate`, the shared contrast backing from src/glass.css — the
+  // popover floats over the scene and its pack frost is 21% dark, so its white
+  // icons had nothing to sit on. Paint only: every geometry token this contract
+  // exists to protect (`right-0 top-full z-30 mt-1.5 flex w-max`) is unchanged.
+  assert.match(
+    storePage,
+    /className="dc-scene-plate absolute right-0 top-full z-30 mt-1\.5 flex w-max text-white"\s*\n\s*radius=\{16\}/,
+  );
 });

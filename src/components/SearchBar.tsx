@@ -56,10 +56,19 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
         }}
         data-store-search-trigger
       >
+        {/* `dc-scene-plate` (src/glass.css): the capsule asked for tint 0.4,
+            which the pack renders as ~17% dark — no visible material over the
+            scene's snow, so the white query and its placeholder floated on
+            nothing. The plate is the same backing the review cards wear; it also
+            cancels this surface's live blur, which the app-wide blur-0 override
+            already asks for and which costs a full-frame filter while the store
+            scrolls. The ink (placeholder + magnifier) is lifted by the
+            `[data-search-launcher]` rules, because the input is this surface's
+            SIBLING, not its child. */}
         <GlassSurface
           tint={0.4}
           radius={18}
-          className="pointer-events-none absolute inset-0 transition duration-200 group-hover:brightness-[1.02]"
+          className="dc-scene-plate pointer-events-none absolute inset-0 transition duration-200 group-hover:brightness-[1.02]"
         />
         <div className="relative flex items-center gap-2 px-4 py-3.5">
           <SearchIcon className="h-5 w-5 shrink-0 text-white/55" />

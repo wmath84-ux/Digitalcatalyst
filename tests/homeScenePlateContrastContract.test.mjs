@@ -157,7 +157,11 @@ test("the search pill gets a rim and legible placeholder ink inside the bar", ()
 test("the bar variant paints the element, and never stacks or seams", () => {
   // The element paint (covers the header's animated padding band, and — for the
   // popover, which is a scroll container — does not scroll away with content).
-  assert.match(css, /:where\(\.dc-scene-plate--bar\) \{\s*\n\s*background-color: rgba\(8, 14, 30, 0\.74\)/);
+  // 2026-09-06: the bar variant also serves the app's chrome strips, which
+  // index.css paints with `--dc-chrome-glass` at !important from a
+  // two-attribute selector — so the plate rule now carries `body` (extra
+  // specificity, still a true ancestor of every bar) and !important paint.
+  assert.match(css, /body \.dc-scene-plate--bar \{\s*\n\s*background-color: rgba\(8, 14, 30, 0\.74\) !important/);
   // On a surface it must not double up with the layer plate…
   assert.match(css, /:where\(\.dc-scene-plate--bar\) > div\[aria-hidden\]:nth-of-type\(2\) \{\s*\n\s*background: transparent !important/);
   // …and on a wrapper it must not let the inner surface draw a rounded hairline
@@ -228,7 +232,14 @@ test("the registry items are untouched — the material is CSS at the call sites
   assert.match(read("src/components/ui/GlassCard.tsx"), /GLASS_DOCS\.tint/);
 });
 
-test("the frozen footer dock and admin stay out of this pass", () => {
+test("the footer dock's files and admin stay out of the JSX pass", () => {
+  // Wave 1 froze the dock's files and `liquidGlassWaveOneContract` still guards
+  // its imports. The owner has since asked for the bottom navigation bar to be
+  // optimised (2026-09-06), and it is — but from src/glass.css, keyed off the
+  // `[data-glass-dock]` hook the dock already ships, so these files stay
+  // byte-comparable and the pinned docs sensitivity in TS never moves. The
+  // dock's own contract is
+  // tests/storeChromeDockDragScrollContract.test.mjs.
   for (const p of [
     "src/components/BottomNav.tsx",
     "src/components/glass-dock/GlassDock.tsx",
@@ -236,7 +247,7 @@ test("the frozen footer dock and admin stay out of this pass", () => {
     "src/components/glass-dock/DesktopPeekDock.tsx",
     "src/components/glass-dock/GlassSidebar.tsx",
   ]) {
-    assert.doesNotMatch(read(p), /dc-scene-(plate|ink|field)/, `${p} is frozen by owner direction`);
+    assert.doesNotMatch(read(p), /dc-scene-(plate|ink|field)/, `${p} must stay byte-comparable`);
   }
 });
 

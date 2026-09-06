@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDragScroll } from "@/hooks/useDragScroll";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckIcon, SlidersIcon, XIcon } from "./icons";
 import type { StoreFilter } from "../data/storeFilters";
@@ -30,6 +31,10 @@ type FilterChipsProps = {
 export default function FilterChips({ filters, activeId, onSelect }: FilterChipsProps) {
   const [showFilters, setShowFilters] = useState(false);
   const closeTimer = useRef<number | null>(null);
+  // Mouse parity: the chip row is a touch scroller with its scrollbar hidden,
+  // so a desktop pointer drags it left/right like a thumb — and a drag that
+  // ends on a chip does not fire that filter.
+  const chipRow = useDragScroll<HTMLDivElement>();
 
   const grouped = useMemo(() => {
     const map = new Map<string, StoreFilter[]>();
@@ -105,7 +110,7 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
           >
             <GlassSurface
               radius={24}
-              className="w-full overflow-hidden text-sm text-white/85"
+              className="dc-scene-plate w-full overflow-hidden text-sm text-white/85"
               contentClassName="p-5"
             >
               <div className="flex items-start justify-between gap-3">
@@ -191,8 +196,18 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
           white-on-dark labels for this light strip (see src/glass.css). The row
           still scrolls sideways, and the indicator rides inside the group, so it
           stays glued to its chip while scrolling. `dc-segment` is the shared
-          light-theme recipe in src/glass.css (the PDP tab strip uses it too). */}
-      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          light-theme recipe in src/glass.css (the PDP tab strip uses it too).
+
+          Store legibility (same pass as Home): `dc-scene-plate` puts the shared
+          dark contrast backing under the pill so an unselected chip label no
+          longer washes out against the bright snow, and `useDragScroll` lets a
+          mouse drag the row left/right exactly like a thumb — with the drag
+          never firing the chip it happens to end on. */}
+      <div
+        ref={chipRow.ref}
+        onPointerDown={chipRow.onPointerDown}
+        className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         <GlassButton
           variant="capsule"
           type="button"
@@ -205,7 +220,7 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
         </GlassButton>
 
         <GlassToggleGroup
-          className="dc-segment shrink-0"
+          className="dc-segment dc-scene-plate shrink-0"
           value={activeId}
           onValueChange={onSelect}
           aria-label="Filter the catalogue"

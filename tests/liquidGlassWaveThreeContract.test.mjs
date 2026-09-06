@@ -116,7 +116,14 @@ test("store cards are glass cards and keep their commerce contract", () => {
 
 test("the filter row is one sliding droplet, not N pills", () => {
   assert.match(chips, /<GlassToggleGroup\b/);
-  assert.match(chips, /className="dc-segment shrink-0"/, "light ink + it must not shrink inside the scroller");
+  // 2026-09-06 (store legibility): the row also carries `dc-scene-plate`, the
+  // shared contrast backing from src/glass.css, because the pack's 10% frost
+  // disappears over the winter scene's snow. Light ink + `shrink-0` unchanged.
+  assert.match(
+    chips,
+    /className="dc-segment dc-scene-plate shrink-0"/,
+    "light ink + contrast plate + it must not shrink inside the scroller",
+  );
   assert.match(chips, /value=\{activeId\}/);
   assert.match(chips, /onValueChange=\{onSelect\}/, "the admin-driven filter contract is unchanged");
   assert.match(chips, /title=\{filter\.description \|\| filter\.label\}/, "a chip's description is still announced on hover");

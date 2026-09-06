@@ -264,13 +264,22 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
           automatically whenever the catalog snapshot changes; the source
           demo's default cards fill the fan until seven products exist. */}
       <section aria-label="Top rated" className="pt-1">
-        <p className="dc-section-label px-4">Top rated</p>
+        {/* Loose ink straight on the scene (not inside a card), so it takes the
+            same text-shadow scrim Home uses: `.dc-section-label` is white at
+            56%, which washes out over the snow behind the coverflow. */}
+        <p className="dc-scene-ink dc-section-label px-4">Top rated</p>
         <TiltedCoverflow products={products} onOpenProduct={onView} />
       </section>
 
       <div className="space-y-4">
         <SearchBar value={search} onChange={setSearch} sort={sort} onSortChange={setSort} />
-        <div data-store-filter-bar className="sticky top-0 z-20 border-b border-white/10 bg-[var(--dc-chrome-glass)] py-2.5 [backdrop-filter:var(--dc-chrome-glass-blur)]">
+        {/* Same chrome plate as the header: this sticky bar painted the pack's
+            10% `--dc-chrome-glass` tint, i.e. nothing visible over the snow the
+            products scroll through. `dc-scene-plate--bar` gives it the shared
+            dark plate + hairline rim + soft drop (src/glass.css), and outranks
+            both the token utilities below and index.css's chrome rule while
+            glass is on. */}
+        <div data-store-filter-bar className="dc-scene-plate dc-scene-plate--bar sticky top-0 z-20 border-b border-white/10 bg-[var(--dc-chrome-glass)] py-2.5 [backdrop-filter:var(--dc-chrome-glass-blur)]">
           {/* Mobile overlap fix: the view-mode toggle is a normal flex
               sibling (shrink-0) instead of an absolutely-positioned overlay,
               so the scrolling chip row and the button can never paint on top
@@ -292,10 +301,15 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
                 <LayoutIcon className="h-[18px] w-[18px]" />
               </GlassButton>
 
+              {/* Same plate as everything else that floats over the scene —
+                  and being a pack surface it also loses its live blur, which
+                  matters here because the popover hangs over scrolling cards.
+                  The anchor geometry below is the shape
+                  storeViewDropdownResponsiveContract pins, untouched. */}
               {viewDropdownOpen && (
                 <GlassSurface
                   data-store-view-options
-                  className="absolute right-0 top-full z-30 mt-1.5 flex w-max text-white"
+                  className="dc-scene-plate absolute right-0 top-full z-30 mt-1.5 flex w-max text-white"
                   radius={16}
                   contentClassName="flex w-max gap-1 p-1.5"
                 >
@@ -322,7 +336,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
       </div>
 
       {error ? (
-        <div className="mx-4 mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200">{error}</div>
+        <div className="dc-scene-ink mx-4 mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200">{error}</div>
       ) : loading ? (
         <div className="mx-4 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">{[0, 1, 2, 3].map((item) => <GlassCard key={item} className="h-72 animate-pulse" aria-hidden="true" />)}</div>
       ) : filtered.length === 0 ? (

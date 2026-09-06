@@ -373,18 +373,28 @@ html[data-glass="on"] :where(.dc-scene-plate) {
 /* The bar variant: the plate is the element's own paint, so it covers the
    header's animated padding band and follows its animated bottom radius. A
    bar casts DOWN only (it is pinned to the top of the frame), and keeps a
-   single bright hairline along its top edge instead of a full outer ring. */
-html[data-glass="on"] :where(.dc-scene-plate--bar) {
-  background-color: rgba(8, 14, 30, 0.74);
+   single bright hairline along its top edge instead of a full outer ring.
+
+   2026-09-06 · the bar is now also the app's CHROME strip (every route's
+   `[data-site-header]`, the store's sticky `[data-store-filter-bar]`), and
+   index.css paints those with `var(--dc-chrome-glass)` — the pack's 10% tint —
+   at `!important` from `[data-site-header]:not([data-home-header])`, i.e.
+   specificity (0,2,0). So `body` joins the selector (a true ancestor of every
+   bar, portalled overlays included) and the paint goes `!important`: (0,2,2)
+   plus importance is what lets one plate serve both a wrapper the app owns and
+   a strip the design system already claims. `?glass=off` still restores the
+   published chrome, because the whole block stays behind the glass gate. */
+html[data-glass="on"] body .dc-scene-plate--bar {
+  background-color: rgba(8, 14, 30, 0.74) !important;
   background-image: linear-gradient(
     160deg,
     rgba(12, 20, 40, 0.78) 0%,
     rgba(8, 14, 30, 0.72) 55%,
     rgba(6, 11, 24, 0.76) 100%
-  );
+  ) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 18px 40px -22px rgba(2, 6, 16, 0.9);
+    0 18px 40px -22px rgba(2, 6, 16, 0.9) !important;
 }
 
 /* When `--bar` lands on a GlassSurface *itself* rather than on an element that
@@ -812,4 +822,137 @@ html[data-glass="on"] [data-course-dock] .dc-footer-pill {
   background: transparent;
   border: 0;
   box-shadow: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * 2026-09-06 · THE STORE, THE APP CHROME AND THE FOOTER DOCK
+ * ──────────────────────────────────────────────────────────────────────────
+ * Owner direction, after the Home pass shipped: "it is looking good now also
+ * (a) optimise the bottom navigation bar, (b) when we use our mouse it is not
+ * interacting as thumb left-right scroll interaction, (c) optimise the store
+ * page."
+ *
+ * (a) and (c) are material, so they are CSS and they live here. (b) is
+ * behaviour: src/hooks/useDragScroll.ts gives every horizontal rail a real
+ * mouse drag (with a fling, click suppression and scroll-snap hand-off), and
+ * the `[data-drag-scrolling]` states it paints are in src/index.css.
+ *
+ * The store's cards needed nothing — `GlassCard` carries `.dc-glass-card` on
+ * every route, so the plate Home shipped already covers the grid, the list
+ * rows and the empty state. What was still unreadable on the store page was
+ * everything that is NOT a card: the chrome strips (index.css paints them with
+ * the 10% `--dc-chrome-glass` tint — handled by the `--bar` rule above, which
+ * the shared header and the sticky filter bar now opt into), the search
+ * capsule, the filter segment, the hero's pills and loose copy, the
+ * coverflow's hint line, and the footer dock below.
+ * Every rule stays behind `html[data-glass="on"]`, so `?glass=off` restores
+ * the published material exactly.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* The store's search capsule is built the other way round from Home's search
+   pill: the pack surface is an `absolute inset-0` overlay and the <input> is
+   its SIBLING, so `.dc-scene-field` (which reaches into a surface) cannot
+   touch its ink. Both search boxes share the `[data-search-launcher]` wrapper,
+   so the launcher is the hook that can — and it lifts the two muted steps to
+   exactly the plate's ladder (/35–/45 → 0.7, /50–/60 → 0.76) so the store and
+   Home read the same. */
+html[data-glass="on"] :where([data-search-launcher]) input::placeholder {
+  color: rgba(255, 255, 255, 0.66);
+}
+
+html[data-glass="on"] :where([data-search-launcher]) :where(.text-white\/35, .text-white\/40, .text-white\/45) {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+html[data-glass="on"] :where([data-search-launcher]) :where(.text-white\/50, .text-white\/55, .text-white\/60) {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+/* The plate's ink floor is a `color` on the surface ROOT, so it would also
+   swallow a brand accent written on that same root: the store hero's
+   "Learning marketplace" pill is `text-indigo-200` in the JSX and would come
+   out plain white. Hand the accent back — #c7d2fe measures 7:1 on the plate,
+   and the published colour is the design. Same specificity as the ink floor and
+   later in the file, so it wins exactly this one case. */
+html[data-glass="on"] :where(.dc-scene-plate):where(.text-indigo-200) {
+  color: #c7d2fe;
+}
+
+/* The store hero's brand line is a gradient-clipped heading — the
+   indigo → violet → fuchsia ramp `storeFiltersAdminProductContract` pins in the
+   JSX. At the 600-weight stops that ramp measures ~1.1:1 against the scene's
+   snow band (indigo-600 and the snow are very nearly the same luminance), so
+   the largest type on the store page was its least readable. The JSX keeps the
+   pinned ramp; the lift is CSS behind the glass gate. The 300-weight stops
+   measure 3.8:1 over snow — AA for large type — and stay bright on the night
+   sky, and `.dc-scene-ink` on the heading gives them the same dark scrim the
+   white half of the line already wears. */
+html[data-glass="on"] :where(.dc-scene-ink) :where(.bg-clip-text.text-transparent) {
+  background-image: linear-gradient(to right, #a5b4fc 0%, #c4b5fd 50%, #f0abfc 100%) !important;
+}
+
+/* The coverflow's hint line ("drag, click, or use the arrow keys") is the
+   source component's dark-theme grey, #9E9E98: 2.7:1 over the snow, under AA
+   for 12px type, and it sits on the scene with no surface under it. The cards
+   keep their own painted scrim, so only this line is lifted. */
+html[data-glass="on"] :where([data-store-coverflow]) :where(.dc-scene-ink) {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ── (a) THE FOOTER DOCK ───────────────────────────────────────────────────
+ * The dock's own files stay byte-comparable. Wave 1 froze them and
+ * `liquidGlassWaveOneContract` still asserts they never reach for registry
+ * primitives, so the material moves here instead — driven by the hook the dock
+ * already ships (`[data-glass-dock]`, rendered by all four BottomNav wrappers)
+ * and by `!important`, because the panel paints its tokens inline.
+ *
+ * What was wrong: the panel's inline `background` is `DOCK_PANEL_BG`, the pack's
+ * pinned docs tint rgba(60,62,68,0.105). Over the scene's snow that is 10% grey
+ * on near-white — no edge, no material, and the bright tab icons and white
+ * labels floated on nothing. It now wears the same plate numbers as the chrome
+ * bars (0.72–0.78 navy) with the cards' rim recipe, so the footer reads as one
+ * material with the header above it and the cards beside it. The pinned docs
+ * SENSITIVITY is untouched — no TS number moved; this is the same CSS-side plate
+ * the review cards wear, and the GlassMaterial lens still refracts the scene
+ * through it. */
+html[data-glass="on"] :where([data-glass-dock]) {
+  background-color: rgba(8, 14, 30, 0.74) !important;
+  background-image: linear-gradient(
+    160deg,
+    rgba(12, 20, 40, 0.78) 0%,
+    rgba(8, 14, 30, 0.72) 55%,
+    rgba(6, 11, 24, 0.76) 100%
+  ) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.26),
+    0 18px 44px -20px rgba(2, 6, 16, 0.9) !important;
+}
+
+/* The tooltip is the dock's only text and it floats over the dock's own plate,
+   so there is nothing behind it worth refracting — and six permanently-mounted
+   `backdrop-filter`s (one per tab, mounted even at opacity 0) cost compositing
+   for nothing. An opaque plate with a real rim instead: fewer live layers,
+   better type. */
+html[data-glass="on"] :where([data-glass-dock-item]) > div:first-child {
+  background-color: rgba(6, 11, 26, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  color: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: 0 10px 26px -12px rgba(2, 6, 16, 0.95) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Kill switch, finally honest for the dock. `?glass=off` strips
+   `[data-glass-lens]` / `[data-glass-surface]` and the flat tier strips the
+   whole document, but the dock's refraction lens (GlassMaterial) carries
+   neither hook and writes `backdrop-filter: url(#…)` inline — so with glass off
+   the footer kept refracting while everything else went back to published
+   material. The lens root is the `aria-hidden` layer GlassMaterial mounts as
+   the dock's first child. */
+html[data-glass="off"] :where([data-glass-dock]) > [aria-hidden] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }

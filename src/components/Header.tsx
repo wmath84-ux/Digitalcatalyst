@@ -171,7 +171,17 @@ export default function Header({
   return (
     <header
       data-site-header
-      className={`sticky top-0 z-30 bg-white/75 px-4 py-3 sm:px-5 md:px-8 md:py-4 backdrop-blur-xl transition-all duration-300 ${
+      /* `dc-scene-plate dc-scene-plate--bar` is the shared contrast plate from
+         src/glass.css: index.css paints every app chrome strip with the pack's
+         10% `--dc-chrome-glass` tint, which reads as *no material at all* over
+         the winter scene's bright snow band, so the white app name, subtitle and
+         action icons had nothing to sit on. The bar variant paints the plate on
+         the strip itself (the strip is not a GlassSurface), kills its blur, and
+         adds the hairline rim + soft drop the Home header wears. `bg-white/75`
+         and `backdrop-blur-xl` stay in the class list — they are the published
+         material that `?glass=off` restores, and the gate means this rule only
+         ever applies while glass is on. */
+      className={`dc-scene-plate dc-scene-plate--bar sticky top-0 z-30 bg-white/75 px-4 py-3 sm:px-5 md:px-8 md:py-4 backdrop-blur-xl transition-all duration-300 ${
         hideFrameBorders ? "" : "mobile-header-glow"
       }`}
     >

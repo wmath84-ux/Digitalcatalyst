@@ -27,6 +27,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Clock, Search as SearchIcon, Sparkles, TrendingUp, X } from "lucide-react";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
+import { useDragScroll } from "@/hooks/useDragScroll";
 import StoreHeader from "./Header";
 import BottomNav, { type TabKey } from "./BottomNav";
 import ProductCard from "../components/ProductCard";
@@ -115,6 +116,9 @@ export default function SearchPage({
   onNavigateToNotifications,
 }: SearchPageProps) {
   const { products, loading, error } = useCatalog();
+  // Mouse parity on the chip row: a desktop pointer drags it left/right the way
+  // a thumb does, and the drag never fires a filter (see useDragScroll).
+  const chipRow = useDragScroll<HTMLDivElement>();
   const [query, setQuery] = useState<string>(() => readInitialQuery());
   const [activeFilterId, setActiveFilterId] = useState<string>(ALL_STORE_FILTER.id);
   const [sort, setSort] = useState<SortKey>("relevance");
@@ -374,10 +378,16 @@ export default function SearchPage({
           {showFilters ? (
             <div
               data-search-filters
+              ref={chipRow.ref}
+              onPointerDown={chipRow.onPointerDown}
               className="mt-3 flex gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible"
             >
+              {/* `dc-scene-plate` is the same contrast backing Home's category
+                  strip wears, so the unselected chip labels survive the bright
+                  snow band; `useDragScroll` gives a mouse the thumb's
+                  left/right drag on this hidden-scrollbar row. */}
               <GlassToggleGroup
-                className="dc-segment shrink-0"
+                className="dc-segment dc-scene-plate shrink-0"
                 value={activeFilter.id}
                 onValueChange={setActiveFilterId}
                 aria-label="Filter results"
