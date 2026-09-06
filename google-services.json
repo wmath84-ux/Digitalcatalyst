@@ -14,6 +14,30 @@
       },
       "oauth_client": [
         {
+          "client_id": "930483750234-7ej6u3dftu2as7c7rujeq12qaahq6g5g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.eduvora.shop",
+            "certificate_hash": "8f0e469d4a9fc8b2a7f4ae826e6e02deca1b8d23"
+          }
+        },
+        {
+          "client_id": "930483750234-ek5d6cp64gt1lajrkstcpttu7mvu8i1i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.eduvora.shop",
+            "certificate_hash": "28365885945f425895bd028c83c02d28822248df"
+          }
+        },
+        {
+          "client_id": "930483750234-u0utgrjrg2gm6kp39o696ptsuub1esd9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.eduvora.shop",
+            "certificate_hash": "b2ef777ddcf93f8b6f0020d1399f3f1c918afc4b"
+          }
+        },
+        {
           "client_id": "930483750234-7b4upatuokv8smst1ctljsgpchs9r39m.apps.googleusercontent.com",
           "client_type": 3
         }
