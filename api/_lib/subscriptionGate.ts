@@ -149,9 +149,8 @@ export async function getSubscriptionGateSettings(): Promise<SubscriptionGateSet
   // already been booted by `requireFirebaseUser`/`adminDb`; the indirection
   // through `adminDb()` also gives the test suite an overridable seam.
   const db = adminDb();
-  const { doc, getDoc } = await import("firebase-admin/firestore");
-  const snap = await getDoc(doc(db, "settings", "subscriptionGate"));
-  if (!snap.exists()) {
+  const snap = await db.doc("settings/subscriptionGate").get();
+  if (!snap.exists) {
     return { ...SUBSCRIPTION_GATE_DEFAULTS };
   }
   const data = (snap.data() || {}) as any;
