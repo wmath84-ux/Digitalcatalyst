@@ -74,37 +74,29 @@ export const dueEpochMs = (dateKey, clock, tzOffsetMinutes) =>
 
 const sanitizeKeySegment = (value) => String(value || "").replace(/[.\\/[\]*~`]/g, "_").slice(0, 80);
 
-// Collect every My Day item whose user-set time is due: tasks with a time,
-// schedule events (at their start) and reminders — once per item per local day.
-// `notificationLog` is the server's per-day dedupe map on the myDay document.
-export const collectDueMyDayItems = (data, nowMs, tzOffsetMinutes, lookbackMs = MYDAY_LOOKBACK_MS) => {
-  const due = [];
-  if (!data || !Number.isFinite(tzOffsetMinutes)) return due;
-  const dateKey = localDateKey(nowMs, tzOffsetMinutes);
-  const log = data.notificationLog && typeof data.notificationLog === "object" ? data.notificationLog : {};
-  const already = (key) => Object.prototype.hasOwnProperty.call(log, key);
+const itemLog = (data) =>
+  data.notificationLog && typeof data.notificationLog === "object" ? data.notificationLog : {};
 
-  // The section maps a due item back to its My Day tab so a notification tap
-  // can open the exact list (tasks / schedule / reminders) with the item
-  // highlighted, instead of landing on the generic overview.
-  const pushItem = (kind, section, id, clock, title, body) => {
-    if (!clock) return;
-    const dueAt = dueEpochMs(dateKey, clock, tzOffsetMinutes);
-    if (dueAt > nowMs || nowMs - dueAt > lookbackMs) return;
-    const key = `${kind}:${sanitizeKeySegment(id)}:${dateKey}`;
-    if (already(key)) return;
-    due.push({ key, kind, section, itemId: String(id ?? ""), title, body, dueAt });
-  };
+// Walk every My Day item that could produce a notification, in the same order
+// the UI lists them (reminders → tasks → schedule). `visit` receives the
+// item's parsed clock time plus its ready-made title/body. The walker already
+// applies the per-section rules: completed tasks and done reminders never
+// fire, and a schedule event that already ended today is skipped. Sharing this
+// between the server's due-time collector and the TWA's upcoming-alarm
+// pre-scheduler guarantees both always agree on WHAT can notify.
+const walkMyDayItems = (data, nowMs, tzOffsetMinutes, visit) => {
+  if (!data) return;
+  const dateKey = localDateKey(nowMs, tzOffsetMinutes);
 
   (Array.isArray(data.reminders) ? data.reminders : []).forEach((reminder) => {
     if (!reminder || reminder.done) return;
-    pushItem("reminder", "reminders", reminder.id, parseClockTime(reminder.time),
+    visit("reminder", "reminders", reminder.id, parseClockTime(reminder.time),
       "⏰ Reminder", String(reminder.text || "Time for your reminder."));
   });
 
   (Array.isArray(data.tasks) ? data.tasks : []).forEach((task) => {
     if (!task || task.status === "completed") return;
-    pushItem("task", "tasks", task.id, parseClockTime(task.time),
+    visit("task", "tasks", task.id, parseClockTime(task.time),
       "📝 Task time", `${String(task.title || "Task")}${task.subject ? ` · ${task.subject}` : ""}`);
   });
 
@@ -118,12 +110,68 @@ export const collectDueMyDayItems = (data, nowMs, tzOffsetMinutes, lookbackMs = 
       const endAt = dueEpochMs(dateKey, end, tzOffsetMinutes);
       if (endAt > dueEpochMs(dateKey, start, tzOffsetMinutes) && nowMs > endAt) return;
     }
-    pushItem("schedule", "schedule", event.id, start,
+    visit("schedule", "schedule", event.id, start,
       `📅 ${String(event.title || "Scheduled event")}`,
       `Starts at ${event.startTime}${event.detail ? ` — ${event.detail}` : ""}`);
   });
+};
+
+// Collect every My Day item whose user-set time is due: tasks with a time,
+// schedule events (at their start) and reminders — once per item per local day.
+// `notificationLog` is the server's per-day dedupe map on the myDay document.
+export const collectDueMyDayItems = (data, nowMs, tzOffsetMinutes, lookbackMs = MYDAY_LOOKBACK_MS) => {
+  const due = [];
+  if (!data || !Number.isFinite(tzOffsetMinutes)) return due;
+  const dateKey = localDateKey(nowMs, tzOffsetMinutes);
+  const log = itemLog(data);
+  const already = (key) => Object.prototype.hasOwnProperty.call(log, key);
+
+  walkMyDayItems(data, nowMs, tzOffsetMinutes, (kind, section, id, clock, title, body) => {
+    if (!clock) return;
+    const dueAt = dueEpochMs(dateKey, clock, tzOffsetMinutes);
+    if (dueAt > nowMs || nowMs - dueAt > lookbackMs) return;
+    const key = `${kind}:${sanitizeKeySegment(id)}:${dateKey}`;
+    if (already(key)) return;
+    due.push({ key, kind, section, itemId: String(id ?? ""), title, body, dueAt });
+  });
 
   return due.sort((a, b) => a.dueAt - b.dueAt);
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+export const MYDAY_UPCOMING_HORIZON_MS = 6 * 60 * 60 * 1000;
+
+// Collect every My Day item whose next wall-clock occurrence is still ahead of
+// `nowMs` and within `horizonMs` (default 6h). Used by the TWA to pre-schedule
+// Android local alarms so an exact-time reminder fires on the dot even when the
+// app is closed. `collectDueMyDayItems` only sees items that are ALREADY due,
+// so it cannot arm future alarms — reusing it here (as an earlier version did,
+// with `nowMs` shifted 6h forward) only ever saw the 15-minute slice ~5h45m out
+// and silently never scheduled anything due sooner, which is why tasks created
+// for later the same day produced no notification when the app was closed.
+export const collectUpcomingMyDayItems = (data, nowMs, tzOffsetMinutes, horizonMs = MYDAY_UPCOMING_HORIZON_MS) => {
+  const upcoming = [];
+  if (!data || !Number.isFinite(tzOffsetMinutes)) return upcoming;
+  const log = itemLog(data);
+  const already = (key) => Object.prototype.hasOwnProperty.call(log, key);
+  const today = localDateKey(nowMs, tzOffsetMinutes);
+  const tomorrow = localDateKey(nowMs + DAY_MS, tzOffsetMinutes);
+
+  walkMyDayItems(data, nowMs, tzOffsetMinutes, (kind, section, id, clock, title, body) => {
+    if (!clock) return;
+    const todayAt = dueEpochMs(today, clock, tzOffsetMinutes);
+    // The next occurrence is today's if that time is still ahead, otherwise
+    // tomorrow's (the cross-midnight case: "00:30" scheduled at 23:00 must
+    // mean tomorrow 00:30, not this morning's).
+    const dateKey = todayAt > nowMs ? today : tomorrow;
+    const dueAt = dueEpochMs(dateKey, clock, tzOffsetMinutes);
+    if (dueAt - nowMs > horizonMs) return;
+    const key = `${kind}:${sanitizeKeySegment(id)}:${dateKey}`;
+    if (already(key)) return;
+    upcoming.push({ key, kind, section, itemId: String(id ?? ""), title, body, dueAt });
+  });
+
+  return upcoming.sort((a, b) => a.dueAt - b.dueAt);
 };
 
 // ---------------------------------------------------------------- products

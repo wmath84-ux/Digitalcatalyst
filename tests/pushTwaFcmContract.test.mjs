@@ -81,6 +81,39 @@ test("capacitor bridge: dedupes local alarms by stable item id", () => {
   assert.match(main, /cancelLocalAlarms/);
 });
 
+test("capacitor bridge: attaches the FCM token listener BEFORE register()", () => {
+  // Capacitor fires the initial `registration` token event as soon as
+  // register() completes. A listener attached afterwards can miss that
+  // first event, leaving users/{uid}/fcmTokens empty — the "app closed,
+  // no notification until I open it" symptom. The listener must be
+  // attached first so the token is always POSTed to fcm-register.
+  const listenerIdx = bridge.indexOf('addListener("registration"');
+  const registerIdx = bridge.indexOf("PushNotifications.register()");
+  assert.ok(listenerIdx > 0, "the registration listener must exist");
+  assert.ok(registerIdx > 0, "the register() call must exist");
+  assert.ok(listenerIdx < registerIdx, "the token listener must be attached BEFORE register()");
+});
+
+test("fcm android.notification.icon is a drawable resource name, never a URL", () => {
+  // Google's SDK resolves the notification `icon` against R.drawable;
+  // passing the branding URL made it fall back to the launcher icon (or
+  // drop the icon). The drawable name goes here, while the URL stays in
+  // `data.icon` for the TWA foreground renderer's largeIcon.
+  assert.match(fcmLib, /icon:\s*"ic_stat_eduvora"/);
+  assert.doesNotMatch(fcmLib, /notification:\s*\{[\s\S]*?icon:\s*data\.icon/);
+  assert.match(fcmLib, /icon: payload\.icon \|\| brand\.icon/);
+});
+
+test("ic_stat_eduvora drawable exists for the FCM + LocalNotifications icon", () => {
+  // Both api/_lib/fcm.ts and capacitorBridge.ts reference this name; a
+  // missing drawable silently degrades every notification's status-bar
+  // icon to the launcher icon.
+  assert.ok(
+    fs.existsSync("android/app/src/main/res/drawable/ic_stat_eduvora.xml"),
+    "android/app/src/main/res/drawable/ic_stat_eduvora.xml must exist",
+  );
+});
+
 test("capacitor bridge: tap handler deep-links to the notification's URL", () => {
   // onLocalAlarmTap is wired in main.tsx and converts the
   // notification's `url` extra back into a hash route. The
@@ -263,6 +296,14 @@ test("Android manifest declares Digital Asset Links for the TWA", () => {
   // native app.
   assert.match(manifest, /asset_statements/);
   assert.match(manifest, /trustedurl/);
+});
+
+test("Android manifest sets the FCM default notification icon", () => {
+  // Background FCM notifications must show the correct status-bar icon
+  // without the client having to render anything. The meta-data points at
+  // the committed drawable so FCM never falls back to the launcher icon.
+  assert.match(manifest, /com\.google\.firebase\.messaging\.default_notification_icon/);
+  assert.match(manifest, /@drawable\/ic_stat_eduvora/);
 });
 
 /* ------------------------------------------------------------------ */

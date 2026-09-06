@@ -102,7 +102,13 @@ async function sendToTokenDoc(item: FcmTokenDoc, data: Record<string, string>): 
         notification: {
           title: data.title,
           body: data.body,
-          icon: data.icon,
+          // FCM's `icon` field is a DRAWABLE RESOURCE NAME (e.g.
+          // ic_stat_eduvora), never a URL. Passing the branding URL here
+          // made Google's SDK fail to resolve it and fall back to the
+          // launcher icon (or drop the icon entirely). The real logo URL
+          // stays in the `data.icon` field above, which the TWA's
+          // foreground handler uses for the largeIcon.
+          icon: "ic_stat_eduvora",
           tag: data.tag,
           clickAction: "OPEN_TARGET_URL",
         },

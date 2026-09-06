@@ -11,6 +11,16 @@
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">
 
+        <!-- FCM background notifications: default small icon. The FCM SDK
+             resolves `android.notification.icon` as a drawable resource name,
+             so this must exist as a drawable (see
+             res/drawable/ic_stat_eduvora.xml). Without it, background
+             notifications fall back to the launcher icon, which Android
+             renders as an anonymous white/grey box in the status bar. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_eduvora" />
+
         <!-- fullSensor: allows the Course Player to rotate (even when
              system auto-rotate is OFF). The JS layer (appOrientation.ts)
              locks the rest of the app to portrait at runtime via the
