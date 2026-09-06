@@ -15,9 +15,10 @@
 //
 // Native Google sign-in inside an APK therefore needs a NATIVE plugin
 // (@capacitor-firebase/authentication) which calls the Play Services account
-// picker and hands the resulting ID token to Firebase. That plugin is not
-// installed in this project yet, so the code below is what lets the UI say
-// something accurate instead of failing silently.
+// picker and hands the resulting ID token to Firebase. That plugin IS now
+// installed and wired up in src/context/AuthContext.tsx; the helpers below
+// decide which path to take at runtime, and let the UI explain itself when
+// neither path can work (e.g. an Instagram in-app browser on the web).
 
 export const isCapacitorNative = (): boolean => {
   if (typeof window === "undefined") return false;
@@ -47,9 +48,17 @@ export const isEmbeddedWebView = (): boolean => {
   return /;\s*wv\)/i.test(ua) || /\b(FBAN|FBAV|Instagram|Line|MicroMessenger|GSA)\b/i.test(ua);
 };
 
-/** True when a native Google sign-in plugin has been installed and registered. */
+/**
+ * True when the native Google sign-in plugin is actually available to call.
+ *
+ * Checked at RUNTIME rather than at build time on purpose: the same JS bundle
+ * is served to the website and packaged into the APK, and only the APK has the
+ * native plugin registered on `Capacitor.Plugins`. On the website this returns
+ * false and the web popup/redirect flow is used, exactly as before.
+ */
 export const hasNativeGoogleAuth = (): boolean => {
   if (typeof window === "undefined") return false;
+  if (!isCapacitorNative()) return false;
   const plugins = (window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } })
     .Capacitor?.Plugins;
   return Boolean(plugins && plugins.FirebaseAuthentication);

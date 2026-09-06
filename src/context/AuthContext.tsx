@@ -19,6 +19,7 @@ import {
   setPersistence,
   fetchSignInMethodsForEmail,
   signInWithEmailAndPassword,
+  signInWithCredential,
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
@@ -192,6 +193,45 @@ const ensureUserProfile = async (
   }
 
   return readAppUser(firebaseUser);
+};
+
+
+/**
+ * Native Google sign-in for the Android APK.
+ *
+ * Google's Secure Browser Policy refuses to serve its OAuth consent page to an
+ * embedded WebView, which is exactly what the Capacitor shell is — so
+ * `signInWithPopup` / `signInWithRedirect` can never complete inside the app,
+ * no matter which OAuth clients or SHA-1 fingerprints are registered. Those
+ * credentials are consulted only by the NATIVE Play Services flow, which the
+ * web SDK never reaches from inside a WebView.
+ *
+ * This function takes the native path instead:
+ *
+ *   1. `@capacitor-firebase/authentication` opens the Play Services account
+ *      picker (a real system UI, not a web page) and returns an ID token.
+ *   2. That token is turned into a Firebase credential and exchanged for a
+ *      normal **web-SDK** session via `signInWithCredential`.
+ *
+ * Step 2 is what keeps the rest of the app untouched: `auth.currentUser`,
+ * `onAuthStateChanged`, Firestore security rules and every existing screen
+ * behave exactly as they do after a browser sign-in.
+ *
+ * The plugin is imported dynamically so the website bundle never pays for it
+ * and never tries to resolve a native module that isn't there.
+ */
+const signInWithGoogleNatively = async () => {
+  const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+  const result = await FirebaseAuthentication.signInWithGoogle();
+  const idToken = result.credential?.idToken;
+  if (!idToken) {
+    // The picker was dismissed, or Play Services returned nothing usable.
+    throw Object.assign(new Error("No Google ID token returned"), {
+      code: "auth/native-google-no-token",
+    });
+  }
+  const credential = GoogleAuthProvider.credential(idToken, result.credential?.accessToken);
+  return signInWithCredential(auth, credential);
 };
 
 /**
@@ -407,10 +447,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAdminSession();
     try {
       await setPersistence(auth, browserLocalPersistence);
-      // Admin Google login is popup-only. Redirect cannot finish the
-      // approved-email + role check on the same page, and partitioned
-      // sessionStorage caused "missing initial state".
-      const credential = await signInWithPopup(auth, googleProvider);
+      // Admin Google login is popup-only on the web: redirect cannot finish
+      // the approved-email + role check on the same page, and partitioned
+      // sessionStorage caused "missing initial state". Inside the APK the
+      // popup is impossible at all (Google blocks embedded WebViews), so the
+      // native Play Services picker is used there instead — both paths end in
+      // the same web-SDK session, so the checks below are unchanged.
+      const credential = hasNativeGoogleAuth()
+        ? await signInWithGoogleNatively()
+        : await signInWithPopup(auth, googleProvider);
       const signedInEmail = normalizeEmail(credential.user.email);
       if (signedInEmail !== APPROVED_ADMIN_EMAIL) {
         await signOut(auth);
@@ -463,7 +508,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // which opens the Play Services account picker and hands the resulting ID
     // token to Firebase. Until that plugin is installed and registered, fail
     // LOUDLY and usefully rather than leaving the learner on a dead button.
-    if (isEmbeddedWebView() && !hasNativeGoogleAuth()) {
+    // Inside the APK, take the NATIVE path — the Play Services account picker.
+    if (hasNativeGoogleAuth()) {
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+        const credential = await signInWithGoogleNatively();
+        await commitFirebaseUser(credential.user);
+        return { success: true, message: "Google login successful." };
+      } catch (error) {
+        const code = authErrorCode(error);
+        // The learner backing out of the account picker is not an error worth
+        // shouting about — the plugin reports it as a cancellation.
+        const raw = typeof error === "object" && error && "message" in error
+          ? String((error as { message?: unknown }).message || "")
+          : "";
+        if (code === "auth/native-google-no-token" || /cancel/i.test(raw)) {
+          return { success: false, code: "auth/popup-closed-by-user", message: "Google sign-in cancel कर दिया गया।" };
+        }
+        // A missing google-services.json / unregistered SHA-1 surfaces here
+        // (DEVELOPER_ERROR / ApiException 10), so say what to actually fix.
+        if (/DEVELOPER_ERROR|ApiException:?\s*10\b/i.test(raw)) {
+          return {
+            success: false,
+            code: "auth/native-google-misconfigured",
+            message: "Google sign-in इस build में configure नहीं है (app का SHA-1 fingerprint Firebase में registered नहीं है)। कृपया email aur password से login करें।",
+          };
+        }
+        return { success: false, message: authErrorMessage(error), code };
+      }
+    }
+
+    // Any OTHER embedded WebView (Instagram / Facebook / Line in-app browser)
+    // has no native plugin to fall back on, and Google will refuse the OAuth
+    // page there too — so send the learner to a real browser instead of
+    // leaving them on a button that cannot succeed.
+    if (isEmbeddedWebView()) {
       return {
         success: false,
         code: "auth/native-google-unavailable",

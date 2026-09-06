@@ -18,13 +18,13 @@ nothing, because the web SDK never reaches the native credential path.
 | Thing | Status |
 | --- | --- |
 | `android/app/google-services.json` | **Not present**, and `.gitignore:41` excludes it. It has never been committed. |
-| `@capacitor-firebase/authentication` (native Google sign-in) | **Not installed.** No native plugin exists in `package.json` or `android/capacitor.settings.gradle`. |
-| Firebase Android SDK in Gradle | Only `firebase-messaging` (push). No `firebase-auth`. |
-| Auth code | 100% web SDK — `signInWithPopup` / `signInWithRedirect` in `src/context/AuthContext.tsx`. |
+| `@capacitor-firebase/authentication` (native Google sign-in) | Was **not installed** — this is what actually broke sign-in. Now installed at 7.5.0 and registered with Gradle. |
+| Firebase Android SDK in Gradle | Was `firebase-messaging` only (push), no `firebase-auth`. The plugin now pulls in `firebase-auth` + Play Services auth. |
+| Auth code | Was 100% web SDK (`signInWithPopup` / `signInWithRedirect`). Now takes the native path inside the APK and the web path in browsers. |
 
-So there is no `FirebaseAuthentication.signInWithGoogle()` in this project at
-all. Whatever the APK is running, it is falling into the **web** popup/redirect
-path, and that path is the one Google blocks.
+There was no `FirebaseAuthentication.signInWithGoogle()` in the project at all,
+so the APK was falling into the **web** popup/redirect path — and that is the
+path Google blocks. That is the whole bug.
 
 ## Why SHA-1 alone cannot fix it
 
@@ -66,30 +66,47 @@ Once the native plugin below is installed, `hasNativeGoogleAuth()` returns
 
 ---
 
-## The real fix — native Google sign-in
+## The real fix — native Google sign-in (IMPLEMENTED)
 
-### 1. Install the plugin
+Steps 1, 2 and 4 below are **already done in this repo**. Only step 3 —
+registering your SHA-1 fingerprints and dropping `google-services.json` onto
+the build machine — has to be done by you in the Firebase Console, because
+that file is gitignored and must never be committed.
 
-The current `firebase@12.x` conflicts with the plugin's declared peer range
-(`firebase@^11.2.0`), so install it with legacy peer resolution:
+Run this any time to see exactly what is still missing:
 
 ```bash
-npm install @capacitor-firebase/authentication --legacy-peer-deps
-npx cap sync android
+npm run verify:google-signin
 ```
 
-Then enable the Google provider in `capacitor.config.ts`:
+It is also wired into `android:sync`, `android:assemble:debug` and
+`android:bundle:release`, so a misconfigured APK can no longer be built by
+accident.
+
+### 1. Install the plugin — DONE
+
+`@capacitor-firebase/authentication@7.5.0` is installed (7.x is the line that
+matches Capacitor 7 — 8.x requires Capacitor 8). Its declared peer is
+`firebase@^11`, while the app ships `firebase@12`; the plugin only exchanges an
+ID token, so `package.json` pins the peer to the app's own firebase version via
+`overrides`, and `.npmrc` sets `legacy-peer-deps=true` so a plain `npm install`
+succeeds. A clean `rm -rf node_modules && npm install` was verified.
+
+`capacitor.config.ts` enables the provider:
 
 ```ts
-plugins: {
-  FirebaseAuthentication: {
-    skipNativeAuth: false,
-    providers: ["google.com"],
-  },
+FirebaseAuthentication: {
+  skipNativeAuth: false,
+  providers: ["google.com"],
 },
 ```
 
-### 2. Add `google-services.json`
+`android/variables.gradle` sets **`rgcfaIncludeGoogle = true`**, which is what
+promotes the plugin's Google dependencies from `compileOnly` to
+`implementation`. Without that flag the APK compiles and then throws
+`NoClassDefFoundError` at runtime — a very easy trap to miss.
+
+### 2. Add `google-services.json` — YOUR STEP
 
 Firebase Console → Project settings → **Your apps** → Android app with package
 `app.eduvora.shop` (create it if it doesn't exist) → download
@@ -98,7 +115,7 @@ Firebase Console → Project settings → **Your apps** → Android app with pac
 It is gitignored on purpose; it must be present on whatever machine builds the
 APK.
 
-### 3. *Now* the SHA-1 matters
+### 3. *Now* the SHA-1 matters — YOUR STEP
 
 In the same Firebase Console screen, add the SHA-1 of **every** key that will
 sign the app:
@@ -120,20 +137,27 @@ reason sign-in works on a sideloaded APK but fails from the Play Store.
 After adding fingerprints, **re-download `google-services.json`** — the file
 must contain the new `client_type: 1` entries.
 
-### 4. Route the call natively
+### 4. Route the call natively — DONE
 
-In `loginWithGoogle()`, when `hasNativeGoogleAuth()` is true, call the plugin
-and exchange its ID token for a Firebase web-SDK session so the rest of the app
-(Firestore rules, `onAuthStateChanged`) keeps working unchanged:
+`signInWithGoogleNatively()` in `src/context/AuthContext.tsx` opens the Play
+Services picker and exchanges the returned ID token for a normal **web-SDK**
+session, so `auth.currentUser`, `onAuthStateChanged`, Firestore rules and every
+existing screen behave exactly as they do after a browser sign-in:
 
 ```ts
-import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
-import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
-
-const { credential } = await FirebaseAuthentication.signInWithGoogle();
-const authCredential = GoogleAuthProvider.credential(credential?.idToken);
-const result = await signInWithCredential(auth, authCredential);
+const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+const result = await FirebaseAuthentication.signInWithGoogle();
+const credential = GoogleAuthProvider.credential(result.credential?.idToken);
+return signInWithCredential(auth, credential);
 ```
+
+The import is dynamic so the website bundle never pays for it. Both
+`loginWithGoogle()` and `loginAdminWithGoogle()` take this path when
+`hasNativeGoogleAuth()` is true, and the untouched web popup/redirect path
+otherwise. Two failure modes are translated into plain language rather than
+raw exceptions: a dismissed picker becomes a "cancelled" message, and
+`ApiException: 10 / DEVELOPER_ERROR` — the signature of an unregistered SHA-1 —
+tells the learner to use email/password and tells you what to fix.
 
 ---
 
@@ -248,12 +272,13 @@ b2:ef:77:7d:dc:f9:3f:8b:6f:00:20:d1:39:9f:3f:1c:91:8a:fc:4b
 ```
 
 Add BOTH under Firebase Console → Project settings → Your apps → the Android
-app for `app.eduvora.shop`, then **re-download `google-services.json`**.
+app for `app.eduvora.shop`, then **re-download `google-services.json`** and put
+it at `android/app/google-services.json`.
 
-Remember the caveat from the top of this document: these fingerprints only
-start mattering once the native plugin (step 1) is installed. Registering them
-while the app still uses the web SDK inside a WebView changes nothing, because
-Google blocks that OAuth page before any fingerprint is checked.
+The native plugin is now installed, so these fingerprints finally *do* matter —
+they are what Play Services checks before handing back an ID token. Verify with
+`npm run verify:google-signin`, which fails loudly if the downloaded file has
+no `client_type: 1` entry (i.e. no SHA-1 registered).
 
 Also confirm whether you use **Play App Signing**. If so, Play Console →
 Release → Setup → App signing shows a *third* SHA-1 (Google's re-signing key),

@@ -39,11 +39,12 @@ export default function AuthForm() {
   const [highlightGoogle, setHighlightGoogle] = useState(false);
   const { login, signup, loginWithGoogle, resetPassword } = useAuth();
 
-  // Google sign-in cannot complete inside an embedded WebView (the APK shell
-  // or an in-app browser) unless a native plugin is registered — Google's own
-  // Secure Browser Policy blocks the OAuth page there. Rather than show a
-  // button that always fails, explain the situation and point at the paths
-  // that DO work. See src/utils/nativeRuntime.ts.
+  // Google sign-in cannot complete inside an embedded WebView unless a native
+  // plugin is registered — Google's Secure Browser Policy blocks the OAuth
+  // page there. The APK now ships that plugin, so the button works normally
+  // inside the app; this guard is what remains for OTHER embedded browsers
+  // (Instagram / Facebook / Line), where no native fallback exists.
+  // See src/utils/nativeRuntime.ts.
   const [googleBlocked] = useState(() => isEmbeddedWebView() && !hasNativeGoogleAuth());
   const [insideApp] = useState(() => isCapacitorNative());
 

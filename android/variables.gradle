@@ -13,4 +13,22 @@ ext {
     androidxJunitVersion = '1.2.1'
     androidxEspressoCoreVersion = '3.6.1'
     cordovaAndroidVersion = '10.1.1'
+
+    // ── Native Google Sign-In (@capacitor-firebase/authentication) ─────────
+    // Google's Secure Browser Policy blocks its OAuth consent page inside an
+    // embedded WebView, so the web SDK's popup/redirect flows can never
+    // finish inside this APK. The plugin calls Play Services natively instead
+    // and returns an ID token, which the web layer exchanges for a normal
+    // Firebase session. See docs/android-google-signin.md.
+    //
+    // `rgcfaIncludeGoogle = true` is what switches the plugin's Google
+    // dependencies from `compileOnly` to `implementation`; without it the
+    // classes are missing at runtime and sign-in throws NoClassDefFoundError.
+    rgcfaIncludeGoogle = true
+    rgcfaIncludeFacebook = false
+    firebaseAuthVersion = '23.2.0'
+    playServicesAuthVersion = '21.3.0'
+    androidxCredentialsVersion = '1.3.0'
+    androidxCredentialsPlayServicesAuthVersion = '1.3.0'
+    librariesIdentityGoogleidVersion = '1.1.1'
 }

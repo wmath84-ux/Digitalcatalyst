@@ -66,6 +66,22 @@ const config: CapacitorConfig = {
       // FCM is enabled at runtime via google-services.json (added
       // during `cap sync android`). No extra config needed here.
     },
+    // Native Google Sign-In. Google's Secure Browser Policy blocks its OAuth
+    // page inside an embedded WebView, so the web SDK's popup/redirect flows
+    // can never complete inside this APK. This plugin instead calls the Play
+    // Services account picker natively and returns an ID token, which
+    // src/context/AuthContext.tsx exchanges for a normal Firebase web-SDK
+    // session (signInWithCredential) so Firestore rules, onAuthStateChanged
+    // and every existing screen keep working unchanged.
+    //
+    // `skipNativeAuth: false` lets the plugin sign in to the native Firebase
+    // SDK too, which keeps the native and web sessions in step.
+    // Requires android/app/google-services.json with the SHA-1 fingerprints
+    // of every signing key registered — see docs/android-google-signin.md.
+    FirebaseAuthentication: {
+      skipNativeAuth: false,
+      providers: ["google.com"],
+    },
     LocalNotifications: {
       // Capacitor's LocalNotifications plugin can fire a notification
       // at an exact wall-clock time even when the app is closed and
