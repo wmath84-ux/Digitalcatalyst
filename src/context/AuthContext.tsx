@@ -25,7 +25,6 @@ import {
   getRedirectResult,
   signOut,
   updateProfile,
-  signInWithCredential,
   type User as FirebaseUser,
 } from "firebase/auth";
 import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
@@ -557,19 +556,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await setPersistence(auth, browserLocalPersistence);
 
-      // --- NATIVE ANDROID BRANCH ADDED HERE ---
-      if (Capacitor.isNativePlatform()) {
-        const result = await FirebaseAuthentication.signInWithGoogle();
-        if (!result.credential?.idToken) {
-          throw new Error("Google Sign-In failed to return an ID token.");
-        }
-        const credential = GoogleAuthProvider.credential(result.credential.idToken);
-        const authResult = await signInWithCredential(auth, credential);
-        await commitFirebaseUser(authResult.user);
-        return { success: true, message: "Google login successful." };
-      }
-      // ----------------------------------------
-
+      // The native path is handled above by `hasNativeGoogleAuth()`, which
+      // dynamically imports the plugin. Reaching here means we are in a real
+      // browser, so the web popup/redirect flow is the correct one.
       let credential;
       try {
         credential = await signInWithPopup(auth, googleProvider);

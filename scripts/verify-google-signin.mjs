@@ -49,18 +49,30 @@ if (!/rgcfaIncludeGoogle\s*=\s*true/.test(variables)) {
 
 // ── 3. google-services.json must exist and describe THIS app ───────────────
 const appId = (read("capacitor.config.ts") || "").match(/appId:\s*["']([^"']+)["']/)?.[1] || "app.eduvora.shop";
-const servicesRaw = read("android/app/google-services.json");
+
+// The file Gradle actually reads is android/app/google-services.json. CI
+// writes it there from a secret, and a repo-root copy is also kept as a
+// checked-in reference, so accept either and say which one was used.
+const servicesPath = existsSync(path.join(root, "android/app/google-services.json"))
+  ? "android/app/google-services.json"
+  : existsSync(path.join(root, "google-services.json"))
+    ? "google-services.json"
+    : null;
+const servicesRaw = servicesPath ? read(servicesPath) : null;
+if (servicesPath === "google-services.json") {
+  notes.push("using the repo-root google-services.json (Gradle needs it at android/app/ at build time)");
+}
 
 if (!servicesRaw) {
   problems.push(
-    `android/app/google-services.json is missing. Download it from Firebase Console → Project settings → Your apps → Android app (${appId}). It is gitignored on purpose, so every machine that builds the APK needs its own copy.`,
+    `google-services.json not found (looked in android/app/ and the repo root). Download it from Firebase Console → Project settings → Your apps → Android app (${appId}).`,
   );
 } else {
   let services;
   try {
     services = JSON.parse(servicesRaw);
   } catch {
-    problems.push("android/app/google-services.json is not valid JSON.");
+    problems.push(`${servicesPath} is not valid JSON.`);
   }
 
   if (services) {
