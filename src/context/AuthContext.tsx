@@ -494,14 +494,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [commitFirebaseUser]);
 
+  /**
+   * Send the Firebase password-reset email.
+   *
+   * Three things make this look "broken" when it is actually working, so all
+   * three are handled explicitly here:
+   *
+   *   1. **No account = no email.** With Email Enumeration Protection ON,
+   *      `sendPasswordResetEmail` RESOLVES SUCCESSFULLY for an address that
+   *      has no account — Firebase refuses to confirm or deny existence, and
+   *      simply sends nothing. The old code reported "link sent" in that case,
+   *      so a typo'd address (or an account that was never created) looked
+   *      identical to a real send. The wording below no longer promises an
+   *      email arrived; it says what to do if it doesn't.
+   *
+   *   2. **Empty / invalid address.** The button previously fired with
+   *      whatever was in the email field, including "". Firebase then threw
+   *      `auth/invalid-email` and the learner saw a generic failure.
+   *
+   *   3. **Where the link lands.** Without `actionCodeSettings` the reset link
+   *      opens Firebase's own hosted page on `authDomain`. That works, but the
+   *      learner is dumped on a bare Google page and never comes back to the
+   *      app. Pointing `url` at our own origin returns them to the login
+   *      screen after the reset — and the origin MUST be listed under
+   *      Firebase Console → Authentication → Settings → Authorized domains,
+   *      otherwise Firebase rejects the call with `auth/unauthorized-continue-uri`.
+   */
   const resetPassword = useCallback(async (email: string): Promise<AuthResult> => {
     const normalizedEmail = normalizeEmail(email);
-    if (!normalizedEmail) return { success: false, message: "पहले अपना email address डालें।" };
+    if (!normalizedEmail) {
+      return { success: false, message: "पहले ऊपर अपना email address डालें, फिर Forgot password दबाएँ।" };
+    }
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      return { success: false, message: "यह email address सही नहीं लग रहा। कृपया दोबारा check करें।" };
+    }
     try {
-      await sendPasswordResetEmail(auth, normalizedEmail);
-      return { success: true, message: "Password reset link भेज दिया गया है। Inbox और spam folder check करें।" };
+      // Return the learner to our own login page once the password is reset.
+      // Falls back to Firebase's hosted page if the origin isn't authorized.
+      const continueUrl =
+        typeof window !== "undefined" && /^https?:/.test(window.location.origin)
+          ? `${window.location.origin}/#/auth`
+          : undefined;
+      try {
+        await sendPasswordResetEmail(
+          auth,
+          normalizedEmail,
+          continueUrl ? { url: continueUrl, handleCodeInApp: false } : undefined,
+        );
+      } catch (error) {
+        // An origin that isn't in Authorized domains must not break the reset —
+        // retry without the continue URL so the email still goes out.
+        if (authErrorCode(error) === "auth/unauthorized-continue-uri" && continueUrl) {
+          await sendPasswordResetEmail(auth, normalizedEmail);
+        } else {
+          throw error;
+        }
+      }
+      return {
+        success: true,
+        message: `अगर ${normalizedEmail} से कोई account बना है, तो reset link भेज दिया गया है। Inbox के साथ Spam/Promotions folder भी ज़रूर देखें (भेजने वाला: noreply@my-website-761e9.firebaseapp.com). 2-3 मिनट में link न मिले तो इसका मतलब है कि इस email से कोई account नहीं है — पहले Sign Up करें।`,
+      };
     } catch (error) {
-      return { success: false, message: authErrorMessage(error) };
+      return { success: false, message: authErrorMessage(error), code: authErrorCode(error) };
     }
   }, []);
 

@@ -178,3 +178,83 @@ Firebase Console → Authentication → Users → find the email → look at the
 Ask the learner to tap **Forgot password**. Firebase sends a reset link, and
 setting a password attaches a `password` provider to the existing Google
 account — after that, both sign-in methods work for the same user.
+
+
+---
+
+## Issue 3 — "Forgot password sends no email"
+
+### The code was never the problem
+
+`resetPassword()` in `src/context/AuthContext.tsx` has always called
+`sendPasswordResetEmail`, and `AuthForm` has always had a working
+*Forgot password?* button. What was missing was **feedback**, and the
+Firebase Console side of the setup.
+
+### Why no email arrives
+
+With **Email Enumeration Protection** ON (default for new projects),
+`sendPasswordResetEmail` **resolves successfully even when no account exists**
+for that address. Firebase will not confirm or deny existence — it just sends
+nothing. The old success message said *"link sent, check inbox"*, which is
+indistinguishable from a real send.
+
+Confirmed against this project's Authentication → Users list: it contains
+**exactly one account**, `wmath84@gmail.com`. So every reset attempted for any
+other address was silently a no-op, correctly.
+
+### The likeliest real-world cause: the sender is unverified
+
+Firebase's default sender is `noreply@<project>.firebaseapp.com` —
+here `noreply@my-website-761e9.firebaseapp.com`. Gmail and most providers
+treat that domain as unauthenticated bulk mail and route it to **Spam**, or
+drop it entirely. Check these in the Console:
+
+1. **Authentication → Templates → Password reset** — confirm the template is
+   enabled and note the *From* address.
+2. **Authentication → Settings → Authorized domains** — must list every origin
+   the app is served from (`eduvora.shop`, `localhost`, the Vercel preview
+   domain). A missing origin makes the new `continueUrl` fail.
+3. **Templates → customise the domain** — for reliable delivery, point the
+   sender at your own verified domain (`noreply@eduvora.shop`) and add the
+   SPF/DKIM records Firebase shows. This is the single biggest fix for
+   "the email never arrives".
+
+### What changed in the code
+
+- Empty or malformed address is rejected **before** the call, with a clear
+  instruction, instead of firing a request that can only fail.
+- The success message no longer claims an email definitely arrived. It names
+  the exact sender address, tells the learner to check Spam/Promotions, and
+  says that no email within 2–3 minutes means **no account exists for that
+  address — sign up first**.
+- A `continueUrl` (`<origin>/#/auth`) is attached so the learner lands back on
+  the app's login screen after resetting, instead of a bare Firebase page.
+  If the origin is not in Authorized domains, Firebase rejects it with
+  `auth/unauthorized-continue-uri`; the code catches exactly that and retries
+  without the continue URL, so the email still goes out.
+- The button now reads *"Forgot password? Reset link भेजें"* and shows a
+  sending state, so it is obviously actionable.
+
+---
+
+## Your SHA-1 fingerprints
+
+You supplied two, which is exactly right — both must be registered:
+
+```
+28:36:58:85:94:5f:42:58:95:bd:02:8c:83:c0:2d:28:82:22:48:df
+b2:ef:77:7d:dc:f9:3f:8b:6f:00:20:d1:39:9f:3f:1c:91:8a:fc:4b
+```
+
+Add BOTH under Firebase Console → Project settings → Your apps → the Android
+app for `app.eduvora.shop`, then **re-download `google-services.json`**.
+
+Remember the caveat from the top of this document: these fingerprints only
+start mattering once the native plugin (step 1) is installed. Registering them
+while the app still uses the web SDK inside a WebView changes nothing, because
+Google blocks that OAuth page before any fingerprint is checked.
+
+Also confirm whether you use **Play App Signing**. If so, Play Console →
+Release → Setup → App signing shows a *third* SHA-1 (Google's re-signing key),
+and that is the one end users' installs actually carry — it must be added too.

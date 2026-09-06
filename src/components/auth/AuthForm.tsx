@@ -128,6 +128,12 @@ export default function AuthForm() {
 
   const handleForgotPassword = async () => {
     clearMessages();
+    // Reset uses whatever is in the email field, so tell the learner to fill
+    // it in rather than firing a request that can only fail.
+    if (!email.trim()) {
+      setError("पहले ऊपर अपना email address डालें, फिर Forgot password दबाएँ।");
+      return;
+    }
     setSubmitting(true);
     try {
       const result = await resetPassword(email);
@@ -315,9 +321,9 @@ export default function AuthForm() {
               type="button"
               onClick={handleForgotPassword}
               disabled={busy}
-              className="text-xs font-semibold text-cyan-300 transition hover:text-cyan-200 disabled:opacity-60"
+              className="text-xs font-semibold text-cyan-300 underline underline-offset-2 transition hover:text-cyan-200 disabled:opacity-60"
             >
-              Forgot password?
+              {submitting ? "Reset link भेजा जा रहा है…" : "Forgot password? Reset link भेजें"}
             </button>
           </div>
         )}
