@@ -105,6 +105,24 @@ export default function Classroom3D({
 }: Classroom3DProps) {
   const [focus, setFocus] = useState<ClassroomFocus>("board");
 
+  // The Course Player is the ONE screen where the phone may rotate
+  // (src/utils/appOrientation.ts unlocks it on mount), so the room has to
+  // read well in both orientations. The camera widens its lens in portrait
+  // (SeatRig.tsx) and the CSS repositions the HUD; this flag only tailors
+  // the wording of the hint line.
+  const [portrait, setPortrait] = useState(
+    () => typeof window !== "undefined" && window.innerHeight > window.innerWidth,
+  );
+  useEffect(() => {
+    const update = () => setPortrait(window.innerHeight > window.innerWidth);
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+    };
+  }, []);
+
   /** Flat, seat-friendly module list; locks resolved against real access. */
   const flat = useMemo(() => {
     const list = flattenModules(modules).filter((module) => module.files.length > 0);
@@ -365,7 +383,9 @@ export default function Classroom3D({
         ))}
       </div>
       <p className="dc-classroom-hint">
-        Drag the room to turn your head · keys 1–4 jump to a surface · ← → change lesson
+        {portrait
+          ? "Drag to turn your head · rotate the phone for the full board"
+          : "Drag the room to turn your head · keys 1–4 jump to a surface · ← → change lesson"}
       </p>
     </div>
   );

@@ -29,7 +29,7 @@ export default function SeatRig({
   /** Fired when the learner turns the head by hand, so the HUD can un-pin. */
   onManualLook?: () => void;
 }) {
-  const { camera, gl } = useThree();
+  const { camera, gl, size } = useThree();
   const target = useRef({ yaw: 0, pitch: 0 });
   const current = useRef({ yaw: 0, pitch: 0 });
   const dragging = useRef(false);
@@ -96,15 +96,35 @@ export default function SeatRig({
     camera.updateMatrixWorld();
   });
 
+  // ── Orientation-aware field of view ────────────────────────────────────
+  // The Course Player is NOT landscape-only: it is the one screen in the app
+  // where rotation is unlocked (src/utils/appOrientation.ts), so it has to be
+  // usable held either way. The flat shell handles that by re-stacking its
+  // panes; a 3D room has to handle it in the LENS instead.
+  //
+  // three.js `fov` is the VERTICAL angle, so a tall portrait viewport keeps
+  // the vertical view and squeezes the horizontal one — on a 9:16 phone a 62°
+  // vertical fov leaves only ~38° horizontally, which is a keyhole: the board
+  // no longer fits and the side walls disappear entirely.
+  //
+  // So we hold the HORIZONTAL angle steady instead and derive the vertical
+  // one from the live aspect ratio. Landscape looks exactly as designed;
+  // portrait widens the lens so the whole board still fits, at the cost of
+  // showing more floor and ceiling — which is the correct trade, because the
+  // learner can always turn their head but can never widen the screen.
   useEffect(() => {
     camera.rotation.order = "YXZ";
-    if (camera instanceof THREE.PerspectiveCamera) {
-      camera.fov = 62;
-      camera.near = 0.05;
-      camera.far = 60;
-      camera.updateProjectionMatrix();
-    }
-  }, [camera]);
+    if (!(camera instanceof THREE.PerspectiveCamera)) return;
+    const aspect = size.width / Math.max(1, size.height);
+    // The horizontal angle the room was composed for.
+    const targetHorizontalFov = THREE.MathUtils.degToRad(76);
+    const vertical = 2 * Math.atan(Math.tan(targetHorizontalFov / 2) / aspect);
+    // Clamped so an extreme aspect can never produce a fisheye or a pinhole.
+    camera.fov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(vertical), 55, 96);
+    camera.near = 0.05;
+    camera.far = 60;
+    camera.updateProjectionMatrix();
+  }, [camera, size.width, size.height]);
 
   return null;
 }

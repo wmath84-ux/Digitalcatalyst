@@ -118,3 +118,45 @@
     font-size: 11px;
   }
 }
+
+/* ── Portrait on a phone ─────────────────────────────────────────────────
+   The Course Player is the one screen in the app where rotation is unlocked
+   (src/utils/appOrientation.ts), so the room must work held either way.
+   Landscape is the composed-for orientation; portrait needs three nudges:
+
+     · the camera widens its lens (see SeatRig.tsx) so the board still fits;
+     · the HUD sits higher, clear of the gesture bar and of a thumb resting
+       at the bottom of a tall screen;
+     · the hint line collapses to the essential gesture, because a narrow
+       viewport turns the full sentence into three cramped lines. */
+@media (orientation: portrait) and (max-width: 900px) {
+  .dc-classroom-hud {
+    bottom: max(30px, calc(env(safe-area-inset-bottom) + 18px));
+    gap: 4px;
+    padding: 6px;
+  }
+  .dc-classroom-chip {
+    padding: 8px 10px;
+    font-size: 10.5px;
+  }
+  .dc-classroom-hint {
+    font-size: 9.5px;
+    padding: 5px 11px;
+  }
+}
+
+/* Very short landscape (a phone on its side): the hint would sit on top of
+   the board, so drop it and let the HUD carry the affordance. */
+@media (orientation: landscape) and (max-height: 420px) {
+  .dc-classroom-hint {
+    display: none;
+  }
+  .dc-classroom-hud {
+    bottom: max(10px, env(safe-area-inset-bottom));
+    padding: 5px;
+  }
+  .dc-classroom-chip {
+    padding: 6px 12px;
+    font-size: 10.5px;
+  }
+}
