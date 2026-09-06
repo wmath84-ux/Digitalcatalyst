@@ -1,41 +1,42 @@
 // src/classroom3d/Classroom3D.tsx
 //
-// THE 3D CLASSROOM — the course player rebuilt as a room the learner sits in.
+// THE 3D CLASSROOM — the Course Player rebuilt as a room the learner sits in.
 //
 // Layout, seen from the seat (the learner never moves, only turns their head):
 //
 //        ┌──────────── FRONT WALL ────────────┐
 //        │   ██████  BIG SCREEN  ██████       │   ← straight ahead: the lesson
-//        │   (blackboard framing, chalk rail) │      plays here (ResourceViewer)
+//        │   (blackboard framing, chalk rail) │      plays here
 //        └────────────────────────────────────┘
 //   LEFT-FRONT  ▓ NOTES WALL ▓        RIGHT WALL: winter windows, snow outside
 //   FAR LEFT    ▓ MIND WALL  ▓
 //        ▁▁▁▁▁ your desk: the console tablet ▁▁▁▁▁   ← look down to control
 //
-//   · Turn a little left  → the NOTES wall (the app's real NotesPanel).
-//   · Turn further left   → the MIND MAP wall (the app's real MindMapPanel).
+//   · Turn a little left  → the NOTES wall.
+//   · Turn further left   → the MIND MAP wall.
 //   · Look down           → the desk console: modules, lessons, progress,
 //                           and one-tap head-turns to any surface.
 //
-// Everything is live DOM welded to the geometry, so every course-player
-// capability — YouTube, video, audio, PDF, Docs/Sheets/Slides, forms, images,
-// embeds, rich-text notes, the full mind map editor — works from the chair.
+// ── Part 2: this component owns NO course state ────────────────────────────
+// The room is a SHELL, not a second player. `CoursePlayerApp` stays the single
+// owner of the course, the viewer stack, Firestore notes and the persisted
+// mind maps, and hands the room three ready-made React nodes:
+//
+//   board → the player's own viewer stack (every opened file stays mounted,
+//           so switching lessons in the room is as lossless as in flat mode)
+//   notes → the player's own NotesPanel, writing to the same store
+//   mind  → the player's own MindMapPanel, on the same Firestore documents
+//
+// That means every capability of the flat player — YouTube, video, audio,
+// PDF, Docs/Sheets/Slides, forms, images, embeds, rich-text notes, the full
+// mind map editor, resume playback, mark-complete, paid/locked modules —
+// works from the chair, with zero duplicated logic.
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Preload } from "@react-three/drei";
 import { Network, NotebookPen } from "lucide-react";
-import type { CourseModule, CoursePlayerNote } from "../types/course";
-import NotesPanel from "../course/NotesPanel";
-import MindMapPanel from "../course/MindMapPanel";
-import type { MindMapSaveStatus, MindMapSummary } from "../course/useCourseMindMap";
-import {
-  addChildNode,
-  countNodes,
-  createMindMap,
-  rootId,
-  type MindMap,
-} from "../../utils/mindMapTree";
+import type { CourseFile, CourseModule } from "../types/course";
 import Room from "./Room";
 import SeatRig from "./SeatRig";
 import SurfaceFrame from "./SurfaceFrame";
@@ -48,155 +49,161 @@ export interface Classroom3DProps {
   /** The course tree — the exact shape the flat Course Player consumes. */
   modules: CourseModule[];
   courseTitle?: string;
-  /** Notes: owned by the caller so the flat player and the room share them. */
-  notes?: CoursePlayerNote[];
-  onAddNote?: (html: string) => void;
-  onEditNote?: (id: string, html: string) => void;
-  onDeleteNote?: (id: string) => void;
-  /** Mind map: same deal — pass the hook's state in to persist to Firestore. */
-  mind?: MindMap;
-  onMindChange?: (updater: MindMap | ((current: MindMap) => MindMap)) => void;
-  mindStatus?: MindMapSaveStatus;
-  mindMaps?: MindMapSummary[];
-  activeMapKey?: string;
-  onSelectMap?: (mapKey: string) => void;
-  onCreateMap?: (title?: string) => void;
-  onRenameMap?: (mapKey: string, title: string) => void;
-  onDeleteMap?: (mapKey: string) => void;
-  /** Leave the room (back to the flat player / purchases). */
-  onExit?: () => void;
-}
 
-const demoMind = (): MindMap => {
-  let mind = createMindMap("This module", "Room map");
-  for (const branch of ["Key idea", "Formula", "Doubt to revise"]) {
-    mind = addChildNode(mind, rootId(), branch).mind;
-  }
-  return mind;
-};
+  /** Which lesson the board is showing, and how to change it. */
+  selectedFileId?: string | null;
+  onSelectFile: (file: CourseFile) => void;
+
+  /** Modules the learner may actually open (everything else shows a lock). */
+  accessibleModuleIds?: Set<string>;
+  /** Locked modules the learner can buy — tapping one calls `onBuyModule`. */
+  onBuyModule?: (module: CourseModule) => void;
+
+  /** ── The three live surfaces, supplied by the player ─────────────────── */
+  /** The lesson viewer for the big front screen. */
+  board: ReactNode;
+  /** The notes UI for the left wall. */
+  notes: ReactNode;
+  /** The mind map UI for the far-left wall. */
+  mind: ReactNode;
+
+  /** Desk console readouts. */
+  progress?: number;
+  isDone?: boolean;
+  canMarkComplete?: boolean;
+  onToggleComplete?: () => void;
+  noteCount?: number;
+  mapCount?: number;
+
+  /** "New note" on the notes wall — asks the player's panel to open its composer. */
+  onComposeNote?: () => void;
+
+  /** Leave the room (back to the flat player). */
+  onExit?: () => void;
+  exitLabel?: string;
+}
 
 export default function Classroom3D({
   modules,
   courseTitle = "Course",
-  notes: notesProp,
-  onAddNote,
-  onEditNote,
-  onDeleteNote,
-  mind: mindProp,
-  onMindChange,
-  mindStatus = "saved",
-  mindMaps,
-  activeMapKey = "main",
-  onSelectMap,
-  onCreateMap,
-  onRenameMap,
-  onDeleteMap,
+  selectedFileId,
+  onSelectFile,
+  accessibleModuleIds,
+  onBuyModule,
+  board,
+  notes,
+  mind,
+  progress = 0,
+  isDone = false,
+  canMarkComplete = false,
+  onToggleComplete,
+  noteCount = 0,
+  mapCount = 0,
+  onComposeNote,
   onExit,
+  exitLabel = "Flat player",
 }: Classroom3DProps) {
-  const flat = useMemo(() => flattenModules(modules).filter((module) => module.files.length > 0), [modules]);
-
-  const [moduleIndex, setModuleIndex] = useState(0);
-  const [fileIndex, setFileIndex] = useState(0);
   const [focus, setFocus] = useState<ClassroomFocus>("board");
-  const [completed, setCompleted] = useState<Set<string>>(() => new Set());
-  const [composerSignal, setComposerSignal] = useState(0);
 
-  // Uncontrolled fallbacks so the room is usable stand-alone (dev preview).
-  const [localNotes, setLocalNotes] = useState<CoursePlayerNote[]>([]);
-  const [localMind, setLocalMind] = useState<MindMap>(demoMind);
-  const notes = notesProp ?? localNotes;
-  const mind = mindProp ?? localMind;
+  /** Flat, seat-friendly module list; locks resolved against real access. */
+  const flat = useMemo(() => {
+    const list = flattenModules(modules).filter((module) => module.files.length > 0);
+    if (!accessibleModuleIds) return list;
+    return list.map((module) => ({
+      ...module,
+      locked: module.locked || !accessibleModuleIds.has(String(module.id)),
+    }));
+  }, [modules, accessibleModuleIds]);
 
-  const addNote = useCallback(
-    (html: string) => {
-      if (onAddNote) return onAddNote(html);
-      setLocalNotes((current) => [
-        { id: `n${Date.now()}`, text: html.replace(/<[^>]+>/g, " ").trim(), html, createdAt: Date.now(), links: [] },
-        ...current,
-      ]);
+  const moduleByRawId = useMemo(() => {
+    const map = new Map<string, CourseModule>();
+    const walk = (nodes: CourseModule[]) => {
+      for (const node of nodes) {
+        map.set(String(node.id), node);
+        if (node.modules?.length) walk(node.modules);
+      }
+    };
+    walk(modules);
+    return map;
+  }, [modules]);
+
+  /** Where the selected file lives, so the desk always opens on the right row. */
+  const position = useMemo(() => {
+    if (!selectedFileId) return { moduleIndex: 0, fileIndex: 0 };
+    for (let m = 0; m < flat.length; m += 1) {
+      const f = flat[m].files.findIndex((file) => String(file.id) === String(selectedFileId));
+      if (f >= 0) return { moduleIndex: m, fileIndex: f };
+    }
+    return { moduleIndex: 0, fileIndex: 0 };
+  }, [flat, selectedFileId]);
+
+  /** Which module the desk list is browsing — may differ from the playing one. */
+  const [browseIndex, setBrowseIndex] = useState(position.moduleIndex);
+  useEffect(() => setBrowseIndex(position.moduleIndex), [position.moduleIndex]);
+
+  const activeFileName = useMemo(() => {
+    for (const module of flat) {
+      const file = module.files.find((entry) => String(entry.id) === String(selectedFileId));
+      if (file) return file.name;
+    }
+    return "";
+  }, [flat, selectedFileId]);
+
+  const openFile = useCallback(
+    (moduleIndex: number, fileIndex: number) => {
+      const module = flat[moduleIndex];
+      const file = module?.files[fileIndex];
+      if (!module || !file) return;
+      if (module.locked) {
+        const raw = moduleByRawId.get(String(module.id));
+        if (raw && onBuyModule) onBuyModule(raw);
+        return;
+      }
+      onSelectFile(file);
+      setFocus("board");
     },
-    [onAddNote],
-  );
-  const editNote = useCallback(
-    (id: string, html: string) => {
-      if (onEditNote) return onEditNote(id, html);
-      setLocalNotes((current) =>
-        current.map((note) =>
-          note.id === id ? { ...note, html, text: html.replace(/<[^>]+>/g, " ").trim(), updatedAt: Date.now() } : note,
-        ),
-      );
-    },
-    [onEditNote],
-  );
-  const deleteNote = useCallback(
-    (id: string) => {
-      if (onDeleteNote) return onDeleteNote(id);
-      setLocalNotes((current) => current.filter((note) => note.id !== id));
-    },
-    [onDeleteNote],
-  );
-  const changeMind = useCallback(
-    (updater: MindMap | ((current: MindMap) => MindMap)) => {
-      if (onMindChange) return onMindChange(updater);
-      setLocalMind((current) => (typeof updater === "function" ? updater(current) : updater));
-    },
-    [onMindChange],
+    [flat, moduleByRawId, onBuyModule, onSelectFile],
   );
 
-  const activeModule = flat[moduleIndex];
-  const activeFile = activeModule?.files[fileIndex] ?? null;
-
-  const selectModule = useCallback((index: number) => {
-    setModuleIndex(index);
-    setFileIndex(0);
-    setFocus("board");
-  }, []);
-  const selectFile = useCallback((index: number) => {
-    setFileIndex(index);
-    setFocus("board");
-  }, []);
-
-  /** Prev / Next walks the whole course, crossing module boundaries. */
+  /** Prev / Next walks the whole course, skipping locked modules. */
   const step = useCallback(
     (direction: 1 | -1) => {
       if (!flat.length) return;
-      let m = moduleIndex;
-      let f = fileIndex + direction;
-      while (m >= 0 && m < flat.length) {
+      let m = position.moduleIndex;
+      let f = position.fileIndex + direction;
+      for (let guard = 0; guard < 500; guard += 1) {
+        if (m < 0 || m >= flat.length) return;
         if (f < 0) {
           m -= 1;
           if (m < 0) return;
           f = flat[m].files.length - 1;
-        } else if (f >= flat[m].files.length) {
+          continue;
+        }
+        if (f >= flat[m].files.length) {
           m += 1;
           if (m >= flat.length) return;
           f = 0;
-        } else {
-          setModuleIndex(m);
-          setFileIndex(f);
-          setFocus("board");
-          return;
+          continue;
         }
+        if (flat[m].locked) {
+          m += direction;
+          f = direction > 0 ? 0 : (flat[m]?.files.length ?? 1) - 1;
+          continue;
+        }
+        openFile(m, f);
+        return;
       }
     },
-    [flat, moduleIndex, fileIndex],
+    [flat, position, openFile],
   );
 
-  const toggleComplete = useCallback((fileId: string) => {
-    setCompleted((current) => {
-      const next = new Set(current);
-      if (next.has(fileId)) next.delete(fileId);
-      else next.add(fileId);
-      return next;
-    });
-  }, []);
-
-  // Keyboard: 1-4 turn the head, ←/→ step lessons, Esc goes back to the desk.
+  // Keyboard: 1-4 turn the head, ←/→ step lessons, Esc drops back to the desk.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target && /input|textarea/i.test(target.tagName)) return;
+      if (target && /^(input|textarea|select)$/i.test(target.tagName)) return;
       if (target?.isContentEditable) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
       const map: Record<string, ClassroomFocus> = { "1": "board", "2": "notes", "3": "mind", "4": "desk" };
       if (map[event.key]) setFocus(map[event.key]);
       else if (event.key === "ArrowRight") step(1);
@@ -207,25 +214,8 @@ export default function Classroom3D({
     return () => window.removeEventListener("keydown", onKey);
   }, [step]);
 
-  const mapSummaries = useMemo<MindMapSummary[]>(
-    () =>
-      mindMaps ?? [
-        {
-          mapKey: "main",
-          title: mind.title || "Room map",
-          rootTopic: mind.rootTopic,
-          nodeCount: countNodes(mind),
-          updatedAt: Date.now(),
-          createdAt: Date.now(),
-        },
-      ],
-    [mindMaps, mind],
-  );
-
-  const canvasRef = useRef<HTMLDivElement>(null);
-
   return (
-    <div ref={canvasRef} className="dc-classroom-root">
+    <div className="dc-classroom-root" data-course-classroom-3d>
       <Canvas
         shadows
         dpr={[1, 1.75]}
@@ -237,14 +227,12 @@ export default function Classroom3D({
           <Room />
           <SeatRig focus={focus} />
 
-          {/* ── FRONT: the big board ─────────────────────────────────── */}
+          {/* ── FRONT: the blackboard the big screen is mounted on ────── */}
           <group position={[0, 0, -3.38]}>
-            {/* blackboard slab the screen is mounted on */}
             <mesh position={[0, 1.72, 0.02]} receiveShadow>
               <boxGeometry args={[7.4, 2.7, 0.1]} />
               <meshStandardMaterial color="#16302a" roughness={0.95} />
             </mesh>
-            {/* chalk tray */}
             <mesh position={[0, 0.34, 0.14]} castShadow>
               <boxGeometry args={[7.4, 0.08, 0.18]} />
               <meshStandardMaterial color="#7a5a38" roughness={0.8} />
@@ -265,7 +253,12 @@ export default function Classroom3D({
             active={focus === "board"}
             label="Lecture board"
           >
-            <BoardPanel file={activeFile} moduleTitle={activeModule?.title || courseTitle} />
+            <BoardPanel
+              title={activeFileName}
+              subtitle={flat[position.moduleIndex]?.title || courseTitle}
+            >
+              {board}
+            </BoardPanel>
           </SurfaceFrame>
 
           {/* ── LEFT-FRONT: the notes wall ───────────────────────────── */}
@@ -283,30 +276,24 @@ export default function Classroom3D({
               <WallHeader
                 icon={NotebookPen}
                 title="Your notes"
-                hint={`${notes.length} saved · writes straight from the seat`}
+                hint={`${noteCount} saved · written from the seat`}
                 accent="#fbbf24"
               />
-              <div className="flex shrink-0 items-center gap-2 border-b border-white/8 px-4 py-2">
-                <button
-                  type="button"
-                  onClick={() => setComposerSignal((value) => value + 1)}
-                  className="rounded-xl bg-amber-400/20 px-3 py-1.5 text-[12px] font-black text-amber-200 ring-1 ring-amber-300/40"
-                >
-                  + New note
-                </button>
-                <span className="truncate text-[11px] font-semibold text-white/40">
-                  {activeFile ? `While watching: ${activeFile.name}` : "Pick a lesson from the desk"}
-                </span>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto">
-                <NotesPanel
-                  notes={notes}
-                  onAdd={addNote}
-                  onEdit={editNote}
-                  onDelete={deleteNote}
-                  composerOpenSignal={composerSignal}
-                />
-              </div>
+              {onComposeNote && (
+                <div className="flex shrink-0 items-center gap-2 border-b border-white/8 px-4 py-2">
+                  <button
+                    type="button"
+                    onClick={onComposeNote}
+                    className="rounded-xl bg-amber-400/20 px-3 py-1.5 text-[12px] font-black text-amber-200 ring-1 ring-amber-300/40"
+                  >
+                    + New note
+                  </button>
+                  <span className="truncate text-[11px] font-semibold text-white/40">
+                    {activeFileName ? `While watching: ${activeFileName}` : "Pick a lesson from the desk"}
+                  </span>
+                </div>
+              )}
+              <div className="min-h-0 flex-1 overflow-hidden">{notes}</div>
             </div>
           </SurfaceFrame>
 
@@ -325,24 +312,10 @@ export default function Classroom3D({
               <WallHeader
                 icon={Network}
                 title="Mind map"
-                hint={`${countNodes(mind)} nodes · ${activeModule?.title || courseTitle}`}
+                hint={`${mapCount} map${mapCount === 1 ? "" : "s"} · ${flat[position.moduleIndex]?.title || courseTitle}`}
                 accent="#c4b5fd"
               />
-              <div className="min-h-0 flex-1">
-                <MindMapPanel
-                  mind={mind}
-                  onMindChange={changeMind}
-                  status={mindStatus}
-                  playerTheme="dark"
-                  open={focus === "mind"}
-                  maps={mapSummaries}
-                  activeMapKey={activeMapKey}
-                  onSelectMap={onSelectMap}
-                  onCreateMap={onCreateMap}
-                  onRenameMap={onRenameMap}
-                  onDeleteMap={onDeleteMap}
-                />
-              </div>
+              <div className="min-h-0 flex-1 overflow-hidden">{mind}</div>
             </div>
           </SurfaceFrame>
 
@@ -350,18 +323,24 @@ export default function Classroom3D({
           <DeskConsole>
             <DeskPanel
               modules={flat}
-              moduleIndex={moduleIndex}
-              fileIndex={fileIndex}
-              onSelectModule={selectModule}
-              onSelectFile={selectFile}
+              browseIndex={browseIndex}
+              playingModuleIndex={position.moduleIndex}
+              playingFileIndex={position.fileIndex}
+              selectedFileId={selectedFileId ?? null}
+              onBrowseModule={setBrowseIndex}
+              onOpenFile={openFile}
               onStep={step}
               focus={focus}
               onFocus={setFocus}
-              completed={completed}
-              onToggleComplete={toggleComplete}
-              noteCount={notes.length}
-              mapCount={mapSummaries.length}
+              progress={progress}
+              isDone={isDone}
+              canMarkComplete={canMarkComplete}
+              onToggleComplete={onToggleComplete}
+              noteCount={noteCount}
+              mapCount={mapCount}
+              activeFileName={activeFileName}
               onExit={onExit}
+              exitLabel={exitLabel}
             />
           </DeskConsole>
 

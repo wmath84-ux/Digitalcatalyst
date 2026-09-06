@@ -39,6 +39,7 @@ const SETTING_ACCENTS: Record<string, { color: string; delay: number; divider: b
   snow: { color: "#3A86FF", delay: 0.15, divider: true },
   viewport: { color: "#06D6A0", delay: 0.15, divider: true },
   fullscreen: { color: "#B388FF", delay: 0.2, divider: true },
+  classroom: { color: "#22D3EE", delay: 0.18, divider: true },
 };
 
 const notifySetting = (label: string, next: boolean) => {
@@ -150,6 +151,14 @@ export interface PlayerPanelProps {
   onThemeChange: (next: "dark" | "light") => void;
   snowMode: boolean;
   onSnowModeChange: (next: boolean) => void;
+  /**
+   * Room mode — swaps the flat Split Deck for the 3D Classroom shell
+   * (src/classroom3d): the learner sits at a desk with the lesson on the
+   * board ahead, the notes wall to the left and the mind map wall further
+   * left. Same course brain, different room.
+   */
+  classroom3d: boolean;
+  onClassroom3dChange: (next: boolean) => void;
   showViewportToggle: boolean;
   desktopView: boolean;
   onDesktopViewChange: (next: boolean) => void;
@@ -174,6 +183,8 @@ export default function PlayerPanel({
   onThemeChange,
   snowMode,
   onSnowModeChange,
+  classroom3d,
+  onClassroom3dChange,
   showViewportToggle,
   desktopView,
   onDesktopViewChange,
@@ -341,10 +352,14 @@ export default function PlayerPanel({
       <div data-course-panel-section="settings" data-course-settings-menu data-course-theme={theme}>
         {settingsRow("Light theme", theme === "light", (next) => onThemeChange(next ? "light" : "dark"), "theme")}
         {settingsRow("Snowfall", snowMode, (next) => onSnowModeChange(next), "snow")}
+        {settingsRow("3D Classroom", classroom3d, (next) => onClassroom3dChange(next), "classroom")}
         {showViewportToggle ? settingsRow("Desktop view", desktopView, (next) => onDesktopViewChange(next), "viewport") : null}
         {canFullscreen ? settingsRow("Hide status bar", courseFullscreen, (next) => onHideStatusBarChange(next), "fullscreen") : null}
         <p className="flex items-center gap-2 px-4 pb-1 pt-3 text-[10px] font-semibold text-[var(--course-muted)]">
           <MonitorSmartphone size={12} /> Split mode hamesha on hai — lesson aur study pane side by side.
+        </p>
+        <p className="flex items-center gap-2 px-4 pb-3 text-[10px] font-semibold text-[var(--course-muted)]">
+          <MonitorSmartphone size={12} /> 3D Classroom on karein to wahi lesson, notes aur mind map ek classroom mein baith kar milenge.
         </p>
       </div>
     </div>

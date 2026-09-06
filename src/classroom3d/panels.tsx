@@ -2,54 +2,50 @@
 //
 // The DOM bodies that live on the classroom's surfaces.
 //
-//   BoardPanel   → the huge screen straight ahead: the ACTIVE lesson plays
-//                  here through the app's real ResourceViewer, so YouTube,
-//                  video, audio, PDF, Docs, Sheets, Slides, forms, images and
-//                  embeds all behave exactly as they do in the flat player.
-//   DeskPanel    → the tablet on the desk: module switcher, lesson switcher,
-//                  progress, and the "turn my head" buttons.
-//
-// The notes wall and the mind wall mount the app's own NotesPanel and
-// MindMapPanel directly — no wrappers needed beyond a scroll container.
+//   BoardPanel → the chalk rail above the big front screen; its body is the
+//                Course Player's own viewer stack, passed in as children, so
+//                every file type behaves exactly as it does in flat mode.
+//   DeskPanel  → the tablet on the desk: module switcher, lesson switcher,
+//                progress, mark-complete, and the "turn my head" buttons.
+//   WallHeader → the shared header the notes / mind map walls wear.
 
-import { useMemo } from "react";
+import type { ReactNode } from "react";
 import {
   BookOpen,
-  ChevronLeft,
-  ChevronRight,
   CircleCheck,
   LockKeyhole,
   Network,
   NotebookPen,
   Presentation,
+  ShoppingBag,
   SkipBack,
   SkipForward,
 } from "lucide-react";
-import type { CourseFile } from "../types/course";
-import ResourceViewer from "../course/ResourceViewer";
 import { FILE_KIND_LABEL, FOCUS_PRESETS, type ClassroomFocus, type FlatModule } from "./state";
 
 /* ── Board ─────────────────────────────────────────────────────────────── */
 
-export function BoardPanel({ file, moduleTitle }: { file: CourseFile | null; moduleTitle: string }) {
+export function BoardPanel({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: ReactNode;
+}) {
   return (
     <div className="flex h-full w-full flex-col bg-[#060910] text-white">
-      {/* chalk rail */}
       <div className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-[#0d1424] px-5 py-3">
         <Presentation size={18} className="text-[#7dd3fc]" />
         <div className="min-w-0">
           <p className="truncate text-[13px] font-black tracking-wide text-white/90">
-            {file?.name || "Choose a lesson from your desk"}
+            {title || "Choose a lesson from your desk"}
           </p>
-          <p className="truncate text-[11px] font-semibold text-white/45">
-            {moduleTitle}
-            {file ? ` · ${FILE_KIND_LABEL[file.type] || file.type}` : ""}
-          </p>
+          <p className="truncate text-[11px] font-semibold text-white/45">{subtitle}</p>
         </div>
       </div>
-      <div className="min-h-0 flex-1">
-        <ResourceViewer file={file} active desktopView />
-      </div>
+      <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
     </div>
   );
 }
@@ -58,18 +54,26 @@ export function BoardPanel({ file, moduleTitle }: { file: CourseFile | null; mod
 
 export interface DeskPanelProps {
   modules: FlatModule[];
-  moduleIndex: number;
-  fileIndex: number;
-  onSelectModule: (index: number) => void;
-  onSelectFile: (index: number) => void;
+  /** Which module the LIST is browsing (may differ from what is playing). */
+  browseIndex: number;
+  /** Where the playing lesson actually lives. */
+  playingModuleIndex: number;
+  playingFileIndex: number;
+  selectedFileId: string | null;
+  onBrowseModule: (index: number) => void;
+  onOpenFile: (moduleIndex: number, fileIndex: number) => void;
   onStep: (direction: 1 | -1) => void;
   focus: ClassroomFocus;
   onFocus: (focus: ClassroomFocus) => void;
-  completed: Set<string>;
-  onToggleComplete: (fileId: string) => void;
+  progress: number;
+  isDone: boolean;
+  canMarkComplete: boolean;
+  onToggleComplete?: () => void;
   noteCount: number;
   mapCount: number;
+  activeFileName: string;
   onExit?: () => void;
+  exitLabel?: string;
 }
 
 const FOCUS_ICON: Record<ClassroomFocus, typeof BookOpen> = {
@@ -81,27 +85,27 @@ const FOCUS_ICON: Record<ClassroomFocus, typeof BookOpen> = {
 
 export function DeskPanel({
   modules,
-  moduleIndex,
-  fileIndex,
-  onSelectModule,
-  onSelectFile,
+  browseIndex,
+  playingModuleIndex,
+  playingFileIndex,
+  selectedFileId,
+  onBrowseModule,
+  onOpenFile,
   onStep,
   focus,
   onFocus,
-  completed,
+  progress,
+  isDone,
+  canMarkComplete,
   onToggleComplete,
   noteCount,
   mapCount,
+  activeFileName,
   onExit,
+  exitLabel = "Flat player",
 }: DeskPanelProps) {
-  const activeModule = modules[moduleIndex];
-  const files = activeModule?.files ?? [];
-  const activeFile = files[fileIndex] ?? null;
-
-  const progress = useMemo(() => {
-    const total = modules.reduce((sum, module) => sum + module.files.length, 0);
-    return total ? Math.round((completed.size / total) * 100) : 0;
-  }, [modules, completed]);
+  const browsed = modules[browseIndex];
+  const files = browsed?.files ?? [];
 
   return (
     <div className="flex h-full w-full flex-col bg-gradient-to-b from-[#0b1024] to-[#070a14] px-5 py-4 text-white">
@@ -110,8 +114,7 @@ export function DeskPanel({
         {FOCUS_PRESETS.map((preset) => {
           const Icon = FOCUS_ICON[preset.id];
           const active = focus === preset.id;
-          const badge =
-            preset.id === "notes" ? noteCount : preset.id === "mind" ? mapCount : 0;
+          const badge = preset.id === "notes" ? noteCount : preset.id === "mind" ? mapCount : 0;
           return (
             <button
               key={preset.id}
@@ -137,18 +140,34 @@ export function DeskPanel({
         })}
       </div>
 
-      {/* Progress */}
-      <div className="mt-3 shrink-0">
-        <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-widest text-white/45">
-          <span>Course progress</span>
-          <span className="text-[#a5f3d0]">{progress}%</span>
+      {/* Progress + mark complete */}
+      <div className="mt-3 flex shrink-0 items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-widest text-white/45">
+            <span>Course progress</span>
+            <span className="text-[#a5f3d0]">{progress}%</span>
+          </div>
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#22d3ee] to-[#a78bfa] transition-[width] duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
-        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-[#22d3ee] to-[#a78bfa] transition-[width] duration-500"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
+        <button
+          type="button"
+          disabled={!canMarkComplete}
+          onClick={onToggleComplete}
+          className="flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-black transition disabled:opacity-35"
+          style={{
+            background: isDone ? "rgba(52,211,153,0.18)" : "rgba(255,255,255,0.05)",
+            border: `1px solid ${isDone ? "rgba(110,231,183,0.5)" : "rgba(255,255,255,0.1)"}`,
+            color: isDone ? "#6ee7b7" : "rgba(255,255,255,0.72)",
+          }}
+        >
+          <CircleCheck size={16} />
+          {isDone ? "Completed" : "Mark complete"}
+        </button>
       </div>
 
       {/* Module + lesson columns */}
@@ -156,30 +175,42 @@ export function DeskPanel({
         <section className="flex min-h-0 flex-col rounded-2xl border border-white/10 bg-white/[0.035] p-2">
           <p className="px-2 pb-1.5 text-[10px] font-black uppercase tracking-widest text-white/40">Modules</p>
           <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+            {modules.length === 0 && (
+              <p className="px-2 py-6 text-center text-[12px] font-semibold text-white/40">
+                No modules available yet.
+              </p>
+            )}
             {modules.map((module, index) => {
-              const active = index === moduleIndex;
+              const browsing = index === browseIndex;
+              const playing = index === playingModuleIndex;
               return (
                 <button
                   key={module.id}
                   type="button"
-                  onClick={() => onSelectModule(index)}
+                  onClick={() => onBrowseModule(index)}
                   className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition"
                   style={{
-                    background: active ? "rgba(34,211,238,0.16)" : "transparent",
-                    border: `1px solid ${active ? "rgba(34,211,238,0.45)" : "transparent"}`,
+                    background: browsing ? "rgba(34,211,238,0.16)" : "transparent",
+                    border: `1px solid ${browsing ? "rgba(34,211,238,0.45)" : "transparent"}`,
                   }}
                 >
                   {module.locked ? (
                     <LockKeyhole size={14} className="shrink-0 text-amber-300/80" />
                   ) : (
-                    <BookOpen size={14} className={active ? "shrink-0 text-[#67e8f9]" : "shrink-0 text-white/40"} />
+                    <BookOpen
+                      size={14}
+                      className={browsing ? "shrink-0 text-[#67e8f9]" : "shrink-0 text-white/40"}
+                    />
                   )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[12.5px] font-bold">{module.title}</span>
                     <span className="block text-[10px] font-semibold text-white/40">
-                      {module.files.length} item{module.files.length === 1 ? "" : "s"}
+                      {module.locked ? "Locked · tap a lesson to unlock" : `${module.files.length} item${module.files.length === 1 ? "" : "s"}`}
                     </span>
                   </span>
+                  {playing && (
+                    <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-[#a78bfa] shadow-[0_0_8px_#a78bfa]" />
+                  )}
                 </button>
               );
             })}
@@ -197,48 +228,37 @@ export function DeskPanel({
               </p>
             )}
             {files.map((file, index) => {
-              const active = index === fileIndex;
-              const done = completed.has(file.id);
+              const active =
+                browseIndex === playingModuleIndex && index === playingFileIndex && Boolean(selectedFileId);
+              const locked = browsed?.locked;
               return (
-                <div
+                <button
                   key={file.id}
-                  className="flex items-center gap-1.5 rounded-xl px-1 transition"
+                  type="button"
+                  onClick={() => onOpenFile(browseIndex, index)}
+                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition"
                   style={{
                     background: active ? "rgba(167,139,250,0.16)" : "transparent",
                     border: `1px solid ${active ? "rgba(167,139,250,0.45)" : "transparent"}`,
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => onSelectFile(index)}
-                    className="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-2 text-left"
+                  <span
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[10px] font-black"
+                    style={{
+                      background: active ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.07)",
+                      color: active ? "#ddd6fe" : "rgba(255,255,255,0.6)",
+                    }}
                   >
-                    <span
-                      className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[10px] font-black"
-                      style={{
-                        background: active ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.07)",
-                        color: active ? "#ddd6fe" : "rgba(255,255,255,0.6)",
-                      }}
-                    >
-                      {index + 1}
+                    {locked ? <LockKeyhole size={12} /> : index + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[12.5px] font-bold">{file.name}</span>
+                    <span className="block text-[10px] font-semibold text-white/40">
+                      {FILE_KIND_LABEL[file.type] || file.type}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[12.5px] font-bold">{file.name}</span>
-                      <span className="block text-[10px] font-semibold text-white/40">
-                        {FILE_KIND_LABEL[file.type] || file.type}
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onToggleComplete(file.id)}
-                    title={done ? "Mark as not done" : "Mark complete"}
-                    className="mr-1 shrink-0 rounded-lg p-1.5 transition"
-                    style={{ color: done ? "#6ee7b7" : "rgba(255,255,255,0.28)" }}
-                  >
-                    <CircleCheck size={17} />
-                  </button>
-                </div>
+                  </span>
+                  {locked && <ShoppingBag size={14} className="shrink-0 text-amber-300/80" />}
+                </button>
               );
             })}
           </div>
@@ -255,7 +275,7 @@ export function DeskPanel({
           <SkipBack size={15} /> Prev
         </button>
         <div className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-[12px] font-bold text-white/70">
-          {activeFile ? activeFile.name : "No lesson selected"}
+          {activeFileName || "No lesson selected"}
         </div>
         <button
           type="button"
@@ -268,9 +288,9 @@ export function DeskPanel({
           <button
             type="button"
             onClick={onExit}
-            className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-[12px] font-black text-white/70"
+            className="shrink-0 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-[12px] font-black text-white/70"
           >
-            Leave room
+            {exitLabel}
           </button>
         )}
       </div>
@@ -285,15 +305,11 @@ export function WallHeader({
   title,
   hint,
   accent,
-  onPrev,
-  onNext,
 }: {
   icon: typeof NotebookPen;
   title: string;
   hint: string;
   accent: string;
-  onPrev?: () => void;
-  onNext?: () => void;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-[#0b1120] px-4 py-2.5">
@@ -307,16 +323,6 @@ export function WallHeader({
         <p className="truncate text-[13px] font-black text-white/90">{title}</p>
         <p className="truncate text-[11px] font-semibold text-white/40">{hint}</p>
       </div>
-      {onPrev && (
-        <button type="button" onClick={onPrev} className="rounded-lg p-1.5 text-white/50 hover:text-white">
-          <ChevronLeft size={18} />
-        </button>
-      )}
-      {onNext && (
-        <button type="button" onClick={onNext} className="rounded-lg p-1.5 text-white/50 hover:text-white">
-          <ChevronRight size={18} />
-        </button>
-      )}
     </div>
   );
 }
