@@ -11,7 +11,6 @@ jobs:
   build-apk:
     name: Build Debug APK
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -32,7 +31,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Build web app
         run: npm run build
@@ -44,15 +43,14 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
 
-      - name: Inject google-services.json (optional, enables FCM)
+      - name: Decode google-services.json
         env:
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON_BASE64" ]; then
-            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > android/app/google-services.json
-            echo "google-services.json written"
+            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           else
-            echo "GOOGLE_SERVICES_JSON_BASE64 not set - skipping (local alarms still work)"
+            echo "WARNING: GOOGLE_SERVICES_JSON_BASE64 secret nahi mila!"
           fi
 
       - name: Capacitor sync android
@@ -76,7 +74,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: build-apk
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -97,7 +94,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Build web app
         run: npm run build
@@ -109,15 +106,14 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
 
-      - name: Inject google-services.json (optional, enables FCM)
+      - name: Decode google-services.json
         env:
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON_BASE64" ]; then
-            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > android/app/google-services.json
-            echo "google-services.json written"
+            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           else
-            echo "GOOGLE_SERVICES_JSON_BASE64 not set - skipping (local alarms still work)"
+            echo "WARNING: GOOGLE_SERVICES_JSON_BASE64 secret nahi mila!"
           fi
 
       - name: Capacitor sync android
@@ -150,3 +146,4 @@ jobs:
           name: app-release-aab-${{ github.run_number }}
           path: android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 30
+        

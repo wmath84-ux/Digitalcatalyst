@@ -65,7 +65,10 @@ test("capacitor bridge: schedules a local alarm at the exact wall-clock time", (
   // some OEM ROMs).
   assert.match(bridge, /scheduleLocalAlarm/);
   assert.match(bridge, /allowWhileIdle: true/);
-  assert.match(bridge, /channelId: "eduvora-reminders"/);
+  // The channel id is a named export (shared by the create-channel path and
+  // every post) — pin both the value and the usage.
+  assert.match(bridge, /REMINDER_CHANNEL_ID\s*=\s*"eduvora-reminders"/);
+  assert.match(bridge, /channelId: REMINDER_CHANNEL_ID/);
 });
 
 test("capacitor bridge: dedupes local alarms by stable item id", () => {

@@ -94,17 +94,22 @@ test("the rail keeps its data contract and gains the lens only where it counts",
 });
 
 test("the rail's removed controls stay removed", () => {
-  // desktopRailPeekDockContract: the collapse toggle must never come back.
+  // desktopRailPeekDockContract: the OLD desktop collapse toggle must never
+  // come back. (The tablet-band GlassSidebar rail is a different, deliberate
+  // component with its own controlled expand state — pinned below.)
   for (const banned of [
     "data-desktop-rail-toggle",
     "RailGlassToggle",
     "railCollapsed",
     "railHidden",
     "setPeekOpen",
-    "onOpenChange",
   ]) {
     assert.ok(!shell.includes(banned), `DesktopShell.tsx must not contain ${banned}`);
   }
+  // The compact (<=1023 px) rail is the pack GlassSidebar: a 64 px icon rail
+  // that springs open to 220 px on demand, controlled by the shell.
+  assert.match(shell, /open=\{compactRailOpen\}/);
+  assert.match(shell, /onOpenChange=\{setCompactRailOpen\}/);
   assert.match(shell, /<DesktopPeekDock active=\{active\} purchasesBadge=\{ownedCount\} \/>/);
 });
 

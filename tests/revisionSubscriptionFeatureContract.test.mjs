@@ -65,7 +65,9 @@ test("RevisionApp gates paywalled actions with the floating premium gate", () =>
   assert.match(revisionApp, /Existing saved tests and in-progress attempts remain usable/);
   assert.match(revisionApp, /Smart Revision sessions operate on existing learner-owned data/);
   // The gate lives on the existing route — #/revision still mounts the app.
-  assert.match(main, /hash\.startsWith\(REVISION_HASH\)\) return <RevisionApp \/>/);
+  // The route may be wrapped by the shared page-enter animation shell
+  // (<PageEnter>), so allow markup between the hash check and <RevisionApp />.
+  assert.match(main, /hash\.startsWith\(REVISION_HASH\)\)[\s\S]{0,160}?<RevisionApp \/>/);
 });
 
 test("the premium gate pushes buyers to the subscription page", () => {

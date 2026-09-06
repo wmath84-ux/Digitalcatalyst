@@ -7,10 +7,11 @@
 // The server-side endpoints load the canonical `ServerPriceQuote`
 // and grant the entitlements transactionally.
 //
-// The `productName` / `finalPrice` / `currency` props are still
-// used for the on-screen amount card; they are display-only and
-// never sent to the server (the server computes the amount from
-// `quote.cashPayable`).
+// The `productName` / `finalPrice` props are still used for the
+// on-screen amount card; they are display-only and never sent to
+// the server (the server computes the amount from `quote.cashPayable`).
+// `finalPrice` arrives in paise (the quote's `cashPayable`), so it is
+// rendered through `formatPaise` everywhere — including the Pay button.
 //
 // Razorpay Standard Checkout opens full-screen. Closing it (native ×,
 // backdrop tap, Esc, or system Back) does not require a payment and
@@ -49,7 +50,6 @@ interface PaymentGatewayProps {
    * card never disagrees with the server's number.
    */
   finalPrice: number;
-  currency: string;
   productName: string;
   onPaymentSuccess: (payment: VerifiedPayment) => void;
   onGoBack: () => void;
@@ -156,7 +156,7 @@ interface VerifyPaymentResponse {
   grantedEntitlementIds?: string[];
 }
 
-export default function PaymentGateway({ quoteId, finalPrice, currency, productName, onPaymentSuccess, onGoBack }: PaymentGatewayProps) {
+export default function PaymentGateway({ quoteId, finalPrice, productName, onPaymentSuccess, onGoBack }: PaymentGatewayProps) {
   const { appName } = useBranding();
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
   const [error, setError] = useState("");
@@ -381,7 +381,7 @@ export default function PaymentGateway({ quoteId, finalPrice, currency, productN
           <GlassSurface className="pointer-events-none absolute inset-0" />
           <span className="relative z-10 flex items-center justify-center gap-2">
             {busy ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <CreditCard className="h-5 w-5" />}
-            {finalPrice === 0 ? "Unlock free access" : busy ? "Please wait…" : `Pay securely — ${currency}${finalPrice.toLocaleString("en-IN")}`}
+            {finalPrice === 0 ? "Unlock free access" : busy ? "Please wait…" : `Pay securely — ${displayAmount}`}
           </span>
         </button>
       )}

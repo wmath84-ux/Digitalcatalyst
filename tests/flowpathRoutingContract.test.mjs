@@ -64,9 +64,15 @@ test("dock Home / MyDay / Revision radial items navigate to real pages", () => {
   assert.match(bottomDock, /window\.location\.hash = route;/);
 });
 
-test("home header has a Plus shortcut next to the leaderboard that opens FlowPath", () => {
-  assert.match(homeHeader, /aria-label="Leaderboard"/);
-  assert.match(homeHeader, /aria-label="Open FlowPath planning"/);
-  assert.match(homeHeader, /window\.location\.hash = "#\/flowpath"/);
-  assert.match(homeHeader, /<Plus size=\{18\}/);
+test("home header keeps the leaderboard action; FlowPath stays reachable from the nav chrome", () => {
+  // The action cluster is the pack ExpandingTabs with a data-driven item
+  // list, so the accessible labels live on the item objects (the component
+  // renders them as aria-label) instead of inline attributes.
+  assert.match(homeHeader, /id: "leaderboard"/);
+  assert.match(homeHeader, /ariaLabel: "Leaderboard"/);
+  assert.match(homeHeader, /window\.location\.hash = "#\/leaderboard"/);
+  // The dedicated header Plus shortcut was retired; FlowPath is reached from
+  // the mobile bottom nav (and the desktop dock) instead.
+  const bottomNav = fs.readFileSync("src/components/BottomNav.tsx", "utf8");
+  assert.match(bottomNav, /if \(key === "flowpath"\) window\.location\.hash = "#\/flowpath"/);
 });

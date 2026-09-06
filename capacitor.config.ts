@@ -15,27 +15,27 @@
 // internals.
 //
 // What this config does:
-//   • appId        — the unique Android package id, used for the
-//                    Play Store listing, the signed AAB, and the
-//                    FCM token registration namespace.
-//   • appName      — what the app is called inside the launcher.
-//   • webDir       — the folder Capacitor copies into the native
-//                    shell on `npx cap sync android`. Pointed at
-//                    `dist` because vite outputs there.
-//   • server       — only used in dev mode (`cap run android`).
-//                    Production loads files from inside the APK.
-//   • android      — all the Android-specific tuning: package id,
-//                    signing config (debug by default; release uses
-//                    the keystore the user creates in the Play
-//                    Console), allowMixedContent=false so the
-//                    WebView refuses plain-http XHR (the entire app
-//                    is HTTPS), captureInput so the WebView grabs
-//                    key events (online tests use keyboard input).
+// • appId — the unique Android package id, used for the
+//   Play Store listing, the signed AAB, and the
+//   FCM token registration namespace.
+// • appName — what the app is called inside the launcher.
+// • webDir — the folder Capacitor copies into the native
+//   shell on `npx cap sync android`. Pointed at
+//   `dist` because vite outputs there.
+// • server — only used in dev mode (`cap run android`).
+//   Production loads files from inside the APK.
+// • android — all the Android-specific tuning: package id,
+//   signing config (debug by default; release uses
+//   the keystore the user creates in the Play
+//   Console), allowMixedContent=false so the
+//   WebView refuses plain-http XHR (the entire app
+//   is HTTPS), captureInput so the WebView grabs
+//   key events (online tests use keyboard input).
 //
-//   • plugins      — third-party Capacitor plugins. Push Notifications
-//                    and Local Notifications are what give us
-//                    100% reliable, exact-time, background delivery
-//                    that Web Push on Android Chrome can never match.
+// • plugins — third-party Capacitor plugins. Push Notifications
+//   and Local Notifications are what give us
+//   100% reliable, exact-time, background delivery
+//   that Web Push on Android Chrome can never match.
 
 import type { CapacitorConfig } from "@capacitor/cli";
 
@@ -87,6 +87,11 @@ const config: CapacitorConfig = {
       // at an exact wall-clock time even when the app is closed and
       // the phone is locked. This is what gives us the "1 minute
       // delivery" guarantee that Web Push on Android can never make.
+    },
+    FirebaseAuthentication: {
+      skipNativeAuth: false,
+      providers: ["google.com"],
+      webClientId: "930483750234-7b4upatuokv8smst1ctljsgpchs9r39m.apps.googleusercontent.com",
     },
   },
 };

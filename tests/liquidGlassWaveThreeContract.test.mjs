@@ -109,7 +109,7 @@ test("store cards are glass cards and keep their commerce contract", () => {
   // CTA: actionable → registry button; terminal states → flat status plate.
   assert.match(card, /<LiquidMetalButton\b[\s\S]*?tone="primary"/);
   assert.match(card, /purchased \|\| inCart \|\| unavailable \? \(/);
-  for (const label of ["Purchased", "Not for sale", "In Cart", "Add to Cart"]) {
+  for (const label of ["Purchased", "Not for sale", "In Cart", "Add to my cart"]) {
     assert.ok(card.includes(label), `the ${label} state must keep its copy`);
   }
 });

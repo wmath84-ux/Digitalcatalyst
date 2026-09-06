@@ -25,6 +25,7 @@ import {
   getRedirectResult,
   signOut,
   updateProfile,
+  signInWithCredential,
   type User as FirebaseUser,
 } from "firebase/auth";
 import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
@@ -121,6 +122,7 @@ const authErrorMessage = (error: unknown): string => {
   const raw = typeof error === "object" && error && "message" in error
     ? String((error as { message?: unknown }).message || "")
     : String(error || "");
+
   if (/missing initial state/i.test(raw)) {
     return "Google login session reset हो गई। कृपया फिर से Google से साइन इन करें।";
   }
@@ -554,6 +556,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       await setPersistence(auth, browserLocalPersistence);
+
+      // --- NATIVE ANDROID BRANCH ADDED HERE ---
+      if (Capacitor.isNativePlatform()) {
+        const result = await FirebaseAuthentication.signInWithGoogle();
+        if (!result.credential?.idToken) {
+          throw new Error("Google Sign-In failed to return an ID token.");
+        }
+        const credential = GoogleAuthProvider.credential(result.credential.idToken);
+        const authResult = await signInWithCredential(auth, credential);
+        await commitFirebaseUser(authResult.user);
+        return { success: true, message: "Google login successful." };
+      }
+      // ----------------------------------------
+
       let credential;
       try {
         credential = await signInWithPopup(auth, googleProvider);

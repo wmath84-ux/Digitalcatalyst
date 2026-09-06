@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "930483750234",
+    "project_id": "my-website-761e9",
+    "storage_bucket": "my-website-761e9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:930483750234:android:ccf25c95a4885efc5d5f63",
+        "android_client_info": {
+          "package_name": "app.eduvora.shop"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "930483750234-7b4upatuokv8smst1ctljsgpchs9r39m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBk5MBE9tKU1vxgbeWWOpS6jjuAz1Ue59M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "930483750234-7b4upatuokv8smst1ctljsgpchs9r39m.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

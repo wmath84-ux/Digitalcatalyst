@@ -69,7 +69,8 @@ test("display meta and icons resolve through fallback-safe helpers", () => {
 test("the FlowPath route is wrapped in an error boundary with working escapes", () => {
   // The boundary must wrap the FlowPath route in main.tsx...
   assert.match(main, /FlowPathErrorBoundary/);
-  assert.match(main, /<FlowPathApp onNavigateToHome/);
+  // The JSX is multi-line (props one per line), so match whitespace-tolerantly.
+  assert.match(main, /<FlowPathApp\s+onNavigateToHome/);
   // ...and offer Retry / Back / Home so the user is never stuck on a
   // white screen with dead navigation.
   assert.match(boundary, /componentDidCatch/);
