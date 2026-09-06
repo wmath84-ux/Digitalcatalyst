@@ -224,12 +224,15 @@ export default function TiltedCoverflow({ products, onOpenProduct }: TiltedCover
   const positions = buildXPositions(SCALE_BY_OFFSET, cardWidth, GAP_PX);
 
   return (
-    <div data-store-coverflow className="flex w-full select-none items-center justify-center overflow-hidden px-4 py-6">
+    /* `data-store-gutter` is the desktop-alignment hook (index.css): the
+       mobile px-4 is zeroed inside the desktop shell. */
+    <div data-store-coverflow data-store-gutter className="flex w-full select-none items-center justify-center overflow-hidden px-4 py-6 lg:py-8">
       <div className="relative flex w-full max-w-5xl flex-col items-center gap-8">
-        {/* Stage — owns the horizontal drag. */}
+        {/* Stage — owns the horizontal drag. The 380→430 px desktop cap
+            gives the larger cards headroom for the breathing loop. */}
         <motion.div
           className="relative flex w-full items-center justify-center"
-          style={{ perspective: "1400px", height: "clamp(280px, 36vw, 380px)" }}
+          style={{ perspective: "1400px", height: "clamp(280px, 36vw, 430px)" }}
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.15}
@@ -250,13 +253,18 @@ export default function TiltedCoverflow({ products, onOpenProduct }: TiltedCover
             const words = slide.caption.split(" ");
 
             return (
-              /* Layer 1 — fan transform + hit target, no visual chrome. */
+              /* Layer 1 — fan transform + hit target, no visual chrome.
+                 Card size: 17 vw tracks the viewport, the 160 px floor keeps
+                 phones/tablets exactly as before, and the 300 px cap (was
+                 220) is only reached above ~1290 px — so the fan grows with
+                 the column on desktop instead of staying a fixed sliver on
+                 wide monitors. */
               <motion.button
                 key={slide.id}
                 ref={slide.id === 0 ? cardRef : undefined}
                 type="button"
                 aria-label={slide.caption}
-                className="absolute aspect-[4/5] w-[clamp(160px,17vw,220px)]"
+                className="absolute aspect-[4/5] w-[clamp(160px,17vw,300px)]"
                 style={{
                   transformStyle: "preserve-3d",
                   transformOrigin: "center center",
