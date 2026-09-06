@@ -1,3 +1,4 @@
+
 name: Build Android APK
 
 on:
@@ -43,15 +44,14 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
 
-      - name: Inject google-services.json (optional, enables FCM)
+      - name: Decode google-services.json
         env:
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON_BASE64" ]; then
-            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > android/app/google-services.json
-            echo "google-services.json written"
+            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           else
-            echo "GOOGLE_SERVICES_JSON_BASE64 not set - skipping (local alarms still work)"
+            echo "WARNING: GOOGLE_SERVICES_JSON_BASE64 secret nahi mila!"
           fi
 
       - name: Capacitor sync android
@@ -107,15 +107,14 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
 
-      - name: Inject google-services.json (optional, enables FCM)
+      - name: Decode google-services.json
         env:
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON_BASE64" ]; then
-            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > android/app/google-services.json
-            echo "google-services.json written"
+            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           else
-            echo "GOOGLE_SERVICES_JSON_BASE64 not set - skipping (local alarms still work)"
+            echo "WARNING: GOOGLE_SERVICES_JSON_BASE64 secret nahi mila!"
           fi
 
       - name: Capacitor sync android
@@ -133,9 +132,6 @@ jobs:
           else
             echo "Warning: KEYSTORE_BASE64 secret nahi mila!"
           fi
-
-      - name: TEMP - print release SHA-1
-        run: keytool -list -v -keystore android/app/release.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -alias "${{ secrets.KEY_ALIAS }}"
 
       - name: Build Release AAB
         run: |
