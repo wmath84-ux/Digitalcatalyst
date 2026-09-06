@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import Header from "./components/Header";
 import { GlassSurface } from "./components/ui/glass";
+import { useDragScroll } from "@/hooks/useDragScroll";
 import { GlassButton } from "./components/ui/glass-button";
 import { GlassCard } from "./components/ui/GlassCard";
 import { PopoverItem } from "./components/ui/glass-popover";
@@ -179,6 +180,10 @@ function PremiumProductContent({
     [homepageReviews, liveProductReviews, localReviews, product.documentId, product.id],
   );
   const [activeImage, setActiveImage] = useState(0);
+  // Mouse parity: the gallery thumbs are a hidden-scrollbar rail, so a desktop
+  // pointer drags it left/right like a thumb — and a drag never re-selects the
+  // image it happens to end on.
+  const thumbs = useDragScroll<HTMLDivElement>();
   const [activeTab, setActiveTab] = useState<DetailTab>("Description");
   const [expandedModule, setExpandedModule] = useState<string | null>(product.canonicalModules?.[0]?.id || null);
   const [shareOpen, setShareOpen] = useState(false);
@@ -519,7 +524,7 @@ function PremiumProductContent({
     <div data-pdp-root className="relative pb-5 text-white">
 
       <div className="relative">
-        <nav data-pdp-loose className="flex flex-wrap items-center gap-1.5 px-4 pt-4 text-[11px] text-white/55">
+        <nav data-pdp-loose className="dc-scene-ink flex flex-wrap items-center gap-1.5 px-4 pt-4 text-[11px] text-white/55">
           <button type="button" onClick={onBack} className="transition hover:text-white">Store</button>
           <ChevronRight className="h-3 w-3 text-white/40" />
           <span>{product.category}</span>
@@ -534,9 +539,9 @@ function PremiumProductContent({
             exactly the mobile order (gallery → buy → everything else). */}
         <div data-pdp-body className="flex flex-col gap-6 px-4 pb-8 pt-4">
           <section data-pdp-gallery className="flex flex-col gap-3">
-            <GlassSurface radius={24} tint={0.25} blur={0} className="group relative overflow-hidden" contentClassName="relative">
+            <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate group relative overflow-hidden" contentClassName="relative">
               <img data-pdp-hero-img src={selectedImage} alt={product.title} className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105" />
-              <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1.5 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
+              <div className="dc-scene-plate dc-scene-plate--bar absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1.5 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
               </div>
               <div className="absolute right-3 top-3 flex gap-2">
@@ -550,10 +555,10 @@ function PremiumProductContent({
                   <Expand className="h-4 w-4" />
                 </GlassButton>
               </div>
-              <div className="absolute bottom-3 right-3 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">{activeImage + 1} / {gallery.length}</div>
+              <div className="dc-scene-plate dc-scene-plate--bar absolute bottom-3 right-3 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">{activeImage + 1} / {gallery.length}</div>
             </GlassSurface>
             {gallery.length > 1 && (
-              <div data-pdp-thumbs className="flex gap-2 overflow-x-auto pb-1">
+              <div data-pdp-thumbs ref={thumbs.ref} onPointerDown={thumbs.onPointerDown} className="flex gap-2 overflow-x-auto pb-1">
                 {gallery.map((image, index) => (
                   <button key={`${image}-${index}`} onClick={() => setActiveImage(index)} className={`h-16 min-w-16 flex-1 overflow-hidden rounded-xl border-2 transition ${activeImage === index ? "border-white/80" : "border-transparent opacity-70"}`}>
                     <img src={image} alt={`${product.title} ${index + 1}`} className="h-full w-full object-cover" />
@@ -582,7 +587,7 @@ function PremiumProductContent({
               </div>
             </div>
 
-            <GlassSurface data-pdp-meta radius={24} tint={0.25} blur={0} className="text-white/85" contentClassName="grid grid-cols-2 gap-2 p-3 text-[11px]">
+            <GlassSurface data-pdp-meta radius={24} tint={0.25} blur={0} className="dc-scene-plate text-white/85" contentClassName="grid grid-cols-2 gap-2 p-3 text-[11px]">
               <Meta icon={Clock} text={product.classLevel} />
               <Meta icon={BarChart3} text={product.subject} />
               <Meta icon={Globe} text={product.category} />
@@ -591,7 +596,7 @@ function PremiumProductContent({
 
             {isProductOwned ? (
               availablePaidUpdates.length > 0 ? (
-                <GlassSurface data-pdp-upgrade-box radius={24} tint={0.25} blur={0} className="relative overflow-hidden text-white" contentClassName="p-5">
+                <GlassSurface data-pdp-upgrade-box radius={24} tint={0.25} blur={0} className="dc-scene-plate relative overflow-hidden text-white" contentClassName="p-5">
                   <div className="relative flex items-start gap-3">
                     <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white">
                       <Zap size={20} />
@@ -616,7 +621,7 @@ function PremiumProductContent({
                 </GlassSurface>
               ) : null
             ) : (
-              <GlassSurface radius={24} tint={0.25} blur={0} className="relative overflow-visible text-white" contentClassName="p-5">
+              <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate relative overflow-visible text-white" contentClassName="p-5">
                 {/* Anchoring: the struck reference price is read first and
                     quietly, so the payable figure lands as the relief. The
                     saving is stated in rupees (loss aversion) rather than as a
@@ -651,7 +656,7 @@ function PremiumProductContent({
                     <GlassButton type="button" onClick={() => setShareOpen((value) => !value)} aria-label="Share product" className="[&_.size-12]:size-10"><Share2 className="h-4 w-4" /></GlassButton>
                     {/* Wave 10: the share menu is the pack popover material (GlassSurface
                         radius 20) with the pack's own PopoverItem rows — no painted row plates. */}
-                    <GlassSurface data-product-share radius={20} className="absolute right-0 top-12 z-50 w-60 text-white" contentClassName="py-1" hidden={!shareOpen}>
+                    <GlassSurface data-product-share radius={20} className="dc-scene-plate absolute right-0 top-12 z-50 w-60 text-white" contentClassName="py-1" hidden={!shareOpen}>
                       <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-white/55">Share this product</p>
                       <PopoverItem onClick={() => void shareNative()} className="text-xs font-medium"><Share2 className="h-3.5 w-3.5" /> Share via device</PopoverItem>
                       <PopoverItem onClick={() => shareTo("whatsapp")} className="text-xs font-medium"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</PopoverItem>
@@ -667,7 +672,7 @@ function PremiumProductContent({
                 follows the user down the page, parked where the thumb rests
                 and clear of the (unchanged) footer dock. */}
             {!isProductOwned && !unavailable ? (
-              <div data-pdp-thumb-bar className="dc-thumb-bar flex items-center gap-3 md:hidden">
+              <div data-pdp-thumb-bar className="dc-scene-plate dc-scene-plate--bar dc-thumb-bar flex items-center gap-3 md:hidden">
                 <div className="flex min-w-0 flex-col">
                   <span className="text-[15px] dc-hero-price">{formatPrice(product.price)}</span>
                   {product.originalPrice > product.price ? (
@@ -685,13 +690,13 @@ function PremiumProductContent({
             ) : null}
 
             {unavailable && (
-              <div className="rounded-2xl border border-amber-400/30 bg-amber-500/15 p-4 text-sm text-amber-200 backdrop-blur-xl">
+              <div className="dc-scene-ink rounded-2xl border border-amber-400/30 bg-amber-500/15 p-4 text-sm text-amber-200 backdrop-blur-xl">
                 This product is published for preview, but checkout is not enabled yet.
               </div>
             )}
 
             {!isProductOwned && !unavailable && canShowCouponInput && (
-              <GlassSurface radius={24} tint={0.25} blur={0} className="text-white" contentClassName="p-4">
+              <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate text-white" contentClassName="p-4">
                 <PromoCodeInput
                   kind="coupon"
                   label="Have a coupon? Enter the code below."
@@ -710,7 +715,7 @@ function PremiumProductContent({
           <div data-pdp-stack className="flex min-w-0 flex-col gap-6">
           {!isProductOwned && !unavailable && (
             <section id="pdp-purchase-options" className="scroll-mt-32">
-              <div className="mb-3 px-1"><h2 className="text-lg font-black dc-ink-1">Build your purchase</h2><p className="text-xs dc-ink-3">Same as subscription extras: tick the modules you need, see the price beside each one, then checkout.</p></div>
+              <div className="mb-3 px-1"><h2 className="dc-scene-ink text-lg font-black dc-ink-1">Build your purchase</h2><p className="dc-scene-ink text-xs dc-ink-3">Same as subscription extras: tick the modules you need, see the price beside each one, then checkout.</p></div>
               <PdpPurchaseBuilder
                 product={product}
                 isProductOwned={isProductOwned}
@@ -750,6 +755,9 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
   const tabs: DetailTab[] = ["Description", "Curriculum", "Instructor"];
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [tabBarStuck, setTabBarStuck] = useState(false);
+  // Mouse parity on the tab strip too: drag it sideways instead of hunting for
+  // Shift+wheel, and a drag never switches the tab it ends on.
+  const tabStrip = useDragScroll<HTMLDivElement>();
 
   // Magnet behaviour: the tab bar is sticky inside the PDP scroll container,
   // so it sticks just below the app header while the user scrolls through the
@@ -787,12 +795,12 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
   // scroll box — an `overflow-hidden` ancestor traps `position: sticky`,
   // which is why the magnet tab bar below never seated under the header.
   return (
-    <GlassSurface data-pdp-details radius={24} tint={0.25} blur={0} className="overflow-hidden text-white" style={{ overflow: "clip" }} contentClassName="relative">
+    <GlassSurface data-pdp-details radius={24} tint={0.25} blur={0} className="dc-scene-plate overflow-hidden text-white" style={{ overflow: "clip" }} contentClassName="relative">
       <div ref={sentinelRef} aria-hidden className="h-px" />
       <div
         data-pdp-tabbar
         data-stuck={tabBarStuck ? "true" : "false"}
-        className={`sticky top-0 z-30 px-3 pb-2 pt-3 transition-shadow duration-200 ${tabBarStuck ? "bg-[var(--dc-chrome-glass)]" : "rounded-t-[23px]"}`}
+        className={`sticky top-0 z-30 px-3 pb-2 pt-3 transition-shadow duration-200 ${tabBarStuck ? "dc-scene-plate dc-scene-plate--bar bg-[var(--dc-chrome-glass)]" : "rounded-t-[23px]"}`}
       >
         {/* Wave 3 (commerce): the tab strip is the pack's `glass-toggle-group`,
             the same control the store filter row uses — one sliding droplet
@@ -800,15 +808,15 @@ function DetailsCard({ product, modules, curriculumMode, highlights, tab, onTab,
             (`data-pdp-tabbar`, its stuck shadow, `rounded-t-[23px]`) is untouched,
             and so is every `data-pdp-curriculum*` hook. `dc-segment` is the
             light-theme ink in src/glass.css. */}
-        <div className="flex overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div ref={tabStrip.ref} onPointerDown={tabStrip.onPointerDown} className="flex overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <GlassToggleGroup
-            className="dc-segment shrink-0"
+            className="dc-segment dc-scene-plate shrink-0"
             value={tab}
             onValueChange={(next) => onTab(next as DetailTab)}
             aria-label="Product details"
           >
             {tabs.map((item) => (
-              <GlassToggleItem key={item} value={item} className="whitespace-nowrap px-3.5 py-2 text-xs font-semibold">
+              <GlassToggleItem key={item} value={item} className="whitespace-nowrap px-3.5 py-2 text-xs font-semibold min-h-[38px]">
                 {item}
               </GlassToggleItem>
             ))}
@@ -932,7 +940,7 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
   const visibleReviews = reviews.slice(0, visibleCount);
   const remaining = Math.max(0, reviews.length - visibleCount);
   return (
-    <GlassSurface data-pdp-reviews id="product-reviews" radius={24} tint={0.25} blur={0} className="scroll-mt-36 text-white" contentClassName="p-5">
+    <GlassSurface data-pdp-reviews id="product-reviews" radius={24} tint={0.25} blur={0} className="dc-scene-plate scroll-mt-36 text-white" contentClassName="p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-white">Ratings & Reviews</h2>
         <button onClick={onToggleComposer} className="rounded-full bg-indigo-600 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-indigo-500">{composerOpen ? "Cancel" : canReview ? "Write a review" : "Review eligibility"}</button>
@@ -988,7 +996,7 @@ function ReviewsCard({ product, reviews, canReview, composerOpen, rating, commen
 
 function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavigate?: (product: Product) => void }) {
   return (
-    <GlassSurface data-pdp-related radius={24} className="text-white" contentClassName="p-5">
+    <GlassSurface data-pdp-related radius={24} className="dc-scene-plate text-white" contentClassName="p-5">
       <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-black dc-ink-1">You may also like</h2><p className="dc-section-label">Matched from the live catalog</p></div><ArrowUpRight className="h-4 w-4 text-white/55" /></div>
       <div data-pdp-related-list className="space-y-3">{products.map((item) => <GlassCard key={item.id} role="button" tabIndex={0} onClick={() => onNavigate?.(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate?.(item); } }} aria-label={`View ${item.title}`} className="group w-full cursor-pointer overflow-hidden text-left transition hover:-translate-y-0.5" contentClassName="flex p-0"><img src={item.image} alt={item.title} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-white">{item.title}</span><span className="flex items-center gap-1 text-xs text-white/55"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-white">{formatPrice(item.price)}</span></span></GlassCard>)}</div>
     </GlassSurface>

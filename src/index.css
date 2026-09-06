@@ -5417,6 +5417,29 @@ html[data-course-player-active="true"] {
   background: transparent !important;
 }
 
+/* Six 44px tabs + five 8px gaps + the panel's 16px padding + the nav's 12px
+   gutter come to exactly 360px — the width of the most common phone, with zero
+   slack. Below that (320px SE-class handsets, and any split-screen column) the
+   first and last tab spill off-screen: `[data-glass-dock]` opts out of
+   `max-width` so the magnification spring is never frozen, which means nothing
+   clips it either — the end tabs are simply unreachable.
+
+   So tighten the RHYTHM, never the targets: 6·44 + 5·4 + 2·8 + 2·8 = 316px,
+   which fits a 320px viewport with every tap target still at 44px (ICON_SIZE in
+   GlassDock.tsx is untouched). The wave is transform-only, so the tighter gaps
+   do not change it, and `--dc-footer-nav-h` is measured from the dock's real
+   height, which this does not touch. */
+@media (max-width: 380px) {
+  [data-site-footer-nav]:has([data-glass-dock]) {
+    padding-inline: 8px;
+  }
+
+  [data-glass-dock] {
+    gap: 4px;
+    padding-inline: 8px;
+  }
+}
+
 [data-site-footer]:has([data-glass-dock]),
 [data-site-footer][data-glass-dock] {
   background: transparent !important;

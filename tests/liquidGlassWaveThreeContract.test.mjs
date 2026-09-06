@@ -154,7 +154,11 @@ test("the product page keeps every pinned hook and swaps only the switcher", () 
   assert.match(details, /data-pdp-tabbar/, "the sticky tab bar the scroll logic measures");
   assert.match(details, /rounded-t-\[23px\]/, "the stuck-state corner maths is untouched");
   assert.match(details, /<GlassToggleGroup\b/);
-  assert.match(details, /className="dc-segment shrink-0"/);
+  // 2026-09-06 (PDP legibility): the strip also carries `dc-scene-plate`, the
+  // shared contrast backing from src/glass.css — the pack's frost disappears over
+  // the winter scene. `dc-segment` (light ink) and `shrink-0` (it must not shrink
+  // inside the scroller) are unchanged.
+  assert.match(details, /className="dc-segment dc-scene-plate shrink-0"/);
   assert.match(details, /onTab\(next as DetailTab\)/, "the tab union type still narrows at the boundary");
   assert.doesNotMatch(details, /bg-zinc-100\/70/, "the ad-hoc grey track is gone");
   for (const anchor of ["data-pdp-curriculum", "data-pdp-curriculum-mode", "data-pdp-curriculum-module", "data-pdp-curriculum-upgrade-hint"]) {
