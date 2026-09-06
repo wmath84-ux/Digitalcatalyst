@@ -33,6 +33,11 @@ interface ConfirmDialogProps {
  * buttons for Cancel / Delete, so the destructive action has weight without
  * the flat solid pill. `role="alertdialog"`, Escape-to-cancel and the shared
  * scroll lock are unchanged.
+ *
+ * My Day legibility: `dc-scene-plate` puts the same dark backing, rim and ink
+ * floor under the confirmation that every card / bar / sheet wears, so a
+ * delete prompt over the bright winter scene reads at the same contrast as
+ * the list it came from (src/glass.css).
  */
 export default function ConfirmDialog({
   open,
@@ -89,7 +94,7 @@ export default function ConfirmDialog({
       <GlassSurface
         radius={0}
         style={{ borderRadius: "var(--glass-sheet-radius)" }}
-        className="glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"
+        className="dc-scene-plate glass-dialog-in relative max-h-full w-full max-w-sm overflow-hidden text-white"
         contentClassName="max-h-full overflow-y-auto overscroll-contain p-6 custom-scrollbar"
         role="alertdialog"
         aria-modal="true"

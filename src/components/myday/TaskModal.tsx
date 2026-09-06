@@ -149,7 +149,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
             Priority
           </label>
           <GlassToggleGroup
-            className="dc-segment flex w-full"
+            className="dc-segment dc-scene-plate flex w-full"
             data-stretch
             value={task.priority}
             onValueChange={(v) => setTask({ ...task, priority: v as Task["priority"] })}
@@ -169,8 +169,11 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
           <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-white/55">
             Status
           </label>
+          {/* `dc-segment dc-scene-plate`: inside the plated sheet the pack's
+              35% tint group had no visible boundary — the shared backing gives
+              the segmented control the same well the store filters sit in. */}
           <GlassToggleGroup
-            className="dc-segment flex w-full"
+            className="dc-segment dc-scene-plate flex w-full"
             data-stretch
             value={task.status}
             onValueChange={(v) => setTask({ ...task, status: v as Task["status"] })}

@@ -32,9 +32,13 @@ export default function SideNav({ active, onNavigate }: SideNavProps) {
   const custom = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
   return (
     <aside className="sticky top-[65px] hidden h-fit w-60 shrink-0 md:block md:w-56 lg:w-60 xl:w-64">
+      {/* Legibility (the same pass as Home, Store and the product page):
+          `dc-scene-plate` is the ONE shared material in src/glass.css — a dark
+          navy backing, a real rim, blur 0 and lifted `/55 · /70` ink — so the
+          rail reads at the same contrast as the panels beside it. */}
       <GlassSurface
         radius={24}
-        className="text-white"
+        className="dc-scene-plate text-white"
         contentClassName="flex flex-col gap-1 p-4 md:p-3"
       >
         <div className="mb-5 flex items-center gap-2.5 px-1">

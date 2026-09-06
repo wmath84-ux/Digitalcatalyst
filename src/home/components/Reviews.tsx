@@ -1,6 +1,7 @@
 import { BadgeCheck } from "lucide-react";
 import type { PublishedProductReview } from "../../hooks/useProductReviews";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { useDragScroll } from "../../hooks/useDragScroll";
 
 interface ReviewsProps {
   reviews: PublishedProductReview[];
@@ -8,6 +9,10 @@ interface ReviewsProps {
 }
 
 export default function Reviews({ reviews, onOpenReview }: ReviewsProps) {
+  // Mouse parity: dragging the rail left/right with a pointer works like a
+  // thumb swipe, and a drag is never mistaken for opening a review card.
+  const rail = useDragScroll<HTMLDivElement>();
+
   const average = reviews.length
     ? reviews.reduce((total, review) => total + review.rating, 0) / reviews.length
     : 0;
@@ -17,11 +22,15 @@ export default function Reviews({ reviews, onOpenReview }: ReviewsProps) {
   return (
     <section className="mt-7 pb-4">
       <div className="flex items-center justify-between px-5">
-        <h2 className="text-base font-bold text-white">Loved by Learners</h2>
-        <span className="text-xs font-semibold text-white/55">{average.toFixed(1)} ★ average</span>
+        <h2 className="dc-scene-ink text-base font-bold text-white">Loved by Learners</h2>
+        <span className="dc-scene-ink text-xs font-semibold text-white/55">{average.toFixed(1)} ★ average</span>
       </div>
 
-      <div className="mt-3 flex gap-3 overflow-x-auto px-5 pb-2 no-scrollbar snap-x-mandatory">
+      <div
+        ref={rail.ref}
+        onPointerDown={rail.onPointerDown}
+        className="mt-3 flex gap-3 overflow-x-auto px-5 pb-2 no-scrollbar snap-x-mandatory"
+      >
         {reviews.map((review) => (
           <GlassCard
             role="button"

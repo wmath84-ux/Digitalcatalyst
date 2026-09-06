@@ -81,6 +81,26 @@
   }
 
   /*
+    ── Mouse drag-to-scroll on the horizontal rails ──────────────────────────
+    Set by src/hooks/useDragScroll.ts for the length of a pointer drag, so a
+    desktop mouse gets the same left/right gesture a thumb gets on the hidden
+    scrollbars. While the rail is held it grabs the cursor, refuses to select
+    text, and suspends scroll-snap so the content follows the pointer 1:1
+    instead of snapping mid-drag. Removing the attribute on release re-arms
+    snap, which settles the rail onto its nearest card by itself.
+  */
+  [data-drag-scrolling="true"] {
+    cursor: grabbing !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    scroll-snap-type: none !important;
+  }
+
+  [data-drag-scrolling="true"] * {
+    cursor: grabbing !important;
+  }
+
+  /*
    * Mobile header glow.
    *
    * The site header sits sticky at the top of every page. On mobile
@@ -5382,12 +5402,42 @@ html[data-course-player-active="true"] {
 [data-glass-dock] {
   overflow: visible;
   isolation: isolate;
+  /* Layout only — the capsule's MATERIAL is painted in src/glass.css. Since the
+     2026-09-06 footer pass, `html[data-glass="on"] :where([data-glass-dock])`
+     plates the dock (same importance, one specificity point higher, so it wins
+     this `transparent`): a bare refraction lens over the winter scene's snow had
+     no visible material at all, which is what "optimise the bottom navigation
+     bar" was about. This rule stays because it is what keeps the dock from
+     reserving a band, and it is what `?glass=off` falls back to. */
   background: transparent !important;
 }
 
 [data-site-footer-nav]:has([data-glass-dock]) {
   overflow: visible !important;
   background: transparent !important;
+}
+
+/* Six 44px tabs + five 8px gaps + the panel's 16px padding + the nav's 12px
+   gutter come to exactly 360px — the width of the most common phone, with zero
+   slack. Below that (320px SE-class handsets, and any split-screen column) the
+   first and last tab spill off-screen: `[data-glass-dock]` opts out of
+   `max-width` so the magnification spring is never frozen, which means nothing
+   clips it either — the end tabs are simply unreachable.
+
+   So tighten the RHYTHM, never the targets: 6·44 + 5·4 + 2·8 + 2·8 = 316px,
+   which fits a 320px viewport with every tap target still at 44px (ICON_SIZE in
+   GlassDock.tsx is untouched). The wave is transform-only, so the tighter gaps
+   do not change it, and `--dc-footer-nav-h` is measured from the dock's real
+   height, which this does not touch. */
+@media (max-width: 380px) {
+  [data-site-footer-nav]:has([data-glass-dock]) {
+    padding-inline: 8px;
+  }
+
+  [data-glass-dock] {
+    gap: 4px;
+    padding-inline: 8px;
+  }
 }
 
 [data-site-footer]:has([data-glass-dock]),

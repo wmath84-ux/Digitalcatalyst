@@ -608,13 +608,19 @@ export default function App() {
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
         />
 
+        {/* The phone search strip is CHROME, so it wears the bar plate the
+            shared header and the store's filter bar wear: `dc-scene-plate--bar`
+            paints the strip's own box (there is no pack surface inside it) and
+            `dc-scene-field` gives the pill a rim + a legible placeholder. A
+            search that reads clearly is the one feature every My Day page is
+            reached through. */}
         {showMobileSearch && (
-          <div className="animate-slideUp border-b border-white/10 bg-[var(--dc-chrome-glass)] px-4 pb-3 pt-2 [backdrop-filter:var(--dc-chrome-glass-blur)]">
+          <div className="dc-scene-plate dc-scene-plate--bar animate-slideUp border-b border-white/10 bg-[var(--dc-chrome-glass)] px-4 pb-3 pt-2 [backdrop-filter:var(--dc-chrome-glass-blur)]">
             <div className="flex items-center gap-2">
               <GlassInput
                 type="search"
                 autoFocus
-                className="w-full"
+                className="dc-scene-field w-full"
                 icon={<Search className="h-4 w-4" aria-hidden="true" />}
                 value={globalSearch}
                 onChange={(e) => setGlobalSearch(e.target.value)}
@@ -649,9 +655,15 @@ export default function App() {
                 Profile page inside MyDayAllowanceCard. My Day itself stays a
                 clean planning surface; the PremiumGate below still explains
                 the allowance at the exact moment a creation is blocked. */}
+            {/* Cloud-sync / device-saving status. This is the one line of My
+                Day copy with no surface under it — it floats on the scene (and,
+                from 1024px up, on the frame's 55% white veil), where `text-white/55`
+                was the least legible text on the page. `dc-scene-ink` is the
+                shared hook for exactly that: a per-glyph dark scrim plus the
+                lifted ink floor. */}
             {(!cloudLoaded || savingMyDay || cloudSyncFailed) && (
               <div className="mb-3 text-center">
-                <p className={cloudSyncFailed ? "text-[11px] font-bold text-amber-200" : "text-[11px] font-semibold text-white/55"}>
+                <p className={cloudSyncFailed ? "dc-scene-ink text-[11px] font-bold text-amber-200" : "dc-scene-ink text-[11px] font-semibold text-white/55"}>
                   {savingMyDay
                     ? "Saving My Day…"
                     : cloudSyncFailed

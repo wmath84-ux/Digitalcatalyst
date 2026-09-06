@@ -93,7 +93,7 @@ export default function CreateMenu({ options, onSelect }: CreateMenuProps) {
         >
           <Plus className="h-10 w-10 md:h-12 md:w-12" strokeWidth={2.5} />
         </button>
-        <p className="mt-3 text-sm font-semibold text-white/55 md:text-base">Add to your day</p>
+        <p className="dc-scene-ink mt-3 text-sm font-semibold text-white/55 md:text-base">Add to your day</p>
 
         {open && (
           /* Fixed-width anchor, centred on the button. The dedicated
@@ -107,12 +107,15 @@ export default function CreateMenu({ options, onSelect }: CreateMenuProps) {
             {/* Wave 13: the drop-up panel is the pack GlassSurface (dropdown
                 material, radius 20); `dc-create-menu` only carries the pop
                 keyframe, no material. */}
+            {/* The drop-up floats straight over the scene, so it wears the
+                same `dc-scene-plate` backing as every other panel — the menu
+                labels stay at card contrast instead of veil contrast. */}
             <GlassSurface
               radius={20}
               data-myday-create-menu
               role="menu"
               aria-label="Create"
-              className="dc-create-menu relative mx-auto w-full max-w-[calc(100vw-2rem)]"
+              className="dc-create-menu dc-scene-plate relative mx-auto w-full max-w-[calc(100vw-2rem)]"
               contentClassName="p-1.5"
             >
               {options.map((option, index) => {

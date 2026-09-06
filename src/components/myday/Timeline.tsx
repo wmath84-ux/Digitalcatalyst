@@ -68,8 +68,12 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
     return next?.id;
   }, [sorted, nowMinutes, activeId]);
 
+  // Legibility (the same pass as Home, Store and the product page):
+  // `dc-scene-plate` is the ONE shared material in src/glass.css — a dark
+  // navy backing, a real rim, blur 0 and lifted `/40 · /55 · /70 · /85` ink —
+  // so this panel reads at the same contrast as the cards inside it.
   return (
-    <GlassSurface radius={24} className="text-white" contentClassName="flex flex-col">
+    <GlassSurface radius={24} className="dc-scene-plate text-white" contentClassName="flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-5 pb-4 sm:px-6">
         <div className="flex items-center gap-3">
@@ -188,10 +192,13 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
                           </div>
                         </div>
 
-                        {/* Edit / Delete */}
+                        {/* Edit / Delete — the hide-until-hover step is gated
+                            on `(hover: hover)`: a touch tablet has no hover
+                            state, so the row actions stay reachable on every
+                            device instead of only under a mouse. */}
                         <div
                           onClick={(e) => e.stopPropagation()}
-                          className="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                          className="flex shrink-0 items-center gap-0.5 [@media(hover:hover)]:sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                         >
                           <GlassButton
                             onClick={(e) => { e.stopPropagation(); onEdit(event); }}

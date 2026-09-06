@@ -147,7 +147,15 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
       ref={headerRef}
       data-site-header
       data-home-header
-      className="relative z-30 text-white"
+      /* `dc-scene-plate--bar` gives the bar the SAME material the review cards
+         wear (glass.css · THE CONTRAST PLATE): a dark, translucent plate, a
+         bright top hairline and a downward shadow, so the greeting and the
+         search pill stay legible over the Winter scene's snow and lake instead
+         of floating on a 10% tint. The `--bar` variant paints the header
+         element itself, because this bar's animated padding band + bottom
+         radius live outside the GlassSurface it wraps. The surface keeps the
+         pinned docs sensitivity below (tint 0.25 · blur 0) untouched. */
+      className="dc-scene-plate dc-scene-plate--bar relative z-30 text-white"
       data-home-gradient-from={gradientFrom}
       data-home-gradient-to={gradientTo}
       data-home-gradient-css={brandGlassGradient(gradientFrom, gradientTo)}
@@ -248,7 +256,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
             type="text"
             inputMode="search"
             placeholder="Search courses, PDFs, e-books..."
-            className="w-full [&_input]:cursor-pointer [&_input]:pr-24 [&_input]:outline-none"
+            className="dc-scene-field w-full [&_input]:cursor-pointer [&_input]:pr-24 [&_input]:outline-none"
             readOnly
           />
           {query ? (
@@ -271,7 +279,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
         </div>
 
         {query.trim().length > 0 && (
-          <GlassSurface radius={24} tint={0.25} blur={0} className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-80 overflow-y-auto text-white/85" contentClassName="p-1">
+          <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate dc-scene-plate--bar absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-80 overflow-y-auto text-white/85" contentClassName="p-1">
             {suggestions.length === 0 ? (
               <p className="px-3 py-4 text-center text-sm text-white/55">
                 No matches for “{query}”. Try a different keyword.

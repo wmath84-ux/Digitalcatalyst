@@ -8,6 +8,7 @@ import { GlassButton } from "../ui/glass-button";
 import { GlassInput } from "../ui/glass-input";
 import { GlassCard } from "../ui/GlassCard";
 import { GlassToggleGroup, GlassToggleItem } from "../ui/glass-toggle-group";
+import { useDragScroll } from "../../hooks/useDragScroll";
 
 interface TaskListProps {
   tasks: Task[];
@@ -35,6 +36,10 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
   const [localSearch, setLocalSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  // The filter chips overflow sideways on a phone. `useDragScroll` gives a
+  // mouse / pen the same grab-and-drag a thumb gets on the store's filter row
+  // and the PDP tab strip — and a drag never fires the chip it ends on.
+  const filterRow = useDragScroll<HTMLDivElement>();
 
   // Combine global and local search
   const searchQuery = globalSearch.trim() || localSearch.trim();
@@ -79,8 +84,12 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [filtered, highlightId]);
 
+  // Legibility (the same pass as Home, Store and the product page):
+  // `dc-scene-plate` is the ONE shared material in src/glass.css — a dark
+  // navy backing, a real rim, blur 0 and lifted `/40 · /55 · /70 · /85` ink —
+  // so this panel reads at the same contrast as the cards inside it.
   return (
-    <GlassSurface radius={24} className="text-white" contentClassName="flex flex-col">
+    <GlassSurface radius={24} className="dc-scene-plate text-white" contentClassName="flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-5 sm:px-6">
         <div className="flex items-center gap-3">
@@ -116,13 +125,15 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
         {/* Wave 13: the search field is the pack GlassInput (icon slot); the
             "n found" chip and the clear disc sit beside it. */}
         <div className="flex items-center gap-2">
+          {/* `dc-scene-field` — rim + placeholder lift on the search pill, the
+              same treatment the shared header's search wears. */}
           <GlassInput
             icon={<Search className={cn("h-4 w-4 shrink-0", isSearchActive ? "text-indigo-300" : "text-white/55")} />}
             value={globalSearch || localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             placeholder="Search tasks by title or subject..."
             disabled={!!globalSearch}
-            className={cn("min-w-0 flex-1", isSearchActive && "ring-2 ring-indigo-400/30 rounded-full")}
+            className={cn("dc-scene-field min-w-0 flex-1", isSearchActive && "ring-2 ring-indigo-400/30 rounded-full")}
           />
           {isSearchActive && (
             <div className="flex shrink-0 items-center gap-1.5">
@@ -143,11 +154,17 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto px-4 pt-3.5 pb-1 sm:px-6 hide-scrollbar">
+      {/* Filter tabs — `dc-segment dc-scene-plate` is the store / PDP recipe:
+          the shared dark backing under the pill (so an unselected chip label no
+          longer washes out) and the indigo droplet indicator on top of it. */}
+      <div
+        ref={filterRow.ref}
+        onPointerDown={filterRow.onPointerDown}
+        className="flex items-center gap-1.5 overflow-x-auto px-4 pt-3.5 pb-1 sm:px-6 hide-scrollbar"
+      >
         <ListFilter className="h-4 w-4 shrink-0 text-white/55 mr-1" />
         <GlassToggleGroup
-          className={cn("dc-segment shrink-0", globalSearch && "opacity-50")}
+          className={cn("dc-segment dc-scene-plate shrink-0", globalSearch && "opacity-50")}
           value={filter}
           onValueChange={(next) => { if (!globalSearch) setFilter(next as typeof filter); }}
           aria-label="Filter tasks"

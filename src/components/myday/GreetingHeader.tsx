@@ -36,8 +36,12 @@ const formattedDate = new Date().toLocaleDateString("en-US", {
 export default function GreetingHeader({ name, completed, total, streak }: GreetingHeaderProps) {
   const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
 
+  // Legibility (the same pass as Home, Store and the product page):
+  // `dc-scene-plate` is the ONE shared material in src/glass.css — a dark
+  // navy backing, a real rim, blur 0 and lifted `/40 · /55 · /70 · /85` ink —
+  // so this panel reads at the same contrast as the cards inside it.
   return (
-    <GlassSurface radius={24} className="relative overflow-hidden text-white">
+    <GlassSurface radius={24} className="dc-scene-plate relative overflow-hidden text-white">
 
       <div className="relative px-5 py-6 sm:px-8 sm:py-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">

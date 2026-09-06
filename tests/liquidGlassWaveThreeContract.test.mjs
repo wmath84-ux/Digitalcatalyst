@@ -116,7 +116,14 @@ test("store cards are glass cards and keep their commerce contract", () => {
 
 test("the filter row is one sliding droplet, not N pills", () => {
   assert.match(chips, /<GlassToggleGroup\b/);
-  assert.match(chips, /className="dc-segment shrink-0"/, "light ink + it must not shrink inside the scroller");
+  // 2026-09-06 (store legibility): the row also carries `dc-scene-plate`, the
+  // shared contrast backing from src/glass.css, because the pack's 10% frost
+  // disappears over the winter scene's snow. Light ink + `shrink-0` unchanged.
+  assert.match(
+    chips,
+    /className="dc-segment dc-scene-plate shrink-0"/,
+    "light ink + contrast plate + it must not shrink inside the scroller",
+  );
   assert.match(chips, /value=\{activeId\}/);
   assert.match(chips, /onValueChange=\{onSelect\}/, "the admin-driven filter contract is unchanged");
   assert.match(chips, /title=\{filter\.description \|\| filter\.label\}/, "a chip's description is still announced on hover");
@@ -147,7 +154,11 @@ test("the product page keeps every pinned hook and swaps only the switcher", () 
   assert.match(details, /data-pdp-tabbar/, "the sticky tab bar the scroll logic measures");
   assert.match(details, /rounded-t-\[23px\]/, "the stuck-state corner maths is untouched");
   assert.match(details, /<GlassToggleGroup\b/);
-  assert.match(details, /className="dc-segment shrink-0"/);
+  // 2026-09-06 (PDP legibility): the strip also carries `dc-scene-plate`, the
+  // shared contrast backing from src/glass.css — the pack's frost disappears over
+  // the winter scene. `dc-segment` (light ink) and `shrink-0` (it must not shrink
+  // inside the scroller) are unchanged.
+  assert.match(details, /className="dc-segment dc-scene-plate shrink-0"/);
   assert.match(details, /onTab\(next as DetailTab\)/, "the tab union type still narrows at the boundary");
   assert.doesNotMatch(details, /bg-zinc-100\/70/, "the ad-hoc grey track is gone");
   for (const anchor of ["data-pdp-curriculum", "data-pdp-curriculum-mode", "data-pdp-curriculum-module", "data-pdp-curriculum-upgrade-hint"]) {

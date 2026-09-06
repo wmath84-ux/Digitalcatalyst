@@ -132,10 +132,12 @@ export default function TaskItem({ task, onToggle, onCycleStatus, onEdit, onDele
         </div>
       </div>
 
-      {/* Actions */}
+      {/* Actions — the hide-until-hover step is gated on `(hover: hover)`:
+          a touch tablet has no hover state, so Edit / Delete stay reachable
+          on every device instead of only under a mouse. */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+        className="flex shrink-0 items-center gap-0.5 [@media(hover:hover)]:sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
       >
         <GlassButton
           onClick={(e) => { e.stopPropagation(); onEdit(task); }}
