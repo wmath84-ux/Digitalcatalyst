@@ -11,7 +11,6 @@ jobs:
   build-apk:
     name: Build Debug APK
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -76,7 +75,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: build-apk
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -136,16 +134,16 @@ jobs:
             echo "Warning: KEYSTORE_BASE64 secret nahi mila!"
           fi
 
-          - name: TEMP - print release SHA-1
-          run: keytool -list -v -keystore android/app/release.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -alias "${{ secrets.KEY_ALIAS }}"
+      - name: TEMP - print release SHA-1
+        run: keytool -list -v -keystore android/app/release.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -alias "${{ secrets.KEY_ALIAS }}"
 
       - name: Build Release AAB
         run: |
           cd android && ./gradlew bundleRelease --no-daemon \
-            -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.jks \
-            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+          -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.jks \
+          -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+          -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+          -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
       - name: Upload Release AAB
         uses: actions/upload-artifact@v4
