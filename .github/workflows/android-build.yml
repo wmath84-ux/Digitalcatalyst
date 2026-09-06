@@ -53,6 +53,13 @@ jobs:
             echo "WARNING: GOOGLE_SERVICES_JSON_BASE64 secret nahi mila!"
           fi
 
+      # Fails the build if google-services.json has no Android OAuth client
+      # (i.e. no SHA-1 registered) - otherwise the APK installs fine and only
+      # throws ApiException: 10 the first time a learner taps "Continue with
+      # Google". See docs/android-google-signin.md.
+      - name: Verify Google Sign-In config
+        run: npm run verify:google-signin
+
       - name: Capacitor sync android
         run: npx cap sync android
 
@@ -115,6 +122,13 @@ jobs:
           else
             echo "WARNING: GOOGLE_SERVICES_JSON_BASE64 secret nahi mila!"
           fi
+
+      # Fails the build if google-services.json has no Android OAuth client
+      # (i.e. no SHA-1 registered) - otherwise the APK installs fine and only
+      # throws ApiException: 10 the first time a learner taps "Continue with
+      # Google". See docs/android-google-signin.md.
+      - name: Verify Google Sign-In config
+        run: npm run verify:google-signin
 
       - name: Capacitor sync android
         run: npx cap sync android
