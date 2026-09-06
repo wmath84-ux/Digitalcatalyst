@@ -1,0 +1,180 @@
+# Google Sign-In in the Android APK — why it fails, and the real fix
+
+## TL;DR
+
+The APK's Google login does **not** fail because of a missing SHA-1 fingerprint
+or a missing Android OAuth client. It fails because **Google refuses to serve
+its OAuth consent page inside an embedded WebView**, and the Capacitor APK is
+an embedded WebView running the same web bundle the browser runs.
+
+Adding a SHA-1 is still required later — but only as *step 3* of the real fix,
+which is installing a native sign-in plugin. On its own, a SHA-1 changes
+nothing, because the web SDK never reaches the native credential path.
+
+---
+
+## What is actually in this repo
+
+| Thing | Status |
+| --- | --- |
+| `android/app/google-services.json` | **Not present**, and `.gitignore:41` excludes it. It has never been committed. |
+| `@capacitor-firebase/authentication` (native Google sign-in) | **Not installed.** No native plugin exists in `package.json` or `android/capacitor.settings.gradle`. |
+| Firebase Android SDK in Gradle | Only `firebase-messaging` (push). No `firebase-auth`. |
+| Auth code | 100% web SDK — `signInWithPopup` / `signInWithRedirect` in `src/context/AuthContext.tsx`. |
+
+So there is no `FirebaseAuthentication.signInWithGoogle()` in this project at
+all. Whatever the APK is running, it is falling into the **web** popup/redirect
+path, and that path is the one Google blocks.
+
+## Why SHA-1 alone cannot fix it
+
+`google-services.json` and its `oauth_client` entries are consumed by the
+**native** Google Play Services sign-in flow. The web SDK inside the WebView
+never calls Play Services; it opens `accounts.google.com` as a web page.
+
+When that page is loaded from an embedded WebView user agent, Google's
+[Secure Browser Policy](https://developers.googleblog.com/2021/06/upcoming-security-changes-to-googles-oauth-2.0-authorization-endpoint.html)
+returns **`403 disallowed_useragent`**. That check happens before any client id
+or certificate fingerprint is examined, so:
+
+- adding an Android OAuth client (`client_type: 1`) → still blocked
+- adding the release **and** debug SHA-1 → still blocked
+- switching popup → redirect → still blocked
+
+This is also why the same account signs in fine on the website: a real Chrome
+tab is an allowed user agent.
+
+## What was changed in the code (this PR)
+
+The app can't install a native plugin on the user's behalf, but it should never
+show a button that is guaranteed to fail. So:
+
+1. **`src/utils/nativeRuntime.ts`** (new) — detects the Capacitor shell, any
+   Android WebView (`; wv)` in the UA), known in-app browsers (Instagram,
+   Facebook, Line, WeChat), and whether a native `FirebaseAuthentication`
+   plugin has been registered.
+
+2. **`loginWithGoogle()`** now returns a clear, actionable error instead of a
+   silent failure when it detects a blocked WebView with no native plugin —
+   telling the learner to use email/password, or to open the site in Chrome.
+
+3. **`AuthForm`** disables the Google button in that environment and shows an
+   amber explanation, so nobody taps a dead button repeatedly.
+
+Once the native plugin below is installed, `hasNativeGoogleAuth()` returns
+`true`, the guard switches itself off automatically, and the button comes back.
+
+---
+
+## The real fix — native Google sign-in
+
+### 1. Install the plugin
+
+The current `firebase@12.x` conflicts with the plugin's declared peer range
+(`firebase@^11.2.0`), so install it with legacy peer resolution:
+
+```bash
+npm install @capacitor-firebase/authentication --legacy-peer-deps
+npx cap sync android
+```
+
+Then enable the Google provider in `capacitor.config.ts`:
+
+```ts
+plugins: {
+  FirebaseAuthentication: {
+    skipNativeAuth: false,
+    providers: ["google.com"],
+  },
+},
+```
+
+### 2. Add `google-services.json`
+
+Firebase Console → Project settings → **Your apps** → Android app with package
+`app.eduvora.shop` (create it if it doesn't exist) → download
+`google-services.json` → place it at `android/app/google-services.json`.
+
+It is gitignored on purpose; it must be present on whatever machine builds the
+APK.
+
+### 3. *Now* the SHA-1 matters
+
+In the same Firebase Console screen, add the SHA-1 of **every** key that will
+sign the app:
+
+```bash
+# debug builds
+keytool -list -v -keystore ~/.android/debug.keystore \
+  -alias androiddebugkey -storepass android -keypass android
+
+# your release keystore
+keytool -list -v -keystore android/app/eduvora.keystore -alias eduvora
+```
+
+If you use **Play App Signing**, also copy the SHA-1 that Play Console shows
+under *Release → Setup → App signing* — Google re-signs your upload, so that
+is the fingerprint end users' installs actually carry. Missing this is the #1
+reason sign-in works on a sideloaded APK but fails from the Play Store.
+
+After adding fingerprints, **re-download `google-services.json`** — the file
+must contain the new `client_type: 1` entries.
+
+### 4. Route the call natively
+
+In `loginWithGoogle()`, when `hasNativeGoogleAuth()` is true, call the plugin
+and exchange its ID token for a Firebase web-SDK session so the rest of the app
+(Firestore rules, `onAuthStateChanged`) keeps working unchanged:
+
+```ts
+import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
+import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
+
+const { credential } = await FirebaseAuthentication.signInWithGoogle();
+const authCredential = GoogleAuthProvider.credential(credential?.idToken);
+const result = await signInWithCredential(auth, authCredential);
+```
+
+---
+
+## Issue 2 — "the correct password is rejected"
+
+Your diagnosis is right, and the code now handles it.
+
+With **Email Enumeration Protection** on (the default for Firebase projects
+created after Sept 2023), these three cases all return the single generic code
+`auth/invalid-credential`:
+
+1. the password really is wrong,
+2. no account exists for that email,
+3. **the account exists but has no password** — it was created with "Continue
+   with Google", so there is nothing to compare against and a "correct"
+   password can never work.
+
+Case 3 is the one that feels like a bug. `login()` now detects it via
+`fetchSignInMethodsForEmail` and returns a specific message —
+*"यह account Google sign-in से बना है… Continue with Google से login करें"* —
+and the UI rings the Google button so the next tap is the right one.
+
+Note the honest limitation: with enumeration protection **on**, that API
+returns an empty list, so detection degrades to "unknown" and the learner gets
+the generic message. The generic message was therefore also rewritten to
+mention Google sign-in. We deliberately do **not** query Firestore for this —
+`users/{uid}` is owner-or-admin readable (`firestore.rules:69`), and opening it
+to signed-out reads would recreate exactly the enumeration oracle the
+protection prevents.
+
+### How to confirm an account is Google-only
+
+Firebase Console → Authentication → Users → find the email → look at the
+**Providers** column:
+
+- Google icon only → no password exists; sign in with Google, or use *Forgot
+  password* to set one (this adds a password provider to the same account).
+- Google + email icons → a password exists and a genuinely wrong one was typed.
+
+### A permanent cure for affected accounts
+
+Ask the learner to tap **Forgot password**. Firebase sends a reset link, and
+setting a password attaches a `password` provider to the existing Google
+account — after that, both sign-in methods work for the same user.

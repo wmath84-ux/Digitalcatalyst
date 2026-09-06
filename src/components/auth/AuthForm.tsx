@@ -9,6 +9,7 @@ import BrandMark from "@/components/BrandMark";
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassToggleGroup, GlassToggleItem } from "@/components/ui/glass-toggle-group";
+import { hasNativeGoogleAuth, isCapacitorNative, isEmbeddedWebView } from "@/utils/nativeRuntime";
 
 type Mode = "login" | "signup";
 
@@ -35,12 +36,22 @@ export default function AuthForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [highlightGoogle, setHighlightGoogle] = useState(false);
   const { login, signup, loginWithGoogle, resetPassword } = useAuth();
+
+  // Google sign-in cannot complete inside an embedded WebView (the APK shell
+  // or an in-app browser) unless a native plugin is registered — Google's own
+  // Secure Browser Policy blocks the OAuth page there. Rather than show a
+  // button that always fails, explain the situation and point at the paths
+  // that DO work. See src/utils/nativeRuntime.ts.
+  const [googleBlocked] = useState(() => isEmbeddedWebView() && !hasNativeGoogleAuth());
+  const [insideApp] = useState(() => isCapacitorNative());
 
   const clearMessages = () => {
     setError(null);
     setSignupNotice(null);
     setSuccess(null);
+    setHighlightGoogle(false);
   };
 
   const completeSuccess = (message: string, fallback?: string) => {
@@ -89,6 +100,9 @@ export default function AuthForm() {
           return;
         }
         setError(result.message);
+        // A Google-created account has no password to check, so nudge the
+        // learner straight at the button that will actually sign them in.
+        if (result.code === "auth/google-only-account") setHighlightGoogle(true);
         return;
       }
       completeSuccess(result.message, "#/store");
@@ -184,8 +198,10 @@ export default function AuthForm() {
         variant="capsule"
         type="button"
         onClick={handleGoogleLogin}
-        disabled={busy}
+        disabled={busy || googleBlocked}
+        aria-disabled={googleBlocked}
         className="mt-6 w-full [&>span>div]:h-12 [&>span>div]:w-full [&>span>div]:font-bold disabled:cursor-not-allowed disabled:opacity-60"
+        style={highlightGoogle ? { boxShadow: "0 0 0 2px rgba(66,133,244,0.85), 0 0 26px rgba(66,133,244,0.55)", borderRadius: 999 } : undefined}
       >
         <span className="flex items-center justify-center gap-3">
         {googleSubmitting ? (
@@ -201,6 +217,14 @@ export default function AuthForm() {
         {googleSubmitting ? "Google से connect हो रहा है…" : "Continue with Google"}
         </span>
       </GlassButton>
+
+      {googleBlocked && (
+        <p className="mt-2 rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-[11px] font-semibold leading-relaxed text-amber-100">
+          {insideApp
+            ? "Google sign-in इस app version के अंदर उपलब्ध नहीं है (Google embedded WebView में OAuth allow नहीं करता). नीचे email + password से login करें — या eduvora.shop को Chrome में खोलकर Google से sign in करें।"
+            : "यह in-app browser Google sign-in block करता है। ऊपर ⋮ menu से \u201COpen in Chrome\u201D चुनें, या नीचे email + password इस्तेमाल करें।"}
+        </p>
+      )}
 
       <div className="my-5 flex items-center gap-3">
         <span className="h-px flex-1 bg-white/10" />

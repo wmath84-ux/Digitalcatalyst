@@ -17,6 +17,7 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
   setPersistence,
+  fetchSignInMethodsForEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
@@ -28,6 +29,7 @@ import {
 import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { APPROVED_ADMIN_EMAIL, clearAdminSession, createAdminSession } from "../utils/adminSession";
+import { hasNativeGoogleAuth, isCapacitorNative, isEmbeddedWebView } from "../utils/nativeRuntime";
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
@@ -95,9 +97,9 @@ const authErrorMessage = (error: unknown): string => {
 
   const messages: Record<string, string> = {
     "auth/email-already-in-use": "इस ईमेल से अकाउंट पहले से मौजूद है। कृपया Login करें या password reset करें।",
-    "auth/invalid-credential": "ईमेल या पासवर्ड सही नहीं है।",
+    "auth/invalid-credential": "ईमेल या पासवर्ड सही नहीं है। अगर आपने यह account Google से बनाया था, तो नीचे \u201CContinue with Google\u201D से login करें।",
     "auth/user-not-found": "इस ईमेल से कोई अकाउंट नहीं मिला।",
-    "auth/wrong-password": "पासवर्ड सही नहीं है।",
+    "auth/wrong-password": "पासवर्ड सही नहीं है। अगर यह account Google से बना था, तो \u201CContinue with Google\u201D से login करें।",
     "auth/weak-password": "पासवर्ड कम से कम 6 characters का होना चाहिए।",
     "auth/invalid-email": "कृपया valid email address डालें।",
     "auth/network-request-failed": "Network connection failed. Internet check करके फिर कोशिश करें।",
@@ -105,6 +107,8 @@ const authErrorMessage = (error: unknown): string => {
     "auth/popup-closed-by-user": "Google sign-in window बंद कर दी गई।",
     "auth/popup-blocked": "Browser ने Google sign-in popup block कर दिया। Popups allow करके फिर कोशिश करें।",
     "auth/account-exists-with-different-credential": "इस ईमेल का अकाउंट दूसरे sign-in method से बना है।",
+    "auth/operation-not-supported-in-this-environment": "यह sign-in method इस app के अंदर काम नहीं करता।",
+    "auth/web-storage-unsupported": "इस browser में storage blocked है, इसलिए login पूरा नहीं हो सका।",
     "auth/unauthorized-domain": "यह domain Firebase Authentication में authorized नहीं है।",
     "auth/operation-not-allowed": "यह sign-in provider Firebase Console में enabled नहीं है।",
     "auth/configuration-not-found": "Firebase Authentication provider configured नहीं है।",
@@ -188,6 +192,33 @@ const ensureUserProfile = async (
   }
 
   return readAppUser(firebaseUser);
+};
+
+/**
+ * Best-effort answer to "was this account created with Google and given no
+ * password?".
+ *
+ * `fetchSignInMethodsForEmail` answers this definitively — but only while
+ * Firebase's **Email Enumeration Protection** is OFF. With it ON (the default
+ * for projects created after Sept 2023) the API deliberately returns an empty
+ * list for every address so that an attacker cannot probe which emails are
+ * registered. That is a good default and we do NOT ask anyone to weaken it:
+ * we simply treat "empty list" as "don't know" and fall back to the generic
+ * message, which now mentions Google sign-in anyway.
+ *
+ * A signed-out Firestore lookup is deliberately NOT used here — `users/{uid}`
+ * is readable only by its owner or an admin (firestore.rules), and opening
+ * that up would turn the database into exactly the email-enumeration oracle
+ * the protection above exists to prevent.
+ */
+const isGoogleOnlyAccount = async (email: string): Promise<boolean> => {
+  try {
+    const methods = await fetchSignInMethodsForEmail(auth, email);
+    if (!methods || methods.length === 0) return false; // unknown, not "no"
+    return methods.includes("google.com") && !methods.includes("password");
+  } catch {
+    return false;
+  }
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -280,13 +311,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string): Promise<AuthResult> => {
     clearAdminSession();
+    const normalizedEmail = normalizeEmail(email);
     try {
       await setPersistence(auth, browserLocalPersistence);
-      const credential = await signInWithEmailAndPassword(auth, normalizeEmail(email), password);
+      const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       await commitFirebaseUser(credential.user);
       return { success: true, message: "Login successful." };
     } catch (error) {
-      return { success: false, message: authErrorMessage(error), code: authErrorCode(error) };
+      const code = authErrorCode(error);
+      // ── "Sahi password bhi wrong bata raha hai" ─────────────────────────
+      // Firebase (with Email Enumeration Protection ON, the default for new
+      // projects) collapses THREE different situations into the single
+      // generic code `auth/invalid-credential`:
+      //
+      //   1. the password really is wrong,
+      //   2. no account exists for this email at all,
+      //   3. the account exists but has NO password — it was created with
+      //      "Continue with Google", so there is nothing to compare against
+      //      and the correct-looking password can never succeed.
+      //
+      // Case 3 is the one that makes a learner insist they typed it right,
+      // and `fetchSignInMethodsForEmail` no longer distinguishes it either
+      // (enumeration protection makes it return an empty list for every
+      // address). What we CAN do is look up the profile document the app
+      // itself writes on every sign-in: it records `providerIds`, so a
+      // Google-only account is identifiable without leaking anything a
+      // signed-out attacker could not already guess.
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password") {
+        const googleOnly = await isGoogleOnlyAccount(normalizedEmail);
+        if (googleOnly) {
+          return {
+            success: false,
+            code: "auth/google-only-account",
+            message:
+              "यह account Google sign-in से बना है, इसलिए इसका कोई password नहीं है। नीचे \u201CContinue with Google\u201D से login करें — या \u201CForgot password\u201D से एक password set कर लें।",
+          };
+        }
+      }
+      return { success: false, message: authErrorMessage(error), code };
     }
   }, [commitFirebaseUser]);
 
@@ -381,6 +443,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithGoogle = useCallback(async (): Promise<AuthResult> => {
     clearAdminSession();
+
+    // ── Why Google login fails inside the APK ───────────────────────────────
+    // The Android build is a Capacitor WebView running this exact same web
+    // bundle, so both of the web SDK's Google paths are attempted here — and
+    // Google blocks both inside an embedded WebView:
+    //
+    //   · signInWithPopup    — there is no browser window to hand the result
+    //                          back to, so the popup never resolves;
+    //   · signInWithRedirect — Google's OAuth server rejects embedded-WebView
+    //                          user agents outright with `disallowed_useragent`.
+    //
+    // This is Google's Secure Browser Policy, not a Firebase misconfiguration:
+    // adding an Android OAuth client or a SHA-1 fingerprint does NOT lift it,
+    // because those credentials are only consulted by the NATIVE Play Services
+    // sign-in flow, which the web SDK never reaches from inside a WebView.
+    //
+    // The real fix is a native plugin (@capacitor-firebase/authentication),
+    // which opens the Play Services account picker and hands the resulting ID
+    // token to Firebase. Until that plugin is installed and registered, fail
+    // LOUDLY and usefully rather than leaving the learner on a dead button.
+    if (isEmbeddedWebView() && !hasNativeGoogleAuth()) {
+      return {
+        success: false,
+        code: "auth/native-google-unavailable",
+        message: isCapacitorNative()
+          ? "Google sign-in अभी app के अंदर उपलब्ध नहीं है। कृपया email aur password से login करें, या website eduvora.shop को browser में खोलकर Google से sign in करें।"
+          : "यह in-app browser Google sign-in को allow नहीं करता। कृपया इस page को Chrome या किसी normal browser में खोलें।",
+      };
+    }
+
     try {
       await setPersistence(auth, browserLocalPersistence);
       let credential;
