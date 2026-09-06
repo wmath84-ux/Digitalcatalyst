@@ -189,7 +189,10 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
   );
 
   return (
-    <div className="relative px-4">
+    /* `data-store-gutter` is the desktop-alignment hook (index.css): the
+       mobile px-4 is zeroed inside the desktop shell so the chips sit on the
+       same gutter as the hero, search and cards. */
+    <div data-store-gutter className="relative px-4">
       {/* Wave 3 (commerce): the chip row is `glass-toggle-group`, so the selected
           filter is a droplet that *slides* between chips instead of a repaint —
           one moving lens rather than N pills. `dc-chip-group` re-inks the pack's
@@ -206,7 +209,7 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
       <div
         ref={chipRow.ref}
         onPointerDown={chipRow.onPointerDown}
-        className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:[scrollbar-width:thin] lg:[scrollbar-color:rgba(255,255,255,0.16)_transparent] lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:h-1 lg:[&::-webkit-scrollbar-track]:bg-transparent lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-white/15"
       >
         <GlassButton
           variant="capsule"
