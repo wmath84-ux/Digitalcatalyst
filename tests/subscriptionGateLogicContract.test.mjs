@@ -62,6 +62,11 @@ test("subscriptionGate reader uses the shared Admin Firestore accessor", () => {
   assert.match(gateServer, /import\s*\{\s*adminDb\s*\}\s*from\s*"\.\/firebaseAdmin\.js"/);
   assert.doesNotMatch(gateServer, /import\s*\{\s*getFirestore\s*\}\s*from\s*"\.\/firebaseAdmin\.js"/);
   assert.match(gateServer, /const\s+db\s*=\s*adminDb\(\);/);
+  // Admin Firestore uses reference methods and a boolean `exists` property,
+  // not the client SDK's standalone doc/getDoc functions or exists() method.
+  assert.match(gateServer, /db\.doc\("settings\/subscriptionGate"\)\.get\(\)/);
+  assert.doesNotMatch(gateServer, /firebase-admin\/firestore/);
+  assert.doesNotMatch(gateServer, /snap\.exists\(\)/);
 });
 
 test("server model honours the subscriber-only price rule", () => {
@@ -311,7 +316,7 @@ test("a missing settings/subscriptionGate document keeps the legacy gate working
   // `features[key].gated: true`.
   assert.match(
     gateServer,
-    /if\s*\(!snap\.exists\(\)\)\s*\{\s*return\s*\{\s*\.\.\.SUBSCRIPTION_GATE_DEFAULTS\s*\}\s*;\s*\}/,
+    /if\s*\(!snap\.exists\)\s*\{\s*return\s*\{\s*\.\.\.SUBSCRIPTION_GATE_DEFAULTS\s*\}\s*;\s*\}/,
     "missing doc → defaults (legacy gate preserved)",
   );
 });
