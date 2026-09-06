@@ -136,6 +136,9 @@ jobs:
             echo "Warning: KEYSTORE_BASE64 secret nahi mila!"
           fi
 
+          - name: TEMP - print release SHA-1
+          run: keytool -list -v -keystore android/app/release.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -alias "${{ secrets.KEY_ALIAS }}"
+
       - name: Build Release AAB
         run: |
           cd android && ./gradlew bundleRelease --no-daemon \
