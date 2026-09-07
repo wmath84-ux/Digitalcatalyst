@@ -3509,9 +3509,14 @@ html.light .dc-glass-dark {
 
 [data-profile-col="main"] > *,
 [data-profile-col="side"] > *,
+[data-profile-layout] > [data-profile-hero],
 [data-profile-layout] > [data-profile-stats],
 [data-profile-layout] > header {
   min-width: 0;
+}
+
+[data-profile-layout] > [data-profile-hero] {
+  width: 100%;
 }
 
 /* The gradient hero should never inherit a card border or a competing
@@ -3539,6 +3544,7 @@ html.light .dc-glass-dark {
   }
   [data-profile-layout] > header,
   [data-profile-layout] > [role="status"],
+  [data-profile-layout] > [data-profile-hero],
   [data-profile-layout] > section,
   [data-profile-layout] > [data-profile-stats] {
     grid-column: 1 / -1;
@@ -3565,13 +3571,14 @@ html.light .dc-glass-dark {
   }
   [data-profile-layout] > header,
   [data-profile-layout] > [role="status"],
+  [data-profile-layout] > [data-profile-hero],
   [data-profile-layout] > section,
   [data-profile-layout] > [data-profile-stats] {
     grid-column: 1 / -1;
   }
   [data-profile-col="main"] { grid-column: span 7; }
   [data-profile-col="side"] { grid-column: span 5; }
-  [data-profile-layout] section {
+  [data-profile-layout] :is(section, [data-profile-hero]) {
     border-radius: 16px;
   }
   [data-profile-page] [data-site-header],
@@ -3615,6 +3622,7 @@ html.light .dc-glass-dark {
   }
   [data-profile-layout] > header,
   [data-profile-layout] > [role="status"],
+  [data-profile-layout] > [data-profile-hero],
   [data-profile-layout] > section,
   [data-profile-layout] > [data-profile-stats] {
     grid-column: 1 / -1;
@@ -4431,10 +4439,10 @@ html[data-course-player-active="true"] {
     gap: clamp(14px, 2vw, 20px);
     align-items: start;
   }
-  [data-profile-col="main"] > section[data-profile-membership-card],
-  [data-profile-col="main"] > section[data-profile-upgrade-card],
-  [data-profile-col="main"] > section[data-renewal-card],
-  [data-profile-col="side"] > section[data-profile-referral],
+  [data-profile-col="main"] > [data-profile-membership-card],
+  [data-profile-col="main"] > [data-profile-upgrade-card],
+  [data-profile-col="main"] > [data-renewal-card],
+  [data-profile-col="side"] > [data-profile-referral],
   [data-profile-col="side"] > nav {
     grid-column: 1 / -1;
   }

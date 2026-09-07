@@ -51,7 +51,7 @@
 import { Suspense, memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import { AdaptiveDpr, AdaptiveEvents, BakeShadows, Preload } from "@react-three/drei";
-import { Network, NotebookPen } from "lucide-react";
+import { CircleCheck, Maximize, SkipBack, SkipForward } from "lucide-react";
 import type { CourseFile, CourseModule } from "../types/course";
 import { getCourseEmbed } from "../utils/courseEmbed";
 import Room from "./Room";
@@ -63,7 +63,7 @@ import WallActivity from "./WallActivity";
 import WallVisibility from "./WallVisibility";
 import { WallTransformThrottle } from "./throttledTransform";
 import { computeInitialDpr, pickInitialTier, qualitySettings, type ClassroomQuality } from "./quality";
-import { BoardPanel, DeskPanel, WallHeader } from "./panels";
+import { BoardPanel, DeskPanel } from "./panels";
 import {
   BOARD_ZOOM_MIN,
   BOARD_ZOOM_PORTRAIT_FIT,
@@ -407,7 +407,7 @@ export default function Classroom3D({
   }, [step, focus, boardFullscreen, zoomBoardBy, fitBoard]);
 
   return (
-    <div className="dc-classroom-root" data-course-classroom-3d>
+    <div className="course-player-shell dc-classroom-root" data-course-classroom-3d data-course-theme="dark">
       <Canvas
         shadows
         // Mount-time resolution from the area-aware heuristic (quality.ts):
@@ -501,32 +501,20 @@ export default function Classroom3D({
             spill={settings.spillLights === "all" || focus === "notes"}
             label="Notes wall"
           >
-            <div className="flex h-full w-full flex-col bg-[#0a0f1c] text-white">
-              <WallHeader
-                icon={NotebookPen}
-                title="Your notes"
-                hint={`${noteCount} saved · written from the seat`}
-                accent="#fbbf24"
-              />
+            <div className="relative h-full w-full overflow-hidden bg-[#0a0f1c] text-white">
+              <WallActivity wall="notes" active={focus === "notes"}>
+                {notes}
+              </WallActivity>
               {onComposeNote && (
-                <div className="flex shrink-0 items-center gap-2 border-b border-white/8 px-4 py-2">
-                  <button
-                    type="button"
-                    onClick={onComposeNote}
-                    className="rounded-xl bg-amber-400/20 px-3 py-1.5 text-[12px] font-black text-amber-200 ring-1 ring-amber-300/40"
-                  >
-                    + New note
-                  </button>
-                  <span className="truncate text-[11px] font-semibold text-white/40">
-                    {activeFileName ? `While watching: ${activeFileName}` : "Pick a lesson from the desk"}
-                  </span>
-                </div>
+                <button
+                  type="button"
+                  onClick={onComposeNote}
+                  className="dc-classroom-surface-fab"
+                  data-classroom-new-note
+                >
+                  + New note
+                </button>
               )}
-              <div className="min-h-0 flex-1 overflow-hidden">
-                <WallActivity wall="notes" active={focus === "notes"}>
-                  {notes}
-                </WallActivity>
-              </div>
             </div>
           </SurfaceFrame>
 
@@ -542,18 +530,10 @@ export default function Classroom3D({
             spill={settings.spillLights === "all" || focus === "mind"}
             label="Mind map wall"
           >
-            <div className="flex h-full w-full flex-col bg-[#0a0f1c] text-white">
-              <WallHeader
-                icon={Network}
-                title="Mind map"
-                hint={`${mapCount} map${mapCount === 1 ? "" : "s"} · ${flat[position.moduleIndex]?.title || courseTitle}`}
-                accent="#c4b5fd"
-              />
-              <div className="min-h-0 flex-1 overflow-hidden">
-                <WallActivity wall="mind" active={focus === "mind"}>
-                  {mind}
-                </WallActivity>
-              </div>
+            <div className="h-full w-full overflow-hidden bg-[#0a0f1c] text-white">
+              <WallActivity wall="mind" active={focus === "mind"}>
+                {mind}
+              </WallActivity>
             </div>
           </SurfaceFrame>
 
@@ -611,6 +591,31 @@ export default function Classroom3D({
             {preset.label}
           </button>
         ))}
+      </div>
+      <div className="dc-classroom-control-tray" data-classroom-control-tray>
+        <button type="button" className="dc-classroom-control-btn" onClick={() => step(-1)}>
+          <SkipBack size={18} /> Prev
+        </button>
+        <button type="button" className="dc-classroom-control-btn" onClick={() => step(1)}>
+          Next <SkipForward size={18} />
+        </button>
+        <button type="button" className="dc-classroom-control-btn" onClick={fitBoard}>
+          <Maximize size={18} /> Fit board
+        </button>
+        <button
+          type="button"
+          className="dc-classroom-control-btn"
+          onClick={onToggleComplete}
+          disabled={!canMarkComplete || !onToggleComplete}
+          data-done={isDone ? "true" : "false"}
+        >
+          <CircleCheck size={18} /> {isDone ? "Done" : "Complete"}
+        </button>
+        {onExit ? (
+          <button type="button" className="dc-classroom-control-btn" onClick={onExit}>
+            {exitLabel}
+          </button>
+        ) : null}
       </div>
       <p className="dc-classroom-hint">
         {portrait
