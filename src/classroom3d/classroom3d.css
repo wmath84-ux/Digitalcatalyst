@@ -274,3 +274,53 @@
   -webkit-backdrop-filter: none !important;
   animation: none !important;
 }
+
+/* ── Embed impostor + isolation (Part 14) ───────────────────────────────────
+   Third-party iframes (YouTube, Docs/Sheets/Slides/Forms, Whimsical, generic
+   embeds) repaint uncontrollably, so while the camera moves SeatRig holds
+   `.dc-embed-moving` on the canvas parent and the swap below is pure CSS:
+   the live frame drops to visibility:hidden (box kept — no reflow, no
+   reload, scroll/input/cursors survive) and its static impostor sibling
+   grids over it. Settle clears the class and the live frame is back. Native
+   <video>/<audio> are deliberately untouched — Part 13 keeps them live.
+
+   Layer audit (item D — verified against the installed drei source before
+   writing a single hint): drei's transform-mode <Html> is el.portal-root
+   (position:absolute, overflow:hidden, our `dc-classroom-surface` class) >
+   div.outer (viewport-sized, gets the camera matrix) > div.inner (gets the
+   object matrix) > div.content (our panel). Therefore:
+     · NO contain:paint/size on the portal root or the walls — the root's
+       own box is ~0×0 with visibly-overflowing children, so paint/size
+       containment would clip the walls to nothing;
+     · NO will-change:transform/translateZ(0) on the frames — iframes
+       already composite into their own layer in every engine, so another
+       forced layer only burns memory;
+     · YES contain:layout+style on `.dc-embed-frame` (the div wrapping each
+       iframe + its impostor): overlay churn inside can never invalidate
+       ancestors, and it sits BELOW the fullscreen target
+       ([data-course-viewer]), so the top-layer escape hatch is unaffected;
+     · YES content-visibility:auto + contain-intrinsic-size on every wall
+       (item E10): the browser skips off-screen walls like virtualized rows,
+       with the intrinsic size holding layout while skipped. WallActivity's
+       inline style upgrades inactive walls to `hidden` (strictly stronger)
+       and keeps `auto` while active — the two compose, never fight. */
+
+.dc-embed-moving [data-embed-impostor-target] {
+  visibility: hidden;
+}
+
+[data-impostor-mode="motion"] {
+  display: none;
+}
+.dc-embed-moving [data-impostor-mode="motion"] {
+  display: grid;
+}
+
+.dc-embed-frame {
+  contain: layout style;
+}
+
+[data-classroom-wall] {
+  content-visibility: auto;
+  contain-intrinsic-size: 1280px 800px;
+}

@@ -106,7 +106,13 @@ test("ResourceViewer uses a sandboxed iframe with fullscreen / clipboard permiss
   // mode) runs unsandboxed because Google's own /edit page needs sign-in
   // cookies + share/comment popups a sandbox list silently breaks.
   assert.match(resourceViewer, /sandbox=\{editMode \? undefined : "allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin allow-presentation"\}/);
-  assert.match(resourceViewer, /allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-read; clipboard-write"/);
+  // Part 14 reconciliation: the one-size-fits-all `allow` list became a
+  // per-kind map (media contexts only where media plays, clipboard only
+  // where copy/paste is real, full list kept for YouTube + unknown embeds).
+  assert.match(resourceViewer, /allow=\{embedAllowForKind\(kind\)\}/);
+  assert.match(resourceViewer, /const EMBED_ALLOW_FULL = "autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-read; clipboard-write";/);
+  assert.match(resourceViewer, /youtube: "autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write",/);
+  assert.match(resourceViewer, /doc: "fullscreen; clipboard-read; clipboard-write",/);
 });
 
 test("The active file's open-in-new-tab escape hatch lives in the Player tab", () => {

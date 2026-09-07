@@ -50,7 +50,10 @@ const deskConsole = read("src/classroom3d/DeskConsole.tsx");
 // ---------------------------------------------------------------------------
 
 test("WallActivity skips rendering + input when inactive, without unmounting", () => {
-  assert.match(wallActivity, /contentVisibility: active \? "visible" : "hidden",/);
+  // Part 14 reconciliation: active walls use `auto` (browser skips the
+  // off-screen subtree like a virtualized row) instead of `visible`;
+  // inactive walls keep the strictly stronger forced `hidden`.
+  assert.match(wallActivity, /contentVisibility: active \? "auto" : "hidden",/);
   assert.match(wallActivity, /pointerEvents: active \? "auto" : "none",/);
   // The children render unconditionally — the gate never unmounts the wall,
   // so viewer state, drafts and listeners survive a look-away.

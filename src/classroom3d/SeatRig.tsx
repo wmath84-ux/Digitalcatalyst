@@ -24,6 +24,13 @@
 // canvas parent that sheds overlay effects, plus a dpr dip to 1×) and every
 // hot path is allocation-free — no React state, no per-event objects, no
 // per-frame property writes that never change.
+//
+// Part 14: the rig publishes "is the view actively changing" to embedMotion
+// every frame (drag, pinch, focus spring, board lean — but NOT the idle
+// breathing sway), driving the iframe impostor swap, the YouTube quality
+// step-down and the transform throttle. The spring also snaps sub-visible
+// residuals to rest so motion ends when VISIBLE motion ends, not a second
+// into the exponential tail.
 
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
@@ -39,6 +46,12 @@ import {
   focusPreset,
   type ClassroomFocus,
 } from "./state";
+import {
+  EMBED_MOVING_CLASS,
+  reportEmbedMotion,
+  resetEmbedMotion,
+  subscribeEmbedMotion,
+} from "./embedMotion";
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -213,6 +226,23 @@ export default function SeatRig({
     return () => element.removeEventListener("wheel", onWheel);
   }, [gl]);
 
+  // Part 14: mirror the motion signal onto the canvas parent as a CSS class
+  // (edge-driven — the store only notifies on true/false transitions), so
+  // the iframe impostor swap is pure CSS with zero React renders. Unmount
+  // resets the store: leaving the room must never strand subscribers — or a
+  // remount — inside a stale "moving".
+  useEffect(() => {
+    const element = gl.domElement.parentElement;
+    const unsubscribe = subscribeEmbedMotion((moving) => {
+      element?.classList.toggle(EMBED_MOVING_CLASS, moving);
+    });
+    return () => {
+      unsubscribe();
+      element?.classList.remove(EMBED_MOVING_CLASS);
+      resetEmbedMotion();
+    };
+  }, [gl]);
+
   useFrame((state, delta) => {
     // Critically-damped-ish spring so a focus jump feels like a head turn,
     // not a cut — the lean rides the very same spring.
@@ -220,6 +250,30 @@ export default function SeatRig({
     current.current.yaw += (target.current.yaw - current.current.yaw) * k;
     current.current.pitch += (target.current.pitch - current.current.pitch) * k;
     current.current.zoom += (target.current.zoom - current.current.zoom) * k;
+
+    // Snap sub-visible residuals: below ~1.5 px of wall travel the spring's
+    // exponential tail is invisible but would read as "moving" for another
+    // second — snapping ends motion when VISIBLE motion ends. (Exact rest
+    // also makes the settled check below a plain comparison, no epsilon.)
+    if (Math.abs(target.current.yaw - current.current.yaw) < 0.002) current.current.yaw = target.current.yaw;
+    if (Math.abs(target.current.pitch - current.current.pitch) < 0.002) {
+      current.current.pitch = target.current.pitch;
+    }
+    if (Math.abs(target.current.zoom - current.current.zoom) < 0.002) current.current.zoom = target.current.zoom;
+
+    // Part 14 motion signal: a finger on the glass, or a spring still
+    // travelling (focus hop, pinch/wheel lean, recenter glide). The sway
+    // below is added straight to the camera — never to these refs — so idle
+    // breathing correctly reads as rest.
+    if (
+      dragging.current ||
+      pointers.current.size >= 2 ||
+      target.current.yaw !== current.current.yaw ||
+      target.current.pitch !== current.current.pitch ||
+      target.current.zoom !== current.current.zoom
+    ) {
+      reportEmbedMotion();
+    }
 
     // A seated body breathes — a whisper of sway keeps the room alive.
     const t = state.clock.elapsedTime;

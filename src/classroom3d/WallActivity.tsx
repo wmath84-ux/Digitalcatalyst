@@ -10,7 +10,10 @@
 //   · rendering is skipped (`content-visibility: hidden` keeps the laid-out
 //     box, so re-activation never reflows; paint, layout and style of the
 //     whole subtree are skipped, including iframes), and pointer input is
-//     cut, so hover/focus work can't fire off-screen either;
+//     cut, so hover/focus work can't fire off-screen either. The ACTIVE wall
+//     since Part 14 uses `auto` instead of `visible`, so the browser also
+//     skips it on the frames it isn't on-screen (same mechanism, browser-
+//     driven); `hidden` on inactive is unchanged and strictly stronger.
 //   · <video>/<audio> elements are paused imperatively and resumed on return.
 //     pause() never seeks, so playback resumes at the exact frame — the same
 //     "inactive never keeps playing" contract ResourceViewer's own `active`
@@ -31,7 +34,7 @@
 // below (keep `video`), and the lesson will keep playing sound-only behind
 // the notes wall.
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 
 const YOUTUBE_HOSTS = ["www.youtube-nocookie.com", "www.youtube.com"];
 
@@ -44,6 +47,25 @@ const youTubeCommand = (frame: HTMLIFrameElement, func: "pauseVideo" | "playVide
     /* cross-origin quirks / detached frame — the message is best-effort */
   }
 };
+
+// ── Wall focus, as React context (Part 14) ───────────────────────────────
+// ResourceViewer lives OUTSIDE the room's prop flow (CoursePlayerApp hands
+// the room opaque nodes), yet its iframes need to know which wall they sit
+// on: EmbedFrame/YouTubeFrame lazy-load their `src` on first wall focus (E9)
+// and render motion-impostor siblings only inside the classroom. `null`
+// means "not on a wall" (flat player) — embeds load immediately there, so
+// flat behaviour is untouched by every Part 14 gate.
+export interface WallActivityState {
+  wall: "board" | "notes" | "mind" | "desk";
+  active: boolean;
+}
+
+export const WallActivityContext = createContext<WallActivityState | null>(null);
+
+/** Which classroom wall this subtree sits on, or null in the flat player. */
+export function useWallActivity(): WallActivityState | null {
+  return useContext(WallActivityContext);
+}
 
 export default function WallActivity({
   active,
@@ -102,18 +124,27 @@ export default function WallActivity({
     pausedFrames.current = [];
   }, [active]);
 
+  // Memo'd so pinch-tick parent renders don't re-render context consumers.
+  const contextValue = useMemo(() => ({ wall, active }), [wall, active]);
+
   return (
-    <div
-      ref={root}
-      data-classroom-wall={wall}
-      data-wall-active={active ? "true" : "false"}
-      className="h-full w-full min-h-0 min-w-0"
-      style={{
-        contentVisibility: active ? "visible" : "hidden",
-        pointerEvents: active ? "auto" : "none",
-      }}
-    >
-      {children}
-    </div>
+    <WallActivityContext.Provider value={contextValue}>
+      <div
+        ref={root}
+        data-classroom-wall={wall}
+        data-wall-active={active ? "true" : "false"}
+        className="h-full w-full min-h-0 min-w-0"
+        style={{
+          // Part 14: active walls drop to `auto` (the browser skips the
+          // subtree when it's off-screen, like a virtualized list row —
+          // `contain-intrinsic-size` in classroom3d.css holds the layout);
+          // inactive walls keep the forced `hidden` skip from Part 13.
+          contentVisibility: active ? "auto" : "hidden",
+          pointerEvents: active ? "auto" : "none",
+        }}
+      >
+        {children}
+      </div>
+    </WallActivityContext.Provider>
   );
 }

@@ -38,12 +38,22 @@
 // auto quality tiers, walls that sleep when unfaced or off-screen, and a
 // drag-fidelity mode while the head turns. See docs/part13-classroom-
 // performance.md for the full per-item account.
+//
+// ── Part 14: third-party iframes get the game treatment ────────────────────
+// YouTube/Docs/Sheets/Slides/Forms/Whimsical/embeds render uncontrollably,
+// so the room fakes them like a game fakes expensive assets: a static
+// impostor swaps over the live frame while the camera moves (the iframe is
+// never unmounted), YouTube steps down to 'small' instead of pausing, the
+// wall's DOM transform commits at ~22 Hz during motion, embeds lazy-boot on
+// first wall focus, and permissions are tightened per kind. See
+// docs/part14-classroom-embed-optimization.md.
 
 import { Suspense, memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import { AdaptiveDpr, AdaptiveEvents, BakeShadows, Preload } from "@react-three/drei";
 import { Network, NotebookPen } from "lucide-react";
 import type { CourseFile, CourseModule } from "../types/course";
+import { getCourseEmbed } from "../utils/courseEmbed";
 import Room from "./Room";
 import SeatRig from "./SeatRig";
 import SurfaceFrame from "./SurfaceFrame";
@@ -51,6 +61,7 @@ import DeskConsole from "./DeskConsole";
 import QualityGovernor from "./QualityGovernor";
 import WallActivity from "./WallActivity";
 import WallVisibility from "./WallVisibility";
+import { WallTransformThrottle } from "./throttledTransform";
 import { computeInitialDpr, pickInitialTier, qualitySettings, type ClassroomQuality } from "./quality";
 import { BoardPanel, DeskPanel, WallHeader } from "./panels";
 import {
@@ -72,6 +83,22 @@ import "./classroom3d.css";
 const BakedShadowsOnce = memo(function BakedShadowsOnce() {
   return <BakeShadows />;
 });
+
+// Embed kinds whose internals render uncontrollably (Part 14): YouTube plus
+// every third-party iframe kind. Native video/audio (`direct`) and images
+// are deliberately excluded — GPU-cheap, fully controllable, and Part 13
+// keeps them visually live while faced.
+const THIRD_PARTY_EMBED_KINDS: ReadonlySet<string> = new Set([
+  "youtube",
+  "pdf",
+  "doc",
+  "sheet",
+  "slides",
+  "form",
+  "drive",
+  "mindmap",
+  "embed",
+]);
 
 export interface Classroom3DProps {
   /** The course tree — the exact shape the flat Course Player consumes. */
@@ -226,6 +253,21 @@ export default function Classroom3D({
     }
     return "";
   }, [flat, selectedFileId]);
+
+  // ── Transform throttle enablement (Part 14, item C) ─────────────────────
+  // The board wall's DOM transform commits at ~22 Hz during camera motion —
+  // but ONLY while the selected lesson is a third-party embed. Native video
+  // keeps drei's full-rate sync (a 45 ms-stepped video wall would judder
+  // visibly on fast drags for zero gain). Approximate by construction — the
+  // board node is opaque (owned by CoursePlayerApp) — and safe in both
+  // directions: a missed embed just syncs full-rate, a false positive just
+  // steps at 22 Hz.
+  const boardHasEmbed = useMemo(() => {
+    const file = flat[position.moduleIndex]?.files[position.fileIndex];
+    if (!file) return false;
+    return THIRD_PARTY_EMBED_KINDS.has(getCourseEmbed(file).kind);
+  }, [flat, position]);
+  const throttledWalls = useMemo(() => (boardHasEmbed ? (["board"] as const) : ([] as const)), [boardHasEmbed]);
 
   const openFile = useCallback(
     (moduleIndex: number, fileIndex: number) => {
@@ -541,6 +583,14 @@ export default function Classroom3D({
               exitLabel={exitLabel}
             />
           </DeskConsole>
+
+          {/* Decoupled wall-transform rate (Part 14, item C): while the camera
+              moves, listed walls commit DOM matrices at ~22 Hz instead of 60
+              (the scene itself still renders full-rate). Mounted LAST on
+              purpose — R3F runs same-priority frames in mount order, so
+              drei's writes land first and the throttle decides what stands.
+              Only the board, only while it shows a third-party embed. */}
+          <WallTransformThrottle walls={throttledWalls} />
 
           {/* No HDRI env map on purpose: the room must render offline inside
               the Capacitor shell, so all lighting is local and analytic. */}
