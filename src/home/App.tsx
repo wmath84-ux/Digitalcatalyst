@@ -5,7 +5,9 @@ import Header from "./components/Header";
 import HeroCarousel from "./components/HeroCarousel";
 import CategoryNav from "./components/CategoryNav";
 import ProductCard from "./components/ProductCard";
+import ProductCardSkeleton from "./components/ProductCardSkeleton";
 import ContinueLearning from "./components/ContinueLearning";
+import ContinueLearningSkeleton from "./components/ContinueLearningSkeleton";
 import Reviews from "./components/Reviews";
 import BottomNav, { type TabKey } from "../components/BottomNav";
 import StickerWall from "../components/StickerWall";
@@ -54,7 +56,7 @@ export default function App({
   onToggleFavorite,
 }: AppProps) {
   const { user } = useAuth();
-  const { products: catalogProducts, purchasedIds } = useCatalog();
+  const { products: catalogProducts, purchasedIds, loading: catalogLoading, error: catalogError } = useCatalog();
   // Hero slides are admin-editable (Admin → Home · Hero Slides). Live
   // Firestore list; falls back to the built-in slides until the admin
   // saves their own.
@@ -79,6 +81,7 @@ export default function App({
   // mobile header never turns the name into a second line.
   const userName = user?.name?.trim().split(/\s+/)[0] || "Learner";
   const [progressRecords, setProgressRecords] = useState<Array<{ productId: string; completedFileIds: string[]; updatedAt: number }>>([]);
+  const [progressLoading, setProgressLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Ask for notification permission the moment a user lands on Home (app open).
@@ -93,7 +96,8 @@ export default function App({
   }, [user]);
 
   useEffect(() => {
-    if (!user) { setProgressRecords([]); return undefined; }
+    if (!user) { setProgressRecords([]); setProgressLoading(false); return undefined; }
+    setProgressLoading(true);
     return onSnapshot(collection(db, "users", user.id, "courseProgress"), (snapshot) => {
       setProgressRecords(snapshot.docs.map((item) => {
         const data = item.data() || {};
@@ -101,7 +105,10 @@ export default function App({
         const updatedAt = stamp && typeof stamp.toMillis === "function" ? stamp.toMillis() : Number(stamp || 0);
         return { productId: String(data.productId || item.id), completedFileIds: Array.isArray(data.completedFileIds) ? data.completedFileIds.map(String) : [], updatedAt };
       }));
-    }, () => setProgressRecords([]));
+      // With the persistent Firestore cache the first callback is usually
+      // the cached snapshot; either way progress is known now.
+      setProgressLoading(false);
+    }, () => { setProgressRecords([]); setProgressLoading(false); });
   }, [user]);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -288,7 +295,7 @@ export default function App({
                 />
               </div>
 
-              {continueLearningEntries.length > 0 && (
+              {continueLearningEntries.length > 0 ? (
                 <div data-home-continue>
                   <ContinueLearning
                     items={continueLearningEntries.map(({ item, progress }) => ({
@@ -302,6 +309,18 @@ export default function App({
                     }))}
                   />
                 </div>
+              ) : (
+                // While a signed-in learner's progress snapshot is still
+                // in flight (and the catalog it joins against is not
+                // loaded yet), reserve the section with dimension-matched
+                // cards so the grid below never jumps. Signed-out users
+                // and learners with no progress get nothing here, same as
+                // before.
+                user && (progressLoading || catalogLoading) && (
+                  <div data-home-continue data-home-continue-loading>
+                    <ContinueLearningSkeleton count={2} />
+                  </div>
+                )
               )}
 
               <section data-home-trending className="px-5 pt-6 md:px-8">
@@ -320,7 +339,32 @@ export default function App({
                   </button>
                 </div>
 
-                {categoryFiltered.length === 0 ? (
+
+                {catalogLoading ? (
+                  // Skeleton cards carry the EXACT geometry of ProductCard
+                  // (same glass plate, aspect-[4/3] art, same text-block
+                  // heights), so the swap to real cards has zero layout
+                  // shift. The grid/columns/gap classes are identical to
+                  // the real grid below. 4 placeholders match the
+                  // "Trending Now" top-4 count on the default tab.
+                  <div
+                    data-home-grid
+                    data-home-grid-loading
+                    aria-busy="true"
+                    aria-label="Loading products"
+                    className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4"
+                  >
+                    {Array.from({ length: activeCategory === "all" ? 4 : 6 }).map((_, index) => (
+                      <ProductCardSkeleton key={index} />
+                    ))}
+                  </div>
+                ) : catalogError ? (
+                  // Snapshot failure still surfaces clearly — skeletons
+                  // replace the LOADING state only, never the error state.
+                  <div className="mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200">
+                    {catalogError}
+                  </div>
+                ) : categoryFiltered.length === 0 ? (
                   <p className="dc-scene-ink mt-8 text-center text-sm text-white/55">
                     No products in this category yet.
                   </p>

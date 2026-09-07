@@ -1,6 +1,11 @@
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { getFirestore, initializeFirestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import {
   getAuth,
@@ -34,9 +39,38 @@ try {
 function getDb() {
   if (!app) return {} as any;
   try {
-    return initializeFirestore(app, { ignoreUndefinedProperties: true });
+    // Persistent IndexedDB cache (stale-while-revalidate).
+    //
+    // With the persistent local cache enabled, Firestore serves every
+    // listener's LAST-KNOWN snapshot from IndexedDB instantly on app open,
+    // while the onSnapshot listeners silently refresh against the server in
+    // the background — the same stale-while-revalidate pattern Gmail and
+    // Twitter use. Cold first-ever load still needs the network for data;
+    // every open after that paints products/purchases/reviews from cache
+    // before (or without) the server round-trip, so a learner who reloads
+    // offline still sees the full catalog instead of a blank/error screen.
+    //
+    // API note: in the modular SDK v10+ (this repo pins firebase 12.x,
+    // @firebase/firestore 4.x) the cache is configured through the
+    // `localCache` settings field with the persistentLocalCache() factory
+    // (the older global enable-persistence function is deprecated and is
+    // intentionally not used). The multiple-tab manager lets open tabs
+    // share one IndexedDB connection; on platforms where persistence is
+    // unavailable (Node, a WebView with IndexedDB disabled) the factory
+    // throws, and we fall back to the default in-memory cache rather than
+    // failing Firestore init.
+    return initializeFirestore(app, {
+      ignoreUndefinedProperties: true,
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
   } catch {
-    return getFirestore(app);
+    // Either Firestore was already initialized (getFirestore returns it) or
+    // persistent storage is unavailable in this runtime — memory cache.
+    try {
+      return getFirestore(app);
+    } catch {
+      return {} as any;
+    }
   }
 }
 export const db = getDb();
