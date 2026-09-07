@@ -8,10 +8,22 @@
 //
 // Anything rendered inside is real, focusable, scrollable DOM: rich-text
 // editors, iframes, video players and the mind map canvas all keep working.
+//
+// Two things make that true rather than merely intended:
+//
+//   · the panel is scaled through `surfaceScale()`, the ONLY correct px →
+//     metre mapping for a drei <Html transform> (see surfaceScale.ts). The
+//     hand-rolled `width / pixelWidth` this file used to carry was 40× too
+//     small, which is why every surface in the room read as an empty slab;
+//   · the panel gets `attachDragScroll`, because the room's own
+//     `touch-action: none` (needed so head-turn drags never scroll the page)
+//     also disables native touch scrolling inside these panels.
 
 import { Html } from "@react-three/drei";
 import type { ReactNode } from "react";
 import { Component, type ErrorInfo } from "react";
+import { surfaceScale } from "./surfaceScale";
+import { useDragScroll } from "./useSurfaceScroll";
 
 /** A crashed panel must never take the whole room down with it. */
 class PanelBoundary extends Component<{ label: string; children: ReactNode }, { failed: boolean }> {
@@ -68,8 +80,11 @@ export default function SurfaceFrame({
   children,
 }: SurfaceFrameProps) {
   const pixelHeight = Math.round((pixelWidth * height) / width);
-  // metres-per-pixel: the DOM plane must land exactly on the slab face.
-  const scale = width / pixelWidth;
+  // The DOM plane must land exactly on the slab face: drei maps 40 CSS px to
+  // one world unit, so the scale is (metres / px) × 40 — never (metres / px).
+  const scale = surfaceScale(width, pixelWidth);
+  // Finger + mouse drag scrolling for everything inside this surface.
+  const panelRef = useDragScroll<HTMLDivElement>();
   const panelStyle = {
     width: `${pixelWidth}px`,
     height: `${pixelHeight}px`,
@@ -111,7 +126,12 @@ export default function SurfaceFrame({
         wrapperClass="dc-classroom-surface"
         zIndexRange={[10, 0]}
       >
-        <div className="h-full w-full min-h-0 min-w-0" data-classroom-surface-panel>
+        <div
+          ref={panelRef}
+          className="h-full w-full min-h-0 min-w-0"
+          data-classroom-surface-panel
+          data-classroom-surface-scroll
+        >
           <PanelBoundary label={label}>{children}</PanelBoundary>
         </div>
       </Html>

@@ -11,6 +11,8 @@
 
 import { Html } from "@react-three/drei";
 import type { ReactNode } from "react";
+import { surfaceScale } from "./surfaceScale";
+import { useDragScroll } from "./useSurfaceScroll";
 
 export default function DeskConsole({
   children,
@@ -26,7 +28,12 @@ export default function DeskConsole({
 }) {
   const width = 1.16; // metres
   const height = (width * pixelHeight) / pixelWidth;
-  const scale = width / pixelWidth;
+  // Same px → metre mapping as every wall (surfaceScale.ts): drei's transform
+  // mode puts 40 CSS px in one world unit, so the tablet needs the ×40 too —
+  // without it the console rendered as a 3 cm speck on a 1.16 m slab.
+  const scale = surfaceScale(width, pixelWidth);
+  // The module + lesson columns are the most-scrolled lists in the room.
+  const panelRef = useDragScroll<HTMLDivElement>();
   const panelStyle = {
     width: `${pixelWidth}px`,
     height: `${pixelHeight}px`,
@@ -83,7 +90,12 @@ export default function DeskConsole({
           wrapperClass="dc-classroom-surface"
           zIndexRange={[12, 0]}
         >
-          <div className="h-full w-full min-h-0 min-w-0" data-classroom-surface-panel>
+          <div
+            ref={panelRef}
+            className="h-full w-full min-h-0 min-w-0"
+            data-classroom-surface-panel
+            data-classroom-surface-scroll
+          >
             {children}
           </div>
         </Html>

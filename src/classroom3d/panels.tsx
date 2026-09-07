@@ -9,9 +9,11 @@
 //                progress, mark-complete, and the "turn my head" buttons.
 //   WallHeader → the shared header the notes / mind map walls wear.
 
-import { memo, useRef, type ReactNode } from "react";
+import { memo, useCallback, useRef, type ReactNode } from "react";
 import {
   BookOpen,
+  ChevronDown,
+  ChevronUp,
   CircleCheck,
   Expand,
   LockKeyhole,
@@ -34,6 +36,7 @@ import {
   type ClassroomFocus,
   type FlatModule,
 } from "./state";
+import { useHoldScroll } from "./useSurfaceScroll";
 
 /* ── Board ─────────────────────────────────────────────────────────────── */
 
@@ -71,6 +74,15 @@ export const BoardPanel = memo(function BoardPanel({
   const tap = useRef({ time: 0, x: 0, y: 0 });
   // A touch toggle's trailing synthetic `dblclick` must not toggle straight back.
   const touchToggledAt = useRef(0);
+  // ── Progressive scroll keys (press and HOLD) ────────────────────────────
+  // A board is read from across a room, so "one click = one fixed jump" is
+  // the wrong control: the keys below start a requestAnimationFrame loop on
+  // pointerdown that keeps the board's content moving — slowly at first, then
+  // faster — and cancel it on pointerup / pointerleave. The scroller is
+  // resolved at press time from the board BODY, because the body is swapped
+  // for a different viewer on every lesson.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const holdScroll = useHoldScroll(useCallback(() => bodyRef.current, []));
   const showControls = Boolean(onZoomIn || onZoomOut || onFit || onToggleFullscreen);
   const zoomedOut = zoom <= BOARD_ZOOM_MIN + 1e-6;
   const zoomedIn = zoom >= BOARD_ZOOM_MAX - 1e-6;
@@ -123,6 +135,27 @@ export const BoardPanel = memo(function BoardPanel({
             onDoubleClick={(event) => event.stopPropagation()}
             onPointerUp={(event) => event.stopPropagation()}
           >
+            <button
+              type="button"
+              className="dc-classroom-board-btn"
+              data-classroom-board-scroll-up
+              aria-label="Scroll up"
+              title="Hold to scroll up"
+              {...holdScroll(-1)}
+            >
+              <ChevronUp size={14} />
+            </button>
+            <button
+              type="button"
+              className="dc-classroom-board-btn"
+              data-classroom-board-scroll-down
+              aria-label="Scroll down"
+              title="Hold to scroll down"
+              {...holdScroll(1)}
+            >
+              <ChevronDown size={14} />
+            </button>
+            <span className="dc-classroom-board-sep" aria-hidden />
             <button
               type="button"
               onClick={onZoomOut}
@@ -179,7 +212,11 @@ export const BoardPanel = memo(function BoardPanel({
           </div>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+      {/* The board's content area. `data-classroom-board-body` is what the
+          hold-scroll keys resolve their scroller from. */}
+      <div ref={bodyRef} className="min-h-0 flex-1 overflow-hidden" data-classroom-board-body>
+        {children}
+      </div>
     </div>
   );
 });

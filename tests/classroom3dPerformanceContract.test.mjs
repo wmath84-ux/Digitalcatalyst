@@ -50,10 +50,13 @@ const deskConsole = read("src/classroom3d/DeskConsole.tsx");
 // ---------------------------------------------------------------------------
 
 test("WallActivity skips rendering + input when inactive, without unmounting", () => {
-  // Part 14 reconciliation: active walls use `auto` (browser skips the
-  // off-screen subtree like a virtualized row) instead of `visible`;
-  // inactive walls keep the strictly stronger forced `hidden`.
-  assert.match(wallActivity, /contentVisibility: active \? "auto" : "hidden",/);
+  // Superseded by the surface-rendering pass: `auto` is UNSAFE inside drei's
+  // 3D-transformed Html portal (Chromium can measure the portal root as a
+  // near-zero/offscreen box and skip the subtree, which paints an empty
+  // board), so an active wall is forced `visible`. Inactive walls keep the
+  // strictly stronger forced `hidden`.
+  // See tests/classroom3dSurfaceRenderingContract.test.mjs.
+  assert.match(wallActivity, /contentVisibility: active \? "visible" : "hidden",/);
   assert.match(wallActivity, /pointerEvents: active \? "auto" : "none",/);
   // The children render unconditionally — the gate never unmounts the wall,
   // so viewer state, drafts and listeners survive a look-away.
@@ -84,12 +87,16 @@ test("WallActivity pauses media on look-away and resumes only what played", () =
 });
 
 test("the room gates each live wall on focus; fullscreen counts as facing the board", () => {
+  // The gate is now focus OR on-screen (see wallFocus.ts): turning the head
+  // by hand never changes `focus`, and gating on `focus` alone showed the
+  // learner a blank slab on the wall they had just turned to. Fullscreen
+  // still counts as facing the board.
   assert.match(
     classroom,
-    /<WallActivity wall="board" active=\{focus === "board" \|\| boardFullscreen\}>/,
+    /<WallActivity wall="board" active=\{focus === "board" \|\| onScreen\.board \|\| boardFullscreen\}>/,
   );
-  assert.match(classroom, /<WallActivity wall="notes" active=\{focus === "notes"\}>/);
-  assert.match(classroom, /<WallActivity wall="mind" active=\{focus === "mind"\}>/);
+  assert.match(classroom, /<WallActivity wall="notes" active=\{focus === "notes" \|\| onScreen\.notes\}>/);
+  assert.match(classroom, /<WallActivity wall="mind" active=\{focus === "mind" \|\| onScreen\.mind\}>/);
   // Every wall exposes the DOM hook the visibility gate queries.
   assert.match(wallActivity, /data-classroom-wall=\{wall\}/);
   assert.match(panels, /data-classroom-wall="desk"/);

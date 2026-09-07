@@ -235,7 +235,12 @@ test("Classroom3D throttles only the embed-carrying board, mounted last", () => 
 test("embed frames get layout/style containment, walls get a skip base", () => {
   assert.match(resourceViewer, /className="dc-embed-frame relative h-full min-h-0 w-full min-w-0 overflow-hidden"/);
   assert.match(css, /\.dc-embed-frame \{\n  contain: layout style;\n\}/);
-  assert.match(css, /\[data-classroom-wall\] \{\n  content-visibility: auto;\n  contain-intrinsic-size: 1280px 800px;\n\}/);
+  // `content-visibility: auto` was removed from the wall base rule: inside
+  // drei's 3D-transformed Html portal Chromium can classify the portal root
+  // as a near-zero/offscreen box and skip the whole subtree, which is one of
+  // the ways a wall painted as an empty slab. The intrinsic size stays, so
+  // walls WallActivity forces to `hidden` still reserve their box.
+  assert.match(css, /\[data-classroom-wall\] \{\n  contain-intrinsic-size: 1280px 800px;\n\}/);
   // The audited no-list: nothing that would clip drei's ~0×0 portal root,
   // nothing that burns a redundant compositor layer, nothing that could
   // touch the top-layer fullscreen escape hatch.

@@ -48,10 +48,10 @@
 // first wall focus, and permissions are tightened per kind. See
 // docs/part14-classroom-embed-optimization.md.
 
-import { Suspense, memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, memo, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import { AdaptiveDpr, AdaptiveEvents, BakeShadows, Preload } from "@react-three/drei";
-import { CircleCheck, Maximize, SkipBack, SkipForward } from "lucide-react";
+import { CircleCheck, LayoutList, Maximize, Network, NotebookPen, SkipBack, SkipForward } from "lucide-react";
 import type { CourseFile, CourseModule } from "../types/course";
 import { getCourseEmbed } from "../utils/courseEmbed";
 import Room from "./Room";
@@ -64,6 +64,16 @@ import WallVisibility from "./WallVisibility";
 import { WallTransformThrottle } from "./throttledTransform";
 import { computeInitialDpr, pickInitialTier, qualitySettings, type ClassroomQuality } from "./quality";
 import { BoardPanel, DeskPanel } from "./panels";
+import {
+  MapSheetBody,
+  ModuleSheetBody,
+  NoteSheetBody,
+  RoomSheet,
+  type RoomMapItem,
+  type RoomNoteItem,
+  type RoomSheetKind,
+} from "./RoomSheet";
+import { getWallOnScreen, subscribeWallOnScreen } from "./wallFocus";
 import {
   BOARD_ZOOM_MIN,
   BOARD_ZOOM_PORTRAIT_FIT,
@@ -133,6 +143,24 @@ export interface Classroom3DProps {
   /** "New note" on the notes wall — asks the player's panel to open its composer. */
   onComposeNote?: () => void;
 
+  /* ── The floating in-room libraries (the right-hand keys) ──────────────
+     These are CHOOSERS only. Picking something here turns the learner's head
+     to the wall that owns it and asks the player's own panel to show it —
+     the note is still written on the notes wall and the map is still drawn
+     on the mind wall, with their real editors and toolbars. */
+  /** Every note in this course, for the floating note library. */
+  noteItems?: RoomNoteItem[];
+  /** Open one of those notes in the NotesPanel editor on the notes wall. */
+  onOpenNote?: (id: string) => void;
+  /** Every mind map in this module, for the floating map library. */
+  mapItems?: RoomMapItem[];
+  /** Which map the mind wall is currently drawing. */
+  activeMapKey?: string | null;
+  /** Show another map on the mind wall. */
+  onSelectMap?: (mapKey: string) => void;
+  /** Start a new map and draw it on the mind wall. */
+  onCreateMap?: () => void;
+
   /** Leave the room (back to the flat player). */
   onExit?: () => void;
   exitLabel?: string;
@@ -155,10 +183,27 @@ export default function Classroom3D({
   noteCount = 0,
   mapCount = 0,
   onComposeNote,
+  noteItems,
+  onOpenNote,
+  mapItems,
+  activeMapKey,
+  onSelectMap,
+  onCreateMap,
   onExit,
   exitLabel = "Flat player",
 }: Classroom3DProps) {
   const [focus, setFocus] = useState<ClassroomFocus>("board");
+
+  // Which floating library is open over the room (null = none). It is a
+  // CHOOSER, never a content surface: every pick closes it and puts the
+  // content on a board.
+  const [sheet, setSheet] = useState<RoomSheetKind | null>(null);
+
+  // ── Which walls are actually in view (wallFocus.ts) ─────────────────────
+  // A wall wakes up when it is focused OR simply on screen. Turning the head
+  // by hand never changes `focus`, and gating on `focus` alone is what made a
+  // dragged-to wall render as a blank slab.
+  const onScreen = useSyncExternalStore(subscribeWallOnScreen, getWallOnScreen, getWallOnScreen);
 
   // ── Board lean + fullscreen (Part 12) ───────────────────────────────────
   // `boardZoom` is the camera's lean toward the board: 1 = the seat's normal
@@ -246,6 +291,15 @@ export default function Classroom3D({
   const [browseIndex, setBrowseIndex] = useState(position.moduleIndex);
   useEffect(() => setBrowseIndex(position.moduleIndex), [position.moduleIndex]);
 
+  /**
+   * Which module the FLOATING library has expanded. Deliberately separate
+   * from `browseIndex`: collapsing a module in the floating panel must not
+   * empty the desk console's lesson column behind it, and -1 (all collapsed)
+   * is a state the desk has no meaning for.
+   */
+  const [sheetModuleIndex, setSheetModuleIndex] = useState(position.moduleIndex);
+  useEffect(() => setSheetModuleIndex(position.moduleIndex), [position.moduleIndex]);
+
   const activeFileName = useMemo(() => {
     for (const module of flat) {
       const file = module.files.find((entry) => String(entry.id) === String(selectedFileId));
@@ -280,6 +334,9 @@ export default function Classroom3D({
         return;
       }
       onSelectFile(file);
+      // The chooser's whole job ends here: the lesson goes on the board and
+      // the panel gets out of the way.
+      setSheet(null);
       setFocus("board");
     },
     [flat, moduleByRawId, onBuyModule, onSelectFile],
@@ -395,7 +452,8 @@ export default function Classroom3D({
         // first. The browser also exits native fullscreen on Esc by itself,
         // so the LIVE top layer is read here — a lagging state sync must
         // neither re-request fullscreen nor yank the head to the desk.
-        if (document.fullscreenElement) void document.exitFullscreen();
+        if (sheet) setSheet(null);
+        else if (document.fullscreenElement) void document.exitFullscreen();
         else if (boardFullscreen) setBoardFullscreen(false);
         else setFocus("desk");
       } else if (focus === "board" && (event.key === "+" || event.key === "=")) zoomBoardBy(BOARD_ZOOM_STEP);
@@ -404,7 +462,7 @@ export default function Classroom3D({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [step, focus, boardFullscreen, zoomBoardBy, fitBoard]);
+  }, [step, focus, sheet, boardFullscreen, zoomBoardBy, fitBoard]);
 
   return (
     <div className="course-player-shell dc-classroom-root" data-course-classroom-3d data-course-theme="dark">
@@ -483,7 +541,7 @@ export default function Classroom3D({
                   mounted instance — playback position, drafts, listeners —
                   but an unfaced board skips rendering and pauses its media.
                   Fullscreen counts as faced: the learner is watching it. */}
-              <WallActivity wall="board" active={focus === "board" || boardFullscreen}>
+              <WallActivity wall="board" active={focus === "board" || onScreen.board || boardFullscreen}>
                 {board}
               </WallActivity>
             </BoardPanel>
@@ -502,7 +560,7 @@ export default function Classroom3D({
             label="Notes wall"
           >
             <div className="relative h-full w-full overflow-hidden bg-[#0a0f1c] text-white">
-              <WallActivity wall="notes" active={focus === "notes"}>
+              <WallActivity wall="notes" active={focus === "notes" || onScreen.notes}>
                 {notes}
               </WallActivity>
               {onComposeNote && (
@@ -531,7 +589,7 @@ export default function Classroom3D({
             label="Mind map wall"
           >
             <div className="h-full w-full overflow-hidden bg-[#0a0f1c] text-white">
-              <WallActivity wall="mind" active={focus === "mind"}>
+              <WallActivity wall="mind" active={focus === "mind" || onScreen.mind}>
                 {mind}
               </WallActivity>
             </div>
@@ -593,6 +651,38 @@ export default function Classroom3D({
         ))}
       </div>
       <div className="dc-classroom-control-tray" data-classroom-control-tray>
+        {/* ── The library keys ────────────────────────────────────────────
+            The desk console still holds the full switcher, but looking down
+            to change module while a lecture is playing is a chore. These
+            three keys summon the same lists as a floating panel in the
+            middle of the room — and every pick lands on a BOARD. */}
+        <button
+          type="button"
+          className="dc-classroom-control-btn"
+          data-classroom-open-modules
+          data-active={sheet === "modules" ? "true" : "false"}
+          onClick={() => setSheet((current) => (current === "modules" ? null : "modules"))}
+        >
+          <LayoutList size={18} /> Modules
+        </button>
+        <button
+          type="button"
+          className="dc-classroom-control-btn"
+          data-classroom-open-notes
+          data-active={sheet === "notes" ? "true" : "false"}
+          onClick={() => setSheet((current) => (current === "notes" ? null : "notes"))}
+        >
+          <NotebookPen size={18} /> Notes
+        </button>
+        <button
+          type="button"
+          className="dc-classroom-control-btn"
+          data-classroom-open-maps
+          data-active={sheet === "mind" ? "true" : "false"}
+          onClick={() => setSheet((current) => (current === "mind" ? null : "mind"))}
+        >
+          <Network size={18} /> Maps
+        </button>
         <button type="button" className="dc-classroom-control-btn" onClick={() => step(-1)}>
           <SkipBack size={18} /> Prev
         </button>
@@ -617,6 +707,85 @@ export default function Classroom3D({
           </button>
         ) : null}
       </div>
+      {/* ── The floating in-room library ───────────────────────────────── */}
+      {sheet === "modules" && (
+        <RoomSheet
+          title="Modules"
+          hint="Scroll with your finger · tap a lesson to put it on the board"
+          accent="#38bdf8"
+          onClose={() => setSheet(null)}
+        >
+          <ModuleSheetBody
+            modules={flat}
+            browseIndex={sheetModuleIndex}
+            playingModuleIndex={position.moduleIndex}
+            playingFileIndex={position.fileIndex}
+            onBrowseModule={setSheetModuleIndex}
+            onOpenFile={openFile}
+          />
+        </RoomSheet>
+      )}
+      {sheet === "notes" && (
+        <RoomSheet
+          title="Note library"
+          hint="Tap a note to open it on the notes wall"
+          accent="#f59e0b"
+          onClose={() => setSheet(null)}
+          action={
+            onComposeNote
+              ? {
+                  label: "New note",
+                  onClick: () => {
+                    // Written on the WALL, never in this panel.
+                    setSheet(null);
+                    setFocus("notes");
+                    onComposeNote();
+                  },
+                }
+              : undefined
+          }
+        >
+          <NoteSheetBody
+            notes={noteItems ?? []}
+            onOpenNote={(id) => {
+              setSheet(null);
+              setFocus("notes");
+              onOpenNote?.(id);
+            }}
+          />
+        </RoomSheet>
+      )}
+      {sheet === "mind" && (
+        <RoomSheet
+          title="Mind map library"
+          hint="Tap a map to draw it — toolbar and all — on the mind wall"
+          accent="#a78bfa"
+          onClose={() => setSheet(null)}
+          action={
+            onCreateMap
+              ? {
+                  label: "New map",
+                  onClick: () => {
+                    setSheet(null);
+                    setFocus("mind");
+                    onCreateMap();
+                  },
+                }
+              : undefined
+          }
+        >
+          <MapSheetBody
+            maps={mapItems ?? []}
+            activeMapKey={activeMapKey}
+            onOpenMap={(mapKey) => {
+              setSheet(null);
+              setFocus("mind");
+              onSelectMap?.(mapKey);
+            }}
+          />
+        </RoomSheet>
+      )}
+
       <p className="dc-classroom-hint">
         {portrait
           ? "Drag to turn · double-tap the board to lean in · rotate for the full board"
