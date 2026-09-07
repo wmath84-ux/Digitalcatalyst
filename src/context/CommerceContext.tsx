@@ -13,7 +13,8 @@ interface CommerceContextValue {
   toggleFavorite: (productId: string) => Promise<boolean>;
 }
 
-const CommerceContext = createContext<CommerceContextValue | undefined>(undefined);
+// Exported for src/classroom3d/SurfaceContexts.tsx (see AuthContext).
+export const CommerceContext = createContext<CommerceContextValue | undefined>(undefined);
 const normalizeIds = (value: unknown) => Array.isArray(value) ? value.map(String).filter(Boolean) : [];
 
 export function CommerceProvider({ children }: { children: ReactNode }) {

@@ -26,8 +26,15 @@ import { memo, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { BOOK_BIN_COLORS, getMergedRoomStatics } from "./mergedStatics";
+import { ROOM } from "./roomGeometry";
 
-const ROOM = { width: 12, depth: 13, height: 3.5 };
+// The shell's measurements are shared with mergedStatics (windows, lamps,
+// books), Classroom3D (the board row) and SeatRig (the camera poses), so they
+// live in roomGeometry.ts and are only re-exported here as a local alias.
+//
+// The room is wide because the front wall carries THREE boards of the same
+// size — mind map LEFT, lecture board CENTRE, notes RIGHT — and the side walls
+// have to sit outside the outer bezels rather than cut through them.
 
 /* ── Materials ─────────────────────────────────────────────────────────── */
 
@@ -225,9 +232,9 @@ function Room({ snow = 420, lampLights = 2 }: { snow?: number; lampLights?: 1 | 
         <planeGeometry args={[ROOM.width, ROOM.depth]} />
         <meshStandardMaterial color="#8a6a4b" roughness={0.85} />
       </mesh>
-      {/* Front wall panelling behind the board */}
-      <mesh position={[0, 1.6, -3.44]}>
-        <planeGeometry args={[ROOM.width, 3.2]} />
+      {/* Front wall panelling behind the whole board row */}
+      <mesh position={[0, ROOM.height / 2 - 0.05, -3.44]}>
+        <planeGeometry args={[ROOM.width, ROOM.height - 0.1]} />
         <meshStandardMaterial color="#20303f" roughness={0.9} />
       </mesh>
       {/* Skirting */}
@@ -249,7 +256,12 @@ function Room({ snow = 420, lampLights = 2 }: { snow?: number; lampLights?: 1 | 
         <meshStandardMaterial color="#ffffff" roughness={1} />
       </mesh>
       {/* One cold daylight shared by all three bays (was one light per bay). */}
-      <pointLight position={[5.7, 1.85, 1.6]} intensity={8} distance={12} color="#bcd8ff" />
+      <pointLight
+        position={[ROOM.width / 2 - 0.3, 1.85, 1.6]}
+        intensity={8}
+        distance={16}
+        color="#bcd8ff"
+      />
       <Snowfall count={snow} />
       {/* Radiator under the windows */}
       <mesh position={[ROOM.width / 2 - 0.2, 0.35, 1.6]} castShadow>
@@ -261,13 +273,17 @@ function Room({ snow = 420, lampLights = 2 }: { snow?: number; lampLights?: 1 | 
       <mesh geometry={merged.lampBoxes}>
         <meshStandardMaterial color="#fff6e2" emissive="#ffd9a0" emissiveIntensity={1.5} />
       </mesh>
+      {/* Two ceiling fills on high/medium, one on low — unchanged in COUNT
+          (the perf budget is per-light, not per-box), only pushed further out
+          and given a longer reach so the widened room is still lit at both
+          ends of the board row. */}
       {lampLights === 2 ? (
         <>
-          <pointLight position={[0, 2.85, -0.5]} intensity={10} distance={11} color="#ffd9a8" />
-          <pointLight position={[0, 2.85, 3.5]} intensity={10} distance={11} color="#ffd9a8" />
+          <pointLight position={[-5, 2.85, -0.5]} intensity={12} distance={19} color="#ffd9a8" />
+          <pointLight position={[5, 2.85, 3.5]} intensity={12} distance={19} color="#ffd9a8" />
         </>
       ) : (
-        <pointLight position={[0, 2.85, 1.4]} intensity={12} distance={13} color="#ffd9a8" />
+        <pointLight position={[0, 2.85, 1.4]} intensity={14} distance={22} color="#ffd9a8" />
       )}
 
       {/* Ceiling fan (slow — it's winter) */}
@@ -299,7 +315,7 @@ function Room({ snow = 420, lampLights = 2 }: { snow?: number; lampLights?: 1 | 
       </group>
 
       {/* Bookshelf body + books merged per colour (was 22 meshes). */}
-      <mesh position={[-ROOM.width / 2 + 0.35, 0.9, 7.2]} castShadow>
+      <mesh position={[-ROOM.width / 2 + 0.37, 0.9, 7.2]} castShadow>
         <boxGeometry args={[0.4, 1.8, 2.2]} />
         <meshStandardMaterial color="#7c5a3a" roughness={0.85} />
       </mesh>
@@ -367,7 +383,7 @@ function Room({ snow = 420, lampLights = 2 }: { snow?: number; lampLights?: 1 | 
         castShadow
         shadow-mapSize={[512, 512]}
       />
-      <fog attach="fog" args={["#9fb3cc", 14, 34]} />
+      <fog attach="fog" args={["#9fb3cc", 20, 46]} />
     </group>
   );
 }

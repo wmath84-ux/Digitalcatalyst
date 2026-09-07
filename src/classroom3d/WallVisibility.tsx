@@ -21,22 +21,25 @@
 
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import { BOARD, BOARD_X, bearingToBoard } from "./roomGeometry";
 import { resetWallOnScreen, setWallOnScreen } from "./wallFocus";
 
 interface WallSpec {
   wall: "board" | "notes" | "mind";
-  /** Yaw (rad, rotation.y) at which the camera faces this wall head-on. */
-  yaw: number;
-  /** Wall angular half-size (rad) from the seat, margin included. */
-  halfSize: number;
+  /** The board's centre along the front wall (metres). */
+  x: number;
 }
 
-// Directions from the seat (0.15, 1.24, 2.62) to each wall centre, as
-// rotation.y values: yaw = atan2(-(x - cx), -(z - cz)).
+// The triptych: mind map LEFT, lecture board CENTRE, notes RIGHT — all on the
+// front wall, all the same slab (see roomGeometry.ts). The bearing to each is
+// computed LIVE from the camera's own position rather than baked for the seat,
+// because the FIT ⇄ FILL blend slides the eye square-on to whichever board is
+// focused: a seat-relative angle would keep the other two "on screen" long
+// after the camera had glided 7 m sideways past them.
 const WALLS: WallSpec[] = [
-  { wall: "board", yaw: 0.025, halfSize: 0.55 },
-  { wall: "notes", yaw: 0.976, halfSize: 0.36 },
-  { wall: "mind", yaw: 1.551, halfSize: 0.4 },
+  { wall: "board", x: BOARD_X.board },
+  { wall: "notes", x: BOARD_X.notes },
+  { wall: "mind", x: BOARD_X.mind },
 ];
 
 /** Half the composed horizontal FOV (76°), plus a small lead-in margin. */
@@ -80,9 +83,17 @@ export default function WallVisibility({ forceVisible = false }: { forceVisible?
         const bottom = pitch - halfFovV;
         show = entry.visible ? bottom < DESK_PITCH + 0.35 : bottom < DESK_PITCH + 0.2;
       } else {
-        const distance = Math.abs(yaw - entry.yaw);
-        const limit = HALF_FOV_H + entry.halfSize;
-        show = entry.visible ? distance < limit + EDGE_BAND : distance < limit;
+        // Angle between where the head points and where this board actually
+        // is, from the camera's LIVE position, plus the board's own angular
+        // half-width at that live distance (a board you have glided up to
+        // subtends far more of the frame than the same board from the seat).
+        const dx = entry.x - camera.position.x;
+        const dz = BOARD.z - camera.position.z;
+        const range = Math.hypot(dx, dz);
+        const off = Math.abs(yaw - bearingToBoard(entry.x, camera.position.x, camera.position.z));
+        const halfSize = range > 0.2 ? Math.atan(BOARD.width / 2 / range) : Math.PI;
+        const limit = HALF_FOV_H + halfSize;
+        show = entry.visible ? off < limit + EDGE_BAND : off < limit;
       }
       if (show === entry.visible) continue;
       entry.visible = show;

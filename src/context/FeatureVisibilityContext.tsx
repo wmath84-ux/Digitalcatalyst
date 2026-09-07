@@ -40,7 +40,8 @@ const defaultValue: {
   clearFeatureVisibility: noop,
 };
 
-const FeatureVisibilityContext = createContext<typeof defaultValue>(defaultValue);
+// Exported for src/classroom3d/SurfaceContexts.tsx (see AuthContext).
+export const FeatureVisibilityContext = createContext<typeof defaultValue>(defaultValue);
 
 /** Provider that owns the visibility map. */
 export function FeatureVisibilityProvider({ children }: { children: ReactNode }) {

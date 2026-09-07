@@ -15,6 +15,16 @@
 
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { ROOM } from "./roomGeometry";
+
+/**
+ * The wall x-positions are DERIVED from the shared room width, never typed
+ * twice: the room was widened to fit the three-board triptych (see
+ * roomGeometry.ts) and a hardcoded `5.94` here would have left the windows
+ * hanging in mid-air six metres inside the new right wall.
+ */
+const RIGHT_WALL_X = ROOM.width / 2 - 0.06;
+const LEFT_WALL_X = -ROOM.width / 2 + 0.37;
 
 const box = (
   w: number,
@@ -65,8 +75,11 @@ export const WINDOW_BAY_Z = [-1.4, 1.6, 4.6];
 /** Ceiling lamp centres (must match Room.tsx). */
 export const LAMP_POSITIONS: Array<[number, number]> = (() => {
   const out: Array<[number, number]> = [];
+  // Three across instead of two: the room is nearly twice as wide now, and two
+  // lamps at ±3 m would leave both ends of the board row unlit. They are still
+  // ONE merged emissive mesh, so the extra boxes cost no draw calls.
   for (const z of [-2.4, 1.4, 5.2]) {
-    for (const x of [-3, 3]) out.push([x, z]);
+    for (const x of [-7, 0, 7]) out.push([x, z]);
   }
   return out;
 })();
@@ -106,14 +119,14 @@ export function getMergedRoomStatics(): MergedRoomStatics {
   }
 
   // ── Window bays (3 bays × 7 parts → 3 meshes) ───────────────────────────
-  // Bay frame: position (5.94, 1.85, z), rotated -90° about Y. Parts are
-  // authored in bay-local space, then transformed by the bay matrix.
+  // Bay frame: on the right wall, rotated -90° about Y. Parts are authored in
+  // bay-local space, then transformed by the bay matrix.
   const frames: THREE.BufferGeometry[] = [];
   const glass: THREE.BufferGeometry[] = [];
   const ledges: THREE.BufferGeometry[] = [];
   for (const z of WINDOW_BAY_Z) {
     const bay = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(0, -Math.PI / 2, 0));
-    bay.setPosition(5.94, 1.85, z);
+    bay.setPosition(RIGHT_WALL_X, 1.85, z);
     const place = (geo: THREE.BufferGeometry): THREE.BufferGeometry => {
       geo.applyMatrix4(bay);
       return geo;
@@ -136,7 +149,7 @@ export function getMergedRoomStatics(): MergedRoomStatics {
   for (const y of [0.45, 0.95, 1.45]) {
     for (let i = 0; i < 7; i += 1) {
       bookBins[i % 5].push(
-        box(0.26, 0.34, 0.07 + (i % 3) * 0.02, -5.63, y, 7.2 - 0.9 + i * 0.28 + (i % 2) * 0.03),
+        box(0.26, 0.34, 0.07 + (i % 3) * 0.02, LEFT_WALL_X, y, 7.2 - 0.9 + i * 0.28 + (i % 2) * 0.03),
       );
     }
   }

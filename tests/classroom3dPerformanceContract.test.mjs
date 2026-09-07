@@ -255,9 +255,11 @@ test("spill lights are tier-gated; only visible masses cast shadows", () => {
 
 test("WallVisibility gates walls on yaw and the desk on pitch", () => {
   // Directions from the seat to each wall centre (rotation.y, radians).
-  assert.match(wallVisibility, /wall: "board", yaw: 0\.025/);
-  assert.match(wallVisibility, /wall: "notes", yaw: 0\.976/);
-  assert.match(wallVisibility, /wall: "mind", yaw: 1\.551/);
+  // The triptych: three boards on the front wall, positions taken from the
+  // shared geometry module rather than retyped here.
+  assert.match(wallVisibility, /wall: "board", x: BOARD_X\.board/);
+  assert.match(wallVisibility, /wall: "notes", x: BOARD_X\.notes/);
+  assert.match(wallVisibility, /wall: "mind", x: BOARD_X\.mind/);
   assert.match(wallVisibility, /HALF_FOV_H/);
   assert.match(wallVisibility, /DESK_PITCH/);
   // Hysteresis so a wall on the frame edge never flickers.

@@ -373,6 +373,66 @@
   }
 }
 
+/* ── The THREE-TAP focus key and the DUAL-FUNCTION fit key ──────────────────
+   Both live in the board's control cluster AND in the always-visible control
+   tray, because the cluster is only readable while the board is faced and the
+   whole point of the focus key is to leave the board you are looking at. */
+
+/* The focus key is a pill, not a round icon button: it carries the name of
+   the surface it is sitting on, so the cycle never has to be remembered. */
+.dc-classroom-board-cycle {
+  width: auto;
+  gap: 6px;
+  padding: 0 12px 0 9px;
+  grid-auto-flow: column;
+  align-items: center;
+  color: #bae6fd;
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.34);
+}
+.dc-classroom-board-cycle-label {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* FIT ⇄ FILL: the key lights up while the board is covering the screen, so
+   the two states are distinguishable at a glance from across the room. */
+.dc-classroom-board-btn[data-filled="true"] {
+  color: #fef3c7;
+  background: rgba(251, 191, 36, 0.24);
+  border-color: rgba(251, 191, 36, 0.55);
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.4);
+}
+.dc-classroom-control-btn[data-filled="true"] {
+  color: #fef3c7;
+  border-color: rgba(251, 191, 36, 0.5);
+  background: rgba(251, 191, 36, 0.18);
+}
+/* The focus key in the tray shows which surface is in front of the learner. */
+.dc-classroom-control-btn[data-classroom-cycle-focus][data-focus="board"] {
+  color: #bae6fd;
+  border-color: rgba(56, 189, 248, 0.45);
+}
+.dc-classroom-control-btn[data-classroom-cycle-focus][data-focus="notes"] {
+  color: #fde68a;
+  border-color: rgba(245, 158, 11, 0.45);
+}
+.dc-classroom-control-btn[data-classroom-cycle-focus][data-focus="mind"] {
+  color: #ddd6fe;
+  border-color: rgba(167, 139, 250, 0.45);
+}
+
+/* A surface that failed to load now says WHY and offers a retry, so it can
+   never be a dead end again (see SurfaceFrame.tsx). */
+[data-classroom-surface-retry] {
+  cursor: pointer;
+}
+[data-classroom-surface-retry]:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 /* ── Board fullscreen ──────────────────────────────────────────────────────
    The board panel is shown with the Fullscreen API (the same mechanism as
    the flat player's viewer), so the browser paints it in the top layer —

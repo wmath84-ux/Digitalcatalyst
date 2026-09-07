@@ -228,11 +228,23 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
   /** Bumped on every local edit so a slower in-flight write cannot clobber it. */
   const revisionRef = useRef(0);
   /**
+   * The scope a PENDING (debounced) write belongs to, captured when it was
+   * queued. `scopeRef` is reassigned on every render, so by the time a
+   * debounce fires after a module / map switch it already points at the NEW
+   * document — and the edit the learner just made would either be written to
+   * the wrong map or, because the load effect drops `readyRef` first, not
+   * written at all. This is the ref that makes "mind map save nahi ho raha"
+   * on a lesson switch impossible.
+   */
+  const pendingScopeRef = useRef<typeof scopeRef.current | null>(null);
+  /**
    * A map the learner just created. The load effect adopts it instead of
    * fetching a document that cannot exist yet, so "New map" opens instantly
    * with the chosen name rather than flashing an empty default first.
    */
   const pendingNewRef = useRef<{ mapKey: string; mind: MindMap } | null>(null);
+  /** Latest `persist` without making it a dependency of the load effect. */
+  const persistRef = useRef<(override?: typeof scopeRef.current | null) => void>(() => undefined);
 
   // ── The module's map list ───────────────────────────────────────────────
   useEffect(() => {
@@ -350,6 +362,18 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
     }
 
     let cancelled = false;
+    // A debounce left over from the map we are LEAVING is written out first.
+    // `persist` is called with the scope captured when that edit was queued
+    // (the render has already moved `scopeRef` on to the new document), and
+    // `mindRef` still holds the outgoing map because the new one loads
+    // asynchronously below. Skipping this is how a branch added seconds
+    // before a lesson switch used to vanish.
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+      persistRef.current(pendingScopeRef.current);
+      pendingScopeRef.current = null;
+    }
     readyRef.current = false;
     setLoading(true);
     setStatus("loading");
@@ -441,7 +465,7 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
   );
 
   // ── Save: debounced write, mirrored locally on the way out ──────────────
-  const persist = useCallback(() => {
+  const persist = useCallback((override?: typeof scopeRef.current | null) => {
     const {
       uid: currentUid,
       productId: currentProduct,
@@ -449,7 +473,7 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
       docKey: key,
       scoped: isScoped,
       mapKey: currentMapKey,
-    } = scopeRef.current;
+    } = override ?? scopeRef.current;
     if (!isScoped || !key || !readyRef.current) return;
     const signedInUid = typeof auth?.currentUser?.uid === "string" ? auth.currentUser.uid : "";
     if (!signedInUid || signedInUid !== String(currentUid)) {
@@ -518,15 +542,19 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
   // The load effect adopts a freshly created map and saves it immediately;
   // it needs `persist` without listing it as a dependency (that would re-run
   // the whole load on every save-status change).
-  const persistRef = useRef(persist);
   persistRef.current = persist;
 
   /** Queue a write after the learner pauses. */
   const scheduleSave = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    // Snapshot WHERE this edit belongs now: if the learner switches module or
+    // map inside the debounce window, the write still lands on the map they
+    // were drawing on.
+    pendingScopeRef.current = { ...scopeRef.current };
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
-      persist();
+      persist(pendingScopeRef.current);
+      pendingScopeRef.current = null;
     }, debounceMs);
   }, [debounceMs, persist]);
 
@@ -545,11 +573,13 @@ export default function useCourseMindMap(input: UseCourseMindMapInput): UseCours
 
   /** Write right now — used when the panel closes so nothing is left pending. */
   const flush = useCallback(() => {
+    const pending = timerRef.current !== null ? pendingScopeRef.current : null;
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    persist();
+    pendingScopeRef.current = null;
+    persist(pending);
   }, [persist]);
 
   // ── Map list actions ────────────────────────────────────────────────────

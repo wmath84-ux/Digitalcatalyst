@@ -51,7 +51,17 @@
 import { Suspense, memo, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import { AdaptiveDpr, AdaptiveEvents, BakeShadows, Preload } from "@react-three/drei";
-import { CircleCheck, LayoutList, Maximize, Network, NotebookPen, SkipBack, SkipForward } from "lucide-react";
+import {
+  CircleCheck,
+  LayoutList,
+  Maximize,
+  Minimize,
+  Network,
+  NotebookPen,
+  Repeat,
+  SkipBack,
+  SkipForward,
+} from "lucide-react";
 import type { CourseFile, CourseModule } from "../types/course";
 import { getCourseEmbed } from "../utils/courseEmbed";
 import Room from "./Room";
@@ -75,15 +85,18 @@ import {
 } from "./RoomSheet";
 import { getWallOnScreen, subscribeWallOnScreen } from "./wallFocus";
 import {
+  BOARD_ZOOM_MAX,
   BOARD_ZOOM_MIN,
-  BOARD_ZOOM_PORTRAIT_FIT,
   BOARD_ZOOM_STEP,
-  BOARD_ZOOM_TOGGLE,
+  FOCUS_CYCLE,
   FOCUS_PRESETS,
   clampBoardZoom,
   flattenModules,
+  nextFocusInCycle,
+  zoomBlend,
   type ClassroomFocus,
 } from "./state";
+import { BOARD, BOARD_X, SEAT } from "./roomGeometry";
 import "./classroom3d.css";
 
 // Baked once, never per frame (Part 13): the room's shadow casters are
@@ -98,6 +111,14 @@ const BakedShadowsOnce = memo(function BakedShadowsOnce() {
 // every third-party iframe kind. Native video/audio (`direct`) and images
 // are deliberately excluded — GPU-cheap, fully controllable, and Part 13
 // keeps them visually live while faced.
+/** All three boards are authored at the same CSS width, so they are the same
+ *  size on their slabs AND the same resolution: `surfaceScale()` maps this
+ *  onto `BOARD.width` metres (see surfaceScale.ts). */
+const BOARD_PIXEL_WIDTH = 1600;
+
+/** Chalk slab the triptych rides on: the row plus a margin each side. */
+const BOARD_ROW_WIDTH = BOARD_X.notes - BOARD_X.mind + BOARD.width + 0.8;
+
 const THIRD_PARTY_EMBED_KINDS: ReadonlySet<string> = new Set([
   "youtube",
   "pdf",
@@ -205,11 +226,13 @@ export default function Classroom3D({
   // dragged-to wall render as a blank slab.
   const onScreen = useSyncExternalStore(subscribeWallOnScreen, getWallOnScreen, getWallOnScreen);
 
-  // ── Board lean + fullscreen (Part 12) ───────────────────────────────────
-  // `boardZoom` is the camera's lean toward the board: 1 = the seat's normal
-  // position, BOARD_ZOOM_MAX = the closest lean. SeatRig turns it into a
-  // clamped forward dolly on the same spring as the head turn, and glides it
-  // back to 1 whenever the learner looks at another wall.
+  // ── The view blend + fullscreen (Part 12 → Part 19) ─────────────────────
+  // `boardZoom` blends between two camera POSES for whichever board is faced
+  // (see state.ts): MIN = FIT, the camera at the seat with its head turned;
+  // MAX = FILL, the camera square-on to that board at exactly the distance
+  // `fillDistance()` computes from the live lens, so the board covers the
+  // whole screen and nothing else shows around it. SeatRig interpolates on
+  // the same spring as the head turn and glides back to FIT at the desk.
   const [boardZoom, setBoardZoom] = useState(BOARD_ZOOM_MIN);
   // Bumped by Fit / double-tap so SeatRig re-aims at the board even when the
   // focus never changed ("board" → "board" can't re-fire the focus effect).
@@ -380,29 +403,60 @@ export default function Classroom3D({
   }, []);
 
   /**
-   * Fit-to-screen: the lean back to normal — a touch closer in portrait,
-   * where SeatRig's widened lens shrinks the board — and the head back to
-   * the board's exact centre. Reuses the room's `portrait` flag, like the
-   * hint line below.
+   * FIT: back to the seat pose, head square on the focused board. FILL is
+   * computed live by SeatRig from the real lens, so portrait no longer needs
+   * its own hand-tuned "a touch closer" constant — the same call is exact in
+   * both orientations.
    */
   const fitBoard = useCallback(() => {
-    setBoardZoom(portrait ? BOARD_ZOOM_PORTRAIT_FIT : BOARD_ZOOM_MIN);
-    setFocus("board");
+    setBoardZoom(BOARD_ZOOM_MIN);
+    // Looking down at the desk has no FIT/FILL pose of its own, so the key
+    // lifts the head to the board first rather than doing nothing at all.
+    setFocus((current) => (FOCUS_CYCLE.includes(current) ? current : "board"));
     setBoardFitSignal((value) => value + 1);
-  }, [portrait]);
+  }, []);
 
-  /** Double-tap / double-click the board: face it, centre it, toggle a close-up. */
-  const toggleBoardZoom = useCallback(() => {
-    setFocus("board");
+  /**
+   * The DUAL-FUNCTION fit key the owner asked for: one button, two states,
+   * alternating for as long as it is tapped.
+   *
+   *   click 1 → FIT   (the seat's normal view of the board)
+   *   click 2 → FILL  (only the board — zoomed until it covers the screen and
+   *                    nothing else is visible around it)
+   *   click 3 → FIT … and so on.
+   *
+   * "Am I at fit?" is read from the live blend rather than a second flag, so
+   * the wheel and a pinch — which sweep the same blend continuously — can
+   * never leave the button disagreeing with the camera.
+   */
+  const toggleFitFill = useCallback(() => {
+    setFocus((current) => (FOCUS_CYCLE.includes(current) ? current : "board"));
     setBoardFitSignal((value) => value + 1);
     setBoardZoom((current) =>
-      current > (BOARD_ZOOM_MIN + BOARD_ZOOM_TOGGLE) / 2
-        ? portrait
-          ? BOARD_ZOOM_PORTRAIT_FIT
-          : BOARD_ZOOM_MIN
-        : BOARD_ZOOM_TOGGLE,
+      current > BOARD_ZOOM_MIN + 1e-6 ? BOARD_ZOOM_MIN : BOARD_ZOOM_MAX,
     );
-  }, [portrait]);
+  }, []);
+
+  /** Double-tap / double-click a board: the same FIT ⇄ FILL flip. */
+  const toggleBoardZoom = toggleFitFill;
+
+  /**
+   * The THREE-TAP focus key: Board → Notes → Mind map → Board … for as long
+   * as it is tapped. The blend is deliberately left alone, so a learner who
+   * filled the screen cycles through three full-screen boards, and one who is
+   * at fit cycles through three boards in the room.
+   */
+  const cycleFocus = useCallback(() => {
+    setFocus((current) => nextFocusInCycle(current));
+    setBoardFitSignal((value) => value + 1);
+  }, []);
+
+  /** Which surface the cycle key is sitting on, for its label. */
+  const focusLabel = useMemo(
+    () => FOCUS_PRESETS.find((preset) => preset.id === focus)?.label ?? "Board",
+    [focus],
+  );
+  const filled = zoomBlend(boardZoom) >= 0.5;
 
   /**
    * Board fullscreen WITHOUT leaving the room: the exact mechanism
@@ -435,8 +489,9 @@ export default function Classroom3D({
     return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
 
-  // Keyboard: 1-4 turn the head, ←/→ step lessons, +/−/0 lean toward the
-  // board, Esc exits board-fullscreen first and only otherwise drops to the desk.
+  // Keyboard: 1-4 turn the head, C cycles Board → Notes → Mind map, F flips
+  // FIT ⇄ FILL, ←/→ step lessons, +/− sweep the blend and 0 fits. Esc exits
+  // board-fullscreen first and only otherwise drops to the desk.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -456,13 +511,15 @@ export default function Classroom3D({
         else if (document.fullscreenElement) void document.exitFullscreen();
         else if (boardFullscreen) setBoardFullscreen(false);
         else setFocus("desk");
-      } else if (focus === "board" && (event.key === "+" || event.key === "=")) zoomBoardBy(BOARD_ZOOM_STEP);
-      else if (focus === "board" && (event.key === "-" || event.key === "_")) zoomBoardBy(-BOARD_ZOOM_STEP);
-      else if (focus === "board" && event.key === "0") fitBoard();
+      } else if (event.key === "f" || event.key === "F") toggleFitFill();
+      else if (event.key === "c" || event.key === "C") cycleFocus();
+      else if (FOCUS_CYCLE.includes(focus) && (event.key === "+" || event.key === "=")) zoomBoardBy(BOARD_ZOOM_STEP);
+      else if (FOCUS_CYCLE.includes(focus) && (event.key === "-" || event.key === "_")) zoomBoardBy(-BOARD_ZOOM_STEP);
+      else if (event.key === "0") fitBoard();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [step, focus, sheet, boardFullscreen, zoomBoardBy, fitBoard]);
+  }, [step, focus, sheet, boardFullscreen, zoomBoardBy, fitBoard, toggleFitFill, cycleFocus]);
 
   return (
     <div className="course-player-shell dc-classroom-root" data-course-classroom-3d data-course-theme="dark">
@@ -473,7 +530,9 @@ export default function Classroom3D({
         // is owned by <AdaptiveDpr> under the quality governor — never here.
         dpr={initialDpr}
         gl={{ antialias: true, powerPreference: "high-performance" }}
-        camera={{ fov: 62, position: [0.15, 1.24, 2.62] }}
+        // The seat (roomGeometry.ts) — the same numbers SeatRig springs from,
+        // so the first frame is already in the chair instead of snapping to it.
+        camera={{ fov: 62, position: [SEAT.x, SEAT.y, SEAT.z] }}
       >
         <Suspense fallback={null}>
           <color attach="background" args={["#9fb3cc"]} />
@@ -493,28 +552,37 @@ export default function Classroom3D({
               so the top layer can never be gated by a stale head angle. */}
           <WallVisibility forceVisible={boardFullscreen} />
 
-          {/* ── FRONT: the blackboard the big screen is mounted on ────── */}
-          <group position={[0, 0, -3.38]}>
-            <mesh position={[0, 1.72, 0.02]} receiveShadow>
-              <boxGeometry args={[7.4, 2.7, 0.1]} />
+          {/* ── FRONT: the TRIPTYCH screen wall ───────────────────────────
+              One wide chalk slab carrying THREE boards of the SAME size —
+              mind map on the LEFT, the lesson in the CENTRE, notes on the
+              RIGHT — all flat on the wall and all facing the seat square-on.
+              Measurements come from roomGeometry.ts so the shell, the merged
+              statics, the camera poses and the visibility rig can never
+              disagree about where a board is. */}
+          <group position={[0, 0, -3.42]}>
+            <mesh position={[0, BOARD.y, 0.02]} receiveShadow>
+              <boxGeometry args={[BOARD_ROW_WIDTH, BOARD.height + 0.55, 0.1]} />
               <meshStandardMaterial color="#16302a" roughness={0.95} />
             </mesh>
-            <mesh position={[0, 0.34, 0.14]} castShadow>
-              <boxGeometry args={[7.4, 0.08, 0.18]} />
+            {/* Chalk rail, full width, just under the row of bezels */}
+            <mesh position={[0, BOARD.y - BOARD.height / 2 - 0.19, 0.14]} castShadow>
+              <boxGeometry args={[BOARD_ROW_WIDTH, 0.08, 0.18]} />
               <meshStandardMaterial color="#7a5a38" roughness={0.8} />
             </mesh>
-            {[-1.4, -1.1, -0.8].map((x, i) => (
-              <mesh key={x} position={[x, 0.41, 0.16]} rotation={[0, 0, Math.PI / 2]}>
+            {[-8.4, -8.1, -7.8, 7.8, 8.1, 8.4].map((x, i) => (
+              <mesh key={x} position={[x, BOARD.y - BOARD.height / 2 - 0.15, 0.16]} rotation={[0, 0, Math.PI / 2]}>
                 <cylinderGeometry args={[0.014, 0.014, 0.12, 8]} />
-                <meshStandardMaterial color={["#ffffff", "#ffe8a3", "#ffd0d0"][i]} />
+                <meshStandardMaterial color={["#ffffff", "#ffe8a3", "#ffd0d0"][i % 3]} />
               </mesh>
             ))}
           </group>
+
+          {/* ── CENTRE: the lecture board (the lesson plays here) ─────── */}
           <SurfaceFrame
-            position={[0, 1.78, -3.28]}
-            width={6.4}
-            height={3.05}
-            pixelWidth={1600}
+            position={[BOARD_X.board, BOARD.y, BOARD.z]}
+            width={BOARD.width}
+            height={BOARD.height}
+            pixelWidth={BOARD_PIXEL_WIDTH}
             accent="#38bdf8"
             active={focus === "board"}
             spill={settings.spillLights === "all" || focus === "board"}
@@ -525,15 +593,10 @@ export default function Classroom3D({
               subtitle={flat[position.moduleIndex]?.title || courseTitle}
               zoom={boardZoom}
               boardFullscreen={boardFullscreen}
-              onZoomIn={() => {
-                setFocus("board");
-                zoomBoardBy(BOARD_ZOOM_STEP);
-              }}
-              onZoomOut={() => {
-                setFocus("board");
-                zoomBoardBy(-BOARD_ZOOM_STEP);
-              }}
+              focusLabel={focusLabel}
+              onCycleFocus={cycleFocus}
               onFit={fitBoard}
+              onToggleFitFill={toggleFitFill}
               onToggleFullscreen={toggleBoardFullscreen}
               onToggleZoom={toggleBoardZoom}
             >
@@ -547,17 +610,16 @@ export default function Classroom3D({
             </BoardPanel>
           </SurfaceFrame>
 
-          {/* ── LEFT-FRONT: the notes wall ───────────────────────────── */}
+          {/* ── RIGHT: the notes board — same slab as the lecture board ── */}
           <SurfaceFrame
-            position={[-4.55, 1.6, -0.55]}
-            rotation={[0, 0.98, 0]}
-            width={3.5}
-            height={2.5}
-            pixelWidth={1100}
+            position={[BOARD_X.notes, BOARD.y, BOARD.z]}
+            width={BOARD.width}
+            height={BOARD.height}
+            pixelWidth={BOARD_PIXEL_WIDTH}
             accent="#f59e0b"
             active={focus === "notes"}
             spill={settings.spillLights === "all" || focus === "notes"}
-            label="Notes wall"
+            label="Notes board"
           >
             <div className="relative h-full w-full overflow-hidden bg-[#0a0f1c] text-white">
               <WallActivity wall="notes" active={focus === "notes" || onScreen.notes}>
@@ -576,17 +638,16 @@ export default function Classroom3D({
             </div>
           </SurfaceFrame>
 
-          {/* ── FAR LEFT: the mind map wall ──────────────────────────── */}
+          {/* ── LEFT: the mind map board — same slab again ─────────────── */}
           <SurfaceFrame
-            position={[-5.86, 1.6, 2.5]}
-            rotation={[0, Math.PI / 2, 0]}
-            width={4.2}
-            height={2.7}
-            pixelWidth={1240}
+            position={[BOARD_X.mind, BOARD.y, BOARD.z]}
+            width={BOARD.width}
+            height={BOARD.height}
+            pixelWidth={BOARD_PIXEL_WIDTH}
             accent="#a78bfa"
             active={focus === "mind"}
             spill={settings.spillLights === "all" || focus === "mind"}
-            label="Mind map wall"
+            label="Mind map board"
           >
             <div className="h-full w-full overflow-hidden bg-[#0a0f1c] text-white">
               <WallActivity wall="mind" active={focus === "mind" || onScreen.mind}>
@@ -689,8 +750,29 @@ export default function Classroom3D({
         <button type="button" className="dc-classroom-control-btn" onClick={() => step(1)}>
           Next <SkipForward size={18} />
         </button>
-        <button type="button" className="dc-classroom-control-btn" onClick={fitBoard}>
-          <Maximize size={18} /> Fit board
+        {/* ── The two keys the owner asked for, always within thumb reach ──
+            They live here as well as on the board's own chrome because the
+            board chrome is only readable while you are FACING the board: a
+            key that switches boards has to work from any of them. */}
+        <button
+          type="button"
+          className="dc-classroom-control-btn"
+          data-classroom-cycle-focus
+          data-focus={focus}
+          onClick={cycleFocus}
+          title="Switch surface: Board → Notes → Mind map"
+        >
+          <Repeat size={18} /> {focusLabel}
+        </button>
+        <button
+          type="button"
+          className="dc-classroom-control-btn"
+          data-classroom-fit-fill
+          data-filled={filled ? "true" : "false"}
+          onClick={toggleFitFill}
+          title="Tap: fit the board · tap again: only the board, filling the screen"
+        >
+          {filled ? <Minimize size={18} /> : <Maximize size={18} />} {filled ? "Fit" : "Zoom"}
         </button>
         <button
           type="button"
@@ -788,8 +870,8 @@ export default function Classroom3D({
 
       <p className="dc-classroom-hint">
         {portrait
-          ? "Drag to turn · double-tap the board to lean in · rotate for the full board"
-          : "Drag to turn · 1–4 jump to a surface · ← → change lesson · scroll to lean in · double-click the board to zoom"}
+          ? "Drag to turn · tap Zoom to fill the screen with one board · tap the surface key to switch Board → Notes → Mind map"
+          : "Drag to turn · 1–4 jump to a surface · C cycles Board → Notes → Mind map · F flips Fit ⇄ Zoom · ← → change lesson · double-click a board to fill the screen"}
       </p>
     </div>
   );

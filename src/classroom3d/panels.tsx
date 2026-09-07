@@ -18,21 +18,21 @@ import {
   Expand,
   LockKeyhole,
   Maximize,
+  Minimize,
   Network,
   NotebookPen,
   Presentation,
+  Repeat,
   ShoppingBag,
   Shrink,
   SkipBack,
   SkipForward,
-  ZoomIn,
-  ZoomOut,
 } from "lucide-react";
 import {
-  BOARD_ZOOM_MAX,
   BOARD_ZOOM_MIN,
   FILE_KIND_LABEL,
   FOCUS_PRESETS,
+  zoomBlend,
   type ClassroomFocus,
   type FlatModule,
 } from "./state";
@@ -49,24 +49,29 @@ export const BoardPanel = memo(function BoardPanel({
   children,
   zoom = BOARD_ZOOM_MIN,
   boardFullscreen = false,
-  onZoomIn,
-  onZoomOut,
+  focusLabel = "Board",
+  onCycleFocus,
   onFit,
+  onToggleFitFill,
   onToggleFullscreen,
   onToggleZoom,
 }: {
   title: string;
   subtitle: string;
   children: ReactNode;
-  /** The room's board lean — shown as a percentage next to the + / − keys. */
+  /** The room's FIT ⇄ FILL blend — 1 is fit, BOARD_ZOOM_MAX is filled. */
   zoom?: number;
   /** True while this panel holds the browser fullscreen top layer. */
   boardFullscreen?: boolean;
-  onZoomIn?: () => void;
-  onZoomOut?: () => void;
+  /** The surface the three-tap key is currently sitting on. */
+  focusLabel?: string;
+  /** THREE-TAP key: Board → Notes → Mind map → Board … */
+  onCycleFocus?: () => void;
   onFit?: () => void;
+  /** DUAL-FUNCTION key: fit ⇄ only-the-board-filling-the-screen. */
+  onToggleFitFill?: () => void;
   onToggleFullscreen?: () => void;
-  /** Double-tap / double-click on the board chrome toggles the close-up. */
+  /** Double-tap / double-click on the board chrome toggles FIT ⇄ FILL. */
   onToggleZoom?: () => void;
 }) {
   // Double-TAP detection for touch (mobile browsers don't reliably fire
@@ -83,9 +88,9 @@ export const BoardPanel = memo(function BoardPanel({
   // for a different viewer on every lesson.
   const bodyRef = useRef<HTMLDivElement>(null);
   const holdScroll = useHoldScroll(useCallback(() => bodyRef.current, []));
-  const showControls = Boolean(onZoomIn || onZoomOut || onFit || onToggleFullscreen);
-  const zoomedOut = zoom <= BOARD_ZOOM_MIN + 1e-6;
-  const zoomedIn = zoom >= BOARD_ZOOM_MAX - 1e-6;
+  const showControls = Boolean(onCycleFocus || onToggleFitFill || onFit || onToggleFullscreen);
+  /** Past halfway the camera is on its way to FILL, so the key offers FIT. */
+  const filled = zoomBlend(zoom) >= 0.5;
   // A gesture that starts inside the lesson viewer belongs to the viewer:
   // double-clicking a diagram zooms the DIAGRAM (flat-mode behaviour) — it
   // must never also lean the camera.
@@ -156,16 +161,24 @@ export const BoardPanel = memo(function BoardPanel({
               <ChevronDown size={14} />
             </button>
             <span className="dc-classroom-board-sep" aria-hidden />
+            {/* ── THREE-TAP FOCUS ──────────────────────────────────────────
+                The key the owner calls "the zoom button": one tap puts the
+                lecture board in front of you, the next the notes board, the
+                next the mind map board — and it keeps cycling for as long as
+                it is tapped. It carries the surface it is ON, not the one it
+                is going to, so the room never asks the learner to remember an
+                order. */}
             <button
               type="button"
-              onClick={onZoomOut}
-              disabled={!onZoomOut || zoomedOut}
-              className="dc-classroom-board-btn"
-              data-classroom-board-zoom-out
-              aria-label="Zoom out"
-              title="Lean back"
+              onClick={onCycleFocus}
+              disabled={!onCycleFocus}
+              className="dc-classroom-board-btn dc-classroom-board-cycle"
+              data-classroom-board-cycle
+              aria-label="Switch surface: board, notes, mind map"
+              title="Tap to switch: Board → Notes → Mind map"
             >
-              <ZoomOut size={14} />
+              <Repeat size={14} />
+              <span className="dc-classroom-board-cycle-label">{focusLabel}</span>
             </button>
             <span
               key={Math.round(zoom * 100)}
@@ -173,29 +186,25 @@ export const BoardPanel = memo(function BoardPanel({
               data-classroom-board-zoom-pct
               aria-live="polite"
             >
-              {Math.round(zoom * 100)}%
+              {Math.round(zoomBlend(zoom) * 100)}%
             </span>
+            {/* ── DUAL-FUNCTION FIT / ZOOM ─────────────────────────────────
+                One key, two states, alternating: tap for FIT (the seat's view
+                of the board, room and all), tap again for FILL (the camera
+                glides square-on and stops where the board covers the entire
+                screen, so nothing else is visible around it), tap again for
+                FIT — for as long as it is tapped. */}
             <button
               type="button"
-              onClick={onZoomIn}
-              disabled={!onZoomIn || zoomedIn}
-              className="dc-classroom-board-btn"
-              data-classroom-board-zoom-in
-              aria-label="Zoom in"
-              title="Lean closer"
-            >
-              <ZoomIn size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={onFit}
-              disabled={!onFit}
+              onClick={onToggleFitFill ?? onFit}
+              disabled={!onToggleFitFill && !onFit}
               className="dc-classroom-board-btn"
               data-classroom-board-zoom-fit
-              aria-label="Fit to screen"
-              title="Fit to screen"
+              data-filled={filled ? "true" : "false"}
+              aria-label={filled ? "Fit the board to the room view" : "Zoom the board to fill the screen"}
+              title={filled ? "Fit" : "Zoom — fill the screen with this board"}
             >
-              <Maximize size={14} />
+              {filled ? <Minimize size={14} /> : <Maximize size={14} />}
             </button>
             <button
               type="button"

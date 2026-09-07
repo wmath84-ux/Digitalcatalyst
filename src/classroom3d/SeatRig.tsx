@@ -36,16 +36,17 @@ import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import {
-  BOARD_DOLLY_METRES,
-  BOARD_ZOOM_MAX,
   BOARD_ZOOM_MIN,
+  BOARD_ZOOM_WHEEL,
   PITCH_LIMIT,
   SEAT,
   YAW_LIMIT,
   clampBoardZoom,
   focusPreset,
+  zoomBlend,
   type ClassroomFocus,
 } from "./state";
+import { BOARD, BOARD_X, FOCUS_BOARD, fillDistance } from "./roomGeometry";
 import {
   EMBED_MOVING_CLASS,
   reportEmbedMotion,
@@ -106,11 +107,11 @@ export default function SeatRig({
     target.current.pitch = preset.pitch;
   }, [focus, recenterSignal]);
 
-  // The board lean follows the room's zoom state — and glides back to the
-  // seat's normal position the moment the learner looks at another wall. The
-  // spring below makes the return a lean-back, never a jump-cut.
+  // The blend follows the room's zoom state on ANY of the three boards, and
+  // glides back to FIT the moment the learner looks down at the desk (which
+  // has no FILL pose). The spring makes the return an ease, never a jump-cut.
   useEffect(() => {
-    target.current.zoom = focus === "board" ? clampBoardZoom(zoom) : BOARD_ZOOM_MIN;
+    target.current.zoom = FOCUS_BOARD[focus] ? clampBoardZoom(zoom) : BOARD_ZOOM_MIN;
   }, [focus, zoom]);
 
   // Manual head turn + pinch-to-lean — canvas-only pointer drags.
@@ -147,10 +148,11 @@ export default function SeatRig({
       if (!pointers.current.has(event.pointerId)) return;
       pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (pointers.current.size >= 2) {
-        // Two fingers on the room lean the seat — but only while facing the
-        // board, exactly like the wheel. Anywhere else the gesture is a no-op
-        // (the zoom state is left alone so nothing fires on the way back).
-        if (focusRef.current === "board" && pinch.current && pinch.current.distance > 0) {
+        // Two fingers on the room drive the FIT ⇄ FILL blend — on any of the
+        // three boards, not just the centre one. Over the desk the gesture is
+        // a no-op (the zoom state is left alone so nothing fires on the way
+        // back up to the tablet).
+        if (FOCUS_BOARD[focusRef.current] && pinch.current && pinch.current.distance > 0) {
           const values = pointers.current.values();
           const first = values.next().value as { x: number; y: number };
           const second = values.next().value as { x: number; y: number };
@@ -217,10 +219,12 @@ export default function SeatRig({
   useEffect(() => {
     const element = gl.domElement;
     const onWheel = (event: WheelEvent) => {
-      if (focusRef.current !== "board") return;
+      // Wheel = FIT ⇄ FILL, on whichever board is faced. Looking down at the
+      // desk keeps the wheel for the page underneath.
+      if (!FOCUS_BOARD[focusRef.current]) return;
       event.preventDefault();
       // Same notch as the image viewer's wheel zoom.
-      onZoomDeltaRef.current?.(event.deltaY < 0 ? 0.2 : -0.2);
+      onZoomDeltaRef.current?.(event.deltaY < 0 ? BOARD_ZOOM_WHEEL : -BOARD_ZOOM_WHEEL);
     };
     element.addEventListener("wheel", onWheel, { passive: false });
     return () => element.removeEventListener("wheel", onWheel);
@@ -275,21 +279,57 @@ export default function SeatRig({
       reportEmbedMotion();
     }
 
-    // A seated body breathes — a whisper of sway keeps the room alive.
+    // A seated body breathes — a whisper of sway keeps the room alive. It is
+    // damped out as the view approaches FILL: a board that is supposed to
+    // cover the whole screen must not drift a pixel off its own edges.
     const t = state.clock.elapsedTime;
-    const swayY = Math.sin(t * 0.55) * 0.0045;
-    const swayX = Math.sin(t * 0.37 + 1.2) * 0.0035;
+    const blend = zoomBlend(current.current.zoom);
+    const breathe = 1 - blend;
+    const swayY = Math.sin(t * 0.55) * 0.0045 * breathe;
+    const swayX = Math.sin(t * 0.37 + 1.2) * 0.0035 * breathe;
 
-    // The lean is a forward dolly from the seat: at BOARD_ZOOM_MIN the camera
-    // sits exactly where it always has, and at BOARD_ZOOM_MAX it has glided
-    // 3.6 m toward the board — still 2.2 m of air short of the chalk rail.
-    const lean =
-      (clamp(current.current.zoom, BOARD_ZOOM_MIN, BOARD_ZOOM_MAX) - BOARD_ZOOM_MIN) * BOARD_DOLLY_METRES;
-    camera.position.set(SEAT.x, SEAT.y + Math.sin(t * 0.8) * 0.006, SEAT.z - lean);
+    // ── FIT pose: the seat, head turned to the focused surface ────────────
+    // This is where the camera has always sat. The spring above already eased
+    // yaw/pitch toward it, so those two are read straight from `current`.
+    let eyeX = SEAT.x;
+    let eyeY = SEAT.y + Math.sin(t * 0.8) * 0.006 * breathe;
+    let eyeZ = SEAT.z;
+    let yaw = current.current.yaw;
+    let pitch = current.current.pitch;
+
+    // ── FILL pose: square-on to the focused board, close enough to cover the
+    // whole viewport (the owner's "kuchh na dikhe aaspaas"). `fillDistance`
+    // reads the LIVE lens, so portrait — where the vertical fov is clamped up
+    // to 96° and the board must be much nearer to cover the frame — gets its
+    // own exact answer instead of a landscape-shaped guess.
+    //
+    // Square-on matters twice over: it is the only pose where the board can
+    // cover the screen without distortion, AND the only one where its DOM has
+    // no perspective skew — which is what makes node dragging on the mind map
+    // and the caret in the note editor land where the finger actually is.
+    const side = FOCUS_BOARD[focusRef.current];
+    if (side && blend > 0) {
+      const boardX = BOARD_X[side];
+      const distance = fillDistance(
+        BOARD.width,
+        BOARD.height,
+        "fov" in camera ? Number((camera as { fov: number }).fov) : 62,
+        size.width / Math.max(1, size.height),
+      );
+      eyeX += (boardX - eyeX) * blend;
+      eyeY += (BOARD.y - eyeY) * blend;
+      eyeZ += (BOARD.z + distance - eyeZ) * blend;
+      // The head squares up as the eye slides across: at FILL the board is
+      // dead ahead (yaw 0) and level (pitch 0), so nothing is skewed.
+      yaw += (0 - yaw) * blend;
+      pitch += (0 - pitch) * blend;
+    }
+
+    camera.position.set(eyeX, eyeY, eyeZ);
     // (rotation.order is "YXZ" once, in the lens effect below — nothing here
     // ever changes it, so re-asserting it every frame was pure overhead.)
-    camera.rotation.y = current.current.yaw + swayY;
-    camera.rotation.x = current.current.pitch + swayX;
+    camera.rotation.y = yaw + swayY;
+    camera.rotation.x = pitch + swayX;
     camera.rotation.z = 0;
     camera.updateMatrixWorld();
   });
