@@ -154,7 +154,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
   return (
     <div className="flex flex-col gap-3" data-checkout-review-step>
       {/* Purchase type chip */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2" data-checkout-review-head>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-black text-indigo-200">
           <PurchaseTypeIcon size={12} />
           {purchaseTypeLabel}
@@ -352,6 +352,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
           type="button"
           onClick={() => setShowDetails(true)}
           className="[&>span>div]:h-9 [&>span>div]:px-4 [&>span>div]:text-xs [&>span>div]:font-bold"
+          data-checkout-selection-toggle
         >
           Show selection details
         </GlassButton>
@@ -359,7 +360,7 @@ export default function CheckoutReviewStep({ onProceed, onEdit }: { onProceed: (
 
       {/* Refresh banner */}
       {showError ? (
-        <div className="flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-500/15 p-3 text-xs text-amber-200 sm:text-sm">
+        <div className="flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-500/15 p-3 text-xs text-amber-200 sm:text-sm" data-checkout-review-notice>
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="flex-1">
             <p className="font-black">We couldn't refresh the price.</p>

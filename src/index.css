@@ -6633,3 +6633,213 @@ html.light .dc-compare-table .dc-compare-rowhead {
 html.light .dc-desktop-shell [data-pdp-tabbar][data-stuck="true"] {
   background-color: rgb(255 255 255 / 0.78);
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   SUBSCRIPTION — DESKTOP WORKSPACE LAYOUT
+   ══════════════════════════════════════════════════════════════════════
+   The subscription page is built mobile-first as one vertical column of
+   step cards (showcase → plan → add-ons → discounts → review). Inside the
+   desktop shell that column stretched edge-to-edge, so on a wide monitor
+   the plan comparison table became a very wide ribbon and the review sat
+   alone at the bottom.
+
+   The desktop model (scoped to `.dc-desktop-shell`, so the phone band and
+   the tablet-portrait band keep the exact existing layout):
+
+     · The buy-flow splits into a two-column workspace only when the shell's
+       content column is genuinely wide (container query `dc-shell`, mirrors
+       the revision / profile container reflow): the configuration surface
+       (showcase + plan + add-ons + discounts) on the left, and a persistent
+       review rail (live card + price summary) on the right that sticks
+       beside the pointer while the buyer edits.
+     · The whole workspace caps at 1440 px and centres, so it is never a
+       thin ribbon on a 27" monitor nor over-wide on a small laptop.
+     · Below the split threshold it stays the single readable column.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Constrain + centre the workspace + the owned-plan card on every
+   desktop-served viewport (the shell supplies the gutters). */
+@media (min-width: 960px) {
+  [data-subscription-layout],
+  [data-subscription-owned-plan] {
+    width: 100%;
+    max-width: 1440px;
+    margin-inline: auto;
+  }
+  [data-subscription-member-view] {
+    width: 100%;
+    max-width: 1240px;
+    margin-inline: auto;
+  }
+  /* The sticky bottom buy bar sits inside the shell's content column, so it
+     already lives right of the rail. On desktop it fills the whole column
+     edge-to-edge; align its inner content with the workspace and keep the CTA
+     readable instead of a full-bleed ribbon. */
+  .dc-desktop-shell [data-subscription-subscribe-bar] {
+    padding-inline: clamp(16px, 3.5vw, 48px);
+  }
+  .dc-desktop-shell [data-subscription-subscribe-bar] > * {
+    width: 100%;
+    max-width: 1160px;
+    margin-inline: auto;
+  }
+  .dc-desktop-shell [data-subscription-main],
+  .dc-desktop-shell [data-subscription-rail] {
+    min-width: 0;
+  }
+}
+
+/* The actual split — only when the shell's content column is wide enough.
+   The container query subtracts the 260 px rail + gutters before deciding,
+   so a 1024 px laptop with the side rail keeps the single comfortable
+   column while a 1440 px desktop gets the two-column workspace. */
+@container dc-shell (min-width: 860px) {
+  [data-subscription-layout] {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 26vw, 380px);
+    column-gap: clamp(20px, 2vw, 36px);
+    align-items: start;
+  }
+  .dc-desktop-shell [data-subscription-rail] {
+    position: sticky;
+    top: -0.25rem;
+    align-self: start;
+    /* The shell scroller resolves sticky insets from its content box, which
+       already starts one topbar + 1.5rem below the viewport top — mirror the
+       PDP buy rail so the review rail seats under the glass topbar. */
+    max-height: calc(100vh - var(--desktop-topbar-height, 64px) - 3rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(100 116 139 / 0.38) transparent;
+    padding-bottom: 2px;
+  }
+  .dc-desktop-shell [data-subscription-rail]::-webkit-scrollbar {
+    width: 8px;
+  }
+  .dc-desktop-shell [data-subscription-rail]::-webkit-scrollbar-thumb {
+    background: rgb(100 116 139 / 0.38);
+    border-radius: 9999px;
+  }
+}
+@supports (height: 100dvh) {
+  .dc-desktop-shell [data-subscription-rail] {
+    max-height: calc(100dvh - var(--desktop-topbar-height, 64px) - 3rem);
+  }
+}
+
+/* Undo the global tablet clamp() shrink for the subscription workspace so
+   cards on 640–1366 px windows keep their phone box metrics (the same pass
+   Revision + the Profile undo). */
+@media (min-width: 640px) and (max-width: 1366px) {
+  [data-subscription-layout] h1,
+  [data-subscription-owned-plan] h1 { font-size: 1.5rem !important; }
+  [data-subscription-layout] h2,
+  [data-subscription-owned-plan] h2 { font-size: 1.25rem !important; }
+  [data-subscription-layout] h3,
+  [data-subscription-owned-plan] h3 { font-size: 1.125rem !important; }
+  [data-subscription-layout] button,
+  [data-subscription-owned-plan] button { font-size: 0.875rem; }
+  [data-subscription-layout] .p-3,
+  [data-subscription-owned-plan] .p-3 { padding: 0.75rem !important; }
+  [data-subscription-layout] .p-4,
+  [data-subscription-owned-plan] .p-4 { padding: 1rem !important; }
+  [data-subscription-layout] .p-5,
+  [data-subscription-owned-plan] .p-5 { padding: 1.25rem !important; }
+  [data-subscription-layout] .p-6,
+  [data-subscription-owned-plan] .p-6 { padding: 1.5rem !important; }
+  [data-subscription-layout] .gap-3,
+  [data-subscription-owned-plan] .gap-3 { gap: 0.75rem !important; }
+  [data-subscription-layout] .gap-4,
+  [data-subscription-owned-plan] .gap-4 { gap: 1rem !important; }
+  [data-subscription-layout] .gap-6,
+  [data-subscription-owned-plan] .gap-6 { gap: 1.5rem !important; }
+  [data-subscription-layout] .rounded-2xl,
+  [data-subscription-owned-plan] .rounded-2xl { border-radius: 1rem !important; }
+  [data-subscription-layout] .rounded-3xl,
+  [data-subscription-owned-plan] .rounded-3xl { border-radius: 1.5rem !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   CHECKOUT — DESKTOP WORKSPACE LAYOUT
+   ══════════════════════════════════════════════════════════════════════
+   `#/checkout` is deliberately full-bleed (it owns the Razorpay iframe, so
+   the desktop shell rail/topbar stays out of the way). That means the
+   phone-width frame it renders would otherwise stretch edge-to-edge to a
+   very wide, hard-to-scan column of cards. The desktop model:
+
+     · The review + success steps cap at a reading-friendly width and
+       centre, so the cards never become full-width ribbons.
+     · At ≥1200 px the review step splits into a two-column workspace:
+       buyer / what-you'll-get / line-items / selection on the left, and a
+       persistent price + pay rail on the right that sticks while the buyer
+       reads.
+     · Mobile + tablet-portrait keep the exact single-column order.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* The whole checkout (review / payment / success) is a centred, comfortable
+   column inside the full-bleed checkout app (which is width:100% on desktop).
+   The shell supplies the page chrome; the content caps at a readable width so
+   cards never turn into full-width ribbons on a wide monitor. */
+@media (min-width: 960px) {
+  [data-checkout-content] {
+    width: 100%;
+    max-width: 1160px;
+    margin-inline: auto;
+  }
+}
+
+/* ≥1200 px: the commerce split. The review step keeps its original DOM
+   order (so phone + tablet portrait are untouched) and reflows into a
+   two-column grid — buyer / what-you'll-get / items / selection on the
+   left, coupon / price / pay actions on the right. */
+@media (min-width: 1200px) {
+  [data-checkout-review-step] {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 420px);
+    column-gap: clamp(24px, 2.6vw, 44px);
+    align-items: start;
+    /* Pack the right-hand price/pay rail (coupon + price + actions) up
+       against the left content instead of stranding it rows below, and let
+       an absent card (e.g. no line-items on a subscription) simply vacate
+       its slot. */
+    grid-auto-flow: row dense;
+  }
+  [data-checkout-review-step] > * {
+    min-width: 0;
+  }
+  [data-checkout-review-step] > [data-checkout-review-head],
+  [data-checkout-review-step] > [data-checkout-review-notice] {
+    grid-column: 1 / -1;
+  }
+  [data-checkout-review-step] > [data-checkout-buyer],
+  [data-checkout-review-step] > [data-checkout-subscription-unlocks],
+  [data-checkout-review-step] > [data-checkout-line-items],
+  [data-checkout-review-step] > [data-checkout-selection-details],
+  [data-checkout-review-step] > [data-checkout-selection-toggle] {
+    grid-column: 1;
+  }
+  [data-checkout-review-step] > [data-checkout-coupon],
+  [data-checkout-review-step] > [data-checkout-price-section],
+  [data-checkout-review-step] > [data-checkout-actions] {
+    grid-column: 2;
+  }
+}
+
+/* Undo the global tablet clamp() shrink for the checkout content so cards
+   on 640–1366 px windows keep their phone box metrics. */
+@media (min-width: 640px) and (max-width: 1366px) {
+  [data-checkout-app] h1 { font-size: 1.5rem !important; }
+  [data-checkout-app] h2 { font-size: 1.25rem !important; }
+  [data-checkout-app] h3 { font-size: 1.125rem !important; }
+  [data-checkout-app] button { font-size: 0.875rem; }
+  [data-checkout-app] .p-3 { padding: 0.75rem !important; }
+  [data-checkout-app] .p-4 { padding: 1rem !important; }
+  [data-checkout-app] .p-5 { padding: 1.25rem !important; }
+  [data-checkout-app] .p-6 { padding: 1.5rem !important; }
+  [data-checkout-app] .gap-3 { gap: 0.75rem !important; }
+  [data-checkout-app] .gap-4 { gap: 1rem !important; }
+  [data-checkout-app] .gap-6 { gap: 1.5rem !important; }
+  [data-checkout-app] .rounded-2xl { border-radius: 1rem !important; }
+  [data-checkout-app] .rounded-3xl { border-radius: 1.5rem !important; }
+}
