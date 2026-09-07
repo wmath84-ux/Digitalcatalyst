@@ -1029,10 +1029,24 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   /* Grids: cards auto-fit the full desktop area, so they scale with
      the monitor instead of leaving empty wallpaper on wide screens. */
   [data-home-grid],
-  [data-store-grid],
   [data-pdp-grid],
   [data-search-grid] {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+  }
+
+  /* The store grid steps at 240 px, not 220: at 1920+ that is the
+     difference between a wall of tiny cards (7–9 columns) and a
+     browsable catalogue (6–8 columns) with readable card copy. */
+  [data-store-grid] {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+  }
+
+  /* Store "Mixed" view: the flat grid auto-fits like the grid view; the
+     featured (full-row) card is kept full-width by the unlayered
+     `[data-store-mixed-feature]` rule below. */
+  [data-store-mixed] {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+    gap: 16px !important;
   }
 
   /* Store's rectangular-card view and My Library rows fill the
@@ -1086,6 +1100,18 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
    level down (inside its content div). Same no-shrink guarantee. */
 [data-store-view-options] > div > button {
   flex: 0 0 auto;
+}
+
+/* ── Store "Mixed" view: featured rows ─────────────────────────────────
+   The mixed view is one flat grid at every breakpoint (grid-cols-2 on
+   mobile/tablet, auto-fill from 960 px — see the desktop block above).
+   Every 3rd item is the featured card. `span 2` is full-row on the
+   2-column mobile/tablet layout (the original pair behaviour) and a
+   deliberate wide lead card on the desktop auto-fill grid, where a
+   full-row card would strand the two cards of each group on half-empty
+   rows. */
+[data-store-mixed] > [data-store-mixed-feature] {
+  grid-column: span 2;
 }
 
 /* ── Revision "test submit" confirm dialog ─────────────────────────────
@@ -1181,6 +1207,46 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
      full width opt out by removing the default. The shell leaves the
      default at the global desktop content max so the column is
      comfortable on a 27" monitor. */
+}
+
+/* ── Store page: desktop alignment + the sticky filter bar ────────────
+   The shell supplies the content gutter (clamp(12px, 1.5vw, 24px),
+   mirrored on the top bar), so the store sections' mobile px-4 insets
+   must not stack on top of it — otherwise the hero, chips, search and
+   cards all sit 16 px right of the top bar's title. `data-store-gutter`
+   is the shared hook (Hero, coverflow, SearchBar, FilterChips, and the
+   three product containers). */
+.dc-desktop-shell [data-store-gutter] {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* The "Top rated" label keeps its pinned `px-4` class (contract), so the
+   desktop zero-out is scoped to the section wrapper instead. */
+.dc-desktop-shell [data-store-top-rated] .dc-section-label {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* The sticky chip bar sticks to the SCROLLER, and on desktop the top bar
+   overlays the scroller (its frost samples the page). The scroller's
+   top-bar clearance padding (`calc(var(--desktop-topbar-height) + 1.5rem)`
+   in the shell rules below) is the store page's only problem: the sticky
+   offset is measured from the scroller's PADDING box, so that padding
+   double-counts and shifts the bar off its layout slot. For the store
+   page alone, move the clearance onto the PAGE ROOT instead (identical
+   visual, scrollport padding back to 0) — then `top` lands the bar
+   exactly at the top bar's bottom edge. The variable is 64 px on desktop
+   and 56 px in the 960–1023 tablet band, where the top bar row is pinned
+   to 56 px. */
+.dc-desktop-shell:has([data-store-page]) [data-desktop-content] {
+  padding-top: 0 !important;
+}
+.dc-desktop-shell [data-store-page] {
+  padding-top: calc(var(--desktop-topbar-height, 64px) + 1.5rem);
+}
+.dc-desktop-shell [data-store-filter-bar] {
+  top: var(--desktop-topbar-height);
 }
 
 /* Tablet adaptations of the desktop shell — keep the rail but let

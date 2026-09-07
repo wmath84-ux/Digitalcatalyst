@@ -33,7 +33,12 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
   };
 
   return (
-    <div className="space-y-2 px-4">
+    /* `data-store-gutter` is the desktop-alignment hook (index.css): the
+       mobile px-4 is zeroed inside the desktop shell. At lg the search and
+       the sort control share one row — the capsule keeps a desktop reading
+       width (max-w-2xl) instead of stretching edge-to-edge. */
+    <div data-store-gutter className="px-4">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
       {/* Wave 2 (global chrome): the capsule used to be an ad-hoc
           `bg-white/[0.08] border-white/10 backdrop-blur-xl` div. It is
           now a `GlassSurface` lens, i.e. the same refraction layer the header
@@ -42,6 +47,9 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
           untouched: still a `role="button"` tap target (`data-store-search-trigger`)
           that hands its draft query to `#/search?q=`, still keyboard-operable,
           still clearable. */}
+      <div
+        className="w-full lg:max-w-2xl"
+      >
       <div
         data-search-launcher
         className="group relative block w-full cursor-pointer overflow-hidden rounded-2xl text-left outline-none transition active:scale-[0.99]"
@@ -100,13 +108,16 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
           )}
         </div>
       </div>
+      </div>
 
       {/* Wave 3 (commerce): the sort control is `glass-select`. It is a listbox,
           not a native select, so the ink for the trigger and the portaled panel
           comes from `.dc-glass-select*` in src/glass.css; the option list keeps
           the pack's own keyboard behaviour (Enter selects, Escape closes) and
-          `aria-haspopup="listbox"` / `role="option"` come from the item itself. */}
-      <div className="flex justify-end">
+          `aria-haspopup="listbox"` / `role="option"` come from the item itself.
+          On desktop it shares the search row (right edge); on mobile it keeps
+          its own right-aligned row. */}
+      <div className="flex shrink-0 justify-end">
         <GlassSelect value={sort} onValueChange={onSortChange}>
           <GlassSelectTrigger
             aria-label="Sort products"
@@ -120,6 +131,7 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
             ))}
           </GlassSelectContent>
         </GlassSelect>
+      </div>
       </div>
     </div>
   );

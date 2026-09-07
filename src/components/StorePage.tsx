@@ -253,7 +253,11 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
   }, [products, search, activeFilter, sort]);
 
   return (
-    <div className="relative overflow-hidden pb-6">
+    /* No `overflow-hidden` here on purpose: an `overflow` ancestor other
+       than `visible` becomes the sticky element's offset container, which
+       would silently disable the filter bar's sticky behaviour. Every child
+       that can overflow (hero, coverflow, cards) clips itself. */
+    <div data-store-page className="relative pb-6">
       {/* Phase A: the page paints no ambient wash or orbs of its own — the
           single fixed Black Ice backdrop is the background on every device. */}
 
@@ -262,8 +266,11 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
       {/* AI Canvas Tilted Coverflow — the store's top-rated rail. Slides are
           ranked by a Bayesian weighted rating (see topRatedSlides) and update
           automatically whenever the catalog snapshot changes; the source
-          demo's default cards fill the fan until seven products exist. */}
-      <section aria-label="Top rated" className="pt-1">
+          demo's default cards fill the fan until seven products exist.
+          `data-store-top-rated` is the desktop-alignment hook (index.css):
+          the shell zeroes the label's mobile px-4 so the caption lines up
+          with the shell gutter. */}
+      <section aria-label="Top rated" data-store-top-rated className="pt-1 lg:pt-2">
         {/* Loose ink straight on the scene (not inside a card), so it takes the
             same text-shadow scrim Home uses: `.dc-section-label` is white at
             56%, which washes out over the snow behind the coverflow. */}
@@ -273,13 +280,25 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
 
       <div className="space-y-4">
         <SearchBar value={search} onChange={setSearch} sort={sort} onSortChange={setSort} />
-        {/* Same chrome plate as the header: this sticky bar painted the pack's
-            10% `--dc-chrome-glass` tint, i.e. nothing visible over the snow the
-            products scroll through. `dc-scene-plate--bar` gives it the shared
-            dark plate + hairline rim + soft drop (src/glass.css), and outranks
-            both the token utilities below and index.css's chrome rule while
-            glass is on. */}
-        <div data-store-filter-bar className="dc-scene-plate dc-scene-plate--bar sticky top-0 z-20 border-b border-white/10 bg-[var(--dc-chrome-glass)] py-2.5 [backdrop-filter:var(--dc-chrome-glass-blur)]">
+      </div>
+
+      {/* The bar is a SIBLING of the search wrapper, not a child: a sticky
+          element is confined to its containing block, so inside the old
+          `space-y-4` box (which ends at the bar's own bottom edge) it could
+          only "stick" for ~65 px of scroll. At page level its containing
+          block runs to the end of the product list, so the chips stay
+          reachable the whole time the user browses. The 16 px gap it used to
+          get from `space-y-4` is now an explicit `mt-4`.
+
+          Same chrome plate as the header: this sticky bar painted the pack's
+          10% `--dc-chrome-glass` tint, i.e. nothing visible over the snow the
+          products scroll through. `dc-scene-plate--bar` gives it the shared
+          dark plate + hairline rim + soft drop (src/glass.css), and outranks
+          both the token utilities below and index.css's chrome rule while
+          glass is on. (On desktop, `top` is lifted below the shell's top bar
+          by a shell-scoped rule in index.css — the class list stays `top-0`
+          for the mobile scroller.) */}
+      <div data-store-filter-bar className="dc-scene-plate dc-scene-plate--bar sticky top-0 z-20 mt-4 border-b border-white/10 bg-[var(--dc-chrome-glass)] py-2.5 [backdrop-filter:var(--dc-chrome-glass-blur)]">
           {/* Mobile overlap fix: the view-mode toggle is a normal flex
               sibling (shrink-0) instead of an absolutely-positioned overlay,
               so the scrolling chip row and the button can never paint on top
@@ -332,17 +351,16 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
               )}
             </div>
           </div>
-        </div>
       </div>
 
       {error ? (
-        <div className="dc-scene-ink mx-4 mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200">{error}</div>
+        <div className="dc-scene-ink mx-4 mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200 lg:mx-0">{error}</div>
       ) : loading ? (
-        <div className="mx-4 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">{[0, 1, 2, 3].map((item) => <GlassCard key={item} className="h-72 animate-pulse" aria-hidden="true" />)}</div>
+        <div className="mx-4 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:mx-0 lg:grid-cols-4 xl:grid-cols-6">{[0, 1, 2, 3].map((item) => <GlassCard key={item} className="h-72 animate-pulse" aria-hidden="true" />)}</div>
       ) : filtered.length === 0 ? (
         /* Educational empty state: says what happened, why, and gives the
            user a one-tap way out instead of a dead end. */
-        <GlassCard className="mx-4 mt-6" contentClassName="dc-empty">
+        <GlassCard className="mx-4 mt-6 lg:mx-0" contentClassName="dc-empty">
           <span className="dc-empty-art" aria-hidden="true">
             <BookOpenIcon className="h-7 w-7 text-indigo-300" />
           </span>
@@ -366,7 +384,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
         </GlassCard>
       ) : viewMode === "list" ? (
         /* ── Rectangular cards / list view ── */
-        <div data-store-list className="flex flex-col gap-3 px-4 pt-4">
+        <div data-store-gutter data-store-list className="flex flex-col gap-3 px-4 pt-4">
           {filtered.map((product) => (
             <ProductCardList
               key={product.id}
@@ -381,66 +399,48 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
           ))}
         </div>
       ) : viewMode === "mixed" ? (
-        /* ── Mixed view: every 3rd item is full-width, others in 2-col grid ── */
-        <div className="flex flex-col gap-4 px-4 pt-4">
-          {(() => {
-            const rows: React.ReactNode[] = [];
-            let i = 0;
-            while (i < filtered.length) {
-              const p = filtered[i];
-              if (i % 3 === 0) {
-                /* Full-width featured card */
-                rows.push(
-                  <ProductCardList
-                    key={p.id}
-                    product={p}
-                    wishlisted={wishlist.has(p.id)}
-                    inCart={cartIds.has(p.id)}
-                    purchased={purchased.has(p.id)}
-                    onToggleWishlist={onToggleWishlist}
-                    onAddToCart={onAddToCart}
-                    onView={onView}
-                  />,
-                );
-                i += 1;
-              } else {
-                /* 2-column grid pair */
-                const next = filtered[i + 1];
-                rows.push(
-                  <div key={`pair-${p.id}`} data-store-grid className="grid grid-cols-2 gap-3">
-                    <ProductCard
-                      product={p}
-                      wishlisted={wishlist.has(p.id)}
-                      inCart={cartIds.has(p.id)}
-                      purchased={purchased.has(p.id)}
-                      onToggleWishlist={onToggleWishlist}
-                      onAddToCart={onAddToCart}
-                      onView={onView}
-                    />
-                    {next ? (
-                      <ProductCard
-                        product={next}
-                        wishlisted={wishlist.has(next.id)}
-                        inCart={cartIds.has(next.id)}
-                        purchased={purchased.has(next.id)}
-                        onToggleWishlist={onToggleWishlist}
-                        onAddToCart={onAddToCart}
-                        onView={onView}
-                      />
-                    ) : (
-                      <div />
-                    )}
-                  </div>,
-                );
-                i += next ? 2 : 1;
-              }
-            }
-            return rows;
-          })()}
+        /* ── Mixed view: every 3rd item is a full-row featured card, the rest
+           flow in the grid. One flat container at every breakpoint (the old
+           per-pair wrappers were overridden by the desktop `data-store-grid`
+           auto-fill rule, which left two cards stranded in empty tracks).
+           Mobile: grid-cols-2 with the featured card spanning both tracks —
+           identical to the old pair behaviour. Desktop (index.css): the same
+           auto-fill columns as the grid view. */
+        <div data-store-gutter data-store-mixed className="grid grid-cols-2 gap-3 px-4 pt-4">
+          {filtered.map((product, index) =>
+            index % 3 === 0 ? (
+              /* Featured card. The wrapper is `flex` so the horizontal card
+                 stretches to the row height (set by the taller vertical
+                 cards beside it) instead of floating with dead space under
+                 it. */
+              <div key={product.id} data-store-mixed-feature className="col-span-2 flex">
+                <ProductCardList
+                  product={product}
+                  wishlisted={wishlist.has(product.id)}
+                  inCart={cartIds.has(product.id)}
+                  purchased={purchased.has(product.id)}
+                  onToggleWishlist={onToggleWishlist}
+                  onAddToCart={onAddToCart}
+                  onView={onView}
+                />
+              </div>
+            ) : (
+              <ProductCard
+                key={product.id}
+                product={product}
+                wishlisted={wishlist.has(product.id)}
+                inCart={cartIds.has(product.id)}
+                purchased={purchased.has(product.id)}
+                onToggleWishlist={onToggleWishlist}
+                onAddToCart={onAddToCart}
+                onView={onView}
+              />
+            ),
+          )}
         </div>
       ) : (
         /* ── Default grid view ── */
-        <div data-store-grid className="grid grid-cols-1 gap-4 px-4 pt-4 sm:grid-cols-2">
+        <div data-store-gutter data-store-grid className="grid grid-cols-1 gap-4 px-4 pt-4 sm:grid-cols-2">
           {filtered.map((product) => (
             <ProductCard
               key={product.id}
