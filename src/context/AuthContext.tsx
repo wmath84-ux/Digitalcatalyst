@@ -84,7 +84,10 @@ interface AuthContextValue {
   setUser: (user: AuthUser | null) => void;
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+// Exported for src/classroom3d/SurfaceContexts.tsx: drei's <Html> renders a
+// wall's DOM in a SECOND React root, where no context crosses, so the room
+// re-provides the app's contexts inside each surface.
+export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const normalizeEmail = (email?: string | null) => String(email || "").trim().toLowerCase();
 

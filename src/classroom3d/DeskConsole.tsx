@@ -7,11 +7,15 @@
 // asks the learner to stand up or leave the seat.
 //
 // Physically it is a wooden desk with a slim glass tablet lying on it at a
-// reading tilt; the tablet's face is live DOM.
+// reading tilt; the tablet's face is live DOM — and, like every other surface
+// in the room, that DOM is rendered by drei's <Html> into a SECOND React root
+// where no context crosses. The tablet therefore wears the same
+// <SurfaceContexts> bridge as the walls (see SurfaceContexts.tsx).
 
 import { Html } from "@react-three/drei";
 import type { ReactNode } from "react";
 import { surfaceScale } from "./surfaceScale";
+import SurfaceContexts, { useSurfaceContexts } from "./SurfaceContexts";
 import { useDragScroll } from "./useSurfaceScroll";
 
 export default function DeskConsole({
@@ -34,6 +38,9 @@ export default function DeskConsole({
   const scale = surfaceScale(width, pixelWidth);
   // The module + lesson columns are the most-scrolled lists in the room.
   const panelRef = useDragScroll<HTMLDivElement>();
+  // Read here (inside the canvas, where R3F has already bridged the app's
+  // contexts) and re-provided inside the <Html> root below.
+  const contexts = useSurfaceContexts();
   const panelStyle = {
     width: `${pixelWidth}px`,
     height: `${pixelHeight}px`,
@@ -90,14 +97,16 @@ export default function DeskConsole({
           wrapperClass="dc-classroom-surface"
           zIndexRange={[12, 0]}
         >
-          <div
-            ref={panelRef}
-            className="h-full w-full min-h-0 min-w-0"
-            data-classroom-surface-panel
-            data-classroom-surface-scroll
-          >
-            {children}
-          </div>
+          <SurfaceContexts value={contexts}>
+            <div
+              ref={panelRef}
+              className="h-full w-full min-h-0 min-w-0"
+              data-classroom-surface-panel
+              data-classroom-surface-scroll
+            >
+              {children}
+            </div>
+          </SurfaceContexts>
         </Html>
         {spill && (
           <pointLight position={[0, 0, 0.5]} intensity={1.6} distance={2.2} color="#a99cf5" />

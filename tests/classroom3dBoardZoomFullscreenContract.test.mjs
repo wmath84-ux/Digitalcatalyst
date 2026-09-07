@@ -46,36 +46,56 @@ const player = read("src/CoursePlayerApp.tsx");
 //    backwards nor clip through the board.
 // ---------------------------------------------------------------------------
 
-test("the board lean has a clamped, seat-safe range", () => {
+test("the view blend has a clamped, seat-safe range", () => {
+  // MIN = FIT (the seat's own view), MAX = FILL (square-on, board covering the
+  // whole screen). The blend is a pose interpolation now, not a dolly in
+  // metres, so there is no hand-tuned travel constant to drift out of sync.
   assert.match(state, /export const BOARD_ZOOM_MIN = 1;/);
-  assert.match(state, /export const BOARD_ZOOM_MAX = 2\.5;/);
+  assert.match(state, /export const BOARD_ZOOM_MAX = 2;/);
   assert.match(state, /export const BOARD_ZOOM_STEP = 0\.25;/);
-  assert.match(state, /export const BOARD_ZOOM_TOGGLE = 2;/);
-  assert.match(state, /export const BOARD_ZOOM_PORTRAIT_FIT = 1\.15;/);
-  assert.match(state, /export const BOARD_DOLLY_METRES = 2\.4;/);
+  assert.match(state, /export const BOARD_ZOOM_WHEEL = 0\.2;/);
+  // The hand-tuned per-orientation fit constant is gone: FILL is computed from
+  // the LIVE lens, which is exact in portrait and landscape alike.
+  assert.doesNotMatch(state, /BOARD_ZOOM_PORTRAIT_FIT/);
+  assert.doesNotMatch(state, /BOARD_DOLLY_METRES/);
+  assert.doesNotMatch(state, /BOARD_ZOOM_TOGGLE/);
   // NaN / Infinity / out-of-range input collapses to the safe range.
   assert.match(state, /export const clampBoardZoom = \(value: number\): number =>/);
   assert.match(
     state,
     /Number\.isFinite\(value\) \? Math\.min\(BOARD_ZOOM_MAX, Math\.max\(BOARD_ZOOM_MIN, value\)\) : BOARD_ZOOM_MIN;/,
   );
+  // 0 at FIT, 1 at FILL, clamped — the value SeatRig interpolates poses with.
+  assert.match(state, /export const zoomBlend = \(value: number\): number => \{/);
+  assert.match(state, /Math\.min\(1, Math\.max\(0, \(value - BOARD_ZOOM_MIN\) \/ span\)\);/);
 });
 
-test("SeatRig turns the lean into a forward dolly on the head-turn spring", () => {
-  // The lean rides the very same critically-damped spring as yaw / pitch.
+test("SeatRig blends the FIT and FILL poses on the head-turn spring", () => {
+  // The blend rides the very same critically-damped spring as yaw / pitch.
   assert.match(seatRig, /current\.current\.zoom \+= \(target\.current\.zoom - current\.current\.zoom\) \* k;/);
-  // …and becomes a forward dolly from the seat, clamped at both ends.
+  assert.match(seatRig, /const blend = zoomBlend\(current\.current\.zoom\);/);
+  // FIT pose = the seat itself.
+  assert.match(seatRig, /let eyeX = SEAT\.x;/);
+  assert.match(seatRig, /let eyeZ = SEAT\.z;/);
+  // FILL pose = square-on to the focused board (yaw 0, pitch 0 — no skew) at
+  // the distance the LIVE lens needs for the slab to cover the whole frame.
+  assert.match(seatRig, /const side = FOCUS_BOARD\[focusRef\.current\];/);
+  assert.match(seatRig, /if \(side && blend > 0\) \{/);
   assert.match(
     seatRig,
-    /\(clamp\(current\.current\.zoom, BOARD_ZOOM_MIN, BOARD_ZOOM_MAX\) - BOARD_ZOOM_MIN\) \* BOARD_DOLLY_METRES/,
+    /const distance = fillDistance\(\s+BOARD\.width,\s+BOARD\.height,[\s\S]*?size\.width \/ Math\.max\(1, size\.height\),\s+\);/,
   );
-  assert.match(seatRig, /camera\.position\.set\(SEAT\.x, SEAT\.y \+ Math\.sin\(t \* 0\.8\) \* 0\.006, SEAT\.z - lean\);/);
+  assert.match(seatRig, /eyeZ \+= \(BOARD\.z \+ distance - eyeZ\) \* blend;/);
+  assert.match(seatRig, /eyeX \+= \(boardX - eyeX\) \* blend;/);
+  assert.match(seatRig, /yaw \+= \(0 - yaw\) \* blend;/);
+  assert.match(seatRig, /pitch \+= \(0 - pitch\) \* blend;/);
+  assert.match(seatRig, /camera\.position\.set\(eyeX, eyeY, eyeZ\);/);
 });
 
-test("the lean glides back to the seat when the focus leaves the board", () => {
-  // Same effect pattern as the head re-aim: the TARGET resets, the spring
-  // below makes the return a lean-back rather than a jump-cut.
-  assert.match(seatRig, /target\.current\.zoom = focus === "board" \? clampBoardZoom\(zoom\) : BOARD_ZOOM_MIN;/);
+test("the blend glides back to FIT when the head leaves the boards", () => {
+  // Any of the THREE boards can fill — only the desk has no FILL pose, and the
+  // spring below makes the return an ease rather than a jump-cut.
+  assert.match(seatRig, /target\.current\.zoom = FOCUS_BOARD\[focus\] \? clampBoardZoom\(zoom\) : BOARD_ZOOM_MIN;/);
 });
 
 test("the room owns the zoom state and feeds it to the rig and the wall", () => {
@@ -94,17 +114,20 @@ test("the room owns the zoom state and feeds it to the rig and the wall", () => 
 // 2. Wheel / pinch on the empty room lean the seat — board only.
 // ---------------------------------------------------------------------------
 
-test("the wheel leans toward the board, and only while facing it", () => {
+test("the wheel drives FIT ⇄ FILL, and only while facing a board", () => {
   // Native listener so preventDefault actually holds (React onWheel is
   // passive-by-default and the room must never scroll under the learner).
   assert.match(seatRig, /element\.addEventListener\("wheel", onWheel, \{ passive: false \}\);/);
-  assert.match(seatRig, /if \(focusRef\.current !== "board"\) return;/);
+  assert.match(seatRig, /if \(!FOCUS_BOARD\[focusRef\.current\]\) return;/);
   assert.match(seatRig, /event\.preventDefault\(\);/);
-  // Same notch as the image viewer's wheel zoom.
-  assert.match(seatRig, /onZoomDeltaRef\.current\?\.\(event\.deltaY < 0 \? 0\.2 : -0\.2\);/);
+  // Same notch as the image viewer's wheel zoom, from one shared constant.
+  assert.match(
+    seatRig,
+    /onZoomDeltaRef\.current\?\.\(event\.deltaY < 0 \? BOARD_ZOOM_WHEEL : -BOARD_ZOOM_WHEEL\);/,
+  );
 });
 
-test("a two-finger pinch on the room drives the lean from the finger spread", () => {
+test("a two-finger pinch on the room drives the blend from the finger spread", () => {
   // The second fingertip converts the drag into a pinch.
   assert.match(seatRig, /if \(pointers\.current\.size === 2\) \{/);
   assert.match(seatRig, /dragging\.current = false;/);
@@ -112,8 +135,11 @@ test("a two-finger pinch on the room drives the lean from the finger spread", ()
   // Same distance-ratio maths as the image viewer's pinch zoom, clamped.
   assert.match(seatRig, /const next = clampBoardZoom\(\(pinch\.current\.zoom \* distance\) \/ pinch\.current\.distance\);/);
   assert.match(seatRig, /if \(delta !== 0\) onZoomDeltaRef\.current\?\.\(delta\);/);
-  // Pinch, like the wheel, is a no-op anywhere but the board.
-  assert.match(seatRig, /if \(focusRef\.current === "board" && pinch\.current && pinch\.current\.distance > 0\) \{/);
+  // Pinch, like the wheel, works on any board and is a no-op over the desk.
+  assert.match(
+    seatRig,
+    /if \(FOCUS_BOARD\[focusRef\.current\] && pinch\.current && pinch\.current\.distance > 0\) \{/,
+  );
   // Lifting back to one fingertip resumes the head turn from where it is.
   assert.match(seatRig, /if \(pointers\.current\.size === 1\) \{/);
 });
@@ -130,39 +156,60 @@ test("the single-finger head turn is unchanged by the pinch split", () => {
 // 3. The board wall carries zoom in / zoom out / fit / fullscreen.
 // ---------------------------------------------------------------------------
 
-test("BoardPanel renders the zoom + fit + fullscreen cluster", () => {
+test("BoardPanel renders the cycle + fit/fill + fullscreen cluster", () => {
   assert.match(panels, /data-classroom-board-panel/);
   assert.match(panels, /data-classroom-board-controls/);
-  assert.match(panels, /data-classroom-board-zoom-out/);
-  assert.match(panels, /data-classroom-board-zoom-in/);
+  // The THREE-TAP focus key: Board → Notes → Mind map → Board …
+  assert.match(panels, /data-classroom-board-cycle/);
+  assert.match(panels, /<Repeat size=\{14\} \/>/);
+  assert.match(panels, /aria-label="Switch surface: board, notes, mind map"/);
+  // It carries the surface it is ON, so the order never has to be remembered.
+  assert.match(panels, /<span className="dc-classroom-board-cycle-label">\{focusLabel\}<\/span>/);
+  // The DUAL-FUNCTION fit key: FIT ⇄ FILL.
   assert.match(panels, /data-classroom-board-zoom-fit/);
+  assert.match(panels, /data-filled=\{filled \? "true" : "false"\}/);
+  assert.match(panels, /\{filled \? <Minimize size=\{14\} \/> : <Maximize size=\{14\} \/>\}/);
+  assert.match(
+    panels,
+    /aria-label=\{filled \? "Fit the board to the room view" : "Zoom the board to fill the screen"\}/,
+  );
   assert.match(panels, /data-classroom-board-fullscreen/);
-  assert.match(panels, /data-classroom-board-zoom-pct/);
-  // Fit reuses the image viewer's Maximize glyph; fullscreen gets Expand/Shrink.
-  assert.match(panels, /<ZoomOut size=\{14\} \/>/);
-  assert.match(panels, /<ZoomIn size=\{14\} \/>/);
-  assert.match(panels, /<Maximize size=\{14\} \/>/);
   assert.match(panels, /<Expand size=\{14\} \/>/);
   assert.match(panels, /<Shrink size=\{14\} \/>/);
-  assert.match(panels, /aria-label="Fit to screen"/);
   assert.match(panels, /aria-label=\{boardFullscreen \? "Exit fullscreen" : "Fullscreen"\}/);
+  // The old +/− pair is gone: one cycle key and one two-state fit key replace
+  // them, and continuous sweep stays on the wheel, the pinch and +/− on the
+  // keyboard. Nothing in the room may still offer a dead zoom key.
+  assert.doesNotMatch(panels, /data-classroom-board-zoom-in/);
+  assert.doesNotMatch(panels, /data-classroom-board-zoom-out/);
 });
 
-test("the zoom keys disable at the ends of the lean", () => {
-  assert.match(panels, /disabled=\{!onZoomOut \|\| zoomedOut\}/);
-  assert.match(panels, /disabled=\{!onZoomIn \|\| zoomedIn\}/);
-  assert.match(panels, /const zoomedOut = zoom <= BOARD_ZOOM_MIN \+ 1e-6;/);
-  assert.match(panels, /const zoomedIn = zoom >= BOARD_ZOOM_MAX - 1e-6;/);
+test("the blend readout tracks the live pose", () => {
+  // Past halfway the camera is on its way to FILL, so the key offers FIT — and
+  // the readout says how far along the blend is.
+  assert.match(panels, /const filled = zoomBlend\(zoom\) >= 0\.5;/);
   // The percentage re-keys on every change so the CSS pop re-fires.
   assert.match(panels, /key=\{Math\.round\(zoom \* 100\)\}/);
+  assert.match(panels, /\{Math\.round\(zoomBlend\(zoom\) \* 100\)\}%/);
+  // Both keys disable when the room did not supply them.
+  assert.match(panels, /disabled=\{!onCycleFocus\}/);
+  assert.match(panels, /disabled=\{!onToggleFitFill && !onFit\}/);
 });
 
-test("the board's zoom keys face the board before leaning", () => {
-  assert.match(classroom, /onZoomIn=\{\(\) => \{\s+setFocus\("board"\);\s+zoomBoardBy\(BOARD_ZOOM_STEP\);\s+\}\}/);
-  assert.match(classroom, /onZoomOut=\{\(\) => \{\s+setFocus\("board"\);\s+zoomBoardBy\(-BOARD_ZOOM_STEP\);\s+\}\}/);
+test("the room wires the cycle and fit/fill keys to the board chrome", () => {
+  assert.match(classroom, /onCycleFocus=\{cycleFocus\}/);
+  assert.match(classroom, /onToggleFitFill=\{toggleFitFill\}/);
   assert.match(classroom, /onFit=\{fitBoard\}/);
+  assert.match(classroom, /focusLabel=\{focusLabel\}/);
   assert.match(classroom, /onToggleFullscreen=\{toggleBoardFullscreen\}/);
   assert.match(classroom, /onToggleZoom=\{toggleBoardZoom\}/);
+  // Both keys also live in the ALWAYS-VISIBLE control tray: the board chrome is
+  // only readable while the board is faced, and the whole point of the cycle
+  // key is to leave the board you are looking at.
+  assert.match(classroom, /data-classroom-cycle-focus/);
+  assert.match(classroom, /data-classroom-fit-fill/);
+  assert.match(classroom, /onClick=\{cycleFocus\}/);
+  assert.match(classroom, /onClick=\{toggleFitFill\}/);
 });
 
 // ---------------------------------------------------------------------------
@@ -170,7 +217,7 @@ test("the board's zoom keys face the board before leaning", () => {
 //    gestures stay the viewer's.
 // ---------------------------------------------------------------------------
 
-test("double-click and double-tap on the board toggle the close-up", () => {
+test("double-click and double-tap on a board flip FIT ⇄ FILL", () => {
   // Mouse path.
   assert.match(panels, /onDoubleClick=\{\(event\) => \{/);
   // Touch path: two pointer-ups within 350 ms and 48 px (mobile browsers
@@ -180,9 +227,9 @@ test("double-click and double-tap on the board toggle the close-up", () => {
   // A touch toggle's trailing synthetic dblclick must not toggle straight back.
   assert.match(panels, /if \(Date\.now\(\) - touchToggledAt\.current < 600\) return;/);
   assert.match(panels, /onToggleZoom\(\);/);
-  // The room recentres the head and toggles between fit and the close-up.
-  assert.match(classroom, /const toggleBoardZoom = useCallback\(\(\) => \{/);
-  assert.match(classroom, /: BOARD_ZOOM_TOGGLE,/);
+  // The room's double-tap handler IS the fit/fill key — one behaviour, two ways
+  // to reach it.
+  assert.match(classroom, /const toggleBoardZoom = toggleFitFill;/);
 });
 
 test("gestures inside the lesson viewer never lean the camera", () => {
@@ -199,15 +246,46 @@ test("gestures inside the lesson viewer never lean the camera", () => {
 // 5. Fit-to-screen resets the lean and recentres, reusing `portrait`.
 // ---------------------------------------------------------------------------
 
-test("fit-to-screen resets the lean and recentres the board", () => {
-  // Portrait fits a touch closer (the widened lens shrinks the board);
-  // landscape returns to the seat's exact normal position.
-  assert.match(classroom, /setBoardZoom\(portrait \? BOARD_ZOOM_PORTRAIT_FIT : BOARD_ZOOM_MIN\);/);
+test("FIT resets the blend and recentres the head", () => {
   assert.match(classroom, /const fitBoard = useCallback\(\(\) => \{/);
+  assert.match(classroom, /setBoardZoom\(BOARD_ZOOM_MIN\);/);
   assert.match(classroom, /setBoardFitSignal\(\(value\) => value \+ 1\);/);
   // The signal re-aims the head even when the focus never changed.
   assert.match(seatRig, /\}, \[focus, recenterSignal\]\);/);
   assert.match(classroom, /const \[boardFitSignal, setBoardFitSignal\] = useState\(0\);/);
+});
+
+test("the fit key is DUAL-FUNCTION: fit, then only-the-board, then fit again", () => {
+  // The owner's spec, exactly: "pahle click mein fit, dusre click mein keval
+  // board zoom, aur again click wapas fit — ese continuous chalta rahe."
+  assert.match(classroom, /const toggleFitFill = useCallback\(\(\) => \{/);
+  assert.match(
+    classroom,
+    /setBoardZoom\(\(current\) =>\s+current > BOARD_ZOOM_MIN \+ 1e-6 \? BOARD_ZOOM_MIN : BOARD_ZOOM_MAX,\s+\);/,
+  );
+  // Read from the live blend, never a second flag, so the wheel and the pinch
+  // can't leave the key disagreeing with the camera.
+  assert.match(classroom, /const filled = zoomBlend\(boardZoom\) >= 0\.5;/);
+});
+
+test("the zoom key is THREE-TAP: board, then notes, then mind map, forever", () => {
+  // The owner's spec: "pahle click mein board per focus, dusre mein note per,
+  // teesre mein mind map per — aur ese baar baar click karne par switch hota
+  // rahe."
+  assert.match(state, /export const FOCUS_CYCLE: readonly ClassroomFocus\[\] = \["board", "notes", "mind"\] as const;/);
+  assert.match(state, /export const nextFocusInCycle = \(current: ClassroomFocus\): ClassroomFocus => \{/);
+  assert.match(state, /return FOCUS_CYCLE\[\(index \+ 1\) % FOCUS_CYCLE\.length\];/);
+  // Off-cycle (the desk) starts the cycle at the board instead of skipping.
+  assert.match(state, /if \(index < 0\) return FOCUS_CYCLE\[0\];/);
+  assert.match(classroom, /const cycleFocus = useCallback\(\(\) => \{/);
+  assert.match(classroom, /setFocus\(\(current\) => nextFocusInCycle\(current\)\);/);
+  // The blend is deliberately NOT reset, so a filled learner cycles through
+  // three full-screen boards and a fitted one cycles through the room.
+  const body = classroom.slice(
+    classroom.indexOf("const cycleFocus = useCallback"),
+    classroom.indexOf("/** Which surface the cycle key is sitting on"),
+  );
+  assert.doesNotMatch(body, /setBoardZoom/);
 });
 
 // ---------------------------------------------------------------------------
@@ -255,9 +333,13 @@ test("Esc exits board-fullscreen first and only otherwise drops to the desk", ()
     /else if \(event\.key === "Escape"\) \{[\s\S]*?if \(document\.fullscreenElement\) void document\.exitFullscreen\(\);[\s\S]*?else setFocus\("desk"\);/,
   );
   assert.match(classroom, /else if \(boardFullscreen\) setBoardFullscreen\(false\);/);
-  // `sheet` joined the deps when the floating library landed: Esc now closes
-  // an open chooser first, then fullscreen, then drops to the desk.
-  assert.match(classroom, /\}, \[step, focus, sheet, boardFullscreen, zoomBoardBy, fitBoard\]\);/);
+  // `sheet` joined the deps when the floating library landed, and the two new
+  // keys (C = cycle, F = fit/fill) joined with them: Esc closes an open
+  // chooser first, then fullscreen, then drops to the desk.
+  assert.match(
+    classroom,
+    /\}, \[step, focus, sheet, boardFullscreen, zoomBoardBy, fitBoard, toggleFitFill, cycleFocus\]\);/,
+  );
 });
 
 test("exiting fullscreen returns to the same focus, head and lean", () => {
@@ -275,12 +357,14 @@ test("exiting fullscreen returns to the same focus, head and lean", () => {
   assert.doesNotMatch(sync, /setBoardZoom/);
 });
 
-test("keyboard +/−/0 lean only while facing the board", () => {
-  assert.match(classroom, /focus === "board" && \(event\.key === "\+" \|\| event\.key === "="\)/);
+test("keyboard +/−/0 sweep the blend while facing any board; C and F are the new keys", () => {
+  assert.match(classroom, /FOCUS_CYCLE\.includes\(focus\) && \(event\.key === "\+" \|\| event\.key === "="\)/);
   assert.match(classroom, /zoomBoardBy\(BOARD_ZOOM_STEP\)/);
-  assert.match(classroom, /focus === "board" && \(event\.key === "-" \|\| event\.key === "_"\)/);
+  assert.match(classroom, /FOCUS_CYCLE\.includes\(focus\) && \(event\.key === "-" \|\| event\.key === "_"\)/);
   assert.match(classroom, /zoomBoardBy\(-BOARD_ZOOM_STEP\)/);
-  assert.match(classroom, /focus === "board" && event\.key === "0"\) fitBoard\(\)/);
+  assert.match(classroom, /else if \(event\.key === "0"\) fitBoard\(\);/);
+  assert.match(classroom, /else if \(event\.key === "f" \|\| event\.key === "F"\) toggleFitFill\(\);/);
+  assert.match(classroom, /else if \(event\.key === "c" \|\| event\.key === "C"\) cycleFocus\(\);/);
 });
 
 // ---------------------------------------------------------------------------
@@ -309,8 +393,10 @@ test("the player still owns course state — the room stays a shell", () => {
 test("the orientation-aware lens and the hint's portrait wording survive", () => {
   assert.match(seatRig, /const targetHorizontalFov = THREE\.MathUtils\.degToRad\(76\);/);
   assert.match(classroom, /window\.innerHeight > window\.innerWidth/);
-  assert.match(classroom, /double-tap the board to lean in/);
-  assert.match(classroom, /scroll to lean in/);
+  // The hint teaches the two keys the owner asked for, in both orientations.
+  assert.match(classroom, /tap Zoom to fill the screen with one board/);
+  assert.match(classroom, /F flips Fit ⇄ Zoom/);
+  assert.match(classroom, /C cycles Board → Notes → Mind map/);
 });
 
 test("no HDRI or environment maps — the room still renders offline", () => {

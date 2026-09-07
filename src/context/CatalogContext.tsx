@@ -14,7 +14,8 @@ interface CatalogContextValue {
   error: string | null;
 }
 
-const CatalogContext = createContext<CatalogContextValue | undefined>(undefined);
+// Exported for src/classroom3d/SurfaceContexts.tsx (see AuthContext).
+export const CatalogContext = createContext<CatalogContextValue | undefined>(undefined);
 
 const numericPrice = (value: unknown): number => {
   const amount = Number(String(value ?? "0").replace(/[^0-9.-]/g, ""));

@@ -81,8 +81,12 @@ test("SeatRig publishes motion for drag, pinch, springs and lean — not sway", 
   assert.equal((seatRig.match(/< 0\.002\) current\.current\./g) || []).length, 2);
   assert.match(seatRig, /if \(Math\.abs\(target\.current\.pitch - current\.current\.pitch\) < 0\.002\) \{/);
   // The breathing sway is added straight to the camera, never to the refs
-  // the motion check reads — idle rest correctly reads as rest.
-  assert.match(seatRig, /camera\.rotation\.y = current\.current\.yaw \+ swayY;/);
+  // the motion check reads — idle rest correctly reads as rest. It is also
+  // damped out as the view approaches FILL, so a board that is supposed to
+  // cover the screen never drifts a pixel off its own edges.
+  assert.match(seatRig, /camera\.rotation\.y = yaw \+ swayY;/);
+  assert.match(seatRig, /const breathe = 1 - blend;/);
+  assert.match(seatRig, /\* 0\.0045 \* breathe;/);
 });
 
 test("SeatRig mirrors motion onto the canvas parent as a CSS class", () => {

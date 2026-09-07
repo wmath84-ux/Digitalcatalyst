@@ -754,7 +754,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     persistLocalNotes(user.id, product.id, next);
   };
 
-  const returnStudySurfacesToLibrary = useCallback(() => {
+  const returnStudySurfacesToLibrary = useCallback((room = false) => {
     // Entering the 3D room should always start Notes and Mind map at their
     // library/list home screens. If the learner had a note editor open in the
     // flat pane, save that draft first so switching shells never throws work
@@ -788,7 +788,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       }
     }
     setNotesSessionView({ view: "list" });
-    setMindMapSessionView("library");
+    // The FLAT player's mind map tab starts on its library (a grid of this
+    // module's maps) because that tab has to double as the map chooser. The
+    // 3D room does not: it has a dedicated MIND BOARD on the front wall and
+    // its own Maps key in the control tray, so a library overlay covering the
+    // canvas there just hides the thing the wall exists to show — the learner
+    // taps the wall, nothing seems to happen, and the map reads as "save nahi
+    // ho raha". Entering the room therefore opens straight onto the canvas.
+    setMindMapSessionView(room ? "canvas" : "library");
+    // `room` is a call-time argument, not a captured value, so it is not a
+    // dependency of this callback.
   }, [notes, product.id, user]);
 
   const selectFile = (file: CourseFile) => {
@@ -981,7 +990,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onClassroom3dChange={(next) => {
         if (next) {
           mindMap.flush();
-          returnStudySurfacesToLibrary();
+          returnStudySurfacesToLibrary(true);
         }
         setClassroom3d(next);
       }}
