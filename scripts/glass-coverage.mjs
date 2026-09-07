@@ -169,7 +169,7 @@ for (const file of appFiles) {
 /**
  * Some registry items are only ever reached through an app-layer wrapper in
  * src/components/ui/ (GlassCard pins light-ink defaults over the pack's
- * white-on-dark card; PageTabs, ConfirmDialog, MacWindowModal and Toast do the
+ * white-on-dark card; PageTabs, ConfirmDialog and Toast do the
  * same for tabs/dialog/toast). Counting only direct imports would report those
  * items as 0 — the brief marks them "hidden inside wrappers" — so attribute a
  * wrapper's render sites back to the items it wraps.

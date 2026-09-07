@@ -13,7 +13,6 @@ const coursePlayer = fs.readFileSync("src/CoursePlayerApp.tsx", "utf8");
 const playerPanel = fs.readFileSync("src/course/PlayerPanel.tsx", "utf8");
 const courseEmbed = fs.readFileSync("src/utils/courseEmbed.ts", "utf8");
 const resourceViewer = fs.readFileSync("src/course/ResourceViewer.tsx", "utf8");
-const rotatedScroll = fs.readFileSync("src/course/useRotatedScroll.ts", "utf8");
 const styles = fs.readFileSync("src/index.css", "utf8");
 
 test("Google Form answering and confirmation remain in the framed player", () => {
@@ -30,13 +29,6 @@ test("Google Form answering and confirmation remain in the framed player", () =>
   assert.match(coursePlayer, /data-course-split="on"/);
   assert.match(coursePlayer, /<SplitDeck/);
   assert.match(coursePlayer, /<PlayerPanel/);
-});
-
-test("rotated mobile landscape maps a visible vertical swipe to scrollTop", () => {
-  assert.match(rotatedScroll, /const wantsY = Math\.abs\(dsy\) >= Math\.abs\(dsx\)/);
-  assert.match(rotatedScroll, /if \(axis === "y"\) target\.scrollTop -= dsy/);
-  assert.match(rotatedScroll, /if \(axis === "x"\) target\.scrollLeft -= dsx/);
-  assert.doesNotMatch(rotatedScroll, /scrollTop \+= dsx/);
 });
 
 test("physical mobile landscape explicitly opts scrollable content into vertical panning", () => {

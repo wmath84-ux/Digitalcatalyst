@@ -112,20 +112,6 @@ test("the course delete confirmation is a pack surface with every hook", () => {
 });
 
 test("the remaining selects render the registry listbox without losing their logic", () => {
-  const editor = read("src/flowpath/components/ActivityEditor.tsx");
-  assert.equal((code(editor).match(/<select\b/g) ?? []).length, 0);
-  assert.equal(editor.match(/<FieldSelect/g)?.length, 7, "one field lost its select");
-  for (const v of ['value: "in-progress"', 'value: "exam"', 'value: "mixed"', '"amber", "sky", "rose", "emerald", "violet"']) {
-    assert.ok(editor.includes(v), v);
-  }
-  // writes the same union types the server multiplexer validates
-  assert.match(editor, /v as "pending" \| "in-progress" \| "completed"/);
-
-  const bulk = read("src/flowpath/components/BulkRevisionCreator.tsx");
-  assert.match(bulk, /<GlassSelect/);
-  // difficulty still writes the preset's question count + minutes
-  assert.match(bulk, /questions: preset\.questions, minutes: preset\.minutes/);
-
   const ai = read("src/revision/components/AiConfigForm.tsx");
   assert.match(ai, /disabled=\{allModels\.length === 0\}/);
   assert.match(ai, /Loading models…/);

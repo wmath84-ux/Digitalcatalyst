@@ -41,8 +41,6 @@ const vercelConfig = fs.readFileSync("vercel.json", "utf8");
 const flowpathClient = fs.readFileSync("src/flowpath/lib/flowpathControlClient.ts", "utf8");
 const flowpathFirestore = fs.readFileSync("src/flowpath/hooks/useFlowPathFirestore.ts", "utf8");
 const flowpathSync = fs.readFileSync("src/flowpath/hooks/useFlowPathSync.ts", "utf8");
-const activityEditor = fs.readFileSync("src/flowpath/components/ActivityEditor.tsx", "utf8");
-const bulkRevisionCreator = fs.readFileSync("src/flowpath/components/BulkRevisionCreator.tsx", "utf8");
 const flowpathView = fs.readFileSync("src/components/flowpath/FlowPathView.tsx", "utf8");
 const flowpathTypes = fs.readFileSync("src/flowpath/types/flowpath.ts", "utf8");
 
@@ -302,60 +300,6 @@ test("useFlowPathSync translates local Activity to server FlowPathActivity for e
   assert.match(flowpathSync, /scheduleStartTime/);
   assert.match(flowpathSync, /noteColor/);
   assert.match(flowpathSync, /testConfig/);
-});
-
-/* ------------------------------------------------------------------ */
-/*  Client: ActivityEditor + BulkRevisionCreator                       */
-/* ------------------------------------------------------------------ */
-
-test("ActivityEditor handles all 7 activity kinds from a single modal", () => {
-  // One modal, six kind tabs (task, reminder, schedule, note,
-  // revision, mcq). kind-specific fields appear below the tabs
-  // based on the selected kind.
-  assert.match(activityEditor, /KIND_TABS/);
-  assert.match(activityEditor, /"task"/);
-  assert.match(activityEditor, /"reminder"/);
-  assert.match(activityEditor, /"schedule"/);
-  assert.match(activityEditor, /"note"/);
-  assert.match(activityEditor, /"revision"/);
-  assert.match(activityEditor, /"mcq"/);
-});
-
-test("ActivityEditor supports immediate, datetime, and recurring schedule modes", () => {
-  // Three schedule modes. Recurring writes a `recurrence` field
-  // with daily/weekly/monthly freq. Datetime computes an epoch
-  // ms. Immediate leaves scheduledFor null.
-  assert.match(activityEditor, /scheduleMode === "immediate"/);
-  assert.match(activityEditor, /scheduleMode === "datetime"/);
-  assert.match(activityEditor, /scheduleMode === "recurring"/);
-  assert.match(activityEditor, /recurrence/);
-});
-
-test('ActivityEditor surfaces a live "Will fire on ..." footer preview', () => {
-  // The footer tells the user exactly when the activity will
-  // fire before they submit. This catches "I thought I picked
-  // next Monday" mistakes before they happen.
-  assert.match(activityEditor, /Will fire on/);
-  assert.match(activityEditor, /Fires immediately on save/);
-});
-
-test("BulkRevisionCreator supports 2-5 slots with the Easy/Medium/Hard preset", () => {
-  // The "2-3 tests at once" flow the user explicitly asked for.
-  // 5 is the UI cap; the server bulk limit is 50. Easy / Medium /
-  // Hard preset auto-fills each slot with the right question
-  // count and minute estimate so an admin can ship a graduated
-  // practice set in one click.
-  assert.match(bulkRevisionCreator, /Easy \/ Medium \/ Hard/);
-  assert.match(bulkRevisionCreator, /applyPresetEazyMediumHard/);
-  assert.match(bulkRevisionCreator, /slots\.length >= 5/);
-  assert.match(bulkRevisionCreator, /batchId/);
-});
-
-test("BulkRevisionCreator shares a single batchId across every slot", () => {
-  // The audit feed groups the slots as one logical action;
-  // the user's Revision bank shows them as a cluster.
-  assert.match(bulkRevisionCreator, /batch-\$\{Date\.now\(\)\.toString\(36\)\}/);
-  assert.match(bulkRevisionCreator, /batchIndex: i/);
 });
 
 /* ------------------------------------------------------------------ */

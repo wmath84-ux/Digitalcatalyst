@@ -68,7 +68,7 @@ test("the admin panel never picks up the glass material", () => {
       // admin's notify() pushes into the singleton store while the viewport
       // (GlassToaster) stays mounted in src/main.tsx; no glass surface
       // renders inside the admin tree.
-      /from "[^"]*(components\/ui\/glass(?!-toast)|ui\/GlassCard|ui\/LiquidMetalButton|ui\/MacWindowModal)/,
+      /from "[^"]*(components\/ui\/glass(?!-toast)|ui\/GlassCard|ui\/LiquidMetalButton)/,
       `${file} must not import the glass rollout primitives`,
     );
   }
