@@ -242,6 +242,16 @@ test("the dev sandbox exercises the same contract", () => {
   assert.match(preview, /openNoteSignal=\{noteRequest\.signal\}/);
 });
 
+test("the sheet's accent respects the app's browser floor", () => {
+  // browserslist floors this app at Chrome 96 / Safari 15; `color-mix` needs
+  // Chrome 111 / Safari 16.2, and Lightning CSS cannot lower one that reads a
+  // CSS variable — it would ship as-is and be dropped whole on an older
+  // engine. The accent is therefore pre-mixed to rgba in JS.
+  assert.doesNotMatch(css, /color-mix/);
+  assert.match(roomSheet, /const accentTints = \(accent: string\)/);
+  assert.match(roomSheet, /"--dc-sheet-accent-wash": `rgba\(\$\{rgb\}, 0\.16\)`/);
+});
+
 test("the floating sheet is styled as a panel inside the room", () => {
   assert.match(css, /\.dc-room-sheet-layer \{/);
   // The room stays visible and tappable-to-dismiss behind it.

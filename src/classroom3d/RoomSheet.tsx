@@ -25,7 +25,7 @@
 // perspective-skewed and unreadable exactly when you need it. The room stays
 // visible and lit behind it, so it reads as a panel summoned into the room.
 
-import { memo, type ReactNode } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import { BookOpen, ChevronRight, LockKeyhole, Network, NotebookPen, Plus, X } from "lucide-react";
 import { FILE_KIND_LABEL, type FlatModule } from "./state";
 import { useDragScroll } from "./useSurfaceScroll";
@@ -45,6 +45,31 @@ export interface RoomMapItem {
   title: string;
   nodeCount: number;
 }
+
+/**
+ * The accent, pre-mixed into the four tints the sheet needs.
+ *
+ * Deliberately NOT `color-mix()`: this app's browserslist floor is Chrome 96 /
+ * Safari 15 (see vite.config.ts), and `color-mix` needs Chrome 111 / Safari
+ * 16.2. Lightning CSS can lower a `color-mix` of two literal colours, but not
+ * one that reads a CSS variable — it would ship as-is and be dropped whole on
+ * an older engine, taking the row background and the button border with it.
+ * Mixing here, in JS, keeps the sheet correct on every engine the app ships to.
+ */
+const accentTints = (accent: string) => {
+  const hex = accent.replace("#", "");
+  const full = hex.length === 3 ? hex.split("").map((c) => c + c).join("") : hex;
+  const int = Number.parseInt(full, 16);
+  const rgb = Number.isFinite(int)
+    ? `${(int >> 16) & 255}, ${(int >> 8) & 255}, ${int & 255}`
+    : "139, 92, 246";
+  return {
+    "--dc-sheet-accent": accent,
+    "--dc-sheet-accent-wash": `rgba(${rgb}, 0.16)`,
+    "--dc-sheet-accent-fill": `rgba(${rgb}, 0.3)`,
+    "--dc-sheet-accent-line": `rgba(${rgb}, 0.55)`,
+  } as React.CSSProperties;
+};
 
 /* ── The shell ─────────────────────────────────────────────────────────── */
 
@@ -67,6 +92,7 @@ export const RoomSheet = memo(function RoomSheet({
   // The room is `touch-action: none` end to end, so even this upright panel
   // needs the room's own drag scrolling (surfaceScroll.ts) to move a list.
   const body = useDragScroll<HTMLDivElement>();
+  const tints = useMemo(() => accentTints(accent), [accent]);
 
   return (
     <div className="dc-room-sheet-layer" data-classroom-room-sheet>
@@ -81,7 +107,7 @@ export const RoomSheet = memo(function RoomSheet({
       />
       <section
         className="dc-room-sheet"
-        style={{ "--dc-sheet-accent": accent } as React.CSSProperties}
+        style={tints}
         role="dialog"
         aria-label={title}
       >
