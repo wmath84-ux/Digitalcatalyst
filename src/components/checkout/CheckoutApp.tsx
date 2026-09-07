@@ -174,34 +174,36 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
         </div>
 
         <div ref={scrollRef} data-footer-nav-space className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-8">
-          {step === 1 ? (
-            <CheckoutReviewStep onProceed={handleProceedToPayment} onEdit={handleEditSelection} />
-          ) : null}
+          <div data-checkout-content className="flex min-w-0 flex-col gap-3">
+            {step === 1 ? (
+              <CheckoutReviewStep onProceed={handleProceedToPayment} onEdit={handleEditSelection} />
+            ) : null}
 
-          {step === 2 && quote ? (
-            <PaymentGateway
-              quoteId={quoteId}
-              finalPrice={finalPrice}
-              productName={productName}
-              onPaymentSuccess={handlePaymentSuccess}
-              onGoBack={handleBackToReview}
-            />
-          ) : null}
+            {step === 2 && quote ? (
+              <PaymentGateway
+                quoteId={quoteId}
+                finalPrice={finalPrice}
+                productName={productName}
+                onPaymentSuccess={handlePaymentSuccess}
+                onGoBack={handleBackToReview}
+              />
+            ) : null}
 
-          {step === 3 ? (
-            <CheckoutSuccessStep
-              orderId={transaction?.orderId || quote?.quoteId}
-              paymentId={transaction?.paymentId || null}
-              paymentMethod={transaction?.paymentMethod || "Razorpay"}
-              grantedEntitlementIds={transaction?.grantedEntitlementIds || []}
-              purchaseKind={quote?.purchaseKind || selection?.purchaseKind || null}
-              cashPaid={quote?.cashPayable || 0}
-              minimumPayable={quote?.minimumPayable || 0}
-              currency={quote?.currency || "INR"}
-              onGoToLibrary={handleGoToLibrary}
-              onBackToSource={checkout.goBack}
-            />
-          ) : null}
+            {step === 3 ? (
+              <CheckoutSuccessStep
+                orderId={transaction?.orderId || quote?.quoteId}
+                paymentId={transaction?.paymentId || null}
+                paymentMethod={transaction?.paymentMethod || "Razorpay"}
+                grantedEntitlementIds={transaction?.grantedEntitlementIds || []}
+                purchaseKind={quote?.purchaseKind || selection?.purchaseKind || null}
+                cashPaid={quote?.cashPayable || 0}
+                minimumPayable={quote?.minimumPayable || 0}
+                currency={quote?.currency || "INR"}
+                onGoToLibrary={handleGoToLibrary}
+                onBackToSource={checkout.goBack}
+              />
+            ) : null}
+          </div>
         </div>
 
         <BottomNav active={null} onChange={handleFooterChange} purchasesBadge={purchasedIds.size} />

@@ -1123,225 +1123,234 @@ export default function SubscriptionPage({
             </span>
           </div>
         )}
-        <StackedCards cards={SHOWCASE_CARDS} />
-
-        {/* ── STEP 1 — plan + billing duration ─────────────────────────────
-            Everything downstream (feature prices, course prices, the live
-            card, the total) is resolved from these two values, so they are
-            the first and most prominent decision on the page. */}
-        <Step
-          index={1}
-          title="Choose your plan and duration"
-          hint="Compare what each plan includes, then pick monthly or yearly. Prices below update instantly."
-          done={Boolean(plan)}
-        >
-        {/* Plan + cycle card. Members only see their own plan + HIGHER plans
-            (pickerPlans) — lower plans are hidden, not merely disabled, so a
-            downgrade can never even be selected. */}
-        <PlanOverview
-          plans={pickerPlans}
-          features={features}
-          selectedPlanId={selectedPlanId}
-          onChangePlan={setSelectedPlanId}
-          cycle={cycle}
-          onChangeCycle={(c) => {
-            if (supportedCycles.includes(c)) setCycle(c);
-          }}
-          selectedFeatureRecords={selectedFeatureRecords}
-          includedFeatureRecords={includedFeatureRecords}
-          totalPaise={totalPaise}
-          ownedPlanId={isActiveMember ? ownedPlanId || null : null}
-          ownedCycle={isActiveMember ? ownedCycle : null}
-          isSubscriber={isActiveMember}
-          subscriberPriceRupees={subscriberPriceRupees}
-        />
-
-        {/* The comparison table — the single answer to "what is actually
-            different between these plans?". Columns are the selection target,
-            rows are the features, cells state the real outcome (Included /
-            exact add-on price / not offered) for the active cycle. */}
-        <PlanComparisonTable
-          plans={pickerPlans}
-          features={rawFeatures}
-          cycle={cycle}
-          selectedPlanId={selectedPlanId}
-          ownedPlanId={isActiveMember ? ownedPlanId || null : null}
-          onSelectPlan={setSelectedPlanId}
-        />
-        </Step>
-
         {/* Already-owned selection: the entire buy flow below is replaced by
             a single statement of what is active. Nothing purchasable is
             rendered, so the same subscription type cannot be bought twice —
             EXCEPT through the explicit add-on path ("Add features / courses"),
-            which reopens the pickers and only ever charges the new items. */}
+            which reopens the pickers and only ever charges the new items.
+            On desktop the buy flow splits into a two-column workspace: the
+            configuration surface (showcase + plan + add-ons + discounts) in
+            the main column, and a persistent review rail (live card + price
+            summary) that stays beside the pointer while the buyer edits. */}
         {isSelectionOwned && ownedPlanSummary ? (
-          <OwnedPlanCard
-            summary={ownedPlanSummary}
-            expiresAtLabel={formatExpiryDate(subscriptionExpiresAtMs)}
-            renewalOpensAtLabel={formatExpiryDate(ownedPlanSummary.renewalOpensAt)}
-            otherPlanNames={purchasablePlanNames}
-            onSeeOtherPlans={() => {
-              // Only HIGHER plans are ever offered (no-downgrade rule).
-              const firstUpgrade = upgradePlans[0] || null;
-              if (firstUpgrade) setSelectedPlanId(firstUpgrade.id);
-            }}
-            onAddMore={() => setAddOnIntent(true)}
-          />
+            <OwnedPlanCard
+              summary={ownedPlanSummary}
+              expiresAtLabel={formatExpiryDate(subscriptionExpiresAtMs)}
+              renewalOpensAtLabel={formatExpiryDate(ownedPlanSummary.renewalOpensAt)}
+              otherPlanNames={purchasablePlanNames}
+              onSeeOtherPlans={() => {
+                // Only HIGHER plans are ever offered (no-downgrade rule).
+                const firstUpgrade = upgradePlans[0] || null;
+                if (firstUpgrade) setSelectedPlanId(firstUpgrade.id);
+              }}
+              onAddMore={() => setAddOnIntent(true)}
+            />
         ) : (
-        <>
-        {/* ── STEP 2 — optional add-ons ───────────────────────────────────
-            Clearly framed as optional so the buyer knows the plan alone is a
-            complete purchase; every price here is already resolved for the
-            plan + cycle chosen in step 1. */}
-        <Step
-          index={2}
-          title="Add courses and features"
-          hint="Optional. Anything included with your plan is marked and never charged twice."
-          done={selectedCourseIds.length > 0 || selectedFeatureIds.length > 0}
-        >
-        {/* Course (product) selector trigger */}
-        <CourseSelectTrigger
-          selectedIds={selectedCourseIds}
-          onOpen={() => setCourseModalOpen(true)}
-          products={availableProducts}
-        />
+        <div data-subscription-layout className="flex min-w-0 flex-col">
+          <div data-subscription-main className="min-w-0">
+            <StackedCards cards={SHOWCASE_CARDS} />
 
-        {/* Feature selector trigger */}
-        <FeatureSelectTrigger
-          features={features}
-          selectedIds={selectedFeatureIds}
-          onOpen={() => setFeatureModalOpen(true)}
-          purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
-        />
-
-        {/* Price-tier strip — features grouped by their resolved price
-            for the active plan + cycle. */}
-        <FeaturePricingTiers
-          tiers={featureTiers}
-          cycle={cycle}
-          selectedIds={selectedFeatureIds}
-          purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
-          onToggleTier={(ids, allSelected) => {
-            setSelectedFeatureIds((current) => {
-              const next = new Set(current);
-              if (allSelected) ids.forEach((id) => next.delete(id));
-              else ids.forEach((id) => next.add(id));
-              return Array.from(next);
-            });
-          }}
-        />
-
-        </Step>
-
-        {/* ── STEP 3 — discounts ──────────────────────────────────────────── */}
-        <Step
-          index={3}
-          title="Apply a code"
-          hint="Optional. Coupons and referral codes are verified by the server before payment."
-          done={Boolean(appliedCoupon || appliedReferral)}
-        >
-        {/* Coupon section — server-validated via the Part 7 engine.
-            The coupon field is hidden when nothing is payable. */}
-        <div className="space-y-3 px-5">
-          {canShowCouponInput ? (
-            <PromoCodeInput
-              kind="coupon"
-              label="Have a coupon? Enter the code below."
-              placeholder="Enter coupon code"
-              appliedCode={appliedCoupon?.code ?? null}
-              appliedMessage={appliedCoupon?.label ?? null}
-              errorMessage={couponStatus === "error" ? couponErrorMessage : null}
-              onApply={handleApplyCoupon}
-              onRemove={handleRemoveCoupon}
-              disabled={isSubmitting}
-            />
-          ) : null}
-          {!isFreeSelection ? (
-            <PromoCodeInput
-              kind="referral"
-              label="Have a referral code? Get ₹250 off the final price."
-              placeholder="Enter referral code"
-              appliedCode={appliedReferral?.code ?? null}
-              appliedMessage={appliedReferral?.label ?? null}
-              errorMessage={referralError}
-              onApply={handleApplyReferral}
-              onRemove={handleRemoveReferral}
-              disabled={isSubmitting}
-            />
-          ) : (
-            <div
-              data-subscription-free-note
-              className="flex items-start gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-2.5 text-[11px] leading-relaxed text-emerald-200"
+            {/* ── STEP 1 — plan + billing duration ─────────────────────────────
+                Everything downstream (feature prices, course prices, the live
+                card, the total) is resolved from these two values, so they are
+                the first and most prominent decision on the page. */}
+            <Step
+              index={1}
+              title="Choose your plan and duration"
+              hint="Compare what each plan includes, then pick monthly or yearly. Prices below update instantly."
+              done={Boolean(plan)}
             >
-              <span aria-hidden="true">🎉</span>
-              <span>
-                This subscription is <strong>free</strong> — no payment is
-                needed. Tap the button below to activate it instantly.
-              </span>
+            {/* Plan + cycle card. Members only see their own plan + HIGHER plans
+                (pickerPlans) — lower plans are hidden, not merely disabled, so a
+                downgrade can never even be selected. */}
+            <PlanOverview
+              plans={pickerPlans}
+              features={features}
+              selectedPlanId={selectedPlanId}
+              onChangePlan={setSelectedPlanId}
+              cycle={cycle}
+              onChangeCycle={(c) => {
+                if (supportedCycles.includes(c)) setCycle(c);
+              }}
+              selectedFeatureRecords={selectedFeatureRecords}
+              includedFeatureRecords={includedFeatureRecords}
+              totalPaise={totalPaise}
+              ownedPlanId={isActiveMember ? ownedPlanId || null : null}
+              ownedCycle={isActiveMember ? ownedCycle : null}
+              isSubscriber={isActiveMember}
+              subscriberPriceRupees={subscriberPriceRupees}
+            />
+
+            {/* The comparison table — the single answer to "what is actually
+                different between these plans?". Columns are the selection target,
+                rows are the features, cells state the real outcome (Included /
+                exact add-on price / not offered) for the active cycle. */}
+            <PlanComparisonTable
+              plans={pickerPlans}
+              features={rawFeatures}
+              cycle={cycle}
+              selectedPlanId={selectedPlanId}
+              ownedPlanId={isActiveMember ? ownedPlanId || null : null}
+              onSelectPlan={setSelectedPlanId}
+            />
+            </Step>
+
+            {/* ── STEP 2 — optional add-ons ───────────────────────────────────
+                Clearly framed as optional so the buyer knows the plan alone is a
+                complete purchase; every price here is already resolved for the
+                plan + cycle chosen in step 1. */}
+            <Step
+              index={2}
+              title="Add courses and features"
+              hint="Optional. Anything included with your plan is marked and never charged twice."
+              done={selectedCourseIds.length > 0 || selectedFeatureIds.length > 0}
+            >
+            {/* Course (product) selector trigger */}
+            <CourseSelectTrigger
+              selectedIds={selectedCourseIds}
+              onOpen={() => setCourseModalOpen(true)}
+              products={availableProducts}
+            />
+
+            {/* Feature selector trigger */}
+            <FeatureSelectTrigger
+              features={features}
+              selectedIds={selectedFeatureIds}
+              onOpen={() => setFeatureModalOpen(true)}
+              purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
+            />
+
+            {/* Price-tier strip — features grouped by their resolved price
+                for the active plan + cycle. */}
+            <FeaturePricingTiers
+              tiers={featureTiers}
+              cycle={cycle}
+              selectedIds={selectedFeatureIds}
+              purchasedIds={isActiveMember ? ownedFeatureIds : Array.from(includedFeatureIds)}
+              onToggleTier={(ids, allSelected) => {
+                setSelectedFeatureIds((current) => {
+                  const next = new Set(current);
+                  if (allSelected) ids.forEach((id) => next.delete(id));
+                  else ids.forEach((id) => next.add(id));
+                  return Array.from(next);
+                });
+              }}
+            />
+
+            </Step>
+
+            {/* ── STEP 3 — discounts ──────────────────────────────────────────── */}
+            <Step
+              index={3}
+              title="Apply a code"
+              hint="Optional. Coupons and referral codes are verified by the server before payment."
+              done={Boolean(appliedCoupon || appliedReferral)}
+            >
+            {/* Coupon section — server-validated via the Part 7 engine.
+                The coupon field is hidden when nothing is payable. */}
+            <div className="space-y-3 px-5">
+              {canShowCouponInput ? (
+                <PromoCodeInput
+                  kind="coupon"
+                  label="Have a coupon? Enter the code below."
+                  placeholder="Enter coupon code"
+                  appliedCode={appliedCoupon?.code ?? null}
+                  appliedMessage={appliedCoupon?.label ?? null}
+                  errorMessage={couponStatus === "error" ? couponErrorMessage : null}
+                  onApply={handleApplyCoupon}
+                  onRemove={handleRemoveCoupon}
+                  disabled={isSubmitting}
+                />
+              ) : null}
+              {!isFreeSelection ? (
+                <PromoCodeInput
+                  kind="referral"
+                  label="Have a referral code? Get ₹250 off the final price."
+                  placeholder="Enter referral code"
+                  appliedCode={appliedReferral?.code ?? null}
+                  appliedMessage={appliedReferral?.label ?? null}
+                  errorMessage={referralError}
+                  onApply={handleApplyReferral}
+                  onRemove={handleRemoveReferral}
+                  disabled={isSubmitting}
+                />
+              ) : (
+                <div
+                  data-subscription-free-note
+                  className="flex items-start gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/15 px-3 py-2.5 text-[11px] leading-relaxed text-emerald-200"
+                >
+                  <span aria-hidden="true">🎉</span>
+                  <span>
+                    This subscription is <strong>free</strong> — no payment is
+                    needed. Tap the button below to activate it instantly.
+                  </span>
+                </div>
+              )}
             </div>
-          )}
+
+            </Step>
+          </div>
+
+          <aside data-subscription-rail className="min-w-0">
+            {/* ── STEP 4 — review ─────────────────────────────────────────────
+                The live card restates plan + duration + every selection and the
+                money in one surface. It is the same component the confirmation
+                modal renders, driven by the same props, so the two can never
+                disagree. On desktop this becomes a sticky rail that stays beside
+                the pointer while the buyer edits the configuration. */}
+            <Step
+              index={4}
+              title="Review what you're buying"
+              hint="This card updates the moment you change the plan, the duration or any add-on."
+              done={Boolean(plan)}
+            >
+            <div className="px-5">
+              <LiveSelectionCard {...liveSelection} />
+            </div>
+
+            {/* Full itemised breakdown stays available underneath for buyers who
+                want every line rather than the summary. */}
+            <div className="pt-3">
+            <PriceSummary
+              plan={plan}
+              cycle={cycle}
+              basePricePaise={planPricePaise}
+              planAlreadyIncluded={isAddOnUpgrade}
+              featuresTotalPaise={featuresTotalPaise}
+              featuresCount={chargeableFeatureIds.filter((id) => !includedFeatureIds.has(id)).length}
+              includedFeatureCount={includedFeatureIds.size}
+              productsCount={chargeableProductRecords.length}
+              productsTotalPaise={productsTotalPaise}
+              featureTitles={chargeableFeatureRecords.map((feature) => feature.name)}
+              includedFeatureTitles={includedFeatureRecords.map((feature) => feature.name)}
+              alreadyOwnedFeatureTitles={carriedOverFeatureRecords.map((feature) => feature.name)}
+              alreadyOwnedProductTitles={carriedOverProductRecords.map((product) => String(product.title || ""))}
+              products={chargeableProductRecords.map((product) => ({
+                id: String(product.documentId || product.id),
+                title: String(product.title || ""),
+              }))}
+              couponDiscountPaise={couponDiscountPaise}
+              couponCode={appliedReferral?.code ?? appliedCoupon?.code ?? null}
+              discountLabel={appliedReferral ? "Referral discount" : "Coupon discount"}
+              minPayablePaise={minPayablePaise}
+              totalPaise={totalPaise}
+            />
+            </div>
+            </Step>
+
+            <p className="px-5 pt-5 text-center text-[11px] leading-relaxed dc-ink-3">
+              By subscribing you agree to the{" "}
+              <a href="/terms-of-service.html" className="font-semibold text-violet-300 underline underline-offset-2 hover:text-violet-200">
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a href="/privacy-policy.html" className="font-semibold text-violet-300 underline underline-offset-2 hover:text-violet-200">
+                Privacy Policy
+              </a>
+              . Access lasts for the selected {cycle === "monthly" ? "monthly" : "yearly"} period. We send limited renewal reminders; every renewal requires your confirmation.
+            </p>
+          </aside>
         </div>
-
-        </Step>
-
-        {/* ── STEP 4 — review ─────────────────────────────────────────────
-            The live card restates plan + duration + every selection and the
-            money in one surface. It is the same component the confirmation
-            modal renders, driven by the same props, so the two can never
-            disagree. */}
-        <Step
-          index={4}
-          title="Review what you're buying"
-          hint="This card updates the moment you change the plan, the duration or any add-on."
-          done={Boolean(plan)}
-        >
-        <div className="px-5">
-          <LiveSelectionCard {...liveSelection} />
-        </div>
-
-        {/* Full itemised breakdown stays available underneath for buyers who
-            want every line rather than the summary. */}
-        <div className="pt-3">
-        <PriceSummary
-          plan={plan}
-          cycle={cycle}
-          basePricePaise={planPricePaise}
-          planAlreadyIncluded={isAddOnUpgrade}
-          featuresTotalPaise={featuresTotalPaise}
-          featuresCount={chargeableFeatureIds.filter((id) => !includedFeatureIds.has(id)).length}
-          includedFeatureCount={includedFeatureIds.size}
-          productsCount={chargeableProductRecords.length}
-          productsTotalPaise={productsTotalPaise}
-          featureTitles={chargeableFeatureRecords.map((feature) => feature.name)}
-          includedFeatureTitles={includedFeatureRecords.map((feature) => feature.name)}
-          alreadyOwnedFeatureTitles={carriedOverFeatureRecords.map((feature) => feature.name)}
-          alreadyOwnedProductTitles={carriedOverProductRecords.map((product) => String(product.title || ""))}
-          products={chargeableProductRecords.map((product) => ({
-            id: String(product.documentId || product.id),
-            title: String(product.title || ""),
-          }))}
-          couponDiscountPaise={couponDiscountPaise}
-          couponCode={appliedReferral?.code ?? appliedCoupon?.code ?? null}
-          discountLabel={appliedReferral ? "Referral discount" : "Coupon discount"}
-          minPayablePaise={minPayablePaise}
-          totalPaise={totalPaise}
-        />
-        </div>
-        </Step>
-
-        <p className="px-5 pt-5 text-center text-[11px] leading-relaxed dc-ink-3">
-          By subscribing you agree to the{" "}
-          <a href="/terms-of-service.html" className="font-semibold text-violet-300 underline underline-offset-2 hover:text-violet-200">
-            Terms of Service
-          </a>{" "}
-          and{" "}
-          <a href="/privacy-policy.html" className="font-semibold text-violet-300 underline underline-offset-2 hover:text-violet-200">
-            Privacy Policy
-          </a>
-          . Access lasts for the selected {cycle === "monthly" ? "monthly" : "yearly"} period. We send limited renewal reminders; every renewal requires your confirmation.
-        </p>
-        </>
         )}
         {submitError ? (
           <p

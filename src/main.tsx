@@ -444,16 +444,20 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
       pageTitle={
         hash.startsWith("#/flowpath")
           ? "FlowPath"
-          : hash.startsWith(PRODUCT_HASH)
-            ? "Product details"
-            : undefined
+          : hash.startsWith(SUBSCRIPTION_HASH)
+            ? "Subscription"
+            : hash.startsWith(PRODUCT_HASH)
+              ? "Product details"
+              : undefined
       }
       pageSubtitle={
         hash.startsWith("#/flowpath")
           ? "Your day. Your goals. One continuous flow."
-          : hash.startsWith(PRODUCT_HASH)
-            ? "Everything about this resource, before you buy"
-            : undefined
+          : hash.startsWith(SUBSCRIPTION_HASH)
+            ? "Compare plans, add courses and features, and review before you buy"
+            : hash.startsWith(PRODUCT_HASH)
+              ? "Everything about this resource, before you buy"
+              : undefined
       }
     >
       {children}
