@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FlowPathView } from "./components/flowpath/FlowPathView";
 import Header from "./home/components/Header";
+import GameEnvironment from "./components/GameEnvironment";
 import { useAuth } from "./context/AuthContext";
 
 interface FlowPathAppProps {
@@ -32,6 +33,7 @@ export default function FlowPathApp({
   const { user } = useAuth();
   const userName = user?.name?.trim().split(/\s+/)[0] || "Learner";
   const [searchQuery, setSearchQuery] = useState("");
+  const [isGameOpen, setIsGameOpen] = useState(false);
 
   return (
     <div className="flowpath-app relative min-h-screen text-fp-text">
@@ -53,12 +55,18 @@ export default function FlowPathApp({
           favoritesCount={favoritesCount}
           onOpenFavorites={onOpenFavorites}
           onOpenNotifications={onOpenNotifications}
+          onOpenGameEnvironment={() => setIsGameOpen(true)}
         />
       </div>
 
       <div className="relative z-10">
         <FlowPathView onNavigateToHome={onNavigateToHome} />
       </div>
+      
+      {/* Game Environment Modal */}
+      {isGameOpen && (
+        <GameEnvironment onClose={() => setIsGameOpen(false)} />
+      )}
     </div>
   );
 }
