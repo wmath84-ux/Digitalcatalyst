@@ -135,11 +135,13 @@ export default function WallActivity({
         data-wall-active={active ? "true" : "false"}
         className="h-full w-full min-h-0 min-w-0"
         style={{
-          // Part 14: active walls drop to `auto` (the browser skips the
-          // subtree when it's off-screen, like a virtualized list row —
-          // `contain-intrinsic-size` in classroom3d.css holds the layout);
-          // inactive walls keep the forced `hidden` skip from Part 13.
-          contentVisibility: active ? "auto" : "hidden",
+          // Active classroom surfaces must paint immediately. `auto` is unsafe
+          // inside drei's 3D-transformed Html portals because browsers may
+          // measure the portal root as a near-zero/offscreen box and skip the
+          // subtree, leaving only the black backing board visible on first load.
+          // Inactive walls still use `hidden` so expensive embeds sleep when
+          // the learner turns away.
+          contentVisibility: active ? "visible" : "hidden",
           pointerEvents: active ? "auto" : "none",
         }}
       >

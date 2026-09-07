@@ -27,6 +27,15 @@ export default function DeskConsole({
   const width = 1.16; // metres
   const height = (width * pixelHeight) / pixelWidth;
   const scale = width / pixelWidth;
+  const panelStyle = {
+    width: `${pixelWidth}px`,
+    height: `${pixelHeight}px`,
+    minWidth: `${pixelWidth}px`,
+    minHeight: `${pixelHeight}px`,
+    overflow: "hidden",
+    borderRadius: 14,
+    background: "#080b16",
+  };
 
   return (
     <group position={[0.15, 0, 2.02]}>
@@ -70,17 +79,13 @@ export default function DeskConsole({
           position={[0, 0, 0.009]}
           scale={scale}
           occlude={false}
-          style={{
-            width: pixelWidth,
-            height: pixelHeight,
-            overflow: "hidden",
-            borderRadius: 14,
-            background: "#080b16",
-          }}
+          style={panelStyle}
           wrapperClass="dc-classroom-surface"
           zIndexRange={[12, 0]}
         >
-          {children}
+          <div className="h-full w-full min-h-0 min-w-0" data-classroom-surface-panel>
+            {children}
+          </div>
         </Html>
         {spill && (
           <pointLight position={[0, 0, 0.5]} intensity={1.6} distance={2.2} color="#a99cf5" />

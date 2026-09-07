@@ -26,7 +26,14 @@
 .dc-classroom-surface {
   pointer-events: auto;
   touch-action: auto;
+  overflow: visible !important;
   -webkit-font-smoothing: antialiased;
+}
+.dc-classroom-surface [data-classroom-surface-panel] {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
 }
 .dc-classroom-surface * {
   /* Panels are rendered small on screen; keep type crisp rather than blurry. */
@@ -86,6 +93,71 @@
   box-shadow: 0 0 22px rgba(139, 92, 246, 0.4);
 }
 
+.dc-classroom-control-tray {
+  position: absolute;
+  right: max(18px, env(safe-area-inset-right));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 21;
+  display: grid;
+  gap: 10px;
+  width: min(180px, 28vw);
+  padding: 10px;
+  border-radius: 24px;
+  background: rgba(9, 12, 24, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.48);
+}
+
+.dc-classroom-control-btn {
+  appearance: none;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.dc-classroom-control-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(139, 92, 246, 0.26);
+  border-color: rgba(167, 139, 250, 0.58);
+  color: #fff;
+}
+.dc-classroom-control-btn:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+.dc-classroom-control-btn[data-done="true"] {
+  color: #a7f3d0;
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(110, 231, 183, 0.45);
+}
+
+.dc-classroom-surface-fab {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  border: 1px solid rgba(251, 191, 36, 0.42);
+  border-radius: 999px;
+  background: rgba(217, 119, 6, 0.78);
+  color: #fff7ed;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38);
+}
+
 .dc-classroom-hint {
   position: absolute;
   top: max(14px, env(safe-area-inset-top));
@@ -107,6 +179,24 @@
 }
 
 @media (max-width: 640px) {
+  .dc-classroom-control-tray {
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: calc(max(18px, env(safe-area-inset-bottom)) + 58px);
+    width: min(94vw, 520px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    transform: translateX(-50%);
+    gap: 6px;
+    padding: 7px;
+    border-radius: 18px;
+  }
+  .dc-classroom-control-btn {
+    min-height: 38px;
+    border-radius: 12px;
+    font-size: 11px;
+    gap: 5px;
+  }
   .dc-classroom-hint {
     font-size: 10px;
     max-width: 92vw;
@@ -152,11 +242,27 @@
     display: none;
   }
   .dc-classroom-hud {
-    bottom: max(10px, env(safe-area-inset-bottom));
+    bottom: max(8px, env(safe-area-inset-bottom));
     padding: 5px;
   }
   .dc-classroom-chip {
     padding: 6px 12px;
+    font-size: 10.5px;
+  }
+  .dc-classroom-control-tray {
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    transform: none;
+    width: auto;
+    grid-template-columns: repeat(5, auto);
+    gap: 6px;
+    padding: 6px;
+    border-radius: 16px;
+  }
+  .dc-classroom-control-btn {
+    min-height: 34px;
+    padding-inline: 10px;
+    border-radius: 11px;
     font-size: 10.5px;
   }
 }
@@ -299,11 +405,12 @@
        iframe + its impostor): overlay churn inside can never invalidate
        ancestors, and it sits BELOW the fullscreen target
        ([data-course-viewer]), so the top-layer escape hatch is unaffected;
-     · YES content-visibility:auto + contain-intrinsic-size on every wall
-       (item E10): the browser skips off-screen walls like virtualized rows,
-       with the intrinsic size holding layout while skipped. WallActivity's
-       inline style upgrades inactive walls to `hidden` (strictly stronger)
-       and keeps `auto` while active — the two compose, never fight. */
+     · NO content-visibility:auto on the live wall panels: inside drei's
+       3D-transformed Html portal, Chromium can classify the portal root as a
+       near-zero/offscreen box during first layout and skip the subtree. That
+       produced a full-size black board with only tiny backing/chalk details
+       visible. WallActivity still switches inactive walls to `hidden` so they
+       sleep after the learner turns away. */
 
 .dc-embed-moving [data-embed-impostor-target] {
   visibility: hidden;
@@ -321,6 +428,5 @@
 }
 
 [data-classroom-wall] {
-  content-visibility: auto;
   contain-intrinsic-size: 1280px 800px;
 }

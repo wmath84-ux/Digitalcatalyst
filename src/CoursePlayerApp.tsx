@@ -13,7 +13,7 @@ import NotesPanel from "./course/NotesPanel";
 import PlayerPanel from "./course/PlayerPanel";
 import useCourseMindMap from "./course/useCourseMindMap";
 import { combineHtml, loadLocalNotes, persistLocalNotes } from "./course/notesStore";
-import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
+import { getCoursePanelSession, resetCoursePanelSession, setMindMapSessionView, setNotesSessionView } from "./course/coursePanelSession";
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
@@ -748,6 +748,43 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     persistLocalNotes(user.id, product.id, next);
   };
 
+  const returnStudySurfacesToLibrary = useCallback(() => {
+    // Entering the 3D room should always start Notes and Mind map at their
+    // library/list home screens. If the learner had a note editor open in the
+    // flat pane, save that draft first so switching shells never throws work
+    // away, then reset only the UI view.
+    const sessionNotes = getCoursePanelSession().notes;
+    if (user?.id && sessionNotes.view !== "list") {
+      const safeHtml = sanitizeRichText(combineHtml(sessionNotes.title, sessionNotes.draft));
+      if (!isEmptyRichText(safeHtml)) {
+        const plain = richTextToPlain(safeHtml);
+        if (sessionNotes.view === "compose") {
+          const next: CoursePlayerNote[] = [
+            {
+              id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              text: plain,
+              html: safeHtml,
+              createdAt: Date.now(),
+            },
+            ...notes,
+          ];
+          setNotes(next);
+          persistLocalNotes(user.id, product.id, next);
+        } else {
+          const next = notes.map((note) =>
+            note.id === sessionNotes.noteId
+              ? { ...note, text: plain, html: safeHtml, updatedAt: Date.now() }
+              : note,
+          );
+          setNotes(next);
+          persistLocalNotes(user.id, product.id, next);
+        }
+      }
+    }
+    setNotesSessionView({ view: "list" });
+    setMindMapSessionView("library");
+  }, [notes, product.id, user]);
+
   const selectFile = (file: CourseFile) => {
     // Switching modules must PAUSE the outgoing lesson rather than let it keep
     // playing in the background. `ResourceViewer` does that itself the moment
@@ -936,7 +973,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onDesktopViewChange={setDesktopView}
       classroom3d={classroom3d}
       onClassroom3dChange={(next) => {
-        if (next) mindMap.flush();
+        if (next) {
+          mindMap.flush();
+          returnStudySurfacesToLibrary();
+        }
         setClassroom3d(next);
       }}
       canFullscreen={canFullscreen}

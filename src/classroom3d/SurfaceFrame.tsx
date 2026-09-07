@@ -70,6 +70,17 @@ export default function SurfaceFrame({
   const pixelHeight = Math.round((pixelWidth * height) / width);
   // metres-per-pixel: the DOM plane must land exactly on the slab face.
   const scale = width / pixelWidth;
+  const panelStyle = {
+    width: `${pixelWidth}px`,
+    height: `${pixelHeight}px`,
+    minWidth: `${pixelWidth}px`,
+    minHeight: `${pixelHeight}px`,
+    overflow: "hidden",
+    borderRadius: 10,
+    background: "#05070f",
+    boxShadow: `0 0 ${active ? 70 : 20}px rgba(0,0,0,0.55)`,
+    transition: "box-shadow 240ms ease",
+  };
 
   return (
     <group position={position} rotation={rotation}>
@@ -96,19 +107,13 @@ export default function SurfaceFrame({
         position={[0, 0, 0.05]}
         distanceFactor={undefined}
         scale={scale}
-        style={{
-          width: pixelWidth,
-          height: pixelHeight,
-          overflow: "hidden",
-          borderRadius: 10,
-          background: "#05070f",
-          boxShadow: `0 0 ${active ? 70 : 20}px rgba(0,0,0,0.55)`,
-          transition: "box-shadow 240ms ease",
-        }}
+        style={panelStyle}
         wrapperClass="dc-classroom-surface"
         zIndexRange={[10, 0]}
       >
-        <PanelBoundary label={label}>{children}</PanelBoundary>
+        <div className="h-full w-full min-h-0 min-w-0" data-classroom-surface-panel>
+          <PanelBoundary label={label}>{children}</PanelBoundary>
+        </div>
       </Html>
       {/* Soft light spill from the panel onto the wall — dropped entirely on
           the low tier (3 fewer shaded lights) while the emissive frame keeps
