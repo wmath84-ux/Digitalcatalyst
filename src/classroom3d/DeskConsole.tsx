@@ -16,10 +16,13 @@ export default function DeskConsole({
   children,
   pixelWidth = 1100,
   pixelHeight = 720,
+  spill = true,
 }: {
   children: ReactNode;
   pixelWidth?: number;
   pixelHeight?: number;
+  /** Tablet glow light (off on the low tier — the emissive face still reads). */
+  spill?: boolean;
 }) {
   const width = 1.16; // metres
   const height = (width * pixelHeight) / pixelWidth;
@@ -32,7 +35,9 @@ export default function DeskConsole({
         <boxGeometry args={[1.5, 0.055, 0.7]} />
         <meshStandardMaterial color="#b78551" roughness={0.55} />
       </mesh>
-      <mesh position={[0, 0.53, -0.32]} castShadow>
+      {/* Only the desktop and tablet cast — thin/hidden parts (modesty, legs,
+          notebook) skip the shadow map so the one-time bake stays small. */}
+      <mesh position={[0, 0.53, -0.32]}>
         <boxGeometry args={[1.44, 0.4, 0.04]} />
         <meshStandardMaterial color="#8d6238" roughness={0.7} />
       </mesh>
@@ -42,7 +47,7 @@ export default function DeskConsole({
         [-0.68, 0.3],
         [0.68, 0.3],
       ].map(([x, z]) => (
-        <mesh key={`${x}-${z}`} position={[x, 0.375, z]} castShadow>
+        <mesh key={`${x}-${z}`} position={[x, 0.375, z]}>
           <cylinderGeometry args={[0.028, 0.028, 0.75, 8]} />
           <meshStandardMaterial color="#49505f" metalness={0.5} roughness={0.45} />
         </mesh>
@@ -77,12 +82,14 @@ export default function DeskConsole({
         >
           {children}
         </Html>
-        <pointLight position={[0, 0, 0.5]} intensity={1.6} distance={2.2} color="#a99cf5" />
+        {spill && (
+          <pointLight position={[0, 0, 0.5]} intensity={1.6} distance={2.2} color="#a99cf5" />
+        )}
       </group>
 
       {/* Notebook + pen, because a desk without them is not a desk */}
       <group position={[-0.56, 0.79, 0.13]} rotation={[0, 0.22, 0]}>
-        <mesh castShadow>
+        <mesh>
           <boxGeometry args={[0.3, 0.02, 0.22]} />
           <meshStandardMaterial color="#f6f2e8" roughness={0.9} />
         </mesh>

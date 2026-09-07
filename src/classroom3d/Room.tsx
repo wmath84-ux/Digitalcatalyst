@@ -8,10 +8,24 @@
 // Winter is the mood the owner asked for: cold blue daylight through frosted
 // glass, snow falling outside, warm amber ceiling lamps fighting it, a
 // radiator under the windows and steam rising off a mug on the desk.
+//
+// ── Part 13: what changed for performance ─────────────────────────────────
+//   · Repeated static props (desks, window frames, lamps, books) are merged
+//     into ~11 meshes (see mergedStatics.ts) instead of ~110 draw calls.
+//   · The window glass is plain transparency now (the old glass forced a
+//     second scene render per surface) — it still reads as frosted glass
+//     and costs one blended quad.
+//   · Lights are consolidated: 1 window light (was 3), 2 ceiling lights on
+//     high/medium or 1 on low (was 6). Emissive meshes still READ as lit.
+//   · Shadows are baked once (<BakeShadows> in Classroom3D): the room is
+//     static, so the shadow map never recomputes per frame. `castShadow`
+//     survives only where a shadow is actually visible.
+//   · Snowfall count follows the quality tier; the loop allocates nothing.
 
-import { useMemo, useRef } from "react";
+import { memo, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { BOOK_BIN_COLORS, getMergedRoomStatics } from "./mergedStatics";
 
 const ROOM = { width: 12, depth: 13, height: 3.5 };
 
@@ -37,6 +51,7 @@ function Snowfall({ count = 420 }: { count?: number }) {
     return { positions, speeds };
   }, [count]);
 
+  // Allocation-free: the attribute array is reused in place every frame.
   useFrame((_, delta) => {
     const geometry = ref.current?.geometry;
     if (!geometry) return;
@@ -57,51 +72,6 @@ function Snowfall({ count = 420 }: { count?: number }) {
       </bufferGeometry>
       <pointsMaterial color="#ffffff" size={0.075} sizeAttenuation transparent opacity={0.9} depthWrite={false} />
     </points>
-  );
-}
-
-/* ── One window bay: frame, frosted glass, snow ledge ───────────────────── */
-
-function WindowBay({ z }: { z: number }) {
-  const x = ROOM.width / 2 - 0.06;
-  return (
-    <group position={[x, 1.85, z]} rotation={[0, -Math.PI / 2, 0]}>
-      {/* glass */}
-      <mesh>
-        <planeGeometry args={[2.5, 1.9]} />
-        <meshPhysicalMaterial
-          color="#dceaff"
-          transparent
-          opacity={0.28}
-          roughness={0.35}
-          transmission={0.75}
-          thickness={0.06}
-        />
-      </mesh>
-      {/* frame */}
-      {[
-        [0, 0.98, 2.7, 0.12],
-        [0, -0.98, 2.7, 0.12],
-      ].map(([px, py, w, h], i) => (
-        <mesh key={`h${i}`} position={[px as number, py as number, 0.03]}>
-          <boxGeometry args={[w as number, h as number, 0.1]} />
-          <meshStandardMaterial color="#eef3fb" roughness={0.7} />
-        </mesh>
-      ))}
-      {[-1.28, 0, 1.28].map((px) => (
-        <mesh key={px} position={[px, 0, 0.03]}>
-          <boxGeometry args={[0.1, 2.05, 0.1]} />
-          <meshStandardMaterial color="#eef3fb" roughness={0.7} />
-        </mesh>
-      ))}
-      {/* snow piled on the outer ledge */}
-      <mesh position={[0, -1.02, -0.22]} rotation={[-0.12, 0, 0]}>
-        <boxGeometry args={[2.6, 0.1, 0.34]} />
-        <meshStandardMaterial color="#ffffff" roughness={1} />
-      </mesh>
-      {/* cold daylight pushing into the room */}
-      <pointLight position={[0, 0, 1.2]} intensity={5} distance={9} color="#bcd8ff" />
-    </group>
   );
 }
 
@@ -143,7 +113,7 @@ function Classmate({
           <meshStandardMaterial color={hue} roughness={0.85} />
         </mesh>
         {/* scarf */}
-        <mesh position={[0, 0.86, 0.01]} castShadow>
+        <mesh position={[0, 0.86, 0.01]}>
           <torusGeometry args={[0.15, 0.045, 8, 18]} />
           <meshStandardMaterial color="#e2506a" roughness={0.9} />
         </mesh>
@@ -153,18 +123,18 @@ function Classmate({
           <meshStandardMaterial color="#c89272" roughness={0.75} />
         </mesh>
         {/* hair / beanie */}
-        <mesh position={[0, 1.11, -0.01]} castShadow>
+        <mesh position={[0, 1.11, -0.01]}>
           <sphereGeometry args={[0.152, 18, 14, 0, Math.PI * 2, 0, Math.PI * 0.62]} />
           <meshStandardMaterial color="#2a2333" roughness={0.95} />
         </mesh>
         {/* writing arm */}
         <group ref={arm} position={[0.17, 0.76, 0.06]}>
-          <mesh position={[0, -0.02, 0.2]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <mesh position={[0, -0.02, 0.2]} rotation={[Math.PI / 2, 0, 0]}>
             <capsuleGeometry args={[0.052, 0.34, 4, 8]} />
             <meshStandardMaterial color={hue} roughness={0.85} />
           </mesh>
         </group>
-        <mesh position={[-0.2, 0.66, 0.12]} rotation={[1.15, 0, 0]} castShadow>
+        <mesh position={[-0.2, 0.66, 0.12]} rotation={[1.15, 0, 0]}>
           <capsuleGeometry args={[0.052, 0.3, 4, 8]} />
           <meshStandardMaterial color={hue} roughness={0.85} />
         </mesh>
@@ -174,45 +144,6 @@ function Classmate({
         <capsuleGeometry args={[0.075, 0.34, 4, 8]} />
         <meshStandardMaterial color="#2f3646" roughness={0.9} />
       </mesh>
-    </group>
-  );
-}
-
-/* ── Desk + chair ──────────────────────────────────────────────────────── */
-
-function Desk({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
-  return (
-    <group position={position} rotation={[0, rotation, 0]}>
-      <mesh position={[0, 0.74, 0]} castShadow receiveShadow>
-        <boxGeometry args={[1.35, 0.05, 0.62]} />
-        <meshStandardMaterial color="#b07f4e" roughness={0.62} />
-      </mesh>
-      <mesh position={[0, 0.52, -0.28]} castShadow>
-        <boxGeometry args={[1.3, 0.4, 0.04]} />
-        <meshStandardMaterial color="#8d6238" roughness={0.7} />
-      </mesh>
-      {[
-        [-0.6, -0.26],
-        [0.6, -0.26],
-        [-0.6, 0.26],
-        [0.6, 0.26],
-      ].map(([x, z]) => (
-        <mesh key={`${x}-${z}`} position={[x, 0.37, z]} castShadow>
-          <cylinderGeometry args={[0.026, 0.026, 0.74, 8]} />
-          <meshStandardMaterial color="#4a5162" roughness={0.5} metalness={0.5} />
-        </mesh>
-      ))}
-      {/* chair */}
-      <group position={[0, 0, 0.72]}>
-        <mesh position={[0, 0.45, 0]} castShadow>
-          <boxGeometry args={[0.46, 0.05, 0.44]} />
-          <meshStandardMaterial color="#3d4658" roughness={0.8} />
-        </mesh>
-        <mesh position={[0, 0.72, 0.2]} castShadow>
-          <boxGeometry args={[0.46, 0.5, 0.05]} />
-          <meshStandardMaterial color="#3d4658" roughness={0.8} />
-        </mesh>
-      </group>
     </group>
   );
 }
@@ -257,13 +188,16 @@ function Steam({ position }: { position: [number, number, number] }) {
 
 /* ── The room ──────────────────────────────────────────────────────────── */
 
-export default function Room() {
+function Room({ snow = 420, lampLights = 2 }: { snow?: number; lampLights?: 1 | 2 }) {
   const fan = useRef<THREE.Group>(null);
   const clock = useRef<THREE.Mesh>(null);
   useFrame((state) => {
     if (fan.current) fan.current.rotation.y = state.clock.elapsedTime * 0.35;
     if (clock.current) clock.current.rotation.z = -state.clock.elapsedTime * 0.1;
   });
+
+  // Module-singleton merged geometry: built once, reused for the app's life.
+  const merged = getMergedRoomStatics();
 
   const classmates = useMemo(
     () =>
@@ -302,28 +236,38 @@ export default function Room() {
         <meshStandardMaterial color="#5a4633" roughness={0.8} />
       </mesh>
 
-      {/* Winter windows on the left wall + snow outside */}
-      {[-1.4, 1.6, 4.6].map((z) => (
-        <WindowBay key={z} z={z} />
-      ))}
-      <Snowfall />
+      {/* Winter windows — merged frames + glass + ledges (was 21 meshes).
+          Frosted glass from plain transparency: one blended quad, never a
+          second scene render per surface. */}
+      <mesh geometry={merged.windowFrames}>
+        <meshStandardMaterial color="#eef3fb" roughness={0.7} />
+      </mesh>
+      <mesh geometry={merged.windowGlass}>
+        <meshStandardMaterial color="#dceaff" transparent opacity={0.32} roughness={0.4} />
+      </mesh>
+      <mesh geometry={merged.windowLedges}>
+        <meshStandardMaterial color="#ffffff" roughness={1} />
+      </mesh>
+      {/* One cold daylight shared by all three bays (was one light per bay). */}
+      <pointLight position={[5.7, 1.85, 1.6]} intensity={8} distance={12} color="#bcd8ff" />
+      <Snowfall count={snow} />
       {/* Radiator under the windows */}
       <mesh position={[ROOM.width / 2 - 0.2, 0.35, 1.6]} castShadow>
         <boxGeometry args={[0.16, 0.55, 6.5]} />
         <meshStandardMaterial color="#e8edf5" roughness={0.5} metalness={0.3} />
       </mesh>
 
-      {/* Ceiling lamps */}
-      {[-2.4, 1.4, 5.2].map((z) =>
-        [-3, 3].map((x) => (
-          <group key={`${x}-${z}`} position={[x, ROOM.height - 0.1, z]}>
-            <mesh>
-              <boxGeometry args={[1.5, 0.08, 0.28]} />
-              <meshStandardMaterial color="#fff6e2" emissive="#ffd9a0" emissiveIntensity={1.5} />
-            </mesh>
-            <pointLight position={[0, -0.5, 0]} intensity={7} distance={7.5} color="#ffd9a8" castShadow={false} />
-          </group>
-        )),
+      {/* Ceiling lamps — one merged emissive mesh (was 6) + consolidated lights. */}
+      <mesh geometry={merged.lampBoxes}>
+        <meshStandardMaterial color="#fff6e2" emissive="#ffd9a0" emissiveIntensity={1.5} />
+      </mesh>
+      {lampLights === 2 ? (
+        <>
+          <pointLight position={[0, 2.85, -0.5]} intensity={10} distance={11} color="#ffd9a8" />
+          <pointLight position={[0, 2.85, 3.5]} intensity={10} distance={11} color="#ffd9a8" />
+        </>
+      ) : (
+        <pointLight position={[0, 2.85, 1.4]} intensity={12} distance={13} color="#ffd9a8" />
       )}
 
       {/* Ceiling fan (slow — it's winter) */}
@@ -354,24 +298,16 @@ export default function Room() {
         </mesh>
       </group>
 
-      {/* Bookshelf + poster on the right wall */}
-      <group position={[-ROOM.width / 2 + 0.35, 0, 7.2]}>
-        <mesh position={[0, 0.9, 0]} castShadow>
-          <boxGeometry args={[0.4, 1.8, 2.2]} />
-          <meshStandardMaterial color="#7c5a3a" roughness={0.85} />
+      {/* Bookshelf body + books merged per colour (was 22 meshes). */}
+      <mesh position={[-ROOM.width / 2 + 0.35, 0.9, 7.2]} castShadow>
+        <boxGeometry args={[0.4, 1.8, 2.2]} />
+        <meshStandardMaterial color="#7c5a3a" roughness={0.85} />
+      </mesh>
+      {merged.books.map((geometry, index) => (
+        <mesh key={BOOK_BIN_COLORS[index]} geometry={geometry}>
+          <meshStandardMaterial color={BOOK_BIN_COLORS[index]} roughness={0.85} />
         </mesh>
-        {[0.45, 0.95, 1.45].map((y) =>
-          Array.from({ length: 7 }).map((_, i) => (
-            <mesh key={`${y}-${i}`} position={[0.02, y, -0.9 + i * 0.28 + (i % 2) * 0.03]} castShadow>
-              <boxGeometry args={[0.26, 0.34, 0.07 + (i % 3) * 0.02]} />
-              <meshStandardMaterial
-                color={["#c2554a", "#3f7fb5", "#e0a33a", "#4a9070", "#8a5bb8"][i % 5]}
-                roughness={0.85}
-              />
-            </mesh>
-          )),
-        )}
-      </group>
+      ))}
 
       {/* Teacher's desk in front */}
       <group position={[-3.6, 0, -2.4]}>
@@ -385,15 +321,20 @@ export default function Room() {
         </mesh>
       </group>
 
-      {/* Student desks (the learner's own is at z ≈ 3.1 and stays empty) */}
-      {[2.1, 4.6, 6.9].map((z) =>
-        [-3.1, 0.15, 3.3].map((x) => {
-          // The learner's own desk is built by <DeskConsole>, so skip its slot.
-          const isSeat = Math.abs(x - 0.15) < 0.01 && Math.abs(z - 2.1) < 0.01;
-          if (isSeat) return null;
-          return <Desk key={`${x}-${z}`} position={[x, 0, z]} />;
-        }),
-      )}
+      {/* Student desks — 4 merged meshes (was 64). The learner's own desk is
+          built by <DeskConsole>, so its slot stays empty here too. */}
+      <mesh geometry={merged.deskTops} castShadow receiveShadow>
+        <meshStandardMaterial color="#b07f4e" roughness={0.62} />
+      </mesh>
+      <mesh geometry={merged.deskBodies}>
+        <meshStandardMaterial color="#8d6238" roughness={0.7} />
+      </mesh>
+      <mesh geometry={merged.deskLegs}>
+        <meshStandardMaterial color="#4a5162" roughness={0.5} metalness={0.5} />
+      </mesh>
+      <mesh geometry={merged.chairParts}>
+        <meshStandardMaterial color="#3d4658" roughness={0.8} />
+      </mesh>
 
       {/* Classmates */}
       {classmates.map((mate, i) => (
@@ -415,7 +356,8 @@ export default function Room() {
       </group>
       <Steam position={[0.8, 0.86, 1.9]} />
 
-      {/* Winter light rig */}
+      {/* Winter light rig — shadows bake once (see <BakeShadows>), so the
+          map below renders a single time instead of every frame. */}
       <ambientLight intensity={0.55} color="#cfe0f5" />
       <hemisphereLight args={["#dfeaff", "#4a3f34", 0.6]} />
       <directionalLight
@@ -423,9 +365,14 @@ export default function Room() {
         intensity={1.5}
         color="#cfe3ff"
         castShadow
-        shadow-mapSize={[1024, 1024]}
+        shadow-mapSize={[512, 512]}
       />
       <fog attach="fog" args={["#9fb3cc", 14, 34]} />
     </group>
   );
 }
+
+// The room is static between tier changes — memo keeps pinch-zoom and focus
+// renders (which re-run the parent every gesture tick) from reconciling the
+// whole scene graph for no reason. Tier props still flow through on change.
+export default memo(Room);

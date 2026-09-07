@@ -9,7 +9,7 @@
 //                progress, mark-complete, and the "turn my head" buttons.
 //   WallHeader → the shared header the notes / mind map walls wear.
 
-import { useRef, type ReactNode } from "react";
+import { memo, useRef, type ReactNode } from "react";
 import {
   BookOpen,
   CircleCheck,
@@ -37,7 +37,10 @@ import {
 
 /* ── Board ─────────────────────────────────────────────────────────────── */
 
-export function BoardPanel({
+// Memoized (Part 13): the room re-renders on every pinch tick and focus hop,
+// but the board chrome only depends on its own props — and the heavy viewer
+// subtree bails out on its stable `children` identity either way.
+export const BoardPanel = memo(function BoardPanel({
   title,
   subtitle,
   children,
@@ -179,7 +182,7 @@ export function BoardPanel({
       <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
     </div>
   );
-}
+});
 
 /* ── Desk console ──────────────────────────────────────────────────────── */
 
@@ -214,7 +217,10 @@ const FOCUS_ICON: Record<ClassroomFocus, typeof BookOpen> = {
   desk: BookOpen,
 };
 
-export function DeskPanel({
+// Memoized (Part 13): this is the biggest DOM reconcile in the room (two
+// scrollable lists), and pinch-zoom ticks must not rebuild it — none of its
+// props change while the board lean moves, so the whole subtree is skipped.
+export const DeskPanel = memo(function DeskPanel({
   modules,
   browseIndex,
   playingModuleIndex,
@@ -239,7 +245,13 @@ export function DeskPanel({
   const files = browsed?.files ?? [];
 
   return (
-    <div className="flex h-full w-full flex-col bg-gradient-to-b from-[#0b1024] to-[#070a14] px-5 py-4 text-white">
+    // `data-classroom-wall="desk"` is the hook WallVisibility uses to stop
+    // painting the tablet while the learner looks up (visibility only — the
+    // console never unmounts and its state is untouched).
+    <div
+      data-classroom-wall="desk"
+      className="flex h-full w-full flex-col bg-gradient-to-b from-[#0b1024] to-[#070a14] px-5 py-4 text-white"
+    >
       {/* Focus row — the head-turn buttons */}
       <div className="flex shrink-0 items-center gap-2">
         {FOCUS_PRESETS.map((preset) => {
@@ -427,11 +439,12 @@ export function DeskPanel({
       </div>
     </div>
   );
-}
+});
 
 /* ── A small header the wall panels share ──────────────────────────────── */
 
-export function WallHeader({
+// Memoized with the rest (Part 13): static chrome must not reconcile on ticks.
+export const WallHeader = memo(function WallHeader({
   icon: Icon,
   title,
   hint,
@@ -456,4 +469,4 @@ export function WallHeader({
       </div>
     </div>
   );
-}
+});

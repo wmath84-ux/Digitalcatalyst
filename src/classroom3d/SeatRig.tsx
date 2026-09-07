@@ -19,6 +19,11 @@
 // panel must NOT move the camera — the rig only listens to pointer events
 // that reach the canvas itself. Pinching the PICTURE still zooms the picture
 // (the viewer's own gesture); pinching the ROOM leans the seat closer.
+//
+// Part 13: a drag also drops the room to drag fidelity (a CSS class on the
+// canvas parent that sheds overlay effects, plus a dpr dip to 1×) and every
+// hot path is allocation-free — no React state, no per-event objects, no
+// per-frame property writes that never change.
 
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
@@ -68,6 +73,17 @@ export default function SeatRig({
   // Every pointer currently on the canvas, for the drag-vs-pinch split.
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ distance: number; zoom: number; applied: number } | null>(null);
+  // Live render resolution for the drag-dip (Part 13): a drag temporarily
+  // drops dpr to 1× and dragend restores the snapshot — unless the quality
+  // governor moved the resolution meanwhile, in which case its live decision
+  // wins. Read through refs so the once-attached listeners never go stale.
+  const liveDpr = useThree((state) => state.viewport.dpr);
+  const setDpr = useThree((state) => state.setDpr);
+  const dprRef = useRef(liveDpr);
+  dprRef.current = liveDpr;
+  const setDprRef = useRef(setDpr);
+  setDprRef.current = setDpr;
+  const dipDpr = useRef<number | null>(null);
 
   // A focus change re-aims the head. `recenterSignal` re-aims without a focus
   // change — Fit-to-screen recentres the board even when already on "board".
@@ -89,16 +105,28 @@ export default function SeatRig({
     const element = gl.domElement;
     const down = (event: PointerEvent) => {
       pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      if (pointers.current.size === 2) {
+      if (pointers.current.size === 1) {
+        // A drag starts: the DOM walls drop to drag fidelity (see the
+        // `.dc-dragging` rule in classroom3d.css) and the render resolution
+        // dips to 1×, so the frame rate holds while the view sweeps. Both
+        // restore on release; the dip only engages above 1× and dragend
+        // restores only what the dip itself set (never the governor's).
+        element.parentElement?.classList.add("dc-dragging");
+        if (dprRef.current > 1.01 && dipDpr.current === null) {
+          dipDpr.current = dprRef.current;
+          setDprRef.current(1);
+        }
+        dragging.current = true;
+        last.current = { x: event.clientX, y: event.clientY };
+      } else if (pointers.current.size === 2) {
         // The second fingertip turns the drag into a pinch: rotation stops
         // and the finger spread takes over as the zoom control.
         dragging.current = false;
-        const [first, second] = Array.from(pointers.current.values());
+        const values = pointers.current.values();
+        const first = values.next().value as { x: number; y: number };
+        const second = values.next().value as { x: number; y: number };
         const distance = Math.hypot(first.x - second.x, first.y - second.y);
         pinch.current = { distance, zoom: target.current.zoom, applied: target.current.zoom };
-      } else if (pointers.current.size < 2) {
-        dragging.current = true;
-        last.current = { x: event.clientX, y: event.clientY };
       }
       element.setPointerCapture?.(event.pointerId);
     };
@@ -110,7 +138,9 @@ export default function SeatRig({
         // board, exactly like the wheel. Anywhere else the gesture is a no-op
         // (the zoom state is left alone so nothing fires on the way back).
         if (focusRef.current === "board" && pinch.current && pinch.current.distance > 0) {
-          const [first, second] = Array.from(pointers.current.values());
+          const values = pointers.current.values();
+          const first = values.next().value as { x: number; y: number };
+          const second = values.next().value as { x: number; y: number };
           const distance = Math.hypot(first.x - second.x, first.y - second.y);
           // Same distance-ratio maths as the image viewer's pinch zoom.
           const next = clampBoardZoom((pinch.current.zoom * distance) / pinch.current.distance);
@@ -123,7 +153,10 @@ export default function SeatRig({
       if (!dragging.current) return;
       const dx = event.clientX - last.current.x;
       const dy = event.clientY - last.current.y;
-      last.current = { x: event.clientX, y: event.clientY };
+      // Mutated in place — a drag fires dozens of pointermoves per second
+      // and none of them should allocate.
+      last.current.x = event.clientX;
+      last.current.y = event.clientY;
       if (Math.abs(dx) + Math.abs(dy) > 1) onManualLook?.();
       target.current.yaw = clamp(target.current.yaw + dx * 0.0042, YAW_LIMIT.min, YAW_LIMIT.max);
       target.current.pitch = clamp(target.current.pitch - dy * 0.0032, PITCH_LIMIT.min, PITCH_LIMIT.max);
@@ -133,11 +166,20 @@ export default function SeatRig({
       pinch.current = null;
       if (pointers.current.size === 1) {
         // Back to one fingertip: the head turn resumes from where it is.
-        const [remaining] = Array.from(pointers.current.values());
-        last.current = { x: remaining.x, y: remaining.y };
+        const remaining = pointers.current.values().next().value as { x: number; y: number };
+        last.current.x = remaining.x;
+        last.current.y = remaining.y;
         dragging.current = true;
       } else if (pointers.current.size === 0) {
         dragging.current = false;
+        // The drag ends: drag fidelity off, and the dpr dip restored — but
+        // only if the quality governor hasn't moved the resolution meanwhile
+        // (its live decision always wins over this stale snapshot).
+        element.parentElement?.classList.remove("dc-dragging");
+        if (dipDpr.current !== null) {
+          if (dprRef.current <= 1.01) setDprRef.current(dipDpr.current);
+          dipDpr.current = null;
+        }
       }
       element.releasePointerCapture?.(event.pointerId);
     };
@@ -190,7 +232,8 @@ export default function SeatRig({
     const lean =
       (clamp(current.current.zoom, BOARD_ZOOM_MIN, BOARD_ZOOM_MAX) - BOARD_ZOOM_MIN) * BOARD_DOLLY_METRES;
     camera.position.set(SEAT.x, SEAT.y + Math.sin(t * 0.8) * 0.006, SEAT.z - lean);
-    camera.rotation.order = "YXZ";
+    // (rotation.order is "YXZ" once, in the lens effect below — nothing here
+    // ever changes it, so re-asserting it every frame was pure overhead.)
     camera.rotation.y = current.current.yaw + swayY;
     camera.rotation.x = current.current.pitch + swayX;
     camera.rotation.z = 0;

@@ -31,16 +31,27 @@
 // PDF, Docs/Sheets/Slides, forms, images, embeds, rich-text notes, the full
 // mind map editor, resume playback, mark-complete, paid/locked modules —
 // works from the chair, with zero duplicated logic.
+//
+// ── Part 13: the room runs like a real-time game ────────────────────────────
+// Same room, same features, a fraction of the per-frame work: merged static
+// geometry, consolidated lights, shadows baked once, an fps governor with
+// auto quality tiers, walls that sleep when unfaced or off-screen, and a
+// drag-fidelity mode while the head turns. See docs/part13-classroom-
+// performance.md for the full per-item account.
 
-import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Preload } from "@react-three/drei";
+import { AdaptiveDpr, AdaptiveEvents, BakeShadows, Preload } from "@react-three/drei";
 import { Network, NotebookPen } from "lucide-react";
 import type { CourseFile, CourseModule } from "../types/course";
 import Room from "./Room";
 import SeatRig from "./SeatRig";
 import SurfaceFrame from "./SurfaceFrame";
 import DeskConsole from "./DeskConsole";
+import QualityGovernor from "./QualityGovernor";
+import WallActivity from "./WallActivity";
+import WallVisibility from "./WallVisibility";
+import { computeInitialDpr, pickInitialTier, qualitySettings, type ClassroomQuality } from "./quality";
 import { BoardPanel, DeskPanel, WallHeader } from "./panels";
 import {
   BOARD_ZOOM_MIN,
@@ -53,6 +64,14 @@ import {
   type ClassroomFocus,
 } from "./state";
 import "./classroom3d.css";
+
+// Baked once, never per frame (Part 13): the room's shadow casters are
+// static (classmate sway is sub-texel at 512 px over 12 m), so a memo'd
+// <BakeShadows> renders its shadow map on mount and never again — focus hops
+// and pinch ticks re-render the room but must not re-bake the map.
+const BakedShadowsOnce = memo(function BakedShadowsOnce() {
+  return <BakeShadows />;
+});
 
 export interface Classroom3DProps {
   /** The course tree — the exact shape the flat Course Player consumes. */
@@ -125,6 +144,26 @@ export default function Classroom3D({
   const [boardFitSignal, setBoardFitSignal] = useState(0);
   // True while the board panel holds the browser fullscreen top layer.
   const [boardFullscreen, setBoardFullscreen] = useState(false);
+
+  // ── Adaptive quality (Part 13) ──────────────────────────────────────────
+  // The governor inside the Canvas samples real frame times and reports tier
+  // changes here; the room answers with snow/lights/spill while <AdaptiveDpr>
+  // answers with resolution. Renders are rare by design — only a tier edge
+  // re-renders, never a frame — and the tier persists for the session.
+  const [quality, setQuality] = useState<ClassroomQuality>(pickInitialTier);
+  const settings = useMemo(() => qualitySettings(quality), [quality]);
+  const initialDpr = useMemo(
+    () =>
+      computeInitialDpr(
+        typeof window === "undefined" ? 1280 : window.innerWidth,
+        typeof window === "undefined" ? 720 : window.innerHeight,
+        typeof window === "undefined" ? 1 : window.devicePixelRatio || 1,
+        quality,
+      ),
+    // Mount-only on purpose: runtime dpr belongs to the governor alone.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   // The Course Player is the ONE screen where the phone may rotate
   // (src/utils/appOrientation.ts unlocks it on mount), so the room has to
@@ -329,14 +368,30 @@ export default function Classroom3D({
     <div className="dc-classroom-root" data-course-classroom-3d>
       <Canvas
         shadows
-        dpr={[1, 1.75]}
+        // Mount-time resolution from the area-aware heuristic (quality.ts):
+        // huge viewports start lower than small phone screens. Runtime dpr
+        // is owned by <AdaptiveDpr> under the quality governor — never here.
+        dpr={initialDpr}
         gl={{ antialias: true, powerPreference: "high-performance" }}
         camera={{ fov: 62, position: [0.15, 1.24, 2.62] }}
       >
         <Suspense fallback={null}>
           <color attach="background" args={["#9fb3cc"]} />
-          <Room />
+          {/* Auto-graphics-settings: the governor samples fps and steps the
+              tier; AdaptiveDpr/AdaptiveEvents react through the fiber store
+              the governor writes (see QualityGovernor.tsx for why the bridge
+              is needed); shadows bake exactly once on mount. */}
+          <QualityGovernor onTier={setQuality} />
+          <AdaptiveDpr />
+          <AdaptiveEvents />
+          <BakedShadowsOnce />
+          <Room snow={settings.snow} lampLights={settings.lampLights} />
           <SeatRig focus={focus} zoom={boardZoom} recenterSignal={boardFitSignal} onZoomDelta={zoomBoardBy} />
+          {/* Off-screen walls stop painting (yaw/pitch gate — the DOM is
+              touched only on visibility edges). Mounted after SeatRig so it
+              reads the same frame's rotation; fullscreen forces all visible
+              so the top layer can never be gated by a stale head angle. */}
+          <WallVisibility forceVisible={boardFullscreen} />
 
           {/* ── FRONT: the blackboard the big screen is mounted on ────── */}
           <group position={[0, 0, -3.38]}>
@@ -362,6 +417,7 @@ export default function Classroom3D({
             pixelWidth={1600}
             accent="#38bdf8"
             active={focus === "board"}
+            spill={settings.spillLights === "all" || focus === "board"}
             label="Lecture board"
           >
             <BoardPanel
@@ -381,7 +437,13 @@ export default function Classroom3D({
               onToggleFullscreen={toggleBoardFullscreen}
               onToggleZoom={toggleBoardZoom}
             >
-              {board}
+              {/* Only the faced wall works (Part 13): the viewer keeps its
+                  mounted instance — playback position, drafts, listeners —
+                  but an unfaced board skips rendering and pauses its media.
+                  Fullscreen counts as faced: the learner is watching it. */}
+              <WallActivity wall="board" active={focus === "board" || boardFullscreen}>
+                {board}
+              </WallActivity>
             </BoardPanel>
           </SurfaceFrame>
 
@@ -394,6 +456,7 @@ export default function Classroom3D({
             pixelWidth={1100}
             accent="#f59e0b"
             active={focus === "notes"}
+            spill={settings.spillLights === "all" || focus === "notes"}
             label="Notes wall"
           >
             <div className="flex h-full w-full flex-col bg-[#0a0f1c] text-white">
@@ -417,7 +480,11 @@ export default function Classroom3D({
                   </span>
                 </div>
               )}
-              <div className="min-h-0 flex-1 overflow-hidden">{notes}</div>
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <WallActivity wall="notes" active={focus === "notes"}>
+                  {notes}
+                </WallActivity>
+              </div>
             </div>
           </SurfaceFrame>
 
@@ -430,6 +497,7 @@ export default function Classroom3D({
             pixelWidth={1240}
             accent="#a78bfa"
             active={focus === "mind"}
+            spill={settings.spillLights === "all" || focus === "mind"}
             label="Mind map wall"
           >
             <div className="flex h-full w-full flex-col bg-[#0a0f1c] text-white">
@@ -439,12 +507,18 @@ export default function Classroom3D({
                 hint={`${mapCount} map${mapCount === 1 ? "" : "s"} · ${flat[position.moduleIndex]?.title || courseTitle}`}
                 accent="#c4b5fd"
               />
-              <div className="min-h-0 flex-1 overflow-hidden">{mind}</div>
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <WallActivity wall="mind" active={focus === "mind"}>
+                  {mind}
+                </WallActivity>
+              </div>
             </div>
           </SurfaceFrame>
 
           {/* ── DOWN: the desk console ───────────────────────────────── */}
-          <DeskConsole>
+          {/* Desk spill follows the tier outright (off on low): the console is
+              legible from its emissive face alone. */}
+          <DeskConsole spill={settings.spillLights === "all"}>
             <DeskPanel
               modules={flat}
               browseIndex={browseIndex}
