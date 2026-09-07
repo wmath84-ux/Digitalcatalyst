@@ -42,7 +42,16 @@ import SeatRig from "./SeatRig";
 import SurfaceFrame from "./SurfaceFrame";
 import DeskConsole from "./DeskConsole";
 import { BoardPanel, DeskPanel, WallHeader } from "./panels";
-import { FOCUS_PRESETS, flattenModules, type ClassroomFocus } from "./state";
+import {
+  BOARD_ZOOM_MIN,
+  BOARD_ZOOM_PORTRAIT_FIT,
+  BOARD_ZOOM_STEP,
+  BOARD_ZOOM_TOGGLE,
+  FOCUS_PRESETS,
+  clampBoardZoom,
+  flattenModules,
+  type ClassroomFocus,
+} from "./state";
 import "./classroom3d.css";
 
 export interface Classroom3DProps {
@@ -104,6 +113,18 @@ export default function Classroom3D({
   exitLabel = "Flat player",
 }: Classroom3DProps) {
   const [focus, setFocus] = useState<ClassroomFocus>("board");
+
+  // ── Board lean + fullscreen (Part 12) ───────────────────────────────────
+  // `boardZoom` is the camera's lean toward the board: 1 = the seat's normal
+  // position, BOARD_ZOOM_MAX = the closest lean. SeatRig turns it into a
+  // clamped forward dolly on the same spring as the head turn, and glides it
+  // back to 1 whenever the learner looks at another wall.
+  const [boardZoom, setBoardZoom] = useState(BOARD_ZOOM_MIN);
+  // Bumped by Fit / double-tap so SeatRig re-aims at the board even when the
+  // focus never changed ("board" → "board" can't re-fire the focus effect).
+  const [boardFitSignal, setBoardFitSignal] = useState(0);
+  // True while the board panel holds the browser fullscreen top layer.
+  const [boardFullscreen, setBoardFullscreen] = useState(false);
 
   // The Course Player is the ONE screen where the phone may rotate
   // (src/utils/appOrientation.ts unlocks it on mount), so the room has to
@@ -215,7 +236,69 @@ export default function Classroom3D({
     [flat, position, openFile],
   );
 
-  // Keyboard: 1-4 turn the head, ←/→ step lessons, Esc drops back to the desk.
+  /** Nudge the board lean; clamped so the camera never leaves the seat backwards nor reaches the board. */
+  const zoomBoardBy = useCallback((delta: number) => {
+    setBoardZoom((current) => clampBoardZoom(Number((current + delta).toFixed(3))));
+  }, []);
+
+  /**
+   * Fit-to-screen: the lean back to normal — a touch closer in portrait,
+   * where SeatRig's widened lens shrinks the board — and the head back to
+   * the board's exact centre. Reuses the room's `portrait` flag, like the
+   * hint line below.
+   */
+  const fitBoard = useCallback(() => {
+    setBoardZoom(portrait ? BOARD_ZOOM_PORTRAIT_FIT : BOARD_ZOOM_MIN);
+    setFocus("board");
+    setBoardFitSignal((value) => value + 1);
+  }, [portrait]);
+
+  /** Double-tap / double-click the board: face it, centre it, toggle a close-up. */
+  const toggleBoardZoom = useCallback(() => {
+    setFocus("board");
+    setBoardFitSignal((value) => value + 1);
+    setBoardZoom((current) =>
+      current > (BOARD_ZOOM_MIN + BOARD_ZOOM_TOGGLE) / 2
+        ? portrait
+          ? BOARD_ZOOM_PORTRAIT_FIT
+          : BOARD_ZOOM_MIN
+        : BOARD_ZOOM_TOGGLE,
+    );
+  }, [portrait]);
+
+  /**
+   * Board fullscreen WITHOUT leaving the room: the exact mechanism
+   * ResourceViewer already uses (requestFullscreen / exitFullscreen), aimed
+   * at the board panel instead of the viewer. The SAME viewer instance is
+   * shown in the browser's top layer — no unmount, no iframe reload, no lost
+   * playback — with the 3D canvas still alive underneath. Focus, yaw, pitch
+   * and zoom are untouched, so exiting returns to exactly where the learner
+   * was.
+   */
+  const toggleBoardFullscreen = useCallback(() => {
+    const root = document.querySelector("[data-classroom-board-panel]");
+    if (!root) return;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void (root as HTMLElement).requestFullscreen?.();
+  }, []);
+
+  // Keep the Fullscreen / Exit label and the Esc priority in lock-step with
+  // the real top layer (covers native Esc, the Android swipe-down exit and
+  // the YouTube player's OWN fullscreen button — which must NOT flip our
+  // state, so only a fullscreen element inside the board panel counts).
+  useEffect(() => {
+    const sync = () => {
+      const active = document.fullscreenElement;
+      const panel = document.querySelector("[data-classroom-board-panel]");
+      setBoardFullscreen(Boolean(active && panel && (active === panel || panel.contains(active))));
+    };
+    sync();
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
+  // Keyboard: 1-4 turn the head, ←/→ step lessons, +/−/0 lean toward the
+  // board, Esc exits board-fullscreen first and only otherwise drops to the desk.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -226,11 +309,21 @@ export default function Classroom3D({
       if (map[event.key]) setFocus(map[event.key]);
       else if (event.key === "ArrowRight") step(1);
       else if (event.key === "ArrowLeft") step(-1);
-      else if (event.key === "Escape") setFocus("desk");
+      else if (event.key === "Escape") {
+        // Board-fullscreen wins over the room: Esc gives the board back
+        // first. The browser also exits native fullscreen on Esc by itself,
+        // so the LIVE top layer is read here — a lagging state sync must
+        // neither re-request fullscreen nor yank the head to the desk.
+        if (document.fullscreenElement) void document.exitFullscreen();
+        else if (boardFullscreen) setBoardFullscreen(false);
+        else setFocus("desk");
+      } else if (focus === "board" && (event.key === "+" || event.key === "=")) zoomBoardBy(BOARD_ZOOM_STEP);
+      else if (focus === "board" && (event.key === "-" || event.key === "_")) zoomBoardBy(-BOARD_ZOOM_STEP);
+      else if (focus === "board" && event.key === "0") fitBoard();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [step]);
+  }, [step, focus, boardFullscreen, zoomBoardBy, fitBoard]);
 
   return (
     <div className="dc-classroom-root" data-course-classroom-3d>
@@ -243,7 +336,7 @@ export default function Classroom3D({
         <Suspense fallback={null}>
           <color attach="background" args={["#9fb3cc"]} />
           <Room />
-          <SeatRig focus={focus} />
+          <SeatRig focus={focus} zoom={boardZoom} recenterSignal={boardFitSignal} onZoomDelta={zoomBoardBy} />
 
           {/* ── FRONT: the blackboard the big screen is mounted on ────── */}
           <group position={[0, 0, -3.38]}>
@@ -274,6 +367,19 @@ export default function Classroom3D({
             <BoardPanel
               title={activeFileName}
               subtitle={flat[position.moduleIndex]?.title || courseTitle}
+              zoom={boardZoom}
+              boardFullscreen={boardFullscreen}
+              onZoomIn={() => {
+                setFocus("board");
+                zoomBoardBy(BOARD_ZOOM_STEP);
+              }}
+              onZoomOut={() => {
+                setFocus("board");
+                zoomBoardBy(-BOARD_ZOOM_STEP);
+              }}
+              onFit={fitBoard}
+              onToggleFullscreen={toggleBoardFullscreen}
+              onToggleZoom={toggleBoardZoom}
             >
               {board}
             </BoardPanel>
@@ -384,8 +490,8 @@ export default function Classroom3D({
       </div>
       <p className="dc-classroom-hint">
         {portrait
-          ? "Drag to turn your head · rotate the phone for the full board"
-          : "Drag the room to turn your head · keys 1–4 jump to a surface · ← → change lesson"}
+          ? "Drag to turn · double-tap the board to lean in · rotate for the full board"
+          : "Drag to turn · 1–4 jump to a surface · ← → change lesson · scroll to lean in · double-click the board to zoom"}
       </p>
     </div>
   );

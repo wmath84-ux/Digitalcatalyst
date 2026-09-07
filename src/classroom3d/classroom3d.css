@@ -160,3 +160,97 @@
     font-size: 10.5px;
   }
 }
+
+/* ── Board wall controls (Part 12) ─────────────────────────────────────────
+   The + / − / fit / fullscreen cluster riding the board's title bar. Same
+   pill-and-glass language as the floating HUD chips above, tinted sky to
+   match the board wall's accent (#38bdf8). */
+
+.dc-classroom-board-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(9, 12, 24, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.dc-classroom-board-btn {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+.dc-classroom-board-btn:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+}
+.dc-classroom-board-btn:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+.dc-classroom-board-btn[data-active="true"] {
+  color: #e0f2fe;
+  background: rgba(56, 189, 248, 0.28);
+  border-color: rgba(56, 189, 248, 0.6);
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.45);
+}
+
+/* The zoom percentage pops gently on every change (the label is re-keyed by
+   zoom level in BoardPanel, so the animation re-fires without any JS). */
+.dc-classroom-board-pct {
+  display: inline-block;
+  min-width: 46px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.78);
+  animation: dc-classroom-pct-pop 240ms ease;
+}
+@keyframes dc-classroom-pct-pop {
+  0% {
+    transform: scale(1.3);
+    color: #7dd3fc;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-classroom-board-pct {
+    animation: none;
+  }
+}
+
+/* ── Board fullscreen ──────────────────────────────────────────────────────
+   The board panel is shown with the Fullscreen API (the same mechanism as
+   the flat player's viewer), so the browser paints it in the top layer —
+   above the 3D canvas, free of the wall's 3D transform — while the SAME
+   viewer instance stays mounted. Viewport units (not %) size it: inside the
+   wall the panel is a percentage of a fixed-pixel Html box, but in the top
+   layer it must be the viewport itself. */
+
+[data-classroom-board-panel]:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  border-radius: 0;
+  background: #060910;
+  box-shadow: 0 0 90px rgba(56, 189, 248, 0.28);
+}
+[data-classroom-board-panel]::backdrop {
+  background: #000;
+}

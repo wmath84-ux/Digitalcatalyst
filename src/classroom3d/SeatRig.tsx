@@ -3,53 +3,123 @@
 // The seated camera. The learner NEVER walks in this classroom — the whole
 // experience is "sit at your desk and turn your head", exactly as the owner
 // specified. So there is no orbit control and no WASD: the camera is pinned
-// to the seat and only its yaw / pitch move, clamped to a human head-turn.
+// to the seat and only its yaw / pitch move, clamped to a human head-turn —
+// plus, since Part 12, a lean toward the board (a clamped forward dolly that
+// can neither leave the seat backwards nor reach the board).
 //
-// Three ways to turn:
+// Three ways to turn, three ways to lean:
 //   · drag anywhere on the empty room (pointer / touch),
 //   · tap a focus chip in the HUD (springs to that surface),
-//   · the desk console buttons (same springs).
+//   · the desk console buttons (same springs);
+//   · lean: the wheel over the empty room while facing the board, a two-finger
+//     pinch on the room, or a double-tap / double-click on the board itself
+//     (that last one lives on the BoardPanel, next to the + / − / fit keys).
 //
-// Because every panel is live DOM welded to a slab, drags that start ON a
-// panel must NOT rotate the room — the rig only listens to pointer events
-// that reach the canvas itself.
+// Because every panel is live DOM welded to a slab, gestures that start ON a
+// panel must NOT move the camera — the rig only listens to pointer events
+// that reach the canvas itself. Pinching the PICTURE still zooms the picture
+// (the viewer's own gesture); pinching the ROOM leans the seat closer.
 
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { PITCH_LIMIT, SEAT, YAW_LIMIT, focusPreset, type ClassroomFocus } from "./state";
+import {
+  BOARD_DOLLY_METRES,
+  BOARD_ZOOM_MAX,
+  BOARD_ZOOM_MIN,
+  PITCH_LIMIT,
+  SEAT,
+  YAW_LIMIT,
+  clampBoardZoom,
+  focusPreset,
+  type ClassroomFocus,
+} from "./state";
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 export default function SeatRig({
   focus,
+  zoom = BOARD_ZOOM_MIN,
+  recenterSignal = 0,
+  onZoomDelta,
   onManualLook,
 }: {
   focus: ClassroomFocus;
+  /** The room's board lean. Only honoured while facing the board. */
+  zoom?: number;
+  /** Bump to re-aim at the current focus without changing it (Fit-to-screen). */
+  recenterSignal?: number;
+  /** Wheel / pinch on the empty room report a zoom delta; the room owns the clamped state. */
+  onZoomDelta?: (delta: number) => void;
   /** Fired when the learner turns the head by hand, so the HUD can un-pin. */
   onManualLook?: () => void;
 }) {
   const { camera, gl, size } = useThree();
-  const target = useRef({ yaw: 0, pitch: 0 });
-  const current = useRef({ yaw: 0, pitch: 0 });
+  const target = useRef({ yaw: 0, pitch: 0, zoom: BOARD_ZOOM_MIN });
+  const current = useRef({ yaw: 0, pitch: 0, zoom: BOARD_ZOOM_MIN });
   const dragging = useRef(false);
   const last = useRef({ x: 0, y: 0 });
+  // The canvas listeners below are attached once — they read the live room
+  // state through refs so they never go stale between renders.
+  const focusRef = useRef(focus);
+  focusRef.current = focus;
+  const onZoomDeltaRef = useRef(onZoomDelta);
+  onZoomDeltaRef.current = onZoomDelta;
+  // Every pointer currently on the canvas, for the drag-vs-pinch split.
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ distance: number; zoom: number; applied: number } | null>(null);
 
-  // A focus change re-aims the head.
+  // A focus change re-aims the head. `recenterSignal` re-aims without a focus
+  // change — Fit-to-screen recentres the board even when already on "board".
   useEffect(() => {
     const preset = focusPreset(focus);
-    target.current = { yaw: preset.yaw, pitch: preset.pitch };
-  }, [focus]);
+    target.current.yaw = preset.yaw;
+    target.current.pitch = preset.pitch;
+  }, [focus, recenterSignal]);
 
-  // Manual head turn — canvas-only pointer drags.
+  // The board lean follows the room's zoom state — and glides back to the
+  // seat's normal position the moment the learner looks at another wall. The
+  // spring below makes the return a lean-back, never a jump-cut.
+  useEffect(() => {
+    target.current.zoom = focus === "board" ? clampBoardZoom(zoom) : BOARD_ZOOM_MIN;
+  }, [focus, zoom]);
+
+  // Manual head turn + pinch-to-lean — canvas-only pointer drags.
   useEffect(() => {
     const element = gl.domElement;
     const down = (event: PointerEvent) => {
-      dragging.current = true;
-      last.current = { x: event.clientX, y: event.clientY };
+      pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.current.size === 2) {
+        // The second fingertip turns the drag into a pinch: rotation stops
+        // and the finger spread takes over as the zoom control.
+        dragging.current = false;
+        const [first, second] = Array.from(pointers.current.values());
+        const distance = Math.hypot(first.x - second.x, first.y - second.y);
+        pinch.current = { distance, zoom: target.current.zoom, applied: target.current.zoom };
+      } else if (pointers.current.size < 2) {
+        dragging.current = true;
+        last.current = { x: event.clientX, y: event.clientY };
+      }
       element.setPointerCapture?.(event.pointerId);
     };
     const move = (event: PointerEvent) => {
+      if (!pointers.current.has(event.pointerId)) return;
+      pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.current.size >= 2) {
+        // Two fingers on the room lean the seat — but only while facing the
+        // board, exactly like the wheel. Anywhere else the gesture is a no-op
+        // (the zoom state is left alone so nothing fires on the way back).
+        if (focusRef.current === "board" && pinch.current && pinch.current.distance > 0) {
+          const [first, second] = Array.from(pointers.current.values());
+          const distance = Math.hypot(first.x - second.x, first.y - second.y);
+          // Same distance-ratio maths as the image viewer's pinch zoom.
+          const next = clampBoardZoom((pinch.current.zoom * distance) / pinch.current.distance);
+          const delta = next - pinch.current.applied;
+          pinch.current.applied = next;
+          if (delta !== 0) onZoomDeltaRef.current?.(delta);
+        }
+        return;
+      }
       if (!dragging.current) return;
       const dx = event.clientX - last.current.x;
       const dy = event.clientY - last.current.y;
@@ -59,7 +129,16 @@ export default function SeatRig({
       target.current.pitch = clamp(target.current.pitch - dy * 0.0032, PITCH_LIMIT.min, PITCH_LIMIT.max);
     };
     const up = (event: PointerEvent) => {
-      dragging.current = false;
+      pointers.current.delete(event.pointerId);
+      pinch.current = null;
+      if (pointers.current.size === 1) {
+        // Back to one fingertip: the head turn resumes from where it is.
+        const [remaining] = Array.from(pointers.current.values());
+        last.current = { x: remaining.x, y: remaining.y };
+        dragging.current = true;
+      } else if (pointers.current.size === 0) {
+        dragging.current = false;
+      }
       element.releasePointerCapture?.(event.pointerId);
     };
     element.addEventListener("pointerdown", down);
@@ -76,19 +155,41 @@ export default function SeatRig({
     };
   }, [gl, onManualLook]);
 
+  // Wheel over the empty room leans toward the board — board only, so a wheel
+  // anywhere else never arms a surprise zoom for the way back. A native
+  // listener (not React onWheel) so preventDefault actually holds and the
+  // page never scrolls or zooms under the room.
+  useEffect(() => {
+    const element = gl.domElement;
+    const onWheel = (event: WheelEvent) => {
+      if (focusRef.current !== "board") return;
+      event.preventDefault();
+      // Same notch as the image viewer's wheel zoom.
+      onZoomDeltaRef.current?.(event.deltaY < 0 ? 0.2 : -0.2);
+    };
+    element.addEventListener("wheel", onWheel, { passive: false });
+    return () => element.removeEventListener("wheel", onWheel);
+  }, [gl]);
+
   useFrame((state, delta) => {
     // Critically-damped-ish spring so a focus jump feels like a head turn,
-    // not a cut.
+    // not a cut — the lean rides the very same spring.
     const k = 1 - Math.pow(0.0016, delta);
     current.current.yaw += (target.current.yaw - current.current.yaw) * k;
     current.current.pitch += (target.current.pitch - current.current.pitch) * k;
+    current.current.zoom += (target.current.zoom - current.current.zoom) * k;
 
     // A seated body breathes — a whisper of sway keeps the room alive.
     const t = state.clock.elapsedTime;
     const swayY = Math.sin(t * 0.55) * 0.0045;
     const swayX = Math.sin(t * 0.37 + 1.2) * 0.0035;
 
-    camera.position.set(SEAT.x, SEAT.y + Math.sin(t * 0.8) * 0.006, SEAT.z);
+    // The lean is a forward dolly from the seat: at BOARD_ZOOM_MIN the camera
+    // sits exactly where it always has, and at BOARD_ZOOM_MAX it has glided
+    // 3.6 m toward the board — still 2.2 m of air short of the chalk rail.
+    const lean =
+      (clamp(current.current.zoom, BOARD_ZOOM_MIN, BOARD_ZOOM_MAX) - BOARD_ZOOM_MIN) * BOARD_DOLLY_METRES;
+    camera.position.set(SEAT.x, SEAT.y + Math.sin(t * 0.8) * 0.006, SEAT.z - lean);
     camera.rotation.order = "YXZ";
     camera.rotation.y = current.current.yaw + swayY;
     camera.rotation.x = current.current.pitch + swayX;

@@ -9,19 +9,31 @@
 //                progress, mark-complete, and the "turn my head" buttons.
 //   WallHeader → the shared header the notes / mind map walls wear.
 
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import {
   BookOpen,
   CircleCheck,
+  Expand,
   LockKeyhole,
+  Maximize,
   Network,
   NotebookPen,
   Presentation,
   ShoppingBag,
+  Shrink,
   SkipBack,
   SkipForward,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
-import { FILE_KIND_LABEL, FOCUS_PRESETS, type ClassroomFocus, type FlatModule } from "./state";
+import {
+  BOARD_ZOOM_MAX,
+  BOARD_ZOOM_MIN,
+  FILE_KIND_LABEL,
+  FOCUS_PRESETS,
+  type ClassroomFocus,
+  type FlatModule,
+} from "./state";
 
 /* ── Board ─────────────────────────────────────────────────────────────── */
 
@@ -29,21 +41,140 @@ export function BoardPanel({
   title,
   subtitle,
   children,
+  zoom = BOARD_ZOOM_MIN,
+  boardFullscreen = false,
+  onZoomIn,
+  onZoomOut,
+  onFit,
+  onToggleFullscreen,
+  onToggleZoom,
 }: {
   title: string;
   subtitle: string;
   children: ReactNode;
+  /** The room's board lean — shown as a percentage next to the + / − keys. */
+  zoom?: number;
+  /** True while this panel holds the browser fullscreen top layer. */
+  boardFullscreen?: boolean;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onFit?: () => void;
+  onToggleFullscreen?: () => void;
+  /** Double-tap / double-click on the board chrome toggles the close-up. */
+  onToggleZoom?: () => void;
 }) {
+  // Double-TAP detection for touch (mobile browsers don't reliably fire
+  // `dblclick`): two pointer-ups within 350 ms and 48 px.
+  const tap = useRef({ time: 0, x: 0, y: 0 });
+  // A touch toggle's trailing synthetic `dblclick` must not toggle straight back.
+  const touchToggledAt = useRef(0);
+  const showControls = Boolean(onZoomIn || onZoomOut || onFit || onToggleFullscreen);
+  const zoomedOut = zoom <= BOARD_ZOOM_MIN + 1e-6;
+  const zoomedIn = zoom >= BOARD_ZOOM_MAX - 1e-6;
+  // A gesture that starts inside the lesson viewer belongs to the viewer:
+  // double-clicking a diagram zooms the DIAGRAM (flat-mode behaviour) — it
+  // must never also lean the camera.
+  const insideViewer = (target: EventTarget | null) =>
+    Boolean(
+      target &&
+        typeof (target as HTMLElement).closest === "function" &&
+        (target as HTMLElement).closest("[data-course-viewer]"),
+    );
+
   return (
-    <div className="flex h-full w-full flex-col bg-[#060910] text-white">
+    <div
+      className="flex h-full w-full flex-col bg-[#060910] text-white"
+      data-classroom-board-panel
+      data-board-fullscreen={boardFullscreen ? "true" : "false"}
+      onDoubleClick={(event) => {
+        if (!onToggleZoom || insideViewer(event.target)) return;
+        if (Date.now() - touchToggledAt.current < 600) return;
+        onToggleZoom();
+      }}
+      onPointerUp={(event) => {
+        if (!onToggleZoom || event.pointerType === "mouse" || insideViewer(event.target)) return;
+        const now = Date.now();
+        const travelled = Math.hypot(event.clientX - tap.current.x, event.clientY - tap.current.y);
+        if (now - tap.current.time < 350 && travelled < 48) {
+          touchToggledAt.current = now;
+          tap.current.time = 0;
+          onToggleZoom();
+        } else {
+          tap.current = { time: now, x: event.clientX, y: event.clientY };
+        }
+      }}
+    >
       <div className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-[#0d1424] px-5 py-3">
         <Presentation size={18} className="text-[#7dd3fc]" />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-black tracking-wide text-white/90">
             {title || "Choose a lesson from your desk"}
           </p>
           <p className="truncate text-[11px] font-semibold text-white/45">{subtitle}</p>
         </div>
+        {showControls && (
+          <div
+            className="dc-classroom-board-controls"
+            data-classroom-board-controls
+            // Tapping the keys themselves is not a board double-tap.
+            onDoubleClick={(event) => event.stopPropagation()}
+            onPointerUp={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={onZoomOut}
+              disabled={!onZoomOut || zoomedOut}
+              className="dc-classroom-board-btn"
+              data-classroom-board-zoom-out
+              aria-label="Zoom out"
+              title="Lean back"
+            >
+              <ZoomOut size={14} />
+            </button>
+            <span
+              key={Math.round(zoom * 100)}
+              className="dc-classroom-board-pct"
+              data-classroom-board-zoom-pct
+              aria-live="polite"
+            >
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              type="button"
+              onClick={onZoomIn}
+              disabled={!onZoomIn || zoomedIn}
+              className="dc-classroom-board-btn"
+              data-classroom-board-zoom-in
+              aria-label="Zoom in"
+              title="Lean closer"
+            >
+              <ZoomIn size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={onFit}
+              disabled={!onFit}
+              className="dc-classroom-board-btn"
+              data-classroom-board-zoom-fit
+              aria-label="Fit to screen"
+              title="Fit to screen"
+            >
+              <Maximize size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={onToggleFullscreen}
+              disabled={!onToggleFullscreen}
+              className="dc-classroom-board-btn"
+              data-classroom-board-fullscreen
+              data-active={boardFullscreen ? "true" : "false"}
+              aria-label={boardFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              title={boardFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            >
+              {boardFullscreen ? <Shrink size={14} /> : <Expand size={14} />}
+            </button>
+          </div>
+        )}
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
     </div>
