@@ -25,9 +25,27 @@
    focus and their own pointer gestures must never rotate the room. */
 .dc-classroom-surface {
   pointer-events: auto;
-  touch-action: auto;
+  /* The room root is `touch-action: none` (a head-turn drag must never scroll
+     or zoom the page), and touch-action is intersected down the ancestor
+     chain — so native touch panning is unavailable inside these panels no
+     matter what is declared here. Rather than pretend otherwise, the room
+     scrolls its own panels with pointer events (src/classroom3d/
+     surfaceScroll.ts): press and drag anywhere on a panel and the nearest
+     scroller follows the finger, with a fling on release. `none` is declared
+     explicitly so the browser never ALSO tries to pan a panel and double the
+     travel. */
+  touch-action: none;
   overflow: visible !important;
   -webkit-font-smoothing: antialiased;
+}
+
+/* While a panel is being drag-scrolled, kill text selection and the caret so
+   the gesture reads as scrolling rather than selecting. */
+.dc-surface-dragging,
+.dc-surface-dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  cursor: grabbing !important;
 }
 .dc-classroom-surface [data-classroom-surface-panel] {
   height: 100%;
@@ -136,6 +154,12 @@
 .dc-classroom-control-btn:disabled {
   opacity: 0.38;
   cursor: default;
+}
+.dc-classroom-control-btn[data-active="true"] {
+  color: #ede9fe;
+  background: rgba(139, 92, 246, 0.3);
+  border-color: rgba(167, 139, 250, 0.6);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
 }
 .dc-classroom-control-btn[data-done="true"] {
   color: #a7f3d0;
@@ -313,6 +337,15 @@
   box-shadow: 0 0 18px rgba(56, 189, 248, 0.45);
 }
 
+/* A hairline between the scroll keys and the zoom keys — two different jobs
+   in one cluster. */
+.dc-classroom-board-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 1px;
+}
+
 /* The zoom percentage pops gently on every change (the label is re-keyed by
    zoom level in BoardPanel, so the animation re-fires without any JS). */
 .dc-classroom-board-pct {
@@ -429,4 +462,274 @@
 
 [data-classroom-wall] {
   contain-intrinsic-size: 1280px 800px;
+}
+
+
+/* ── The floating in-room library (RoomSheet.tsx) ──────────────────────────
+   Summoned by the Modules / Notes / Maps keys on the right. It is a CHOOSER:
+   it floats over the room, it is scrolled with a thumb, and picking anything
+   closes it and sends the content to the wall that owns it. The room stays
+   lit behind it — this is a panel inside the classroom, not a page on top of
+   the app. */
+
+.dc-room-sheet-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.dc-room-sheet-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  cursor: default;
+  pointer-events: auto;
+  background: radial-gradient(120% 80% at 50% 45%, rgba(4, 6, 14, 0.32), rgba(4, 6, 14, 0.62));
+  animation: dc-room-sheet-fade 200ms ease;
+}
+
+.dc-room-sheet {
+  position: relative;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 94vw);
+  max-height: min(560px, 82vh);
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(15, 19, 36, 0.94), rgba(8, 11, 22, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 40px 90px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 0 60px -18px var(--dc-sheet-accent, #8b5cf6);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  overflow: hidden;
+  animation: dc-room-sheet-rise 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes dc-room-sheet-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes dc-room-sheet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-room-sheet,
+  .dc-room-sheet-scrim {
+    animation: none;
+  }
+}
+
+.dc-room-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px 12px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  background: linear-gradient(90deg, var(--dc-sheet-accent-wash, rgba(139, 92, 246, 0.16)), transparent);
+}
+
+.dc-room-sheet-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 0.01em;
+}
+
+.dc-room-sheet-hint {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.dc-room-sheet-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  color: #fff;
+  background: var(--dc-sheet-accent-fill, rgba(139, 92, 246, 0.3));
+  border: 1px solid var(--dc-sheet-accent-line, rgba(139, 92, 246, 0.55));
+  cursor: pointer;
+}
+
+.dc-room-sheet-close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+}
+.dc-room-sheet-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.dc-room-sheet-body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px;
+}
+
+.dc-room-sheet-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dc-room-sheet-sublist {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 8px;
+  padding: 0 0 0 12px;
+  list-style: none;
+  border-left: 1px dashed rgba(255, 255, 255, 0.14);
+}
+
+.dc-room-sheet-row,
+.dc-room-sheet-lesson {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.dc-room-sheet-row:hover,
+.dc-room-sheet-lesson:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.dc-room-sheet-row[data-expanded="true"],
+.dc-room-sheet-row[data-active="true"],
+.dc-room-sheet-lesson[data-active="true"] {
+  background: var(--dc-sheet-accent-wash, rgba(139, 92, 246, 0.16));
+  border-color: var(--dc-sheet-accent-line, rgba(139, 92, 246, 0.55));
+}
+
+.dc-room-sheet-row-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 10px;
+  color: var(--dc-sheet-accent, #8b5cf6);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dc-room-sheet-lesson-index {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.dc-room-sheet-row-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.94);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dc-room-sheet-row-sub {
+  display: block;
+  margin-top: 1px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dc-room-sheet-goto {
+  flex: none;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dc-sheet-accent, #8b5cf6);
+  background: var(--dc-sheet-accent-wash, rgba(139, 92, 246, 0.16));
+  border: 1px solid var(--dc-sheet-accent-line, rgba(139, 92, 246, 0.55));
+}
+
+.dc-room-sheet-playing {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 999px;
+  background: #a78bfa;
+  box-shadow: 0 0 9px #a78bfa;
+}
+
+.dc-room-sheet-empty {
+  margin: 0;
+  padding: 26px 18px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+@media (max-width: 640px) {
+  .dc-room-sheet {
+    width: 94vw;
+    max-height: 72vh;
+    border-radius: 22px;
+  }
+  .dc-room-sheet-head {
+    padding: 12px 12px 10px 15px;
+  }
+  .dc-room-sheet-title {
+    font-size: 14px;
+  }
 }

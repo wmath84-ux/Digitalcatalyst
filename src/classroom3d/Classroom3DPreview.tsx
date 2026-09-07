@@ -37,6 +37,7 @@ export default function Classroom3DPreview() {
   const [notes, setNotes] = useState<CoursePlayerNote[]>([]);
   const [mind, setMind] = useState<MindMap>(demoMind);
   const [composerSignal, setComposerSignal] = useState(0);
+  const [noteRequest, setNoteRequest] = useState<{ id: string; signal: number }>({ id: "", signal: 0 });
   const [done, setDone] = useState<Set<string>>(() => new Set());
 
   const plain = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -88,6 +89,8 @@ export default function Classroom3DPreview() {
           onEdit={editNote}
           onDelete={deleteNote}
           composerOpenSignal={composerSignal}
+          openNoteSignal={noteRequest.signal}
+          openNoteId={noteRequest.id}
         />
       }
       mind={
@@ -118,6 +121,19 @@ export default function Classroom3DPreview() {
       noteCount={notes.length}
       mapCount={maps.length}
       onComposeNote={() => setComposerSignal((value) => value + 1)}
+      // The floating libraries, same contract as the real player.
+      noteItems={notes.map((note) => ({
+        id: note.id,
+        title: (note.text.split("\n")[0] || "Untitled note").slice(0, 90),
+        preview: note.text.slice(0, 120),
+      }))}
+      onOpenNote={(id) => setNoteRequest((current) => ({ id, signal: current.signal + 1 }))}
+      mapItems={maps.map((map) => ({
+        mapKey: map.mapKey,
+        title: map.title || map.rootTopic || "Untitled map",
+        nodeCount: map.nodeCount,
+      }))}
+      activeMapKey="main"
       onExit={() => {
         window.location.hash = "#/home";
       }}

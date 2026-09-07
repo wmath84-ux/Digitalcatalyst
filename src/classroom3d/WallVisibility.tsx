@@ -19,8 +19,9 @@
 // horizontal angle steady across orientations); vertical half-FOV is read
 // live from the camera because portrait widens it dramatically.
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import { resetWallOnScreen, setWallOnScreen } from "./wallFocus";
 
 interface WallSpec {
   wall: "board" | "notes" | "mind";
@@ -47,6 +48,9 @@ const DESK_PITCH = -0.63;
 
 export default function WallVisibility({ forceVisible = false }: { forceVisible?: boolean }) {
   const { camera } = useThree();
+  // The store outlives this component (module scope), so a room that unmounts
+  // must hand the next one a clean map instead of last session's angles.
+  useEffect(() => resetWallOnScreen, []);
   const forceRef = useRef(forceVisible);
   forceRef.current = forceVisible;
   // Cached wall elements + last applied state. Resolved lazily because the
@@ -83,6 +87,9 @@ export default function WallVisibility({ forceVisible = false }: { forceVisible?
       if (show === entry.visible) continue;
       entry.visible = show;
       entry.el.style.visibility = show ? "visible" : "hidden";
+      // Publish the same edge to the room (wallFocus.ts): a wall the learner
+      // turned to by hand must WAKE UP, not just be allowed to paint.
+      setWallOnScreen(entry.wall, show);
     }
   });
 

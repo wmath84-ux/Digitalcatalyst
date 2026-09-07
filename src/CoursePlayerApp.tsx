@@ -363,6 +363,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Monotonic counter the room's "+ New note" button bumps; NotesPanel opens
   // its composer on every increment, exactly as the flat header's + does.
   const [roomComposerSignal, setRoomComposerSignal] = useState(0);
+  // Same idea for the room's floating NOTE LIBRARY: it is a chooser, so it
+  // reports "open this one" and the NotesPanel ON THE WALL does the editing.
+  const [roomNoteRequest, setRoomNoteRequest] = useState<{ id: string; signal: number }>({
+    id: "",
+    signal: 0,
+  });
   // Android-only capability: iOS can never hide its status bar and desktop
   // browsers don't need to. Gates the "Hide status bar" player toggle.
   const canFullscreen = useMemo(() => isMobileDevice() && !isIOSDevice(), []);
@@ -1059,6 +1065,24 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // rail's icon — the deck never keeps its own copy of the tab list.
   const activeStudyTab = dockTabRecord(dockTab);
 
+  // The two lists the room's floating libraries show. Titles come from the
+  // same rich-text helpers the flat panels use, so a note reads identically
+  // in the chooser and on the wall.
+  const roomNoteItems = notes.map((note) => {
+    const plain = richTextToPlain(note.html || "") || note.text || "";
+    const [firstLine, ...rest] = plain.split("\n").filter(Boolean);
+    return {
+      id: note.id,
+      title: (firstLine || "Untitled note").slice(0, 90),
+      preview: (rest.join(" ") || plain).slice(0, 120),
+    };
+  });
+  const roomMapItems = mindMap.maps.map((map) => ({
+    mapKey: map.mapKey,
+    title: map.title || map.rootTopic || "Untitled map",
+    nodeCount: map.nodeCount,
+  }));
+
   // ── Room mode: the same brain, a 3D classroom instead of the Split Deck ──
   // Everything below is a REFERENCE to the panels the flat shell already
   // built: `viewerStack` goes on the board, the player's own NotesPanel goes
@@ -1082,6 +1106,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             onEdit={(id, html) => editNote(id, html)}
             onDelete={(id) => deleteNote(id)}
             composerOpenSignal={roomComposerSignal}
+            openNoteSignal={roomNoteRequest.signal}
+            openNoteId={roomNoteRequest.id}
           />
         )}
         mind={(
@@ -1110,6 +1136,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         noteCount={notes.length}
         mapCount={mindMap.maps.length}
         onComposeNote={() => setRoomComposerSignal((value) => value + 1)}
+        // ── The room's floating libraries ─────────────────────────────────
+        // Lists only. Every pick turns the learner's head to the wall that
+        // owns the content and asks the player's own panel — the very same
+        // instance the flat player uses — to show it.
+        noteItems={roomNoteItems}
+        onOpenNote={(id) => setRoomNoteRequest((current) => ({ id, signal: current.signal + 1 }))}
+        mapItems={roomMapItems}
+        activeMapKey={mindMap.activeMapKey}
+        onSelectMap={(mapKey) => mindMap.selectMap(mapKey)}
+        onCreateMap={() => mindMap.createMap()}
         onExit={() => {
           // Leaving the room must not lose a pending mind map write.
           mindMap.flush();

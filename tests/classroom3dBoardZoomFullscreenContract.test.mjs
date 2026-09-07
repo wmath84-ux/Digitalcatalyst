@@ -255,7 +255,9 @@ test("Esc exits board-fullscreen first and only otherwise drops to the desk", ()
     /else if \(event\.key === "Escape"\) \{[\s\S]*?if \(document\.fullscreenElement\) void document\.exitFullscreen\(\);[\s\S]*?else setFocus\("desk"\);/,
   );
   assert.match(classroom, /else if \(boardFullscreen\) setBoardFullscreen\(false\);/);
-  assert.match(classroom, /\}, \[step, focus, boardFullscreen, zoomBoardBy, fitBoard\]\);/);
+  // `sheet` joined the deps when the floating library landed: Esc now closes
+  // an open chooser first, then fullscreen, then drops to the desk.
+  assert.match(classroom, /\}, \[step, focus, sheet, boardFullscreen, zoomBoardBy, fitBoard\]\);/);
 });
 
 test("exiting fullscreen returns to the same focus, head and lean", () => {
@@ -286,7 +288,9 @@ test("keyboard +/−/0 lean only while facing the board", () => {
 // ---------------------------------------------------------------------------
 
 test("module switching and lesson stepping are untouched", () => {
-  assert.match(classroom, /onSelectFile\(file\);\s+setFocus\("board"\);/);
+  // Opening a file also dismisses the floating chooser — it is a chooser,
+  // not a place content lives — and then puts the head back on the board.
+  assert.match(classroom, /onSelectFile\(file\);[\s\S]{0,220}?setSheet\(null\);\s+setFocus\("board"\);/);
   assert.match(classroom, /if \(flat\[m\]\.locked\) \{/);
   assert.match(classroom, /openFile\(m, f\);/);
   assert.match(classroom, /else if \(event\.key === "ArrowRight"\) step\(1\);/);
