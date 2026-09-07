@@ -47,6 +47,12 @@ import { useDocsEditorAccess } from "../hooks/useDocsEditorAccess";
 import { usePersonalDriveCopy } from "../hooks/usePersonalDriveCopy";
 import { useAuth } from "../context/AuthContext";
 import { resumePosition, type CoursePlaybackPatch, type CoursePlaybackStore } from "./playbackState";
+// Part 14 classroom gates (no-ops in the flat player): the wall-focus
+// context (lazy iframe boot), the camera-motion signal (YouTube quality
+// step-down) and the static motion/lazy placeholder for third-party frames.
+import { useWallActivity } from "../classroom3d/WallActivity";
+import { subscribeEmbedMotion } from "../classroom3d/embedMotion";
+import EmbedImpostor from "./EmbedImpostor";
 
 /**
  * The ACTIVE file's action model, reported live to the Course Player so the
@@ -88,6 +94,47 @@ const SUPPORTED_KINDS = new Set([
   "direct",
   "none",
 ]);
+
+// ── Permissions, audited per embed kind (Part 14, item F) ────────────────
+// The `sandbox` list is UNCHANGED (every token is load-bearing for the
+// documented behaviours: scripts+forms for docs/forms/CodePen, popups for
+// share/print, modals for dialogs + window.print, downloads for export,
+// same-origin for Google auth cookies, presentation for Slides casting).
+// The `allow` list, however, was one-size-fits-all — every frame got media
+// autoplay, encrypted media and picture-in-picture contexts it never uses,
+// each one a potential background-cost surface inside the frame. Now:
+//
+//   · youtube → media stays (autoplay/encrypted-media/picture-in-picture),
+//     fullscreen stays, clipboard-write stays ("copy video URL"); only the
+//     pointless clipboard-READ goes (no paste surface in a player).
+//   · doc/sheet/slides/form → fullscreen (Slides Present) + clipboard
+//     read/write (copy/paste IS the interaction); no media of any kind.
+//   · pdf/drive → fullscreen + clipboard-write (copy text out; nothing to
+//     paste into, nothing that plays).
+//   · mindmap → fullscreen + clipboard read/write (copy/paste cards is
+//     core Whimsical interaction); no media.
+//   · embed (generic) + anything unknown → the FULL previous list, on
+//     purpose: unknown third-party content (Loom, interactives, players)
+//     may legitimately need any of it, and breaking an unknown embed to
+//     save hypothetical background work is the wrong trade.
+//
+// Nothing here touches the sandbox line, `allowFullScreen`, the unsandboxed
+// full editor, downloads, or the new-tab escape hatches.
+const EMBED_ALLOW_FULL = "autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-read; clipboard-write";
+
+export const EMBED_ALLOW_BY_KIND: Record<string, string> = {
+  youtube: "autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write",
+  doc: "fullscreen; clipboard-read; clipboard-write",
+  sheet: "fullscreen; clipboard-read; clipboard-write",
+  slides: "fullscreen; clipboard-read; clipboard-write",
+  form: "fullscreen; clipboard-read; clipboard-write",
+  pdf: "fullscreen; clipboard-write",
+  drive: "fullscreen; clipboard-write",
+  mindmap: "fullscreen; clipboard-read; clipboard-write",
+  embed: EMBED_ALLOW_FULL,
+};
+
+const embedAllowForKind = (kind: string): string => EMBED_ALLOW_BY_KIND[kind] ?? EMBED_ALLOW_FULL;
 
 interface ResourceViewerProps {
   file: CourseFile | null;
@@ -439,6 +486,12 @@ interface YouTubePlayer {
   getCurrentTime: () => number;
   getDuration: () => number;
   destroy: () => void;
+  // Part 14: quality step-down while the classroom camera moves (audio keeps
+  // playing — only the decode/render cost drops). Optional + defensively
+  // called: the real API provides both, but a torn-down player must never
+  // throw the room.
+  setPlaybackQuality?: (quality: string) => void;
+  getPlaybackQuality?: () => string;
 }
 
 type YouTubeApiWindow = Window & {
@@ -476,6 +529,15 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
   const resumeRef = useRef(resumeAt);
   const progressRef = useRef(onProgress);
   progressRef.current = onProgress;
+  // Part 14 (E9): inside the classroom the player doesn't even boot until
+  // its wall is first faced — no iframe, no src, zero cost. The latch only
+  // ever flips false → true (set during render, React's sanctioned latch),
+  // so a loaded player is NEVER torn down: position, pause state and the
+  // API instance survive every look-away, exactly like the flat stack. Flat
+  // player (no wall context) loads immediately, exactly as before.
+  const wall = useWallActivity();
+  const [wallLoaded, setWallLoaded] = useState(!wall || wall.active);
+  if (wall?.active && !wallLoaded) setWallLoaded(true);
 
   const videoId = (() => {
     const match = url.match(/\/embed\/([^?/#]+)/);
@@ -487,7 +549,7 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
     let poll: ReturnType<typeof setInterval> | null = null;
     let readyTimeout: ReturnType<typeof setTimeout> | null = null;
     const ready = { value: false };
-    if (!videoId) return undefined;
+    if (!videoId || !wallLoaded) return undefined;
 
     // A bot-check / sign-in response can load inside YouTube's iframe without
     // ever firing the IFrame API's `onReady`. Without a timeout the viewer
@@ -555,7 +617,7 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
       playerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoId]);
+  }, [videoId, wallLoaded]);
 
   // Switching module pauses the video where it is — it must never keep
   // playing behind another lesson.
@@ -568,6 +630,47 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
       player.pauseVideo();
     } catch { /* player torn down */ }
   }, [active]);
+
+  // ── Part 14 (B): YouTube under camera motion ──────────────────────────
+  // The EXPLICIT split, so the two mechanisms never fight:
+  //   · focus AWAY from the board → WallActivity postMessages `pauseVideo`
+  //     (Part 13, preserved: audio deliberately does NOT continue behind
+  //     another wall, matching flat mode's file-switch pause);
+  //   · camera MOVING while faced → the player is NOT paused (a drag that
+  //     muted the lesson would be miserable); instead the decode/render
+  //     cost steps down to 'small' and the visual impostor covers the
+  //     frame, so audio continues untouched while pixels cost ~nothing.
+  //     Settle restores the exact prior quality (`default` = the API's
+  //     auto), never a hardcoded HD.
+  // Native <video>/<audio> get NO motion treatment (Part 13 keeps them
+  // visually live while faced — GPU-cheap and fully controllable); only
+  // uncontrollable third-party iframes need it.
+  useEffect(() => {
+    if (!wallLoaded) return undefined;
+    let priorQuality = "default";
+    return subscribeEmbedMotion((moving) => {
+      const player = playerRef.current;
+      if (!player) return;
+      try {
+        if (moving) {
+          priorQuality = player.getPlaybackQuality?.() || "default";
+          player.setPlaybackQuality?.("small");
+        } else {
+          player.setPlaybackQuality?.(priorQuality);
+        }
+      } catch { /* player torn down mid-gesture */ }
+    });
+  }, [wallLoaded]);
+
+  // E9, still latched shut: placeholder only — the API player above hasn't
+  // booted (and the fallback below hasn't framed) for this wall yet.
+  if (!wallLoaded) {
+    return (
+      <div className="relative h-full min-h-0 w-full min-w-0 overflow-hidden" data-course-viewer-embed data-embed-kind="youtube" data-course-youtube-player>
+        <EmbedImpostor kind="youtube" title={title} mode="lazy" />
+      </div>
+    );
+  }
 
   // No IFrame API available (offline / blocked) — fall back to the plain
   // embed, still resuming via the `start` parameter.
@@ -592,7 +695,11 @@ function YouTubeFrame({ url, watchUrl, title, active, resumeAt, onProgress }: { 
           </div>
         </div>
       ) : null}
-      <div ref={hostRef} className="absolute inset-0 h-full w-full bg-black" data-course-viewer-iframe title={title} />
+      <div ref={hostRef} className="absolute inset-0 h-full w-full bg-black" data-course-viewer-iframe data-embed-impostor-target title={title} />
+      {/* Part 14 motion impostor (classroom walls only): CSS-swapped over the
+          live player while the camera moves — the player is never unmounted,
+          so position and API state survive every gesture. */}
+      {wall ? <EmbedImpostor kind="youtube" title={title} mode="motion" /> : null}
     </div>
   );
 }
@@ -701,6 +808,14 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
    * higher values trade that for bigger text and let the stage pan.
    */
   const [editorZoom, setEditorZoom] = useState(1);
+  // Part 14 (E9): same wall latch as YouTubeFrame — inside the classroom the
+  // `src` isn't even set until this wall is first faced (placeholder only,
+  // zero cost); once set, the iframe is NEVER unmounted, so doc scroll,
+  // form input, cursors and auth state survive every look-away and every
+  // motion swap. Flat player loads immediately, exactly as before.
+  const wall = useWallActivity();
+  const [wallLoaded, setWallLoaded] = useState(!wall || wall.active);
+  if (wall?.active && !wallLoaded) setWallLoaded(true);
 
   // Google's full editor never reflows, so it is laid out at a desktop-class
   // width and scaled down to the stage (see EDITOR_VIEWPORT_WIDTHS). Only the
@@ -731,6 +846,9 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
   }, [measuresStage]);
 
   useEffect(() => {
+    // Pre-latch there's no iframe to time out — and the effect re-runs on
+    // the latch edge (dep below), so a fresh frame always gets its window.
+    if (!wallLoaded) return undefined;
     setLoading(true);
     setFailed(false);
     setEditorZoom(1);
@@ -747,7 +865,7 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [url, reloadKey]);
+  }, [url, reloadKey, wallLoaded]);
 
   // Scale the narrow frame up so it still fills the stage edge-to-edge.
   const mobileScale = mobileDocument && stageWidth > 0 ? Math.max(stageWidth / MOBILE_VIEWPORT_WIDTH, 0.5) : 1;
@@ -817,10 +935,27 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
         }
       : undefined;
 
+  // E9, still latched shut: placeholder only — NO iframe element at all, so
+  // there is no `src` to fetch, boot, or bill against data/battery.
+  if (!wallLoaded) {
+    return (
+      <div
+        className="relative h-full min-h-0 w-full min-w-0 overflow-hidden"
+        data-course-viewer-embed
+        data-embed-kind={kind}
+        data-viewport-mode={mobileDocument ? "mobile" : "desktop"}
+      >
+        <EmbedImpostor kind={kind} title={title} mode="lazy" />
+      </div>
+    );
+  }
+
   return (
     <div
       ref={stageRef}
-      className="relative h-full min-h-0 w-full min-w-0 overflow-hidden"
+      // `dc-embed-frame` (Part 14, item D): compositor/layout isolation so
+      // the frame's internal churn can't cascade into the wall tree.
+      className="dc-embed-frame relative h-full min-h-0 w-full min-w-0 overflow-hidden"
       data-course-viewer-embed
       data-embed-kind={kind}
       data-viewport-mode={mobileDocument ? "mobile" : "desktop"}
@@ -876,7 +1011,9 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
         title={title}
         className={`block border-0 ${mobileDocument || scalingEditor ? "absolute left-0 top-0 bg-white" : "h-full max-h-full min-h-0 w-full max-w-full min-w-0"} ${kind === "youtube" ? "absolute inset-0 bg-black" : mobileDocument || scalingEditor ? "" : "bg-white"}`}
         style={frameStyle}
-        allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-read; clipboard-write"
+        // Per-kind permissions (Part 14, item F) — tightened where safe, full
+        // list only for YouTube media and unknown generic embeds.
+        allow={embedAllowForKind(kind)}
         // The FULL Google editor (edit mode) must run unsandboxed: Google's
         // own /edit page needs sign-in cookies, share/comment popups that
         // escape the frame, print, and download flows that a sandbox list
@@ -886,6 +1023,7 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
         allowFullScreen
         referrerPolicy="strict-origin-when-cross-origin"
         data-course-viewer-iframe
+        data-embed-impostor-target
         onLoad={() => {
           if (timeoutRef.current) clearTimeout(timeoutRef.current);
           setLoading(false);
@@ -897,6 +1035,10 @@ function EmbedFrame({ url, originalUrl = "", title, kind, supported, mobileDocum
           setFailed(true);
         }}
       />
+      {/* Part 14 motion impostor (classroom walls only): CSS-swapped over the
+          live iframe while the camera moves — the frame itself is never
+          unmounted, so scroll, input, cursors and auth state survive. */}
+      {wall ? <EmbedImpostor kind={kind} title={title} mode="motion" /> : null}
       {/*
         Fitting a desktop editor onto a phone makes it small. Each tap here
         narrows the frame's CSS viewport, so the editor re-lays-out bigger

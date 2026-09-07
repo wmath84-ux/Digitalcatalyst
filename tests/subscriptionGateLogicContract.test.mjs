@@ -25,8 +25,6 @@ const subscriberBadge = fs.readFileSync("src/components/subscription/SubscriberA
 const subscriberPriceBadge = fs.readFileSync("src/components/subscription/SubscriberOnlyPriceBadge.tsx", "utf8");
 const hiddenHint = fs.readFileSync("src/components/subscription/HiddenFeatureHint.tsx", "utf8");
 const gateHook = fs.readFileSync("src/hooks/useSubscriptionGateLogic.ts", "utf8");
-const featureVisibility = fs.readFileSync("src/hooks/useFeatureVisibility.ts", "utf8");
-const usageHook = fs.readFileSync("src/hooks/useUsageThisMonth.ts", "utf8");
 const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8"));
 
 // ---------------------------------------------------------------------------
@@ -222,23 +220,6 @@ test("useSubscriptionGateLogic reads the live settings doc with safe defaults", 
   assert.match(gateHook, /refetch/);
 });
 
-test("useFeatureVisibility resolves visible / gate / hidden from access + gate", () => {
-  assert.match(featureVisibility, /export function useFeatureVisibility/);
-  assert.match(featureVisibility, /useSubscriptionGateLogic/);
-  assert.match(featureVisibility, /useMyDayAccess/);
-  assert.match(featureVisibility, /useRevisionAccess/);
-  assert.match(featureVisibility, /"visible"\s*\|\s*"gate"\s*\|\s*"hidden"/);
-  assert.match(featureVisibility, /globalOn\s*=\s*settings\.hideUntilPurchasedEnabled\s*\|\|\s*perFeature/);
-});
-
-test("useUsageThisMonth reads the per-month usage document + the admin cap", () => {
-  assert.match(usageHook, /export function useUsageThisMonth/);
-  assert.match(usageHook, /users["'],\s*uid,\s*"usage"/);
-  assert.match(usageHook, /resolveAiQuestionsPerDay/);
-  assert.match(usageHook, /capPerDay/);
-  assert.match(usageHook, /remainingThisMonth/);
-});
-
 // ---------------------------------------------------------------------------
 // 6. Subscription page chrome — the subscriber gets a clear "you are a member" visual
 // ---------------------------------------------------------------------------
@@ -321,9 +302,3 @@ test("a missing settings/subscriptionGate document keeps the legacy gate working
   );
 });
 
-test("the legacy `gate` mode is the default — pre-Phase-2 data is unaffected", () => {
-  // When the doc is missing, the effective visibilityMode is still
-  // "gate" (because hideUntilPurchasedEnabled defaults to false and
-  // features[key].gated defaults to false).
-  assert.match(featureVisibility, /return\s+settings\.oldGateEnabled\s*\?\s*"gate"\s*:\s*"hidden"/);
-});

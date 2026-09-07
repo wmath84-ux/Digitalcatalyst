@@ -267,8 +267,8 @@ test("LecturePicker caps the visible queue at 20 so the modal stays usable", () 
 });
 
 test("LecturePicker collects all queued lectures into one flowpath.bulk call", () => {
-  // Single submit = single network call. The ActivityEditor
-  // does the same for tasks / reminders / etc.
+  // Single submit = single network call, no matter how many lectures
+  // are queued.
   assert.match(lecturePicker, /flowpath\.bulk/);
   assert.match(lecturePicker, /queued lecture/);
 });

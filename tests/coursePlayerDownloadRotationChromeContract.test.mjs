@@ -28,7 +28,6 @@ const coursePlayer = readSource("src/CoursePlayerApp.tsx");
 const playerPanel = readSource("src/course/PlayerPanel.tsx");
 const resourceViewer = readSource("src/course/ResourceViewer.tsx");
 const courseEmbed = readSource("src/utils/courseEmbed.ts");
-const rotatedScroll = readSource("src/course/useRotatedScroll.ts");
 const styles = readSource("src/index.css");
 
 // ---------------------------------------------------------------------------
@@ -62,20 +61,10 @@ test("Every download carries a filename with the matching extension", () => {
 // 2. Rotated-view scrolling
 // ---------------------------------------------------------------------------
 
-test("The rotated view drives scrolling itself instead of letting the browser guess", () => {
-  assert.match(rotatedScroll, /export function useRotatedScroll/);
-  // The visible finger axis wins: up/down changes scrollTop and left/right is
-  // reserved for a genuinely horizontal scroller. A horizontal swipe must no
-  // longer be required to move a vertical module/notes list.
-  assert.match(rotatedScroll, /target\.scrollTop -= dsy/);
-  assert.match(rotatedScroll, /target\.scrollLeft -= dsx/);
-  assert.match(rotatedScroll, /Math\.abs\(dsy\) >= Math\.abs\(dsx\)/);
-  // Only genuinely scrollable ancestors are targeted.
-  assert.match(rotatedScroll, /const scrollableAncestor/);
-  // A small movement must not steal taps from buttons.
-  assert.match(rotatedScroll, /SLOP/);
-  // pointermove has to be cancelable to suppress native panning.
-  assert.match(rotatedScroll, /"pointermove", onPointerMove, \{ passive: false \}/);
+test("the rotated-scroll hook file is gone — the browser owns scrolling again", () => {
+  // `src/course/useRotatedScroll.ts` was deleted with the immersive
+  // rotation view; nothing may reintroduce it.
+  assert.ok(!fs.existsSync(path.join(repoRoot, "src/course/useRotatedScroll.ts")));
 });
 
 test("the rotate-to-fullscreen button and immersive view are removed", () => {

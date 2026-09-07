@@ -107,3 +107,34 @@ export const FILE_KIND_LABEL: Record<string, string> = {
   embed: "Interactive",
   mindmap: "Mind map",
 };
+
+/* ── Board lean — camera zoom-to-board (Part 12) ────────────────────────────
+   `boardZoom` is the camera's lean toward the front board: 1 = the seat's
+   normal position, BOARD_ZOOM_MAX = the closest lean. SeatRig turns it into
+   a forward dolly of (zoom - MIN) * BOARD_DOLLY_METRES on the same spring
+   as the head turn.
+
+   The numbers are chosen so the camera can never misbehave:
+     · MIN = 1 — the lens never pulls back past the seat.
+     · MAX = 2.5 → 3.6 m forward, from z = 2.62 to z = -0.98. The board face
+       sits at z ≈ -3.23, so 2.2 m of air always remains — no clipping — and
+       the path (x = 0.15, y ≈ 1.24) glides over the learner's desk, clear of
+       the mug, the neighbouring desks and every classmate behind the seat. */
+
+export const BOARD_ZOOM_MIN = 1;
+export const BOARD_ZOOM_MAX = 2.5;
+/** One button / key press of lean. */
+export const BOARD_ZOOM_STEP = 0.25;
+/** Where a double-tap / double-click on the board lands the camera. */
+export const BOARD_ZOOM_TOGGLE = 2;
+/**
+ * Fit-to-screen in portrait. The portrait lens is wider (SeatRig holds the
+ * horizontal angle steady), so the board reads smaller — fitting a touch
+ * closer keeps the chalk the same readable size in both orientations.
+ */
+export const BOARD_ZOOM_PORTRAIT_FIT = 1.15;
+/** Metres of forward travel per 1.0 of zoom. */
+export const BOARD_DOLLY_METRES = 2.4;
+
+export const clampBoardZoom = (value: number): number =>
+  Number.isFinite(value) ? Math.min(BOARD_ZOOM_MAX, Math.max(BOARD_ZOOM_MIN, value)) : BOARD_ZOOM_MIN;

@@ -21,7 +21,7 @@
 //      CoursePlayerApp's `CourseModule` shape so the existing Player keeps
 //      working without edits.
 //
-// URL-only sanitisation rule (mirrors the existing `courseContent.ts` policy):
+// URL-only sanitisation rule (inherited from the deleted `src/utils/courseContent.ts` shim):
 //   * Strip Firebase Storage URLs.
 //   * Strip non-HTTPS URLs.
 //   * Strip data URLs / base64.
@@ -131,7 +131,7 @@ const toCanonicalResourceType = (raw) => RESOURCE_TYPE_ALIASES[normResourceType(
 
 const toPlayerResourceType = (raw) => toCanonicalResourceType(raw);
 
-// URL validation (mirrors utils/courseContent.ts).
+// URL validation — the canonical rule (the legacy `src/utils/courseContent.ts` shim was deleted).
 const VALID_URL_TYPES = new Set([
   "youtube", "video", "audio", "pdf", "doc", "sheet", "slides", "image",
   "google_form", "ebook", "embed", "mindmap", "iframe",

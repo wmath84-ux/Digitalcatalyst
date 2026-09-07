@@ -49,6 +49,8 @@ export interface SurfaceFrameProps {
   accent?: string;
   /** Dim the frame when the learner is not facing this surface. */
   active?: boolean;
+  /** Render the glow light the panel spills onto the wall (off on low tier). */
+  spill?: boolean;
   label: string;
   children: ReactNode;
 }
@@ -61,6 +63,7 @@ export default function SurfaceFrame({
   pixelWidth = 1280,
   accent = "#8b5cf6",
   active = true,
+  spill = true,
   label,
   children,
 }: SurfaceFrameProps) {
@@ -107,8 +110,12 @@ export default function SurfaceFrame({
       >
         <PanelBoundary label={label}>{children}</PanelBoundary>
       </Html>
-      {/* Soft light spill from the panel onto the wall */}
-      <pointLight position={[0, 0, 0.9]} intensity={active ? 2.1 : 0.5} distance={4.2} color={accent} />
+      {/* Soft light spill from the panel onto the wall — dropped entirely on
+          the low tier (3 fewer shaded lights) while the emissive frame keeps
+          reading as a glow. */}
+      {spill && (
+        <pointLight position={[0, 0, 0.9]} intensity={active ? 2.1 : 0.5} distance={4.2} color={accent} />
+      )}
     </group>
   );
 }

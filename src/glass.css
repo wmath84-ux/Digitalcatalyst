@@ -155,7 +155,7 @@ html[data-glass="on"] :where([data-glass="panel"]) {
   box-decoration-break: clone;
 }
 
-/* ── Wave 1: shared primitives (Modal / ConfirmDialog / MacWindowModal /
+/* ── Wave 1: shared primitives (Modal / ConfirmDialog /
  *    Toast / PageTabs / LiquidMetalButton) ─────────────────────────────────
  * These rules are the parts a `GlassSurface` cannot express as a prop — the
  * responsive corner shape of a sheet vs a card, the entry motion, and the
@@ -165,7 +165,7 @@ html[data-glass="on"] :where([data-glass="panel"]) {
 
 :root {
   /* Phones: bottom sheet -> top corners only. From the sm band up the panel is
-     a card, so all four corners round. Modal/MacWindowModal read this through
+     a card, so all four corners round. Modal reads this through
      their inline `style` because an inline border-radius beats a class. */
   --glass-sheet-radius: 1.75rem 1.75rem 0 0;
 }

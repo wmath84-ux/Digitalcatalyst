@@ -35,7 +35,6 @@ const curriculumPage = fs.readFileSync("src/admin/pages/CurriculumBuilderPage.ts
 const providers = fs.readFileSync("src/components/admin/AdminProviders.tsx", "utf8");
 const nav = fs.readFileSync("src/components/admin/nav.ts", "utf8");
 const section = fs.readFileSync("src/admin/pages/RevisionCurriculumSection.tsx", "utf8");
-const editor = fs.readFileSync("src/admin/pages/ManualCurriculumEditor.tsx", "utf8");
 const indexCss = fs.readFileSync("src/index.css", "utf8");
 
 test("admin nav exposes AI Configuration and Curriculum Builder as two separate entries", () => {
@@ -51,8 +50,9 @@ test("AdminApp routes /admin/curriculum to the Curriculum Builder page", () => {
 });
 
 test("AI Configuration page no longer renders the curriculum tree or the AI generation panel", () => {
-  // The page used to render both `RevisionCurriculumSection` and
-  // `ManualCurriculumEditor` at the bottom; both have moved.
+  // The page used to render `RevisionCurriculumSection` at the bottom; it
+  // moved to the Curriculum Builder page (the legacy `ManualCurriculumEditor`
+  // file was deleted — its save & publish logic now lives on that page).
   assert.doesNotMatch(adminPage, /<RevisionCurriculumSection/);
   assert.doesNotMatch(adminPage, /<ManualCurriculumEditor/);
   assert.doesNotMatch(adminPage, /import RevisionCurriculumSection/);
@@ -100,15 +100,6 @@ test("Curriculum Builder page uses the shared `useRevisionCatalog` context", () 
   assert.match(curriculumPage, /useRevisionCatalog\(\)/);
   // The AI Configuration page also uses the same context.
   assert.match(adminPage, /useRevisionCatalog/);
-});
-
-test("the manual editor is still a self-contained component", () => {
-  // The original `ManualCurriculumEditor` is still on disk so
-  // existing imports in tests / storybook keep working, but it is
-  // no longer rendered by the AI Configuration page (the contract
-  // is enforced by the test above).
-  assert.match(editor, /export default function ManualCurriculumEditor/);
-  assert.match(editor, /Save & publish/);
 });
 
 test("the curriculum AI generation panel keeps its existing API contract", () => {
