@@ -1023,13 +1023,49 @@ function RootPage(): ReactNode {
     setThemeColor(darkScreen ? THEME_COLOR_DARK : THEME_COLOR_LIGHT);
   }, [hash, protectedRoutePending, openingVisible]);
 
-  const launchPending =
-    loading
-    || skipLandingForInstalledMobilePwa
-    || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
+  // Installed mobile PWA cold start: the hash is normalised to #/home on
+  // the first effect, but on the VERY first render the URL is still empty.
+  // We used to paint a blank <main> here while the session restored — now
+  // we paint the real Home shell immediately: the header/nav chrome is
+  // data-independent and every data-bearing section renders its own
+  // dimension-matched skeleton (Home's product grid / continue-learning),
+  // so there is zero blank time and zero layout shift when content lands.
+  // (Admins are still exempt from any learner-catalog gating, and
+  // genuinely protected routes keep their session spinner below.)
+  const showHomeShellImmediately =
+    skipLandingForInstalledMobilePwa ||
+    Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH));
 
-  if (launchPending && skipLandingForInstalledMobilePwa) {
-    return <main className="min-h-[100dvh]" aria-busy="true" aria-label="Opening app" />;
+  if (showHomeShellImmediately) {
+    return (
+      <PageEnter pageKey={pageEnterAppKey(HOME_HASH)}>
+        <HomeApp
+          favoriteIds={favoriteIds}
+          onToggleFavorite={handleToggleFavorite}
+          onNavigateToStore={() => {
+            window.location.hash = STORE_HASH;
+          }}
+          onNavigateToProduct={navigateToProduct}
+          onNavigateToProductReview={navigateToProductReview}
+          onNavigateToCourse={navigateToCourse}
+          onNavigateToMyDay={() => {
+            window.location.hash = MY_DAY_HASH;
+          }}
+          onNavigateToProfile={() => {
+            window.location.hash = PROFILE_HASH;
+          }}
+          onNavigateToPurchases={() => {
+            window.location.hash = `${STORE_HASH}/purchases`;
+          }}
+          onNavigateToFavorites={() => {
+            window.location.hash = FAVORITES_HASH;
+          }}
+          onNavigateToNotifications={() => {
+            window.location.hash = NOTIFICATIONS_HASH;
+          }}
+        />
+      </PageEnter>
+    );
   }
 
   if (protectedRoutePending) {

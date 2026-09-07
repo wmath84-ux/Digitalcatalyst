@@ -9,6 +9,7 @@ import TiltedCoverflow from "./TiltedCoverflow";
 import { GlassCard } from "./ui/GlassCard";
 import { GlassSurface } from "./ui/glass";
 import { GlassButton } from "./ui/glass-button";
+import Skeleton from "./ui/Skeleton";
 import { BookOpenIcon } from "./icons";
 import { useStoreFilters } from "../hooks/useStoreFilters";
 import {
@@ -356,7 +357,30 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
       {error ? (
         <div className="dc-scene-ink mx-4 mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200 lg:mx-0">{error}</div>
       ) : loading ? (
-        <div className="mx-4 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:mx-0 lg:grid-cols-4 xl:grid-cols-6">{[0, 1, 2, 3].map((item) => <GlassCard key={item} className="h-72 animate-pulse" aria-hidden="true" />)}</div>
+        /* Dimension-matched skeletons: the store defaults to the horizontal
+           list card (w-36/sm:w-44 artwork + text column), so each
+           placeholder mirrors that exact geometry inside the same flex
+           column + gaps the real cards use — zero layout shift when the
+           live list replaces them. The old state was four h-72 pulse
+           blocks that jumped to a different layout. */
+        <div data-store-gutter data-store-list data-store-list-loading aria-busy="true" aria-label="Loading products" className="flex flex-col gap-3 px-4 pt-4">
+          {[0, 1, 2, 3, 4, 5].map((item) => (
+            <GlassCard key={item} aria-hidden="true" contentClassName="flex p-0" className="flex overflow-hidden">
+              <div className="relative h-28 w-36 shrink-0 overflow-hidden sm:h-32 sm:w-44">
+                <Skeleton width="100%" height="100%" radius={0} />
+              </div>
+              <div className="flex flex-1 flex-col gap-1.5 p-3 sm:p-4">
+                <Skeleton width="80%" height="0.95rem" radius={6} />
+                <Skeleton width="45%" height="0.75rem" radius={6} />
+                <Skeleton width="60%" height="0.75rem" radius={6} />
+                <div className="mt-auto flex items-center justify-between pt-2">
+                  <Skeleton width="30%" height="1rem" radius={6} />
+                  <Skeleton width="5.5rem" height="2rem" radius={999} />
+                </div>
+              </div>
+            </GlassCard>
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
         /* Educational empty state: says what happened, why, and gives the
            user a one-tap way out instead of a dead end. */

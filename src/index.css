@@ -1361,6 +1361,51 @@ body {
 .animate-pop       { animation: pop 0.3s ease-out; }
 .animate-shimmer   { animation: shimmer 2s linear infinite; }
 
+/* ── Loading skeletons (Part 17 — loading experience) ─────────────────
+   Reusable shimmer placeholder painted by <Skeleton/>
+   (src/components/ui/Skeleton.tsx). The base tint matches the pack's
+   own glass token — ~10 % white on the dark winter scene
+   (--dc-chrome-glass is rgba(255,255,255,.105)) — and the moving
+   highlight is the same indigo family used by progress fills and
+   accent pills. It reuses the existing `shimmer` keyframes above so
+   the app has exactly one shimmer vocabulary. `background-size` is
+   doubled so the gradient band has room to travel; the keyframe
+   animates background-position from -200% → 200%.
+   Layout-shift rule: a skeleton is sized with width/height/radius props
+   that mirror the real content it replaces, and it never carries its
+   own margin — spacing always comes from the real layout's containers
+   (grid gaps / flex gaps / wrappers), so swapping it for real content
+   moves nothing. */
+.dc-skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.08);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(129, 140, 248, 0.14) 45%,
+    rgba(255, 255, 255, 0.16) 55%,
+    transparent 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 200% 100%;
+  background-position: -200% 0;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-skeleton {
+    /* Reduced motion keeps a static, clearly-unfinished surface — no
+       sweep, but never invisible (matches OfflineScreen's rule that
+       reduced motion means "no motion", not "nothing"). */
+    animation: none;
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
 /* My Day create menu — a COMPACT drop-UP that hangs above the big "+"
    button on every screen size. The card pops out of the button (bottom
    origin, slight rise + scale), then each row staggers in. Keeping the

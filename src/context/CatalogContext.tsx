@@ -115,7 +115,13 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Stale-while-revalidate (see firebase.ts — persistentLocalCache):
+    // with the IndexedDB persistent cache enabled the listener's FIRST
+    // callback is the cached snapshot (metadata.fromCache === true), which
+    // lets the catalog paint instantly on every warm app open while the
+    // live snapshot refreshes silently in the background.
     const unsubscribe = onSnapshot(collection(db, "siteProducts"), (snapshot) => {
+      const fromCache = snapshot.metadata.fromCache === true;
       const next = snapshot.docs
         .map((item) => ({ data: item.data(), id: item.id }))
         // `status` is authoritative. This repairs old documents created as
@@ -124,13 +130,42 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         .filter((item) => isProductPublished(item.data))
         .map((item) => mapProduct(item.id, item.data))
         .sort((a, b) => a.title.localeCompare(b.title));
+
+      if (fromCache) {
+        // Cached data, however old, is always paint-worthy: it clears the
+        // skeleton immediately on warm loads (online or offline).
+        if (next.length > 0) {
+          setBaseProducts(next);
+          setError(null);
+          setLoading(false);
+        }
+        // An EMPTY cache only happens on a genuinely cold device: keep the
+        // skeleton up and wait for the server result instead of flashing an
+        // empty catalog (or, offline, an endless skeleton that the error
+        // handler below used to turn into a false error screen).
+        return;
+      }
+
+      // Live server snapshot — authoritative.
       setBaseProducts(next);
       setError(null);
       setLoading(false);
     }, (snapshotError) => {
       console.error("Catalog sync failed", snapshotError);
-      setBaseProducts([]);
-      setError("The live catalog could not be loaded. Please try again shortly.");
+      // Permission-denied / invalid-argument style failures are genuine:
+      // surface the error. A network failure on a COLD cache is the one
+      // offline-first edge — there is nothing cached to show yet, so fall
+      // back to a clear (retryable) message instead of hanging on the
+      // skeleton forever. On a warm cache the listener already painted
+      // cached products above, so this branch keeps that list in place
+      // (setBaseProducts with the same value) and only raises the error
+      // banner when the screen would otherwise be blank.
+      setBaseProducts((current) => {
+        if (current.length === 0) {
+          setError("The live catalog could not be loaded. Please check your connection and try again shortly.");
+        }
+        return current;
+      });
       setLoading(false);
     });
     return unsubscribe;
