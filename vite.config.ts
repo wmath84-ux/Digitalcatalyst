@@ -6,7 +6,6 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import browserslist from "browserslist";
 import { defineConfig } from "vite";
-import { viteSingleFile } from "vite-plugin-singlefile";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -92,7 +91,6 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    viteSingleFile(),
     // GitHub embeds are served by /api/embed-proxy on the deployed site
     // (Vercel serverless). The local dev server has no backend, so this
     // stub answers the route with a small placeholder instead of Vite's
@@ -164,6 +162,40 @@ export default defineConfig({
        every oklch() in place. */
     cssMinify: "lightningcss",
     ...(cssTarget ? { cssTarget } : {}),
+    /* ── Code splitting (perf pass 2026-09-08) ────────────────────────────
+       `vite-plugin-singlefile` used to inline the ENTIRE app (3.3 MB raw /
+       919 kB gzip) into `dist/index.html`. That is one blocking parse +
+       compile of every route — admin, course player, revision, mind map — on
+       every cold start, including a low-RAM Android WebView that only wanted
+       the landing page. docs/part16 §3 measured it and laid out this exact
+       plan; `src/main.tsx` now lazy-loads every route behind React.lazy, so
+       Rollup can emit one small shell + per-route chunks.
+
+       Capacitor keeps working: `webDir` (dist/) ships every chunk inside the
+       APK and the WebView serves them from its own local origin, so dynamic
+       `import()` resolves exactly like it does online (docs/part16 §3).
+       `public/sw.js` precaches the emitted chunk list at runtime so offline
+       mode still boots. */
+    rollupOptions: {
+      output: {
+        /* Only leaf vendor libraries are pinned into stable chunks. Grouping
+           by package (never by route) keeps module init order deterministic
+           and gives the browser cache a long-lived, rarely-changing file.
+           Everything else — including `@xyflow/react`, which only the course
+           player's mind map imports — is left to Rollup so it lands inside
+           the lazy chunk that actually needs it. */
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "vendor-react";
+          if (/[\\/]node_modules[\\/](@firebase|firebase|idb)[\\/]/.test(id)) return "vendor-firebase";
+          if (/[\\/]node_modules[\\/](framer-motion|motion-dom|motion-utils)[\\/]/.test(id)) return "vendor-motion";
+          return undefined;
+        },
+      },
+    },
+    /* The shell + vendor chunks are the only ones on the critical path; the
+       lazy route chunks are allowed to be chunky without failing the build. */
+    chunkSizeWarningLimit: 900,
   },
   css: {
     lightningcss: {

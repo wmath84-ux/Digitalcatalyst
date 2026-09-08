@@ -64,6 +64,8 @@ function TopCard({ card, onSwipe, activeIndex, total }: TopCardProps) {
         <img
           src={card.image}
           alt={card.title}
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover"
           draggable={false}
         />
@@ -167,6 +169,8 @@ export default function StackedCards({ cards }: { cards: ShowcaseCard[] }) {
                   <img
                     src={card.image}
                     alt=""
+                    loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover"
                     draggable={false}
                   />

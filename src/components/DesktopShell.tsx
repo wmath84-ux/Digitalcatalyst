@@ -75,6 +75,7 @@ import { GlassSurface } from "@/components/ui/glass";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassButton } from "@/components/ui/glass-button";
 import { LiquidMetalButton } from "@/components/ui/LiquidMetalButton";
+import { prefetchRoute } from "@/utils/lazyRoute";
 
 /** The hash-prefixed routes the rail can drive. Each one navigates by
  *  setting `window.location.hash` so the change is persistent + the
@@ -456,7 +457,7 @@ export default function DesktopShell({
               user ? (
                 <div className="flex items-center gap-2">
                   {user.photoURL ? (
-                    <img src={user.photoURL} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
+                    <img src={user.photoURL} alt="" decoding="async" width={32} height={32} className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
                   ) : (
                     <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-indigo-600 text-[10px] font-black text-white">
                       {initials}
@@ -575,7 +576,7 @@ export default function DesktopShell({
           {user ? (
             <div className="flex items-center gap-2.5 rounded-2xl p-2 transition hover:bg-white/[0.06]">
               {user.photoURL ? (
-                <img src={user.photoURL} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
+                <img src={user.photoURL} alt="" decoding="async" width={36} height={36} className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
               ) : (
                 <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-indigo-600 text-xs font-black text-white">
                   {initials}
@@ -811,6 +812,13 @@ function RailItem({
     <button
       type="button"
       onClick={() => onNavigate(entry.hash)}
+      /* Desktop intent signal: the pointer resting on a rail row (or keyboard
+         focus landing on it) is a strong hint the learner is about to open
+         that route, so start its code chunk now — the click then renders from
+         memory instead of waiting on the network. Idempotent, and skipped on
+         Save-Data / 2G (see utils/lazyRoute). */
+      onPointerEnter={() => prefetchRoute(entry.hash)}
+      onFocus={() => prefetchRoute(entry.hash)}
       aria-current={active ? "page" : undefined}
       aria-label={active ? `${entry.label} (current page)` : entry.label}
       data-desktop-rail-item={entry.key}

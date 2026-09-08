@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { StrictMode, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
@@ -20,32 +20,49 @@ import "./glass.css";
 // accents. Paint only, and scoped to `.course-player-shell`, so it must come
 // AFTER index.css and glass.css to win the ties it re-points.
 import "./course/flatPlayerChrome.css";
-import StoreApp from "./App";
-import HomeApp from "./home/App";
-import PdpApp from "./PdpApp";
-import CheckoutApp from "./components/checkout/CheckoutApp";
-import MyDayApp from "./MyDayApp";
-import LeaderboardApp from "./LeaderboardApp";
-import RevisionApp from "./revision/RevisionApp";
-import ProfileApp from "./profile/App";
-import SettingsPage from "./settings/SettingsPage";
-import SubscriberExperiencePage from "./profile/SubscriberExperiencePage";
-import ProfilePreview from "./profile/ProfilePreview";
-import MindMapPreview from "./course/MindMapPreview";
-import GlassPreviewPage from "./GlassPreview";
-import CourseRouteGuard from "./components/CourseRouteGuard";
-import CartWishlistApp from "./CartWishlistApp";
-import SubscriptionApp from "./subscription/App";
+// ── Route-level code splitting (perf pass 2026-09-08) ───────────────────────
+// Every screen below used to be a STATIC import, so the single bundle carried
+// the admin console, the course player, the revision engine and the mind map
+// on a cold landing-page open (docs/part16 §3 measured 3.3 MB raw / 919 kB
+// gzip in one blocking parse). `lazyRoute()` keeps the exact same JSX below —
+// only the module boundary changes — and exposes `.preload()` so the ACTIVE
+// route's chunk starts downloading the instant this script runs, before React
+// renders. That removes the split's only cost (a render-time waterfall) while
+// keeping every unvisited route off the critical path.
+//
+// `LandingApp` is deliberately NOT lazy: it is the app's default first screen
+// (`#/` and `#/landing`), so Vite's `<link rel=modulepreload>` for a static
+// import discovers it in parallel with the shell instead of one hop later.
 import LandingApp from "./LandingApp";
-import AuthApp from "./AuthApp";
-import AdminLoginApp from "./AdminLoginApp";
-import AdminApp from "./admin/AdminApp";
-import FlowPathApp from "./FlowPathApp";
+import { lazyRoute, onIdle, prefersReducedData, setRoutePreloader } from "./utils/lazyRoute";
+import { initPerfMonitor, isPerfEnabled, markPerf, recordRouteTiming } from "./utils/perfMonitor";
+
+const StoreApp = lazyRoute(() => import("./App"));
+const HomeApp = lazyRoute(() => import("./home/App"));
+const PdpApp = lazyRoute(() => import("./PdpApp"));
+const CheckoutApp = lazyRoute(() => import("./components/checkout/CheckoutApp"));
+const MyDayApp = lazyRoute(() => import("./MyDayApp"));
+const LeaderboardApp = lazyRoute(() => import("./LeaderboardApp"));
+const RevisionApp = lazyRoute(() => import("./revision/RevisionApp"));
+const ProfileApp = lazyRoute(() => import("./profile/App"));
+const SettingsPage = lazyRoute(() => import("./settings/SettingsPage"));
+const SubscriberExperiencePage = lazyRoute(() => import("./profile/SubscriberExperiencePage"));
+const ProfilePreview = lazyRoute(() => import("./profile/ProfilePreview"));
+const MindMapPreview = lazyRoute(() => import("./course/MindMapPreview"));
+const GlassPreviewPage = lazyRoute(() => import("./GlassPreview"));
+const CourseRouteGuard = lazyRoute(() => import("./components/CourseRouteGuard"));
+const CartWishlistApp = lazyRoute(() => import("./CartWishlistApp"));
+const SubscriptionApp = lazyRoute(() => import("./subscription/App"));
+const AuthApp = lazyRoute(() => import("./AuthApp"));
+const AdminLoginApp = lazyRoute(() => import("./AdminLoginApp"));
+const AdminApp = lazyRoute(() => import("./admin/AdminApp"));
+const FlowPathApp = lazyRoute(() => import("./FlowPathApp"));
+const NotificationsPage = lazyRoute(() => import("./components/NotificationsPage"));
+const UserQueriesPage = lazyRoute(() => import("./components/UserQueriesPage"));
+const SearchPage = lazyRoute(() => import("./components/SearchPage"));
+const RenewalPreviewPage = lazyRoute(() => import("./components/subscription/RenewalPreviewPage"));
+const OpeningAnimationPreview = lazyRoute(() => import("./components/dev/OpeningAnimationPreview"));
 import { FlowPathErrorBoundary } from "./components/flowpath/FlowPathErrorBoundary";
-import NotificationsPage from "./components/NotificationsPage";
-import UserQueriesPage from "./components/UserQueriesPage";
-import SearchPage from "./components/SearchPage";
-import RenewalPreviewPage from "./components/subscription/RenewalPreviewPage";
 import RenewalBannerHost from "./components/subscription/RenewalBannerHost";
 import GlassCommandPalette from "./components/GlassCommandPalette";
 import { GlassToaster, toast as glassToast } from "./components/ui/glass-toast";
@@ -80,7 +97,6 @@ import AppShell from "./components/AppShell";
 import PageSkeleton, { type PageSkeletonBlock } from "./components/PageSkeleton";
 import PageEnter, { pageEnterAppKey } from "./components/PageEnter";
 import { attachOpeningSplash, useOpeningSplashVisible } from "./utils/openingSplash";
-import OpeningAnimationPreview from "./components/dev/OpeningAnimationPreview";
 import { resolveActiveFromHash } from "./components/DesktopShell";
 import { useResponsiveCategory } from "./utils/responsive";
 import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
@@ -451,12 +467,79 @@ function Root() {
     <>
       <RouteBackdrop />
       <DesktopAppHost>
-        <RootPage />
+        {/* One Suspense boundary for the whole hash router: every route in
+            RootPage is a `lazyRoute()` chunk. The fallback is the app's own
+            session-restore screen, so a route swap looks like the loading
+            state the app already had — never a white flash. The ACTIVE
+            route's chunk is preloaded at boot (see preloadRouteChunk below),
+            so on a warm cache this fallback is normally never painted. */}
+        <Suspense fallback={<RouteChunkFallback />}>
+          <RootPage />
+        </Suspense>
       </DesktopAppHost>
       <OfflineGate />
     </>
   );
 }
+
+/**
+ * Suspense fallback for a route chunk that has not arrived yet. Visually
+ * identical to the existing `protectedRoutePending` screen in RootPage so a
+ * slow network shows one consistent loading state instead of a blank page.
+ */
+function RouteChunkFallback() {
+  return (
+    <main className="grid min-h-[100dvh] place-items-center px-6 text-center text-white" data-route-chunk-loading>
+      <div>
+        <span className="mx-auto block h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-violet-400" />
+        <p className="mt-4 text-sm font-semibold text-slate-300">Loading…</p>
+      </div>
+    </main>
+  );
+}
+
+/**
+ * Map a hash route to the lazy chunk that renders it.
+ *
+ * Used twice, and only ever for chunks the user is about to need:
+ *   1. at boot, for the route in the URL — the fetch then overlaps React's
+ *      first render instead of waiting for it (no lazy-loading waterfall);
+ *   2. on `hashchange`, one tick before React re-renders.
+ */
+function routeChunkFor(hash: string): { preload: () => Promise<unknown> } | null {
+  if (!hash || hash.startsWith(LANDING_HASH)) return null; // statically imported
+  if (hash.startsWith(HOME_HASH)) return HomeApp;
+  if (hash.startsWith(AUTH_HASH)) return AuthApp;
+  if (hash.startsWith(ADMIN_LOGIN_HASH)) return AdminLoginApp;
+  if (hash.startsWith(ADMIN_HASH)) return AdminApp;
+  if (hash.startsWith(CART_HASH) || hash.startsWith(FAVORITES_HASH)) return CartWishlistApp;
+  if (hash.startsWith(CHECKOUT_HASH)) return CheckoutApp;
+  if (hash.startsWith(SUBSCRIPTION_HASH)) return SubscriptionApp;
+  if (hash.startsWith(QUERIES_HASH)) return UserQueriesPage;
+  if (hash.startsWith(NOTIFICATIONS_HASH)) return NotificationsPage;
+  if (hash.startsWith(SEARCH_HASH)) return SearchPage;
+  if (hash.startsWith(COURSE_HASH)) return CourseRouteGuard;
+  if (hash.startsWith(SETTINGS_HASH)) return SettingsPage;
+  if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return SubscriberExperiencePage;
+  if (hash.startsWith(PROFILE_HASH)) return ProfileApp;
+  if (hash.startsWith(MY_DAY_HASH)) return MyDayApp;
+  if (hash.startsWith(LEADERBOARD_HASH)) return LeaderboardApp;
+  if (hash.startsWith(FLOWPATH_HASH)) return FlowPathApp;
+  if (hash.startsWith(REVISION_HASH)) return RevisionApp;
+  if (hash.startsWith(PRODUCT_HASH)) return PdpApp;
+  if (hash.startsWith(STORE_HASH)) return StoreApp;
+  return null;
+}
+
+/** Start the chunk for `hash` now. Cheap and idempotent (see lazyRoute). */
+export function preloadRouteChunk(hash: string): void {
+  void routeChunkFor(hash)?.preload().catch(() => undefined);
+}
+
+// Let any component warm a route without importing this module (which would
+// be a cycle — main.tsx imports the shell). The desktop rail uses it on hover.
+setRoutePreloader(preloadRouteChunk);
+
 
 /**
  * The ONE Black Ice backdrop for the whole app (Phase A, wave A1).
@@ -1556,6 +1639,47 @@ function RootPage(): ReactNode {
 // run even if a page component throws while mounting (that used to leave the
 // splash on screen forever, or hide it before a frame was ever painted).
 attachOpeningSplash();
+
+// ── Route chunk warm-up (perf pass 2026-09-08) ──────────────────────────────
+// Kick the ACTIVE route's chunk off right now, while React is still booting
+// and the AuthProvider is still waiting on Firebase. Without this the split
+// would add a render → suspend → fetch hop to every cold start; with it the
+// chunk downloads in parallel with the shell's own work, so the split costs
+// nothing on the route the learner actually opened.
+if (typeof window !== "undefined") {
+  // Opt-in only (`?perf=1`). Registers nothing when the flag is off, so this
+  // line costs one localStorage read on a normal boot. See utils/perfMonitor.
+  initPerfMonitor();
+  markPerf("boot");
+  preloadRouteChunk(window.location.hash);
+  // Installed mobile PWAs boot with an empty hash and are sent straight to
+  // Home by RootPage, so warm that chunk too rather than the landing page.
+  if (!window.location.hash && isInstalledMobilePwa()) preloadRouteChunk("#/home");
+  // A hash change renders the new route on the SAME tick, so React would
+  // suspend before the import starts. Listening in the capture phase gets the
+  // fetch going a beat earlier — usually enough to skip the fallback entirely.
+  window.addEventListener("hashchange", () => {
+    const target = window.location.hash;
+    preloadRouteChunk(target);
+    if (isPerfEnabled()) {
+      const started = performance.now();
+      // Two frames: the first is the React commit, the second is after paint.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        recordRouteTiming(target, performance.now() - started);
+      }));
+    }
+  }, { capture: true });
+  // Once the first screen is idle, warm ONLY the two routes a learner reaches
+  // next from almost anywhere (the store and the profile tab of the footer
+  // nav). Everything else stays unfetched until it is asked for, and nothing
+  // is speculatively fetched at all on Save-Data / 2G.
+  onIdle(() => {
+    if (prefersReducedData()) return;
+    void StoreApp.preload().catch(() => undefined);
+    void ProfileApp.preload().catch(() => undefined);
+  }, 4_000);
+}
+
 // Drive the footer's outside magic glow with the page's scroll energy
 // (see src/utils/footerGlow.ts). Runs once for the whole app shell.
 initFooterGlow();

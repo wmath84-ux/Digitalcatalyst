@@ -42,7 +42,7 @@ export default function ProductCard({
       className="group relative flex h-full flex-col overflow-hidden transition duration-300 hover:-translate-y-1"
     >
       <div className="relative aspect-[16/10] w-full overflow-hidden">
-        <img src={product.image} alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <img src={product.image} alt={product.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
 
         <div className="absolute left-2 top-2 z-20 flex gap-1.5">
           {purchased && (

@@ -120,6 +120,9 @@ export interface OpeningInput {
   override: OpeningOverride | null;
   /** This device asked (on the dev page) for the full clip despite reduced motion. */
   preferFullClip?: boolean;
+  /** Data Saver is on, or the connection is 2G-class. The clip is ~5 MB, so
+   *  those devices get the static card instead (mirrored in index.html). */
+  saveData?: boolean;
   /** The clip the pre-React boot script already started, if any. Adopting it
    *  instead of re-deriving it is what stops a mid-clip viewport change from
    *  reloading the file and restarting the animation. */
@@ -308,6 +311,16 @@ export function resolveOpeningDecision(input: OpeningInput): OpeningDecision {
       reason: "system prefers reduced motion — showing the static opening card (opening=force plays the clip anyway)",
     };
   }
+  if (input.saveData && input.override !== "force") {
+    return {
+      ...base,
+      show: true,
+      mode: "static",
+      reason:
+        "Data Saver / 2G-class connection — showing the static opening card instead of downloading the clip " +
+        "(opening=force plays it anyway)",
+    };
+  }
   return {
     ...base,
     show: true,
@@ -392,8 +405,24 @@ function currentInput(timings?: Partial<OpeningTimings>): OpeningInput {
     reducedMotion: prefersReducedMotion(),
     preferFullClip: readPreferFullClip(),
     offline: navigator.onLine === false,
+    saveData: prefersReducedDataForOpening(),
     override: readOpeningOverride(window.location.search, readStoredOverride(), peekOpeningRuntimeOverride()),
   };
+}
+
+/**
+ * Data Saver / 2G-class probe, mirrored by the pre-React script in index.html.
+ * Kept local (not imported from utils/lazyRoute) so this module stays free of
+ * app imports — it is loaded on the boot path.
+ */
+function prefersReducedDataForOpening(): boolean {
+  if (!isBrowser()) return false;
+  const connection = (navigator as Navigator & {
+    connection?: { saveData?: boolean; effectiveType?: string };
+  }).connection;
+  if (!connection) return false;
+  if (connection.saveData === true) return true;
+  return /(^|-)2g$/.test(String(connection.effectiveType || ""));
 }
 
 function readStoredOverride(): string | null {

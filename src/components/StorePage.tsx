@@ -112,7 +112,7 @@ function ProductCardList({
     >
       {/* Image — left side */}
       <div className="relative h-auto w-36 shrink-0 overflow-hidden sm:w-44">
-        <img src={product.image} alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <img src={product.image} alt={product.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         <div className="absolute left-2 top-2 flex gap-1">
           {purchased && (
             <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white">

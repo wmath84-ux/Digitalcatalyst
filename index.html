@@ -180,8 +180,15 @@
         // for a second before React can say so.
         var preferFull = false;
         try { preferFull = localStorage.getItem("eduvora.opening.preferFull.v1") === "1"; } catch (e) {}
+        // Perf: the clip is ~5 MB. On Data Saver or a 2G-class connection it
+        // would eat the bandwidth the app itself needs to boot and would still
+        // miss its own first-frame deadline, so those devices get the static
+        // brand card (the same designed fallback reduced-motion already uses).
+        // ?opening=force still plays it.
+        var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        var slowNet = !!conn && (conn.saveData === true || /(^|-)2g$/.test(String(conn.effectiveType || "")));
         var show = override !== "off" && (enabled || override === "on" || override === "force") && !(offline && override !== "force");
-        var playClip = show && override !== "static" && !(REDUCE && override !== "force" && !preferFull);
+        var playClip = show && override !== "static" && !(REDUCE && override !== "force" && !preferFull) && !(slowNet && override !== "force");
 
         if (splash && !show) splash.dataset.opening = "skipped";
         if (video) {
@@ -194,7 +201,10 @@
           if (!isNativeApp) video.setAttribute("muted", "");
           video.playsInline = true;
           video.setAttribute("playsinline", "");
-          video.setAttribute("src", src);
+          // Only point the element at the file when the clip is actually going
+          // to play: with preload="auto" a bare src assignment downloads all
+          // ~5 MB even on a boot that never shows a single frame.
+          if (playClip) video.setAttribute("src", src);
         }
         if (splash) splash.dataset.preReact = "boot";
         if (playClip && video) {
