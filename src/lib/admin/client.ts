@@ -14,12 +14,30 @@ import { defaultCatalog, normalizeCatalog, REVISION_CATALOG_DOC_ID } from "../..
 import type { PaidUpdate, ProductModule } from "./types";
 import { normalizeRevisionTestBankLimits } from "../../../utils/revisionLimits.js";
 import { normalizePlanAiAllowances } from "../../../utils/aiAllowances.js";
+import { normalizePlanPersonalModules } from "../../../utils/personalCourse.js";
 
 export class ApiError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status; } }
 const bodyOf = (init?: RequestInit) => init?.body ? JSON.parse(String(init.body)) as Record<string, any> : {};
 const urlOf = (input: string) => new URL(input, window.location.origin);
 const asDate = (value: any) => value?.toDate?.()?.toISOString?.() || String(value || new Date().toISOString());
 const money = (value: any) => Number(String(value ?? 0).replace(/[^0-9.-]/g, "")) || 0;
+/** Build the Firestore `personalModules` block (null allowedTypes = all 12 are DROPPED, since Firestore rejects null values and missing means "all" to the normalizer). */
+const persistPersonalModulesBlock = (value: any, planId: string) => {
+  const config = normalizePlanPersonalModules(value && typeof value === "object" ? { personalModules: value } : {}, planId);
+  const cycleOf = (cycle: any) => ({
+    moduleLimit: cycle.moduleLimit,
+    resourceLimit: cycle.resourceLimit,
+    perModuleResourceLimit: cycle.perModuleResourceLimit,
+    ...(Array.isArray(cycle.allowedTypes) && cycle.allowedTypes.length > 0 ? { allowedTypes: cycle.allowedTypes } : {}),
+  });
+  return {
+    enabled: config.enabled,
+    customEmbedEnabled: config.customEmbedEnabled,
+    contentStorageEnabled: config.contentStorageEnabled,
+    monthly: cycleOf(config.monthly),
+    yearly: cycleOf(config.yearly),
+  };
+};
 /** Coerce any editor value to a string so `undefined` never reaches Firestore. */
 const str = (value: any, fallback = "") => (value === null || value === undefined ? fallback : String(value));
 /** Coerce a list field to a clean string array (drops undefined/null/blank entries). */
@@ -217,7 +235,7 @@ async function subscriptionPlansRequest(init?: RequestInit) {
       return { id: item.id, name: data.name || "Plan", description: data.description || "", billingCycles: [
         { cycle: "monthly", label: "Monthly", price: money(data.monthlyPrice ?? data.priceMonthly ?? 0) },
         { cycle: "yearly", label: "Yearly", price: money(data.yearlyPrice ?? data.priceYearly ?? 0) },
-      ], revisionTestBankLimits: normalizeRevisionTestBankLimits(data.revisionTestBankLimits, item.id), aiAllowances: normalizePlanAiAllowances(data.aiAllowances), accessTier: data.accessTier || item.id, badge: data.badge || null, cta: data.cta || "Subscribe", featured: Boolean(data.featured), active: data.active !== false, visibleCycles: normaliseVisibleCycles(data.visibleCycles), subscriberPricingOverride: normaliseSubscriberPricing(data.subscriberPricingOverride) };
+      ], revisionTestBankLimits: normalizeRevisionTestBankLimits(data.revisionTestBankLimits, item.id), aiAllowances: normalizePlanAiAllowances(data.aiAllowances), personalModules: normalizePlanPersonalModules(data, item.id), accessTier: data.accessTier || item.id, badge: data.badge || null, cta: data.cta || "Subscribe", featured: Boolean(data.featured), active: data.active !== false, visibleCycles: normaliseVisibleCycles(data.visibleCycles), subscriberPricingOverride: normaliseSubscriberPricing(data.subscriberPricingOverride) };
     }) };
   }
   const body = bodyOf(init); const recordId = String(body.id || id()); const ref = doc(db, "subscriptionPlans", recordId);
@@ -234,6 +252,10 @@ async function subscriptionPlansRequest(init?: RequestInit) {
     allowedCycles: ["monthly", "yearly"],
     revisionTestBankLimits: normalizeRevisionTestBankLimits(body.revisionTestBankLimits, recordId),
     aiAllowances: normalizePlanAiAllowances(body.aiAllowances),
+    // Personal Course Modules ("My Modules"): canonical per-plan config.
+    // Prices are never part of this block — plan prices live at the top
+    // level (monthlyPrice/yearlyPrice) and are untouched by this save.
+    personalModules: persistPersonalModulesBlock(body.personalModules, recordId),
     accessTier: body.accessTier || "basic",
     badge: body.badge || null,
     cta: body.cta || "Subscribe",

@@ -38,7 +38,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
-import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
+import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Library, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
@@ -96,7 +96,7 @@ const ROW_ICON_SIZE = 44;
 const ROW_MAG_RANGE = 120;
 const ROW_MAG_SCALE = 1.55;
 
-type SheetRowKind = "module" | "file" | "update" | "buy";
+type SheetRowKind = "module" | "file" | "update" | "buy" | "personal-entry";
 
 interface SheetRowSpec {
   id: string;
@@ -327,6 +327,17 @@ interface CourseOverlayProps {
   // buttons and every player preference). Owned by the parent for the same
   // reason as the mind map panel.
   playerPanel?: ReactNode;
+  // ── Personal Course Modules ("My Modules") wiring ─────────────────────
+  // Same ownership pattern as the mind map / player panels: the Course
+  // Player owns the hook + state and hands a ready-rendered panel down, so
+  // this overlay stays presentational. When `personalModulesOpen` is true
+  // the MODULES tab swaps its official-module list for that panel; the list
+  // is restored by the panel's own back row (parent flips the flag).
+  personalModulesOpen?: boolean;
+  personalModulesPanel?: ReactNode;
+  /** The modules-tab entry row. `null`/absent hides the entry completely. */
+  personalModulesEntry?: { subtitle: string; locked?: boolean } | null;
+  onOpenPersonalModules?: () => void;
   /**
    * True while the footer navigation is the bottom-centre PEEK dock (the
    * desktop pattern, rendered by the parent as <CoursePeekDock />). In that
@@ -420,6 +431,8 @@ export type StudyRowsArgs = Pick<
   | "onSelectFile"
   | "onBuyModule"
   | "onBuyUpdate"
+  | "personalModulesEntry"
+  | "onOpenPersonalModules"
 >;
 
 export interface StudyRows {
@@ -533,8 +546,31 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
         }
       }
     }
+    // "My Modules" — the learner's own study content for this course, as a
+    // native list row under the official curriculum (same 44px plate, same
+    // scroll-snap behaviour). It only appears when the parent has mounted the
+    // feature; the parent's panel owns every state it can be in (locked /
+    // at-limit / creating…), so the row is always safe to press.
+    const entry = args.personalModulesEntry;
+    if (entry) {
+      rows.push({
+        id: "personal-modules-entry",
+        kind: "personal-entry",
+        icon: <Library size={20} />,
+        color: "#B388FF",
+        title: "My Modules",
+        subtitle: entry.subtitle,
+        selected: false,
+        extra: entry.locked ? <LockKeyhole size={13} className="text-violet-300" /> : <ChevronRight size={15} className="text-[var(--course-muted)]" />,
+        press: () => args.onOpenPersonalModules?.(),
+        dataAttrs: {
+          "data-course-personal-entry": "",
+          "data-personal-locked": entry.locked ? "true" : "false",
+        },
+      });
+    }
     return rows;
-  }, [listMode, activeTab.color, flatModules, expanded, toggleModule, modules, accessibleModuleIds, ownedUpdateIds, previewModuleIds, selectedFileId, onSelectFile]);
+  }, [listMode, activeTab.color, flatModules, expanded, toggleModule, modules, accessibleModuleIds, ownedUpdateIds, previewModuleIds, selectedFileId, onSelectFile, args]);
 
   // Keep the module holding the open file expanded by default.
   useEffect(() => {
@@ -644,6 +680,8 @@ export function StudyContent({
   notesPanel,
   mindMapPanel,
   playerPanel,
+  personalModulesOpen = false,
+  personalModulesPanel,
 }: {
   tab: DockTab;
   rows: SheetRowSpec[];
@@ -652,12 +690,20 @@ export function StudyContent({
   notesPanel: ReactNode;
   mindMapPanel: ReactNode;
   playerPanel: ReactNode;
+  /** My Modules: the modules tab swaps to the learner's own-content panel. */
+  personalModulesOpen?: boolean;
+  personalModulesPanel?: ReactNode;
 }) {
   return (
     // Content swaps in place — the pane itself never closes. No slide
     // animation: the list is a plain scrollable column.
     <div key={tab} className="min-h-0 flex-1 overflow-hidden" data-course-overlay-tab={tab}>
-      {tab === "notes" ? (
+      {tab === "modules" && personalModulesOpen && personalModulesPanel ? (
+        // My Modules (learner-owned study content). The parent owns the hook
+        // + panel state and hands it down ready-rendered, exactly like the
+        // mind map and player panels below.
+        personalModulesPanel
+      ) : tab === "notes" ? (
         notesPanel
       ) : tab === "mindmap" ? (
         // The parent owns the map state + Firestore hook, so the panel is
@@ -739,6 +785,8 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       }
       mindMapPanel={props.mindMapPanel ?? MINDMAP_FALLBACK}
       playerPanel={props.playerPanel ?? PLAYER_FALLBACK}
+      personalModulesOpen={props.personalModulesOpen}
+      personalModulesPanel={props.personalModulesPanel}
     />
   );
 

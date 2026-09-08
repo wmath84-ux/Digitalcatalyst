@@ -10,6 +10,7 @@ import { handleBrandIcon } from "./_lib/brandIcon.js";
 import { handleSubscriptionGate } from "./_lib/subscriptionGateServer.js";
 import { applyCors } from "./_lib/cors.js";
 import { handleCreateQuery, handleListQueries, handleReplyQuery } from "./_lib/userQueries.js";
+import { handlePersonalCourse } from "./_lib/personalCourse.js";
 
 type SubscriberRow = {
   uid: string;
@@ -153,6 +154,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (action.startsWith("myday.")) {
       return handleMyDay(req, res);
+    }
+    // Personal Course Modules ("My Modules") — server-authoritative
+    // entitlement/limit enforcement + user-owned content writes. Shares this
+    // deployed function to stay within the Hobby 12-function cap.
+    if (action.startsWith("personalCourse.")) {
+      return handlePersonalCourse(req, res);
     }
     if (action.startsWith("flowpath.")) {
       return handleFlowPathControl(req, res);

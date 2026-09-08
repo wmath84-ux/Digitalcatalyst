@@ -360,6 +360,43 @@ service cloud.firestore {
           && !request.resource.data.keys().hasAny(['apiKey', 'authorization', 'secret', 'rawApiKey']);
         allow delete: if isOwner(uid) || isAdmin() || resource.data.expiresAtMs <= request.time.toMillis();
       }
+
+      // ── Personal Course Modules ("My Modules") ──────────────────────────
+      // Learner-created study content inside a course they can access. The
+      // path itself is under the owner's uid namespace, so one learner can
+      // never read another learner's modules and the ownerUid can never be
+      // spoofed (Firestore rules re-derive ownership from the path).
+      //
+      // Entitlement (paid feature), per-plan limits and allowed resource
+      // types are enforced by the AUTHORITATIVE server API
+      // (`/api/personal-course`, api/_lib/personalCourse.ts) inside
+      // Firestore transactions — a browser client can never enable the
+      // feature by editing local state or request payloads. Those checks
+      // need cross-document reads + transactional counting that rules cannot
+      // express, so direct CLIENT WRITES are denied here; the server's Admin
+      // SDK performs every create/update/delete. Reads are allowed so the
+      // Course Player can subscribe live to the learner's own content.
+      //
+      // Official course documents (siteProducts etc.) are never reachable
+      // through these paths, so this feature cannot mutate instructor
+      // content by construction.
+      match /personalCourseModules/{moduleId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if false;
+
+        match /resources/{resourceId} {
+          allow read: if isOwner(uid) || isAdmin();
+          allow create, update, delete: if false;
+        }
+      }
+
+      // Server-maintained usage counters for one user + course (module and
+      // total-resource counts). Readable by the owner for live limit UI;
+      // written only by the Admin SDK API layer.
+      match /personalCourseUsage/{productId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update, delete: if false;
+      }
     }
 
     match /siteProducts/{productId} {

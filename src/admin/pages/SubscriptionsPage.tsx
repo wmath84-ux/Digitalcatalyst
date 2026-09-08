@@ -5,6 +5,14 @@ import { DangerButton, EmptyState, ErrorState, Field, LoadingState, Pill, Primar
 import { useConfirm, useToast } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
 import { resolveFeaturePrice, toPaise } from "../../../utils/featurePricing";
+import {
+  defaultPersonalModulesForPlan,
+  normalizePlanPersonalModules,
+  PERSONAL_COURSE_TYPE_ORDER,
+  personalCourseTypeLabel,
+  type PersonalModulesCycleLimits,
+  type PlanPersonalModulesConfig,
+} from "../../../utils/personalCourse";
 
 type Plan = {
   id: string;
@@ -25,6 +33,8 @@ type Plan = {
   visibleCycles?: string[];
   /** Phase-1: price ONLY existing subscribers see (per-cycle). null = use public price. */
   subscriberPricingOverride?: { monthly: number | null; yearly: number | null; lifetime: number | null };
+  /** Personal Course Modules ("My Modules") per-plan configuration. */
+  personalModules?: PlanPersonalModulesConfig;
 };
 
 /** Per-plan price override stored on a feature doc. */
@@ -98,9 +108,121 @@ type SubscriptionProductRow = {
   subscriberPricingOverride?: { monthly: number | null; yearly: number | null; lifetime: number | null };
 };
 
-const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }, { cycle: "yearly", label: "Yearly", price: 0 }], revisionTestBankLimits: { monthly: 20, yearly: 20 }, aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } }, accessTier: "basic", cta: "Subscribe", featured: false, active: true };
+const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }, { cycle: "yearly", label: "Yearly", price: 0 }], revisionTestBankLimits: { monthly: 20, yearly: 20 }, aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } }, accessTier: "basic", cta: "Subscribe", featured: false, active: true, personalModules: defaultPersonalModulesForPlan("new", 0, 0) };
 const EMPTY_FEATURE: Partial<FeatureRow> = { key: "", name: "", description: "", individualPrice: "0", monthlyPrice: "", yearlyPrice: "", planPricing: {}, icon: "sparkles", included: false, badge: "", sortOrder: 0, freeItemsPerDay: 1, active: true };
 const EMPTY_SUB_PRODUCT: Partial<SubscriptionProductRow> = { productId: "", name: "", individualPrice: "0", monthlyPrice: "", yearlyPrice: "", planPricing: {}, included: false, sortOrder: 0, active: true };
+
+/**
+ * Per-plan "Personal Course Modules (My Modules)" editor.
+ *
+ * One config block per plan, per billing duration (monthly / yearly
+ * independently), exactly the canonical shape the server + player read:
+ * `enabled`, `customEmbedEnabled`, `contentStorageEnabled` plus each cycle's
+ * module / total-resource / per-module-resource limits and the allowed
+ * resource-type list (empty = all 12). Prices are NEVER part of this block —
+ * plan prices stay in the top-level monthly/yearly price fields, so saving
+ * this section can never overwrite or silently derive prices.
+ */
+function PersonalModulesSection({ value, planId, onChange }: {
+  value: PlanPersonalModulesConfig | null;
+  planId: string;
+  onChange: (next: PlanPersonalModulesConfig) => void;
+}) {
+  const config = normalizePlanPersonalModules(value ? { personalModules: value } : {}, planId);
+  const set = (patch: Partial<PlanPersonalModulesConfig>) => onChange({ ...config, ...patch });
+  const setCycle = (cycle: "monthly" | "yearly", patch: Partial<PersonalModulesCycleLimits>) =>
+    set({ [cycle]: { ...config[cycle], ...patch } });
+
+  const limitValue = (raw: number | undefined, fallback: number) =>
+    raw === undefined || raw === null || Number.isNaN(Number(raw)) ? fallback : Number(raw);
+  const clampLimit = (raw: string, fallback: number) => {
+    const number = Math.round(Number(raw));
+    if (!Number.isFinite(number) || String(raw).trim() === "") return fallback;
+    return Math.max(-1, Math.min(10000, number));
+  };
+
+  return (
+    <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/60 p-3" data-admin-plan-personal>
+      <p className="text-sm font-semibold text-slate-900">Personal Course Modules (My Modules)</p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+        Learners with an active subscription can keep their own study modules + resources inside a course.
+        Configure each billing duration independently; −1 = unlimited. Blank type list = all 12 types allowed.
+        This block never touches plan prices.
+      </p>
+
+      <div className="mt-3 space-y-1.5">
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" className="h-5 w-5" data-admin-plan-personal-enabled checked={config.enabled}
+            onChange={(e) => set({ enabled: e.target.checked })} />
+          Enabled for this plan
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" className="h-5 w-5" data-admin-plan-personal-embed checked={config.customEmbedEnabled}
+            onChange={(e) => set({ customEmbedEnabled: e.target.checked })} />
+          Allow "Embed / Website" resources
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" className="h-5 w-5" data-admin-plan-personal-storage checked={config.contentStorageEnabled}
+            onChange={(e) => set({ contentStorageEnabled: e.target.checked })} />
+          Allow personal content storage
+        </label>
+      </div>
+
+      {(["monthly", "yearly"] as const).map((cycle) => {
+        const slice = config[cycle];
+        const chips = slice.allowedTypes && slice.allowedTypes.length > 0 ? slice.allowedTypes : null;
+        const toggleType = (type: string) => {
+          const base = chips ? [...chips] : [...PERSONAL_COURSE_TYPE_ORDER];
+          const next = base.includes(type as never) ? base.filter((item) => item !== type) : [...base, type] as never[];
+          setCycle(cycle, { allowedTypes: next.length >= PERSONAL_COURSE_TYPE_ORDER.length ? null : next });
+        };
+        return (
+          <div key={cycle} className="mt-3 rounded-lg border border-fuchsia-100 bg-white p-2.5">
+            <p className="mb-2 text-xs font-bold capitalize text-fuchsia-800">{cycle} membership</p>
+            <div className="grid grid-cols-3 gap-2">
+              <Field label="Module limit" hint="−1 = unlimited">
+                <input className={inputClass} type="number" min={-1} max={10000}
+                  {...{ [`data-admin-plan-personal-${cycle}-module`]: "" }}
+                  value={limitValue(slice.moduleLimit, 5)}
+                  onChange={(e) => setCycle(cycle, { moduleLimit: clampLimit(e.target.value, 5) })} />
+              </Field>
+              <Field label="Total resource limit" hint="−1 = unlimited">
+                <input className={inputClass} type="number" min={-1} max={10000}
+                  {...{ [`data-admin-plan-personal-${cycle}-resource`]: "" }}
+                  value={limitValue(slice.resourceLimit, 50)}
+                  onChange={(e) => setCycle(cycle, { resourceLimit: clampLimit(e.target.value, 50) })} />
+              </Field>
+              <Field label="Per-module resource limit" hint="−1 = unlimited">
+                <input className={inputClass} type="number" min={-1} max={1000}
+                  {...{ [`data-admin-plan-personal-${cycle}-per-module`]: "" }}
+                  value={limitValue(slice.perModuleResourceLimit, 20)}
+                  onChange={(e) => setCycle(cycle, { perModuleResourceLimit: clampLimit(e.target.value, 20) })} />
+              </Field>
+            </div>
+            <p className="mb-1 mt-2.5 text-[11px] font-semibold text-slate-700">Allowed resource types</p>
+            <div className="flex flex-wrap gap-1.5" data-admin-plan-personal-types data-cycle={cycle}>
+              <button type="button"
+                className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold transition ${!chips ? "bg-fuchsia-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                data-admin-plan-personal-type="all"
+                onClick={() => setCycle(cycle, { allowedTypes: null })}>
+                All 12 types
+              </button>
+              {PERSONAL_COURSE_TYPE_ORDER.map((type) => (
+                <button key={type} type="button"
+                  className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold transition ${chips?.includes(type) ? "bg-fuchsia-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                  data-admin-plan-personal-type={type}
+                  data-active={chips?.includes(type) ? "true" : "false"}
+                  onClick={() => toggleType(type)}>
+                  {personalCourseTypeLabel(type)}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function SubscriptionsPage() {
   const [tab, setTab] = useState("plans");
@@ -432,6 +554,9 @@ export default function SubscriptionsPage() {
                   </p>
                   <p className="mt-1 text-[11px] font-semibold text-violet-600">
                     School AI/day: {p.aiAllowances?.monthly?.dailyGenerationLimit === 0 ? "Unlimited" : p.aiAllowances?.monthly?.dailyGenerationLimit ?? 20} monthly · {p.aiAllowances?.yearly?.dailyGenerationLimit === 0 ? "Unlimited" : p.aiAllowances?.yearly?.dailyGenerationLimit ?? 20} yearly
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-fuchsia-600">
+                    My Modules: {p.personalModules?.enabled ? "Enabled" : "Off"} · {p.personalModules?.monthly?.moduleLimit ?? "—"} monthly modules · {p.personalModules?.yearly?.moduleLimit ?? "—"} yearly modules
                   </p>
                   <div className="mt-2 flex gap-2">
                     <SecondaryButton className="h-9 flex-1 text-xs" onClick={() => setEditingPlan(p)}>Edit</SecondaryButton>
@@ -971,6 +1096,13 @@ export default function SubscriptionsPage() {
                 );
               })}
             </div>
+
+            <PersonalModulesSection
+              value={editingPlan.personalModules ?? null}
+              planId={editingPlan.id ?? "new"}
+              onChange={(next) => setEditingPlan({ ...editingPlan, personalModules: next })}
+            />
+
             <div className="grid grid-cols-2 gap-3">
               <Field label="Access tier">
                 <select className={selectClass} value={editingPlan.accessTier ?? "basic"} onChange={(e) => setEditingPlan({ ...editingPlan, accessTier: e.target.value })}>

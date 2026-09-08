@@ -51,6 +51,26 @@ export interface CourseFile extends CourseAccessMeta {
   size?: number;
   contentType?: string;
   provider?: string;
+  /**
+   * Personal Modules ("My Modules") provenance. Set ONLY when this file was
+   * opened from the learner's OWN personal-content space — official course
+   * files never carry these fields, so every existing consumer (progress,
+   * resume, mind maps, notes, downloads) can tell personal content apart and
+   * keep it out of official course metrics.
+   *
+   *   source           — "personal" when the file is learner-owned.
+   *   ownerUid         — always the authenticated learner's uid (server-set).
+   *   personalModuleId — doc id of the owning personal module
+   *                      (`users/{uid}/personalCourseModules/{moduleId}`).
+   *   personalResourceId — doc id of the owning personal resource
+   *                      (`…/personalCourseModules/{moduleId}/resources/{id}`).
+   *   description      — the personal resource's own description text.
+   */
+  source?: "official" | "personal";
+  ownerUid?: string;
+  personalModuleId?: string;
+  personalResourceId?: string;
+  description?: string;
 }
 
 export interface CourseModule extends CourseAccessMeta {
