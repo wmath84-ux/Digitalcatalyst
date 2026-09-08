@@ -83,6 +83,20 @@ export const persistPlaybackStore = (uid: string, productId: string, store: Cour
   }
 };
 
+/**
+ * Paused/hidden media can keep polling the same position. Do not sort and
+ * stringify the entire resume store (or synchronously write localStorage)
+ * for an identical patch. Changed positions still persist immediately;
+ * there is no debounce, delayed save or loss of the last seek/scroll.
+ */
+export const playbackPatchChanged = (entry: CoursePlaybackEntry | undefined, patch: CoursePlaybackPatch): boolean => {
+  if (!entry) return true;
+  for (const key in patch) {
+    if (Object.prototype.hasOwnProperty.call(patch, key) && !Object.is(entry[key as keyof CoursePlaybackPatch], patch[key as keyof CoursePlaybackPatch])) return true;
+  }
+  return false;
+};
+
 export const mergePlaybackEntry = (
   store: CoursePlaybackStore,
   fileId: string,

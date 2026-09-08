@@ -50,7 +50,7 @@ const EDGE_BAND = 0.15;
 const DESK_PITCH = -0.63;
 
 export default function WallVisibility({ forceVisible = false }: { forceVisible?: boolean }) {
-  const { camera } = useThree();
+  const camera = useThree((state) => state.camera);
   // The store outlives this component (module scope), so a room that unmounts
   // must hand the next one a clean map instead of last session's angles.
   useEffect(() => resetWallOnScreen, []);

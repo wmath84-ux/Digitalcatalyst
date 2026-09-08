@@ -1,83 +1,79 @@
-// src/classroom3d/QualityGovernor.tsx
+// The existing PerformanceMonitor → AdaptiveDpr/AdaptiveEvents bridge.
+// Decisions still require 5 of 6 averaged windows; no per-frame React state.
+// Resolution moves in small steps, while the more visible snow/light tier
+// changes have separate enter/leave thresholds (quality.ts).
 //
-// The room's auto-graphics-settings (Part 13): a <PerformanceMonitor> that
-// watches real frame times and steps the room down (or back up) a quality
-// ladder — snow, lights, spill, resolution — with averaged sampling windows
-// so it never flickers between levels.
-//
-// ── Why a governor instead of plain drei components ───────────────────────
-// drei's <AdaptiveDpr>/<AdaptiveEvents> read the FIBER store's
-// `performance.current`, but drei 10's <PerformanceMonitor> deliberately no
-// longer writes it (it only reports through its callbacks). So the governor
-// is the bridge: every factor change maps to a tier, the tier is written to
-// the fiber store (AdaptiveDpr/AdaptiveEvents react on their own), and the
-// room is told only when the TIER changes — a handful of renders per session,
-// never per frame.
-//
-// The initial tier comes from quality.ts's one-time probe (persisted for the
-// session); the monitor's first averaging window is the warm-up fps sample
-// that corrects the probe within ~a second when it guessed wrong. A device
-// that keeps flip-flopping locks to low via onFallback and remembers it.
-
+// drei 10's `flipped` counter increments on EVERY qualifying window, even an
+// incline at factor=1, not only direction changes. A finite flipflops limit
+// therefore permanently locked even a healthy 60 Hz device to low. Keep the
+// SAME monitor running so a transient load can recover; hysteresis + slow
+// recovery prevent oscillation without a session-long low-quality lock.
 import { memo, useEffect, useRef, useState } from "react";
 import { useThree } from "@react-three/fiber";
-import { PerformanceMonitor } from "@react-three/drei";
+import { PerformanceMonitor, type PerformanceMonitorApi } from "@react-three/drei";
 import {
+  CLASSROOM_SAMPLE_MS,
+  ClassroomFrameBudget,
   QUALITY_FACTOR,
+  MIN_CLASSROOM_PERFORMANCE,
+  classroomFrameBounds,
+  performanceForFactor,
   pickInitialTier,
   qualityForFactor,
   rememberTier,
   type ClassroomQuality,
 } from "./quality";
 
-// Resolution scale the tier writes into the fiber store for <AdaptiveDpr>
-// (multiplied by the mount-time initial dpr): full pixels on high, three
-// quarters on medium, three fifths on low.
-const TIER_PERFORMANCE: Record<ClassroomQuality, number> = {
-  high: 1,
-  medium: 0.75,
-  low: 0.6,
-};
-
-// A decision every ~1.2 s of wall time (6 averaged 200 ms windows): fast
-// enough to catch a struggling phone before the learner notices, slow enough
-// that one GC pause can't cause a step-down.
-const SAMPLE_MS = 200;
+const SAMPLE_MS = CLASSROOM_SAMPLE_MS;
 const SAMPLE_ITERATIONS = 6;
-// After this many up/down flips the device is declared unstable and locked
-// to low for the session (onFallback also stops the sampling entirely).
-const FALLBACK_FLIPFLOPS = 6;
+const FALLBACK_FLIPFLOPS = Infinity;
 
 function QualityGovernor({ onTier }: { onTier: (tier: ClassroomQuality) => void }) {
   const set = useThree((state) => state.set);
-  // Mount-only: the probed (or remembered) starting point. Later room
-  // renders must not move it — live sampling owns the tier from here on.
+  const scene = useThree((state) => state.scene);
+  const [budget] = useState(() => new ClassroomFrameBudget());
   const [startTier] = useState<ClassroomQuality>(pickInitialTier);
   const lastTier = useRef<ClassroomQuality>(startTier);
+  const monitor = useRef<PerformanceMonitorApi | null>(null);
   const onTierRef = useRef(onTier);
   onTierRef.current = onTier;
 
-  // A tier change has two effects: the fiber store's performance (which
-  // <AdaptiveDpr> turns into resolution and <AdaptiveEvents> into R3F event
-  // handling) and the room's snow/lights/spill — the latter via one React
-  // render, only when the tier actually changes.
-  const applyTier = (tier: ClassroomQuality): void => {
-    set((state) => ({
-      performance: { ...state.performance, current: TIER_PERFORMANCE[tier] },
-    }));
+  const applyFactor = (factor: number): void => {
+    const current = performanceForFactor(factor);
+    set((state) => current === state.performance.current && state.performance.min === MIN_CLASSROOM_PERFORMANCE ? state : {
+      performance: { ...state.performance, current, min: MIN_CLASSROOM_PERFORMANCE },
+    });
+    const tier = qualityForFactor(factor, lastTier.current);
     if (tier === lastTier.current) return;
     lastTier.current = tier;
     rememberTier(tier);
     onTierRef.current(tier);
   };
 
-  // Seed the store before the first sample so a remembered low tier doesn't
-  // render a second of full-resolution frames while the monitor warms up.
+  const observeWindow = (api: PerformanceMonitorApi): void => {
+    monitor.current = api;
+    if (!document.hidden && budget.observe(api.factor, api.averages)) {
+      scene.userData.classroomFrameBudgetMs = 1000 / budget.target;
+    }
+  };
+
   useEffect(() => {
-    lastTier.current = startTier;
-    set((state) => ({
-      performance: { ...state.performance, current: TIER_PERFORMANCE[startTier] },
-    }));
+    scene.userData.classroomFrameBudgetMs = 1000 / budget.target;
+    applyFactor(QUALITY_FACTOR[startTier]);
+    // A hidden tab is not a struggling GPU. Discard only the incomplete
+    // sampling history on hide/return; keep the chosen quality and keep
+    // sampling. No forced low tier or DPR reset when the learner comes back.
+    const resetSamples = () => {
+      budget.resetSamples();
+      const api = monitor.current;
+      if (!api) return;
+      api.frames.length = 0;
+      api.averages.length = 0;
+      api.index = 0;
+    };
+    document.addEventListener("visibilitychange", resetSamples);
+    return () => document.removeEventListener("visibilitychange", resetSamples);
+    // Mount-only: live sampling owns quality from here on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -86,13 +82,17 @@ function QualityGovernor({ onTier }: { onTier: (tier: ClassroomQuality) => void 
       factor={QUALITY_FACTOR[startTier]}
       ms={SAMPLE_MS}
       iterations={SAMPLE_ITERATIONS}
+      step={0.05}
+      bounds={() => classroomFrameBounds(budget.target)}
+      onIncline={observeWindow}
+      onDecline={observeWindow}
       flipflops={FALLBACK_FLIPFLOPS}
-      onChange={(api) => applyTier(qualityForFactor(api.factor))}
-      onFallback={() => applyTier("low")}
+      onChange={(api) => {
+        monitor.current = api;
+        if (!document.hidden) applyFactor(api.factor);
+      }}
     />
   );
 }
 
-// Rendered once: `onTier` is a stable setState and everything live flows
-// through refs, so parent re-renders (focus, pinch ticks) never touch this.
 export default memo(QualityGovernor);

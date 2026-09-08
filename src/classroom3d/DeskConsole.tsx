@@ -13,10 +13,22 @@
 // <SurfaceContexts> bridge as the walls (see SurfaceContexts.tsx).
 
 import { Html } from "@react-three/drei";
-import type { ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
+import { retainSharedResources } from "./resourceLifetime";
 import { surfaceScale } from "./surfaceScale";
 import SurfaceContexts, { useSurfaceContexts } from "./SurfaceContexts";
 import { useDragScroll } from "./useSurfaceScroll";
+import { CylinderGeometry, MeshStandardMaterial } from "three";
+
+const LEG_POSITIONS: [number, number, number][] = [
+  [-0.68, 0.375, -0.3], [0.68, 0.375, -0.3],
+  [-0.68, 0.375, 0.3], [0.68, 0.375, 0.3],
+];
+let legAssets: { geometry: CylinderGeometry; material: MeshStandardMaterial } | undefined;
+const getLegAssets = () => (legAssets ??= {
+  geometry: new CylinderGeometry(0.028, 0.028, 0.75, 8),
+  material: new MeshStandardMaterial({ color: "#49505f", metalness: 0.5, roughness: 0.45 }),
+});
 
 export default function DeskConsole({
   children,
@@ -30,6 +42,8 @@ export default function DeskConsole({
   /** Tablet glow light (off on the low tier — the emissive face still reads). */
   spill?: boolean;
 }) {
+  const legs = getLegAssets();
+  useLayoutEffect(() => retainSharedResources([legs.geometry, legs.material]), [legs]);
   const width = 1.16; // metres
   const height = (width * pixelHeight) / pixelWidth;
   // Same px → metre mapping as every wall (surfaceScale.ts): drei's transform
@@ -64,16 +78,11 @@ export default function DeskConsole({
         <boxGeometry args={[1.44, 0.4, 0.04]} />
         <meshStandardMaterial color="#8d6238" roughness={0.7} />
       </mesh>
-      {[
-        [-0.68, -0.3],
-        [0.68, -0.3],
-        [-0.68, 0.3],
-        [0.68, 0.3],
-      ].map(([x, z]) => (
-        <mesh key={`${x}-${z}`} position={[x, 0.375, z]}>
-          <cylinderGeometry args={[0.028, 0.028, 0.75, 8]} />
-          <meshStandardMaterial color="#49505f" metalness={0.5} roughness={0.45} />
-        </mesh>
+      {/* Keep separate bounds: instancing all four added a draw in the common
+          board-facing view, where every individual leg is frustum-culled.
+          Sharing the resources saves memory without that culling regression. */}
+      {LEG_POSITIONS.map((position, index) => (
+        <mesh key={index} position={position} geometry={legs.geometry} material={legs.material} />
       ))}
 
       {/* The console tablet — tilted toward the seated learner */}

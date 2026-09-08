@@ -27,6 +27,8 @@ export const EMBED_MOVING_CLASS = "dc-embed-moving";
 
 let moving = false;
 let settleTimer: ReturnType<typeof setTimeout> | null = null;
+let lastMotionAt = 0;
+const now = () => performance.now();
 const listeners = new Set<(moving: boolean) => void>();
 
 const notify = (): void => {
@@ -39,24 +41,28 @@ const notify = (): void => {
   }
 };
 
-/**
- * Called every frame the view is changing. Raises motion immediately, then
- * re-arms the settle timer — motion only clears after a full quiet window.
- */
-export function reportEmbedMotion(): void {
-  if (settleTimer) {
-    clearTimeout(settleTimer);
-    settleTimer = null;
+// One pending timer, not a new callback + cancel/re-arm on every frame.
+// The deadline still follows the MOST RECENT motion report, so the existing
+// 200 ms quiet-window behaviour (including pauses mid-drag) is unchanged.
+const settle = (): void => {
+  const remaining = EMBED_MOTION_SETTLE_MS - (now() - lastMotionAt);
+  if (remaining > 0) {
+    settleTimer = setTimeout(settle, remaining);
+    return;
   }
+  settleTimer = null;
+  moving = false;
+  notify();
+};
+
+/** Raise immediately; keep extending the quiet deadline without allocating. */
+export function reportEmbedMotion(): void {
+  lastMotionAt = now();
   if (!moving) {
     moving = true;
     notify();
   }
-  settleTimer = setTimeout(() => {
-    settleTimer = null;
-    moving = false;
-    notify();
-  }, EMBED_MOTION_SETTLE_MS);
+  if (settleTimer === null) settleTimer = setTimeout(settle, EMBED_MOTION_SETTLE_MS);
 }
 
 /** Force the signal to rest — room unmount must never strand subscribers. */

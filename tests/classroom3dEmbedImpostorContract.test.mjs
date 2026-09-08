@@ -52,9 +52,10 @@ const audioPlayer = read("src/course/AudioPlayer.tsx");
 test("the motion store raises immediately and clears after a quiet window", () => {
   // Settle debounce inside the required 150–250 ms band.
   assert.match(motion, /EMBED_MOTION_SETTLE_MS = 200;/);
-  // Every report re-arms the timer; only a full quiet window clears motion.
+  // Every report extends the deadline; only a full quiet window clears motion.
   assert.match(motion, /clearTimeout\(settleTimer\);/);
-  assert.match(motion, /settleTimer = setTimeout\(\(\) => \{/);
+  assert.match(motion, /settleTimer = setTimeout\(settle, remaining\)/);
+  assert.match(motion, /lastMotionAt = now\(\)/);
   assert.match(motion, /EMBED_MOTION_SETTLE_MS\);/);
   // Edge-only notification — subscribers never hear per-frame chatter.
   assert.match(motion, /if \(!moving\) \{\n    moving = true;\n    notify\(\);\n  \}/);

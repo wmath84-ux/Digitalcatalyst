@@ -11,8 +11,8 @@
 //     viewport starts LOWER than a small phone viewport, not higher.
 //   · RUNTIME dpr      → drei's <AdaptiveDpr>, fed by QualityGovernor: the
 //     governor maps <PerformanceMonitor>'s factor to a tier and writes the
-//     tier's scale into the fiber store (drei 10's monitor no longer writes
-//     it itself), so resolution steps down smoothly with the tier.
+//     continuous scale into the fiber store (drei 10's monitor no longer
+//     writes it itself). ClassroomCanvas mirrors the resulting live DPR.
 //   · Lights / snow    → the quality TIER below (low/medium/high), stepped by
 //     the same PerformanceMonitor factor with hysteresis bands, so the room
 //     never flickers between levels.
@@ -22,8 +22,8 @@
 // The initial tier comes from a one-time static probe (viewport + dpr + CPU
 // + memory) and is persisted for the session, so the room never starts at
 // max quality on a weak device and never re-probes on every focus change.
-// PerformanceMonitor's first averaging window is the warm-up fps sample that
-// corrects the probe within ~a second when it guessed wrong.
+// PerformanceMonitor uses sustained averaged windows to correct the probe,
+// without letting a loading spike or one bad frame dictate the quality.
 
 /** The room's graphics preset. */
 export type ClassroomQuality = "low" | "medium" | "high";
@@ -53,13 +53,85 @@ export const QUALITY_FACTOR: Record<ClassroomQuality, number> = {
 };
 
 /**
- * Factor → tier with hysteresis bands: climbing back to high needs a
- * convincingly recovered factor (≥ 0.8), while sinking to low needs a
- * genuinely bad one (< 0.5). Together with PerformanceMonitor's averaged
- * windows this keeps the room from flickering between levels.
+ * Stateful hysteresis: high leaves below .7 / returns at .85; low enters
+ * below .4 / leaves at .6. Without previous state, retain the original
+ * stateless classification for callers choosing an initial tier.
  */
-export const qualityForFactor = (factor: number): ClassroomQuality =>
-  factor >= 0.8 ? "high" : factor >= 0.5 ? "medium" : "low";
+export function qualityForFactor(factor: number, previous?: ClassroomQuality): ClassroomQuality {
+  // Different enter/leave thresholds: the old stateless thresholds were
+  // bands, not hysteresis, and could alternate tiers around 0.5 / 0.8.
+  if (previous === "high" && factor >= 0.7) return "high";
+  if (previous === "low" && factor < 0.6) return "low";
+  if (previous) return factor >= 0.85 ? "high" : factor < 0.4 ? "low" : "medium";
+  return factor >= 0.8 ? "high" : factor >= 0.5 ? "medium" : "low";
+}
+
+/**
+ * The old effective START anchors (initial tier × adaptive scale), now
+ * relative to the area-capped HIGH ceiling: low .7 × .6, medium .85 × .75,
+ * high 1. This avoids multiplying by a permanently low startup ceiling and
+ * lets a recovered device reach high again. Intermediate steps keep the
+ * highest sustainable resolution; tier settings themselves are unchanged.
+ */
+export const MIN_CLASSROOM_PERFORMANCE = 0.7 * 0.6;
+
+export function performanceForFactor(factor: number): number {
+  const value = Number.isFinite(factor) ? Math.min(1, Math.max(0, factor)) : 0;
+  const low = MIN_CLASSROOM_PERFORMANCE, medium = 0.85 * 0.75;
+  const scale = value <= 0.4 ? low
+    : value <= 0.65 ? low + (value - 0.4) * ((medium - low) / 0.25)
+      : medium + (value - 0.65) * ((1 - medium) / 0.35);
+  // Bounded, small, infrequent changes; never reallocate a render target
+  // for floating-point noise or write the store on an unchanged sample.
+  return Math.round(scale * 1000) / 1000;
+}
+
+/**
+ * Monitor 10.x reports N / elapsed rather than (N - 1) / elapsed. Account
+ * for its extra frame in the bounds (~5 fps with a 200 ms window). Aim for
+ * sustainable 60 Hz first, not the old 40–60 fps dead band that tolerated
+ * 40–55 fps indefinitely. No forced frame cap / competing render loop.
+ */
+export const CLASSROOM_SAMPLE_MS = 200;
+export const classroomFrameBounds = (target: 30 | 60 = 60): [number, number] => [
+  (target === 60 ? 55 : 27) + 1000 / CLASSROOM_SAMPLE_MS,
+  (target - 1) + 1000 / CLASSROOM_SAMPLE_MS,
+];
+
+/**
+ * A frame budget inside the SAME governor, not a frame limiter/second RAF.
+ * Only after four bad averaged decisions at the resolution floor do we
+ * accept a 33.3 ms budget. Two sustained 60 Hz windows restore 16.7 ms.
+ * No single slow frame, loading pause or one good burst can switch budgets.
+ */
+export class ClassroomFrameBudget {
+  target: 30 | 60 = 60;
+  private floorWindows = 0;
+  private recoveryWindows = 0;
+
+  resetSamples(): void { this.floorWindows = this.recoveryWindows = 0; }
+
+  observe(factor: number, averages: readonly number[]): boolean {
+    let slow = 0, recovered = 0;
+    const [lower, upper] = classroomFrameBounds();
+    for (const fps of averages) {
+      if (fps < lower) slow++;
+      if (fps >= upper) recovered++;
+    }
+    const sustained = Math.floor(averages.length * 0.75) + 1;
+    if (this.target === 60) {
+      this.floorWindows = factor <= 0.4 && slow >= sustained ? this.floorWindows + 1 : 0;
+      if (this.floorWindows < 4) return false;
+      this.target = 30;
+    } else {
+      this.recoveryWindows = recovered >= sustained ? this.recoveryWindows + 1 : 0;
+      if (this.recoveryWindows < 2) return false;
+      this.target = 60;
+    }
+    this.resetSamples();
+    return true;
+  }
+}
 
 /** Session-persisted tier — probed once, reused until the tab closes. */
 const TIER_STORAGE_KEY = "dc.classroomQualityTier";

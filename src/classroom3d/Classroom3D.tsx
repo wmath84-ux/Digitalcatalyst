@@ -49,7 +49,7 @@
 // docs/part14-classroom-embed-optimization.md.
 
 import { Suspense, memo, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Canvas } from "@react-three/fiber";
+import Canvas from "./ClassroomCanvas";
 import { AdaptiveDpr, AdaptiveEvents, BakeShadows, Preload } from "@react-three/drei";
 import {
   CircleCheck,
@@ -259,6 +259,15 @@ export default function Classroom3D({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  // Same area-aware cap, but independent of a remembered START tier: when
+  // sustained samples recover, AdaptiveDpr must be able to restore high.
+  const maximumDpr = useMemo(() => computeInitialDpr(
+    typeof window === "undefined" ? 1280 : window.innerWidth,
+    typeof window === "undefined" ? 720 : window.innerHeight,
+    typeof window === "undefined" ? 1 : window.devicePixelRatio || 1,
+    "high",
+  ), []);
 
   // The Course Player is the ONE screen where the phone may rotate
   // (src/utils/appOrientation.ts unlocks it on mount), so the room has to
@@ -524,11 +533,20 @@ export default function Classroom3D({
   return (
     <div className="course-player-shell dc-classroom-root" data-course-classroom-3d data-course-theme="dark">
       <Canvas
-        shadows
+        // R3F's boolean default selects deprecated PCFSoftShadowMap. Three
+        // converts it to PCF, then the next Canvas render resets it to soft
+        // and rebakes shadows/recompiles shaders. Explicit PCF is the SAME
+        // effective shadow filter, without that reconfiguration loop.
+        shadows="percentage"
+        // The browser's fullscreen top layer completely covers WebGL. Keep
+        // all objects/portals mounted, but render on changes only until exit.
+        // DOM editors, iframes and media have their own independent loops.
+        frameloop={boardFullscreen ? "demand" : "always"}
         // Mount-time resolution from the area-aware heuristic (quality.ts):
         // huge viewports start lower than small phone screens. Runtime dpr
         // is owned by <AdaptiveDpr> under the quality governor — never here.
         dpr={initialDpr}
+        maxDpr={maximumDpr}
         gl={{ antialias: true, powerPreference: "high-performance" }}
         // The seat (roomGeometry.ts) — the same numbers SeatRig springs from,
         // so the first frame is already in the chair instead of snapping to it.

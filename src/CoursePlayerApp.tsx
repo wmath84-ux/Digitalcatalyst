@@ -37,6 +37,7 @@ import {
   loadPlaybackStore,
   mergePlaybackEntry,
   persistPlaybackStore,
+  playbackPatchChanged,
   type CoursePlaybackPatch,
   type CoursePlaybackStore,
 } from "./course/playbackState";
@@ -596,7 +597,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * continue from the same second" work.
    */
   const reportPlayback = useCallback((fileId: string, patch: CoursePlaybackPatch) => {
-    if (!fileId) return;
+    if (!fileId || !playbackPatchChanged(playbackRef.current[fileId], patch)) return;
     mergePlaybackEntry(playbackRef.current, fileId, patch);
     if (user?.id) persistPlaybackStore(user.id, product.id, playbackRef.current);
   }, [product.id, user]);
