@@ -61,15 +61,6 @@ interface NotesPanelProps {
    * of owning its own header row.
    */
   composerOpenSignal?: number;
-  /**
-   * Monotonic counter from the 3D classroom's floating note library. Each
-   * increment asks this panel to open `openNoteId` in the big editor, so a
-   * note picked from the room's chooser is EDITED ON THE NOTES WALL — the
-   * chooser itself never becomes a second notes UI.
-   */
-  openNoteSignal?: number;
-  /** Which note the signal above refers to. */
-  openNoteId?: string | null;
 }
 
 // Older notes were stored as plain text. Render them through the same
@@ -108,8 +99,6 @@ export default function NotesPanel({
   onDelete,
   onEditorOpenChange,
   composerOpenSignal,
-  openNoteSignal,
-  openNoteId,
 }: NotesPanelProps) {
   // Restore the panel's place from the course-player panel SESSION on mount.
   // The session survives this panel unmounting on every tab switch, so a
@@ -187,15 +176,6 @@ export default function NotesPanel({
     if (composerOpenSignal && composerOpenSignal > 0) openComposer();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composerOpenSignal]);
-
-  // The classroom's floating note library asks for one specific note. Same
-  // `> 0` guard, and a missing id (a note deleted meanwhile) is a no-op.
-  useEffect(() => {
-    if (!openNoteSignal || openNoteSignal <= 0 || !openNoteId) return;
-    const note = notes.find((entry) => entry.id === openNoteId);
-    if (note) startEdit(note);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openNoteSignal]);
 
   const submitAdd = () => {
     const html = combineHtml(draftTitle, draft);

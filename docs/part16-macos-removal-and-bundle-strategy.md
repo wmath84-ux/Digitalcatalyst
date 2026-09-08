@@ -4,6 +4,15 @@ Date: 2026-09-07. Branch `arena/01a07b45-digitalcatalyst`.
 Parts 1 + 2 implemented; Part 3 is investigation only — **no splitting change
 without explicit approval.**
 
+> **Update 2026-09-08 — `src/classroom3d` no longer exists.** The 3D Classroom
+> was removed as a feature (owner's direction: the flat Split Deck player is the
+> only course player shell), and `three` / `@react-three/fiber` /
+> `@react-three/drei` / `@types/three` went with it. Every `src/classroom3d` row
+> and every `vendor-three` step below is therefore historical: the audit's
+> numbers were correct on 2026-09-07, but the obvious first vendor split it
+> recommends is now moot — there is no 3D vendor left to split out. See
+> `tests/classroom3dRemovalContract.test.mjs`.
+
 ## Baseline (Part 14, commit `8e687e5`)
 
 `dist/index.html` 5,110.09 kB raw / 1,357.39 kB gzip, ~4,450 modules,

@@ -14,8 +14,7 @@ import {
 
 type BrandingValue = Branding & { loading: boolean };
 
-// Exported for src/classroom3d/SurfaceContexts.tsx (see AuthContext).
-export const BrandingContext = createContext<BrandingValue>({
+const BrandingContext = createContext<BrandingValue>({
   ...DEFAULT_BRANDING,
   loading: true,
 });
