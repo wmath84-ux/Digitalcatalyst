@@ -143,6 +143,12 @@ export interface PlayerPanelProps {
   isDone: boolean;
   canMarkComplete: boolean;
   onToggleComplete: () => void;
+  /**
+   * True when the ACTIVE file is a personal (My Modules) resource: official
+   * progress is never counted against it, so the progress section shows an
+   * honest note instead of a Mark-complete control.
+   */
+  activeFilePersonal?: boolean;
   // Active file's own actions, reported live by the active ResourceViewer.
   fileActions: CourseFileActions | null;
   // Preferences
@@ -175,6 +181,7 @@ export default function PlayerPanel({
   isDone,
   canMarkComplete,
   onToggleComplete,
+  activeFilePersonal = false,
   fileActions,
   snowMode,
   onSnowModeChange,
@@ -253,7 +260,14 @@ export default function PlayerPanel({
           <ChargingCompleteButton done={isDone} onToggle={onToggleComplete} size={42} />
         ) : null}
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-black text-white/90">{isDone ? "Lesson completed" : "Mark complete"}</p>
+          <p className="text-xs font-black text-white/90">
+            {activeFilePersonal ? "Personal module content" : (isDone ? "Lesson completed" : "Mark complete")}
+          </p>
+          {activeFilePersonal ? (
+            <p className="mt-0.5 text-[9px] font-bold text-[var(--course-muted)]" data-course-personal-progress-note>
+              Not counted in official course progress
+            </p>
+          ) : null}
           <div className="mt-1.5 flex items-center gap-2" data-course-progress-summary>
             <ShimmerProgress
               value={progress}
@@ -275,6 +289,11 @@ export default function PlayerPanel({
           <div className="px-2 pb-1 pt-1">
             <p className="truncate text-xs font-black text-white/90" title={fileActions.fileName}>{fileActions.fileName}</p>
             <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--course-muted)]" data-course-viewer-kind>{fileActions.kindLabel}</p>
+            {activeFilePersonal ? (
+              <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-violet-200 ring-1 ring-violet-400/20" data-course-file-provenance>
+                My Modules
+              </p>
+            ) : null}
           </div>
           <div className="space-y-1">
             {fileActions.externalUrl ? (

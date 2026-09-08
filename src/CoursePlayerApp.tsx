@@ -15,6 +15,8 @@ import SnowOverlay from "./course/SnowOverlay";
 const MindMapPanel = lazy(() => import("./course/MindMapPanel"));
 import PlayerPanel from "./course/PlayerPanel";
 import CoursePeekDock from "./course/CoursePeekDock";
+import PersonalModulesPanel from "./course/PersonalModulesPanel";
+import { usePersonalModules } from "./hooks/usePersonalModules";
 import useCourseMindMap from "./course/useCourseMindMap";
 import { combineHtml, loadLocalNotes, persistLocalNotes } from "./course/notesStore";
 import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
@@ -374,6 +376,48 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const updates = useMemo(() => collectUpdates(modules).filter((update) => !ownedUpdateIds.has(update.id)), [modules, ownedUpdateIds]);
   const moduleTitleById = useMemo(() => collectModuleTitleById(modules), [modules]);
 
+  // ── Personal Course Modules ("My Modules") ─────────────────────────────
+  // The learner-owned study space for THIS course. The hook keeps the
+  // server-derived access snapshot + lists; the overlay's Modules tab hosts
+  // the manager panel (same ownership pattern as the mind map / Player
+  // panels). Entitlement + limits are enforced by the server API — the hook
+  // only reflects its answers.
+  const [personalModulesOpen, setPersonalModulesOpen] = useState(false);
+  const personalModules = usePersonalModules(user?.id, product.id);
+  const activeFileIsPersonal = Boolean(selectedFile && String((selectedFile as CourseFile).source || "") === "personal");
+
+  // The modules-tab entry row subtitle follows the live server snapshot:
+  // usage vs the plan's limits when entitled, a clear locked hint otherwise.
+  const personalModulesEntry = useMemo(() => {
+    if (!user) return null;
+    const access = personalModules.access;
+    if (!access) {
+      return { subtitle: "Your own study content", locked: false };
+    }
+    if (!access.entitled) {
+      return { subtitle: access.disabled ? "Not available on this plan" : "Requires an eligible plan", locked: true };
+    }
+    const limits = access.limits;
+    const moduleText = limits && Number(limits.moduleLimit) >= 0
+      ? `${access.moduleCount} of ${limits.moduleLimit} modules`
+      : `${access.moduleCount} ${access.moduleCount === 1 ? "module" : "modules"}`;
+    const resourceText = limits && Number(limits.resourceLimit) >= 0
+      ? `${access.resourceCount} of ${limits.resourceLimit} resources`
+      : `${access.resourceCount} ${access.resourceCount === 1 ? "resource" : "resources"}`;
+    return { subtitle: `${moduleText} · ${resourceText}`, locked: false };
+  }, [user, personalModules.access]);
+
+  /**
+   * Open a personal resource through the SAME viewer stack as official
+   * content. Course progress is never touched: no completed-id, no resume
+   * `lastOpenedFileId` — official progress stays an honest record of the
+   * official curriculum only.
+   */
+  const selectPersonalFile = useCallback((file: CourseFile) => {
+    userSelectedRef.current = true;
+    setSelectedFile(file);
+  }, []);
+
   // ── Per-module mind map ─────────────────────────────────────────────────
   // The player tracks the selected FILE, but the mind map is scoped per
   // MODULE, so switching lessons inside one module keeps the same diagram
@@ -624,6 +668,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    */
   const toggleComplete = async () => {
     if (!user || !selectedFile || !progressRef) return;
+    // Personal (My Modules) content never joins official completion.
+    if (String(selectedFile.source || "") === "personal") return;
     const completing = !completedIds.has(selectedFile.id);
     // Optimistic flip — the Firestore listener confirms it a moment later.
     setCompletedIds((current) => {
@@ -735,7 +781,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     // content loads beside it — side-by-side is the whole point of the
     // layout. The learner can peek-collapse the pane with one more tap on
     // the active dock tab if they want the lesson full-size.
-    if (user && progressRef) {
+    // Personal content (My Modules) never touches course progress — no
+    // lastOpenedFileId, no resume entry, no completion ids.
+    if (user && progressRef && String(file.source || "") !== "personal") {
       void setDoc(progressRef, { productId: product.id, lastOpenedFileId: file.id, lastOpenedAt: serverTimestamp() }, { merge: true });
     }
   };
@@ -894,8 +942,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onBack={onBack}
       progress={progress}
       isDone={isDone}
-      canMarkComplete={Boolean(selectedFile)}
+      canMarkComplete={Boolean(selectedFile) && !activeFileIsPersonal}
       onToggleComplete={() => void toggleComplete()}
+      activeFilePersonal={activeFileIsPersonal}
       fileActions={fileActions?.model ?? null}
       snowMode={snowMode}
       onSnowModeChange={setSnowMode}
@@ -976,6 +1025,20 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         </Suspense>
       )}
       playerPanel={playerPanel}
+      // My Modules — the Modules tab swaps its official list for the
+      // learner-owned manager panel (owned here, hosted by the overlay).
+      personalModulesOpen={personalModulesOpen}
+      personalModulesPanel={(
+        <PersonalModulesPanel
+          personal={personalModules}
+          productTitle={product.title}
+          landscape={useLandscapeRails}
+          onOpenPersonalFile={selectPersonalFile}
+          onExit={() => setPersonalModulesOpen(false)}
+        />
+      )}
+      personalModulesEntry={personalModulesEntry}
+      onOpenPersonalModules={() => setPersonalModulesOpen(true)}
       // PEEK mode: the footer navigation lives at the bottom centre of the
       // whole player (<CoursePeekDock /> below), so the study pane renders no
       // footer of its own. The legacy preference keeps the in-pane dock.

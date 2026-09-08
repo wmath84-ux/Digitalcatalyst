@@ -36,6 +36,10 @@
       "destination": "/api/referral-leaderboard"
     },
     {
+      "source": "/api/personal-course",
+      "destination": "/api/referral-leaderboard"
+    },
+    {
       "source": "/api/push/fcm-register",
       "destination": "/api/push/send"
     },
