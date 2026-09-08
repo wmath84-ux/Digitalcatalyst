@@ -5505,6 +5505,9 @@ html[data-course-player-active="true"] {
   margin: 0 auto;
   border-radius: 9999px;
   background: transparent !important;
+  /* The line is a drag surface: hold + drag left/right scrolls the dock and
+     selects the tab on release, so the browser must not steal the gesture. */
+  touch-action: none;
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.55),
     inset 0 0 0 1px rgba(255, 255, 255, 0.32),

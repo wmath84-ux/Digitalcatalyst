@@ -54,13 +54,34 @@ test("opening is hover OR tap, and both pointer and touch are wired", () => {
   assert.match(peek, /onPointerLeave=\{hide\}/);
   // Touch has no hover, so a tap toggles the dock open/closed and it stays
   // open while the learner swipes it.
-  assert.match(peek, /lastPointerType/);
+  assert.match(peek, /pointerTypeRef/);
   assert.match(peek, /event\.pointerType/);
   assert.match(peek, /setPinned\(\(value\) => !value\)/);
   assert.match(peek, /const open = hover \|\| pinned/);
   // A pinned (touch) dock closes on an outside tap, and the tap still lands.
   assert.match(peek, /document\.addEventListener\(["']pointerdown["'], onDown\)/);
   assert.match(peek, /root\.contains\(event\.target\)/);
+});
+
+test("hold + drag across the LINE scrolls the dock and selects on release", () => {
+  // The press opens the dock immediately so the finger has something to see.
+  assert.match(peek, /onPointerDown=\{\(event\) => \{/);
+  assert.match(peek, /draggingRef\.current = true/);
+  assert.match(peek, /setHover\(true\)/);
+  // The line drives the dock's magnification wave through a shared motion value.
+  assert.match(peek, /const pointerX: MotionValue<number> = useMotionValue\(-200\)/);
+  assert.match(peek, /<GlassDock[^>]*pointerX=\{pointerX\}/);
+  assert.match(peek, /pointerX\.set\(event\.clientX\)/);
+  // A press under the tap threshold toggles; a real left/right drag selects
+  // the tab the finger settled on (the button closest to the finger).
+  assert.match(peek, /DRAG_SELECT_THRESHOLD/);
+  assert.match(peek, /const isTap = Math\.abs\(dx\) < DRAG_SELECT_THRESHOLD/);
+  assert.match(peek, /const id = tabAtX\(event\.clientX\)/);
+  assert.match(peek, /if \(id\) handleSelect\(id\)/);
+  // The nearest-tab picker walks the dock's own items.
+  assert.match(peek, /querySelectorAll<HTMLElement>\('\[data-glass-dock-item\]'\)/);
+  assert.match(peek, /setPointerCapture\(event\.pointerId\)/);
+  assert.match(peek, /releasePointerCapture/);
 });
 
 test("selecting a tab closes the dock and routes through onTabChange", () => {

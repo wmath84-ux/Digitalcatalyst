@@ -7,9 +7,12 @@
 //   · a thin frosted-glass LINE sits at the very bottom centre of the player;
 //   · tapping the line (or hovering it with a pointer) OPENS the footer dock
 //     — the exact same GlassDock the study pane used to hold;
-//   · once open, swiping LEFT / RIGHT across the dock and lifting the finger
-//     on a tab SELECTS that tab (GlassDock's own onPointerUp), so the button
-//     the finger settles on is the one that is clicked;
+//   · HOLD + DRAG across the line scrolls the dock: the dock opens on the
+//     press, the magnification wave follows the finger left/right (the line
+//     drives GlassDock's pointer X), and lifting the finger SELECTS the tab
+//     nearest to it — the button the finger settles on is clicked;
+//   · once open, swiping LEFT / RIGHT across the dock itself and lifting the
+//     finger on a tab selects that tab (GlassDock's own onPointerUp);
 //   · picking a tab (or tapping away / tapping the line again) closes it.
 //
 // Pointer (mouse) interaction works the desktop way: enter reveals, leave
@@ -23,9 +26,13 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useMotionValue, type MotionValue } from 'framer-motion'
 import GlassDock, { type GlassDockItem } from '../components/glass-dock/GlassDock'
 import GlassMaterial from '../components/glass-dock/GlassMaterial'
 import { buildDockItems, type DockTab } from './CourseOverlay'
+
+/** Horizontal travel (px) below which a press counts as a tap, not a drag. */
+const DRAG_SELECT_THRESHOLD = 12
 
 export default function CoursePeekDock({
   tab,
@@ -40,7 +47,14 @@ export default function CoursePeekDock({
   const [pinned, setPinned] = useState(false)
   const closeTimerRef = useRef<number | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
-  const lastPointerType = useRef<string>('mouse')
+  const draggingRef = useRef(false)
+  const startXRef = useRef(0)
+  const startYRef = useRef(0)
+  const wasOpenRef = useRef(false)
+  const pointerTypeRef = useRef('mouse')
+  // The magnification wave's pointer X — the dock follows it. Shared so the
+  // LINE's hold-drag drives the same wave the dock's own pointer moves do.
+  const pointerX: MotionValue<number> = useMotionValue(-200)
 
   const open = hover || pinned
 
@@ -87,14 +101,40 @@ export default function CoursePeekDock({
 
   const items: GlassDockItem[] = buildDockItems(tab)
 
+  /** The tab whose dock item's horizontal centre is nearest `clientX`. */
+  const tabAtX = useCallback((clientX: number): string | null => {
+    const root = rootRef.current
+    if (!root) return null
+    const nodes = Array.from(root.querySelectorAll<HTMLElement>('[data-glass-dock-item]'))
+    let best: string | null = null
+    let bestDist = Infinity
+    for (const node of nodes) {
+      const rect = node.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) continue
+      const dist = Math.abs(rect.left + rect.width / 2 - clientX)
+      if (dist < bestDist) {
+        bestDist = dist
+        best = node.getAttribute('data-glass-dock-item')
+      }
+    }
+    return best
+  }, [])
+
   const handleSelect = useCallback(
     (id: string) => {
       setPinned(false)
       setHover(false)
+      pointerX.set(-200)
       onTabChange(id as DockTab)
     },
-    [onTabChange],
+    [onTabChange, pointerX],
   )
+
+  const close = useCallback(() => {
+    setPinned(false)
+    setHover(false)
+    pointerX.set(-200)
+  }, [pointerX])
 
   return (
     <div
@@ -111,7 +151,7 @@ export default function CoursePeekDock({
         onPointerEnter={show}
         onPointerLeave={hide}
       >
-        <GlassDock compact items={items} onSelect={handleSelect} />
+        <GlassDock compact items={items} onSelect={handleSelect} pointerX={pointerX} />
       </div>
       <div
         data-course-peek-line=""
@@ -122,13 +162,52 @@ export default function CoursePeekDock({
         onPointerEnter={show}
         onPointerLeave={hide}
         onPointerDown={(event) => {
-          lastPointerType.current = event.pointerType
-          show()
+          pointerTypeRef.current = event.pointerType
+          wasOpenRef.current = open
+          draggingRef.current = true
+          startXRef.current = event.clientX
+          startYRef.current = event.clientY
+          // Open immediately so the dock is visible under the finger while it
+          // drags — the wave follows `pointerX` from here on.
+          cancelClose()
+          setHover(true)
+          if (event.pointerType !== 'mouse') setPinned(true)
+          pointerX.set(event.clientX)
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId)
+          } catch {
+            /* capture is a nicety — the drag still works without it */
+          }
         }}
-        onClick={() => {
-          // Touch has no hover: a tap toggles the dock open/closed. Mouse
-          // hover already covers the pointer case (the desktop behaviour).
-          if (lastPointerType.current !== 'mouse') setPinned((value) => !value)
+        onPointerMove={(event) => {
+          if (!draggingRef.current) return
+          pointerX.set(event.clientX)
+        }}
+        onPointerUp={(event) => {
+          if (!draggingRef.current) return
+          draggingRef.current = false
+          try {
+            event.currentTarget.releasePointerCapture?.(event.pointerId)
+          } catch {
+            /* ignore */
+          }
+          const dx = event.clientX - startXRef.current
+          const dy = event.clientY - startYRef.current
+          const isTap = Math.abs(dx) < DRAG_SELECT_THRESHOLD && Math.abs(dy) < DRAG_SELECT_THRESHOLD
+          if (isTap) {
+            // Touch has no hover: a tap toggles the dock open/closed. Mouse
+            // hover already covers the pointer case (the desktop behaviour).
+            if (pointerTypeRef.current !== 'mouse') setPinned(!wasOpenRef.current)
+            return
+          }
+          // A real left/right drag: the button the finger settled on is the
+          // one that is clicked.
+          const id = tabAtX(event.clientX)
+          if (id) handleSelect(id)
+          else close()
+        }}
+        onPointerCancel={() => {
+          draggingRef.current = false
         }}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
