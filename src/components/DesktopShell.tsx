@@ -1,3 +1,4 @@
+import { openGameWorld } from "../lib/gameWorld";
 // src/components/DesktopShell.tsx
 //
 // The first-class desktop experience.
@@ -39,6 +40,7 @@ import {
   Crown,
   Heart,
   Home,
+  Joystick,
   LogOut,
   Search,
   Settings,
@@ -672,6 +674,7 @@ export default function DesktopShell({
                   else if (id === "favorites") handleNavigate("#/favorites");
                   else if (id === "cart") handleNavigate("#/cart");
                   else if (id === "subscription") handleNavigate("#/subscription");
+                  else if (id === "game") openGameWorld();
                 }}
                 items={[
                   {
@@ -703,6 +706,12 @@ export default function DesktopShell({
                     label: "Plans",
                     ariaLabel: "Subscription",
                     icon: <Crown size={16} />,
+                  },
+                  {
+                    id: "game",
+                    label: "Game",
+                    ariaLabel: "Game",
+                    icon: <Joystick size={16} />,
                   },
                 ]}
               />

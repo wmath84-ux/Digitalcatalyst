@@ -1,3 +1,4 @@
+import { openGameWorld } from "../lib/gameWorld";
 import type { ComponentType, ReactNode } from "react";
 import { HelpCircle, Joystick } from "lucide-react";
 import { BellIcon, BookIcon, CartIcon, CrownIcon, DownloadIcon, SearchIcon } from "./icons";
@@ -57,10 +58,9 @@ type HeaderProps = {
    */
   onHelpClick?: () => void;
   /**
-   * When provided, a game controller icon is rendered to open the game
-   * environment. Clicking this icon opens the Strata game world.
+   * Show the Game button that opens the original threejs-world environment.
    */
-  onOpenGameEnvironment?: () => void;
+  showGameButton?: boolean;
 };
 
 /**
@@ -87,7 +87,7 @@ export default function Header({
   onToggleSearch,
   searchActive = false,
   onHelpClick,
-  onOpenGameEnvironment,
+  showGameButton,
 }: HeaderProps) {
   const liveNotificationCount = useUnreadNotificationCount();
   const displayedNotificationCount = liveNotificationCount ?? 0;
@@ -150,11 +150,11 @@ export default function Header({
           icon: <HelpCircle className="h-5 w-5" />,
         }]
       : []),
-    ...(onOpenGameEnvironment
+    ...(showGameButton
       ? [{
           id: "game",
           label: "Game",
-          ariaLabel: "Open Game Environment",
+          ariaLabel: "Game",
           icon: <Joystick className="h-5 w-5" />,
         }]
       : []),
@@ -180,7 +180,7 @@ export default function Header({
     else if (id === "notifications") onNavigateToNotifications();
     else if (id === "subscription") onNavigateToSubscription();
     else if (id === "help") onHelpClick?.();
-    else if (id === "game") onOpenGameEnvironment?.();
+    else if (id === "game") openGameWorld();
   };
 
   return (

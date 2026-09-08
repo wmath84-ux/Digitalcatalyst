@@ -1,4 +1,4 @@
-const CACHE_NAME = 'digital-catalyst-app-shell-v2';
+const CACHE_NAME = 'digital-catalyst-app-shell-v3';
 const APP_SHELL = ['/','/index.html'];
 
 // Live branding pushed from the page (BrandingContext). Falls back to the
@@ -35,6 +35,15 @@ self.addEventListener('activate', event => {
 });
 self.addEventListener('fetch', event => {
   if (event.request.mode === 'navigate') {
+    // A game request must never silently return the cached learning app.
+    const url = new URL(event.request.url);
+    if (url.origin === self.location.origin && url.pathname.includes('/game-world/')) {
+      event.respondWith(fetch(event.request).catch(() => new Response(
+        '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Game offline</title><body style="background:#0c1412;color:white;font:16px system-ui;padding:32px"><h1>Game needs a connection</h1><p>The world could not be downloaded. Reconnect and reload this page.</p><a style="color:#9de8b9" href="../#/home">Back to app</a></body>',
+        { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+      )));
+      return;
+    }
     event.respondWith(fetch(event.request).catch(() => caches.match('/index.html')));
   }
 });

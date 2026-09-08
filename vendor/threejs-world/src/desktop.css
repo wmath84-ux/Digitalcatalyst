@@ -1,0 +1,152 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #06080a;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+#app {
+  position: fixed;
+  inset: 0;
+}
+#app canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+#boot {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #8aa39b;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  z-index: 10;
+}
+#boot .title {
+  font-size: 22px;
+  color: #c8d8d0;
+  margin-bottom: 14px;
+  letter-spacing: 0.35em;
+}
+#boot .bar {
+  width: 260px;
+  height: 2px;
+  background: #1a2420;
+  margin-top: 16px;
+  position: relative;
+  overflow: hidden;
+}
+#boot .bar > div {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  background: #5fae8f;
+  transition: width 0.2s ease;
+}
+#chooser {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #c8d8d0;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  z-index: 20;
+}
+#chooser .title {
+  font-size: 26px;
+  letter-spacing: 0.35em;
+  color: #c8d8d0;
+}
+#chooser .sub {
+  font-size: 11px;
+  color: #6f8a82;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin: 8px 0 28px;
+}
+#chooser .btns {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+#chooser button {
+  width: 210px;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  background: #0e1413;
+  border: 1px solid #243430;
+  border-radius: 10px;
+  color: #c8d8d0;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+#chooser button:hover {
+  border-color: #5fae8f;
+  background: #121a18;
+}
+#chooser button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: #243430;
+  background: #0e1413;
+}
+#chooser button:disabled:hover {
+  border-color: #243430;
+  background: #0e1413;
+}
+#chooser .b-title {
+  font-size: 17px;
+  letter-spacing: 0.12em;
+}
+#chooser .b-sub {
+  font-size: 11px;
+  color: #6f8a82;
+  letter-spacing: 0.05em;
+}
+
+/* Digital Catalyst: touch controls over the same desktop world. */
+.world-touch-controls {
+  position: fixed; z-index: 20; left: 12px; right: 12px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  pointer-events: none; color: white; font: 12px system-ui, sans-serif;
+}
+.world-touch-controls span { margin-right: auto; text-shadow: 0 1px 3px black; }
+.world-touch-controls button {
+  pointer-events: auto; touch-action: manipulation; min-height: 48px;
+  padding: 10px 16px; border-radius: 24px; border: 1px solid #ffffff66;
+  background: #14241ce6; color: white; font: inherit;
+}
+.world-touch-controls button:focus-visible { outline: 2px solid white; }
+
+/* Always accessible, including when boot or GPU initialization fails. */
+#world-navigation {
+  position: fixed; z-index: 100001;
+  top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left));
+  display: flex; gap: 8px;
+}
+#world-navigation a, #world-navigation button {
+  display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box;
+  padding: 10px 14px; border: 1px solid #ffffff66; border-radius: 24px;
+  color: #e6f0ea; background: #14241ce6; text-decoration: none;
+  font: 500 13px/1.4 system-ui, sans-serif; cursor: pointer;
+}
+#world-navigation :focus-visible { outline: 2px solid white; outline-offset: 3px; }
+#world-loading-note { max-width: 330px; padding: 0 20px; text-align: center; font: 13px/1.6 system-ui, sans-serif; opacity: .75; }

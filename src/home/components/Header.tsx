@@ -1,3 +1,4 @@
+import { openGameWorld } from "../../lib/gameWorld";
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { Bell, Heart, Joystick, Search, Trophy, UserRound, X } from "lucide-react";
 import ExpandingTabs from "../../components/ui/ExpandingTabs";
@@ -21,7 +22,8 @@ interface HeaderProps {
   favoritesCount: number;
   onOpenFavorites?: () => void;
   onOpenNotifications?: () => void;
-  onOpenGameEnvironment?: () => void;
+  /** Show the Game button that opens the original threejs-world environment. */
+  showGameButton?: boolean;
 }
 
 const typeLabel: Record<string, string> = {
@@ -53,7 +55,7 @@ function brandGlassGradient(from: string, to: string) {
 }
 
 const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
-  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications, onOpenGameEnvironment },
+  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications, showGameButton },
   ref,
 ) {
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
@@ -202,7 +204,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
               else if (id === "profile") window.location.hash = "#/profile";
               else if (id === "notifications") onOpenNotifications?.();
               else if (id === "favorites") onOpenFavorites?.();
-              else if (id === "game") onOpenGameEnvironment?.();
+              else if (id === "game") openGameWorld();
             }}
             items={[
               { id: "leaderboard", label: "Leaderboard", ariaLabel: "Leaderboard", icon: <Trophy size={17} strokeWidth={2.4} /> },
@@ -224,11 +226,11 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                 badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
                 badgeTone: "rose",
               },
-              ...(onOpenGameEnvironment
+              ...(showGameButton
                 ? [{
                     id: "game",
                     label: "Game",
-                    ariaLabel: "Open Game Environment",
+                    ariaLabel: "Game",
                     icon: <Joystick size={17} strokeWidth={2.4} />,
                   }]
                 : []),

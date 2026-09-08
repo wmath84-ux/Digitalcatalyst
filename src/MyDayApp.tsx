@@ -9,7 +9,6 @@ import {
   X,
 } from "lucide-react";
 import StoreHeader from "./components/Header";
-import GameEnvironment from "./components/GameEnvironment";
 import { useBranding } from "./context/BrandingContext";
 import GreetingHeader from "./components/myday/GreetingHeader";
 import CreateMenu from "./components/myday/CreateMenu";
@@ -591,16 +590,11 @@ export default function App() {
 
   const [globalSearch, setGlobalSearch] = useState("");
   const [showMobileSearch, setShowMobileSearch] = useState(false);
-  const [isGameOpen, setIsGameOpen] = useState(false);
 
   return (
     <OverlayBoundsProvider value={contentColumnRef}>
     <div className="dc-app-shell min-h-screen">
       <div data-app-frame data-myday-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0 lg:max-w-7xl">
-        {/* Game Environment Modal */}
-        {isGameOpen && (
-          <GameEnvironment onClose={() => setIsGameOpen(false)} />
-        )}
         <StoreHeader
           cartCount={cartIds.size}
           notifCount={1}
@@ -612,7 +606,7 @@ export default function App() {
           onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
           onNavigateToCart={() => { window.location.hash = "#/cart"; }}
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
-          onOpenGameEnvironment={() => setIsGameOpen(true)}
+          showGameButton
         />
 
         {/* The phone search strip is CHROME, so it wears the bar plate the

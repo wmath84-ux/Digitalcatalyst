@@ -30,7 +30,6 @@ import {
   Zap,
 } from "lucide-react";
 import Header from "./components/Header";
-import GameEnvironment from "./components/GameEnvironment";
 import { GlassSurface } from "./components/ui/glass";
 import { useDragScroll } from "@/hooks/useDragScroll";
 import { GlassButton } from "./components/ui/glass-button";
@@ -122,7 +121,6 @@ export const getRelatedProducts = (product: Product, catalog: Product[], limit =
 };
 
 export default function ProductDetail(props: ProductDetailProps) {
-  const [isGameOpen, setIsGameOpen] = useState(false);
   
   return (
     <div className="min-h-screen sm:py-6">
@@ -133,7 +131,7 @@ export default function ProductDetail(props: ProductDetailProps) {
           onNavigateToSubscription={props.onNavigateToSubscription || (() => undefined)}
           onNavigateToCart={props.onNavigateToCart || (() => undefined)}
           onNavigateToNotifications={props.onNavigateToNotifications || (() => undefined)}
-          onOpenGameEnvironment={() => setIsGameOpen(true)}
+          showGameButton
         />
         <main data-pdp-scroll className="min-h-0 flex-1 overflow-y-auto md:px-8">
           {props.product ? <PremiumProductContent {...props} product={props.product} /> : <MissingProduct onBack={props.onBack} />}
@@ -144,11 +142,6 @@ export default function ProductDetail(props: ProductDetailProps) {
           storeBadge={1}
           purchasesBadge={props.purchasedIds?.size || 0}
         />
-        
-        {/* Game Environment Modal */}
-        {isGameOpen && (
-          <GameEnvironment onClose={() => setIsGameOpen(false)} />
-        )}
       </div>
     </div>
   );
