@@ -6,7 +6,6 @@ import { doc, getDoc } from "firebase/firestore";
 import { BadgeCheck, Check, Copy, Crown, LoaderCircle, Trophy, Users } from "lucide-react";
 import Header from "./components/Header";
 import BottomNav from "./components/BottomNav";
-import GameEnvironment from "./components/GameEnvironment";
 import { useCatalog } from "./context/CatalogContext";
 import { useCommerce } from "./context/CommerceContext";
 import { useBranding } from "./context/BrandingContext";
@@ -61,7 +60,6 @@ export default function LeaderboardApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copiedReferralCode, setCopiedReferralCode] = useState("");
-  const [isGameOpen, setIsGameOpen] = useState(false);
 
   const copyReferralCode = async (code: string) => {
     if (!code) return;
@@ -148,13 +146,8 @@ export default function LeaderboardApp() {
           onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
           onNavigateToCart={() => { window.location.hash = "#/cart"; }}
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
-          onOpenGameEnvironment={() => setIsGameOpen(true)}
         />
         <main className="flex-1 overflow-y-auto px-4 py-5">
-          {/* Game Environment Modal */}
-          {isGameOpen && (
-            <GameEnvironment onClose={() => setIsGameOpen(false)} />
-          )}
           <GlassCard>
             <div className="flex items-center gap-3">
               <span className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-500/15 text-amber-300"><Trophy /></span>

@@ -1,9 +1,7 @@
-import { useState } from "react";
 import Header from "./components/Header";
 import BottomNav from "./cartWishlist/components/BottomNav";
 import CartPage from "./cartWishlist/pages/CartPage";
 import FavoritesPage from "./cartWishlist/pages/FavoritesPage";
-import GameEnvironment from "./components/GameEnvironment";
 import type { Product, TabKey } from "./cartWishlist/types";
 
 interface CartWishlistAppProps {
@@ -43,7 +41,6 @@ export default function CartWishlistApp({
   onRequireAuth,
   onOpenProduct,
 }: CartWishlistAppProps) {
-  const [isGameOpen, setIsGameOpen] = useState(false);
   
   return (
     <div className="dc-app-shell min-h-screen sm:py-6">
@@ -54,17 +51,12 @@ export default function CartWishlistApp({
           onNavigateToSubscription={onNavigateToSubscription}
           onNavigateToCart={() => onNavigate("cart")}
           onNavigateToNotifications={onNavigateToNotifications}
-          onOpenGameEnvironment={() => setIsGameOpen(true)}
         />
 
         <div className="relative flex flex-1 flex-col overflow-hidden bg-transparent">
           {/* Wave 14: toasts render through the pack GlassToaster (src/main.tsx). */}
           {toast ? <span className="sr-only" role="status">{toast}</span> : null}
-          
-          {/* Game Environment Modal */}
-          {isGameOpen && (
-            <GameEnvironment onClose={() => setIsGameOpen(false)} />
-          )}
+
           {activeTab === "favorites" && (
             <FavoritesPage
               favoriteProducts={favoriteProducts}

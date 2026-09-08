@@ -1,4 +1,4 @@
-const CACHE_NAME = 'digital-catalyst-app-shell-v2';
+const CACHE_NAME = 'digital-catalyst-app-shell-v4';
 const APP_SHELL = ['/','/index.html'];
 
 // Live branding pushed from the page (BrandingContext). Falls back to the

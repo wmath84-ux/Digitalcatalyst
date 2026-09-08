@@ -156,7 +156,6 @@ export default function App({
   const suggestions = searchResults.slice(0, 5);
 
   const [activeCategory, setActiveCategory] = useState("all");
-  const [isGameOpen, setIsGameOpen] = useState(false);
 
   const categoryFiltered: Product[] = useMemo(() => {
     if (activeCategory === "all") {
@@ -239,14 +238,9 @@ export default function App({
           favoritesCount={favoriteIds.size}
           onOpenFavorites={onNavigateToFavorites}
           onOpenNotifications={onNavigateToNotifications}
-          onOpenGameEnvironment={() => setIsGameOpen(true)}
         />
 
         <main className="flex-1 overflow-y-auto pb-2">
-          {/* Game Environment Modal */}
-          {isGameOpen && (
-            <GameEnvironment onClose={() => setIsGameOpen(false)} />
-          )}
           {isSearching ? (
             <section data-home-grid className="px-5 pt-6 md:px-8">
               <div className="flex items-center justify-between">
