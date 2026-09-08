@@ -36,8 +36,8 @@ test("the note card surface + text are theme-variable driven", () => {
   // The card pins the theme text colour so preview text never inherits a
   // clashing shell colour (white text on a white box in dark mode).
   assert.match(darkCard[0], /color:\s*var\(--course-text\)/);
-  // And the light theme has its own card rule (white gradient surface).
-  assert.match(indexCss, /\.course-player-shell\[data-course-theme="light"\] \[data-course-notes-grid\] \[data-course-note\]/);
+  // The app is dark only: no light-theme card rule may come back.
+  assert.doesNotMatch(indexCss, /data-course-theme="light"/);
 });
 
 test("the card preview pins the theme text colour", () => {

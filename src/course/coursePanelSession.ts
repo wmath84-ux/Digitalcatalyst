@@ -5,12 +5,11 @@
 // While the learner stays INSIDE the course player, the panels keep their
 // place across every switch: open the notes editor, jump to the Module tab,
 // come back — the editor is still open. Same for the mind map: library stays
-// library, canvas stays canvas, and the map's own light/dark pick stays
-// picked.
+// library, canvas stays canvas.
 //
 // The moment the learner LEAVES the player (the player unmounts) everything
-// resets to the entry defaults — notes list, mind map library, and the mind
-// map follows the player's theme again. CoursePlayerApp calls
+// resets to the entry defaults — notes list and mind map library.
+// CoursePlayerApp calls
 // `resetCoursePanelSession()` in its unmount cleanup to guarantee that, so a
 // fresh entry always starts from the default library state.
 //
@@ -25,19 +24,14 @@ export type NotesPanelSessionView =
 
 export type MindMapPanelSessionView = "library" | "canvas";
 
-/** null → no manual pick: the mind map follows the Course Player's theme. */
-export type MindMapThemeChoice = "dark" | "light" | null;
-
 interface CoursePanelSessionState {
   notes: NotesPanelSessionView;
   mindMapView: MindMapPanelSessionView;
-  mindMapThemeOverride: MindMapThemeChoice;
 }
 
 const defaultState = (): CoursePanelSessionState => ({
   notes: { view: "list" },
   mindMapView: "library",
-  mindMapThemeOverride: null,
 });
 
 let session: CoursePanelSessionState = defaultState();
@@ -50,10 +44,6 @@ export const setNotesSessionView = (view: NotesPanelSessionView) => {
 
 export const setMindMapSessionView = (view: MindMapPanelSessionView) => {
   session.mindMapView = view;
-};
-
-export const setMindMapSessionTheme = (choice: MindMapThemeChoice) => {
-  session.mindMapThemeOverride = choice;
 };
 
 /**

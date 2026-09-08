@@ -60,14 +60,10 @@
 // The double-tap delete is measured the same way (two taps on the same node
 // within 350ms), which makes it work identically for mouse, touch and pen.
 //
-// ── Theme: follows the Course Player, overridable for this visit ────────
-// The panel starts in whatever theme the Course Player is in (dark or
-// light/white) — EVERY visit, because the override lives in the player's
-// panel session and is reset when the player unmounts. The sun/moon button
-// next to Fit flips ONLY the mind map window for the rest of this visit;
-// the lesson keeps its own theme. Switch tabs and back and the map still
-// keeps the picked theme; leave the player and it follows the player's
-// theme again on the next entry.
+// ── Theme: dark, always ─────────────────────────────────────────────────
+// The map is dark like the rest of the app. The per-window sun/moon switch
+// and the light palette it selected are gone with the app-wide light theme,
+// so there is nothing left to follow or override.
 //
 // ── The toolbar (the bottom strip) ───────────────────────────────────────
 // ONE ICON PER CONTROL — the bar carries no words at all. From the left:
@@ -139,13 +135,11 @@ import {
   Layers,
   Maximize,
   MousePointerClick,
-  Moon,
   Network,
   Pencil,
   Plus,
   Rows3,
   Sparkles,
-  Sun,
   Trash2,
   TriangleAlert,
   Type,
@@ -173,23 +167,12 @@ import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { GlassSurface } from "../components/ui/glass";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassCard } from "../components/ui/GlassCard";
-import {
-  getCoursePanelSession,
-  setMindMapSessionTheme,
-  setMindMapSessionView,
-} from "./coursePanelSession";
+import { getCoursePanelSession, setMindMapSessionView } from "./coursePanelSession";
 
 // ── Theme ─────────────────────────────────────────────────────────────────
 
-export type MindMapTheme = "dark" | "light";
-
-/**
- * The mind map renders in the Course Player's current theme until the
- * learner flips the map's own sun/moon button. The manual choice is kept in
- * the player's PANEL SESSION (src/course/coursePanelSession.ts), so it
- * survives tab switches but resets when the player is left — the next entry
- * always starts by following the player's theme again.
- */
+/** Dark is the only palette the map (and the app) has. */
+export type MindMapTheme = "dark";
 
 /** Double-tap delete is a knife the learner chooses to pick up. Off by default. */
 const dblTapDeleteStorageKey = "dc.mindMapDblTapDelete";
@@ -259,7 +242,7 @@ interface MindNodeData extends Record<string, unknown> {
   isRoot: boolean;
   selected: boolean;
   editing: boolean;
-  /** Palette for this window — "light" is the white mode. */
+  /** Palette for this window — always the dark one. */
   theme: MindMapTheme;
   /**
    * How a long label is fitted inside the box — `wrap` folds it onto further
@@ -953,11 +936,6 @@ export interface MindMapPanelProps {
   /** Flush the debounced write now — called when the sheet closes. */
   onFlush?: () => void;
   /**
-   * The Course Player's CURRENT theme. The map follows it until the learner
-   * flips the mind map's own sun/moon button in the toolbar.
-   */
-  playerTheme?: MindMapTheme;
-  /**
    * True when the panel is opened in landscape. The status strip and the
    * floating zoom controls stay mounted in both orientations, but in
    * landscape they are nudged to the bottom-left of the canvas so the
@@ -1001,7 +979,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
     status,
     errorMessage,
     onFlush,
-    playerTheme = "dark",
     landscape: _landscape,
     open = true,
     maps = [],
@@ -1041,15 +1018,10 @@ function MindMapCanvas(props: MindMapPanelProps) {
       setDeleteMapKey(null);
     }
   }, [open]);
-  // Theme: null → track the Course Player; a value → the learner's own pick
-  // for THIS window, kept in the player's panel session for this visit.
-  const [themeOverride, setThemeOverride] = useState<MindMapTheme | null>(
-    () => getCoursePanelSession().mindMapThemeOverride,
-  );
   const [doubleTapDelete, setDoubleTapDelete] = useState<boolean>(loadDblTapDelete);
   // ── Align-menu choices (box arrangement + how a long label fits) ───────
-  // Views, not data: they are remembered per device like the theme and the
-  // double-tap switch, and never written to Firestore.
+  // Views, not data: they are remembered per device like the double-tap
+  // switch, and never written to Firestore.
   const [arrangement, setArrangement] = useState<MindMapArrangement>(loadArrangement);
   const [textFit, setTextFit] = useState<MindMapTextFit>(loadTextFit);
   // Which tool drop-down is open. Only one at a time, and both are portalled
@@ -1082,14 +1054,8 @@ function MindMapCanvas(props: MindMapPanelProps) {
     moving: Set<string>;
   } | null>(null);
 
-  const mindTheme: MindMapTheme = themeOverride ?? (playerTheme === "light" ? "light" : "dark");
-
-  // Keep the panel session in lock-step with this window's live choices:
-  // the theme pick and the library/canvas view. Both survive tab switches
-  // (this panel unmounts) and reset only when the player itself is left.
-  useEffect(() => {
-    setMindMapSessionTheme(themeOverride);
-  }, [themeOverride]);
+  // One palette, no switch: the map is dark like everything else.
+  const mindTheme: MindMapTheme = "dark";
 
   useEffect(() => {
     setMindMapSessionView(libraryOpen ? "library" : "canvas");
@@ -1723,7 +1689,7 @@ function MindMapCanvas(props: MindMapPanelProps) {
             variant={BackgroundVariant.Dots}
             gap={22}
             size={1}
-            color={mindTheme === "light" ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.07)"}
+            color="rgba(255,255,255,0.07)"
           />
         </ReactFlow>
 
@@ -1893,9 +1859,10 @@ function MindMapCanvas(props: MindMapPanelProps) {
           The only persistent chrome, and every control on it is a SINGLE
           ICON: the cloud-save beacon (tinted by the save state, blinking
           while there is a message to read), the map pill, then the tools —
-          auto-arrange, the align menu, fit-to-screen, this window's
-          light/dark flip, delete-branch and the double-tap-delete arm
-          switch. There is no close button — the dock tab is the way out.
+          auto-arrange, the align menu, fit-to-screen, delete-branch and the
+          double-tap-delete arm switch. There is no close button — the dock
+          tab is the way out. (The light/dark flip is gone: the map is dark
+          like the rest of the app.)
 
           There are no +/− zoom buttons: the canvas is pinched (and panned)
           straight with the fingers, and Fit re-frames the whole map in one
@@ -2122,23 +2089,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
             data-course-mindmap-fit
           >
             <Maximize />
-          </button>
-
-          {/* ── Light / dark for THIS window only ───────────────────────
-              The map follows the Course Player theme until this button is
-              used; from then on the map keeps its own choice (the lesson
-              is untouched). The icon previews what the next tap flips to. */}
-          <button
-            type="button"
-            onClick={() => setThemeOverride(mindTheme === "dark" ? "light" : "dark")}
-            className="mm-tool"
-            aria-label={mindTheme === "dark" ? "Mind map ko white mode mein le jayein" : "Mind map ko dark mode mein le jayein"}
-            title={mindTheme === "dark" ? "White mode — sirf yeh mind map" : "Dark mode — sirf yeh mind map"}
-            data-course-mindmap-theme
-            data-theme={mindTheme}
-            data-next-theme={mindTheme === "dark" ? "light" : "dark"}
-          >
-            {mindTheme === "dark" ? <Sun /> : <Moon />}
           </button>
 
           {/* ── Delete the selected branch ──────────────────────────────

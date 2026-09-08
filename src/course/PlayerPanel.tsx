@@ -35,8 +35,7 @@ import type { CourseFileActions } from "./ResourceViewer";
 
 // ── Preference row accents — the same colours the ⚙ popover used ──────────
 const SETTING_ACCENTS: Record<string, { color: string; delay: number; divider: boolean }> = {
-  theme: { color: "#FF6BF5", delay: 0.1, divider: false },
-  snow: { color: "#3A86FF", delay: 0.15, divider: true },
+  snow: { color: "#3A86FF", delay: 0.1, divider: false },
   viewport: { color: "#06D6A0", delay: 0.15, divider: true },
   fullscreen: { color: "#B388FF", delay: 0.2, divider: true },
 };
@@ -146,8 +145,6 @@ export interface PlayerPanelProps {
   // Active file's own actions, reported live by the active ResourceViewer.
   fileActions: CourseFileActions | null;
   // Preferences
-  theme: "dark" | "light";
-  onThemeChange: (next: "dark" | "light") => void;
   snowMode: boolean;
   onSnowModeChange: (next: boolean) => void;
   showViewportToggle: boolean;
@@ -170,8 +167,6 @@ export default function PlayerPanel({
   canMarkComplete,
   onToggleComplete,
   fileActions,
-  theme,
-  onThemeChange,
   snowMode,
   onSnowModeChange,
   showViewportToggle,
@@ -200,7 +195,6 @@ export default function PlayerPanel({
         color={accent.color}
         delay={accent.delay}
         divider={accent.divider}
-        light={theme === "light"}
         data-course-setting={attr}
       />
     );
@@ -338,8 +332,7 @@ export default function PlayerPanel({
 
       {/* ── 4. Player settings — every preference, one list ──────────── */}
       <SectionLabel>Player settings</SectionLabel>
-      <div data-course-panel-section="settings" data-course-settings-menu data-course-theme={theme}>
-        {settingsRow("Light theme", theme === "light", (next) => onThemeChange(next ? "light" : "dark"), "theme")}
+      <div data-course-panel-section="settings" data-course-settings-menu>
         {settingsRow("Snowfall", snowMode, (next) => onSnowModeChange(next), "snow")}
         {showViewportToggle ? settingsRow("Desktop view", desktopView, (next) => onDesktopViewChange(next), "viewport") : null}
         {canFullscreen ? settingsRow("Hide status bar", courseFullscreen, (next) => onHideStatusBarChange(next), "fullscreen") : null}

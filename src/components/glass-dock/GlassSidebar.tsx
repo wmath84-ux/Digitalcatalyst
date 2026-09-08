@@ -23,6 +23,18 @@
  *
  * This is the rail used on the SMALLEST screen band that still shows the
  * desktop side panel (tablet / narrow-desktop, ≤1023px) — see DesktopShell.
+ *
+ * Two deliberate departures from the reference, both owner-directed:
+ *   1. It boots EXPANDED. The reference starts collapsed and only opens on a
+ *      tap, which read as "the sidebar never expands" on a tablet. The state
+ *      is persisted (`dc.glass.sidebar.open`) so a learner who collapses it
+ *      still gets their choice back on the next visit — the default stays
+ *      expanded only for the first run / a cleared preference.
+ *   2. The SLOT width rides the same spring as the panel. The reference keeps
+ *      its container pinned at EXPANDED_WIDTH, which leaves a dead band of
+ *      empty space beside the collapsed rail; here the column the rail sits in
+ *      physically reflows, so collapsing hands the width back to the page and
+ *      expanding takes it — no blank area either way.
  */
 
 import { useEffect, useState, type ComponentType } from 'react'
@@ -39,6 +51,29 @@ export const COLLAPSED_WIDTH = 64
 export const EXPANDED_WIDTH = 220
 const ICON_TILE_SIZE = 44
 const TOGGLE_BUTTON_HEIGHT = 36
+
+/** The rail boots OPEN; this is only where a returning learner's own choice
+ *  comes from. Anything unreadable (private mode, a first run, a stale value)
+ *  resolves to `true`, never to a collapsed rail. */
+export const OPEN_STORAGE_KEY = "dc.glass.sidebar.open"
+
+export function readStoredOpen(): boolean {
+  if (typeof window === "undefined") return true
+  try {
+    return window.localStorage.getItem(OPEN_STORAGE_KEY) !== "0"
+  } catch {
+    return true
+  }
+}
+
+export function persistOpen(open: boolean): void {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(OPEN_STORAGE_KEY, open ? "1" : "0")
+  } catch {
+    /* private mode — the rail simply boots expanded next time */
+  }
+}
 
 export type GlassSidebarItem = {
   id: string
@@ -154,6 +189,7 @@ export default function GlassSidebar({
   footer,
   open,
   onOpenChange,
+  remember = true,
 }: {
   items: GlassSidebarItem[]
   onSelect: (id: string) => void
@@ -164,8 +200,12 @@ export default function GlassSidebar({
   /** Controlled open state; omit for the component's own state. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** Persist the learner's own expand/collapse choice. Default true. */
+  remember?: boolean
 }) {
-  const [innerOpen, setInnerOpen] = useState(false)
+  // EXPANDED on boot. The reference starts collapsed; that is the state the
+  // owner reported as "it never expands" on a tablet.
+  const [innerOpen, setInnerOpen] = useState(() => (remember ? readStoredOpen() : true))
   const isOpen = open ?? innerOpen
   const width = useSpring(isOpen ? EXPANDED_WIDTH : COLLAPSED_WIDTH, {
     stiffness: 280,
@@ -174,6 +214,7 @@ export default function GlassSidebar({
 
   const setOpen = (next: boolean) => {
     if (open === undefined) setInnerOpen(next)
+    if (remember) persistOpen(next)
     onOpenChange?.(next)
     width.set(next ? EXPANDED_WIDTH : COLLAPSED_WIDTH)
   }
@@ -184,10 +225,12 @@ export default function GlassSidebar({
   }, [isOpen, width])
 
   return (
-    // Fixed-width container: the panel grows rightward from a stable left edge.
-    <div
+    // The slot rides the SAME spring as the panel: the column physically
+    // reflows, so a collapsed rail returns its width to the page instead of
+    // leaving a dead band, and an expanded rail takes the width it paints.
+    <motion.div
       className="relative h-full shrink-0"
-      style={{ width: COLLAPSED_WIDTH }}
+      style={{ width }}
       data-glass-sidebar-slot
       data-open={isOpen ? 'true' : 'false'}
     >
@@ -295,6 +338,6 @@ export default function GlassSidebar({
           </motion.button>
         </div>
       </motion.aside>
-    </div>
+    </motion.div>
   )
 }

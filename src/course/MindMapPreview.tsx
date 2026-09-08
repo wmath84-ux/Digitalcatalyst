@@ -8,7 +8,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import MindMapPanel from "./MindMapPanel";
 import { GlassToggleGroup, GlassToggleItem } from "../components/ui/glass-toggle-group";
-import { GlassButton } from "../components/ui/glass-button";
 import type { MindMapSaveStatus, MindMapSummary } from "./useCourseMindMap";
 import { addChildNode, createMindMap, countNodes, rootId, type MindMap } from "../../utils/mindMapTree";
 
@@ -43,7 +42,6 @@ const buildDemoMap = (): MindMap => {
 export default function MindMapPreview() {
   const [mind, setMind] = useState<MindMap>(buildDemoMap);
   const [status, setStatus] = useState<MindMapSaveStatus>("saved");
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [frame, setFrame] = useState<(typeof FRAMES)[number]["id"]>("phone");
 
   const maps: MindMapSummary[] = useMemo(
@@ -93,13 +91,6 @@ export default function MindMapPreview() {
             </GlassToggleItem>
           ))}
         </GlassToggleGroup>
-        <GlassButton
-          variant="capsule"
-          onClick={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
-          className="[&>span>div]:h-8 [&>span>div]:px-3 [&>span>div]:text-xs"
-        >
-          Player theme: {theme}
-        </GlassButton>
         <span className="ml-2 text-white/55">Save status:</span>
         <GlassToggleGroup className="dc-segment" value={status} onValueChange={(next) => setStatus(next as typeof status)} aria-label="Save status">
           {STATUSES.map((value) => (
@@ -129,7 +120,6 @@ export default function MindMapPreview() {
                 status={status}
                 errorMessage={status === "error" ? "Cloud save fail ho gaya — dobara try ho raha hai." : null}
                 onFlush={() => setStatus("saving")}
-                playerTheme={theme}
                 open
                 maps={maps}
                 activeMapKey="main"

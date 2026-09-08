@@ -429,10 +429,10 @@ html[data-glass="on"] :where(.dc-scene-plate--bar) > * > div[aria-hidden]:nth-of
 }
 
 /* 5 · the ink. The plate is dark on every route now, so the three-step ink
- * scale is pinned to its light-on-dark values INSIDE a card even when the app
- * is in light mode — otherwise `html.light` hands `.dc-ink-*` near-black text
- * and it vanishes into the plate. Scoped to the card so nothing outside
- * changes. */
+ * scale is pinned to its light-on-dark values INSIDE a card. The app is dark
+ * only — there is no light scheme left to fight this — but the values stay
+ * pinned at the card so a future surface token cannot quietly invert them.
+ * Scoped to the card so nothing outside changes. */
 html[data-glass="on"] :where(.dc-glass-card),
 html[data-glass="on"] :where(.dc-scene-plate) {
   --dc-ink-1: rgba(255, 255, 255, 0.97);

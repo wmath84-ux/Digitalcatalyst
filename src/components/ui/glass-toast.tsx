@@ -120,15 +120,13 @@ function ToastCard({ data, fromRight }: { data: ToastData; fromRight: boolean })
   const reduceMotion = useReducedMotion();
   const { color, Icon } = variantOf(data.variant);
 
-  // The AI Canvas card is designed for dark surfaces. On the light admin
-  // shell (html[data-glass="off"]) or the course player's light theme the
-  // same layout/motion rides a darker glass pane so the white ink stays
-  // legible.
+  // The AI Canvas card is designed for dark surfaces. The app is dark only,
+  // so the ONE remaining light surface is the admin shell
+  // (html[data-glass="off"]), where the same layout/motion rides a darker
+  // glass pane so the white ink stays legible.
   const [onLightSurface] = useState(() => {
     if (typeof document === "undefined") return false;
-    if (document.documentElement.dataset.glass === "off") return true;
-    const player = document.querySelector("[data-course-player]");
-    return player?.getAttribute("data-course-theme") === "light";
+    return document.documentElement.dataset.glass === "off";
   });
 
   // ── Auto-dismiss progress bar ────────────────────────────────────────────

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { applyGlassScheme } from "./lib/glassScheme";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
 import ResourceViewer, { type CourseFileActions } from "./course/ResourceViewer";
@@ -213,21 +212,8 @@ const collectModuleIdByFileId = (modules: CourseModule[]): Record<string, string
 // on the device and never collide with Firestore course progress. The store
 // helpers live in src/course/notesStore.ts, shared with the NotesPanel.
 
-type CoursePlayerTheme = "dark" | "light";
-const courseThemeStorageKey = "dc.coursePlayerTheme";
-const loadCourseTheme = (): CoursePlayerTheme => {
-  try {
-    const stored = localStorage.getItem(courseThemeStorageKey);
-    // The old third "white" theme was removed — anyone who had picked it
-    // simply lands on the light palette instead of jumping back to dark.
-    return stored === "light" || stored === "white" ? "light" : "dark";
-  } catch {
-    return "dark";
-  }
-};
-
 // Snow mode — a purely cosmetic, interactive snowfall over the whole player
-// (see src/course/SnowOverlay.tsx). Remembered per device like the theme.
+// (see src/course/SnowOverlay.tsx). Remembered per device.
 const courseSnowStorageKey = "dc.coursePlayerSnow";
 const loadCourseSnow = (): boolean => {
   try {
@@ -334,7 +320,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // "Hide status bar" toggle stays correct even when the learner swipes out
   // of fullscreen.
   const [courseFullscreen, setCourseFullscreen] = useState<boolean>(() => isCoursePlayerFullscreen());
-  const [theme, setTheme] = useState<CoursePlayerTheme>(loadCourseTheme);
   // Snow mode — cosmetic interactive snowfall over the whole player.
   const [snowMode, setSnowMode] = useState<boolean>(loadCourseSnow);
   // Desktop request mode for embedded documents — a Google Doc / Sheet /
@@ -429,8 +414,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     return undefined;
   }, [isLandscape]);
 
-  // Theme flips while already in landscape only re-blend the bar colour —
-  // a fresh fullscreen request here would be gesture-less and get blocked.
+  // A status-bar colour change while already in landscape only re-blends the
+  // bar — a fresh fullscreen request here would be gesture-less and blocked.
   useEffect(() => {
     if (isLandscape) syncCourseLandscapeChromeColor(courseBackgroundForStatusBar);
   }, [courseBackgroundForStatusBar, isLandscape]);
@@ -448,27 +433,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     return unsubscribe;
   }, []);
 
-  // The preference is scoped to the Course Player and restored on the next
-  // visit without changing the theme of the rest of the application.
-  //
-  // While the player is mounted its theme also drives the pack's own light /
-  // dark material (websiteglass.com reads `html.dark|light`), so every
-  // GlassSurface / GlassButton / GlassTile inside the player flips with the
-  // toggle. The site-wide preference is NOT overwritten — the stored scheme
-  // is re-applied the moment the player unmounts.
-  useEffect(() => {
-    applyGlassScheme(theme);
-    return () => applyGlassScheme();
-  }, [theme]);
-  useEffect(() => {
-    try {
-      localStorage.setItem(courseThemeStorageKey, theme);
-    } catch {
-      /* private mode / storage disabled — keep the in-memory preference */
-    }
-  }, [theme]);
-
-  // Snow mode is remembered the same way the theme is.
+  // Snow mode is a per-device preference, like the rest of the player's.
   useEffect(() => {
     try {
       localStorage.setItem(courseSnowStorageKey, snowMode ? "1" : "0");
@@ -513,10 +478,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // ── Panel session reset on exit ─────────────────────────────────────────
   // While the player is open, the Notes and Mind Map panels keep their place
   // across tab / module switches via the panel session (notes editor vs
-  // list, map library vs canvas, the map's own theme pick). Leaving the
-  // player resets ALL of it so the next entry starts at the defaults — the
-  // notes list and the mind map library, with the map following the player's
-  // theme again. One thing is never thrown away: an open notes draft is
+  // list, map library vs canvas). Leaving the player resets ALL of it so the
+  // next entry starts at the defaults — the notes list and the mind map
+  // library. One thing is never thrown away: an open notes draft is
   // preserved as a saved note first.
   useEffect(() => {
     return () => {
@@ -819,7 +783,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const progress = totalEligibleFiles.length ? Math.round((completedIds.size / totalEligibleFiles.length) * 100) : 0;
   const isDone = Boolean(selectedFile && completedIds.has(selectedFile.id));
   const useLandscapeRails = isLandscape;
-  const browserColorScheme = theme === "dark" ? "dark" : "light";
+  // The player is dark only, so the native controls (scrollbars, inputs, the
+  // OS file picker) always resolve to the dark rendering.
+  const browserColorScheme = "dark" as const;
 
   // The desktop/mobile switch only means something for embedded documents —
   // a video or an image renders identically either way.
@@ -896,8 +862,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       canMarkComplete={Boolean(selectedFile)}
       onToggleComplete={() => void toggleComplete()}
       fileActions={fileActions?.model ?? null}
-      theme={theme}
-      onThemeChange={(next) => setTheme(next)}
       snowMode={snowMode}
       onSnowModeChange={setSnowMode}
       showViewportToggle={showViewportToggle}
@@ -958,9 +922,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           onDeleteMap={mindMap.deleteMap}
           mapsLoading={mindMap.mapsLoading}
           atMapLimit={mindMap.atMapLimit}
-          // The map renders in the player's current theme (dark or light)
-          // until the learner flips the map's own sun/moon toolbar button.
-          playerTheme={theme}
           landscape={useLandscapeRails}
           // True only while the mind map tab is the one on screen. Within one
           // player visit the panel restores the learner's last view (library
@@ -986,7 +947,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       ref={playerShellRef}
       className={`course-player-shell fixed inset-0 flex h-[100dvh] w-full overflow-hidden text-[var(--course-text)] ${useLandscapeRails ? "flex-row" : "flex-col"}`}
       data-course-player
-      data-course-theme={theme}
       data-orientation={useLandscapeRails ? "landscape" : "portrait"}
       {...(useLandscapeRails
         ? {
@@ -1015,7 +975,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           handleRef={splitDeckRef}
         />
       </section>
-      {snowMode ? <SnowOverlay theme={theme} /> : null}
+      {snowMode ? <SnowOverlay /> : null}
     </div>
   );
 }

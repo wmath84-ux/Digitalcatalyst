@@ -201,29 +201,32 @@ test("A2: checkout sections and subscription cards are GlassCard / GlassSurface,
   assert.match(read("src/components/subscription/UnlockCelebration.tsx"), /<GlassSurface/, "UnlockCelebration: modal body is a GlassSurface");
 });
 
-test("the pack's own light/dark material is user-switchable via the docs' GlassSwitch example — no app-side scheme logic in the vendored files", () => {
-  // Owner direction: keep websiteglass.com's components exactly as published
-  // (both materials, chosen by html.dark / html.light) and expose that choice
-  // through the pack's own switch, not by pinning a class from applyGlassTier.
+test("the app is dark only — no light scheme, no switch, no stored preference", () => {
+  // Owner direction: the light material is removed everywhere. The one thing
+  // left to do is pin the pack's dark side; applyGlassTier still stays out of
+  // the scheme entirely.
   const glass = read("src/lib/glass.ts");
   assert.doesNotMatch(glass, /classList\.(add|remove|toggle)\("dark"/, "applyGlassTier must not pin the scheme");
   const scheme = read("src/lib/glassScheme.ts");
-  assert.match(scheme, /classList\.toggle\("dark", scheme === "dark"\)/);
-  assert.match(scheme, /classList\.toggle\("light", scheme === "light"\)/);
+  assert.match(scheme, /export type GlassScheme = "dark";/);
+  assert.match(scheme, /classList\.add\("dark"\)/);
+  assert.doesNotMatch(scheme, /GlassScheme = "dark" \| "light"/, "no light value may come back");
+  assert.doesNotMatch(scheme, /export function (setGlassScheme|useGlassScheme)/, "the scheme setters are gone with the switch");
   assert.match(main, /applyGlassScheme\(\)/);
-  // Owner direction (2026-09-02): the "Dark mode" switch moved OFF the home
-  // header — appearance now lives with the account settings, as a
-  // PreferenceRow (which renders the same pack GlassSwitch) on both the
-  // Profile's Preferences modal and the #/settings page.
-  const header = read("src/home/components/Header.tsx");
-  assert.doesNotMatch(header, /<GlassSwitch/, "the header no longer carries the scheme switch");
-  const settingsPage = read("src/settings/SettingsPage.tsx");
-  assert.match(settingsPage, /label="Dark mode"[\s\S]*?checked=\{scheme === "dark"\}/);
-  const profileApp = read("src/profile/App.tsx");
-  assert.match(profileApp, /label="Dark mode"[\s\S]*?checked=\{scheme === "dark"\}/);
-  // The vendored engine still carries upstream's scheme reader untouched.
+  // The switch itself is gone from every surface that used to carry it — the
+  // home header (2026-09-02), then #/settings and the Profile preferences.
+  for (const f of [
+    "src/home/components/Header.tsx",
+    "src/settings/SettingsPage.tsx",
+    "src/profile/App.tsx",
+  ]) {
+    assert.doesNotMatch(read(f), /label="Dark mode"/, `${f} still carries the scheme switch`);
+    assert.doesNotMatch(read(f), /useGlassScheme/, `${f} still reads the scheme`);
+  }
+  // The vendored engine resolves dark unconditionally.
   const engine = read("src/components/ui/glass.tsx");
-  assert.match(engine, /if \(root\.classList\.contains\("light"\)\) return false;/);
+  assert.match(engine, /function readDark\(\): boolean \{\s*return true;/);
+  assert.doesNotMatch(engine, /classList\.contains\("light"\)/);
 });
 
 // ---------------------------------------------------------------------------

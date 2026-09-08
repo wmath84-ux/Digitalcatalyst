@@ -1,47 +1,34 @@
 // Colour scheme for the website-glass pack.
 //
-// The vendored components carry BOTH of websiteglass.com's materials and pick
-// one by reading `html.dark` / `html.light` (see readDark() in
-// components/ui/glass.tsx — upstream code, untouched). This module is the only
-// thing that writes that class: a persisted user preference, exposed through
-// the pack's own <GlassSwitch ariaLabel="Dark mode"> in the header (the exact
-// controlled example from the Glass Switch docs). Default is dark because the
-// Black Ice backdrop is dark; the user can flip to the light material any time
-// and the pack renders exactly what the docs show for that scheme.
-import { useSyncExternalStore } from "react";
+// The app is DARK ONLY. The vendored websiteglass.com components carry both of
+// the published materials and pick one by reading `html.dark` / `html.light`
+// (see readDark() in components/ui/glass.tsx), so the one thing this module
+// still does is pin the dark side of that pair on <html>.
+//
+// There is deliberately no light scheme here any more: no `"light"` value, no
+// stored preference, no `useGlassScheme()` and no switch in the UI. The
+// previous version persisted `dc.glass.scheme` and let Settings / Profile flip
+// the pack to its light material; that whole path is gone, and any stale
+// `dc.glass.scheme` entry left in localStorage is ignored (the class it drove
+// is now written unconditionally).
+//
+// `colorScheme` is written too, so form controls, scrollbars and the native
+// date/time pickers inherit the dark rendering instead of following the OS.
+export type GlassScheme = "dark";
 
-export type GlassScheme = "dark" | "light";
-const KEY = "dc.glass.scheme";
-const listeners = new Set<() => void>();
+/** The old preference key. Read once so it can be dropped. */
+const LEGACY_KEY = "dc.glass.scheme";
 
-function read(): GlassScheme {
-  if (typeof window === "undefined") return "dark";
-  try {
-    const v = window.localStorage.getItem(KEY);
-    if (v === "light" || v === "dark") return v;
-  } catch { /* ignore */ }
-  return "dark";
-}
-
-export function applyGlassScheme(scheme: GlassScheme = read()): void {
+export function applyGlassScheme(): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  root.classList.toggle("dark", scheme === "dark");
-  root.classList.toggle("light", scheme === "light");
-  root.style.colorScheme = scheme;
-}
-
-export function setGlassScheme(scheme: GlassScheme): void {
-  try { window.localStorage.setItem(KEY, scheme); } catch { /* ignore */ }
-  applyGlassScheme(scheme);
-  for (const l of listeners) l();
-}
-
-export function useGlassScheme(): [GlassScheme, (s: GlassScheme) => void] {
-  const scheme = useSyncExternalStore(
-    (cb) => { listeners.add(cb); return () => { listeners.delete(cb); }; },
-    read,
-    () => "dark" as GlassScheme,
-  );
-  return [scheme, setGlassScheme];
+  root.classList.add("dark");
+  root.classList.remove("light");
+  root.dataset.theme = "dark";
+  root.style.colorScheme = "dark";
+  try {
+    window.localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    /* private mode — nothing to clean up */
+  }
 }

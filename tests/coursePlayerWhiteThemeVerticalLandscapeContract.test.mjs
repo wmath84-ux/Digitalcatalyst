@@ -37,20 +37,17 @@ test("physical mobile landscape explicitly opts scrollable content into vertical
   assert.match(styles, /\[data-course-viewer-iframe\]/);
 });
 
-test("theme button simply toggles dark and light with no extra state", () => {
-  assert.ok(coursePlayer.includes('type CoursePlayerTheme = "dark" | "light";'), "theme type has only dark + light");
-  // The Player tab's settings row flips the same two-state preference
-  // directly through the panel (the header that held the quick button is
-  // gone — owner's direction).
-  assert.ok(playerPanel.includes('onThemeChange(next ? "light" : "dark")'), "next theme is a simple flip");
+test("there is no theme state left in the Course Player at all", () => {
+  // The player went dark-only with the app-wide light theme removal: no type,
+  // no toggle, no persisted preference.
+  assert.ok(!coursePlayer.includes("CoursePlayerTheme"), "no theme type remains");
+  assert.ok(!playerPanel.includes("onThemeChange"), "the panel has no theme row");
   assert.ok(!coursePlayer.includes('theme === "light" ? "white"'), "no white step remains in the cycle");
-  // Anyone who previously picked the removed white theme keeps light, and a
-  // third tap cycles straight back to the first state (dark ⇄ light ⇄ dark).
-  assert.ok(coursePlayer.includes('return stored === "light" || stored === "white" ? "light" : "dark";'), "stored white preference migrates to light");
 });
 
-test("no pure-white theme state remains in the Course Player palette", () => {
+test("no light or white theme state remains in the Course Player palette", () => {
   assert.ok(!styles.includes('data-course-theme="white"'), "no white palette block in the stylesheet");
+  assert.ok(!styles.includes('data-course-theme="light"'), "no light palette block either");
   assert.ok(!coursePlayer.includes('"dark" | "light" | "white"'), "no three-state theme type");
-  assert.ok(styles.includes('.course-player-shell[data-course-theme="light"]'), "light palette still present");
+  assert.ok(styles.includes(".course-player-shell {"), "the dark palette block is still there");
 });

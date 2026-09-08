@@ -142,7 +142,7 @@ function Slider({
       {/* Wave 4: native range -> registry glass-slider. The thumb is a lens
           that squashes with drag velocity, and ←/→/Home/End come with it.
           Wave 6 note: this used to carry `dc-slider-on-dark` to force the dark
-          palette. `flowpath/hooks/useTheme.ts` already writes `data-theme` on
+          palette. The app is dark only, so the shell already paints the dark palette on
           <html>` (dark default, removed on unmount), so the pack picks the
           right ink by itself — and the forced rule was wrong for FlowPath's
           light theme, which is why it is gone. */}
