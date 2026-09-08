@@ -40,7 +40,7 @@ import {
   type ReactNode,
 } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { AdaptiveDpr, OrbitControls, Preload, Sky, Stars } from "@react-three/drei";
+import { AdaptiveDpr, Cloud, Clouds, OrbitControls, Preload, Sky, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import {
   fbm,
@@ -48,7 +48,12 @@ import {
   getTerrainHeight,
   type BiomeData,
 } from "@strata-game-library/core";
-import { AdvancedWater, ProceduralSky } from "@strata-game-library/core/components";
+import {
+  AdvancedWater,
+  CloudLayer,
+  GodRays,
+  ProceduralSky,
+} from "@strata-game-library/core/components";
 import {
   createGrassInstances,
   createRockInstances,
@@ -63,6 +68,22 @@ const WORLD_SIZE = 220;
 const TERRAIN_SEGMENTS = 160;
 const WATER_LEVEL = -1.6;
 const SEED = 1337;
+
+/* The look is taken straight from the Strata hero art (.github/assets/
+   strata-hero.webp): a LOW GOLDEN SUN sitting just above the ridgeline on the
+   right, a warm orange horizon fading into deep blue overhead, fat lit clouds,
+   and a bright TURQUOISE lake — not the flat mid-blue the first pass used. */
+/** Direction of the sun, normalised-ish, in world units. */
+const SUN_POSITION: [number, number, number] = [180, 34, -150];
+/** Sun altitude in degrees — low, so it reads as a sunset. */
+const SUN_ALTITUDE = 12;
+const SUN_COLOR = "#ffd9a0";
+const HORIZON_COLOR = "#f0b070";
+const SKY_COLOR = "#9fc9e8";
+/** Hero-art lake palette. */
+const WATER_SHALLOW = 0x3fd0d8;
+const WATER_DEEP = 0x0b6f96;
+const WATER_FOAM = 0xeafbff;
 
 /** The Strata biome map the terrain height + vegetation both sample. */
 const BIOMES: BiomeData[] = [
@@ -245,15 +266,96 @@ function Crystals() {
 }
 
 /* ── Scene ───────────────────────────────────────────────────── */
+/* ── Camera overlay ──────────────────────────────────────────────
+   Strata's <GodRays> is a screen-space effect drawn on a 2×2 plane, so it has
+   to be parented to the CAMERA and pushed to the exact distance where those
+   2 units fill the viewport — otherwise it renders as a tiny quad floating at
+   the world origin (and you never see the shafts). */
+function CameraAttached({ children }: { children: ReactNode }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const { camera } = useThree();
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group) return undefined;
+    camera.add(group);
+    return () => {
+      camera.remove(group);
+    };
+  }, [camera]);
+  return <group ref={groupRef}>{children}</group>;
+}
+
+function CameraOverlay({ children }: { children: ReactNode }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const { camera } = useThree();
+
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group) return undefined;
+    camera.add(group);
+    return () => {
+      camera.remove(group);
+    };
+  }, [camera]);
+
+  useFrame(() => {
+    const group = groupRef.current;
+    if (!group || !(camera instanceof THREE.PerspectiveCamera)) return;
+    // Distance at which a 2-unit-tall plane exactly fills the frustum height.
+    const distance = 1 / Math.tan((camera.fov * Math.PI) / 360);
+    group.position.set(0, 0, -distance);
+    group.scale.set(camera.aspect, 1, 1);
+  });
+
+  return <group ref={groupRef} renderOrder={998}>{children}</group>;
+}
+
+/* ── The sun itself ──────────────────────────────────────────────
+   drei's <Sky> only paints scattering; the glowing disc in the hero art is a
+   separate emissive billboard. This renders the disc + a soft bloom halo at
+   the same place the directional light comes from, so "Suraj" is actually
+   visible in the sky instead of only implied by the lighting. */
+function SunDisc() {
+  const groupRef = useRef<THREE.Group>(null);
+  const { camera } = useThree();
+
+  // Keep the sun locked to the horizon in world space but always facing the
+  // camera, so it reads as a disc from every orbit angle.
+  useFrame(() => {
+    groupRef.current?.lookAt(camera.position);
+  });
+
+  return (
+    <group ref={groupRef} position={SUN_POSITION}>
+      {/* Core disc */}
+      <mesh>
+        <circleGeometry args={[13, 48]} />
+        <meshBasicMaterial color="#fff3d0" toneMapped={false} transparent opacity={0.98} />
+      </mesh>
+      {/* Inner glow */}
+      <mesh position={[0, 0, -0.5]}>
+        <circleGeometry args={[24, 48]} />
+        <meshBasicMaterial color={SUN_COLOR} toneMapped={false} transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </mesh>
+      {/* Outer atmospheric halo */}
+      <mesh position={[0, 0, -1]}>
+        <circleGeometry args={[52, 48]} />
+        <meshBasicMaterial color="#ff9b4d" toneMapped={false} transparent opacity={0.22} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </mesh>
+    </group>
+  );
+}
+
+/* ── Scene ───────────────────────────────────────────────────── */
 function GameScene({ quality }: { quality: "low" | "high" }) {
   const { scene, camera } = useThree();
 
   useEffect(() => {
-    // One place owns the atmosphere: a light horizon colour + matching fog so
-    // the distant terrain fades instead of ending in a hard black band.
-    scene.background = new THREE.Color("#8fc7e8");
-    scene.fog = new THREE.Fog("#8fc7e8", 90, 260);
-    camera.position.set(34, 22, 40);
+    // One place owns the atmosphere: the hero art's warm horizon so the
+    // distant terrain melts into a golden haze instead of a hard band.
+    scene.background = new THREE.Color(HORIZON_COLOR);
+    scene.fog = new THREE.Fog(HORIZON_COLOR, 70, 300);
+    camera.position.set(38, 20, 46);
     camera.lookAt(0, 2, 0);
     return () => {
       scene.fog = null;
@@ -262,46 +364,107 @@ function GameScene({ quality }: { quality: "low" | "high" }) {
 
   return (
     <>
-      {/* Lighting */}
-      <ambientLight intensity={0.55} />
-      <hemisphereLight args={["#cfe9ff", "#5a4a32", 0.7]} />
+      {/* ── Lighting: a warm low sun + cool sky bounce (hero art) ── */}
+      <ambientLight intensity={0.42} color="#ffe3c2" />
+      <hemisphereLight args={[SKY_COLOR, "#4a3a26", 0.75]} />
+      {/* The key light comes FROM the visible sun disc. */}
       <directionalLight
-        position={[70, 90, 40]}
-        intensity={1.65}
+        position={SUN_POSITION}
+        intensity={2.1}
+        color={SUN_COLOR}
         castShadow={quality === "high"}
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-120}
-        shadow-camera-right={120}
-        shadow-camera-top={120}
-        shadow-camera-bottom={-120}
-        shadow-camera-far={400}
+        shadow-camera-left={-140}
+        shadow-camera-right={140}
+        shadow-camera-top={140}
+        shadow-camera-bottom={-140}
+        shadow-camera-far={520}
       />
+      {/* Cool fill from the opposite side so shadowed slopes stay readable. */}
+      <directionalLight position={[-90, 60, 80]} intensity={0.45} color="#a8ccf0" />
 
-      {/* Strata's procedural sky sits behind drei's Sky gradient so the world
-          keeps its atmosphere even if the shader sky is culled on a weak GPU. */}
-      <Sky distance={450000} sunPosition={[70, 45, 40]} turbidity={6} rayleigh={1.6} />
-      <ProceduralSky
-        timeOfDay={{ sunAngle: 46, sunIntensity: 0.95, ambientLight: 0.5, starVisibility: 0, fogDensity: 0.15 }}
-        weather={{ intensity: 0.1 }}
-        size={[900, 450]}
-        distance={320}
+      {/* Sky: drei scattering tuned for a low sun, then Strata's shader sky
+          behind it, then the sun disc itself. */}
+      <Sky
+        distance={450000}
+        sunPosition={SUN_POSITION}
+        turbidity={8}
+        rayleigh={2.6}
+        mieCoefficient={0.006}
+        mieDirectionalG={0.85}
       />
-      <Stars radius={320} depth={60} count={quality === "high" ? 1200 : 400} factor={5} fade saturation={0} />
+      {/* Strata's shader sky is a PLANE, so it has to ride with the camera to
+          act as a backdrop instead of a plate hanging in one direction. */}
+      <CameraAttached>
+        <ProceduralSky
+          timeOfDay={{
+            sunAngle: SUN_ALTITUDE,
+            sunIntensity: 0.85,
+            ambientLight: 0.45,
+            starVisibility: 0.12,
+            fogDensity: 0.2,
+          }}
+          weather={{ intensity: 0.12 }}
+          size={[1200, 700]}
+          distance={420}
+        />
+      </CameraAttached>
+      <SunDisc />
+      <Stars radius={340} depth={70} count={quality === "high" ? 900 : 300} factor={5} fade saturation={0} />
+
+      {/* Clouds — the hero art's fat, sun-lit cumulus. Strata's shader
+          CloudLayer paints the high sheet; drei's volumetric puffs sit lower
+          and catch the warm key light. */}
+      <CloudLayer
+        altitude={110}
+        coverage={0.42}
+        density={0.9}
+        scale={6}
+        size={[900, 900]}
+        wind={{ speed: 0.006 }}
+        dayNight={{ sunAngle: SUN_ALTITUDE, sunIntensity: 0.9, sunColor: new THREE.Color(SUN_COLOR) }}
+      />
+      {quality === "high" ? (
+        <Clouds material={THREE.MeshLambertMaterial} limit={220}>
+          <Cloud seed={2} bounds={[70, 6, 40]} volume={16} position={[-60, 46, -70]} color="#ffe6c8" opacity={0.55} speed={0.12} />
+          <Cloud seed={7} bounds={[60, 5, 34]} volume={13} position={[70, 52, -95]} color="#fff2df" opacity={0.5} speed={0.1} />
+          <Cloud seed={11} bounds={[50, 5, 30]} volume={11} position={[10, 58, 80]} color="#e9f2ff" opacity={0.42} speed={0.09} />
+        </Clouds>
+      ) : null}
+
+      {/* God rays streaming off the low sun — the hero art's hazy sunset. */}
+      {quality === "high" ? (
+        <CameraOverlay>
+          <GodRays
+            lightPosition={SUN_POSITION}
+            color={0xffe0aa}
+            atmosphereColor={0xff8a3d}
+            sunAltitude={SUN_ALTITUDE}
+            intensity={0.85}
+            density={1.15}
+            decay={0.94}
+            samples={40}
+            scattering={2.2}
+            noiseFactor={0.28}
+          />
+        </CameraOverlay>
+      ) : null}
 
       <Terrain />
       <Vegetation quality={quality} />
 
-      {/* Strata's AdvancedWater — caustics + foam, parked at the shoreline. */}
+      {/* Strata's AdvancedWater — the hero art's turquoise glacial lake with
+          caustics and pale foam at the shoreline. */}
       <AdvancedWater
         position={[0, WATER_LEVEL, 0]}
-        size={WORLD_SIZE * 1.4}
-        segments={quality === "high" ? 96 : 40}
-        color={0x2f8fbf}
-        deepColor={0x0a3350}
-        foamColor={0xdff3ff}
-        causticIntensity={0.65}
-        waveHeight={0.22}
-        waveSpeed={0.75}
+        size={WORLD_SIZE * 1.6}
+        segments={quality === "high" ? 128 : 48}
+        color={WATER_SHALLOW}
+        deepColor={WATER_DEEP}
+        foamColor={WATER_FOAM}
+        causticIntensity={0.85}
+        waveHeight={0.28}
+        waveSpeed={0.6}
       />
 
       <Crystals />
@@ -315,7 +478,7 @@ function GameScene({ quality }: { quality: "low" | "high" }) {
         enableDamping
         dampingFactor={0.06}
         minDistance={8}
-        maxDistance={160}
+        maxDistance={190}
         maxPolarAngle={Math.PI / 2.15}
       />
       <AdaptiveDpr pixelated />
