@@ -52,10 +52,10 @@ test("the editor is built on React Flow, which is the only candidate with touch 
 // ---------------------------------------------------------------------------
 
 test("Mind map is a dock tab declared immediately after Note (Player closes the list)", () => {
-  assert.match(overlay, /export type DockTab = "modules" \| "resources" \| "notes" \| "mindmap" \| "paid" \| "player";/);
-  const order = [...overlay.matchAll(/\{ key: "(modules|resources|notes|mindmap|paid|player)"/g)].map((m) => m[1]);
-  assert.deepEqual(order.slice(0, 5), ["modules", "resources", "notes", "mindmap", "paid"], "Mind map must sit right after Note");
-  assert.equal(order[5], "player", "the Player settings tab closes the dock");
+  assert.match(overlay, /export type DockTab = "modules" \| "brain" \| "notes" \| "mindmap" \| "ai" \| "paid" \| "player";/);
+  const order = [...overlay.matchAll(/\{ key: "(modules|brain|notes|mindmap|ai|paid|player)"/g)].map((m) => m[1]);
+  assert.deepEqual(order.slice(0, 5), ["modules", "brain", "notes", "mindmap", "ai"], "Mind map must sit right after Note");
+  assert.deepEqual(order.slice(5), ["paid", "player"], "the Player settings tab closes the dock");
 });
 
 test("the overlay renders the mind map panel for its tab and degrades without one", () => {
@@ -71,18 +71,19 @@ test("every tab (mind map included) renders in the Split Deck's study pane", () 
   // The owner's direction changed: there is no sheet variant at all — the
   // same study pane (permanent, beside the lesson) hosts ALL tabs.
   assert.match(coursePlayer, /study=\{studyOverlay\}/);
-  assert.match(overlay, /data-course-study-chrome="pane"/);
+  assert.doesNotMatch(overlay, /data-course-study-chrome/, "the pane carries no header row");
   assert.match(overlay, /data-course-overlay-tab=\{tab\}/);
   assert.doesNotMatch(overlay, /DEFAULT_MINDMAP_SPLIT|DEFAULT_NOTES_SPLIT/, "per-tab split widths are gone");
   assert.doesNotMatch(overlay, /data-course-split-handle/, "the split drag handle is gone");
   assert.doesNotMatch(overlay, /glass-sheet/, "no right-side sheet variant");
 });
 
-test("the pane's chrome row (title + notes +) also serves the mind map tab", () => {
-  // One chrome row for every tab; it is hidden ONLY while the notes writing
-  // box is open (the editor needs every pixel of the pane).
-  assert.match(overlay, /\{notesWriting \? null : chromeRow\}/);
-  assert.match(overlay, /data-course-overlay-title/);
+test("the pane carries no chrome row at all — every tab starts at the top", () => {
+  // The header (title + notes +) is gone entirely so the content keeps every
+  // pixel it used to take; the notes "+" is a circular button in the grid.
+  assert.doesNotMatch(overlay, /chromeRow/);
+  assert.doesNotMatch(overlay, /data-course-overlay-title/);
+  assert.doesNotMatch(overlay, /data-course-study-chrome/);
   assert.doesNotMatch(overlay, /data-course-overlay-close/);
 });
 
@@ -407,12 +408,12 @@ test("the mind map follows the Course Player theme and can be flipped for the ma
   assert.match(styles, /\.course-mindmap-shell\[data-mindmap-theme="light"\]/);
 });
 
-test("the mind map toolbar has a close button that peek-collapses the pane", () => {
-  assert.match(panel, /data-course-mindmap-close/);
-  assert.match(panel, /onClose\(\);/);
-  assert.match(coursePlayer, /onClose=\{\(\) => \{/);
-  assert.match(coursePlayer, /mindMap\.flush\(\);/);
-  assert.match(coursePlayer, /splitDeckRef\.current\?\.collapse\("study"\)/);
+test("the mind map carries no close button anywhere", () => {
+  // No toolbar X, no library X — the dock tab is the way out, and tapping
+  // any library card (including the open one) returns to the canvas.
+  assert.doesNotMatch(panel, /data-course-mindmap-close/);
+  assert.doesNotMatch(panel, /data-course-mindmap-library-close/);
+  assert.doesNotMatch(coursePlayer, /onClose=\{\(\) => \{/);
 });
 
 test("the toolbar slot is replaced by a slim status strip in both orientations", () => {
@@ -512,7 +513,7 @@ const toolbar = panel.slice(
 );
 // Everything on the bar lives between those two markers; the map library
 // screen above it still carries words.
-const toolCluster = panel.slice(panel.indexOf("Right cluster: the tools"), panel.indexOf("data-course-mindmap-close"));
+const toolCluster = panel.slice(panel.indexOf("Right cluster: the tools"), panel.indexOf("{errorMessage ? ("));
 
 test("the toolbar is icon-only: every control is a single glyph tile, no captions", () => {
   // One tile class per control, and not one of them renders a word.
@@ -523,7 +524,7 @@ test("the toolbar is icon-only: every control is a single glyph tile, no caption
   assert.match(toolbar, /data-course-mindmap-theme/);
   assert.match(toolbar, /data-course-mindmap-delete/);
   assert.match(toolbar, /data-course-mindmap-dbl-delete/);
-  assert.match(toolbar, /data-course-mindmap-close/);
+  assert.doesNotMatch(toolbar, /data-course-mindmap-close/, "no close button on the bar");
   assert.match(toolbar, /data-course-mindmap-auto-arrange/);
   for (const button of toolCluster.matchAll(/<button[\s\S]*?>/g)) {
     const tag = button[0];
@@ -537,21 +538,28 @@ test("the toolbar is icon-only: every control is a single glyph tile, no caption
   assert.match(toolCluster, /title="Fit to screen/);
 });
 
-test("the status strip never scrolls sideways (the 'toolbar slid left' fix)", () => {
-  // A scrollable strip KEEPS the offset the browser hands it while scrolling
-  // a focused tile into view (soft keyboard, rotation, reopen) and never
-  // gives it back — the bar then paints from the middle with its left edge
-  // cut off, which is exactly the "toolbar khisak gaya" report. It is clipped
-  // now, sizes itself, and resets any leftover offset when the sheet opens.
-  assert.match(toolbar, /overflow-hidden/);
-  assert.doesNotMatch(toolbar, /overflow-x-auto/, "the strip must not be a scroll container");
-  assert.doesNotMatch(toolbar, /overflow-x-scroll/);
-  // Only the map-name pill may shrink, so no tool can be pushed off the bar.
-  assert.match(toolbar, /flex min-w-0 flex-1 items-center/);
+test("the status strip is one side-scrolling line (never wrapped, never clipped)", () => {
+  // Every tool sits side-by-side and the bar scrolls horizontally on a narrow
+  // sheet instead of wrapping to a second line. The old "toolbar khisak gaya
+  // left" report came from a scrollable bar that KEPT a stale browser offset
+  // and from `space-between` overflowing both ends — this one resets the
+  // offset on open and never uses space-between.
+  assert.match(toolbar, /overflow-x-auto/);
+  assert.doesNotMatch(toolbar, /overflow-hidden/);
+  assert.doesNotMatch(toolbar, /flex-wrap/);
+  assert.doesNotMatch(toolbar, /justify-between/);
+  // The content keeps its width so the strip scrolls instead of squeezing.
+  assert.match(toolbar, /flex min-w-max flex-1 items-center/);
   assert.match(toolbar, /<span className="min-w-0 truncate normal-case" data-mm-map-name>/);
   // …and any offset a browser still managed to set is cleared on open.
   assert.match(panel, /if \(strip && strip\.scrollLeft !== 0\) strip\.scrollLeft = 0;/);
   assert.match(panel, /const statusRef = useRef<HTMLDivElement>\(null\);/);
+});
+
+test("the toolbar stays hidden until a specific map is opened", () => {
+  // The library is the home screen: no strip and no error bar until a map is
+  // on the canvas.
+  assert.match(panel, /\{libraryOpen \? null : \(/);
 });
 
 test("the toolbar measures itself and sizes its tiles for phone, tablet and desktop", () => {

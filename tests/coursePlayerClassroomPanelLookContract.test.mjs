@@ -301,13 +301,13 @@ test("a module and its own content stay visibly connected, as in the room's choo
   assert.match(css, /\[data-course-sheet-row\]\[data-selected="true"\][^}]*--dc-flat-violet-wash/s);
 });
 
-test("nothing floats: the dock, the rails and the divider's pills are solid plates", () => {
+test("nothing floats: the dock and the rails are solid plates", () => {
   // The room's HUD and trays were frosted glass over a canvas. The flat player
   // gets the same plate family with NO blur, so nothing reads as floating.
+  // (The divider's old grabber/bubble pills are gone — it is a bare line now.)
   const solid = [
     '[data-course-dock] [data-glass-dock]',
     '[data-course-peek-rail]',
-    '[data-course-split-grabber]',
     '[data-course-image-viewer] [data-glass-dock]',
   ];
   for (const target of solid) {
@@ -322,7 +322,7 @@ test("nothing floats: the dock, the rails and the divider's pills are solid plat
   }
   // Blur is switched OFF wherever the port owns the surface, and never turned
   // up: the room's frosted HUD material is not used on the dock or the rails.
-  for (const rule of ALL_RULES.filter((r) => /dock|peek-rail|grabber|ratio-bubble/.test(r.selector))) {
+  for (const rule of ALL_RULES.filter((r) => /dock|peek-rail/.test(r.selector))) {
     for (const { property, value } of declarations(rule.body)) {
       if (/backdrop-filter/.test(property)) {
         assert.equal(value, "none !important", `${rule.selector} still frosts`);
@@ -347,7 +347,7 @@ test("'borders' are inset shadows, so no row grows by 2px", () => {
   );
   assert.deepEqual(realBorders, [], realBorders.join("\n"));
   // Existing border COLOURS may be re-pointed (the box already has them).
-  assert.match(css, /border-bottom-color: var\(--dc-flat-line\);/);
+  assert.match(css, /border-color: var\(--dc-flat-line\);/);
 });
 
 /* ── 4. Scope: nothing leaks out of the player ──────────────────────────── */
@@ -389,8 +389,8 @@ test("each attribute hook the port paints is one the flat player renders", () =>
   // The surfaces the port dresses, spelled out, so a rename in src/course
   // cannot silently leave a rule painting nothing.
   for (const attr of [
-    "data-course-lesson-pane", "data-course-study-pane", "data-course-study-chrome",
-    "data-course-overlay-title", "data-course-overlay-tab", "data-course-sheet-row",
+    "data-course-lesson-pane", "data-course-study-pane",
+    "data-course-sheet-row",
     "data-course-panel-row", "data-course-panel-section-label", "data-course-overlay-module",
     "data-course-overlay-file", "data-course-dock", "data-glass-dock", "data-course-note",
     "data-course-notes-grid", "data-course-mindmap-library", "data-course-mindmap-map-card",
@@ -400,6 +400,13 @@ test("each attribute hook the port paints is one the flat player renders", () =>
     assert.ok(attrs.has(attr), `the port no longer paints ${attr}`);
     assert.ok(FLAT_SOURCES.includes(attr), `${attr} does not exist in the flat player`);
   }
+});
+
+test("module rows wear a medium slate plate with brighter subtitles", () => {
+  // The curriculum spine is neither near-black nor a lifted wash — a medium
+  // plate with brighter subtitles so every module reads instantly.
+  assert.match(css, /\[data-course-sheet-row\]\[data-row-kind="module"\] \{[^}]*rgba\(100, 116, 139, 0\.32\)/s);
+  assert.match(css, /\[data-course-sheet-row\] \[data-row-subtitle\] \{[^}]*rgba\(255, 255, 255, 0\.78\)/s);
 });
 
 test("each class the port paints is one the flat player renders", () => {

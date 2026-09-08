@@ -2,13 +2,12 @@
 //
 // Course Player notes panel.
 //
-//   - The single "+" button (in the overlay's MAIN header) opens a LARGE
-//     rich-text editor that fills the notes sheet, so long notes are
-//     comfortable to read while writing. The panel itself renders no
-//     header rows: the overlay's main header is the only header, and
-//     while the writing box is open even that one is hidden — leaving
-//     toolbar on top, the writing surface in the middle and Save /
-//     Cancel on the bottom for maximum writing space.
+//   - The single "+" button (a small circular button floating at the
+//     grid's bottom-right) opens a LARGE rich-text editor that fills the
+//     notes pane, so long notes are comfortable to read while writing.
+//     The panel renders no header rows at all — while the writing box is
+//     open the pane is exactly toolbar on top, the writing surface in the
+//     middle and Save / Cancel on the bottom for maximum writing space.
 //   - "Save" collapses the note back into a square card in a grid — the
 //     big surface is an editing affordance only, it never changes how a
 //     saved note looks in the list.
@@ -36,7 +35,7 @@
 // map restarts on its library.
 
 import { useEffect, useState } from "react";
-import { Check, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassCard } from "../components/ui/GlassCard";
 import { GlassSurface } from "../components/ui/glass";
@@ -55,10 +54,8 @@ interface NotesPanelProps {
   /** Lets the overlay grow the sheet while the big editor is open. */
   onEditorOpenChange?: (open: boolean) => void;
   /**
-   * Monotonic counter from the overlay's main header "+" button. Each
-   * increment asks this panel to open its composer — the button moved to
-   * the overlay's main header, so the panel listens for the signal instead
-   * of owning its own header row.
+   * Optional external trigger for the composer: each increment opens a
+   * fresh composer. The panel's own circular "+" is the primary trigger.
    */
   composerOpenSignal?: number;
 }
@@ -170,7 +167,7 @@ export default function NotesPanel({
     setDraftTitle("");
   };
 
-  // The main header's "+" (in the overlay) asks for a fresh composer.
+  // An external signal (when provided) asks for a fresh composer.
   // `> 0` keeps the first mount (signal 0) from auto-opening the editor.
   useEffect(() => {
     if (composerOpenSignal && composerOpenSignal > 0) openComposer();
@@ -263,13 +260,13 @@ export default function NotesPanel({
 
   return (
     <div className="flex h-full flex-col overflow-hidden" data-course-notes-panel data-course-notes-mode="list">
-      {/* No secondary header — the overlay's main header carries the
-          title, the "+" (new note) button and the close button, so the
-          note grid starts at the very top of the sheet. */}
+      {/* No header anywhere — the note grid starts at the very top of the
+          pane, and the circular "+" floats at the bottom-right of the grid. */}
       {/* Note list — square cards in a grid. A saved note always collapses
           back to a compact square; the rich formatting is preserved
           underneath and shown again the moment the note is reopened. */}
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div className="h-full overflow-y-auto p-3 pb-16">
         {notes.length === 0 ? (
           <GlassSurface radius={16} className="border border-dashed border-[var(--course-border)] text-white" contentClassName="p-4 text-center text-xs font-semibold text-[var(--course-muted)]">
             {/* The empty pill is the pack surface — no bg-[var(--course-soft)] plate any more. */}
@@ -318,6 +315,20 @@ export default function NotesPanel({
             })}
           </ul>
         )}
+        </div>
+        {/* The one "+" — a small circular button floating at the grid's
+            bottom-right. It opens the same big composer the old header "+"
+            used to open. */}
+        <button
+          type="button"
+          onClick={openComposer}
+          className="absolute bottom-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-950/50 transition hover:bg-indigo-500 active:scale-95"
+          aria-label="Add note"
+          title="Add note"
+          data-course-notes-add
+        >
+          <Plus size={18} strokeWidth={2.8} />
+        </button>
       </div>
 
       {/* Two-step delete confirmation. Rendered through a portal so the

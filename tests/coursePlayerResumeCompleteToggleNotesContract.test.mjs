@@ -172,11 +172,10 @@ test("The notes editor is a large rich-text surface", () => {
   // The composer takes over the whole panel.
   assert.match(notesPanel, /if \(editorOpen\) \{/);
   assert.match(notesPanel, /className="flex min-h-0 flex-1 flex-col p-3"/);
-  // …and the study pane gives it every pixel while it's open: the pane's
-  // chrome row is hidden entirely so the writing surface fills the pane.
-  assert.match(overlay, /const notesWriting = tab === "notes" && notesEditorOpen;/);
-  assert.match(overlay, /\{notesWriting \? null : chromeRow\}/);
-  assert.match(overlay, /onEditorOpenChange=\{setNotesEditorOpen\}/);
+  // …and the study pane gives it every pixel: the pane carries no header at
+  // all, so the writing surface always fills the pane.
+  assert.doesNotMatch(overlay, /chromeRow/);
+  assert.match(notesPanel, /data-course-notes-add/);
 });
 
 test("A saved note still collapses back to a square card in a grid", () => {

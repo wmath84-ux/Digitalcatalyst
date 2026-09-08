@@ -29,6 +29,8 @@ import GlassMaterial, {
 } from './GlassMaterial'
 
 export const ICON_SIZE = 44
+/** Compact plate (course player dock): seven tabs still fit a 360px phone. */
+export const COMPACT_ICON_SIZE = 38
 export const MAG_RANGE = 120
 export const MAG_SCALE = 1.55
 
@@ -78,11 +80,13 @@ function DockItem({
   dataAttrs,
   onSelect,
   skipClickRef,
+  plateSize,
 }: GlassDockItem & {
   mouseX: MotionValue<number>
   index: number
   onSelect: () => void
   skipClickRef: { current: boolean }
+  plateSize: number
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -94,9 +98,11 @@ function DockItem({
     return Math.abs(mx - center)
   })
 
-  const rawSize = useTransform(distance, [0, MAG_RANGE], [ICON_SIZE * MAG_SCALE, ICON_SIZE])
+  const rawSize = useTransform(distance, [0, MAG_RANGE], [plateSize * MAG_SCALE, plateSize])
   const size = useSpring(rawSize, { stiffness: 300, damping: 22, mass: 0.5 })
-  const y = useTransform(size, [ICON_SIZE, ICON_SIZE * MAG_SCALE], [0, -12])
+  const y = useTransform(size, [plateSize, plateSize * MAG_SCALE], [0, -12])
+  // The glyph stays proportional to its plate (22 on 44, 20 on 38).
+  const glyph = plateSize >= 44 ? 22 : 20
 
   const setButtonRef = (node: HTMLButtonElement | null) => {
     if (typeof buttonRef === 'function') buttonRef(node)
@@ -171,7 +177,7 @@ function DockItem({
         className={`relative flex items-center justify-center select-none ${buttonProps?.className ?? ''}`}
       >
         <span className="flex items-center justify-center" style={{ color }}>
-          <Icon size={22} className="h-[22px] w-[22px] shrink-0" style={{ color }} />
+          <Icon size={glyph} className="shrink-0" style={{ color, width: glyph, height: glyph }} />
         </span>
         {extra}
         {!!badge && badge > 0 && (
@@ -200,11 +206,19 @@ export default function GlassDock({
   onSelect,
   siteFooter = false,
   leading,
+  compact = false,
 }: {
   items: GlassDockItem[]
   onSelect: (id: string) => void
   siteFooter?: boolean
   leading?: ReactNode
+  /**
+   * Compact plates (38px instead of 44, tighter gaps + padding) for docks
+   * with more tabs than the home footer — the course player's seven tabs
+   * still fit a 360px phone. Springs, stagger, magnification, plates and
+   * tooltips are otherwise identical.
+   */
+  compact?: boolean
 }) {
   const mouseX = useMotionValue(-200)
   const skipClickRef = useRef(false)
@@ -234,7 +248,7 @@ export default function GlassDock({
         onSelect(id)
       }}
       onPointerCancel={resetPointer}
-      className="relative isolate mx-auto flex w-max max-w-full shrink-0 items-end gap-2 rounded-3xl px-4 pb-3 pt-3"
+      className={`relative isolate mx-auto flex w-max max-w-full shrink-0 items-end rounded-3xl ${compact ? 'gap-1.5 px-3 pb-2.5 pt-2.5' : 'gap-2 px-4 pb-3 pt-3'}`}
       style={{
         touchAction: 'none',
         background: DOCK_PANEL_BG,
@@ -257,6 +271,7 @@ export default function GlassDock({
           mouseX={mouseX}
           index={i}
           skipClickRef={skipClickRef}
+          plateSize={compact ? COMPACT_ICON_SIZE : ICON_SIZE}
           onSelect={() => onSelect(item.id)}
         />
       ))}

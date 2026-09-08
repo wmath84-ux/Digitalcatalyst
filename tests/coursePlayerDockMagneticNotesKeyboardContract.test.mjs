@@ -232,20 +232,22 @@ test("The lesson pane is the lossless viewer stack, only ever resized", () => {
 // 5c. Split Deck — the draggable, magnetic divider
 // ---------------------------------------------------------------------------
 
-test("The divider is an accessible separator with a 44px glass grabber", () => {
+test("The divider is an accessible separator: a slim strip with a yellow line only", () => {
   assert.match(studyPanels, /role="separator"/);
   assert.match(studyPanels, /data-course-split-divider=""/);
-  assert.match(studyPanels, /data-course-split-grabber=""/);
-  assert.match(studyPanels, /data-course-split-ratio-bubble=""/);
+  assert.doesNotMatch(studyPanels, /data-course-split-grabber/, "no grabber pill");
+  assert.doesNotMatch(studyPanels, /data-course-split-ratio-bubble/, "no % bubble");
   assert.match(studyPanels, /aria-orientation=\{row \? "vertical" : "horizontal"\}/);
   assert.match(studyPanels, /aria-valuemin=\{SPLIT_MIN\}/);
   assert.match(studyPanels, /aria-valuemax=\{SPLIT_MAX\}/);
   assert.match(studyPanels, /aria-valuenow=\{ariaNow\}/);
   assert.match(studyPanels, /tabIndex=\{0\}/);
-  // A real touch target and no browser gesture stealing the drag.
+  // A slim 10px strip and no browser gesture stealing the drag; an invisible
+  // ::after extends the grab area for fingers without costing layout.
   assert.match(studyPanels, /flex: `0 0 \$\{DIVIDER_HIT\}px`/);
-  assert.match(splitMotion, /export const DIVIDER_HIT = 44;/);
+  assert.match(splitMotion, /export const DIVIDER_HIT = 10;/);
   assert.match(studyPanels, /touchAction: "none"/);
+  assert.match(styles, /\[data-course-split-divider\]::after/);
 });
 
 test("The divider drags with pointer capture and reports the live ratio", () => {
@@ -257,9 +259,9 @@ test("The divider drags with pointer capture and reports the live ratio", () => 
   // in portrait.
   assert.match(studyPanels, /\(\(rect\.right - clientX\) \/ Math\.max\(1, rect\.width\)\) \* 100/);
   assert.match(studyPanels, /\(\(rect\.bottom - clientY\) \/ Math\.max\(1, rect\.height\)\) \* 100/);
-  // The % bubble reads "lesson% · study%" and is written without a re-render.
-  assert.match(studyPanels, /bubbleTextRef\.current\.textContent = `\$\{lesson\}% · \$\{study\}%`/);
+  // The live read-out (aria-valuenow) is written without a re-render.
   assert.match(studyPanels, /useMotionValueEvent\(ratio, "change"/);
+  assert.match(studyPanels, /setAttribute\("aria-valuenow"/);
   // Only flex-grow is written per frame — never a React render.
   assert.match(studyPanels, /lessonRef\.current\.style\.flexGrow = String\(Math\.max\(0\.0001, 100 - value\)\)/);
   assert.match(studyPanels, /studyRef\.current\.style\.flexGrow = String\(Math\.max\(0\.0001, value\)\)/);
@@ -273,10 +275,10 @@ test("The divider snaps magnetically and settles on a spring", () => {
   assert.match(studyPanels, /SPLIT_SNAP_POINTS\.find\(\(point\) => Math\.abs\(point - raw\) <= SNAP_TOLERANCE\)/);
   assert.match(studyPanels, /clampSplitRatio\(snap \?\? raw, floor\)/);
   assert.match(studyPanels, /animateRatio\(target, SPRING_SETTLE\)/);
-  // One soft pulse ring per snap point crossed mid-drag — the magnetic click.
-  assert.match(splitMotion, /export const PULSE_TOLERANCE = 2;/);
-  assert.match(studyPanels, /data-course-split-pulse=""/);
-  assert.match(studyPanels, /Math\.abs\(point - value\) <= PULSE_TOLERANCE/);
+  // No pulse ring any more — the divider is a bare yellow line, so crossing
+  // a snap point is silent.
+  assert.doesNotMatch(studyPanels, /data-course-split-pulse/);
+  assert.doesNotMatch(splitMotion, /PULSE_TOLERANCE/);
   // Double-click = 50/50.
   assert.match(studyPanels, /onDoubleClick=\{fiftyFifty\}/);
   assert.match(studyPanels, /animateRatio\(50, SPRING_SETTLE\)/);
@@ -314,9 +316,9 @@ test("The divider is fully keyboard driven", () => {
   assert.match(studyPanels, /case "Home":[\s\S]*?collapseTo\("study"\)/);
   assert.match(studyPanels, /case "End":[\s\S]*?collapseTo\("lesson"\)/);
   assert.match(studyPanels, /case "Enter":[\s\S]*?fiftyFifty\(\)/);
-  // The focus ring is the active tab's colour.
-  assert.match(studyPanels, /\["--split-accent" as string\]: accent/);
-  assert.match(styles, /\[data-course-split-divider\]:focus-visible \{\s*outline: 2px solid var\(--split-accent/);
+  // The focus ring is the same fixed yellow as the core line.
+  assert.doesNotMatch(studyPanels, /--split-accent/);
+  assert.match(styles, /\[data-course-split-divider\]:focus-visible \{\s*outline: 2px solid #FFBE0B;/);
 });
 
 test("⌘/Ctrl+1…6 walks the study tabs while the deck is up", () => {
@@ -359,6 +361,17 @@ test("The soft keyboard lifts the study pane's content box only", () => {
   assert.match(studyPanels, /paddingBottom: keyboardInset \? keyboardInset : undefined/);
 });
 
+test("The soft keyboard hands the whole deck to a writing tab, then hands it back", () => {
+  // While the keyboard is open over notes / mind map, the study pane takes
+  // the FULL deck (lesson + divider hidden); closing the keyboard restores
+  // the exact split, because the takeover is derived, never persisted.
+  assert.match(coursePlayer, /keyboardExpandEnabled=\{dockTab === "notes" \|\| dockTab === "mindmap"\}/);
+  assert.match(studyPanels, /const keyboardTakeover = keyboardInset > 0 && keyboardExpandEnabled && collapsed !== "study";/);
+  assert.match(studyPanels, /data-keyboard-takeover=\{keyboardTakeover \? "true" : undefined\}/);
+  assert.match(studyPanels, /style=\{keyboardTakeover \? \{ display: "none" \} : lessonStyle\}/);
+  assert.match(studyPanels, /\{keyboardTakeover \? null : \(/);
+});
+
 // ---------------------------------------------------------------------------
 // 5e. Split Deck — entry / exit, the dock FLIP and the divider's tab colour
 // ---------------------------------------------------------------------------
@@ -389,21 +402,23 @@ test("The deck never unmounts — there is no off state to hand over to", () => 
   assert.doesNotMatch(coursePlayer, /captureDockRect|flipDockFrom/);
 });
 
-test("The divider, its glow and the peek rail all wear the active tab colour", () => {
-  // The five tab colours, straight from the dock's own list.
+test("The divider is fixed yellow; the peek rail wears the active tab colour", () => {
+  // The seven tab colours, straight from the dock's own list.
   assert.match(overlay, /\{ key: "modules"[\s\S]*?color: "#FFBE0B"/);
-  assert.match(overlay, /\{ key: "resources"[\s\S]*?color: "#06D6A0"/);
+  assert.match(overlay, /\{ key: "brain"[\s\S]*?color: "#34D399"/);
   assert.match(overlay, /\{ key: "notes"[\s\S]*?color: "#3A86FF"/);
   assert.match(overlay, /\{ key: "mindmap"[\s\S]*?color: "#B388FF"/);
+  assert.match(overlay, /\{ key: "ai"[\s\S]*?color: "#22D3EE"/);
   assert.match(overlay, /\{ key: "paid"[\s\S]*?color: "#C9A96E"/);
-  // The player hands the ACTIVE tab's colour to the deck…
+  assert.match(overlay, /\{ key: "player"[\s\S]*?color: "#FF6BF5"/);
+  // The divider's core line is ALWAYS yellow — never the tab colour.
+  assert.match(splitMotion, /export const DIVIDER_LINE = "#FFBE0B";/);
+  assert.match(studyPanels, /background: DIVIDER_LINE,/);
+  // The player still hands the ACTIVE tab's colour to the deck for the rails…
   assert.match(coursePlayer, /const activeStudyTab = dockTabRecord\(dockTab\);/);
   assert.match(coursePlayer, /accent=\{activeStudyTab\.color\}/);
-  // …and the deck paints the line + glow + rail from it.
-  assert.match(studyPanels, /boxShadow: `0 0 14px \$\{accent\}66`/);
+  // …and the deck paints the peek rail's glow from it.
   assert.match(studyPanels, /boxShadow: `0 0 14px \$\{accent\}88`/);
-  // A tab switch glides the colour over 300ms.
-  assert.match(studyPanels, /background-color 300ms \$\{EASE_OUT\}/);
 });
 
 test("Every split spring comes from the one motion file", () => {
@@ -412,7 +427,8 @@ test("Every split spring comes from the one motion file", () => {
   assert.match(splitMotion, /export const SPRING_MAG = \{ stiffness: 300, damping: 22, mass: 0\.5 \} as const;/);
   assert.match(splitMotion, /export const EASE_OUT = "cubic-bezier\(0\.22,1,0\.36,1\)";/);
   assert.match(studyPanels, /from "\.\/splitMotion"/);
-  assert.match(studyPanels, /SPRING_MAG,\s*\n\s*SPRING_SETTLE,/);
+  assert.doesNotMatch(studyPanels, /SPRING_MAG/, "the bare divider uses no magnification spring");
+  assert.match(studyPanels, /SPRING_SETTLE,/);
   // No ad-hoc spring numbers anywhere in the deck.
   assert.doesNotMatch(studyPanels, /stiffness: \d/);
   assert.doesNotMatch(studyPanels, /damping: \d/);
@@ -438,16 +454,15 @@ test("The split surfaces are built from the player's own glass tokens", () => {
 test("Notes, mind map and the Player panel keep their tiling inside the pane", () => {
   assert.match(styles, /\[data-course-overlay\] \[data-course-notes-grid\],\s*\n\[data-course-study-pane\] \[data-course-notes-grid\] \{/);
   assert.match(studyPanels, /data-solid-panel=\{solid \? "true" : "false"\}/);
-  assert.match(coursePlayer, /solid=\{dockTab === "notes" \|\| dockTab === "mindmap" \|\| dockTab === "player"\}/);
+  assert.match(coursePlayer, /solid=\{dockTab === "notes" \|\| dockTab === "mindmap" \|\| dockTab === "brain" \|\| dockTab === "ai" \|\| dockTab === "player"\}/);
 });
 
 test("Coarse pointers and reduced motion get the cheap deck", () => {
   assert.match(studyPanels, /const useCoarsePointer = \(\): boolean =>/);
   assert.match(studyPanels, /const reduceMotion = useReducedMotion\(\) === true;/);
   assert.match(studyPanels, /const cheap = coarse \|\| reduceMotion;/);
-  assert.match(studyPanels, /if \(cheap\) return;/);
   assert.match(studyPanels, /breathe=\{!cheap\}/);
-  assert.match(styles, /@media \(pointer: coarse\) \{\s*\[data-course-split-pulse\] \{\s*display: none;/);
+  assert.doesNotMatch(studyPanels, /data-course-split-pulse/, "no pulse ring to skip");
   // Only transform / opacity / box-shadow / flex-grow are ever animated.
   assert.doesNotMatch(studyPanels, /animate\(\{[^}]*blur/);
 });
@@ -471,8 +486,8 @@ test("Switching tabs inside the pane crossfades the content", () => {
 });
 
 test("A landscape pane never settles narrower than the dock inside it, on any device", () => {
-  // The six-icon glass dock's natural width is the floor's reason to exist.
-  assert.match(splitMotion, /export const SPLIT_DOCK_MIN_PX = 344;/);
+  // The seven-icon glass dock's natural width is the floor's reason to exist.
+  assert.match(splitMotion, /export const SPLIT_DOCK_MIN_PX = 336;/);
   assert.match(splitMotion, /export const SPLIT_SHORT_VIEWPORT_PX = 500;/);
   // "Phone" = a narrow viewport OR a short one (turned sideways).
   assert.match(
@@ -485,7 +500,7 @@ test("A landscape pane never settles narrower than the dock inside it, on any de
   // The measured dock floor governs EVERY landscape stage — phones AND
   // tablets/desktops — so the now-always-visible dock is never clipped on a
   // narrow landscape tablet / desktop window (wide stages are unaffected,
-  // since 344 px is below their 15 % band). Collapse-to-rail bypasses it.
+  // since 336 px is below their 15 % band). Collapse-to-rail bypasses it.
   assert.match(
     studyPanels,
     /const dockFloor =\s+axis === "row" && deckWidth > 0 \? clampSplitRatio\(\(SPLIT_DOCK_MIN_PX \/ deckWidth\) \* 100\) : 0;/,

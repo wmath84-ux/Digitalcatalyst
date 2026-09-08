@@ -175,10 +175,11 @@ test("ImageViewer shows a friendly error when the image fails to load", () => {
 // ---------------------------------------------------------------------------
 
 test("NotesPanel supports add, edit, and delete via a single + button", () => {
-  // The "+" moved from the panel's secondary header up to the overlay's
-  // MAIN header — the panel itself renders no header row anymore.
-  assert.match(overlay, /data-course-notes-add/);
-  assert.doesNotMatch(notesPanel, /data-course-notes-add/);
+  // The "+" is a small circular button floating at the panel's own grid
+  // (bottom-right) — the pane carries no header at all, so the button lives
+  // in the panel that owns the composer.
+  assert.match(notesPanel, /data-course-notes-add/);
+  assert.doesNotMatch(overlay, /data-course-notes-add/);
   assert.match(notesPanel, /data-course-notes-save/);
   assert.match(notesPanel, /data-course-note-edit/);
   assert.match(notesPanel, /data-course-note-edit-input/);
@@ -200,23 +201,23 @@ test("NotesPanel renders the empty state and a square-grid notes list", () => {
   assert.doesNotMatch(notesPanel, /<Trash2 /);
 });
 
-test("The single + button lives in the overlay's main header, not the panel", () => {
-  // The "+" moved up into the overlay's main header; the panel no longer
-  // renders its own header row at all.
-  assert.match(overlay, /<Plus size=\{16\} \/>/);
-  assert.match(overlay, /aria-label="Add note"/);
-  assert.doesNotMatch(notesPanel, /<Plus \/>/);
+test("The single + button is a circular button in the panel's grid, not a header", () => {
+  // The pane carries no header at all — the "+" floats at the grid's
+  // bottom-right as a small circular button owned by the panel itself.
+  assert.match(notesPanel, /data-course-notes-add/);
+  assert.match(notesPanel, /aria-label="Add note"/);
+  assert.match(notesPanel, /rounded-full/);
+  assert.doesNotMatch(overlay, /aria-label="Add note"/);
   assert.doesNotMatch(notesPanel, /data-course-notes-title/);
   assert.doesNotMatch(notesPanel, /Context: \{productTitle\}/);
   assert.doesNotMatch(notesPanel, /sync across devices/);
 });
 
-test("The overlay hides its chrome row while the writing box is open", () => {
-  // Writing mode = notes tab + editor open. In that mode the pane keeps no
-  // chrome row at all: toolbar / writing surface / Save + Cancel only, so
-  // the box gets every pixel of the study pane in both orientations.
-  assert.match(overlay, /const notesWriting = tab === "notes" && notesEditorOpen;/);
-  assert.match(overlay, /\{notesWriting \? null : chromeRow\}/);
+test("The overlay carries no chrome row — writing mode is the whole pane", () => {
+  // There is no header to hide any more: every tab (the writing box included)
+  // starts at the very top of the study pane in both orientations.
+  assert.doesNotMatch(overlay, /chromeRow/);
+  assert.doesNotMatch(overlay, /data-course-study-chrome/);
   assert.doesNotMatch(overlay, /Collapse panel/);
 });
 
@@ -319,8 +320,8 @@ test("CoursePlayer routes a single module's 'buy' click back to the parent's onP
 // Bottom dock + overlay (redesign)
 // ---------------------------------------------------------------------------
 
-test("CoursePlayer's footer dock carries the six study tabs (Player included)", () => {
-  for (const tab of ["modules", "resources", "notes", "mindmap", "paid", "player"]) {
+test("CoursePlayer's footer dock carries the seven study tabs (Player included)", () => {
+  for (const tab of ["modules", "brain", "notes", "mindmap", "ai", "paid", "player"]) {
     assert.match(overlay, new RegExp(`key: "${tab}"`), `missing dock tab ${tab}`);
   }
   // The footer is the home page's GlassDock itself — no course-specific
@@ -334,24 +335,29 @@ test("CoursePlayer's footer dock carries the six study tabs (Player included)", 
 });
 
 test("The study pane swaps the active tab's content in place", () => {
-  assert.match(overlay, /data-course-study-chrome="pane"/);
+  // No header row — the tab body starts at the very top of the pane.
+  assert.doesNotMatch(overlay, /data-course-study-chrome/);
   assert.match(overlay, /data-course-overlay-tab=\{tab\}/);
   assert.match(overlay, /key=\{tab\}/);
 });
 
-test("Modules overlay lists available modules, Resources lists only files", () => {
+test("Modules overlay lists available modules with their files", () => {
   assert.match(overlay, /data-course-overlay-list/);
   assert.match(overlay, /"data-mode": listModeAttr/);
   assert.match(overlay, /data-course-overlay-module/);
   assert.match(overlay, /data-course-overlay-file/);
-  assert.match(overlay, /mode === "resources"/);
+  // The old Resources panel is gone — a Brain button sits in its dock slot.
+  assert.doesNotMatch(overlay, /mode === "resources"/);
+  assert.match(overlay, /key: "brain"/);
 });
 
-test("Resources overlay hides paid modules because they already have a dedicated Paid tab", () => {
-  assert.match(overlay, /const isPaidContent/);
-  assert.match(overlay, /!isPaidContent\(module\)/);
-  assert.match(overlay, /mode !== "resources" \|\| !isPaidContent\(file\)/);
-  assert.match(overlay, /moduleFiles\(module\)\.some\(\(file\) => isVisibleFile\(file\) && !isPaidContent\(file\)\)/);
+test("Brain and AI dock tabs are dummy placeholders for now", () => {
+  // Both tabs render a centred icon + title through the same placeholder;
+  // their real functionality lands later.
+  assert.match(overlay, /data-course-brain-panel/);
+  assert.match(overlay, /data-course-ai-panel/);
+  assert.match(overlay, /data-course-dummy-tab/);
+  assert.match(overlay, /key: "ai"/);
 });
 
 test("Modules overlay only lists unlocked modules — locked/paid modules live in the Paid tab", () => {
@@ -387,7 +393,7 @@ test("Notes tab fills the study pane (NotesPanel mounted in the pane)", () => {
   // No fixed half-screen heights — the Split Deck's study pane simply gives
   // the notes panel whatever room the divider leaves it.
   assert.match(overlay, /tab === "notes" \? \(/);
-  assert.match(overlay, /<NotesPanel[\s\S]*?composerOpenSignal=\{composerSignal\}/);
+  assert.match(overlay, /<NotesPanel[\s\S]*?onAdd=\{props\.onAddNote\}/);
   assert.doesNotMatch(overlay, /50dvh/, "fixed half-screen heights are gone");
 });
 

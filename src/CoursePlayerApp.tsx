@@ -319,7 +319,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Per-file resume state (video/audio seconds, image zoom, document scroll).
   const playbackRef = useRef<CoursePlaybackStore>({});
   const [playbackReady, setPlaybackReady] = useState(false);
-  // Bottom dock state — which of the six footer tabs the study pane shows.
+  // Bottom dock state — which of the seven footer tabs the study pane shows.
   const [dockTab, setDockTab] = useState<DockTab>("modules");
   // ── Split Deck — the player's ONE layout ────────────────────────────────
   // The old "sheet" home and its Split-mode settings toggle are gone (owner's
@@ -779,7 +779,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     setDockTab(next);
   };
 
-  // ⌘/Ctrl+1…6 walks the study tabs — a desktop shortcut, so it stays out of
+  // ⌘/Ctrl+1…7 walks the study tabs — a desktop shortcut, so it stays out of
   // the way of any text field and of anything outside the player.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -913,9 +913,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   );
 
   /**
-   * The study pane's content — the six tabs (Modules / Resources / Notes /
-   * Mind map / Paid / Player) plus the footer dock, rendered in-flow inside
-   * the Split Deck's study pane.
+   * The study pane's content — the seven tabs (Modules / Brain / Notes /
+   * Mind map / AI / Paid / Player) plus the footer dock, rendered in-flow
+   * inside the Split Deck's study pane.
    */
   const studyOverlay = (
     <CourseOverlay
@@ -967,12 +967,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           // or canvas) from the panel session; leaving the player resets it
           // back to the library home screen.
           open={dockTab === "mindmap"}
-          onClose={() => {
-            // Closing the map peek-collapses the study pane — it is the
-            // layout, so it has no "closed" state of its own.
-            mindMap.flush();
-            splitDeckRef.current?.collapse("study");
-          }}
         />
       )}
       playerPanel={playerPanel}
@@ -1016,7 +1010,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           studyIcon={activeStudyTab.icon}
           lesson={viewerStack}
           study={studyOverlay}
-          solid={dockTab === "notes" || dockTab === "mindmap" || dockTab === "player"}
+          keyboardExpandEnabled={dockTab === "notes" || dockTab === "mindmap"}
+          solid={dockTab === "notes" || dockTab === "mindmap" || dockTab === "brain" || dockTab === "ai" || dockTab === "player"}
           handleRef={splitDeckRef}
         />
       </section>
