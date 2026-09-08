@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import Header from "./components/Header";
+import GameEnvironment from "../components/GameEnvironment";
 import HeroCarousel from "./components/HeroCarousel";
 import CategoryNav from "./components/CategoryNav";
 import ProductCard from "./components/ProductCard";

@@ -230,6 +230,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                     label: "Game",
                     ariaLabel: "Open Game Environment",
                     icon: <Joystick size={17} strokeWidth={2.4} />,
+                    dataAttrs: { "data-game-mode-button": "true" },
                   }]
                 : []),
             ]}

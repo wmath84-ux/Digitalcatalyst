@@ -37,6 +37,7 @@ import {
   Bell,
   CalendarDays,
   Crown,
+  Gamepad2,
   Heart,
   Home,
   LogOut,
@@ -62,6 +63,7 @@ import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { cn } from "../utils/cn";
 import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";
 import ExpandingTabs from "./ui/ExpandingTabs";
+import GameEnvironment from "./GameEnvironment";
 import GlassSidebar, { type GlassSidebarItem } from "./glass-dock/GlassSidebar";
 // Wave 2 (global chrome) — the website-glass pack. `glass-tooltip` and
 // `glass-input` are vendored registry items; `GlassSurface` is the shared
@@ -228,6 +230,10 @@ export default function DesktopShell({
 }: DesktopShellProps) {
   const { user, logout } = useAuth();
   const screenSize = useScreenSize();
+  // Game mode (Strata Game Library world) is a desktop top-bar action: it is
+  // owned by the shell so EVERY desktop page gets the same button, and the
+  // overlay is rendered above the whole shell.
+  const [isGameOpen, setIsGameOpen] = useState(false);
 
   // Set a body class for CSS-based theming based on screen size + tablet landscape
   useEffect(() => {
@@ -668,12 +674,20 @@ export default function DesktopShell({
                           : null
                 }
                 onSelect={(id) => {
-                  if (id === "notifications") handleNavigate("#/notifications");
+                  if (id === "game") setIsGameOpen(true);
+                  else if (id === "notifications") handleNavigate("#/notifications");
                   else if (id === "favorites") handleNavigate("#/favorites");
                   else if (id === "cart") handleNavigate("#/cart");
                   else if (id === "subscription") handleNavigate("#/subscription");
                 }}
                 items={[
+                  {
+                    id: "game",
+                    label: "Game",
+                    ariaLabel: "Open Game Environment",
+                    icon: <Gamepad2 size={16} />,
+                    dataAttrs: { "data-game-mode-button": "true" },
+                  },
                   {
                     id: "notifications",
                     label: "Alerts",
@@ -749,6 +763,9 @@ export default function DesktopShell({
           hides it. The left rail stays visible. */}
       <DesktopPeekDock active={active} purchasesBadge={ownedCount} />
 
+      {/* Strata game mode — a full-screen overlay above the whole desktop
+          chrome, opened by the top bar's "Game" action. */}
+      {isGameOpen ? <GameEnvironment onClose={() => setIsGameOpen(false)} /> : null}
     </div>
   );
 }

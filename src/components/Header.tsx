@@ -156,6 +156,7 @@ export default function Header({
           label: "Game",
           ariaLabel: "Open Game Environment",
           icon: <Joystick className="h-5 w-5" />,
+                    dataAttrs: { "data-game-mode-button": "true" },
         }]
       : []),
   ];
