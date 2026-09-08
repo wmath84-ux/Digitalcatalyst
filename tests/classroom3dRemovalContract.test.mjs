@@ -175,14 +175,17 @@ test("the viewer's classroom gates and camera-motion optimisations are gone", ()
   assert.match(viewer, /sandbox=\{editMode \? undefined :/);
 });
 
-test("the notes panel keeps the flat header's + signal and drops the room's library signal", () => {
+test("the notes panel owns its circular + and drops the room's library signal", () => {
   const notes = read("src/course/NotesPanel.tsx");
   assert.doesNotMatch(notes, /classroom/i);
   assert.doesNotMatch(notes, /openNoteSignal|openNoteId/);
-  // The overlay's own "+" still drives the composer.
+  // The pane carries no header, so the panel owns its own circular "+" at
+  // the grid's bottom-right; the external signal stays as an optional extra.
+  assert.match(notes, /data-course-notes-add/);
+  assert.match(notes, /onClick=\{openComposer\}/);
   assert.match(notes, /composerOpenSignal\?: number;/);
   assert.match(notes, /if \(composerOpenSignal && composerOpenSignal > 0\) openComposer\(\);/);
-  assert.match(read("src/course/CourseOverlay.tsx"), /composerOpenSignal=\{composerSignal\}/);
+  assert.doesNotMatch(read("src/course/CourseOverlay.tsx"), /composerOpenSignal=\{composerSignal\}/);
 });
 
 test("the dev preview route for the room is gone", () => {
@@ -239,11 +242,11 @@ test("the flat Split Deck player is intact end to end", () => {
   assert.match(deck, /data-course-split-divider/);
   assert.match(deck, /data-course-peek-rail/);
   assert.match(deck, /SPLIT_SNAP_POINTS/);
-  // The six dock tabs and the study pane's chrome row.
-  assert.match(overlay, /data-course-study-chrome/);
+  // The seven dock tabs; the study pane carries no chrome row.
+  assert.doesNotMatch(overlay, /data-course-study-chrome/);
   assert.match(overlay, /data-course-dock\b/);
   assert.match(overlay, /data-course-sheet-row/);
-  assert.match(read("src/course/CourseOverlay.tsx"), /modules|resources|notes|mindmap|paid|player/);
+  assert.match(read("src/course/CourseOverlay.tsx"), /modules|brain|notes|mindmap|ai|paid|player/);
 });
 
 test("the room's panel look is what survived — as flat-player paint", () => {

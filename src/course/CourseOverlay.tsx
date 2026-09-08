@@ -6,7 +6,8 @@
 // Sheet "sidebar" mode is gone and there is no enable/disable toggle — the
 // whole player is two glass panes (lesson + study) with the footer dock
 // living INSIDE the study pane. This component is exactly that study pane's
-// content: the chrome row, the active tab's body and the footer dock.
+// content: the active tab's body and the footer dock. There is no header row
+// anywhere in the pane — every tab starts at its very first pixel.
 //
 // The footer IS the home page footer navigation (src/components/glass-dock/
 // GlassDock.tsx, the same component src/components/BottomNav.tsx renders):
@@ -17,7 +18,7 @@
 // Split Deck's own toggleStudy gesture). There is NO sliding indicator and
 // NO live content swap while the finger moves.
 //
-// Inside the pane each list tab (Modules / Resources / Paid) is a vertical
+// Inside the pane each list tab (Modules / Paid) is a vertical
 // column of dock-style buttons (same 44 px tinted plates, same magnify wave,
 // same active glow). The list is scroll-snapped to the buttons: after the
 // user has scrolled, lifting the finger fires the button the finger settled
@@ -25,9 +26,10 @@
 // under it as usual. No sliding content animations.
 //
 //   - Modules   → every unlocked module (expandable to its files).
-//   - Resources → only non-paid files, grouped under modules that have them.
+//   - Brain     → dummy button for now (functionality lands later).
 //   - Notes     → the notes panel.
 //   - Mind map  → the per-module mind map panel.
+//   - AI        → dummy button for now (functionality lands later).
 //   - Paid      → purchasable updates + locked paid modules.
 //   - Player    → the course identity, progress / mark-complete, the ACTIVE
 //                 file's own buttons (open / download / fullscreen / editor /
@@ -36,14 +38,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
-import { BookOpen, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Plus, Settings, ShoppingBag, Sparkles } from "lucide-react";
+import { BookOpen, Brain, ChevronDown, ChevronRight, Eye, File, FileSpreadsheet, FileText, FormInput, Link2, LockKeyhole, Network, NotebookPen, PlayCircle, Settings, ShoppingBag, Sparkles } from "lucide-react";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "../types/course";
 import NotesPanel from "./NotesPanel";
 import GlassDock, { type GlassDockItem } from "../components/glass-dock/GlassDock";
-import { GlassButton } from "../components/ui/glass-button";
 import { EASE_OUT_MOTION } from "./splitMotion";
+import { AiTabIcon } from "./studyTabIcons";
 
-export type DockTab = "modules" | "resources" | "notes" | "mindmap" | "paid" | "player";
+export type DockTab = "modules" | "brain" | "notes" | "mindmap" | "ai" | "paid" | "player";
 export type DockOrientation = "portrait" | "landscape";
 
 const updateKey = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
@@ -72,9 +74,6 @@ const flattenModules = (modules: CourseModule[], depth = 0): FlatModule[] =>
 
 const isVisibleFile = (file: CourseFile) =>
   file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId);
-
-/** Paid modules / paid files already live in the dedicated Paid tab. */
-const isPaidContent = (item: { accessLevel?: string }) => item.accessLevel === "paidUpdate";
 
 const fileIcon = (file: CourseFile) => {
   if (file.type === "youtube" || file.type === "video" || file.type === "audio") return PlayCircle;
@@ -182,7 +181,7 @@ function SheetRow({
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-black text-white/90">{spec.title}</span>
         {spec.subtitle ? (
-          <span className="mt-0.5 block truncate text-[10px] font-bold uppercase tracking-wide text-[var(--course-muted)]">{spec.subtitle}</span>
+          <span className="mt-0.5 block truncate text-[10px] font-bold uppercase tracking-wide text-[var(--course-muted)]" data-row-subtitle>{spec.subtitle}</span>
         ) : null}
       </span>
       {spec.extra ? <span className="flex shrink-0 items-center gap-1.5">{spec.extra}</span> : null}
@@ -331,18 +330,23 @@ interface CourseOverlayProps {
 }
 
 /**
- * The six study tabs, in dock order. Exported because the Split Deck
- * (src/course/studyPanels.tsx) needs the active tab's colour for the divider
- * line and its icon for the study peek rail — the deck must never keep its own
- * copy of the list.
+ * The seven study tabs, in dock order. Exported because the Split Deck
+ * (src/course/studyPanels.tsx) needs the active tab's colour and its icon
+ * for the study peek rail — the deck must never keep its own copy of the
+ * list. (The divider line itself is fixed yellow.)
  */
 export const TABS: Array<{ key: DockTab; label: string; heading: string; hint: string; color: string; icon: ComponentType<{ size?: number; className?: string; style?: CSSProperties }> }> = [
   { key: "modules", label: "Module", heading: "Modules", hint: "Lessons on a connected path", color: "#FFBE0B", icon: BookOpen },
-  { key: "resources", label: "Resource", heading: "Resources", hint: "Course files (paid modules live in Paid)", color: "#06D6A0", icon: FileText },
+  // The old Resources panel is gone — a Brain button sits in its slot, dummy
+  // for now (its functionality lands later).
+  { key: "brain", label: "Brain", heading: "Brain", hint: "Revision brain — jald aa raha hai", color: "#34D399", icon: Brain },
   { key: "notes", label: "Note", heading: "Notes", hint: "Your private writing pad", color: "#3A86FF", icon: NotebookPen },
   // Mind Map sits immediately after Note, so the two private-study tools are
   // neighbours in the dock. It hosts the per-module map library + canvas.
   { key: "mindmap", label: "Mind map", heading: "Mind map", hint: "Is module ka apna diagram banayein", color: "#B388FF", icon: Network },
+  // The AI buddy sits right next to the mind map, dummy for now (its
+  // functionality lands later). Its glyph is a custom mark, not a stock icon.
+  { key: "ai", label: "AI", heading: "AI", hint: "AI study buddy — jald aa raha hai", color: "#22D3EE", icon: AiTabIcon },
   { key: "paid", label: "Paid", heading: "Paid content", hint: "Upgrades still locked", color: "#C9A96E", icon: ShoppingBag },
   // The footer dock's own settings button. Everything the player header and
   // the ⚙ popover used to offer — course details, progress, mark-complete,
@@ -414,14 +418,12 @@ export interface StudyRows {
   listRows: SheetRowSpec[];
   listModeAttr: string | null;
   emptyMessage: string;
-  headerSubtitle: string;
-  visibleModuleCount: number;
 }
 
 /**
- * The study tabs' rows — ONE builder for the whole pane. The module list, the
- * resource list and the paid list render through the same `StudyContent` as
- * the notes, mind map and player tabs.
+ * The study tabs' rows — ONE builder for the whole pane. The module list and
+ * the paid list render through the same `StudyContent` as the notes, mind
+ * map, brain, AI and player tabs.
  */
 export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
   const activeTab = dockTabRecord(tab);
@@ -451,39 +453,25 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
     });
   }, []);
 
-  const listMode = tab === "modules" || tab === "resources" ? (tab as "modules" | "resources") : null;
+  const listMode = tab === "modules" ? "modules" : null;
 
   const moduleRows = useMemo(() => {
     if (!listMode) return [];
-    const mode = listMode;
     const tabColor = activeTab.color;
     const rows: SheetRowSpec[] = [];
-    // Modules mode: only unlocked modules are shown — locked / paid modules
-    // live in the dedicated "Paid" tab. Resources mode: only NON-PAID modules
-    // that actually contain non-paid files are shown, so paid content is
-    // never listed twice.
-    const visible = (() => {
-      if (mode === "resources") {
-        return flatModules.filter(({ module }) =>
-          module.accessLevel !== "hidden" &&
-          !isPaidContent(module) &&
-          moduleFiles(module).some((file) => isVisibleFile(file) && !isPaidContent(file)),
-        );
-      }
-      const unlocked = unlockedModuleIds(modules, accessibleModuleIds, ownedUpdateIds);
-      return flatModules.filter(({ module }) => unlocked.has(String(module.id)));
-    })();
+    // Only unlocked modules are shown — locked / paid modules live in the
+    // dedicated "Paid" tab.
+    const unlocked = unlockedModuleIds(modules, accessibleModuleIds, ownedUpdateIds);
+    const visible = flatModules.filter(({ module }) => unlocked.has(String(module.id)));
 
     for (const { module, depth } of visible) {
-      const files = moduleFiles(module).filter((file) =>
-        isVisibleFile(file) && (mode !== "resources" || !isPaidContent(file)),
-      );
+      const files = moduleFiles(module).filter((file) => isVisibleFile(file));
       const moduleId = String(module.id);
       const accessible = accessibleModuleIds.has(moduleId);
       const preview = previewModuleIds.has(moduleId);
       const paidNotOwned = isPaidLocked(module, ownedUpdateIds);
       const locked = !accessible || paidNotOwned;
-      const open = mode === "modules" && expanded.has(moduleId);
+      const open = expanded.has(moduleId);
       const holdsSelected = files.some((file) => file.id === selectedFileId);
 
       rows.push({
@@ -498,14 +486,13 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
           <>
             {preview ? <Eye size={13} className="text-sky-300" /> : null}
             {locked && !preview ? <LockKeyhole size={13} className="text-amber-400" /> : null}
-            {mode === "modules" && files.length > 0 ? (
+            {files.length > 0 ? (
               open ? <ChevronDown size={15} className="text-[var(--course-muted)]" /> : <ChevronRight size={15} className="text-[var(--course-muted)]" />
             ) : null}
           </>
         ),
-        // Modules mode: the module button expands / collapses its files.
-        // Resources mode: the module row is a plain (non-clickable) heading.
-        press: mode === "modules" ? () => toggleModule(moduleId) : undefined,
+        // The module button expands / collapses its files.
+        press: () => toggleModule(moduleId),
         dataAttrs: {
           "data-course-overlay-module": "",
           "data-module-id": moduleId,
@@ -514,7 +501,7 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
         },
       });
 
-      if (open || mode === "resources") {
+      if (open) {
         for (const file of files) {
           const Icon = fileIcon(file);
           const fileLocked = locked || (file.accessLevel === "paidUpdate" && !ownedUpdateIds.has(updateKey(file)));
@@ -592,23 +579,47 @@ export function useStudyRows(tab: DockTab, args: StudyRowsArgs): StudyRows {
   const emptyMessage =
     tab === "paid"
       ? "No paid content for this course."
-      : listMode === "resources"
-        ? "No files to show yet."
-        : "No modules to show yet.";
+      : "No modules to show yet.";
 
-  // Only unlocked modules are listed in the "Module" tab, so the header
-  // count reflects the same set the learner actually sees.
-  const visibleModuleCount = useMemo(
-    () => unlockedModuleIds(modules, accessibleModuleIds, ownedUpdateIds).size,
-    [modules, accessibleModuleIds, ownedUpdateIds],
+  return { activeTab, listRows, listModeAttr, emptyMessage };
+}
+
+/**
+ * Placeholder body for the Brain and AI tabs — dummy buttons for now, the
+ * real functionality lands later. A centred icon + title so the tab never
+ * renders a blank surface.
+ */
+function ComingSoonPanel({
+  icon: Icon,
+  color,
+  title,
+  subtitle,
+  panelAttr,
+}: {
+  icon: ComponentType<{ size?: number; className?: string; style?: CSSProperties }>;
+  color: string;
+  title: string;
+  subtitle: string;
+  panelAttr: "data-course-brain-panel" | "data-course-ai-panel";
+}) {
+  return (
+    <div
+      className="grid h-full place-items-center px-6 text-center"
+      data-course-dummy-tab={title}
+      {...{ [panelAttr]: "" }}
+    >
+      <div className="flex flex-col items-center gap-2">
+        <span
+          className="flex h-14 w-14 items-center justify-center"
+          style={{ background: `${color}18`, border: `1px solid ${color}44`, borderRadius: 18, color }}
+        >
+          <Icon size={26} />
+        </span>
+        <p className="text-sm font-black text-white">{title}</p>
+        <p className="text-[11px] font-semibold text-[var(--course-muted)]">{subtitle}</p>
+      </div>
+    </div>
   );
-
-  const headerSubtitle =
-    tab === "modules"
-      ? `${visibleModuleCount} connected ${visibleModuleCount === 1 ? "module" : "modules"}`
-      : activeTab.hint;
-
-  return { activeTab, listRows, listModeAttr, emptyMessage, headerSubtitle, visibleModuleCount };
 }
 
 /**
@@ -648,6 +659,24 @@ export function StudyContent({
         // Everything the player header used to be — course details, progress,
         // the active file's own buttons and every player preference, one list.
         playerPanel
+      ) : tab === "brain" ? (
+        // Dummy for now — the Brain's functionality lands later.
+        <ComingSoonPanel
+          icon={Brain}
+          color="#34D399"
+          title="Brain"
+          subtitle="Revision brain — jald aa raha hai"
+          panelAttr="data-course-brain-panel"
+        />
+      ) : tab === "ai" ? (
+        // Dummy for now — the AI buddy's functionality lands later.
+        <ComingSoonPanel
+          icon={AiTabIcon}
+          color="#22D3EE"
+          title="AI"
+          subtitle="AI study buddy — jald aa raha hai"
+          panelAttr="data-course-ai-panel"
+        />
       ) : (
         <SnapList
           rows={rows}
@@ -666,19 +695,11 @@ export function StudyContent({
 export default function CourseOverlay(props: CourseOverlayProps) {
   const { orientation, tab } = props;
 
-  // NotesPanel reports when its big editor is open; while it is, the pane
-  // keeps NO chrome row at all so the writing surface gets every pixel.
-  const [notesEditorOpen, setNotesEditorOpen] = useState(false);
-  const notesWriting = tab === "notes" && notesEditorOpen;
-  // The chrome row's "+" button lives here, but the composer state lives in
-  // NotesPanel. A monotonically increasing signal asks the panel to open its
-  // composer without lifting the draft state up.
-  const [composerSignal, setComposerSignal] = useState(0);
   /** Pane tab switches crossfade; the opt-out keeps them a plain swap. */
   const paneCrossfade = useReducedMotion() !== true;
 
-  // ── The six tabs' rows ─────────────────────────────────────────────────
-  const { activeTab, listRows, listModeAttr, emptyMessage, headerSubtitle } = useStudyRows(tab, props);
+  // ── The seven tabs' rows ───────────────────────────────────────────────
+  const { listRows, listModeAttr, emptyMessage } = useStudyRows(tab, props);
 
   // ── Footer navigation: the home footer, exactly ────────────────────────
   // Same GlassDock component the home page renders (src/components/BottomNav.tsx):
@@ -697,49 +718,19 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       empty={emptyMessage}
       listModeAttr={listModeAttr}
       notesPanel={
+        // The panel owns its own circular "+" (bottom-right of the grid) —
+        // the pane carries no header at all, so there is nowhere else for
+        // the button to live.
         <NotesPanel
           notes={props.notes}
           onAdd={props.onAddNote}
           onEdit={props.onEditNote}
           onDelete={props.onDeleteNote}
-          onEditorOpenChange={setNotesEditorOpen}
-          composerOpenSignal={composerSignal}
         />
       }
       mindMapPanel={props.mindMapPanel ?? MINDMAP_FALLBACK}
       playerPanel={props.playerPanel ?? PLAYER_FALLBACK}
     />
-  );
-
-  // ── The one chrome row ─────────────────────────────────────────────────
-  // Heading + subtitle + the notes "+". Null ENTIRELY while the notes
-  // writing box is open, so the editor gets every pixel of the surface.
-  const chromeRow = (
-    <div
-      className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[var(--course-border)] px-4 py-3"
-      data-course-study-chrome="pane"
-    >
-      <div className="min-w-0">
-        <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-[var(--course-muted)]" data-course-overlay-title>
-          {activeTab.heading}
-        </p>
-        {headerSubtitle ? (
-          <p className="mt-0.5 truncate text-[10px] font-semibold text-[var(--course-muted)]">{headerSubtitle}</p>
-        ) : null}
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {tab === "notes" ? (
-          <GlassButton
-            onClick={() => setComposerSignal((signal) => signal + 1)}
-            className="[&_.size-12]:size-8"
-            aria-label="Add note"
-            data-course-notes-add
-          >
-            <Plus size={16} />
-          </GlassButton>
-        ) : null}
-      </div>
-    </div>
   );
 
   // ── Footer navigation — exactly the home page's footer ─────────────────
@@ -758,6 +749,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       <div className="mx-auto w-max max-w-full">
         <GlassDock
           siteFooter
+          compact
           items={dockItems}
           onSelect={(id) => props.onTabChange(id as DockTab)}
         />
@@ -767,10 +759,11 @@ export default function CourseOverlay(props: CourseOverlayProps) {
 
   // ── The Split Deck study pane: in-flow, no portal, no scrim, no sheet ──
   // The pane's glass surface + sizing belong to the deck; this component only
-  // fills it: chrome row, tab body, footer dock (in that order).
+  // fills it: tab body, footer dock (in that order). There is NO header row —
+  // every tab starts at the very top of the pane so the content keeps every
+  // pixel the header used to take.
   return (
     <>
-      {notesWriting ? null : chromeRow}
       {/* A tab switch inside the pane crossfades (opacity 150 ms + a 6 px rise). */}
       <motion.div
         key={props.tab}

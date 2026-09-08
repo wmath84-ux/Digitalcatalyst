@@ -10,7 +10,8 @@
 //   · SPRING_SETTLE — the divider's magnetic snap / keyboard step settle.
 //   · SPRING_ENTRY  — the study pane growing open (and shrinking shut).
 //   · SPRING_MAG    — the magnification spring the dock + list rows already
-//                     use (300/22/0.5), reused for the grabber's press scale.
+//                     use (300/22/0.5). (Kept for the dock/rows; the divider
+//                     no longer uses it — it is a bare yellow line now.)
 //   · EASE_OUT      — the pack's one cubic-bezier (websiteglass / AI Canvas).
 //
 // Performance rule for the whole feature: only transform, opacity, box-shadow
@@ -51,26 +52,34 @@ export const SPLIT_SMALL_SCREEN_MIN = 30;
 export const SPLIT_SMALL_SCREEN_PX = 430;
 /** A phone in landscape has a short viewport; it gets the same treatment. */
 export const SPLIT_SHORT_VIEWPORT_PX = 500;
-/** The six-icon glass dock's natural width. In landscape (axis "row") the
+/** The seven-icon compact dock's natural width (7×38 + gaps + padding ≈ 326).
+ *  In landscape (axis "row") the
  *  study pane never *settles* narrower than this on ANY device — phones,
  *  tablets and desktops alike — or the dock would sit inside the pane yet be
  *  clipped by it, which defeats the point of putting it there (the pane
  *  already starts well above this width on wide stages, so the floor only
  *  bites on short/narrow landscape windows). Collapse-to-rail bypasses it. */
-export const SPLIT_DOCK_MIN_PX = 344;
+export const SPLIT_DOCK_MIN_PX = 336;
 /** Magnetic snap points, in study-pane percent. */
 export const SPLIT_SNAP_POINTS = [20, 35, 50, 65, 80] as const;
 /** Released within this many percent of a snap point → animate onto it. */
 export const SNAP_TOLERANCE = 3;
-/** Dragging within this many percent of a snap point → one soft pulse ring. */
-export const PULSE_TOLERANCE = 2;
+/**
+ * The divider's core line is ALWAYS this yellow — it never takes the active
+ * tab's colour. One fixed line colour keeps the split readable as "the
+ * divider" no matter which tab is open.
+ */
+export const DIVIDER_LINE = "#FFBE0B";
 /**
  * Crossing this close to either edge fills that side to 100% and collapses the
  * other into its peek rail (the old overlay's CLOSE_THRESHOLD idea).
  */
 export const FILL_THRESHOLD = 8;
-/** Divider hit area in px — a full 44px touch target on both axes. */
-export const DIVIDER_HIT = 44;
+/** Divider strip in px — a slim 10px band carrying only the 2px yellow core
+ *  line. The visible chrome is the line alone; an invisible `::after` (see
+ *  src/index.css) extends the grab area so fingers still catch it without
+ *  costing the panes any layout space. */
+export const DIVIDER_HIT = 10;
 /** The collapsed pane's glass strip, in px. */
 export const PEEK_RAIL_PX = 28;
 /**

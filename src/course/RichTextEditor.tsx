@@ -12,7 +12,8 @@
 // A plain-text paste (Ctrl/Cmd + Shift + V, or a source with no HTML flavour)
 // keeps its line breaks and indentation instead of collapsing to one line.
 
-import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Bold, Code, Italic, List, ListOrdered, Quote, Strikethrough, Underline, Eraser, Palette, Type, ChevronDown, SeparatorHorizontal } from "lucide-react";
 import { plainToRichText, richTextToPlain, sanitizeRichText } from "../utils/richText";
 import { GlassButton } from "../components/ui/glass-button";
@@ -56,10 +57,47 @@ function MenuItem({ label, onClick, style }: { label: string; onClick: () => voi
   return <PopoverItem style={style} onMouseDown={e => e.preventDefault()} onClick={onClick} className="rounded-md px-3 py-2">{label}</PopoverItem>;
 }
 
-function FormatMenu({ label, icon, open, onToggle, children }: { label: string; icon: ReactNode; open: boolean; onToggle: () => void; children: ReactNode }) {
-  return <div className="relative">
-    <GlassButton variant="capsule" aria-label={label} title={label} aria-expanded={open} onMouseDown={e => e.preventDefault()} onClick={onToggle} className="[&>span>div]:h-8 [&>span>div]:px-2"><span className="flex items-center gap-1"><span>{icon}</span><span className="hidden text-xs sm:inline">{label}</span><ChevronDown size={11} /></span></GlassButton>
-    {open && <GlassSurface radius={20} className="absolute left-0 top-9 z-20 min-w-[145px] text-white" contentClassName="p-1">{children}</GlassSurface>}
+function FormatMenu({ label, icon, open, onToggle, menuRef, children }: { label: string; icon: ReactNode; open: boolean; onToggle: () => void; menuRef: React.RefObject<HTMLDivElement | null>; children: ReactNode }) {
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  // The dropdown is PORTALLED to the body: the toolbar is a horizontal scroll
+  // container now, and any in-flow menu would be clipped by it. Fixed
+  // positioning against the toggle's own rect keeps it glued to its button
+  // while the sheet animates or the keyboard lifts it, clamped into the
+  // viewport so it can never hang off a phone screen.
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null);
+      return undefined;
+    }
+    const measure = () => {
+      const box = anchorRef.current?.getBoundingClientRect();
+      if (!box) return;
+      const width = Math.min(208, window.innerWidth - 16);
+      const left = Math.max(8, Math.min(box.left, window.innerWidth - width - 8));
+      const below = box.bottom + 6;
+      // Open downward; when the keyboard ate the room below, open upward.
+      const top = below + 240 > window.innerHeight ? Math.max(8, box.top - 246) : below;
+      setPos({ top, left, width });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [open]);
+
+  return <div ref={anchorRef} className="relative shrink-0">
+    <GlassButton variant="capsule" aria-label={label} title={label} aria-expanded={open} onMouseDown={e => e.preventDefault()} onClick={onToggle} className="[&>span>div]:h-7 [&>span>div]:px-1.5"><span className="flex items-center gap-1"><span>{icon}</span><span className="hidden text-[11px] sm:inline">{label}</span><ChevronDown size={10} /></span></GlassButton>
+    {open && pos ? createPortal(
+      <div ref={menuRef} role="menu" aria-label={label} className="fixed z-[90]" style={{ top: pos.top, left: pos.left, width: pos.width }} data-course-rich-menu>
+        <GlassSurface radius={20} className="text-white" contentClassName="max-h-[280px] overflow-y-auto p-1">{children}</GlassSurface>
+      </div>,
+      document.body,
+    ) : null}
   </div>;
 }
 
@@ -77,9 +115,12 @@ export default function RichTextEditor({
 }: RichTextEditorProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLDivElement>(null);
-  // Wraps the toggle buttons AND the open dropdown, so "outside" can be
-  // decided against one element for any of the three menus.
+  // Wraps the toggle buttons, so "outside" can be decided against one
+  // element for any of the three menus. The open dropdown itself is portalled
+  // to the body (the toolbar scrolls sideways now), so it gets its own ref —
+  // only one menu is ever open, which is why a single shared ref is enough.
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const richMenuRef = useRef<HTMLDivElement>(null);
   const [openMenu, setOpenMenu] = useState<"heading" | "color" | "font" | null>(null);
   // Tracks what we last pushed upward so re-renders never clobber the caret.
   const lastEmitted = useRef<string>(value);
@@ -98,6 +139,8 @@ export default function RichTextEditor({
   //   · tapping the same toggle still flips it (its own onClick runs);
   //   · tapping an item still applies the format (items close themselves);
   //   · tapping the surface / Save / Cancel / the lesson dismisses the menu.
+  // The portalled menu is skipped the same way (its items close it
+  // themselves after applying their format), and Escape dismisses it too.
   // It listens for pointerdown (not focus/blur) and never preventDefaults,
   // so the caret in the contentEditable surface is exactly where the tap
   // puts it afterwards — no focus stealing, no lost selection.
@@ -106,10 +149,18 @@ export default function RichTextEditor({
     const onPointerDown = (event: PointerEvent) => {
       const node = event.target instanceof Node ? event.target : null;
       if (node && toolbarRef.current?.contains(node)) return;
+      if (node && richMenuRef.current?.contains(node)) return;
       setOpenMenu(null);
     };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenMenu(null);
+    };
     document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [openMenu]);
 
   const syncEmptyFlag = (surface: HTMLDivElement) => {
@@ -283,21 +334,21 @@ export default function RichTextEditor({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-course-rich-editor>
-      <div ref={toolbarRef} className="flex shrink-0 flex-wrap items-center gap-1 rounded-t-xl border border-b-0 border-[var(--course-border)] bg-[var(--dc-chrome-glass)] px-1.5 py-1.5 [backdrop-filter:var(--dc-chrome-glass-blur)]" data-course-rich-toolbar>
-        <FormatMenu label="Heading" icon={<Type size={14} />} open={openMenu === "heading"} onToggle={() => setOpenMenu(openMenu === "heading" ? null : "heading")}>
+      <div ref={toolbarRef} className="flex shrink-0 flex-nowrap items-center gap-1 overflow-x-auto rounded-t-xl border border-b-0 border-[var(--course-border)] bg-[var(--dc-chrome-glass)] px-1.5 py-1.5 [backdrop-filter:var(--dc-chrome-glass-blur)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-course-rich-toolbar onScroll={() => setOpenMenu(null)}>
+        <FormatMenu label="Heading" icon={<Type size={13} />} open={openMenu === "heading"} menuRef={richMenuRef} onToggle={() => setOpenMenu(openMenu === "heading" ? null : "heading")}>
           {[1, 2, 3, 4, 5].map(level => <MenuItem key={level} label={`Heading ${level}`} onClick={() => { exec("formatBlock", `h${level}`); emit(); setOpenMenu(null); }} />)}
         </FormatMenu>
-        <FormatMenu label="Text color" icon={<Palette size={14} />} open={openMenu === "color"} onToggle={() => setOpenMenu(openMenu === "color" ? null : "color")}>
+        <FormatMenu label="Text color" icon={<Palette size={13} />} open={openMenu === "color"} menuRef={richMenuRef} onToggle={() => setOpenMenu(openMenu === "color" ? null : "color")}>
           <div className="grid grid-cols-6 gap-2 p-2">
             {["#202124", "#d93025", "#e37400", "#fbbc04", "#34a853", "#1a73e8", "#9334e8", "#e91e63", "#795548", "#607d8b", "#ffffff", "#eeeeee"].map(color => <GlassSwatch key={color} color={color} title={color} size={24} onMouseDown={e => e.preventDefault()} onClick={() => { surfaceRef.current?.focus(); exec("foreColor", color); emit(); setOpenMenu(null); }} />)}
             <label className="col-span-6 flex cursor-pointer items-center gap-2 border-t border-white/10 pt-2 text-xs text-white/70"><span className="h-5 w-5 rounded-full border" style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }} />Custom color<input type="color" className="sr-only" onChange={e => { surfaceRef.current?.focus(); exec("foreColor", e.target.value); emit(); setOpenMenu(null); }} /></label>
           </div>
         </FormatMenu>
-        <FormatMenu label="Font" icon={<span className="text-xs font-bold">Aa</span>} open={openMenu === "font"} onToggle={() => setOpenMenu(openMenu === "font" ? null : "font")}>
+        <FormatMenu label="Font" icon={<span className="text-[11px] font-bold">Aa</span>} open={openMenu === "font"} menuRef={richMenuRef} onToggle={() => setOpenMenu(openMenu === "font" ? null : "font")}>
           {['Arial','Calibri','Cambria','Comic Sans MS','Courier New','Georgia','Helvetica','Roboto','Times New Roman','Trebuchet MS','Verdana'].map(font => <MenuItem key={font} label={font} style={{ fontFamily: font }} onClick={() => { exec("fontName", font); emit(); setOpenMenu(null); }} />)}
         </FormatMenu>
         {actions.map(({ key, label, icon: Icon, run }) => (
-          <GlassButton key={key} onMouseDown={(event) => { event.preventDefault(); surfaceRef.current?.focus(); run(); emit(); }} className="[&_.size-12]:size-8" aria-label={label} title={label} data-course-rich-action={key}><Icon size={14} /><span className="sr-only">{label}</span></GlassButton>
+          <GlassButton key={key} onMouseDown={(event) => { event.preventDefault(); surfaceRef.current?.focus(); run(); emit(); }} className="shrink-0 [&_.size-12]:size-7" aria-label={label} title={label} data-course-rich-action={key}><Icon size={13} /><span className="sr-only">{label}</span></GlassButton>
         ))}
       </div>
       {/* Heading (title) area — a default title field above the body,

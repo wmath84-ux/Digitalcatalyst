@@ -36,7 +36,7 @@
 // opens the source in a new tab as a fallback.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Download, ExternalLink, FileQuestion, RefreshCw, X } from "lucide-react";
+import { AlertTriangle, Download, ExternalLink, FileQuestion, RefreshCw } from "lucide-react";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassSurface } from "../components/ui/glass";
 import type { CourseFile } from "../types/course";
@@ -365,16 +365,9 @@ function ResourceViewerBody({ file, active = true, playback, onPlaybackChange, o
       */}
       {personalCopyEnabled && copyState.status !== "error" && copyState.warningMessage ? (
         <div className="flex items-center gap-2 border-b border-[var(--course-border)] bg-[var(--course-soft)] px-4 py-2 text-xs font-semibold text-[var(--course-muted)]" role="status" data-course-personal-copy-warning>
+          {/* No dismiss button — the warning clears itself after 8s, and the
+              player carries no close buttons anywhere. */}
           <span className="min-w-0 flex-1">{copyState.warningMessage}</span>
-          <GlassButton
-            onClick={copyState.dismissWarning}
-            className="shrink-0 [&_.size-12]:size-7"
-            aria-label="Dismiss this message"
-            title="Dismiss"
-            data-course-personal-copy-warning-dismiss
-          >
-            <X size={13} />
-          </GlassButton>
         </div>
       ) : null}
       {copyBusy ? (

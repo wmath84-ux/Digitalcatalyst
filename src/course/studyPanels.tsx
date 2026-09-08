@@ -14,10 +14,11 @@
 //                    pane gets <CourseOverlay variant="pane" /> — the same five
 //                    tabs, the same rows and the SAME footer dock, so the dock
 //                    literally lives inside the split.
-//   · SplitDivider — the draggable glass divider: 44px hit area, a 2px core
-//                    line in the active tab's colour, a glass grabber with
-//                    three dots, a live % bubble, one soft pulse ring per snap
-//                    point crossed, full keyboard control.
+//   · SplitDivider — the draggable divider: a slim 10px strip whose ONLY
+//                    visible chrome is a 2px yellow core line (it never takes
+//                    the active tab's colour), with full keyboard control. An
+//                    invisible grab extension keeps it finger-friendly without
+//                    costing the panes any layout space.
 //   · PeekRail     — the 28px glass strip a collapsed pane becomes. Tap it and
 //                    the last ratio springs back.
 //
@@ -52,14 +53,13 @@ import { GlassSurface } from "../components/ui/glass";
 import {
   DEFAULT_SPLIT_RATIO,
   DIVIDER_HIT,
+  DIVIDER_LINE,
   ENTRY_START,
-  EASE_OUT,
   EASE_OUT_MOTION,
   FILL_THRESHOLD,
   KEY_STEP,
   KEY_STEP_FINE,
   PEEK_RAIL_PX,
-  PULSE_TOLERANCE,
   SNAP_TOLERANCE,
   SPLIT_DOCK_MIN_PX,
   SPLIT_MAX,
@@ -68,7 +68,6 @@ import {
   SPLIT_SMALL_SCREEN_PX,
   SPLIT_SNAP_POINTS,
   SPRING_ENTRY,
-  SPRING_MAG,
   SPRING_SETTLE,
   clampSplitRatio,
   loadSplitCollapsed,
@@ -88,7 +87,7 @@ const CHROME_GLASS: CSSProperties = {
   boxShadow: "var(--dc-chrome-glass-rim)",
 };
 
-/** Coarse pointers drop the pulse ring (a cheap scale-only deck instead). */
+/** Coarse pointers get a cheap scale-only deck (no rail breathing). */
 const useCoarsePointer = (): boolean => {
   const [coarse, setCoarse] = useState(
     () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches),
@@ -204,14 +203,8 @@ function PeekRail({
 
 interface SplitDividerProps {
   axis: SplitAxis;
-  /** The active tab's colour — the core line, the glow and the focus ring. */
-  accent: string;
   ratio: MotionValue<number>;
   dragging: boolean;
-  /** Bumped once per snap point crossed mid-drag → one soft pulse ring. */
-  pulseKey: number;
-  /** Coarse pointer / reduced motion: no pulse ring, no breathing. */
-  cheap: boolean;
   /** Lesson-side percent, kept in React state for the a11y read-out. */
   ariaNow: number;
   collapsed: SplitSide | null;
@@ -225,11 +218,8 @@ interface SplitDividerProps {
 
 function SplitDivider({
   axis,
-  accent,
   ratio,
   dragging,
-  pulseKey,
-  cheap,
   ariaNow,
   collapsed,
   onPointerDown,
@@ -240,27 +230,14 @@ function SplitDivider({
   onKeyDown,
 }: SplitDividerProps) {
   const dividerRef = useRef<HTMLDivElement | null>(null);
-  const bubbleTextRef = useRef<HTMLSpanElement | null>(null);
   const row = axis === "row"; // landscape → a vertical divider
 
-  // The live read-out never goes through React: the bubble's text and the
-  // separator's aria-valuenow are written straight to the DOM on every frame.
+  // The live read-out never goes through React: the separator's
+  // aria-valuenow is written straight to the DOM on every frame.
   useMotionValueEvent(ratio, "change", (value) => {
-    const study = Math.round(value);
-    const lesson = 100 - study;
-    if (bubbleTextRef.current) bubbleTextRef.current.textContent = `${lesson}% · ${study}%`;
+    const lesson = 100 - Math.round(value);
     dividerRef.current?.setAttribute("aria-valuenow", String(Math.min(100, Math.max(0, lesson))));
   });
-
-  // The three grabber dots: dim at rest, bright on a desktop hover, and gone
-  // while dragging (the % bubble takes the grabber's place). Opacity lives in
-  // classes, not inline, so the hover rule can actually win.
-  const dot = (
-    <span
-      className="block h-[3px] w-[3px] shrink-0 rounded-full opacity-70 transition-opacity duration-200 group-hover:opacity-100"
-      style={{ background: accent }}
-    />
-  );
 
   return (
     <div
@@ -280,11 +257,12 @@ function SplitDivider({
         row ? "h-full cursor-col-resize flex-col" : "w-full cursor-row-resize"
       }`}
       style={{
-        // A real 44px target on the axis that matters, and no browser gesture
-        // stealing the drag (the whole point of `touch-action: none`).
+        // A slim 10px strip on the axis that matters, and no browser gesture
+        // stealing the drag (the whole point of `touch-action: none`). An
+        // invisible `::after` extends the grab area for fingers — the layout
+        // cost stays 10px.
         flex: `0 0 ${DIVIDER_HIT}px`,
         touchAction: "none",
-        ["--split-accent" as string]: accent,
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -293,75 +271,23 @@ function SplitDivider({
       onDoubleClick={onDoubleClick}
       onKeyDown={onKeyDown}
     >
-      {/* 2px core line in the active tab's colour. It draws itself along its
-          own axis when the deck opens (240ms, the pack's ease) and glides to
-          the new tab colour over 300ms. */}
+      {/* The ONLY visible divider chrome: a 2px yellow core line. It draws
+          itself along its own axis when the deck opens (240ms, the pack's
+          ease). No grabber, no % bubble, no pulse ring — the panes keep every
+          pixel around it. */}
       <motion.span
         key={axis}
         aria-hidden
         data-course-split-line=""
         className={row ? "h-full w-[2px] rounded-full" : "h-[2px] w-full rounded-full"}
         style={{
-          background: accent,
-          boxShadow: `0 0 14px ${accent}66`,
-          transition: `background-color 300ms ${EASE_OUT}, box-shadow 300ms ${EASE_OUT}`,
+          background: DIVIDER_LINE,
+          boxShadow: dragging ? `0 0 16px ${DIVIDER_LINE}` : `0 0 10px ${DIVIDER_LINE}66`,
         }}
         initial={row ? { scaleY: 0, scaleX: 1 } : { scaleX: 0, scaleY: 1 }}
         animate={{ scaleX: 1, scaleY: 1 }}
         transition={{ duration: 0.24, ease: EASE_OUT_MOTION }}
       />
-
-      {/* Centred glass grabber: 24×24 pill, three 3px dots, spring to 1.15
-          while dragging (the dock's own magnification spring). */}
-      <motion.span
-        aria-hidden
-        data-course-split-grabber=""
-        className="absolute left-1/2 top-1/2 flex h-6 w-6 items-center justify-center rounded-full"
-        style={{
-          x: "-50%",
-          y: "-50%",
-          ...CHROME_GLASS,
-          boxShadow: `var(--dc-chrome-glass-rim), 0 0 12px ${accent}33`,
-          willChange: dragging ? "transform" : undefined,
-        }}
-        animate={{ scale: dragging ? 1.15 : 1 }}
-        transition={{ type: "spring", ...SPRING_MAG }}
-      >
-        <span className={`flex items-center justify-center gap-[3px] ${row ? "flex-col" : "flex-row"}`}>
-          {dot}
-          {dot}
-          {dot}
-        </span>
-      </motion.span>
-
-      {/* The magnetic click: ONE soft ring per snap point crossed mid-drag.
-          Coarse pointers skip it entirely (cheap decks on mid-range phones). */}
-      {!cheap && pulseKey > 0 ? (
-        <motion.span
-          key={pulseKey}
-          aria-hidden
-          data-course-split-pulse=""
-          className="pointer-events-none absolute left-1/2 top-1/2 h-6 w-6 rounded-full"
-          style={{ x: "-50%", y: "-50%", boxShadow: `0 0 0 2px ${accent}66` }}
-          initial={{ opacity: 0.85, scale: 0.7 }}
-          animate={{ opacity: 0, scale: 2.1 }}
-          transition={{ duration: 0.45, ease: EASE_OUT_MOTION }}
-        />
-      ) : null}
-
-      {/* Live % bubble — glass pill centred on the grabber: "64% · 36%"
-          (lesson · study). Fades in with the drag, text written imperatively. */}
-      <motion.span
-        aria-hidden
-        data-course-split-ratio-bubble=""
-        className="pointer-events-none absolute left-1/2 top-1/2 z-40 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-black leading-none"
-        style={{ x: "-50%", y: "-50%", ...CHROME_GLASS, color: "var(--course-text)" }}
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: dragging ? 1 : 0, scale: dragging ? 1 : 0.9 }}
-        transition={{ duration: 0.16, ease: EASE_OUT_MOTION }}
-      >
-        <span ref={bubbleTextRef} data-course-split-ratio-value="" />
-      </motion.span>
     </div>
   );
 }
@@ -389,8 +315,15 @@ export interface SplitDeckProps {
   orientation: "portrait" | "landscape";
   /** Ratios + collapse are remembered per course and per axis. */
   courseId: string;
-  /** The active study tab's colour (divider line, glow, focus ring, rail). */
+  /** The active study tab's colour (peek rails only — the divider is fixed yellow). */
   accent: string;
+  /**
+   * True while a writing surface that deserves the whole screen is on screen
+   * (the notes editor / mind map tab). When the soft keyboard then opens, the
+   * study pane takes over the FULL deck — lesson and divider are hidden — and
+   * the previous split comes back untouched when the keyboard closes.
+   */
+  keyboardExpandEnabled?: boolean;
   /** The active study tab's icon (the study peek rail). */
   studyIcon: ComponentType<{ size?: number; className?: string; style?: CSSProperties }>;
   /** The player's lossless viewer stack — never unmounted, only resized. */
@@ -427,6 +360,7 @@ export function SplitDeck({
   study,
   solid = false,
   handleRef,
+  keyboardExpandEnabled = false,
 }: SplitDeckProps) {
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const lessonRef = useRef<HTMLDivElement | null>(null);
@@ -479,7 +413,6 @@ export function SplitDeck({
   const ratio = useMotionValue(ENTRY_START);
   const [collapsed, setCollapsed] = useState<SplitSide | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [pulseKey, setPulseKey] = useState(0);
   const [ariaNow, setAriaNow] = useState(100 - ENTRY_START);
   /** While dragging, the smaller pane leans on its divider-side edge. */
   const [compressed, setCompressed] = useState<SplitSide | null>(null);
@@ -488,7 +421,6 @@ export function SplitDeck({
   collapsedRef.current = collapsed;
   const lastRatioRef = useRef(DEFAULT_SPLIT_RATIO[axis]);
   const dragPointerRef = useRef<number | null>(null);
-  const lastPulseRef = useRef<number | null>(null);
   const controlsRef = useRef<AnimationPlaybackControls | null>(null);
 
   const stopAnimation = useCallback(() => {
@@ -625,17 +557,8 @@ export function SplitDeck({
   const applySplitPercent = useCallback(
     (value: number) => {
       ratio.set(value);
-      if (cheap) return;
-      // One pulse per snap point crossed — the "magnetic click".
-      const near = SPLIT_SNAP_POINTS.find((point) => Math.abs(point - value) <= PULSE_TOLERANCE) ?? null;
-      if (near != null && near !== lastPulseRef.current) {
-        lastPulseRef.current = near;
-        setPulseKey((key) => key + 1);
-      } else if (near == null) {
-        lastPulseRef.current = null;
-      }
     },
-    [cheap, ratio],
+    [ratio],
   );
 
   const settleAfterDrag = useCallback(
@@ -661,7 +584,6 @@ export function SplitDeck({
       stopAnimation();
       try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* fine without capture */ }
       dragPointerRef.current = event.pointerId;
-      lastPulseRef.current = null;
       // Dragging a collapsed rail wakes the pane up: the finger takes over
       // from the very percent the deck is at.
       if (collapsedRef.current) {
@@ -747,6 +669,18 @@ export function SplitDeck({
   // ── Soft keyboard: keep the notes editor above it ──────────────────────
   const keyboardInset = useKeyboardInset(sectionRef);
 
+  /**
+   * Keyboard takeover (phones): while the keyboard is open over a writing
+   * tab (notes / mind map), the study pane takes the FULL deck — the lesson
+   * above it and the divider disappear entirely, so no lesson pixel steals
+   * writing room. This is DERIVED, never persisted: the moment the keyboard
+   * closes, the exact split the learner had (ratio + collapse) is back,
+   * because nothing about it was ever touched. Desktop keyboards never
+   * shrink the visual viewport, so `keyboardInset` stays 0 there and the
+   * takeover simply never engages.
+   */
+  const keyboardTakeover = keyboardInset > 0 && keyboardExpandEnabled && collapsed !== "study";
+
   const paneSizeProp = axis === "row" ? "minWidth" : "minHeight";
   const initialRatio = ratio.get();
   const lessonStyle: CSSProperties = {
@@ -778,15 +712,18 @@ export function SplitDeck({
       data-split-collapsed={collapsed ?? "none"}
       data-split-compressed={dragging && compressed ? compressed : "none"}
       data-keyboard-inset={keyboardInset || undefined}
+      data-keyboard-takeover={keyboardTakeover ? "true" : undefined}
       style={deckStyle}
     >
-      {/* ── Lesson pane: the lossless viewer stack, only ever resized ── */}
+      {/* ── Lesson pane: the lossless viewer stack, only ever resized ──
+          Hidden entirely during a keyboard takeover (the mounted viewers
+          keep their state — only the box is gone). */}
       <div
         ref={lessonRef}
         className="relative min-h-0 min-w-0 overflow-hidden"
         data-course-lesson-pane=""
         data-collapsed={collapsed === "lesson" ? "true" : "false"}
-        style={lessonStyle}
+        style={keyboardTakeover ? { display: "none" } : lessonStyle}
       >
         <div
           className="absolute inset-0 min-h-0 min-w-0 overflow-hidden"
@@ -808,24 +745,25 @@ export function SplitDeck({
         ) : null}
       </div>
 
-      <SplitDivider
-        axis={axis}
-        accent={accent}
-        ratio={ratio}
-        dragging={dragging}
-        pulseKey={pulseKey}
-        cheap={cheap}
-        ariaNow={ariaNow}
+      {/* The divider is gone during a keyboard takeover — there is nothing
+          left to divide while the study pane owns the whole deck. */}
+      {keyboardTakeover ? null : (
+        <SplitDivider
+          axis={axis}
+          ratio={ratio}
+          dragging={dragging}
+          ariaNow={ariaNow}
         collapsed={collapsed}
         onPointerDown={onSplitPointerDown}
         onPointerMove={onSplitPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onDoubleClick={fiftyFifty}
-        onKeyDown={onSplitKeyDown}
-      />
+          onKeyDown={onSplitKeyDown}
+        />
+      )}
 
-      {/* ── Study pane: the five tabs AND the footer dock, inside the split ──
+      {/* ── Study pane: the study tabs AND the footer dock, inside the split ──
           tint 0.3 (≤ 0.35) so notes, the map canvas and the module lists stay
           readable in both themes. */}
       <div

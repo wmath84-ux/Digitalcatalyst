@@ -77,12 +77,12 @@ test("a device-only mapping is reused and backfilled into Firestore", () => {
   assert.match(copyHook, /void persistMapping\(local\)\.catch\(\(\) => undefined\)/);
 });
 
-test("the mapping note is dismissible and never permanent", () => {
+test("the mapping note auto-hides and never carries a dismiss button", () => {
+  // The player carries no close buttons anywhere, so the quiet note clears
+  // itself after 8s instead of offering a dismiss control.
   assert.match(copyHook, /const dismissWarning = useCallback/);
   assert.match(copyHook, /return \{ \.\.\.state, createCopy, dismissWarning \}/);
-  assert.match(resourceViewer, /data-course-personal-copy-warning-dismiss/);
-  assert.match(resourceViewer, /onClick=\{copyState\.dismissWarning\}/);
-  // …and it auto-hides so it can never simply sit there forever.
+  assert.doesNotMatch(resourceViewer, /data-course-personal-copy-warning-dismiss/);
   assert.match(resourceViewer, /setTimeout\(\(\) => copyState\.dismissWarning\(\), 8000\)/);
 });
 

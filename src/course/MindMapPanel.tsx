@@ -78,30 +78,26 @@
 //   then, right-aligned: auto-arrange, the ALIGN menu (how the boxes are
 //   laid out — tree / one line / one column — and how a long label fits,
 //   wrap or clipped to one line), fit-to-screen, this window's light/dark
-//   flip, delete-branch, the double-tap-delete arm switch, and close.
+//   flip, delete-branch and the double-tap-delete arm switch.
 // There are no +/− zoom buttons any more: the canvas is pinched (and panned)
 // straight with the fingers, and Fit re-frames the whole map in one tap.
 //
-// ── Why the strip no longer scrolls sideways ─────────────────────────────
-// This is the "toolbar khisak gaya left" fix, and there were two ways the
-// old bar could slide over:
+// ── Why the strip scrolls sideways (one line, never wrapped) ────────────
+// The bar is a single side-scrolling line: every tool sits side-by-side and
+// the strip scrolls horizontally on a narrow sheet instead of wrapping to a
+// second line or clipping tools off. The old "toolbar khisak gaya left"
+// report came from TWO mistakes this bar avoids:
 //
-//   1. It was a SCROLL CONTAINER (`overflow-x-auto`). A scrollable box keeps
-//      the offset the browser handed it while scrolling a focused tile into
-//      view — the soft keyboard opening for a node rename, an orientation
-//      flip, the sheet reopening — and never gives it back, so the bar
-//      painted from somewhere in the middle with its left edge cut off.
-//   2. It used `justify-between` with percentage-width children. Once the
-//      content was wider than the bar (a long map name was enough) the free
-//      space went negative, and a negative-space `space-between` overflows
-//      out of BOTH ends — the start edge is then unreachable, i.e. the left
-//      half of the bar sat outside the visible area with no way to scroll to
-//      it. Same symptom, different cause, and just as intermittent.
-//
-// The strip is clipped now, its layout is `flex-1` (shrinkable) on the LEFT
-// cluster and `shrink-0` on the tools, the map-name pill is the only element
-// allowed to give up width (it collapses to its icon on a narrow sheet), and
-// any offset a browser still manages to set is reset on every open.
+//   1. A scrollable bar KEEPS the offset the browser hands it while scrolling
+//      a focused tile into view (soft keyboard, orientation flip, reopen) —
+//      this one resets any leftover offset on every open, so it always paints
+//      from its left edge.
+//   2. `justify-between` with percentage-width children: once the content is
+//      wider than the bar the free space goes negative and a negative-space
+//      `space-between` overflows out of BOTH ends, so the start edge becomes
+//      unreachable. This bar uses `justify-start`, and the map-name pill
+//      still collapses to its icon on a narrow sheet so the tools need as
+//      little scrolling as possible.
 //
 // ── Why React Flow and not jsMind ────────────────────────────────────────
 // jsMind ships a purpose-built tree, but its published core
@@ -154,7 +150,6 @@ import {
   TriangleAlert,
   Type,
   WrapText,
-  X,
 } from "lucide-react";
 import {
   addChildNode,
@@ -971,8 +966,6 @@ export interface MindMapPanelProps {
    * offered is lost.
    */
   landscape?: boolean;
-  /** Close the mind map sheet (toolbar X). */
-  onClose?: () => void;
   /**
    * True while the mind map sheet itself is open. The map library (the grid
    * of this module's maps) is the panel's HOME screen: it shows first on
@@ -1008,7 +1001,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
     status,
     errorMessage,
     onFlush,
-    onClose,
     playerTheme = "dark",
     landscape: _landscape,
     open = true,
@@ -1771,44 +1763,11 @@ function MindMapCanvas(props: MindMapPanelProps) {
             map on tap, and carries its own rename / delete actions. */}
         {libraryOpen ? (
           <div className="absolute inset-0 z-20 flex flex-col bg-[var(--dc-chrome-glass)] [backdrop-filter:var(--dc-chrome-glass-blur)]" data-course-mindmap-library>
-            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--mm-border)] px-3 py-2">
-              <div className="min-w-0">
-                <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-[var(--mm-text)]">
-                  Is module ke mind maps
-                </p>
-                <p className="mt-0.5 truncate text-[10px] font-semibold text-[var(--mm-muted)]">
-                  {mapsLoading ? "Loading…" : `${maps.length} ${maps.length === 1 ? "map" : "maps"} · tap karke kholein`}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onCreateMap?.();
-                    setLibraryOpen(false);
-                    setSelectedId(null);
-                    setEditingId(null);
-                  }}
-                  disabled={atMapLimit || !onCreateMap}
-                  className="flex items-center gap-1 rounded-full bg-indigo-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-indigo-500 disabled:opacity-40"
-                  aria-label="Naya mind map banayein"
-                  title={atMapLimit ? "Is module me maps ki limit poori ho gayi" : "New map — naya khaali mind map"}
-                  data-course-mindmap-new
-                >
-                  <Plus size={13} strokeWidth={3} /> New map
-                </button>
-                <GlassButton
-                  onClick={() => { setLibraryOpen(false); setRenamingKey(null); }}
-                  className="shrink-0 [&_.size-12]:size-7"
-                  aria-label="Map list band karein"
-                  data-course-mindmap-library-close
-                >
-                  <X size={13} />
-                </GlassButton>
-              </div>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {/* No header — the grid starts at the very top, and the circular
+                "+" floats at the bottom-right. Tapping any card (including
+                the open one) returns to the canvas, so no close button is
+                needed. */}
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 pb-16">
               {/* While the index is still loading, show skeletons instead of a
                   fake single card — the grid is this panel's first screen, so
                   it should never look emptier than it really is. */}
@@ -1903,37 +1862,59 @@ function MindMapCanvas(props: MindMapPanelProps) {
               </ul>
               )}
             </div>
+            {/* The one "+" — a small circular button floating at the grid's
+                bottom-right. It starts a fresh map and drops straight onto
+                its canvas. */}
+            <button
+              type="button"
+              onClick={() => {
+                onCreateMap?.();
+                setLibraryOpen(false);
+                setSelectedId(null);
+                setEditingId(null);
+              }}
+              disabled={atMapLimit || !onCreateMap}
+              className="absolute bottom-4 right-4 z-10 grid h-10 w-10 place-items-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-950/50 transition hover:bg-indigo-500 active:scale-95 disabled:opacity-40"
+              aria-label="Naya mind map banayein"
+              title={atMapLimit ? "Is module me maps ki limit poori ho gayi" : "New map — naya khaali mind map"}
+              data-course-mindmap-new
+            >
+              <Plus size={18} strokeWidth={2.8} />
+            </button>
           </div>
         ) : null}
       </div>
 
+      {/* The toolbar only exists on the canvas — while the library is open
+          (no specific map chosen yet) there is no strip and no error bar. */}
+      {libraryOpen ? null : (
+        <>
       {/* ── Status strip — the mind map's toolbar ──────────────────────────
           The only persistent chrome, and every control on it is a SINGLE
           ICON: the cloud-save beacon (tinted by the save state, blinking
           while there is a message to read), the map pill, then the tools —
           auto-arrange, the align menu, fit-to-screen, this window's
-          light/dark flip, delete-branch, the double-tap-delete arm switch,
-          and close.
+          light/dark flip, delete-branch and the double-tap-delete arm
+          switch. There is no close button — the dock tab is the way out.
 
           There are no +/− zoom buttons: the canvas is pinched (and panned)
           straight with the fingers, and Fit re-frames the whole map in one
           tap — the two buttons were the ones eating the bar's width.
 
-          The strip is CLIPPED, never scrolled. A scrollable bar keeps the
-          offset the browser handed it while scrolling a focused tile into
-          view (soft keyboard, orientation flip, the sheet reopening) and
-          never gives it back — that stale offset is exactly the "toolbar
-          khisak gaya left" report. The map-name pill is the only element
-          allowed to shrink, so every tool stays on the bar. */}
+          The strip is a SINGLE side-scrolling line — every tool sits
+          side-by-side and the bar scrolls horizontally instead of wrapping
+          or clipping. Any stale offset a browser hands it (soft keyboard,
+          orientation flip, reopen) is reset when the sheet opens, so the
+          bar always paints from its left edge. */}
       <div
         ref={statusRef}
-        className="flex shrink-0 items-center overflow-hidden border-t border-[var(--mm-border)] px-2 py-1.5"
+        className="flex shrink-0 items-center overflow-x-auto border-t border-[var(--mm-border)] px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ gap: "var(--mm-tool-gap)" }}
         data-course-mindmap-status
         data-compact={toolbarCompact ? "true" : "false"}
       >
         {/* ── Left cluster: cloud save + which map is open ─────────────── */}
-        <div className="flex min-w-0 flex-1 items-center" style={{ gap: "var(--mm-tool-gap)" }}>
+        <div className="flex min-w-max flex-1 items-center" style={{ gap: "var(--mm-tool-gap)" }}>
           {/* ── Cloud save ──────────────────────────────────────────────
               The old "Cloud par saved" TEXT was the widest thing on the
               bar, so it is an icon now: the cloud itself is tinted by the
@@ -2197,21 +2178,6 @@ function MindMapCanvas(props: MindMapPanelProps) {
             <MousePointerClick />
           </button>
 
-          {onClose ? (
-            <button
-              type="button"
-              onClick={() => {
-                onFlush?.();
-                onClose();
-              }}
-              className="mm-tool mm-tool-danger"
-              aria-label="Mind map band karein"
-              title="Close mind map"
-              data-course-mindmap-close
-            >
-              <X />
-            </button>
-          ) : null}
         </div>
       </div>
 
@@ -2223,6 +2189,8 @@ function MindMapCanvas(props: MindMapPanelProps) {
           {errorMessage}
         </p>
       ) : null}
+        </>
+      )}
 
       {/* ── Branch delete confirmation ────────────────────────────────────
           Every branch delete path lands here first (toolbar trash AND the

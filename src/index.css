@@ -1872,8 +1872,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 }
 
 /* ── Course Player glass — blur discipline (Phase 2) ─────────────────────
-   Every glass surface in the player (header, landscape rail, footer dock,
-   the Split Deck's panes, divider, grabber and peek rails) reads the same
+   Every glass surface in the player (footer dock, the Split Deck's panes,
+   divider and peek rails) reads the same
    three tokens: --dc-chrome-glass / -blur / -rim. The blur is re-scoped
    HERE, for the player only — a deeper frost than the site header, STATIC
    per theme, and cheaper on touch devices. Nothing in the player ever
@@ -1904,26 +1904,20 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    the footer dock has, WITH the footer dock itself inside it). See
    src/course/studyPanels.tsx + src/course/splitMotion.ts. */
 
-/* Keyboard: the divider's focus ring is the ACTIVE TAB's colour, which the
-   deck writes inline as --split-accent — the ring says which tab you are on. */
+/* Keyboard: the divider's focus ring is the same fixed yellow as the core
+   line it wraps. */
 [data-course-split-divider]:focus-visible {
-  outline: 2px solid var(--split-accent, #3a86ff);
+  outline: 2px solid #FFBE0B;
   outline-offset: -2px;
   border-radius: 999px;
 }
 
-/* Desktop hover: the core line brightens and the grabber's dots come up.
-   Touch devices get no hover state at all. */
+/* Desktop hover: the core line brightens. Touch devices get no hover
+   state at all. */
 @media (hover: hover) and (pointer: fine) {
   [data-course-split-divider]:hover [data-course-split-line] {
     filter: brightness(1.28);
   }
-}
-
-/* While the divider drags, the % bubble takes the grabber's place — the dots
-   step out of the way instead of reading through the glass pill. */
-[data-course-split-divider][data-dragging="true"] [data-course-split-grabber] span > span {
-  opacity: 0;
 }
 
 /* While the divider drags, the pane that is being COMPRESSED leans on its
@@ -1960,17 +1954,11 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 
 /* The collapsed pane's 28px glass strip: a 2px edge glow in the tab colour
    (painted inline) plus the breathing icon framer-motion drives. Coarse
-   pointers and reduced-motion users get the strip without the pulse ring. */
+   pointers and reduced-motion users get the strip without the breathing. */
 [data-course-peek-rail] {
   -webkit-tap-highlight-color: transparent;
 }
-@media (pointer: coarse) {
-  [data-course-split-pulse] {
-    display: none;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  [data-course-split-pulse],
   [data-course-peek-rail] [data-peek-icon] {
     animation: none !important;
     transition: none !important;
@@ -1981,8 +1969,37 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   }
 }
 
+/* The divider is a slim 10px strip carrying only its 2px yellow core line.
+   An invisible `::after` extends the grab area for fingers on both axes, so
+   the strip stays easy to catch without costing the panes any layout space. */
+.course-player-shell [data-course-split-divider]::after {
+  content: "";
+  position: absolute;
+}
+.course-player-shell [data-course-split-divider][data-axis="column"]::after {
+  left: 0;
+  right: 0;
+  top: -10px;
+  bottom: -10px;
+}
+.course-player-shell [data-course-split-divider][data-axis="row"]::after {
+  top: 0;
+  bottom: 0;
+  left: -10px;
+  right: -10px;
+}
+
+/* On very narrow phones (≤350px) the seven-tab course dock scales down a
+   touch so the last tab never clips. `zoom` shrinks layout, not just paint
+   (unlike transform); engines that don't know it keep the normal dock. */
+@media (max-width: 350px) {
+  [data-course-dock] [data-glass-dock] {
+    zoom: 0.88;
+  }
+}
+
 /* ── Course Player dock: NEVER hidden by the site's desktop/tablet rules ──
-   The study pane's tab dock (Modules / Resources / Notes / Mind map / Paid /
+   The study pane's tab dock (Modules / Brain / Notes / Mind map / AI / Paid /
    Player) is the course player's PRIMARY navigation — not site chrome. It
    mounts the exact same <GlassDock siteFooter /> as the home footer, so its
    capsule carries `data-site-footer`. The "hide the mobile footer pill"
