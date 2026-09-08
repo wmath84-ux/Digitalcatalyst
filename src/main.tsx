@@ -15,6 +15,11 @@ import "./winter-background.css";
 // Liquid Glass material layer (website-glass). Inert until
 // src/lib/glass.ts applies a tier to <html>; see docs/liquid-glass-rollout-plan.md.
 import "./glass.css";
+// The Course Player's panel language, ported from the removed 3D Classroom:
+// deep navy plates, one hairline, crisp white ink and the room's five surface
+// accents. Paint only, and scoped to `.course-player-shell`, so it must come
+// AFTER index.css and glass.css to win the ties it re-points.
+import "./course/flatPlayerChrome.css";
 import StoreApp from "./App";
 import HomeApp from "./home/App";
 import PdpApp from "./PdpApp";
@@ -27,7 +32,6 @@ import SettingsPage from "./settings/SettingsPage";
 import SubscriberExperiencePage from "./profile/SubscriberExperiencePage";
 import ProfilePreview from "./profile/ProfilePreview";
 import MindMapPreview from "./course/MindMapPreview";
-import Classroom3DPreview from "./classroom3d/Classroom3DPreview";
 import GlassPreviewPage from "./GlassPreview";
 import CourseRouteGuard from "./components/CourseRouteGuard";
 import CartWishlistApp from "./CartWishlistApp";
@@ -161,10 +165,6 @@ const GLASS_PREVIEW_HASH = "#/dev/glass-preview";
 // clips, replay the real boot sequence, and read the decision the app
 // made on THIS device. See src/components/dev/OpeningAnimationPreview.
 const OPENING_PREVIEW_HASH = "#/dev/opening";
-// The 3D Classroom — the Course Player rebuilt as a room the learner sits in
-// (board straight ahead, notes wall left, mind map wall further left, the
-// control console on the desk). See src/classroom3d/Classroom3D.tsx.
-const CLASSROOM_3D_HASH = "#/dev/classroom-3d";
 const FLOWPATH_HASH = "#/flowpath";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
@@ -432,7 +432,6 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
     || hash.startsWith("#/course/")
     || hash.startsWith(PROFILE_PREVIEW_HASH)
     || hash.startsWith(GLASS_PREVIEW_HASH)
-    || hash.startsWith(CLASSROOM_3D_HASH)
     || hash.startsWith(OPENING_PREVIEW_HASH)
   ) {
     return <>{children}</>;
@@ -1273,7 +1272,6 @@ function RootPage(): ReactNode {
   if (hash.startsWith(GLASS_PREVIEW_HASH)) return <GlassPreviewPage />;
   if (hash.startsWith(OPENING_PREVIEW_HASH)) return <OpeningAnimationPreview />;
   if (hash.startsWith(MINDMAP_PREVIEW_HASH)) return <MindMapPreview />;
-  if (hash.startsWith(CLASSROOM_3D_HASH)) return <Classroom3DPreview />;
   if (hash.startsWith(COURSE_HASH)) {
     if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;
     return (

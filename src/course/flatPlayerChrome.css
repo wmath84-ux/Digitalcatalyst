@@ -1,0 +1,646 @@
+/* src/course/flatPlayerChrome.css
+   ═══════════════════════════════════════════════════════════════════════════
+   THE FLAT PLAYER, DRESSED IN THE 3D CLASSROOM'S PANEL LANGUAGE.
+
+   The 3D Classroom (src/classroom3d) was removed as a feature — the Split Deck
+   is the course player's one and only shell. What the room is still allowed to
+   leave behind is the thing its owner liked best: how its PANELS looked. Every
+   value in this file is that room's own, lifted from `classroom3d.css`,
+   `panels.tsx` (BoardPanel / DeskPanel / WallHeader) and `RoomSheet.tsx`:
+
+     · the board's plate            #060910, header bar #0d1424
+     · the desk's plate             #0b1024 → #070a14
+     · the wall header              #0b1120 over a hairline of white/10
+     · the floating chooser         rgba(15,19,36,.94) → rgba(8,11,22,.96),
+                                    radius 26, blur(22px) saturate(150%),
+                                    0 40px 90px black + an accent bloom
+     · the HUD / control tray       rgba(9,12,24,.62) + blur(18px) saturate(150%)
+     · rows                         white/4 on a white/8 line, hover white/9,
+                                    active in the surface's own accent wash
+     · ink                          white/94 titles · white/70 body · white/45 subs
+     · accents                      board sky #38bdf8 · notes amber #f59e0b ·
+                                    mind map violet #a78bfa · desk cyan #22d3ee ·
+                                    done emerald #6ee7b7
+
+   Why: the owner's brief for the flat player is "relief, maximum visibility,
+   comfortability". Translucent glass over a busy winter scene is the opposite
+   of all three — the room solved it by putting every surface on a DEEP, NEARLY
+   OPAQUE NAVY PLATE with one hairline and crisp white ink, and that is exactly
+   what is ported here.
+
+   ── THE OWNER'S FOUR DECISIONS (2026-09-08) ───────────────────────────────
+   Asked what "the room's panel look on the flat player" means, the answer was:
+     1. the WHOLE panel language — plates, rows, dock, notes, mind map, dialog;
+     2. nothing FLOATS: the dock, the peek rails and the divider's pills are
+        SOLID deep-navy plates with no blur, not frosted glass over the scene;
+     3. keep the room's module ⇄ content CONNECTION — the dashed rail that
+        tied an expanded module to its lessons, cyan parent / violet content;
+     4. the backdrop is the room's own deep-navy gradient, so the winter scene
+        no longer shows through the player's panes.
+
+   ── THE ONE RULE THIS FILE OBEYS ──────────────────────────────────────────
+   PAINT ONLY. Nothing here touches the flat player's behaviour, structure or
+   geometry: no width/height, no padding/margin, no flex/grid, no display, no
+   transform, no animation timing, no new element, no removed element, no
+   z-index of an existing element. Only `background`, `background-image`,
+   `color`, `box-shadow`, `border-color`, `border-radius`, `backdrop-filter`,
+   `outline-color`, scrollbar paint and font smoothing — plus ONE exception,
+   the §6b connector, which draws itself on a `::before` that is absolutely
+   positioned inside a row and `pointer-events: none`, so it too cannot move
+   anything.
+
+   Two consequences of that discipline, both deliberate:
+     · "borders" are painted as `box-shadow: inset 0 0 0 1px …`, never as a
+       real `border` — a real border on an auto-height row would grow every row
+       by 2px and shift the lists the dock snaps to.
+     · the split ratio, the magnetic snaps, the peek rails, the drag, the
+       keyboard control, the scroll-snap lists, the viewer stack, resume
+       playback, notes, mind map, Firestore writes and every data-attribute
+       hook the test suite pins are all EXACTLY as src/course/ left them.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. The room's palette, as player tokens ───────────────────────────────
+   Declared on the shell so every surface inside inherits one material. The
+   player's own `--course-*` tokens (src/index.css) are re-pointed at the
+   classroom's values, so the components that already read them — the notes
+   cards, the rich-text editor, the viewer's empty states, the paid rows —
+   change paint without being touched. */
+.course-player-shell {
+  /* Plates */
+  --dc-flat-board: #060910;              /* the board's body */
+  --dc-flat-board-head: #0d1424;         /* the board's title bar */
+  --dc-flat-wall-head: #0b1120;          /* the notes / mind map wall header */
+  --dc-flat-desk-top: #0b1024;           /* the desk tablet, top */
+  --dc-flat-desk-bottom: #070a14;        /* the desk tablet, bottom */
+  --dc-flat-box: rgba(255, 255, 255, 0.035); /* a section box on the desk */
+
+  /* Furniture glass — the HUD and the control tray */
+  --dc-flat-glass: rgba(9, 12, 24, 0.62);
+  --dc-flat-glass-deep: rgba(9, 12, 24, 0.66);
+  --dc-flat-blur: blur(18px) saturate(150%);
+  --dc-flat-blur-sheet: blur(22px) saturate(150%);
+
+  /* The floating chooser (RoomSheet) */
+  --dc-flat-sheet: linear-gradient(180deg, rgba(15, 19, 36, 0.94), rgba(8, 11, 22, 0.96));
+  --dc-flat-sheet-shadow:
+    0 40px 90px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --dc-flat-scrim: radial-gradient(120% 80% at 50% 45%, rgba(4, 6, 14, 0.32), rgba(4, 6, 14, 0.62));
+
+  /* Hairlines */
+  --dc-flat-line: rgba(255, 255, 255, 0.1);
+  --dc-flat-line-soft: rgba(255, 255, 255, 0.08);
+  --dc-flat-line-strong: rgba(255, 255, 255, 0.14);
+
+  /* Ink */
+  --dc-flat-ink: #ffffff;
+  --dc-flat-ink-title: rgba(255, 255, 255, 0.94);
+  --dc-flat-ink-body: rgba(255, 255, 255, 0.86);
+  --dc-flat-ink-sub: rgba(255, 255, 255, 0.45);
+  --dc-flat-ink-label: rgba(255, 255, 255, 0.45);
+
+  /* Rows */
+  --dc-flat-row: rgba(255, 255, 255, 0.04);
+  --dc-flat-row-hover: rgba(255, 255, 255, 0.09);
+  --dc-flat-row-line: rgba(255, 255, 255, 0.08);
+  --dc-flat-row-line-hover: rgba(255, 255, 255, 0.18);
+
+  /* The room's five surface accents, and the four tints each one needs.
+     Pre-mixed as literals (never `color-mix()`): this app's floor is Chrome 96
+     / Safari 15, and a `color-mix()` that reads a variable ships as-is and is
+     dropped whole on those engines — the same reason RoomSheet.tsx mixed its
+     accent tints in JS. */
+  --dc-flat-sky: #38bdf8;         /* the board */
+  --dc-flat-sky-wash: rgba(56, 189, 248, 0.16);
+  --dc-flat-sky-line: rgba(56, 189, 248, 0.45);
+  --dc-flat-sky-ink: #bae6fd;
+
+  --dc-flat-cyan: #22d3ee;        /* the desk: the module being browsed */
+  --dc-flat-cyan-wash: rgba(34, 211, 238, 0.16);
+  --dc-flat-cyan-line: rgba(34, 211, 238, 0.45);
+  --dc-flat-cyan-ink: #67e8f9;
+
+  --dc-flat-violet: #a78bfa;      /* the mind map wall, and the lesson playing */
+  --dc-flat-violet-wash: rgba(167, 139, 250, 0.16);
+  --dc-flat-violet-line: rgba(167, 139, 250, 0.45);
+  --dc-flat-violet-deep: #8b5cf6;
+  --dc-flat-violet-ink: #ddd6fe;
+
+  --dc-flat-amber: #f59e0b;       /* the notes wall */
+  --dc-flat-amber-wash: rgba(245, 158, 11, 0.16);
+  --dc-flat-amber-line: rgba(245, 158, 11, 0.45);
+  --dc-flat-amber-ink: #fde68a;
+
+  --dc-flat-done: #6ee7b7;        /* mark-complete, done */
+  --dc-flat-done-wash: rgba(52, 211, 153, 0.18);
+  --dc-flat-done-line: rgba(110, 231, 183, 0.5);
+
+  /* Shadows */
+  --dc-flat-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  --dc-flat-shadow-tray: 0 18px 55px rgba(0, 0, 0, 0.48);
+  --dc-flat-glow-violet: 0 0 22px rgba(139, 92, 246, 0.4);
+  --dc-flat-glow-sky: 0 0 18px rgba(56, 189, 248, 0.45);
+
+  /* ── Re-pointing the player's own palette at the room's ────────────────
+     Same variable names src/index.css declares, so every consumer of the
+     player palette (notes, editor, viewer states, paid rows, the overlay's
+     lists) picks the room's material up with no edit of its own. The names
+     and the light-theme block in index.css stay exactly as they were — this
+     is a later, equally specific declaration, so it simply wins the cascade
+     while the player is open and nowhere else in the app. */
+  --course-bg: var(--dc-flat-board);
+  --course-surface: var(--dc-flat-glass);
+  --course-surface-translucent: var(--dc-flat-glass);
+  --course-panel: var(--dc-flat-glass);
+  --course-text: var(--dc-flat-ink);
+  --course-muted: rgba(255, 255, 255, 0.68);
+  --course-border: var(--dc-flat-line);
+  --course-soft: var(--dc-flat-row);
+  --course-soft-hover: var(--dc-flat-row-hover);
+  --course-strong: rgba(255, 255, 255, 0.24);
+  --course-loading: rgba(6, 9, 16, 0.72);
+
+  /* The site-wide chrome glass, re-scoped to the room's furniture glass. The
+     rich-text toolbar, the mind map library and every GlassSurface-based
+     strip inside the player read this token, so they all become HUD glass.
+     The ROOT token in index.css is untouched — the store, the headers and the
+     desktop shell keep their published material. */
+  --dc-chrome-glass: var(--dc-flat-glass);
+  --dc-chrome-glass-blur: var(--dc-flat-blur);
+  --dc-chrome-glass-rim:
+    inset 0 1px 1px rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+
+  /* Panels are read at arm's length, like a board across a room: crisp type,
+     no sub-pixel fringing (the room's `.dc-classroom-surface` rule). */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── 2. The backdrop: the room itself ──────────────────────────────────────
+   The player used to paint nothing and let the winter scene show through every
+   pane — that is what made text hard to hold. It now paints the room: the same
+   two-glow-over-deep-navy composition the app's winter backdrop uses, but in
+   the classroom's own key and far darker, so a lit board reads as lit against
+   it. Painted on the shell (which is already `fixed inset-0`), so no layer is
+   added and nothing can shift. The snow overlay still falls on top of it. */
+.course-player-shell {
+  background-color: #04060e;
+  background-image:
+    radial-gradient(circle at 18% -10%, rgba(56, 189, 248, 0.16) 0, transparent 52%),
+    radial-gradient(circle at 84% -6%, rgba(139, 92, 246, 0.15) 0, transparent 50%),
+    radial-gradient(120% 90% at 50% 108%, rgba(4, 6, 14, 0.9) 0, transparent 62%),
+    linear-gradient(to bottom, #0d1424 0%, #080c18 46%, #04060e 100%);
+}
+
+/* ── 3. The lesson pane IS the board ───────────────────────────────────────
+   The room's board: a near-black plate, a hairline all round, and the sky
+   bloom that used to spill off the board wall. Content (YouTube's black,
+   a PDF's white, an image) sits on it exactly as it sat on the slab. */
+.course-player-shell [data-course-lesson-pane] {
+  background-color: var(--dc-flat-board);
+  background-image:
+    radial-gradient(120% 60% at 50% -8%, rgba(56, 189, 248, 0.1) 0, transparent 60%),
+    linear-gradient(180deg, #0a0f1c 0%, var(--dc-flat-board) 34%);
+  box-shadow:
+    inset 0 0 0 1px var(--dc-flat-line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ── 4. The study pane IS the desk tablet ──────────────────────────────────
+   The desk's own gradient plate. The pane's GlassSurface tint and sheen stay
+   on top of it (they are its children, painted inline), so the surface keeps
+   the pack's material — it just finally has something dark and calm under it
+   instead of the scene. */
+.course-player-shell [data-course-study-pane] {
+  background-color: var(--dc-flat-desk-bottom);
+  background-image: linear-gradient(180deg, var(--dc-flat-desk-top) 0%, var(--dc-flat-desk-bottom) 100%);
+  box-shadow: inset 0 0 0 1px var(--dc-flat-line);
+}
+
+/* Notes and the mind map already asked for a deeper plate (`data-solid-panel`,
+   src/index.css). In the room those two walls sat on the board's near-black,
+   which is what makes long text and node labels restful — so the deep plate
+   becomes the board's, in both themes. */
+.course-player-shell [data-course-study-pane][data-solid-panel="true"],
+.course-player-shell[data-course-theme="light"] [data-course-study-pane][data-solid-panel="true"] {
+  background-color: rgba(6, 9, 16, 0.94);
+  background-image: linear-gradient(180deg, rgba(13, 20, 36, 0.94) 0%, rgba(6, 9, 16, 0.96) 100%);
+}
+
+/* ── 5. The pane's chrome row IS a wall header ─────────────────────────────
+   BoardPanel and WallHeader both wore one thing: a slightly lighter bar, a
+   hairline under it, a white/90 title and a white/45 subtitle. The study pane's
+   one chrome row gets exactly that. */
+.course-player-shell [data-course-study-chrome] {
+  background-color: var(--dc-flat-wall-head);
+  background-image: linear-gradient(90deg, rgba(167, 139, 250, 0.12), transparent 62%);
+  border-bottom-color: var(--dc-flat-line);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+}
+.course-player-shell [data-course-overlay-title] {
+  color: var(--dc-flat-ink-title);
+}
+/* The subtitle is the row's other <p> — the room printed hints at white/45. */
+.course-player-shell [data-course-study-chrome] [data-course-overlay-title] + p {
+  color: var(--dc-flat-ink-sub);
+}
+
+/* The active tab decides which wall the pane is showing, so the chrome row
+   takes that surface's accent wash — sky for the lesson-side tabs, amber for
+   notes, violet for the mind map — exactly as the room tinted each wall. */
+.course-player-shell [data-course-overlay-tab="notes"] [data-course-study-chrome] {
+  background-image: linear-gradient(90deg, var(--dc-flat-amber-wash), transparent 62%);
+}
+.course-player-shell [data-course-overlay-tab="mindmap"] [data-course-study-chrome] {
+  background-image: linear-gradient(90deg, var(--dc-flat-violet-wash), transparent 62%);
+}
+
+/* ── 6. Every list row IS a room row ───────────────────────────────────────
+   RoomSheet's rows and DeskPanel's module/lesson rows are one design: white/4
+   on a white/8 hairline, radius 16, hover to white/9 + white/18, and the
+   active row in its surface's accent wash with the accent's line. The flat
+   lists (Modules / Resources / Paid, and the Player tab's action rows) get
+   that treatment. Paint only — the rows keep their own height, their 44px
+   tinted icon plates, the magnify wave and the scroll-snap fire. */
+.course-player-shell [data-course-sheet-row],
+.course-player-shell [data-course-panel-row] {
+  background-color: var(--dc-flat-row);
+  box-shadow: inset 0 0 0 1px var(--dc-flat-row-line);
+  border-radius: 16px;
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .course-player-shell [data-course-sheet-row]:hover,
+  .course-player-shell [data-course-panel-row]:hover {
+    background-color: var(--dc-flat-row-hover);
+    box-shadow: inset 0 0 0 1px var(--dc-flat-row-line-hover);
+  }
+}
+
+/* A module being browsed lit CYAN on the desk; the lesson actually playing lit
+   VIOLET with a bloom. The flat lists keep the same two states, keyed off the
+   attributes they already carry. */
+.course-player-shell [data-course-overlay-module][data-selected="true"] {
+  background-color: var(--dc-flat-cyan-wash);
+  box-shadow: inset 0 0 0 1px var(--dc-flat-cyan-line);
+}
+.course-player-shell [data-course-sheet-row][data-selected="true"],
+.course-player-shell [data-course-overlay-file][data-selected="true"] {
+  background-color: var(--dc-flat-violet-wash);
+  box-shadow:
+    inset 0 0 0 1px var(--dc-flat-violet-line),
+    0 0 18px -6px rgba(139, 92, 246, 0.55);
+}
+/* A locked row stays amber, the room's "this costs something" colour. */
+.course-player-shell [data-course-sheet-row][data-locked="true"] {
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.32);
+}
+
+/* Row ink: the room printed titles at white/94 and their second line at
+   white/45, in weights it never dropped below 700. */
+.course-player-shell [data-course-sheet-row] .truncate.text-xs,
+.course-player-shell [data-course-panel-row] .truncate.text-xs {
+  color: var(--dc-flat-ink-title);
+}
+
+/* Section labels — the desk's "MODULES" / "LESSONS IN THIS MODULE": tiny,
+   black-weight, wide-tracked, white/45. */
+.course-player-shell [data-course-panel-section-label] {
+  color: var(--dc-flat-ink-label);
+}
+
+/* ── 6b. A module and its own content, visibly connected ───────────────────
+   The one piece of the room's LOGIC the owner asked to keep: in the room's
+   chooser an expanded module drew its lessons as a SUBLIST — a dashed hairline
+   down the left, the parent lit CYAN and its content lit VIOLET
+   (`.dc-room-sheet-sublist` + the desk's two columns). Reading it, you always
+   knew which lesson belonged to which module.
+
+   The flat list is ONE flat column — a module row followed by its file rows —
+   and its markup is not being touched, so the connection is painted rather
+   than nested: a dashed rail in each file row's own left gutter (inside the
+   8px `px-2` the row already has, clear of its 44px icon plate), bridging the
+   list's 6px `space-y-1.5` gap so consecutive lessons read as one connected
+   run. Top to bottom: cyan module → dashed rail → violet content.
+
+   The rail is an absolutely positioned, non-interactive `::before` inside a
+   row that is already `position: relative`, so it cannot move a pixel of the
+   list, and the scroll-snap centres the dock fires on are untouched. */
+.course-player-shell [data-course-sheet-row][data-row-kind="file"]::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: -6px;
+  bottom: -6px;
+  border-left: 1px dashed rgba(255, 255, 255, 0.14);
+  pointer-events: none;
+}
+/* The rail stops at a module's LAST lesson — it must never run on into the
+   next module and claim its content. `:has()` is Chrome 105 / Safari 15.4,
+   above this app's floor, so on an older engine the rule is dropped and the
+   rail simply overshoots 6px into the gap below the last lesson. */
+.course-player-shell [data-course-sheet-row][data-row-kind="file"]:has(+ [data-row-kind="module"])::before,
+.course-player-shell [data-course-sheet-row][data-row-kind="file"]:last-child::before {
+  bottom: 0;
+}
+/* A module's content carries the mind-wall violet at a whisper, so the run of
+   lessons reads as belonging to the cyan module above it. The lesson that is
+   actually open takes the full violet wash + line, exactly as the playing
+   lesson did on the desk. */
+.course-player-shell [data-course-sheet-row][data-row-kind="file"] {
+  background-color: rgba(167, 139, 250, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.16);
+}
+@media (hover: hover) and (pointer: fine) {
+  .course-player-shell [data-course-sheet-row][data-row-kind="file"]:hover {
+    background-color: rgba(167, 139, 250, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.3);
+  }
+}
+
+/* ── 7. The footer dock: the room's control tray, as a SOLID plate ─────────
+   The room's tray was frosted glass floating over the canvas. The flat player
+   is not a room and the owner's direction for it is explicit — nothing here
+   floats: the dock is a SOLID deep-navy plate, the tray's hairline, the tray's
+   deep shadow, and no blur at all. The panel paints its material inline
+   (GlassDock), so `!important` is the only lever that reaches it; only the
+   paint changes. The magnification wave, the tooltips, the entrance spring,
+   the fluid sheen and every touch behaviour keep running untouched — and
+   because the plate is now opaque, the lens layer inside it has nothing left
+   to refract, so the frost reads as a faint sky→violet sheen (the room's own
+   accent pair) instead of as glass. */
+.course-player-shell [data-course-dock] [data-glass-dock] {
+  background: linear-gradient(180deg, #141b30 0%, #0a0e1c 100%) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    var(--dc-flat-shadow-tray) !important;
+}
+/* The dock's tooltips are the room's hint pill — solid, not frosted. */
+.course-player-shell [data-course-dock] [data-glass-dock-item] > div:first-child {
+  background: var(--dc-flat-board-head) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38) !important;
+}
+
+/* ── 8. Peek rails, grabber, ratio bubble: solid too ───────────────────────
+   The collapsed pane's 28px strip and the divider's two pills painted
+   themselves from `CHROME_GLASS` inline, so they too need `!important` to stop
+   being frosted glass. Same plate family as the dock, the tray's hairline, and
+   no blur. The grabber and the bubble keep their inline box-shadow, which is
+   where the ACTIVE TAB's accent glow lives — that is the room's own accent
+   logic and it stays. */
+.course-player-shell [data-course-peek-rail] {
+  background: linear-gradient(180deg, #141b30 0%, #0a0e1c 100%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13) !important;
+}
+.course-player-shell [data-course-split-grabber],
+.course-player-shell [data-course-split-ratio-bubble] {
+  background: linear-gradient(180deg, #16203a 0%, #0b1020 100%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ── 9. Notes: the notes wall ──────────────────────────────────────────────
+   Cards sit on the room's row plate with an amber hairline — the notes wall's
+   accent — and a card in focus takes the amber wash, which is how the room
+   said "this is the one you are writing in". The card's own GlassCard layers
+   stay on top; only the plate under them changes. */
+.course-player-shell [data-course-notes-grid] [data-course-note] {
+  background-color: var(--dc-flat-row);
+  box-shadow: inset 0 0 0 1px var(--dc-flat-row-line);
+  outline-color: var(--dc-flat-amber-line);
+}
+.course-player-shell [data-course-notes-grid] [data-course-note]:focus-within {
+  background-color: var(--dc-flat-amber-wash);
+  box-shadow:
+    inset 0 0 0 1px var(--dc-flat-amber-line),
+    0 0 24px -8px rgba(245, 158, 11, 0.6);
+  outline-color: var(--dc-flat-amber);
+}
+/* The writing surface itself is the board's near-black — the room's most
+   restful plate, and the reason long notes stopped fighting the scene. */
+.course-player-shell .course-rich-surface,
+.course-player-shell [data-course-note-heading] {
+  background-color: rgba(6, 9, 16, 0.92);
+  border-color: var(--dc-flat-line);
+  color: var(--dc-flat-ink-body);
+}
+.course-player-shell [data-course-rich-toolbar] {
+  background-color: var(--dc-flat-board-head);
+  border-color: var(--dc-flat-line);
+}
+.course-player-shell [data-course-rich-toolbar] button {
+  color: rgba(255, 255, 255, 0.72);
+}
+@media (hover: hover) and (pointer: fine) {
+  .course-player-shell [data-course-rich-toolbar] button:hover {
+    color: var(--dc-flat-ink);
+  }
+}
+
+/* ── 10. Mind map: the mind wall ───────────────────────────────────────────
+   The library overlay is the room's floating chooser, so it wears the
+   RoomSheet material: the two-stop navy gradient, the deep blur, the inset
+   hairline and the violet bloom behind it. The map cards keep their own
+   tinted pack material (their colours are semantic), and only the card that
+   is OPEN right now gets the violet ring the room used. */
+.course-player-shell [data-course-mindmap-library] {
+  background-color: rgba(8, 11, 22, 0.96);
+  background-image: var(--dc-flat-sheet);
+  backdrop-filter: var(--dc-flat-blur-sheet);
+  -webkit-backdrop-filter: var(--dc-flat-blur-sheet);
+  box-shadow:
+    var(--dc-flat-sheet-shadow),
+    0 0 60px -18px var(--dc-flat-violet-deep);
+}
+.course-player-shell [data-course-mindmap-map-card] {
+  box-shadow: inset 0 0 0 1px var(--dc-flat-row-line);
+}
+.course-player-shell [data-course-mindmap-map-card][data-active="true"] {
+  box-shadow:
+    inset 0 0 0 1px rgba(167, 139, 250, 0.6),
+    0 0 22px -6px rgba(139, 92, 246, 0.55);
+}
+/* The map's node/level readout is the room's white/45 sub-ink. (It is a bare
+   <span>, not a pill — nothing is painted behind it.) */
+.course-player-shell [data-course-mindmap-stats] {
+  color: var(--dc-flat-ink-sub);
+}
+
+/* ── 11. The Player tab's progress bar ─────────────────────────────────────
+   The desk printed course progress as a white/10 track with a cyan → violet
+   fill. The player's own bar is a component with its own paint, so only the
+   track tone is offered here; the fill keeps its shimmer. */
+.course-player-shell [data-course-progress-bar] {
+  color: var(--dc-flat-cyan-ink);
+}
+.course-player-shell [data-course-progress-label] {
+  color: #a5f3d0;
+}
+
+/* ── 12. The delete confirmation IS the floating chooser ───────────────────
+   The room's one modal was the RoomSheet: a navy gradient plate on a 26px
+   radius, a deep blur, a black drop shadow and a bloom in the accent of
+   whatever it was choosing, over a radial scrim that kept the room lit but
+   pushed back. This dialog is portaled to <body>, so it is addressed by its
+   own attribute rather than through the shell — it is only ever opened by the
+   course player. */
+[data-course-confirm-backdrop] {
+  background: var(--dc-flat-scrim);
+  backdrop-filter: blur(3px) saturate(120%);
+  -webkit-backdrop-filter: blur(3px) saturate(120%);
+}
+[data-course-confirm-card] {
+  background-color: rgba(8, 11, 22, 0.96);
+  background-image: linear-gradient(180deg, rgba(15, 19, 36, 0.94), rgba(8, 11, 22, 0.96));
+  box-shadow:
+    0 40px 90px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 0 60px -18px rgba(244, 63, 94, 0.55);
+}
+[data-course-confirm-title] {
+  color: var(--dc-flat-ink);
+}
+[data-course-confirm-message] {
+  color: rgba(255, 255, 255, 0.7);
+}
+[data-course-confirm-detail] {
+  background-color: var(--dc-flat-row);
+  box-shadow: inset 0 0 0 1px var(--dc-flat-row-line);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* ── 13. Viewer furniture ──────────────────────────────────────────────────
+   The board's plate under a media surface, and the HUD's pill material on the
+   zoom clusters that float over a document or an image. YouTube keeps its own
+   black, PDFs and Google's pages keep their own white — nothing here repaints
+   a third-party frame. */
+.course-player-shell [data-course-viewer-audio],
+.course-player-shell [data-course-image-viewer] {
+  background-color: var(--dc-flat-board);
+  background-image: radial-gradient(120% 70% at 50% 0%, rgba(56, 189, 248, 0.08) 0, transparent 62%);
+}
+/* The editor's zoom pill is a GlassSurface root, so it takes the board's
+   control-cluster glass under its own tint layers. */
+.course-player-shell [data-course-editor-zoom] {
+  background-color: rgba(9, 12, 24, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+/* The image viewer's zoom dock is the same GlassDock component as the footer
+   dock, so it wears the same SOLID plate — no frost, nothing floating. Its
+   percentage readout is a bare label and keeps its own ink. */
+.course-player-shell [data-course-image-viewer] [data-glass-dock] {
+  background: linear-gradient(180deg, #141b30 0%, #0a0e1c 100%) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    var(--dc-flat-shadow-tray) !important;
+}
+
+/* ── 14. Scrollbars — thin and dark, part of the furniture ─────────────────
+   The room's panels scrolled on an 8px thumb at white/18. Same here, plus the
+   standard properties so Firefox paints the same thin dark bar. */
+.course-player-shell {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+.course-player-shell ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.course-player-shell ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.course-player-shell ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 99px;
+}
+
+/* ── 15. The light theme: the same room, lights up ─────────────────────────
+   The player's theme switch flips `data-course-theme` and syncs `html.light`,
+   so vendored surfaces inside (Google's pages, React Flow) go light. Ink in
+   this player is white in BOTH themes — that is src/index.css's contract and
+   it is not touched — so the "light" room is a DAYLIT room: the same navy
+   family lifted a step, brighter hairlines and brighter rows, never a white
+   plate that would swallow white ink. */
+.course-player-shell[data-course-theme="light"] {
+  --dc-flat-board: #0f1729;
+  --dc-flat-board-head: #1a2438;
+  --dc-flat-wall-head: #182238;
+  --dc-flat-desk-top: #1c2740;
+  --dc-flat-desk-bottom: #121a2c;
+  --dc-flat-box: rgba(255, 255, 255, 0.07);
+
+  --dc-flat-glass: rgba(24, 33, 56, 0.66);
+  --dc-flat-glass-deep: rgba(20, 28, 48, 0.7);
+
+  --dc-flat-line: rgba(255, 255, 255, 0.22);
+  --dc-flat-line-soft: rgba(255, 255, 255, 0.16);
+  --dc-flat-line-strong: rgba(255, 255, 255, 0.28);
+
+  --dc-flat-ink-sub: rgba(255, 255, 255, 0.58);
+  --dc-flat-ink-label: rgba(255, 255, 255, 0.58);
+
+  --dc-flat-row: rgba(255, 255, 255, 0.1);
+  --dc-flat-row-hover: rgba(255, 255, 255, 0.16);
+  --dc-flat-row-line: rgba(255, 255, 255, 0.18);
+  --dc-flat-row-line-hover: rgba(255, 255, 255, 0.3);
+
+  --course-surface: var(--dc-flat-glass);
+  --course-surface-translucent: var(--dc-flat-glass);
+  --course-panel: var(--dc-flat-glass);
+  --course-muted: rgba(255, 255, 255, 0.76);
+  --course-border: var(--dc-flat-line);
+  --course-soft: var(--dc-flat-row);
+  --course-soft-hover: var(--dc-flat-row-hover);
+  --course-strong: rgba(255, 255, 255, 0.34);
+  --course-loading: rgba(15, 23, 41, 0.6);
+  --dc-chrome-glass: var(--dc-flat-glass);
+
+  background-color: #0b1220;
+  background-image:
+    radial-gradient(circle at 18% -10%, rgba(56, 189, 248, 0.22) 0, transparent 54%),
+    radial-gradient(circle at 84% -6%, rgba(139, 92, 246, 0.2) 0, transparent 52%),
+    linear-gradient(to bottom, #1b2740 0%, #131c30 48%, #0b1220 100%);
+}
+
+/* The daylit board and desk keep their own plate under the brighter room. */
+.course-player-shell[data-course-theme="light"] [data-course-lesson-pane] {
+  background-image:
+    radial-gradient(120% 60% at 50% -8%, rgba(56, 189, 248, 0.14) 0, transparent 60%),
+    linear-gradient(180deg, #16203a 0%, var(--dc-flat-board) 34%);
+}
+.course-player-shell[data-course-theme="light"] [data-course-study-pane][data-solid-panel="true"] {
+  background-color: rgba(11, 17, 31, 0.94);
+  background-image: linear-gradient(180deg, rgba(24, 34, 56, 0.94) 0%, rgba(11, 17, 31, 0.96) 100%);
+}
+.course-player-shell[data-course-theme="light"] .course-rich-surface,
+.course-player-shell[data-course-theme="light"] [data-course-note-heading] {
+  background-color: rgba(11, 17, 31, 0.9);
+  color: var(--dc-flat-ink-body);
+}
+.course-player-shell[data-course-theme="light"] [data-course-mindmap-library] {
+  background-color: rgba(15, 22, 38, 0.96);
+  background-image: linear-gradient(180deg, rgba(28, 39, 64, 0.94), rgba(15, 22, 38, 0.96));
+}
+
+/* ── 16. Restraint ─────────────────────────────────────────────────────────
+   The room shed its most expensive paint while the camera moved. The flat
+   player has no camera, so nothing is stripped here — but nothing is added
+   either: no new animation, no new blur beyond the two the room already used,
+   and the blurs stay STATIC (they are tokens, never animated), which is the
+   discipline src/course/studyPanels.tsx already keeps. A learner who asks for
+   reduced motion gets the same paint with no motion, because this file never
+   introduces any. */
+@media (prefers-reduced-motion: reduce) {
+  .course-player-shell [data-course-sheet-row],
+  .course-player-shell [data-course-panel-row] {
+    transition: none;
+  }
+}

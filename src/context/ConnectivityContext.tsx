@@ -40,8 +40,7 @@ type ConnectivityContextValue = {
   retry: () => void;
 };
 
-// Exported for src/classroom3d/SurfaceContexts.tsx (see AuthContext).
-export const ConnectivityContext = createContext<ConnectivityContextValue | null>(null);
+const ConnectivityContext = createContext<ConnectivityContextValue | null>(null);
 
 /** Flag must stay down this long before the gate shows (transient-dip filter). */
 const GRACE_MS = 8000;

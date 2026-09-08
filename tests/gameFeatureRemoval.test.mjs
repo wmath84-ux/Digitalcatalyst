@@ -34,10 +34,16 @@ test('both old and downloaded game implementations and their build hook are dele
   assert.doesNotMatch(read('.gitignore'), /game-world|threejs-world/);
 });
 
-test('shared 3D dependencies and the classroom are retained', () => {
+// This test used to pin the 3D vendor stack + src/classroom3d as "shared, do
+// not delete" while the game was being removed. The 3D Classroom has since been
+// removed as a feature of its own (owner, 2026-09-08), so nothing in the app
+// pulls `three` any more — see tests/classroom3dRemovalContract.test.mjs for
+// the full removal contract.
+test('no 3D vendor stack is left behind by either removal', () => {
   const pkg = JSON.parse(read('package.json'));
-  for (const dependency of ['three', '@react-three/fiber', '@react-three/drei']) {
-    assert.ok(pkg.dependencies[dependency], dependency);
+  for (const dependency of ['three', '@react-three/fiber', '@react-three/drei', '@types/three']) {
+    assert.equal(pkg.dependencies[dependency], undefined, dependency);
+    assert.equal(pkg.devDependencies[dependency], undefined, dependency);
   }
-  assert.ok(fs.existsSync(new URL('../src/classroom3d/Classroom3D.tsx', import.meta.url)));
+  assert.equal(fs.existsSync(new URL('../src/classroom3d', import.meta.url)), false);
 });

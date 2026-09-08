@@ -7,13 +7,11 @@ import ResourceViewer, { type CourseFileActions } from "./course/ResourceViewer"
 import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, type DockTab } from "./course/CourseOverlay";
 import { SplitDeck, type SplitDeckHandle } from "./course/studyPanels";
 import SnowOverlay from "./course/SnowOverlay";
-import Classroom3D from "./classroom3d/Classroom3D";
 import MindMapPanel from "./course/MindMapPanel";
-import NotesPanel from "./course/NotesPanel";
 import PlayerPanel from "./course/PlayerPanel";
 import useCourseMindMap from "./course/useCourseMindMap";
 import { combineHtml, loadLocalNotes, persistLocalNotes } from "./course/notesStore";
-import { getCoursePanelSession, resetCoursePanelSession, setMindMapSessionView, setNotesSessionView } from "./course/coursePanelSession";
+import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, CoursePlayerNote, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
@@ -250,22 +248,6 @@ const loadCourseSnow = (): boolean => {
 // The choice is remembered across lessons and visits. A first-time visitor
 // on a phone that IS in desktop-site mode starts in the readable mobile
 // rendering, because that is the whole point of the control.
-// ── 3D Classroom mode ──────────────────────────────────────────────────────
-// The player has TWO shells over one brain. Flat mode is the Split Deck; room
-// mode is src/classroom3d — a winter classroom the learner sits in, with the
-// lesson on the board straight ahead, the notes wall to the left, the mind map
-// wall further left and the control console on the desk. Both shells render
-// the SAME viewer stack, the SAME NotesPanel and the SAME MindMapPanel, so no
-// course capability exists in one and not the other. The choice is remembered.
-const classroomModeStorageKey = "dc.coursePlayerClassroom3d";
-const loadClassroomMode = (): boolean => {
-  try {
-    return localStorage.getItem(classroomModeStorageKey) === "on";
-  } catch {
-    return false;
-  }
-};
-
 const desktopViewStorageKey = "dc.coursePlayerDesktopView";
 const loadDesktopViewPreference = (): boolean => {
   try {
@@ -359,17 +341,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Slides deck rendered at desktop width is unreadable on a phone, so the
   // learner can flip the same embed to its mobile rendering.
   const [desktopView, setDesktopView] = useState<boolean>(loadDesktopViewPreference);
-  // Room mode — the 3D classroom shell (see `classroomModeStorageKey`).
-  const [classroom3d, setClassroom3d] = useState<boolean>(loadClassroomMode);
-  // Monotonic counter the room's "+ New note" button bumps; NotesPanel opens
-  // its composer on every increment, exactly as the flat header's + does.
-  const [roomComposerSignal, setRoomComposerSignal] = useState(0);
-  // Same idea for the room's floating NOTE LIBRARY: it is a chooser, so it
-  // reports "open this one" and the NotesPanel ON THE WALL does the editing.
-  const [roomNoteRequest, setRoomNoteRequest] = useState<{ id: string; signal: number }>({
-    id: "",
-    signal: 0,
-  });
   // Android-only capability: iOS can never hide its status bar and desktop
   // browsers don't need to. Gates the "Hide status bar" player toggle.
   const canFullscreen = useMemo(() => isMobileDevice() && !isIOSDevice(), []);
@@ -755,52 +726,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     persistLocalNotes(user.id, product.id, next);
   };
 
-  const returnStudySurfacesToLibrary = useCallback((room = false) => {
-    // Entering the 3D room should always start Notes and Mind map at their
-    // library/list home screens. If the learner had a note editor open in the
-    // flat pane, save that draft first so switching shells never throws work
-    // away, then reset only the UI view.
-    const sessionNotes = getCoursePanelSession().notes;
-    if (user?.id && sessionNotes.view !== "list") {
-      const safeHtml = sanitizeRichText(combineHtml(sessionNotes.title, sessionNotes.draft));
-      if (!isEmptyRichText(safeHtml)) {
-        const plain = richTextToPlain(safeHtml);
-        if (sessionNotes.view === "compose") {
-          const next: CoursePlayerNote[] = [
-            {
-              id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              text: plain,
-              html: safeHtml,
-              createdAt: Date.now(),
-            },
-            ...notes,
-          ];
-          setNotes(next);
-          persistLocalNotes(user.id, product.id, next);
-        } else {
-          const next = notes.map((note) =>
-            note.id === sessionNotes.noteId
-              ? { ...note, text: plain, html: safeHtml, updatedAt: Date.now() }
-              : note,
-          );
-          setNotes(next);
-          persistLocalNotes(user.id, product.id, next);
-        }
-      }
-    }
-    setNotesSessionView({ view: "list" });
-    // The FLAT player's mind map tab starts on its library (a grid of this
-    // module's maps) because that tab has to double as the map chooser. The
-    // 3D room does not: it has a dedicated MIND BOARD on the front wall and
-    // its own Maps key in the control tray, so a library overlay covering the
-    // canvas there just hides the thing the wall exists to show — the learner
-    // taps the wall, nothing seems to happen, and the map reads as "save nahi
-    // ho raha". Entering the room therefore opens straight onto the canvas.
-    setMindMapSessionView(room ? "canvas" : "library");
-    // `room` is a call-time argument, not a captured value, so it is not a
-    // dependency of this callback.
-  }, [notes, product.id, user]);
-
   const selectFile = (file: CourseFile) => {
     // Switching modules must PAUSE the outgoing lesson rather than let it keep
     // playing in the background. `ResourceViewer` does that itself the moment
@@ -901,15 +826,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const selectedEmbedKind = selectedFile ? getCourseEmbed(selectedFile).kind : "none";
   const showViewportToggle = VIEWPORT_AWARE_KINDS.includes(selectedEmbedKind);
 
-  // Room mode is remembered per device, like the theme and snow toggles.
-  useEffect(() => {
-    try {
-      localStorage.setItem(classroomModeStorageKey, classroom3d ? "on" : "off");
-    } catch {
-      /* private mode — the toggle simply won't persist */
-    }
-  }, [classroom3d]);
-
   // Leaving the Mind map tab flushes any pending debounced write immediately,
   // so a branch added a moment before switching away is never left unsaved.
   // Guarded by the previous tab: flushing on mount (the player opens on
@@ -987,14 +903,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       showViewportToggle={showViewportToggle}
       desktopView={desktopView}
       onDesktopViewChange={setDesktopView}
-      classroom3d={classroom3d}
-      onClassroom3dChange={(next) => {
-        if (next) {
-          mindMap.flush();
-          returnStudySurfacesToLibrary(true);
-        }
-        setClassroom3d(next);
-      }}
       canFullscreen={canFullscreen}
       courseFullscreen={courseFullscreen}
       onHideStatusBarChange={(next) => {
@@ -1074,97 +982,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // The active tab drives the divider's colour, its glow and the study peek
   // rail's icon — the deck never keeps its own copy of the tab list.
   const activeStudyTab = dockTabRecord(dockTab);
-
-  // The two lists the room's floating libraries show. Titles come from the
-  // same rich-text helpers the flat panels use, so a note reads identically
-  // in the chooser and on the wall.
-  const roomNoteItems = notes.map((note) => {
-    const plain = richTextToPlain(note.html || "") || note.text || "";
-    const [firstLine, ...rest] = plain.split("\n").filter(Boolean);
-    return {
-      id: note.id,
-      title: (firstLine || "Untitled note").slice(0, 90),
-      preview: (rest.join(" ") || plain).slice(0, 120),
-    };
-  });
-  const roomMapItems = mindMap.maps.map((map) => ({
-    mapKey: map.mapKey,
-    title: map.title || map.rootTopic || "Untitled map",
-    nodeCount: map.nodeCount,
-  }));
-
-  // ── Room mode: the same brain, a 3D classroom instead of the Split Deck ──
-  // Everything below is a REFERENCE to the panels the flat shell already
-  // built: `viewerStack` goes on the board, the player's own NotesPanel goes
-  // on the notes wall and the player's own MindMapPanel goes on the mind map
-  // wall. Nothing is re-implemented, so Firestore progress, resume playback,
-  // paid modules and rich-text notes behave identically in both shells.
-  if (classroom3d) {
-    return (
-      <Classroom3D
-        modules={modules}
-        courseTitle={product.title}
-        selectedFileId={selectedFile?.id ?? null}
-        onSelectFile={selectFile}
-        accessibleModuleIds={resolution.accessibleModuleIds}
-        onBuyModule={(module) => handleBuyModule(module)}
-        board={viewerStack}
-        notes={(
-          <NotesPanel
-            notes={notes}
-            onAdd={(html) => saveNote(html)}
-            onEdit={(id, html) => editNote(id, html)}
-            onDelete={(id) => deleteNote(id)}
-            composerOpenSignal={roomComposerSignal}
-            openNoteSignal={roomNoteRequest.signal}
-            openNoteId={roomNoteRequest.id}
-          />
-        )}
-        mind={(
-          <MindMapPanel
-            mind={mindMap.mind}
-            onMindChange={mindMap.setMind}
-            status={mindMap.status}
-            errorMessage={mindMap.errorMessage}
-            onFlush={mindMap.flush}
-            maps={mindMap.maps}
-            activeMapKey={mindMap.activeMapKey}
-            onSelectMap={mindMap.selectMap}
-            onCreateMap={mindMap.createMap}
-            onRenameMap={mindMap.renameMap}
-            onDeleteMap={mindMap.deleteMap}
-            mapsLoading={mindMap.mapsLoading}
-            atMapLimit={mindMap.atMapLimit}
-            playerTheme="dark"
-            open
-          />
-        )}
-        progress={progress}
-        isDone={isDone}
-        canMarkComplete={Boolean(selectedFile)}
-        onToggleComplete={() => void toggleComplete()}
-        noteCount={notes.length}
-        mapCount={mindMap.maps.length}
-        onComposeNote={() => setRoomComposerSignal((value) => value + 1)}
-        // ── The room's floating libraries ─────────────────────────────────
-        // Lists only. Every pick turns the learner's head to the wall that
-        // owns the content and asks the player's own panel — the very same
-        // instance the flat player uses — to show it.
-        noteItems={roomNoteItems}
-        onOpenNote={(id) => setRoomNoteRequest((current) => ({ id, signal: current.signal + 1 }))}
-        mapItems={roomMapItems}
-        activeMapKey={mindMap.activeMapKey}
-        onSelectMap={(mapKey) => mindMap.selectMap(mapKey)}
-        onCreateMap={() => mindMap.createMap()}
-        onExit={() => {
-          // Leaving the room must not lose a pending mind map write.
-          mindMap.flush();
-          setClassroom3d(false);
-        }}
-        exitLabel="Flat player"
-      />
-    );
-  }
 
   // ── ONE shell for both orientations — content + footer navigation only ──
   // There is NO header anywhere in the player (owner's direction): portrait
