@@ -18,7 +18,13 @@
     /* Path mapping */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@strata-core-dist/*": ["node_modules/@strata-game-library/core/dist/*"],
+      "strata-game-library/core": ["src/strata-shim/core.ts"],
+      "strata-game-library/presets": ["src/strata-shim/presets.ts"],
+      "strata-game-library/compose": ["src/strata-shim/compose.ts"],
+      "strata-game-library/r3f": ["src/strata-shim/r3f.ts"],
+      "strata-game-library": ["src/strata-shim/index.ts"]
     },
 
     /* Linting */
@@ -27,5 +33,13 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "utils", "vite.config.ts"]
+  "include": ["src", "utils", "vite.config.ts"],
+  /* `src/strata-examples/` is vendored VERBATIM from jbcom/strata-game-library
+     so the scenes run exactly as upstream ships them. Those files are written
+     against the library's git HEAD, which is ahead of the published npm
+     packages in a few signatures (e.g. `fbm` gained a 5th argument, `BiomeData`
+     changed shape). They run correctly — the code paths the examples use are
+     all present — but they will not typecheck against the installed versions,
+     and editing them would defeat the point of vendoring them as-is. */
+  "exclude": ["src/strata-examples/*/"]
 }

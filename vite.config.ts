@@ -7,6 +7,8 @@ import react from "@vitejs/plugin-react";
 import browserslist from "browserslist";
 import { defineConfig } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
+// @ts-expect-error -- plain .mjs build helper, no type declarations
+import strataResolve from "./scripts/vite-plugin-strata-resolve.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -90,6 +92,9 @@ const cssTarget = resolveCssTarget();
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    /* Repairs the extensionless directory imports the published
+       @strata-game-library/* packages ship (see the plugin for details). */
+    strataResolve(),
     react(),
     tailwindcss(),
     viteSingleFile(),
@@ -155,6 +160,22 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      /* STRATA GAME LIBRARY — umbrella-package aliases.
+         The upstream examples in `src/strata-examples/` are vendored verbatim
+         from jbcom/strata-game-library, so they import from
+         `strata-game-library/...`. That umbrella package re-exports the scoped
+         `@strata-game-library/*` packages but is never published to npm, so
+         these aliases stand in for it (see src/strata-shim/core.ts).
+         Order matters: the subpath entries must precede the bare one. */
+      /* The core package's `exports` map hides its dist folder, and its root
+         barrel uses invalid extensionless directory specifiers, so the shim
+         reaches the real submodule barrels through this alias. */
+      "@strata-core-dist": path.resolve(__dirname, "node_modules/@strata-game-library/core/dist"),
+      "strata-game-library/core": path.resolve(__dirname, "src/strata-shim/core.ts"),
+      "strata-game-library/presets": path.resolve(__dirname, "src/strata-shim/presets.ts"),
+      "strata-game-library/compose": path.resolve(__dirname, "src/strata-shim/compose.ts"),
+      "strata-game-library/r3f": path.resolve(__dirname, "src/strata-shim/r3f.ts"),
+      "strata-game-library": path.resolve(__dirname, "src/strata-shim/index.ts"),
     },
   },
   build: {
