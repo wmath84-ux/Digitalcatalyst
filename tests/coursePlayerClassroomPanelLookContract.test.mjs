@@ -206,10 +206,9 @@ test("the player's own palette is re-pointed at the room's, by name", () => {
   // The site-wide chrome glass, re-scoped to the player only.
   assert.match(css, /--dc-chrome-glass: var\(--dc-flat-glass\);/);
   assert.match(css, /--dc-chrome-glass-blur: var\(--dc-flat-blur\);/);
-  // A light theme that is a DAYLIT room — white ink is the player's contract
-  // in both themes, so the plate lifts a step and never goes white.
-  assert.match(css, /\.course-player-shell\[data-course-theme="light"\] \{/);
-  assert.match(css, /\.course-player-shell\[data-course-theme="light"\] \{[^}]*--dc-flat-desk-top: #1c2740;/s);
+  // The daylit ("light") room is gone: the player is dark only, so nothing
+  // may re-scope the flat tokens under a theme attribute.
+  assert.doesNotMatch(css, /data-course-theme="light"/);
 });
 
 /* ── 3. Paint only: the flat player cannot move ─────────────────────────── */
@@ -374,7 +373,7 @@ test("the app-wide glass token keeps its published material", () => {
   // tests/storeChromeDockDragScrollContract.test.mjs.)
   assert.match(indexCss, /--dc-chrome-glass: rgba\(60, 62, 68, 0\.105\)/);
   assert.match(indexCss, /\.course-player-shell \{[^}]*--course-bg/s, "the player's own palette block survives in index.css");
-  assert.match(indexCss, /\.course-player-shell\[data-course-theme="light"\]/);
+  assert.doesNotMatch(indexCss, /data-course-theme="light"/, "the light palette is gone");
 });
 
 /* ── 5. Every selector really exists in the flat player ─────────────────── */

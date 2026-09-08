@@ -151,8 +151,9 @@ test("the Player tab no longer offers a 3D Classroom switch", () => {
   const panel = read("src/course/PlayerPanel.tsx");
   assert.doesNotMatch(panel, /classroom/i);
   assert.doesNotMatch(panel, /onClassroom3dChange/);
-  // The preferences that ARE the flat player's survive, in order.
-  assert.match(panel, /settingsRow\("Light theme"/);
+  // The preferences that ARE the flat player's survive, in order. The
+  // "Light theme" row is gone with the app-wide light theme.
+  assert.doesNotMatch(panel, /settingsRow\("Light theme"/);
   assert.match(panel, /settingsRow\("Snowfall"/);
   assert.match(panel, /settingsRow\("Desktop view"/);
   assert.match(panel, /settingsRow\("Hide status bar"/);

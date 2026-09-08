@@ -9,20 +9,21 @@ const resourceViewer = fs.readFileSync("src/course/ResourceViewer.tsx", "utf8");
 const courseEmbed = fs.readFileSync("src/utils/courseEmbed.ts", "utf8");
 const styles = fs.readFileSync("src/index.css", "utf8");
 
-test("The Player tab exposes a persisted light/dark theme toggle", () => {
-  // The toggle is the FIRST "Light theme" Glass Switch row of the Player
-  // tab's settings section (the old header quick-button is long gone, and
-  // the header itself is gone too — owner's direction).
-  assert.match(playerPanel, /settingsRow\("Light theme", theme === "light", \(next\) => onThemeChange\(next \? "light" : "dark"\), "theme"\)/);
-  assert.match(playerPanel, /data-course-theme=\{theme\}/);
-  assert.match(coursePlayer, /onThemeChange=\{\(next\) => setTheme\(next\)\}/);
-  assert.match(coursePlayer, /dc\.coursePlayerTheme/);
-  assert.match(coursePlayer, /localStorage\.setItem\(courseThemeStorageKey, theme\)/);
+test("The Player tab has no theme toggle — the app is dark only", () => {
+  // The "Light theme" Glass Switch row is gone, along with the state, the
+  // storage key and the `data-course-theme` hook that carried it.
+  assert.doesNotMatch(playerPanel, /Light theme/);
+  assert.doesNotMatch(playerPanel, /data-course-theme/);
+  assert.doesNotMatch(coursePlayer, /onThemeChange/);
+  assert.doesNotMatch(coursePlayer, /dc\.coursePlayerTheme/);
+  assert.doesNotMatch(coursePlayer, /courseThemeStorageKey/);
+  // The player still pins the native controls to the dark rendering.
+  assert.match(coursePlayer, /const browserColorScheme = "dark" as const;/);
 });
 
-test("Course Player theme is scoped and supplies both palette variants", () => {
+test("Course Player palette is scoped and dark only", () => {
   assert.match(styles, /\.course-player-shell\s*\{/);
-  assert.match(styles, /\.course-player-shell\[data-course-theme="light"\]/);
+  assert.doesNotMatch(styles, /data-course-theme="light"/);
   for (const variable of ["--course-bg", "--course-surface", "--course-panel", "--course-text", "--course-muted", "--course-border"]) {
     assert.match(styles, new RegExp(variable), `missing ${variable}`);
   }

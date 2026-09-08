@@ -152,6 +152,10 @@ export default function StickerWall({
     let alive = true
     let rafId = 0
     let ro: ResizeObserver | null = null
+    // True only between a pointer-down that landed ON a sticker and the
+    // matching up — i.e. exactly the window in which the wall may claim the
+    // gesture and stop the page from scrolling.
+    const dragRef = { current: false }
 
     const boot = async () => {
       const Matter = await import('matter-js')
@@ -222,6 +226,96 @@ export default function StickerWall({
         constraint: { stiffness: 0.2, damping: 0.1, render: { visible: false } },
       })
       Matter.Composite.add(world, mouseConstraint)
+
+      /* ── Scroll ownership ──────────────────────────────────────────────
+         Out of the box matter.js owns EVERY gesture that lands on the canvas,
+         which is why the card ate the page scroll:
+
+           · `Mouse.create` binds `wheel` non-passively and calls
+             `preventDefault()` inside it unconditionally — a trackpad /
+             mouse-wheel flick over the wall went nowhere;
+           · its `touchmove` handler calls `preventDefault()` on every touch,
+             and `touchstart` does the same, so a finger that started on empty
+             wall could never pan the page either.
+
+         The wall must keep only the gestures it actually serves: a finger (or
+         a pointer) that lands ON a sticker drags that sticker, and every other
+         gesture belongs to the page. So matter's four source handlers are
+         rebound here — same functions, but `preventDefault` is silenced
+         whenever the gesture did not start on a body. */
+      const rawHandlers = {
+        down: mouse.mousedown as (event: Event) => void,
+        move: mouse.mousemove as (event: Event) => void,
+        up: mouse.mouseup as (event: Event) => void,
+        wheel: mouse.mousewheel as (event: Event) => void,
+      }
+      canvas.removeEventListener('mousedown', rawHandlers.down)
+      canvas.removeEventListener('mousemove', rawHandlers.move)
+      canvas.removeEventListener('mouseup', rawHandlers.up)
+      canvas.removeEventListener('wheel', rawHandlers.wheel)
+      canvas.removeEventListener('touchstart', rawHandlers.down)
+      canvas.removeEventListener('touchmove', rawHandlers.move)
+      canvas.removeEventListener('touchend', rawHandlers.up)
+
+      /** A touch that did not begin on a sticker is the PAGE's gesture: let
+       *  matter track the pointer, but hide `preventDefault` so the browser's
+       *  compositor still pans. */
+      const withoutPreventDefault = (event: Event, handler: (event: Event) => void) => {
+        event.preventDefault = () => {}
+        try {
+          handler(event)
+        } finally {
+          delete (event as { preventDefault?: unknown }).preventDefault
+        }
+      }
+
+      const pointFromEvent = (event: Event) => {
+        const rect = canvas.getBoundingClientRect()
+        const touch = (event as TouchEvent).changedTouches?.[0]
+        const source = (touch ?? event) as Touch | MouseEvent
+        // World coordinates are CSS pixels from the canvas corner — the DPR
+        // lives in the context transform, not in the world.
+        return { x: source.clientX - rect.left, y: source.clientY - rect.top }
+      }
+
+      const hitSticker = (event: Event) => {
+        const bodies = Matter.Composite.allBodies(world).filter((body) => !body.isStatic)
+        return Matter.Query.point(bodies, pointFromEvent(event)).length > 0
+      }
+
+      mouse.mousedown = (event: Event) => {
+        // Decided BEFORE matter runs: it sets `mouse.button` here, and the
+        // touchstart `preventDefault` (kept only on a hit) is what tells the
+        // browser this touch sequence is ours, not a scroll.
+        if ((event as TouchEvent).changedTouches) dragRef.current = hitSticker(event)
+        if (dragRef.current || !(event as TouchEvent).changedTouches) rawHandlers.down(event)
+        else withoutPreventDefault(event, rawHandlers.down)
+      }
+      mouse.mousemove = (event: Event) => {
+        if (dragRef.current || !(event as TouchEvent).changedTouches) rawHandlers.move(event)
+        else withoutPreventDefault(event, rawHandlers.move)
+      }
+      mouse.mouseup = (event: Event) => {
+        const touch = Boolean((event as TouchEvent).changedTouches)
+        if (dragRef.current || !touch) rawHandlers.up(event)
+        else withoutPreventDefault(event, rawHandlers.up)
+        dragRef.current = false
+      }
+      // The wheel is never the wall's: the page owns every wheel tick.
+      mouse.mousewheel = (event: Event) => withoutPreventDefault(event, rawHandlers.wheel)
+
+      canvas.addEventListener('mousemove', mouse.mousemove, { passive: true })
+      canvas.addEventListener('mousedown', mouse.mousedown, { passive: true })
+      canvas.addEventListener('mouseup', mouse.mouseup, { passive: true })
+      canvas.addEventListener('wheel', mouse.mousewheel, { passive: true })
+      canvas.addEventListener('touchmove', mouse.mousemove, { passive: false })
+      canvas.addEventListener('touchstart', mouse.mousedown, { passive: false })
+      canvas.addEventListener('touchend', mouse.mouseup, { passive: false })
+      const releaseDrag = () => {
+        dragRef.current = false
+      }
+      canvas.addEventListener('touchcancel', releaseDrag)
+      canvas.addEventListener('pointercancel', releaseDrag)
 
       const bodyOpts = {
         restitution: RESTITUTION,
@@ -426,7 +520,10 @@ export default function StickerWall({
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="relative h-full w-full overflow-hidden"
-        style={{ touchAction: 'none' }}
+        // `pan-y`, not `none`: a finger on empty wall scrolls the page. A
+        // finger that lands on a sticker cancels its own touchstart in JS,
+        // which is what stops the pan for THAT gesture only.
+        style={{ touchAction: 'pan-y' }}
       >
         <style>{`
           .sticker-wall-pill {

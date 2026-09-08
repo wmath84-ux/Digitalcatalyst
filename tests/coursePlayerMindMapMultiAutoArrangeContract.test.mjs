@@ -395,5 +395,6 @@ test("a map card keeps a floor of height and a real surface, never a flat grey t
   assert.match(styles, /\[data-course-mindmap-map-card\]\s*\{[^}]*background:/);
   assert.match(styles, /\[data-course-mindmap-map-card\]\s*\{[^}]*box-shadow:/);
   assert.match(styles, /\[data-course-mindmap-map-card\]\[data-active="true"\]/);
-  assert.match(styles, /\[data-mindmap-theme="light"\] \[data-course-mindmap-map-card\]/);
+  // Dark only: the card has one palette, so no light-theme override exists.
+  assert.doesNotMatch(styles, /data-mindmap-theme="light"/);
 });

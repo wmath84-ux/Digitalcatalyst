@@ -31,7 +31,7 @@
 // inside it are released from their phone clipping (search for
 // "TABLET / DESKTOP SCROLL MODEL" in `src/index.css`).
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import useScreenSize from "@/hooks/useScreenSize";
 import {
   Bell,
@@ -62,7 +62,12 @@ import { DEFAULT_LOGO_URL } from "@/utils/branding";
 import { cn } from "../utils/cn";
 import { TopBarTabsProvider, type TopBarTabsConfig } from "./TopBarTabsContext";
 import ExpandingTabs from "./ui/ExpandingTabs";
-import GlassSidebar, { type GlassSidebarItem } from "./glass-dock/GlassSidebar";
+import GlassSidebar, {
+  COLLAPSED_WIDTH as GLASS_RAIL_COLLAPSED_WIDTH,
+  EXPANDED_WIDTH as GLASS_RAIL_EXPANDED_WIDTH,
+  readStoredOpen as readStoredRailOpen,
+  type GlassSidebarItem,
+} from "./glass-dock/GlassSidebar";
 // Wave 2 (global chrome) — the website-glass pack. `glass-tooltip` and
 // `glass-input` are vendored registry items; `GlassSurface` is the shared
 // refraction layer and `LiquidMetalButton` our wrapper around `glass-button`.
@@ -170,6 +175,10 @@ const RAIL_COLORS: Record<DesktopRailKey, string> = {
   profile: "#FF7B54",
   settings: "#9AA5B1",
 };
+
+/** Left gutter of the glass-rail column (`pl-3`) — part of the width the
+ *  page column is pushed by, so it belongs in `--desktop-rail-width`. */
+const GLASS_RAIL_GUTTER = 12;
 
 /**
  * The SMALLEST band that still gets the desktop side panel (tablet /
@@ -377,8 +386,11 @@ export default function DesktopShell({
   const customLogo = logoUrl && logoUrl !== DEFAULT_LOGO_URL;
 
   // Smallest side-panel band → AI Canvas Glass Sidebar instead of the wide rail.
+  // The rail boots EXPANDED (the reference component's collapsed default read
+  // as "the sidebar never opens"); GlassSidebar persists whatever the learner
+  // chooses, so a deliberate collapse still survives the next visit.
   const compactRail = useCompactRail();
-  const [compactRailOpen, setCompactRailOpen] = useState(false);
+  const [compactRailOpen, setCompactRailOpen] = useState<boolean>(() => readStoredRailOpen());
   const sidebarItems: GlassSidebarItem[] = railEntries.map((entry) => ({
     id: entry.hash,
     label: entry.label,
@@ -388,8 +400,29 @@ export default function DesktopShell({
     badge: entry.badge,
   }));
 
+  // The compact rail's column REFLOWS — GlassSidebar springs its own slot
+  // between 64 px and 220 px instead of painting over the page — so the
+  // surfaces positioned against `--desktop-rail-width` (FlowPath's bottom
+  // dock, the desktop peek dock) have to follow it. The glass column also
+  // carries `pl-3`, which is part of the width the page is pushed by.
+  const shellRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return undefined;
+    if (!compactRail) {
+      shell.style.removeProperty("--desktop-rail-width");
+      return undefined;
+    }
+    shell.style.setProperty(
+      "--desktop-rail-width",
+      `${(compactRailOpen ? GLASS_RAIL_EXPANDED_WIDTH : GLASS_RAIL_COLLAPSED_WIDTH) + GLASS_RAIL_GUTTER}px`,
+    );
+    return undefined;
+  }, [compactRail, compactRailOpen]);
+
   return (
     <div
+      ref={shellRef}
       className="dc-desktop-shell flex min-h-[100dvh] w-full text-white"
       data-desktop-shell
       data-tablet-responsive

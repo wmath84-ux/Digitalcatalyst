@@ -29,14 +29,15 @@ const mindMapPanel = fs.readFileSync("src/course/MindMapPanel.tsx", "utf8");
 const coursePlayer = fs.readFileSync("src/CoursePlayerApp.tsx", "utf8");
 const overlay = fs.readFileSync("src/course/CourseOverlay.tsx", "utf8");
 
-test("the panel session stores notes view, mind map view and the map theme pick", () => {
+test("the panel session stores the notes view and the mind map view", () => {
   assert.match(session, /notes: NotesPanelSessionView/);
   assert.match(session, /mindMapView: MindMapPanelSessionView/);
-  assert.match(session, /mindMapThemeOverride: MindMapThemeChoice/);
-  // Defaults = the entry state: notes list, map library, no theme override.
+  // The map theme pick left with the app-wide light theme — the session holds
+  // two views now, nothing else.
+  assert.doesNotMatch(session, /mindMapThemeOverride/);
+  // Defaults = the entry state: notes list and map library.
   assert.match(session, /notes: \{ view: "list" \}/);
   assert.match(session, /mindMapView: "library"/);
-  assert.match(session, /mindMapThemeOverride: null/);
   // A single reset function hands every field back to those defaults.
   assert.match(session, /export const resetCoursePanelSession/);
   assert.match(session, /session = defaultState\(\);/);
@@ -79,15 +80,13 @@ test("the mind map restores library vs canvas from the session", () => {
   assert.match(mindMapPanel, /setLibraryOpen\(!resumeCanvas\);/);
 });
 
-test("the mind map theme pick is per-visit: follows the player, no device-wide override", () => {
-  // The override initialises from the session and is written back to it.
-  assert.match(mindMapPanel, /getCoursePanelSession\(\)\.mindMapThemeOverride/);
-  assert.match(mindMapPanel, /setMindMapSessionTheme\(themeOverride\)/);
-  // null override → the map renders in the player's live theme.
-  assert.match(mindMapPanel, /themeOverride \?\? \(playerTheme === "light" \? "light" : "dark"\)/);
-  // The old forever-persisted per-device override must be gone: every fresh
-  // player entry follows the player's theme again.
+test("the mind map has no theme pick at all — per-visit or per-device", () => {
+  // Neither the session override nor the old per-device key exists any more:
+  // the map is dark like the rest of the app.
+  assert.doesNotMatch(mindMapPanel, /mindMapThemeOverride/);
+  assert.doesNotMatch(mindMapPanel, /setMindMapSessionTheme/);
   assert.doesNotMatch(mindMapPanel, /dc\.mindMapThemeOverride/);
+  assert.match(mindMapPanel, /const mindTheme: MindMapTheme = "dark";/);
 });
 
 test("leaving the player resets the session and preserves an open notes draft", () => {

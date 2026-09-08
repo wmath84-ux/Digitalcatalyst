@@ -221,9 +221,8 @@
 /* Notes and the mind map already asked for a deeper plate (`data-solid-panel`,
    src/index.css). In the room those two walls sat on the board's near-black,
    which is what makes long text and node labels restful — so the deep plate
-   becomes the board's, in both themes. */
-.course-player-shell [data-course-study-pane][data-solid-panel="true"],
-.course-player-shell[data-course-theme="light"] [data-course-study-pane][data-solid-panel="true"] {
+   becomes the board's. */
+.course-player-shell [data-course-study-pane][data-solid-panel="true"] {
   background-color: rgba(6, 9, 16, 0.94);
   background-image: linear-gradient(180deg, rgba(13, 20, 36, 0.94) 0%, rgba(6, 9, 16, 0.96) 100%);
 }
@@ -550,75 +549,6 @@
   background: rgba(255, 255, 255, 0.18);
   border-radius: 99px;
 }
-
-/* ── 15. The light theme: the same room, lights up ─────────────────────────
-   The player's theme switch flips `data-course-theme` and syncs `html.light`,
-   so vendored surfaces inside (Google's pages, React Flow) go light. Ink in
-   this player is white in BOTH themes — that is src/index.css's contract and
-   it is not touched — so the "light" room is a DAYLIT room: the same navy
-   family lifted a step, brighter hairlines and brighter rows, never a white
-   plate that would swallow white ink. */
-.course-player-shell[data-course-theme="light"] {
-  --dc-flat-board: #0f1729;
-  --dc-flat-board-head: #1a2438;
-  --dc-flat-wall-head: #182238;
-  --dc-flat-desk-top: #1c2740;
-  --dc-flat-desk-bottom: #121a2c;
-  --dc-flat-box: rgba(255, 255, 255, 0.07);
-
-  --dc-flat-glass: rgba(24, 33, 56, 0.66);
-  --dc-flat-glass-deep: rgba(20, 28, 48, 0.7);
-
-  --dc-flat-line: rgba(255, 255, 255, 0.22);
-  --dc-flat-line-soft: rgba(255, 255, 255, 0.16);
-  --dc-flat-line-strong: rgba(255, 255, 255, 0.28);
-
-  --dc-flat-ink-sub: rgba(255, 255, 255, 0.58);
-  --dc-flat-ink-label: rgba(255, 255, 255, 0.58);
-
-  --dc-flat-row: rgba(255, 255, 255, 0.1);
-  --dc-flat-row-hover: rgba(255, 255, 255, 0.16);
-  --dc-flat-row-line: rgba(255, 255, 255, 0.18);
-  --dc-flat-row-line-hover: rgba(255, 255, 255, 0.3);
-
-  --course-surface: var(--dc-flat-glass);
-  --course-surface-translucent: var(--dc-flat-glass);
-  --course-panel: var(--dc-flat-glass);
-  --course-muted: rgba(255, 255, 255, 0.76);
-  --course-border: var(--dc-flat-line);
-  --course-soft: var(--dc-flat-row);
-  --course-soft-hover: var(--dc-flat-row-hover);
-  --course-strong: rgba(255, 255, 255, 0.34);
-  --course-loading: rgba(15, 23, 41, 0.6);
-  --dc-chrome-glass: var(--dc-flat-glass);
-
-  background-color: #0b1220;
-  background-image:
-    radial-gradient(circle at 18% -10%, rgba(56, 189, 248, 0.22) 0, transparent 54%),
-    radial-gradient(circle at 84% -6%, rgba(139, 92, 246, 0.2) 0, transparent 52%),
-    linear-gradient(to bottom, #1b2740 0%, #131c30 48%, #0b1220 100%);
-}
-
-/* The daylit board and desk keep their own plate under the brighter room. */
-.course-player-shell[data-course-theme="light"] [data-course-lesson-pane] {
-  background-image:
-    radial-gradient(120% 60% at 50% -8%, rgba(56, 189, 248, 0.14) 0, transparent 60%),
-    linear-gradient(180deg, #16203a 0%, var(--dc-flat-board) 34%);
-}
-.course-player-shell[data-course-theme="light"] [data-course-study-pane][data-solid-panel="true"] {
-  background-color: rgba(11, 17, 31, 0.94);
-  background-image: linear-gradient(180deg, rgba(24, 34, 56, 0.94) 0%, rgba(11, 17, 31, 0.96) 100%);
-}
-.course-player-shell[data-course-theme="light"] .course-rich-surface,
-.course-player-shell[data-course-theme="light"] [data-course-note-heading] {
-  background-color: rgba(11, 17, 31, 0.9);
-  color: var(--dc-flat-ink-body);
-}
-.course-player-shell[data-course-theme="light"] [data-course-mindmap-library] {
-  background-color: rgba(15, 22, 38, 0.96);
-  background-image: linear-gradient(180deg, rgba(28, 39, 64, 0.94), rgba(15, 22, 38, 0.96));
-}
-
 /* ── 16. Restraint ─────────────────────────────────────────────────────────
    The room shed its most expensive paint while the camera moved. The flat
    player has no camera, so nothing is stripped here — but nothing is added

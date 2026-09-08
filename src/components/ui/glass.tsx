@@ -36,33 +36,25 @@ import { cn } from "@/lib/utils";
 
 // ── environment ────────────────────────────────────────────────────────────
 
-function subscribeScheme(cb: () => void): () => void {
-  if (typeof window === "undefined") return () => undefined;
-  const mq = window.matchMedia("(prefers-color-scheme: dark)");
-  mq.addEventListener("change", cb);
-  const obs = new MutationObserver(cb);
-  obs.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["class", "data-theme"],
-  });
-  return () => {
-    mq.removeEventListener("change", cb);
-    obs.disconnect();
-  };
+/* ── scheme ─────────────────────────────────────────────────────────────────
+ * The app is DARK ONLY. Upstream shipped a reader that resolved the material
+ * from `html.dark` / `html.light` / `data-theme` / the OS preference; every
+ * one of those inputs is gone now (see src/lib/glassScheme.ts), so the reader
+ * is a constant and the subscription that watched those attributes has nothing
+ * left to watch. `useGlassDark` keeps its name and its signature — the pack's
+ * components call it in ~20 places — and simply always resolves dark.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+function subscribeScheme(): () => void {
+  return () => undefined;
 }
 
 function readDark(): boolean {
-  if (typeof document === "undefined") return false;
-  const root = document.documentElement;
-  if (root.classList.contains("dark")) return true;
-  if (root.classList.contains("light")) return false;
-  if (root.dataset.theme === "dark") return true;
-  if (root.dataset.theme === "light") return false;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return true;
 }
 
 export function useGlassDark(): boolean {
-  return useSyncExternalStore(subscribeScheme, readDark, () => false);
+  return useSyncExternalStore(subscribeScheme, readDark, () => true);
 }
 
 export function useHydrated(): boolean {

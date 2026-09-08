@@ -2,9 +2,9 @@
 //
 // Contract for the FlowPath "white flash on navigation" fix:
 //
-//   1. The theme attribute is applied to <html> SYNCHRONOUSLY (inside the
-//      state initializer, i.e. before React commits / before first paint),
-//      not only in a post-paint `useEffect`.
+//   1. Nothing in FlowPath publishes a theme any more — the app is dark
+//      only, so the hook that wrote `data-theme` on <html> is deleted and
+//      the first frame can never be painted in the wrong scheme.
 //   2. No FlowPath surface mounts invisible: the header, activity cards,
 //      empty state and plus nodes all use `initial={false}` so the very
 //      first painted frame already shows the UI instead of a ~0.7s blank.
@@ -16,7 +16,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const useTheme = fs.readFileSync("src/flowpath/hooks/useTheme.ts", "utf8");
 const flowPathView = fs.readFileSync("src/components/flowpath/FlowPathView.tsx", "utf8");
 // FlowPath's dedicated header component was retired — the page now opens
 // with the shared home greeting header (see src/FlowPathApp.tsx).
@@ -26,15 +25,16 @@ const emptyState = fs.readFileSync("src/components/flowpath/EmptyState.tsx", "ut
 const activityCard = fs.readFileSync("src/components/flowpath/ActivityCard.tsx", "utf8");
 const plusNode = fs.readFileSync("src/components/flowpath/PlusNode.tsx", "utf8");
 
-test("FlowPath theme is applied to <html> synchronously, before the first paint", () => {
-  // The attribute write must live in a shared helper used by the state
-  // initializer (runs during render, pre-commit) — not only inside effects.
-  assert.match(useTheme, /applyThemeAttribute/);
-  // The initializer itself must call it, so the first painted frame already
-  // carries the stored theme.
-  assert.match(useTheme, /useState<"dark" \| "light">\(\(\) => \{[\s\S]*?applyThemeAttribute\(resolvedNow\)/);
-  // The attribute is set on documentElement.
-  assert.match(useTheme, /document\.documentElement\.setAttribute\("data-theme", resolved\)/);
+test("FlowPath publishes no theme — the app is dark only", () => {
+  // The pre-paint `data-theme` write is gone with the light theme: there is
+  // one scheme, so nothing can flash the wrong one on the first frame.
+  assert.ok(!fs.existsSync("src/flowpath/hooks/useTheme.ts"), "the theme hook is deleted");
+  assert.doesNotMatch(flowPathView, /useTheme/);
+  assert.doesNotMatch(flowPathView, /data-theme/);
+  // …and the app-level scheme writer pins dark, never light.
+  const scheme = fs.readFileSync("src/lib/glassScheme.ts", "utf8");
+  assert.match(scheme, /classList\.add\("dark"\)/);
+  assert.doesNotMatch(scheme, /classList\.toggle\("light"/);
 });
 
 test("no FlowPath surface mounts invisible (no opacity-0 entrance dead time)", () => {

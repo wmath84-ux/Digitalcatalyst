@@ -22,9 +22,6 @@ export function ActivityNode({ type, status, flowKind, onClick }: ActivityNodePr
   const isOverdue = status === "overdue";
 
   const size = isCurrent ? 56 : 42;
-  const isLight =
-    typeof document !== "undefined" &&
-    document.documentElement.getAttribute("data-theme") === "light";
 
   return (
     <motion.button
@@ -41,7 +38,7 @@ export function ActivityNode({ type, status, flowKind, onClick }: ActivityNodePr
         height: size,
         background: isCompleted
           ? "linear-gradient(155deg, var(--fp-text-10), var(--fp-text-3))"
-          : `radial-gradient(circle at 32% 28%, ${meta.color}${isLight ? "45" : "55"}, var(--fp-bg-0) 70%)`,
+          : `radial-gradient(circle at 32% 28%, ${meta.color}${"55"}, var(--fp-bg-0) 70%)`,
         border: `1px solid ${isCompleted ? "var(--fp-text-15)" : isOverdue ? "rgba(251,113,133,0.55)" : meta.color + "88"}`,
         boxShadow: isCurrent
           ? `0 0 0 1px var(--fp-border) inset, 0 0 34px 6px ${meta.glow}, 0 18px 40px -12px rgba(0,0,0,0.8)`
@@ -63,7 +60,7 @@ export function ActivityNode({ type, status, flowKind, onClick }: ActivityNodePr
       ) : (
         <Icon
           className={isCurrent ? "h-6 w-6" : "h-4 w-4"}
-          style={{ color: isOverdue ? "var(--fp-rose-text)" : isLight ? "var(--fp-text)" : "white" }}
+          style={{ color: isOverdue ? "var(--fp-rose-text)" : "white" }}
           strokeWidth={2.2}
         />
       )}

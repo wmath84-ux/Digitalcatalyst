@@ -16,7 +16,6 @@ interface GlassPrefToggleProps {
   color: string; // accent hex, e.g. "#FF6BF5"
   delay?: number; // entrance stagger
   open?: boolean; // popover visibility — replays the entrance on every open
-  light?: boolean; // player light theme → dark ink
   /** Renders the thin divider line above the row (glass-toggle spec). */
   divider?: boolean;
   /** Contract hook, e.g. data-course-setting="theme". */
@@ -30,7 +29,6 @@ export function GlassPrefToggle({
   color,
   delay = 0,
   open = true,
-  light = false,
   divider = false,
   "data-course-setting": dataSetting,
 }: GlassPrefToggleProps) {
@@ -41,8 +39,10 @@ export function GlassPrefToggle({
     progress.set(on ? 1 : 0);
   }, [on, progress]);
 
-  const offTrack = light ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.08)";
-  const offBorder = light ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.1)";
+  // Dark material only — the light branch the `light` prop used to select is
+  // gone with the app-wide light theme.
+  const offTrack = "rgba(255,255,255,0.08)";
+  const offBorder = "rgba(255,255,255,0.1)";
 
   const trackBg = useTransform(progress, [0, 1], [offTrack, `${color}44`]);
   const trackBorder = useTransform(progress, [0, 1], [offBorder, `${color}55`]);
@@ -53,8 +53,8 @@ export function GlassPrefToggle({
     ["0 2px 8px rgba(0,0,0,0.3)", `0 2px 16px ${color}44`],
   );
 
-  const ink = light ? "text-slate-900/70" : "text-white/60";
-  const dividerClass = light ? "border-black/[0.08]" : "border-white/[0.06]";
+  const ink = "text-white/60";
+  const dividerClass = "border-white/[0.06]";
 
   return (
     <motion.div
@@ -71,7 +71,7 @@ export function GlassPrefToggle({
           style={
             on
               ? { color }
-              : { color: light ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.25)", opacity: 0.5 }
+              : { color: "rgba(255,255,255,0.25)", opacity: 0.5 }
           }
         >
           {on ? "On" : "Off"}

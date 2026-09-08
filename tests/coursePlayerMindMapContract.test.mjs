@@ -387,25 +387,21 @@ test("every node opens the inline editor on a single tap (no separate pencil)", 
   assert.match(panel, /if \(dragMovedRef\.current\) return;/);
 });
 
-test("the mind map follows the Course Player theme and can be flipped for the map window alone", () => {
-  // White mode: the panel ships a dark AND a light palette; it starts in
-  // whatever theme the player is in and the shell exposes the active one.
-  assert.match(panel, /playerTheme = "dark"/);
-  assert.match(panel, /const mindTheme: MindMapTheme = themeOverride \?\? \(playerTheme === "light" \? "light" : "dark"\);/);
+test("the mind map is dark only — no per-window theme pick, no light palette", () => {
+  // The map renders on the app's single dark palette; the shell still reports
+  // it so the scoped variables have one hook to hang off.
+  assert.match(panel, /export type MindMapTheme = "dark";/);
+  assert.match(panel, /const mindTheme: MindMapTheme = "dark";/);
   assert.match(panel, /data-mindmap-theme=\{mindTheme\}/);
   assert.match(panel, /course-mindmap-shell/);
-  // The toolbar button next to Fit flips ONLY this window; the pick is kept
-  // in the player's PANEL SESSION, so it survives tab switches but resets
-  // when the player is left — the next entry follows the player's theme
-  // again instead of resurrecting an old per-device override.
-  assert.match(panel, /data-course-mindmap-theme/);
-  assert.match(panel, /setThemeOverride\(mindTheme === "dark" \? "light" : "dark"\)/);
-  assert.match(panel, /getCoursePanelSession\(\)\.mindMapThemeOverride/);
-  assert.match(panel, /setMindMapSessionTheme\(themeOverride\)/);
-  // The parent hands the player's live theme down.
-  assert.match(coursePlayer, /playerTheme=\{theme\}/);
-  // The palette itself lives in the stylesheet as scoped variables.
-  assert.match(styles, /\.course-mindmap-shell\[data-mindmap-theme="light"\]/);
+  // The sun/moon toolbar button and everything that drove it are gone.
+  assert.doesNotMatch(panel, /data-course-mindmap-theme/);
+  assert.doesNotMatch(panel, /setThemeOverride/);
+  assert.doesNotMatch(panel, /playerTheme/);
+  assert.doesNotMatch(coursePlayer, /playerTheme=\{/);
+  // …and so is the light palette in the stylesheet.
+  assert.doesNotMatch(styles, /data-mindmap-theme="light"/);
+  assert.doesNotMatch(styles, /data-course-theme="light"/);
 });
 
 test("the mind map carries no close button anywhere", () => {
@@ -464,9 +460,8 @@ test("the anchor dot sits on the face that points at the parent, opposite the `+
   // Its paint is themed in the stylesheet (the bead straddles the box border,
   // so it carries a halo in the canvas colour) — never an inline one-off.
   assert.match(styles, /\[data-course-mindmap\] \[data-mind-node-anchor\]\s*\{[^}]*background: #8b5cf6/);
-  // The light-theme override has to hang off the SHELL (the themed element is
-  // the same node that carries `data-course-mindmap`, not an ancestor).
-  assert.match(styles, /\.course-mindmap-shell\[data-mindmap-theme="light"\] \[data-mind-node-anchor\]/);
+  // There is no light-theme override any more — the bead has one palette.
+  assert.doesNotMatch(styles, /data-mindmap-theme="light"/);
   assert.doesNotMatch(dot, /style=\{\{/, "the bead is themed by CSS, not inline");
 });
 
@@ -521,7 +516,8 @@ test("the toolbar is icon-only: every control is a single glyph tile, no caption
   assert.match(toolbar, /data-course-mindmap-save/);
   assert.match(toolbar, /data-course-mindmap-align/);
   assert.match(toolbar, /data-course-mindmap-fit/);
-  assert.match(toolbar, /data-course-mindmap-theme/);
+  // The light/dark tile left the bar with the app-wide light theme.
+  assert.doesNotMatch(toolbar, /data-course-mindmap-theme/);
   assert.match(toolbar, /data-course-mindmap-delete/);
   assert.match(toolbar, /data-course-mindmap-dbl-delete/);
   assert.doesNotMatch(toolbar, /data-course-mindmap-close/, "no close button on the bar");

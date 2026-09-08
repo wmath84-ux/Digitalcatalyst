@@ -652,8 +652,12 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
     width: 100%;
   }
 
-  /* Desktop shell content adjustments for tablet landscape */
-  .dc-desktop-shell [data-desktop-rail] {
+  /* Desktop shell content adjustments for tablet landscape.
+     The glass-sidebar variant is excluded: its column is 64 px collapsed /
+     220 px expanded and GlassSidebar springs that width itself, so a forced
+     `var(--desktop-rail-width)` here would pin it to ~220 px and leave a dead
+     band of empty plate beside the collapsed rail. */
+  .dc-desktop-shell [data-desktop-rail]:not([data-desktop-rail-variant="glass-sidebar"]) {
     width: var(--desktop-rail-width) !important;
   }
 
@@ -1195,7 +1199,9 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
     --desktop-rail-width: 220px;
     --desktop-topbar-height: 56px;
   }
-  .dc-desktop-shell [data-desktop-rail] { width: 220px !important; }
+  .dc-desktop-shell [data-desktop-rail]:not([data-desktop-rail-variant="glass-sidebar"]) {
+    width: 220px !important;
+  }
 }
 
 /* ── Page tabs — the tablet text nav under the header ────────────────────
@@ -1719,11 +1725,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 [data-course-mindmap-map-card][data-active="true"] {
   box-shadow: 0 0 0 1px rgb(167 139 250 / 0.6);
 }
-
-.course-mindmap-shell[data-mindmap-theme="light"] [data-course-mindmap-map-card] {
-  background: transparent;
-}
-
 /* Course Player — square note cards lift off the panel with a mixed
    blue gradient glow so the boxes stay readable against both themes.
    `color` is pinned here (rather than inherited) so a saved note's preview
@@ -1742,11 +1743,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   outline: 2px solid;
   outline-offset: 2px;
 }
-
-.course-player-shell[data-course-theme="light"] [data-course-notes-grid] [data-course-note] {
-  outline-color: rgb(37 99 235 / 0.6);
-}
-
 /* Course Player — a saved note card shows ONLY the note's first heading or
    first line of text, in its original format, centred in the square. The
    block keeps its formatting (a heading stays a heading, bold / colour stay
@@ -1852,25 +1848,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   color: var(--course-text);
   transition: color 180ms ease;
 }
-
-/* The light theme is the pack's LIGHT material (rgba(255,255,255,0.21) on the
-   same backdrop — exactly what the site-wide Dark-mode switch renders); the
-   player syncs `html.light` while it is active so every vendored component
-   inside it flips too. Ink stays white on both materials. */
-.course-player-shell[data-course-theme="light"] {
-  --course-bg: transparent;
-  --course-surface: rgba(255, 255, 255, 0.21);
-  --course-surface-translucent: rgba(255, 255, 255, 0.21);
-  --course-panel: rgba(255, 255, 255, 0.21);
-  --course-text: #ffffff;
-  --course-muted: rgb(255 255 255 / 0.7);
-  --course-border: rgb(255 255 255 / 0.22);
-  --course-soft: rgb(255 255 255 / 0.1);
-  --course-soft-hover: rgb(255 255 255 / 0.18);
-  --course-strong: rgb(255 255 255 / 0.32);
-  --course-loading: rgb(10 12 18 / 0.5);
-}
-
 /* ── Course Player glass — blur discipline (Phase 2) ─────────────────────
    Every glass surface in the player (footer dock, the Split Deck's panes,
    divider and peek rails) reads the same
@@ -1884,16 +1861,9 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   /* The soft inner edge the smaller pane leans on while the divider drags. */
   --course-split-compress-ink: rgb(2 4 10 / 0.85);
 }
-
-.course-player-shell[data-course-theme="light"] {
-  --dc-chrome-glass-blur: blur(14px) saturate(1.2);
-  --course-split-compress-ink: rgb(15 23 42 / 0.4);
-}
-
 @media (pointer: coarse) {
   /* Mid-range phones get the same material with a lighter frost. */
-  .course-player-shell,
-  .course-player-shell[data-course-theme="light"] {
+  .course-player-shell {
     --dc-chrome-glass-blur: blur(12px) saturate(1.2);
   }
 }
@@ -1948,10 +1918,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
 .course-player-shell [data-course-study-pane][data-solid-panel="true"] {
   background: rgba(13, 15, 24, 0.9);
 }
-.course-player-shell[data-course-theme="light"] [data-course-study-pane][data-solid-panel="true"] {
-  background: rgba(36, 39, 52, 0.92);
-}
-
 /* The collapsed pane's 28px glass strip: a 2px edge glow in the tab colour
    (painted inline) plus the breathing icon framer-motion drives. Coarse
    pointers and reduced-motion users get the strip without the breathing. */
@@ -2043,12 +2009,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   contain: size layout paint;
   isolation: isolate;
 }
-
-.course-player-shell[data-course-theme="light"] [data-course-subscription-badge] {
-  color: #6d28d9;
-  background-color: rgb(124 58 237 / 0.12);
-}
-
 /* ── Mind map — scoped dark / white palette ───────────────────────────────
    The mind map panel tracks the Course Player theme by default and can be
    flipped independently from its own toolbar (the sun/moon button next to
@@ -2077,28 +2037,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   color: var(--mm-text);
   transition: color 180ms ease;
 }
-
-/* White mode: the pack's LIGHT material (rgba(255,255,255,0.21) on the same
-   backdrop — exactly what the site-wide Dark-mode switch renders). No paper
-   plate; ink stays white on both materials. */
-.course-mindmap-shell[data-mindmap-theme="light"] {
-  --mm-bg: transparent;
-  --mm-surface: rgba(255, 255, 255, 0.21);
-  --mm-border: rgb(255 255 255 / 0.22);
-  --mm-text: #ffffff;
-  --mm-muted: rgb(255 255 255 / 0.7);
-  --mm-soft: rgba(255, 255, 255, 0.21);
-  --mm-soft-hover: rgb(255 255 255 / 0.3);
-  --mm-dot: rgb(255 255 255 / 0.14);
-  --mm-edge-left: rgb(196 181 253 / 0.7);
-  --mm-edge-right: rgb(165 180 252 / 0.7);
-}
-
-.course-player-shell[data-course-theme="light"] [data-course-preview-badge] {
-  color: #0369a1;
-  background-color: rgb(14 165 233 / 0.12);
-}
-
 .course-player-shell :is(button, a, textarea):focus-visible {
   outline: 2px solid #8b5cf6;
   outline-offset: 2px;
@@ -2227,8 +2165,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
   text-decoration: underline;
   overflow-wrap: anywhere;
 }
-.course-player-shell[data-course-theme="light"] .course-rich-surface a { color: #6d28d9; }
-
 .course-rich-surface table {
   border-collapse: collapse;
   margin: 0.5em 0;
@@ -2351,8 +2287,8 @@ body.eduvora-razorpay-open .razorpay-container iframe {
    revision toolbars). Until they are, the hooks resolve to *exactly* the
    websiteglass GlassSurface material at its defaults — dark tint rgba(60,62,68)
    at 0.5·0.42 = 0.21, blur 14·(0.4+0.5·0.6) = 9.8px, saturate 1+0.6·0.5 = 1.3,
-   the dark rim — and to the light material when `html.light` is set by the
-   header's Dark-mode switch. No white gradients, no identity washes. */
+   the dark rim. The app is dark only, so there is no light branch here any
+   more. No white gradients, no identity washes. */
 .dc-glass,
 .dc-glass-soft,
 .dc-glass-chip,
@@ -2371,19 +2307,6 @@ body.eduvora-razorpay-open .razorpay-container iframe {
     inset 0 0 0 1px rgba(255, 255, 255, 0.12);
   color: #fff;
 }
-html.light .dc-glass,
-html.light .dc-glass-soft,
-html.light .dc-glass-chip,
-html.light .dc-glass-input,
-html.light .dc-glass-toolbar,
-html.light .dc-modal-glass,
-html.light .dc-glass-dark {
-  background: rgba(255, 255, 255, 0.21);
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.9),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
-}
-
 /*
  * Revision `Card` (src/revision/components/ui.tsx) renders the pack's
  * GlassSurface itself (Glass Card values: tint 0.4, radius 20). The `.rev-card`
@@ -2462,46 +2385,6 @@ html.light .dc-glass-dark {
 
   color-scheme: dark;
 }
-
-/* FlowPath light theme overrides */
-[data-theme="light"] {
-  --fp-bg-0: #f6f7fa;
-  --fp-bg-1: #ffffff;
-  --fp-surface: rgba(255, 255, 255, 0.72);
-  --fp-surface-hover: rgba(255, 255, 255, 0.95);
-  --fp-surface-strong: linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(241, 243, 250, 0.80));
-  --fp-panel: linear-gradient(155deg, rgba(255, 255, 255, 0.82), rgba(235, 238, 248, 0.62));
-  --fp-text: #0f1222;
-  --fp-muted: rgba(15, 18, 34, 0.52);
-  --fp-border: rgba(15, 18, 34, 0.10);
-  --fp-border-hover: rgba(15, 18, 34, 0.22);
-  --fp-grid-line: rgba(15, 18, 34, 0.055);
-  --fp-card-shadow: 0 20px 60px -20px rgba(15, 18, 34, 0.18);
-  --fp-strong-shadow: 0 30px 80px -24px rgba(15, 18, 34, 0.22);
-  --fp-overlay: rgba(246, 247, 250, 0.82);
-
-  --fp-text-85: color-mix(in srgb, #0f1222 85%, transparent);
-  --fp-text-70: color-mix(in srgb, #0f1222 70%, transparent);
-  --fp-text-55: color-mix(in srgb, #0f1222 55%, transparent);
-  --fp-text-50: color-mix(in srgb, #0f1222 50%, transparent);
-  --fp-text-45: color-mix(in srgb, #0f1222 45%, transparent);
-  --fp-text-40: color-mix(in srgb, #0f1222 40%, transparent);
-  --fp-text-30: color-mix(in srgb, #0f1222 30%, transparent);
-  --fp-text-20: color-mix(in srgb, #0f1222 20%, transparent);
-  --fp-text-15: color-mix(in srgb, #0f1222 15%, transparent);
-  --fp-text-10: color-mix(in srgb, #0f1222 10%, transparent);
-  --fp-text-6: color-mix(in srgb, #0f1222 6%, transparent);
-  --fp-text-5: color-mix(in srgb, #0f1222 5%, transparent);
-  --fp-text-3: color-mix(in srgb, #0f1222 3%, transparent);
-
-  --fp-rose-text: #e11d48;
-  --fp-amber-text: #b45309;
-  --fp-emerald-text: #047857;
-  --fp-violet-text: #6d28d9;
-
-  color-scheme: light;
-}
-
 /* FlowPath display font (matches the provided design zip) */
 .font-display {
   font-family: "Sora", "Manrope", ui-sans-serif, system-ui, sans-serif;
@@ -2598,16 +2481,6 @@ html.light .dc-glass-dark {
   background-size: 200% 100%;
   animation: fp-shimmer 6s ease-in-out infinite;
 }
-
-[data-theme="light"] .fp-shimmer {
-  background-image: linear-gradient(
-    100deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.85) 50%,
-    transparent 70%
-  );
-}
-
 /* ---------- FlowPath custom slider ---------- */
 .fp-slider {
   -webkit-appearance: none;
@@ -2717,14 +2590,6 @@ html.light .dc-glass-dark {
     0 0 0 2px var(--dc-bd-base),
     0 0 8px rgb(139 92 246 / 0.55);
 }
-
-.course-mindmap-shell[data-mindmap-theme="light"] [data-mind-node-anchor] {
-  background: #a78bfa;
-  box-shadow:
-    0 0 0 2px var(--dc-bd-base),
-    0 0 8px rgb(167 139 250 / 0.45);
-}
-
 /* ── Mind map toolbar — one icon per control, sized per screen ───────────
    Every control in the status strip is a single icon tile (no words), so the
    whole bar reads the same on a 320px phone and on a desktop split view.
@@ -5632,16 +5497,6 @@ html[data-course-player-active="true"] {
     inset 0 1px 1px rgba(255, 255, 255, 0.5),
     inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
-
-html.light {
-  /* The pack's light material (255,255,255 at the same 0.105) when the
-     header's Dark-mode switch is off. */
-  --dc-chrome-glass: rgba(255, 255, 255, 0.105);
-  --dc-chrome-glass-rim:
-    inset 0 1px 1px rgba(255, 255, 255, 0.9),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
-}
-
 [data-site-header]:not([data-home-header]) {
   isolation: isolate;
   background: var(--dc-chrome-glass) !important;
@@ -6144,17 +5999,33 @@ html.light {
 
 
 /* ── Compact side-panel band (<=1023px): AI Canvas Glass Sidebar ──────────
-   The wide 260 px rail is swapped for the 64 px glass rail (it springs open
-   to 220 px over the content, so the layout width stays 64 px + gutters).
-   Any rule that positioned things against `--desktop-rail-width` follows. */
+   The wide 260 px rail is swapped for the glass rail. It boots EXPANDED
+   (220 px) and springs down to its 64 px icon rail when the learner
+   collapses it — and the COLUMN reflows with it, so collapsing hands the
+   width back to the page instead of leaving a blank strip. That is why the
+   two tablet `width: … !important` rules above skip this variant, and why
+   the column sizes itself instead of taking `--desktop-rail-width`.
+
+   `--desktop-rail-width` still matters: FlowPath's bottom dock and the
+   desktop peek dock both position against it. DesktopShell writes it inline
+   (panel + the column's `pl-3`) on every expand/collapse; the 232 px here is
+   the pre-hydration value for the expanded default. */
 @media (max-width: 1023px) {
   .dc-desktop-shell:has([data-desktop-rail-variant="glass-sidebar"]) {
-    --desktop-rail-width: 88px;
+    --desktop-rail-width: 232px;
   }
 }
 [data-desktop-rail-variant="glass-sidebar"] {
-  /* Expanded rail paints over the page instead of reflowing it. */
+  /* The column is exactly as wide as the panel inside it, at both states. */
+  width: auto !important;
+  flex: 0 0 auto;
   overflow: visible;
+}
+/* The panel springs 64 ↔ 220 px, so the docks that sit beside the content
+   column glide instead of jumping to the new edge. */
+.dc-desktop-shell [data-fp-dock],
+[data-desktop-peek-dock] {
+  transition: left 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 
@@ -6164,11 +6035,13 @@ html.light {
   height: calc(var(--dc-footer-nav-h, 0px) + 3.25rem) !important;
 }
 
-/* Home feedback wall (AI Canvas Sticker Wall). The canvas owns its own
-   pointer handling; keep the tablet `* { max-width: 100% }` pass and the page
-   scroll from fighting the matter.js drag surface. */
+/* Home feedback wall (AI Canvas Sticker Wall). The canvas drag surface must
+   not swallow the page scroll: `pan-y` keeps vertical panning alive over the
+   card, and StickerWall cancels only the touch sequences that actually start
+   on a sticker (see "Scroll ownership" in src/components/StickerWall.tsx).
+   The tablet `* { max-width: 100% }` pass stays out of the way. */
 [data-home-sticker-wall] canvas {
-  touch-action: none;
+  touch-action: pan-y;
 }
 @media (max-width: 639px) {
   /* Phone: a shorter wall, tighter gutters — the section is a fitted card,
@@ -6226,16 +6099,6 @@ html.light {
   --dc-elev-3: 0 4px 10px rgba(24, 26, 48, 0.18), 0 26px 60px -22px rgba(60, 66, 120, 0.55);
   --dc-elev-accent: 0 10px 28px -14px rgba(99, 102, 241, 0.65);
 }
-
-html.light {
-  --dc-ink-1: rgba(15, 18, 34, 0.94);
-  --dc-ink-2: rgba(15, 18, 34, 0.72);
-  --dc-ink-3: rgba(15, 18, 34, 0.52);
-  --dc-elev-1: 0 1px 2px rgba(15, 18, 34, 0.06), 0 6px 18px -10px rgba(99, 102, 241, 0.22);
-  --dc-elev-2: 0 2px 6px rgba(15, 18, 34, 0.07), 0 14px 34px -16px rgba(99, 102, 241, 0.26);
-  --dc-elev-3: 0 4px 10px rgba(15, 18, 34, 0.08), 0 26px 60px -22px rgba(99, 102, 241, 0.32);
-}
-
 @layer utilities {
   .dc-ink-1 { color: var(--dc-ink-1); }
   .dc-ink-2 { color: var(--dc-ink-2); }
@@ -6398,12 +6261,7 @@ html.light {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 1px 0 0 rgba(255, 255, 255, 0.08);
-}
-html.light .dc-compare-table .dc-compare-rowhead {
-  background: color-mix(in srgb, #ffffff 92%, transparent);
-  box-shadow: 1px 0 0 rgba(15, 18, 34, 0.08);
-}
-.dc-compare-scroll {
+}.dc-compare-scroll {
   scrollbar-width: thin;
 }
 .dc-compare-scroll::-webkit-scrollbar { height: 6px; }
@@ -6621,10 +6479,6 @@ html.light .dc-compare-table .dc-compare-rowhead {
 .dc-desktop-shell [data-pdp-tabbar][data-stuck="true"] {
   background-color: rgb(12 14 28 / 0.68);
 }
-html.light .dc-desktop-shell [data-pdp-tabbar][data-stuck="true"] {
-  background-color: rgb(255 255 255 / 0.78);
-}
-
 /* ══════════════════════════════════════════════════════════════════════
    SUBSCRIPTION — DESKTOP WORKSPACE LAYOUT
    ══════════════════════════════════════════════════════════════════════

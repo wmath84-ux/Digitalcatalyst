@@ -674,7 +674,7 @@ export default function GlassPreviewPage() {
             <div className="w-full max-w-sm rounded-2xl bg-white p-3 ring-1 ring-slate-200">
               <GlassSlider min={0} max={100} value={curve} onValueChange={setCurve} ariaLabel="Curve strength (light canvas)" className="w-full" />
               <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                Wave 6 removed `dc-slider-on-dark` from FlowPath: `useTheme` already writes `data-theme` on
+                Wave 6 removed `dc-slider-on-dark` from FlowPath: the shell already paints the dark palette on
                 `&lt;html&gt;`, so the slider follows the theme the user picked — this is the same control on a light
                 canvas, which the forced rule used to break.
               </p>

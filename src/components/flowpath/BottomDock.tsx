@@ -7,12 +7,10 @@ import {
   GraduationCap,
   LayoutDashboard,
   Landmark,
-  Moon,
   Palette,
   Plus,
   Settings,
   StickyNote,
-  Sun,
   Sunrise,
   TrendingUp,
   UserRound,
@@ -97,11 +95,9 @@ interface BottomDockProps {
   onStub: (group: string, label: string) => void;
   onNavigateToHome?: () => void;
   /** Settings gear — the controls of the old fixed FLOWPATH title bar.
-   *  Tapping the gear opens a radial with these options; each one keeps
-   *  its original behaviour (theme toggles in place, Flow Curve opens
-   *  the same CurveSettingsModal overlay as before). */
-  resolvedTheme?: "dark" | "light";
-  onToggleTheme?: () => void;
+   *  Tapping the gear opens a radial; Flow Curve opens the same
+   *  CurveSettingsModal overlay it always did. (The light/dark item is gone
+   *  with the app-wide light theme — FlowPath is dark only.) */
   onOpenCurve?: () => void;
 }
 
@@ -110,8 +106,6 @@ export function BottomDock({
   onPlanLectures,
   onStub,
   onNavigateToHome,
-  resolvedTheme = "dark",
-  onToggleTheme,
   onOpenCurve,
 }: BottomDockProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
@@ -134,12 +128,6 @@ export function BottomDock({
   // The old FLOWPATH header's controls, now behind the dock's gear.
   const settingsItems: RadialItem[] = [
     { id: "set-curve", label: "Flow Curve", icon: Palette, color: "#c084fc" },
-    {
-      id: "set-theme",
-      label: resolvedTheme === "dark" ? "Light Mode" : "Dark Mode",
-      icon: resolvedTheme === "dark" ? Sun : Moon,
-      color: "#f5b969",
-    },
   ];
 
   function openMenu(
@@ -214,13 +202,8 @@ export function BottomDock({
             onCreateType(id as ActivityType);
             return;
           }
-          // Settings gear options — same behaviour as the old header
-          // controls: theme flips in place, Flow Curve opens the same
+          // Settings gear options — Flow Curve opens the same
           // CurveSettingsModal overlay it always did.
-          if (id === "set-theme") {
-            if (onToggleTheme) onToggleTheme();
-            return;
-          }
           if (id === "set-curve") {
             if (onOpenCurve) onOpenCurve();
             return;

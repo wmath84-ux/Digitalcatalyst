@@ -33,11 +33,12 @@ test("FlowPath surfaces are the pack GlassSurface; no hand-painted .glass-panel 
   }
 });
 
-test("FlowPath theme blocks set color-scheme and the display font", () => {
-  // Matches the provided design zip: each theme sets color-scheme and a
-  // .font-display class is supplied for the Sora display font.
+test("FlowPath's dark palette sets color-scheme, and the display font is supplied", () => {
+  // Matches the provided design zip: the palette sets color-scheme and a
+  // .font-display class supplies the Sora display font. The light override
+  // block left with the app-wide light theme — one palette, one scheme.
   assert.match(indexCss, /--fp-violet-text: #ddd6fe;[\s\S]*color-scheme: dark;/);
-  assert.match(indexCss, /--fp-violet-text: #6d28d9;[\s\S]*color-scheme: light;/);
+  assert.doesNotMatch(indexCss, /\[data-theme="light"\]/);
   assert.match(indexCss, /\.font-display\s*\{[\s\S]*font-family: "Sora"/);
 });
 

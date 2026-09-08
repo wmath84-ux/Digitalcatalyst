@@ -444,9 +444,10 @@ test("The split surfaces are built from the player's own glass tokens", () => {
   assert.match(studyPanels, /boxShadow: "var\(--dc-chrome-glass-rim\)"/);
   // The study pane keeps its tint at ≤ 0.35 so text stays readable.
   assert.match(studyPanels, /tint=\{0\.3\}/);
-  // Blur is static per theme and cheaper on touch — never animated.
+  // Blur is static and cheaper on touch — never animated. The player is dark
+  // only, so the light-theme re-scope is gone with it.
   assert.match(styles, /\.course-player-shell \{\s*--dc-chrome-glass-blur: blur\(18px\) saturate\(1\.4\);/);
-  assert.match(styles, /\.course-player-shell\[data-course-theme="light"\] \{\s*--dc-chrome-glass-blur: blur\(14px\) saturate\(1\.2\);/);
+  assert.doesNotMatch(styles, /data-course-theme="light"/);
   assert.match(styles, /@media \(pointer: coarse\) \{[\s\S]*?--dc-chrome-glass-blur: blur\(12px\) saturate\(1\.2\);/);
   assert.doesNotMatch(studyPanels, /transition[^;]*backdrop-filter/);
 });

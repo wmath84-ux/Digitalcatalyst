@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
  *
  * A full-viewport, pointer-transparent canvas that renders GUSTY, wind-
  * driven snow over the whole player (content, buttons, empty space),
- * tuned separately for the dark and light course themes.
+ * tuned for the player's single dark palette.
  *
  * Weather model — snow rides the wind, and the wind is INTERMITTENT
  * ────────────────────────────────────────────────────────────────────
@@ -92,10 +92,8 @@ interface Flake {
   ovy: number;
 }
 
-export default function SnowOverlay({ theme }: { theme: "dark" | "light" }) {
+export default function SnowOverlay() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const themeRef = useRef(theme);
-  themeRef.current = theme;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -243,12 +241,9 @@ export default function SnowOverlay({ theme }: { theme: "dark" | "light" }) {
       pointer.strength += (pointer.target - pointer.strength) * Math.min(1, dt * 6);
 
       ctx.clearRect(0, 0, width, height);
-      const dark = themeRef.current === "dark";
-      // Dark theme: pure white flakes with a soft glow.
-      // Light theme: cool slate flakes with white cores — clearly visible
-      // on the pale background without smearing the page.
-      const bodyColor = dark ? "255, 255, 255" : "100, 116, 139";
-      const coreColor = dark ? "255, 255, 255" : "148, 163, 184";
+      // Pure white flakes with a soft glow — the only palette the app has.
+      const bodyColor = "255, 255, 255";
+      const coreColor = "255, 255, 255";
 
       for (let i = flakes.length - 1; i >= 0; i -= 1) {
         const f = flakes[i];
@@ -304,9 +299,9 @@ export default function SnowOverlay({ theme }: { theme: "dark" | "light" }) {
         // ── draw ───────────────────────────────────────────────────
         const px = f.x + f.ox;
         const py = f.y + f.oy;
-        const size = (0.9 + f.z * 2.6) * (dark ? 1 : 1.05);
-        const alpha = ((dark ? 0.35 : 0.4) + f.z * (dark ? 0.55 : 0.45)) * f.life;
-        // soft glow disc under the core sells depth on both themes
+        const size = 0.9 + f.z * 2.6;
+        const alpha = (0.35 + f.z * 0.55) * f.life;
+        // soft glow disc under the core sells depth
         const glow = ctx.createRadialGradient(px, py, 0, px, py, size * 2.6);
         glow.addColorStop(0, `rgba(${coreColor}, ${alpha * 0.5})`);
         glow.addColorStop(1, `rgba(${coreColor}, 0)`);

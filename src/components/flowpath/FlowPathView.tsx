@@ -20,7 +20,6 @@ import { buildTimeLabel, deriveStatus } from "../../flowpath/lib/activityService
 import { useFlowPath } from "../../flowpath/hooks/useFlowPath";
 import { useFlowPathFirestore } from "../../flowpath/hooks/useFlowPathFirestore";
 import { useFlowPathSync } from "../../flowpath/hooks/useFlowPathSync";
-import { useTheme } from "../../flowpath/hooks/useTheme";
 import { LecturePicker, type LectureCourseOption, type LectureModuleOption } from "../../flowpath/components/LecturePicker";
 import { flowpathLectureCourses, flowpathLectureModules, flowpathBulk } from "../../flowpath/lib/flowpathControlClient";
 import { auth } from "../../../firebase";
@@ -259,7 +258,6 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
     }
     return merged;
   }, [items, firestoreItems, currentId]);
-  const { resolved: resolvedTheme, toggle: toggleTheme } = useTheme();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -556,7 +554,7 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
         className="relative mx-auto w-full max-w-3xl px-4 pt-6 pb-44 sm:px-8 sm:pt-8"
         style={{ minHeight: totalHeight }}
       >
-        <Ribbon width={width} height={totalHeight} visibleChunks={visibleChunkPoints} theme={resolvedTheme} />
+        <Ribbon width={width} height={totalHeight} visibleChunks={visibleChunkPoints} />
 
         {isEmpty && <EmptyState />}
 
@@ -667,8 +665,6 @@ export function FlowPathView({ onNavigateToHome }: FlowPathViewProps = {}) {
         onPlanLectures={() => setLecturePickerOpen(true)}
         onStub={(group, label) => toast.info(`${group} · ${label} — coming soon`)}
         onNavigateToHome={onNavigateToHome}
-        resolvedTheme={resolvedTheme}
-        onToggleTheme={toggleTheme}
         onOpenCurve={() => setCurveOpen(true)}
       />
 
