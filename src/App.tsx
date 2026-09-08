@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Header from "./components/Header";
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import StorePage from "./components/StorePage";
 import { PurchasesTab } from "./components/OtherTabs";
+import GameEnvironment from "./components/GameEnvironment";
 import type { Product } from "./data/products";
 import { useCatalog } from "./context/CatalogContext";
 
@@ -38,6 +39,8 @@ export default function App({
   onNavigateToCart,
 }: AppProps) {
   const { purchasedIds: purchased } = useCatalog();
+  const [isGameOpen, setIsGameOpen] = useState(false);
+  
   // Keep the tab in sync with the URL hash. On desktop the left rail and
   // top bar drive navigation by changing `#/store` vs `#/store/purchases`,
   // so the tab must be derived from the hash instead of holding a local
@@ -58,6 +61,7 @@ export default function App({
           onNavigateToSubscription={onNavigateToSubscription}
           onNavigateToCart={onNavigateToCart}
           onNavigateToNotifications={onNavigateToNotifications}
+          onOpenGameEnvironment={() => setIsGameOpen(true)}
         />
 
         <main className="flex-1 overflow-y-auto">
@@ -80,6 +84,11 @@ export default function App({
             (src/main.tsx); the `toast` prop stays for the contract but paints
             nothing here. */}
         {toast ? <span className="sr-only" role="status">{toast}</span> : null}
+
+        {/* Game Environment Modal */}
+        {isGameOpen && (
+          <GameEnvironment onClose={() => setIsGameOpen(false)} />
+        )}
 
         <BottomNav
           active={activeTab === "purchases" ? "purchases" : "store"}

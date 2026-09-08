@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Joystick } from "lucide-react";
 import { BellIcon, BookIcon, CartIcon, CrownIcon, DownloadIcon, SearchIcon } from "./icons";
 import { useUnreadNotificationCount } from "../hooks/useUnreadNotificationCount";
 import BrandMark from "./BrandMark";
@@ -56,6 +56,11 @@ type HeaderProps = {
    * overlay so the shortcut lives on the main header itself.
    */
   onHelpClick?: () => void;
+  /**
+   * When provided, a game controller icon is rendered to open the game
+   * environment. Clicking this icon opens the Strata game world.
+   */
+  onOpenGameEnvironment?: () => void;
 };
 
 /**
@@ -82,6 +87,7 @@ export default function Header({
   onToggleSearch,
   searchActive = false,
   onHelpClick,
+  onOpenGameEnvironment,
 }: HeaderProps) {
   const liveNotificationCount = useUnreadNotificationCount();
   const displayedNotificationCount = liveNotificationCount ?? 0;
@@ -144,6 +150,14 @@ export default function Header({
           icon: <HelpCircle className="h-5 w-5" />,
         }]
       : []),
+    ...(onOpenGameEnvironment
+      ? [{
+          id: "game",
+          label: "Game",
+          ariaLabel: "Open Game Environment",
+          icon: <Joystick className="h-5 w-5" />,
+        }]
+      : []),
   ];
 
   // The expanded pill follows context: an open search wins, otherwise the
@@ -166,6 +180,7 @@ export default function Header({
     else if (id === "notifications") onNavigateToNotifications();
     else if (id === "subscription") onNavigateToSubscription();
     else if (id === "help") onHelpClick?.();
+    else if (id === "game") onOpenGameEnvironment?.();
   };
 
   return (

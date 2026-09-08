@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { Bell, Heart, Search, Trophy, UserRound, X } from "lucide-react";
+import { Bell, Heart, Joystick, Search, Trophy, UserRound, X } from "lucide-react";
 import ExpandingTabs from "../../components/ui/ExpandingTabs";
 import { GlassSurface } from "../../components/ui/glass";
 import { GlassButton } from "../../components/ui/glass-button";
@@ -21,6 +21,7 @@ interface HeaderProps {
   favoritesCount: number;
   onOpenFavorites?: () => void;
   onOpenNotifications?: () => void;
+  onOpenGameEnvironment?: () => void;
 }
 
 const typeLabel: Record<string, string> = {
@@ -52,7 +53,7 @@ function brandGlassGradient(from: string, to: string) {
 }
 
 const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
-  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications },
+  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites, onOpenNotifications, onOpenGameEnvironment },
   ref,
 ) {
   const unreadNotificationCount = useUnreadNotificationCount() || 0;
@@ -201,6 +202,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
               else if (id === "profile") window.location.hash = "#/profile";
               else if (id === "notifications") onOpenNotifications?.();
               else if (id === "favorites") onOpenFavorites?.();
+              else if (id === "game") onOpenGameEnvironment?.();
             }}
             items={[
               { id: "leaderboard", label: "Leaderboard", ariaLabel: "Leaderboard", icon: <Trophy size={17} strokeWidth={2.4} /> },
@@ -222,6 +224,14 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
                 badge: favoritesCount > 0 ? String(favoritesCount) : undefined,
                 badgeTone: "rose",
               },
+              ...(onOpenGameEnvironment
+                ? [{
+                    id: "game",
+                    label: "Game",
+                    ariaLabel: "Open Game Environment",
+                    icon: <Joystick size={17} strokeWidth={2.4} />,
+                  }]
+                : []),
             ]}
           />
           {/* The "Dark mode" GlassSwitch moved off the header — appearance now
