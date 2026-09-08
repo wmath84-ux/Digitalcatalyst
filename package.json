@@ -28,16 +28,15 @@
     }
   },
   "scripts": {
-    "dev": "node scripts/build-game-world.mjs && vite",
-    "build": "node scripts/build-game-world.mjs && vite build",
+    "dev": "vite",
+    "build": "vite build",
     "preview": "vite preview",
     "verify:google-signin": "node scripts/verify-google-signin.mjs",
     "android:sync": "npm run verify:google-signin && npm run build && cap sync android",
     "android:open": "cap open android",
     "android:assemble:debug": "npm run verify:google-signin && npm run build && cap sync android && cd android && ./gradlew assembleDebug",
     "android:bundle:release": "npm run verify:google-signin && npm run build && cap sync android && cd android && ./gradlew bundleRelease",
-    "android:run": "cap run android",
-    "build:game-world": "node scripts/build-game-world.mjs"
+    "android:run": "cap run android"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^7.5.0",

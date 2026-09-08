@@ -51,7 +51,6 @@ export default function CartWishlistApp({
           onNavigateToSubscription={onNavigateToSubscription}
           onNavigateToCart={() => onNavigate("cart")}
           onNavigateToNotifications={onNavigateToNotifications}
-          showGameButton
         />
 
         <div className="relative flex flex-1 flex-col overflow-hidden bg-transparent">

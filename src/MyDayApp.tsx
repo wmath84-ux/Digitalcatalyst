@@ -606,7 +606,6 @@ export default function App() {
           onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
           onNavigateToCart={() => { window.location.hash = "#/cart"; }}
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
-          showGameButton
         />
 
         {/* The phone search strip is CHROME, so it wears the bar plate the

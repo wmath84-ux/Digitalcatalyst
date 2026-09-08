@@ -238,7 +238,6 @@ export default function App({
           favoritesCount={favoriteIds.size}
           onOpenFavorites={onNavigateToFavorites}
           onOpenNotifications={onNavigateToNotifications}
-          showGameButton
         />
 
         <main className="flex-1 overflow-y-auto pb-2">

@@ -131,7 +131,6 @@ export default function ProductDetail(props: ProductDetailProps) {
           onNavigateToSubscription={props.onNavigateToSubscription || (() => undefined)}
           onNavigateToCart={props.onNavigateToCart || (() => undefined)}
           onNavigateToNotifications={props.onNavigateToNotifications || (() => undefined)}
-          showGameButton
         />
         <main data-pdp-scroll className="min-h-0 flex-1 overflow-y-auto md:px-8">
           {props.product ? <PremiumProductContent {...props} product={props.product} /> : <MissingProduct onBack={props.onBack} />}

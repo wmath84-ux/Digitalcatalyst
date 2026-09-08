@@ -53,7 +53,6 @@ export default function FlowPathApp({
           favoritesCount={favoritesCount}
           onOpenFavorites={onOpenFavorites}
           onOpenNotifications={onOpenNotifications}
-          showGameButton
         />
       </div>
 

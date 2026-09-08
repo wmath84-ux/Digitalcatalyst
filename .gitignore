@@ -55,6 +55,3 @@ android/app/src/main/assets/capacitor.plugins.json
 
 # Scratch / temporary demo harnesses (never shipped)
 scratch/
-
-# Built from pinned vendor/threejs-world by dev/build; never commit bundles.
-/public/game-world/

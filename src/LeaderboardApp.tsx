@@ -146,7 +146,6 @@ export default function LeaderboardApp() {
           onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
           onNavigateToCart={() => { window.location.hash = "#/cart"; }}
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
-          showGameButton
         />
         <main className="flex-1 overflow-y-auto px-4 py-5">
           <GlassCard>

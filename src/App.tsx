@@ -59,7 +59,6 @@ export default function App({
           onNavigateToSubscription={onNavigateToSubscription}
           onNavigateToCart={onNavigateToCart}
           onNavigateToNotifications={onNavigateToNotifications}
-          showGameButton
         />
 
         <main className="flex-1 overflow-y-auto">
