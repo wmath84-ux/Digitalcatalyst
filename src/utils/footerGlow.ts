@@ -33,20 +33,29 @@ export function initFooterGlow(): () => void {
   };
 
   // Called once per frame while there is still energy left: the glow
-  // eases back into the footer until it is fully at rest.
+  // eases back into the footer until it is fully at rest. Paints the CURRENT
+  // energy first, then decays for the next frame, so the peak the user sees
+  // is the same value the old inline publish() produced — and the loop always
+  // paints one final `0` frame before it stops.
   const settle = () => {
     raf = null;
+    publish();
+    if (power === 0) return;
     power *= DECAY;
     if (power <= FLOOR) power = 0;
-    publish();
-    if (power > 0) raf = requestAnimationFrame(settle);
+    raf = requestAnimationFrame(settle);
   };
 
   // Capture phase so scrolls inside nested containers (course player,
   // panels, sheets) feed the glow too — not just the window scroll.
+  //
+  // The handler itself does NO work beyond bumping a number: publishing the
+  // custom property (a style write, and therefore a style recalculation) is
+  // left to the rAF loop below, so a fast flick that fires dozens of scroll
+  // events per frame still costs exactly one write per frame instead of one
+  // per event. Purely a scheduling change — the glow curve is identical.
   const onScroll = () => {
     power = Math.min(1, power + STEP);
-    publish();
     if (raf === null) raf = requestAnimationFrame(settle);
   };
 

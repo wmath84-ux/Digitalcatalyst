@@ -360,7 +360,7 @@ function ProfileHero({
         <div className="flex items-center gap-4">
           <div className="shrink-0 rounded-2xl p-[3px] ring-1 ring-white/20">
             {photoURL ? (
-              <img src={photoURL} alt="" className="h-16 w-16 rounded-[14px] object-cover md:h-20 md:w-20" />
+              <img src={photoURL} alt="" decoding="async" width={80} height={80} className="h-16 w-16 rounded-[14px] object-cover md:h-20 md:w-20" />
             ) : (
               <div className="grid h-16 w-16 place-items-center rounded-[14px] bg-indigo-500/20 text-xl font-black text-white md:h-20 md:w-20 md:text-2xl">
                 {initials}
@@ -581,7 +581,7 @@ function LibraryCard({
               className="w-full text-left [&>span>div]:h-auto [&>span>div]:w-full [&>span>div]:rounded-2xl [&>span>div]:p-2 [&>span>div>span]:w-full"
             >
               <span className="flex w-full items-center gap-3">
-                <img src={product.image} alt="" className="h-12 w-16 shrink-0 rounded-xl object-cover" />
+                <img src={product.image} alt="" loading="lazy" decoding="async" width={64} height={48} className="h-12 w-16 shrink-0 rounded-xl object-cover" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-black text-white">{product.title}</span>
                   <span className="text-xs font-medium text-white/55">Owned · Open course</span>

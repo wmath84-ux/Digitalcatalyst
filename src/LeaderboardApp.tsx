@@ -38,6 +38,10 @@ function Avatar({ name, photoURL }: { name: string; photoURL: string | null }) {
       <img
         src={src}
         alt=""
+        loading="lazy"
+        decoding="async"
+        width={44}
+        height={44}
         className="h-11 w-11 rounded-full object-cover"
         onError={() => setFailed(true)}
       />

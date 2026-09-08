@@ -541,7 +541,7 @@ function PremiumProductContent({
         <div data-pdp-body className="flex flex-col gap-6 px-4 pb-8 pt-4">
           <section data-pdp-gallery className="flex flex-col gap-3">
             <GlassSurface radius={24} tint={0.25} blur={0} className="dc-scene-plate group relative overflow-hidden" contentClassName="relative">
-              <img data-pdp-hero-img src={selectedImage} alt={product.title} className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105" />
+              <img data-pdp-hero-img src={selectedImage} alt={product.title} loading="eager" fetchPriority="high" decoding="async" className="aspect-[4/3] w-full object-cover transition duration-700 group-hover:scale-105" />
               <div className="dc-scene-plate dc-scene-plate--bar absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-[var(--dc-chrome-glass)] px-3 py-1.5 text-[10px] font-medium text-white [backdrop-filter:var(--dc-chrome-glass-blur)]">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live catalog
               </div>
@@ -562,7 +562,7 @@ function PremiumProductContent({
               <div data-pdp-thumbs ref={thumbs.ref} onPointerDown={thumbs.onPointerDown} className="flex gap-2 overflow-x-auto pb-1">
                 {gallery.map((image, index) => (
                   <button key={`${image}-${index}`} onClick={() => setActiveImage(index)} className={`h-16 min-w-16 flex-1 overflow-hidden rounded-xl border-2 transition ${activeImage === index ? "border-white/80" : "border-transparent opacity-70"}`}>
-                    <img src={image} alt={`${product.title} ${index + 1}`} className="h-full w-full object-cover" />
+                    <img src={image} alt={`${product.title} ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -999,7 +999,7 @@ function RelatedProducts({ products, onNavigate }: { products: Product[]; onNavi
   return (
     <GlassSurface data-pdp-related radius={24} className="dc-scene-plate text-white" contentClassName="p-5">
       <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-black dc-ink-1">You may also like</h2><p className="dc-section-label">Matched from the live catalog</p></div><ArrowUpRight className="h-4 w-4 text-white/55" /></div>
-      <div data-pdp-related-list className="space-y-3">{products.map((item) => <GlassCard key={item.id} role="button" tabIndex={0} onClick={() => onNavigate?.(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate?.(item); } }} aria-label={`View ${item.title}`} className="group w-full cursor-pointer overflow-hidden text-left transition hover:-translate-y-0.5" contentClassName="flex p-0"><img src={item.image} alt={item.title} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-white">{item.title}</span><span className="flex items-center gap-1 text-xs text-white/55"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-white">{formatPrice(item.price)}</span></span></GlassCard>)}</div>
+      <div data-pdp-related-list className="space-y-3">{products.map((item) => <GlassCard key={item.id} role="button" tabIndex={0} onClick={() => onNavigate?.(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate?.(item); } }} aria-label={`View ${item.title}`} className="group w-full cursor-pointer overflow-hidden text-left transition hover:-translate-y-0.5" contentClassName="flex p-0"><img src={item.image} alt={item.title} loading="lazy" decoding="async" width={112} height={96} className="h-24 w-28 shrink-0 object-cover transition duration-500 group-hover:scale-105" /><span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-3"><span className="line-clamp-2 text-sm font-semibold text-white">{item.title}</span><span className="flex items-center gap-1 text-xs text-white/55"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {item.rating.toFixed(1)} · {item.category}</span><span className="font-bold text-white">{formatPrice(item.price)}</span></span></GlassCard>)}</div>
     </GlassSurface>
   );
 }

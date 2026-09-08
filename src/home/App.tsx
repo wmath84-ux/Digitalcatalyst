@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import Header from "./components/Header";
@@ -10,7 +10,10 @@ import ContinueLearning from "./components/ContinueLearning";
 import ContinueLearningSkeleton from "./components/ContinueLearningSkeleton";
 import Reviews from "./components/Reviews";
 import BottomNav, { type TabKey } from "../components/BottomNav";
-import StickerWall from "../components/StickerWall";
+import DeferredVisible from "../components/DeferredVisible";
+// Bottom-of-page feedback wall: matter.js physics + its own chunk, mounted
+// lazily by DeferredVisible below (see the section near the end of the page).
+const StickerWall = lazy(() => import("../components/StickerWall"));
 import { createUserQuery } from "../utils/userQueries";
 import { categories, reviews as fallbackReviews } from "./data/mockData";
 import type { Banner, Product } from "./types";
@@ -395,19 +398,29 @@ export default function App({
                   compact copy) so it fits without spilling. */}
               <section data-home-sticker-wall className="mt-8 px-4 md:px-8">
                 <div className="h-[420px] w-full overflow-hidden rounded-[2rem] border border-white/10 bg-[#0F0F12] sm:h-[520px] md:h-[600px]">
-                  <StickerWall
-                    onSubmitNote={async (note) => { await createUserQuery(note).catch(() => undefined); }}
-                    footer={
-                      <button
-                        type="button"
-                        onClick={() => { window.location.hash = "#/queries"; }}
-                        className="rounded-full border border-white/15 bg-white/[0.07] px-5 py-2 text-sm font-black text-white backdrop-blur transition hover:bg-white/[0.14]"
-                        data-home-explore-queries
-                      >
-                        Explore user queries
-                      </button>
-                    }
-                  />
+                  {/* The wall boots a matter.js world + a rAF render loop, and
+                      it is the LAST section on Home. `DeferredVisible` keeps
+                      the reserved box (no layout shift) but only mounts — and
+                      only downloads — the physics once the learner scrolls
+                      near it, so a Home visit that never reaches the bottom
+                      costs neither the chunk nor the CPU. */}
+                  <DeferredVisible className="h-full w-full">
+                    <Suspense fallback={<div className="h-full w-full" />}>
+                      <StickerWall
+                        onSubmitNote={async (note) => { await createUserQuery(note).catch(() => undefined); }}
+                        footer={
+                          <button
+                            type="button"
+                            onClick={() => { window.location.hash = "#/queries"; }}
+                            className="rounded-full border border-white/15 bg-white/[0.07] px-5 py-2 text-sm font-black text-white backdrop-blur transition hover:bg-white/[0.14]"
+                            data-home-explore-queries
+                          >
+                            Explore user queries
+                          </button>
+                        }
+                      />
+                    </Suspense>
+                  </DeferredVisible>
                 </div>
               </section>
             </>

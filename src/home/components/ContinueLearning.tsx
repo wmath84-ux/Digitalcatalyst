@@ -63,7 +63,7 @@ function ContinueLearningCard({ item, showProgressLabel }: { item: ContinueLearn
       className="dc-card w-full cursor-pointer text-left transition active:scale-[0.98] [&>div:last-child]:flex [&>div:last-child]:items-center [&>div:last-child]:gap-3"
     >
       <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl ring-1 ring-white/10">
-        <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
+        <img src={item.image} alt={item.title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
       </div>
 
       <div className="min-w-0 flex-1">

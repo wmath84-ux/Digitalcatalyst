@@ -119,7 +119,7 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
             transition: isDragging ? "none" : "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)",
           }}
         >
-          {banners.map((banner) => {
+          {banners.map((banner, bannerIndex) => {
             const linked = isBannerLinked(banner);
             return (
               <div key={banner.id} className="w-full flex-shrink-0 basis-full">
@@ -158,10 +158,17 @@ export default function HeroCarousel({ banners, onOpen }: HeroCarouselProps) {
                       )}
                     </span></GlassButton>
                   </div>
+                  {/* The first slide's artwork is the hero of the page — the
+                      LCP candidate — so it is fetched eagerly at high priority.
+                      Every other slide is off-screen inside the track and is
+                      lazy: a learner who never swipes never pays for them. */}
                   <img
                     src={banner.image}
                     alt={banner.title}
                     draggable={false}
+                    loading={bannerIndex === 0 ? "eager" : "lazy"}
+                    fetchPriority={bannerIndex === 0 ? "high" : "low"}
+                    decoding="async"
                     className="pointer-events-none absolute -right-4 bottom-0 h-full w-1/2 object-cover opacity-90 mix-blend-luminosity md:mix-blend-normal"
                     style={{ maskImage: "linear-gradient(to left, black 55%, transparent 100%)" }}
                   />

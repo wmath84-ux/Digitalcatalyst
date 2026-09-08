@@ -1,7 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, query, where, type DocumentData } from "firebase/firestore";
+import { useEffect, useMemo } from "react";
+import { collection, query, where, type DocumentData } from "firebase/firestore";
 import { db } from "../../firebase";
+import { useSharedSnapshot } from "../lib/sharedSnapshot";
 import type { Product } from "../data/products";
+
+/**
+ * The one published-reviews query in the app.
+ *
+ * Firestore rules expose only moderation-approved reviews. Sorting stays
+ * client-side, avoiding a composite-index requirement for new projects.
+ *
+ * Exported (with its registry key) so `CatalogContext`'s rating aggregate and
+ * this hook share ONE listener instead of opening the same collection query
+ * twice on every app open — see src/lib/sharedSnapshot.ts.
+ */
+export const PUBLISHED_REVIEWS_KEY = "siteReviews:published";
+export const publishedReviewsQuery = () =>
+  query(collection(db, "siteReviews"), where("status", "==", "published"));
 
 export type PublishedProductReview = {
   id: string;
@@ -121,22 +136,15 @@ const buildFallbackReviews = (products: Product[], reviews: FallbackReview[]): P
 };
 
 export function usePublishedProductReviews(products: Product[]) {
-  const [rawReviews, setRawReviews] = useState<Array<{ id: string; data: DocumentData }>>([]);
-  const [loading, setLoading] = useState(true);
+  // One shared listener (see PUBLISHED_REVIEWS_KEY above): the Home rail, the
+  // PDP and the catalog's rating aggregate all read the same snapshot, so the
+  // collection is downloaded — and billed — once per session rather than once
+  // per consumer.
+  const { docs: rawReviews, error, loading } = useSharedSnapshot(PUBLISHED_REVIEWS_KEY, publishedReviewsQuery);
 
   useEffect(() => {
-    // Firestore rules expose only moderation-approved reviews. Sorting stays
-    // client-side, avoiding a composite-index requirement for new projects.
-    const published = query(collection(db, "siteReviews"), where("status", "==", "published"));
-    return onSnapshot(published, (snapshot) => {
-      setRawReviews(snapshot.docs.map((item) => ({ id: item.id, data: item.data() })));
-      setLoading(false);
-    }, (error) => {
-      console.error("Published review sync failed", error);
-      setRawReviews([]);
-      setLoading(false);
-    });
-  }, []);
+    if (error) console.error("Published review sync failed", error);
+  }, [error]);
 
   const reviews = useMemo(() => {
     const productsById = new Map<string, Product>();

@@ -1,6 +1,32 @@
 const CACHE_NAME = 'digital-catalyst-app-shell-v4';
 const APP_SHELL = ['/','/index.html'];
 
+// ── Hashed build output (perf pass 2026-09-08) ──────────────────────────────
+// The app used to ship as ONE inlined index.html, so caching the shell cached
+// the whole program. It is now code-split into content-hashed chunks under
+// /assets/, which changes two things:
+//
+//   1. offline boot needs those chunks in a cache, not just index.html;
+//   2. a repeat visit should never re-download a chunk it already has.
+//
+// Both are handled by a cache-first rule for /assets/ only. Every file there
+// is emitted by Vite with a content hash in its name, so a cached response can
+// never be stale — a new build produces new filenames. Nothing else is cached
+// here: API calls, Firebase/Firestore traffic, auth and Razorpay responses all
+// go straight to the network, exactly as before, so no private or payment
+// data is ever stored by the worker.
+const ASSET_CACHE_NAME = 'digital-catalyst-assets-v1';
+const KEEP_CACHES = [CACHE_NAME, ASSET_CACHE_NAME];
+// Build output only: `name-<contenthash>.ext`. Those filenames change whenever
+// the bytes change, so cache-first is always safe for them. Deliberately does
+// NOT match /assets/animations/*.mp4 — the opening clip is ~5 MB, is served
+// with Range requests, and must not sit in the app's cache quota.
+const HASHED_ASSET = /-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?|ttf|png|jpe?g|svg|webp|avif|gif)$/;
+const isHashedAsset = (url) =>
+  url.origin === self.location.origin
+  && url.pathname.startsWith('/assets/')
+  && HASHED_ASSET.test(url.pathname);
+
 // Live branding pushed from the page (BrandingContext). Falls back to the
 // built-in defaults until the first message arrives. Lets notification titles
 // and icons follow whatever name/logo the admin configured.
@@ -31,12 +57,59 @@ self.addEventListener('install', event => {
   );
 });
 self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))).then(() => self.clients.claim()));
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => !KEEP_CACHES.includes(key)).map(key => caches.delete(key))))
+      // Keep the hashed-asset cache bounded: a long-lived install that has
+      // seen many deploys would otherwise hold every old chunk forever. Well
+      // past a single build's chunk count, so a normal user never hits it.
+      .then(() => caches.open(ASSET_CACHE_NAME).then((cache) => cache.keys().then((entries) => {
+        if (entries.length <= 200) return undefined;
+        return Promise.all(entries.slice(0, entries.length - 100).map((entry) => cache.delete(entry)));
+      })).catch(() => undefined))
+      .then(() => self.clients.claim()),
+  );
 });
 self.addEventListener('fetch', event => {
   if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).catch(() => caches.match('/index.html')));
+    // Network-first, and refresh the cached shell on every success so the
+    // offline copy always matches the LAST build this device actually loaded
+    // (its chunk filenames are the ones sitting in the asset cache below).
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copy)).catch(() => undefined);
+        }
+        return response;
+      }).catch(() => caches.match('/index.html')),
+    );
+    return;
   }
+  // Content-hashed build assets: serve from cache when we have them (instant,
+  // zero network on a warm start and on every route chunk after the first
+  // visit), otherwise fetch once and keep the copy for offline.
+  if (event.request.method !== 'GET') return;
+  let url;
+  try {
+    url = new URL(event.request.url);
+  } catch {
+    return;
+  }
+  if (!isHashedAsset(url)) return;
+  event.respondWith(
+    caches.open(ASSET_CACHE_NAME).then((cache) => cache.match(event.request).then((hit) => {
+      if (hit) return hit;
+      return fetch(event.request).then((response) => {
+        // Only store complete, same-origin successes; an opaque or partial
+        // response would poison the cache for the life of the build.
+        if (response && response.status === 200 && response.type === 'basic') {
+          cache.put(event.request, response.clone()).catch(() => undefined);
+        }
+        return response;
+      });
+    })).catch(() => fetch(event.request)),
+  );
 });
 
 const normalizePushData = (payload) => {

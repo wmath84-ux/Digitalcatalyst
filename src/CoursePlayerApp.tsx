@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayRemove, arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { playSfxAdd, playSfxComplete, playSfxRemove } from "./utils/sfx";
 import { db } from "../firebase";
@@ -6,7 +6,13 @@ import ResourceViewer, { type CourseFileActions } from "./course/ResourceViewer"
 import CourseOverlay, { STUDY_TAB_ORDER, dockTabRecord, type DockTab } from "./course/CourseOverlay";
 import { SplitDeck, type SplitDeckHandle } from "./course/studyPanels";
 import SnowOverlay from "./course/SnowOverlay";
-import MindMapPanel from "./course/MindMapPanel";
+// The mind map canvas is the single heaviest thing in the player: the panel
+// plus `@xyflow/react` is a 221 kB / 73 kB-gzip chunk. `StudyContent` only
+// renders this slot when the mind-map tab is the active one, so React.lazy
+// keeps that chunk off the wire for every learner who opens a lesson and
+// never touches the mind map — while the element below stays byte-identical
+// and the panel, once opened, stays mounted exactly as before.
+const MindMapPanel = lazy(() => import("./course/MindMapPanel"));
 import PlayerPanel from "./course/PlayerPanel";
 import useCourseMindMap from "./course/useCourseMindMap";
 import { combineHtml, loadLocalNotes, persistLocalNotes } from "./course/notesStore";
@@ -905,6 +911,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // Firestore hook and canvas state survive the pane being collapsed and
       // reopened — the learner never loses an unsaved branch to a tab switch.
       mindMapPanel={(
+        <Suspense
+          fallback={(
+            <div className="grid min-h-0 flex-1 place-items-center p-6 text-center text-sm font-semibold text-white/60">
+              <span className="block h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-violet-400" />
+            </div>
+          )}
+        >
         <MindMapPanel
           mind={mindMap.mind}
           onMindChange={mindMap.setMind}
@@ -929,6 +942,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           // back to the library home screen.
           open={dockTab === "mindmap"}
         />
+        </Suspense>
       )}
       playerPanel={playerPanel}
     />

@@ -45,6 +45,8 @@ export default function ProductCard({
         <img
           src={product.image}
           alt={product.title}
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <span

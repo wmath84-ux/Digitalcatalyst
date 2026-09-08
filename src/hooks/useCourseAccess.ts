@@ -28,11 +28,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   collection,
   doc,
-  onSnapshot,
   query,
   where,
 } from "firebase/firestore";
 import { db } from "../../firebase";
+import { subscribeShared, subscribeSharedDoc } from "../lib/sharedSnapshot";
 import { useAuth } from "../context/AuthContext";
 import {
   collectEntitlementOwnership,
@@ -142,13 +142,21 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
       setEntitlementDocs([]);
       return undefined;
     }
-    const entitlementsCol = collection(db, "entitlements");
-    const q = query(entitlementsCol, where("uid", "==", uid));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const docs: EntitlementDoc[] = snapshot.docs.map((item) => {
-          const data = item.data() || {};
+    // Shared listener (src/lib/sharedSnapshot.ts): the route guard, the course
+    // player and the PDP all mount this hook, sometimes two at once (the guard
+    // renders the player). They now join ONE listener per query instead of
+    // each opening its own copy of the same four subscriptions.
+    const unsubscribe = subscribeShared(
+      `entitlements:${uid}`,
+      () => query(collection(db, "entitlements"), where("uid", "==", uid)),
+      (entries, err) => {
+        if (err) {
+          console.warn("[useCourseAccess] entitlement sync failed", err);
+          setEntitlementDocs([]);
+          return;
+        }
+        const docs: EntitlementDoc[] = entries.map((item) => {
+          const data = item.data || {};
           // The doc id is `uid__<entitlementId>`; the
           // server-authoritative shape is on the doc body.
           return {
@@ -165,10 +173,6 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
         });
         setEntitlementDocs(docs);
       },
-      (err) => {
-        console.warn("[useCourseAccess] entitlement sync failed", err);
-        setEntitlementDocs([]);
-      },
     );
     return () => unsubscribe();
   }, [uid]);
@@ -179,11 +183,16 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
       setSubscription(null);
       return undefined;
     }
-    const subRef = doc(db, "users", uid, "subscription", "current");
-    const unsubscribe = onSnapshot(
-      subRef,
-      (snapshot) => {
-        const data = snapshot.data() || {};
+    const unsubscribe = subscribeSharedDoc(
+      `users/${uid}/subscription/current`,
+      () => doc(db, "users", uid, "subscription", "current"),
+      (snapshotData, _exists, err) => {
+        if (err) {
+          console.warn("[useCourseAccess] subscription sync failed", err);
+          setSubscription(null);
+          return;
+        }
+        const data = snapshotData || {};
         const sub = data as Record<string, unknown>;
         if (!Object.keys(sub).length) {
           setSubscription(null);
@@ -201,10 +210,6 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
           includedModuleKeys: Array.isArray(data.includedModuleKeys) ? data.includedModuleKeys.map(String) : [],
         });
       },
-      (err) => {
-        console.warn("[useCourseAccess] subscription sync failed", err);
-        setSubscription(null);
-      },
     );
     return () => unsubscribe();
   }, [uid]);
@@ -218,11 +223,17 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
       setLegacyUpdateIds([]);
       return undefined;
     }
-    const userRef = doc(db, "users", uid);
-    const unsubscribe = onSnapshot(
-      userRef,
-      (snapshot) => {
-        const data = snapshot.data() || {};
+    const unsubscribe = subscribeSharedDoc(
+      `users/${uid}`,
+      () => doc(db, "users", uid),
+      (snapshotData, _exists, err) => {
+        if (err) {
+          console.warn("[useCourseAccess] user-doc sync failed", err);
+          setLegacyProductIds([]);
+          setLegacyUpdateIds([]);
+          return;
+        }
+        const data = snapshotData || {};
         const productIds = Array.isArray(data.purchasedProductIds) ? data.purchasedProductIds.map(String) : [];
         const updateMap = (data.purchasedProductUpdateIds || {}) as Record<string, unknown>;
         const updateIds: string[] = [];
@@ -231,11 +242,6 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
         }
         setLegacyProductIds(productIds);
         setLegacyUpdateIds(updateIds);
-      },
-      (err) => {
-        console.warn("[useCourseAccess] user-doc sync failed", err);
-        setLegacyProductIds([]);
-        setLegacyUpdateIds([]);
       },
     );
     return () => unsubscribe();
@@ -248,13 +254,18 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
       setLegacyPurchaseProductIds([]);
       return undefined;
     }
-    const purchasesCol = collection(db, "users", uid, "purchases");
-    const unsubscribe = onSnapshot(
-      purchasesCol,
-      (snapshot) => {
+    const unsubscribe = subscribeShared(
+      `users/${uid}/purchases`,
+      () => collection(db, "users", uid, "purchases"),
+      (entries, err) => {
+        if (err) {
+          console.warn("[useCourseAccess] purchases subcollection sync failed", err);
+          setLegacyPurchaseProductIds([]);
+          return;
+        }
         const ids = new Set<string>();
-        snapshot.docs.forEach((item) => {
-          const data = item.data() || {};
+        entries.forEach((item) => {
+          const data = item.data || {};
           // Per-Part 6: the base product purchase is stored
           // at docId = productId. We also look at
           // productDocumentId for the same.
@@ -262,10 +273,6 @@ export const useCourseAccess = ({ product, requireBaseCourseForUpdate = true }: 
           if (id) ids.add(id);
         });
         setLegacyPurchaseProductIds(Array.from(ids));
-      },
-      (err) => {
-        console.warn("[useCourseAccess] purchases subcollection sync failed", err);
-        setLegacyPurchaseProductIds([]);
       },
     );
     return () => unsubscribe();
@@ -352,14 +359,19 @@ export const useOwnedProducts = (): {
       setLoading(false);
       return undefined;
     }
-    const entitlementsCol = collection(db, "entitlements");
-    const q = query(entitlementsCol, where("uid", "==", uid));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
+    // Same shared listener as `useCourseAccess` above — the Profile library
+    // and an open course player no longer bill the entitlements query twice.
+    const unsubscribe = subscribeShared(
+      `entitlements:${uid}`,
+      () => query(collection(db, "entitlements"), where("uid", "==", uid)),
+      (entries, err) => {
+        if (err) {
+          setLoading(false);
+          return;
+        }
         const ids = new Set<string>();
-        snapshot.docs.forEach((item) => {
-          const data = item.data() || {};
+        entries.forEach((item) => {
+          const data = item.data || {};
           const kind = data.kind ? String(data.kind) : "";
           if (kind === "full_product" && data.productId) {
             ids.add(String(data.productId));
@@ -368,7 +380,6 @@ export const useOwnedProducts = (): {
         setEntitlementProductIds(Array.from(ids));
         setLoading(false);
       },
-      () => setLoading(false),
     );
     return () => unsubscribe();
   }, [uid]);
@@ -381,18 +392,26 @@ export const useOwnedProducts = (): {
       setSubscriptionProductIds([]);
       return undefined;
     }
-    return onSnapshot(doc(db, "users", uid, "subscription", "current"), (snapshot) => {
-      const data = snapshot.data() || {};
-      const record: SubscriptionRecordShape = {
-        status: data.status ? String(data.status) : undefined,
-        expiresAt: timestampMillis(data.expiresAt),
-      };
-      setSubscriptionProductIds(
-        snapshot.exists() && isSubscriptionRecordActive(record) && Array.isArray(data.includedProductIds)
-          ? data.includedProductIds.map(String)
-          : [],
-      );
-    }, () => setSubscriptionProductIds([]));
+    return subscribeSharedDoc(
+      `users/${uid}/subscription/current`,
+      () => doc(db, "users", uid, "subscription", "current"),
+      (snapshotData, exists, err) => {
+        if (err) {
+          setSubscriptionProductIds([]);
+          return;
+        }
+        const data = snapshotData || {};
+        const record: SubscriptionRecordShape = {
+          status: data.status ? String(data.status) : undefined,
+          expiresAt: timestampMillis(data.expiresAt),
+        };
+        setSubscriptionProductIds(
+          exists && isSubscriptionRecordActive(record) && Array.isArray(data.includedProductIds)
+            ? data.includedProductIds.map(String)
+            : [],
+        );
+      },
+    );
   }, [uid]);
 
   const ownedProductIds = useMemo(

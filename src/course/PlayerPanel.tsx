@@ -218,7 +218,7 @@ export default function PlayerPanel({
           data-course-back
           data-course-logo-back
         >
-          <img src={logoUrl} alt={appName} className="h-10 w-10 rounded-full object-cover select-none" draggable={false} data-course-logo />
+          <img src={logoUrl} alt={appName} decoding="async" width={40} height={40} className="h-10 w-10 rounded-full object-cover select-none" draggable={false} data-course-logo />
         </GlassButton>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-black leading-tight tracking-tight" data-course-product-title>{productTitle}</p>

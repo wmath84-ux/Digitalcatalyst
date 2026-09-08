@@ -15,7 +15,9 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { subscribeShared } from "../lib/sharedSnapshot";
+import { notificationsKey } from "../hooks/useUnreadNotificationCount";
 import { db } from "../../firebase";
 import Header from "./Header";
 import { GlassButton } from "./ui/glass-button";
@@ -274,6 +276,23 @@ export default function NotificationsPage({
 
   const visibleItems = useMemo(() => filterNotifications(items, activeFilter), [activeFilter, items]);
 
+  // ── Incremental rendering (perf pass 2026-09-08) ────────────────────────
+  // Every card is a framer-motion element inside an AnimatePresence, so the
+  // tray used to mount — and animate — the learner's ENTIRE notification
+  // history at once. A long-lived account with hundreds of alerts paid that
+  // cost on every open, on the main thread, before the first card appeared.
+  // The list now renders one page at a time and grows on demand: same data,
+  // same order, same filters — just not all of it in the DOM at once.
+  const NOTIFICATIONS_PAGE_SIZE = 20;
+  const [visibleCount, setVisibleCount] = useState(NOTIFICATIONS_PAGE_SIZE);
+  // A filter switch is a new list: start it at the first page again.
+  useEffect(() => { setVisibleCount(NOTIFICATIONS_PAGE_SIZE); }, [activeFilter]);
+  const pagedItems = useMemo(
+    () => (visibleItems.length > visibleCount ? visibleItems.slice(0, visibleCount) : visibleItems),
+    [visibleItems, visibleCount],
+  );
+  const hiddenCount = visibleItems.length - pagedItems.length;
+
   useEffect(() => {
     setItems(loadSiteNotifications(viewerKey));
   }, [viewerKey]);
@@ -311,9 +330,12 @@ export default function NotificationsPage({
   useEffect(() => {
     if (!user) return undefined;
     const validCategories = new Set<SiteNotificationCategory>(["store", "reading", "course", "unlock", "community", "announcement", "mayday", "subscription"]);
-    return onSnapshot(collection(db, "users", user.id, "notifications"), (snapshot) => {
-      const cloud: SiteNotification[] = snapshot.docs.map((item) => {
-        const data = item.data() || {};
+    // Shares the bell badge's listener (src/lib/sharedSnapshot.ts) instead of
+    // opening a second one on the same collection.
+    return subscribeShared(notificationsKey(user.id), () => collection(db, "users", user.id, "notifications"), (snapshotDocs, error) => {
+      if (error) return;
+      const cloud: SiteNotification[] = snapshotDocs.map((item) => {
+        const data = item.data || {};
         const createdAt = data.createdAt && typeof data.createdAt.toMillis === "function" ? data.createdAt.toMillis() : Number(data.createdAt || Date.now());
         const rawCategory = String(data.category || "");
         const category = (validCategories.has(rawCategory as SiteNotificationCategory) ? rawCategory : "subscription") as SiteNotificationCategory;
@@ -479,7 +501,7 @@ export default function NotificationsPage({
             </div>
 
             <AnimatePresence mode="popLayout">
-              {visibleItems.map((notification, index) => (
+              {pagedItems.map((notification, index) => (
                 <NotificationCard
                   key={notification.id}
                   notification={notification}
@@ -489,6 +511,17 @@ export default function NotificationsPage({
                 />
               ))}
             </AnimatePresence>
+
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setVisibleCount((current) => current + NOTIFICATIONS_PAGE_SIZE)}
+                data-notifications-load-more
+                className="mx-auto mt-2 block rounded-full border border-white/15 bg-white/[0.07] px-5 py-2 text-xs font-black text-white transition hover:bg-white/[0.14]"
+              >
+                Show older notifications ({hiddenCount})
+              </button>
+            )}
 
             <AnimatePresence>
               {visibleItems.length === 0 && (

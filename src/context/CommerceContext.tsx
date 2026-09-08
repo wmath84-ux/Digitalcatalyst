@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { arrayRemove, arrayUnion, doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
+import { arrayRemove, arrayUnion, doc, setDoc, updateDoc } from "firebase/firestore";
+import { subscribeSharedDoc } from "../lib/sharedSnapshot";
 import { db } from "../../firebase";
 import { useAuth } from "./AuthContext";
 
@@ -30,15 +31,20 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
       return undefined;
     }
     setReady(false);
-    return onSnapshot(doc(db, "users", user.id), (snapshot) => {
-      const data = snapshot.data() || {};
-      setCartIds(new Set(normalizeIds(data.cartProductIds)));
-      setFavoriteIds(new Set(normalizeIds(data.wishlistProductIds)));
-      setReady(true);
-    }, (error) => {
-      console.error("Commerce state sync failed", error);
-      setCartIds(new Set());
-      setFavoriteIds(new Set());
+    // `users/{uid}` is the app's most-watched document: the auth profile sync,
+    // this cart/wishlist mirror and the course-access resolver all read it.
+    // They now share ONE listener (src/lib/sharedSnapshot.ts) instead of three.
+    return subscribeSharedDoc(`users/${user.id}`, () => doc(db, "users", user.id), (data, _exists, error) => {
+      if (error) {
+        console.error("Commerce state sync failed", error);
+        setCartIds(new Set());
+        setFavoriteIds(new Set());
+        setReady(true);
+        return;
+      }
+      const value = data || {};
+      setCartIds(new Set(normalizeIds(value.cartProductIds)));
+      setFavoriteIds(new Set(normalizeIds(value.wishlistProductIds)));
       setReady(true);
     });
   }, [user]);

@@ -45,6 +45,23 @@ const SRC = path.join(ROOT, "src");
 const UI_DIR = path.join("src", "components", "ui");
 const BASELINE_FILE = path.join(ROOT, "docs", "baselines", "glass-coverage-baseline.json");
 const DIST_INDEX = path.join(ROOT, "dist", "index.html");
+const DIST_ASSETS = path.join(ROOT, "dist", "assets");
+
+/* The build is code-split (perf pass 2026-09-08): `vite-plugin-singlefile` no
+   longer inlines the stylesheet into dist/index.html, so the oklch()/oklab
+   gates below have to read the emitted dist/assets/*.css as well. Both are
+   concatenated so the metric means the same thing it always did: "what the
+   browser actually receives". */
+const readBuiltPayload = () => {
+  const parts = [];
+  if (existsSync(DIST_INDEX)) parts.push(readFileSync(DIST_INDEX, "utf8"));
+  if (existsSync(DIST_ASSETS)) {
+    for (const name of readdirSync(DIST_ASSETS)) {
+      if (name.endsWith(".css")) parts.push(readFileSync(path.join(DIST_ASSETS, name), "utf8"));
+    }
+  }
+  return parts.length > 0 ? parts.join("\n") : null;
+};
 
 /** Admin is out of scope for the whole rollout — never scanned, never counted. */
 const EXCLUDED_DIRS = new Set([path.join("src", "admin"), path.join("src", "components", "admin")]);
@@ -346,7 +363,7 @@ const fixedLayer = {
 
 /* ── build output ───────────────────────────────────────────────────────── */
 
-const distHtml = existsSync(DIST_INDEX) ? readFileSync(DIST_INDEX, "utf8") : null;
+const distHtml = readBuiltPayload();
 const build = {
   distPresent: distHtml != null,
   /* Tailwind v4 emits oklch() for its whole palette; Lightning CSS lowers all
@@ -384,7 +401,7 @@ const METRICS = [
   { group: "layout", key: "layout.minWidthBreakpoint", label: "ad-hoc min-[Npx] breakpoints", direction: "down" },
   { group: "fixed layer", key: "fixedLayer.backgroundAttachmentFixed", label: "background-attachment: fixed", direction: "down", max: 0 },
   { group: "fixed layer", key: "fixedLayer.backdropViolations", label: "backdrop filter/animation/!important", direction: "down", max: 0 },
-  { group: "build", key: "build.oklchInDist", label: "oklch( in dist/index.html", direction: "down", max: 0 },
+  { group: "build", key: "build.oklchInDist", label: "oklch( in built output", direction: "down", max: 0 },
   { group: "build", key: "build.inOklabInDist", label: "in oklab in dist (ceiling, not 0)", direction: "down" },
   { group: "adoption", key: "pack.renderSites", label: "render-sites (RATCHET)", direction: "up" },
   { group: "adoption", key: "pack.directImports", label: "direct-imports (report only)", direction: "flat" },

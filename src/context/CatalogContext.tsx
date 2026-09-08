@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { collection, onSnapshot, query, where, type DocumentData } from "firebase/firestore";
+import { collection, onSnapshot, type DocumentData } from "firebase/firestore";
 import { db } from "../../firebase";
+import { subscribeShared } from "../lib/sharedSnapshot";
+import { PUBLISHED_REVIEWS_KEY, publishedReviewsQuery } from "../hooks/useProductReviews";
 import type { Product } from "../data/products";
 import { firestoreToCatalogProduct, getProductPublicationStatus, isProductPublished } from "../../utils/productMapping";
 import { fullDemoCourseContent } from "../data/demoCourseContent";
@@ -174,12 +176,21 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   // Live rating aggregate: once a learner publishes a review, the product's
   // average rating and review count are recomputed from approved reviews and
   // reflected everywhere that reads `product.rating` / `product.reviews`.
+  //
+  // Shares the ONE published-reviews listener with `useProductReviews` (Home
+  // rail + PDP) via the registry in src/lib/sharedSnapshot.ts. Before this the
+  // same collection query was open twice on every app open, doubling the
+  // document reads for identical data.
   useEffect(() => {
-    const published = query(collection(db, "siteReviews"), where("status", "==", "published"));
-    return onSnapshot(published, (snapshot) => {
+    return subscribeShared(PUBLISHED_REVIEWS_KEY, publishedReviewsQuery, (docs, snapshotError) => {
+      if (snapshotError) {
+        console.error("Review aggregate sync failed", snapshotError);
+        setRatingAggregates(new Map());
+        return;
+      }
       const aggregates = new Map<string, { sum: number; count: number }>();
-      snapshot.docs.forEach((item) => {
-        const data = item.data() || {};
+      docs.forEach((item) => {
+        const data = item.data || {};
         const productId = String(data.productId || data.productDocumentId || "").trim();
         const rating = Number(data.rating || 0);
         if (!productId || !Number.isFinite(rating) || rating <= 0) return;
@@ -189,9 +200,6 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         aggregates.set(productId, current);
       });
       setRatingAggregates(aggregates);
-    }, (reviewsError) => {
-      console.error("Review aggregate sync failed", reviewsError);
-      setRatingAggregates(new Map());
     });
   }, []);
 
@@ -210,18 +218,23 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       setPurchasedIds(new Set());
       return undefined;
     }
-    return onSnapshot(collection(db, "users", user.id, "purchases"), (snapshot) => {
+    // Shared with `useCourseAccess` (same subcollection, same shape), so the
+    // player/PDP no longer re-download the learner's purchases alongside the
+    // catalog's own copy.
+    return subscribeShared(`users/${user.id}/purchases`, () => collection(db, "users", user.id, "purchases"), (docs, purchaseError) => {
+      if (purchaseError) {
+        console.error("Purchase entitlement sync failed", purchaseError);
+        setPurchasedIds(new Set());
+        return;
+      }
       const ids = new Set<string>();
-      snapshot.docs.forEach((item) => {
-        const data = item.data() || {};
+      docs.forEach((item) => {
+        const data = item.data || {};
         ids.add(String(item.id));
         if (data.productDocumentId != null) ids.add(String(data.productDocumentId));
         if (data.productId != null) ids.add(String(data.productId));
       });
       setPurchasedIds(ids);
-    }, (purchaseError) => {
-      console.error("Purchase entitlement sync failed", purchaseError);
-      setPurchasedIds(new Set());
     });
   }, [user]);
 

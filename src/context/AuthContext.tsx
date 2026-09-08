@@ -27,7 +27,8 @@ import {
   updateProfile,
   type User as FirebaseUser,
 } from "firebase/auth";
-import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { subscribeSharedDoc } from "../lib/sharedSnapshot";
 import { auth, db } from "../../firebase";
 import { APPROVED_ADMIN_EMAIL, clearAdminSession, createAdminSession } from "../utils/adminSession";
 import { hasNativeGoogleAuth, isCapacitorNative, isEmbeddedWebView } from "../utils/nativeRuntime";
@@ -335,10 +336,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user || !auth.currentUser || auth.currentUser.uid !== user.id) return undefined;
-    return onSnapshot(doc(db, "users", user.id), (snapshot) => {
-      if (!snapshot.exists()) return;
-      const data = snapshot.data();
-      setUser((current) => current && current.id === snapshot.id ? {
+    // Joins the ONE `users/{uid}` listener (src/lib/sharedSnapshot.ts) that the
+    // cart/wishlist mirror and the course-access resolver also use. Read-only
+    // mapping — the auth flow itself is untouched.
+    const watchedId = user.id;
+    return subscribeSharedDoc(`users/${watchedId}`, () => doc(db, "users", watchedId), (data, exists, error) => {
+      if (error) { console.warn("Live Firebase profile sync failed", error); return; }
+      if (!exists || !data) return;
+      setUser((current) => current && current.id === watchedId ? {
         ...current,
         name: String(data.name || current.name),
         mobile: String(data.mobile || ""),
@@ -347,7 +352,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         photoURL: String(data.photoURL || current.photoURL || ""),
         role: data.role === "admin" ? "admin" : "user",
       } : current);
-    }, (error) => console.warn("Live Firebase profile sync failed", error));
+    });
   }, [user?.id]);
 
   const login = useCallback(async (email: string, password: string): Promise<AuthResult> => {

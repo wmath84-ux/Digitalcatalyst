@@ -26,12 +26,13 @@
  *
  * No dependencies — node builtins only.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
 const ROOT = process.cwd();
 const DIST = path.join(ROOT, "dist", "index.html");
+const DIST_ASSETS = path.join(ROOT, "dist", "assets");
 const SRC = path.join(ROOT, "src");
 
 const failures = [];
@@ -45,11 +46,20 @@ if (!existsSync(DIST)) {
   process.exit(1);
 }
 const html = readFileSync(DIST, "utf8");
-const css = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)]
-  .map((m) => m[1])
-  .sort((a, b) => b.length - a.length)[0];
+/* The build is code-split (perf pass 2026-09-08), so the stylesheet is emitted
+   as dist/assets/*.css and only linked from index.html. Read whichever shape
+   the build produced — an inlined <style> block (older single-file builds) or
+   the emitted stylesheet — so this gate keeps checking the BUILT css either
+   way. The biggest source wins, exactly as before. */
+const inlineStyles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]);
+const linkedStyles = existsSync(DIST_ASSETS)
+  ? readdirSync(DIST_ASSETS)
+      .filter((name) => name.endsWith(".css"))
+      .map((name) => readFileSync(path.join(DIST_ASSETS, name), "utf8"))
+  : [];
+const css = [...inlineStyles, ...linkedStyles].sort((a, b) => b.length - a.length)[0];
 if (!css) {
-  console.error("FAIL: no <style> block found in dist/index.html");
+  console.error("FAIL: no built stylesheet found (neither a <style> block in dist/index.html nor dist/assets/*.css)");
   process.exit(1);
 }
 

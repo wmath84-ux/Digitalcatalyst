@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection } from "firebase/firestore";
 import { db } from "../../firebase";
+import { subscribeShared } from "../lib/sharedSnapshot";
 import { useAuth } from "../context/AuthContext";
 import { loadSiteNotifications, type SiteNotification } from "../../utils/siteNotifications";
+
+/**
+ * The one per-user notifications query.
+ *
+ * The bell badge (this hook, mounted on nearly every page) and the
+ * Notifications page used to open the SAME collection listener separately, so
+ * opening the tray doubled the reads on the whole collection. Both now join a
+ * single shared listener keyed by uid — see src/lib/sharedSnapshot.ts.
+ */
+export const notificationsKey = (uid: string) => `users/${uid}/notifications`;
 
 export function useUnreadNotificationCount(): number | null {
   const { user, loading } = useAuth();
@@ -28,9 +39,10 @@ export function useUnreadNotificationCount(): number | null {
 
   useEffect(() => {
     if (!user) { setCloudUnreadIds([]); return undefined; }
-    return onSnapshot(collection(db, "users", user.id, "notifications"), (snapshot) => {
-      setCloudUnreadIds(snapshot.docs.filter((item) => item.data().read !== true).map((item) => item.id));
-    }, () => setCloudUnreadIds([]));
+    return subscribeShared(notificationsKey(user.id), () => collection(db, "users", user.id, "notifications"), (docs, error) => {
+      if (error) { setCloudUnreadIds([]); return; }
+      setCloudUnreadIds(docs.filter((item) => item.data.read !== true).map((item) => item.id));
+    });
   }, [user]);
 
   const count = useMemo(() => {
