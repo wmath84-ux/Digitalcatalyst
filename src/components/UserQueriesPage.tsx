@@ -20,6 +20,7 @@ import { Check, Loader2, Mail, MessageSquare, Send } from "lucide-react";
 import Header from "./Header";
 import BottomNav, { type TabKey } from "./BottomNav";
 import { GlassCard } from "./ui/GlassCard";
+import Skeleton from "./ui/Skeleton";
 import { GlassToggleGroup, GlassToggleItem } from "./ui/glass-toggle-group";
 import { listUserQueries, replyToUserQuery, type UserQuery } from "../utils/userQueries";
 
@@ -267,8 +268,23 @@ export default function UserQueriesPage({
           ) : null}
 
           {loading ? (
-            <div className="grid place-items-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-white/40" />
+            <div className="flex flex-col gap-3 pb-4" aria-busy="true" aria-label="Loading queries">
+              {/* The page's own dummy layout — query-card placeholders instead
+                  of a bare spinner, so a switch to Queries shows structure
+                  until the list loads. */}
+              {[0, 1, 2].map((index) => (
+                <GlassCard key={index} aria-hidden="true" className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Skeleton width={40} height={40} radius={999} />
+                    <div className="min-w-0 flex-1">
+                      <Skeleton width="72%" height={14} radius={6} />
+                      <Skeleton width="46%" height={11} radius={6} className="mt-1.5" />
+                    </div>
+                  </div>
+                  <Skeleton width="100%" height={12} radius={6} className="mt-3" />
+                  <Skeleton width="88%" height={12} radius={6} className="mt-1.5" />
+                </GlassCard>
+              ))}
             </div>
           ) : (
             <div className="flex flex-col gap-3 pb-4">

@@ -8,6 +8,7 @@ import { SplitDeck, type SplitDeckHandle } from "./course/studyPanels";
 import SnowOverlay from "./course/SnowOverlay";
 import MindMapPanel from "./course/MindMapPanel";
 import PlayerPanel from "./course/PlayerPanel";
+import CoursePeekDock from "./course/CoursePeekDock";
 import useCourseMindMap from "./course/useCourseMindMap";
 import { combineHtml, loadLocalNotes, persistLocalNotes } from "./course/notesStore";
 import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
@@ -234,6 +235,22 @@ const loadCourseSnow = (): boolean => {
 // The choice is remembered across lessons and visits. A first-time visitor
 // on a phone that IS in desktop-site mode starts in the readable mobile
 // rendering, because that is the whole point of the control.
+// ── Footer dock mode ─────────────────────────────────────────────────────
+// OFF (default) = the newer bottom-centre PEEK dock: a thin frosted line at
+// the bottom centre of the player; tap/hover opens the footer navigation and
+// swiping left/right selects the tab under the finger on release — the exact
+// pattern the desktop shell already uses. ON = the original always-visible
+// dock inside the study pane. Remembered per device; the owner asked for the
+// toggle to default to OFF because the peek dock is the better interaction.
+const legacyFooterDockStorageKey = "dc.coursePlayerLegacyFooterDock";
+const loadLegacyFooterDock = (): boolean => {
+  try {
+    return localStorage.getItem(legacyFooterDockStorageKey) === "1";
+  } catch {
+    return false;
+  }
+};
+
 const desktopViewStorageKey = "dc.coursePlayerDesktopView";
 const loadDesktopViewPreference = (): boolean => {
   try {
@@ -326,6 +343,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // Slides deck rendered at desktop width is unreadable on a phone, so the
   // learner can flip the same embed to its mobile rendering.
   const [desktopView, setDesktopView] = useState<boolean>(loadDesktopViewPreference);
+  // Footer navigation mode: OFF = the bottom-centre peek dock (default), ON =
+  // the legacy always-visible in-pane dock (Player settings).
+  const [legacyFooterDock, setLegacyFooterDock] = useState<boolean>(loadLegacyFooterDock);
   // Android-only capability: iOS can never hide its status bar and desktop
   // browsers don't need to. Gates the "Hide status bar" player toggle.
   const canFullscreen = useMemo(() => isMobileDevice() && !isIOSDevice(), []);
@@ -455,6 +475,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       /* private mode / storage disabled — keep the in-memory preference */
     }
   }, [desktopView]);
+
+  // Footer dock mode is a per-device preference, like the rest of the player's.
+  useEffect(() => {
+    try {
+      localStorage.setItem(legacyFooterDockStorageKey, legacyFooterDock ? "1" : "0");
+    } catch {
+      /* private mode / storage disabled — keep the in-memory preference */
+    }
+  }, [legacyFooterDock]);
 
   useEffect(() => () => resetDocumentViewportMode(), []);
 
@@ -873,6 +902,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         if (next) enterCoursePlayerFullscreen();
         else exitCoursePlayerFullscreen();
       }}
+      legacyFooterDock={legacyFooterDock}
+      onLegacyFooterDockChange={setLegacyFooterDock}
     />
   );
 
@@ -931,6 +962,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         />
       )}
       playerPanel={playerPanel}
+      // PEEK mode: the footer navigation lives at the bottom centre of the
+      // whole player (<CoursePeekDock /> below), so the study pane renders no
+      // footer of its own. The legacy preference keeps the in-pane dock.
+      peekDock={!legacyFooterDock}
     />
   );
 
@@ -975,6 +1010,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           handleRef={splitDeckRef}
         />
       </section>
+      {/* ── Footer navigation: the bottom-centre PEEK dock ────────────────
+          OFF by default (the owner's preferred interaction): a thin frosted
+          line at the bottom centre — tap/hover opens the footer, swipe
+          left/right selects the tab under the finger. The "Always-visible
+          footer dock" Player setting turns it off and restores the dock
+          inside the study pane. */}
+      {!legacyFooterDock ? <CoursePeekDock tab={dockTab} onTabChange={handleDockTabChange} /> : null}
       {snowMode ? <SnowOverlay /> : null}
     </div>
   );

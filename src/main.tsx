@@ -77,6 +77,7 @@ import { requiresAuthentication } from "./utils/appRoutes";
 import { applyGlassTier, detectGlassTier } from "./lib/glass";
 import { applyGlassScheme } from "./lib/glassScheme";
 import AppShell from "./components/AppShell";
+import PageSkeleton, { type PageSkeletonBlock } from "./components/PageSkeleton";
 import PageEnter, { pageEnterAppKey } from "./components/PageEnter";
 import { attachOpeningSplash, useOpeningSplashVisible } from "./utils/openingSplash";
 import OpeningAnimationPreview from "./components/dev/OpeningAnimationPreview";
@@ -168,6 +169,129 @@ const OPENING_PREVIEW_HASH = "#/dev/opening";
 const FLOWPATH_HASH = "#/flowpath";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
+
+/**
+ * Page-level skeleton variants — the "dummy layout" a page shows while its
+ * real content loads, so a route change is never blank and never shows a
+ * bare spinner (the old behaviour). Each variant mirrors that page's own
+ * anatomy (header strip + hero / body blocks + the footer dock clearance),
+ * rendered with the shared <PageSkeleton /> primitive.
+ */
+const PAGE_SKELETON_BLOCKS: Record<string, PageSkeletonBlock[]> = {
+  home: [
+    { width: "82%", height: 22 },
+    { width: "64%", height: 14 },
+    { width: "100%", height: 140 },
+    { width: "46%", height: 16 },
+    { width: "100%", height: 176 },
+    { width: "52%", height: 16 },
+    { width: "100%", height: 120 },
+    { width: "100%", height: 120 },
+  ],
+  store: [
+    { width: "70%", height: 20 },
+    { width: "100%", height: 148 },
+    { width: "100%", height: 148 },
+    { width: "100%", height: 148 },
+  ],
+  product: [
+    { width: "84%", height: 22 },
+    { width: "56%", height: 14 },
+    { width: "100%", height: 200 },
+    { width: "100%", height: 18 },
+    { width: "88%", height: 18 },
+    { width: "100%", height: 56 },
+  ],
+  myday: [
+    { width: "76%", height: 22 },
+    { width: "100%", height: 88 },
+    { width: "100%", height: 88 },
+    { width: "100%", height: 88 },
+  ],
+  revision: [
+    { width: "76%", height: 22 },
+    { width: "100%", height: 104 },
+    { width: "100%", height: 104 },
+    { width: "100%", height: 104 },
+  ],
+  subscription: [
+    { width: "80%", height: 22 },
+    { width: "100%", height: 132 },
+    { width: "100%", height: 132 },
+    { width: "100%", height: 132 },
+  ],
+  profile: [
+    { width: "40%", height: 40, radius: 999 },
+    { width: "70%", height: 20 },
+    { width: "100%", height: 72 },
+    { width: "100%", height: 72 },
+    { width: "100%", height: 72 },
+  ],
+  flowpath: [
+    { width: "76%", height: 22 },
+    { width: "100%", height: 96 },
+    { width: "100%", height: 96 },
+    { width: "100%", height: 96 },
+  ],
+  notifications: [
+    { width: "72%", height: 20 },
+    { width: "100%", height: 72 },
+    { width: "100%", height: 72 },
+    { width: "100%", height: 72 },
+  ],
+  search: [
+    { width: "100%", height: 48 },
+    { width: "52%", height: 16 },
+    { width: "100%", height: 140 },
+    { width: "100%", height: 140 },
+  ],
+};
+
+const PAGE_SKELETON_HERO = new Set(["product"]);
+const PAGE_SKELETON_FOOTER = new Set([
+  "home",
+  "store",
+  "myday",
+  "revision",
+  "subscription",
+  "profile",
+  "flowpath",
+  "notifications",
+  "search",
+]);
+
+/**
+ * Resolve a page key → the skeleton variant for that page. Unknown routes
+ * get the generic default (header + body blocks, no hero, footer clearance).
+ */
+const pageSkeletonVariant = (hash: string) => {
+  if (hash.startsWith(PRODUCT_HASH)) return "product";
+  if (hash.startsWith(HOME_HASH)) return "home";
+  if (hash.startsWith(STORE_HASH)) return "store";
+  if (hash.startsWith(MY_DAY_HASH)) return "myday";
+  if (hash.startsWith(REVISION_HASH)) return "revision";
+  if (hash.startsWith(SUBSCRIPTION_HASH)) return "subscription";
+  if (hash.startsWith(PROFILE_HASH)) return "profile";
+  if (hash.startsWith(FLOWPATH_HASH)) return "flowpath";
+  if (hash.startsWith(NOTIFICATIONS_HASH)) return "notifications";
+  if (hash.startsWith(SEARCH_HASH)) return "search";
+  return "default";
+};
+
+const pageSkeleton = (hash: string) => {
+  const variant = pageSkeletonVariant(hash);
+  const blocks = PAGE_SKELETON_BLOCKS[variant];
+  return (
+    <PageSkeleton
+      key={variant}
+      blocks={blocks}
+      hero={PAGE_SKELETON_HERO.has(variant)}
+      footer={PAGE_SKELETON_FOOTER.has(variant)}
+      count={1}
+      label={`Loading ${variant}`}
+    />
+  );
+};
 
 type NavigableProduct = {
   id: string;
@@ -1068,16 +1192,34 @@ function RootPage(): ReactNode {
   }
 
   if (protectedRoutePending) {
+    // A page swap must never be blank: show the page's own dummy layout while
+    // the session restores (or the auth redirect is decided) instead of a
+    // bare spinner. The real page replaces it without any flash of empty UI.
     return (
-      <main className="grid min-h-[100dvh] place-items-center px-6 text-center text-white">
-        <div>
-          <span className="mx-auto block h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-violet-400" />
-          <p className="mt-4 text-sm font-semibold text-slate-300">
-            {loading ? "Restoring your secure session…" : "Taking you to secure login…"}
-          </p>
-        </div>
+      <main className="min-h-[100dvh] px-5 py-6">
+        {pageSkeleton(hash)}
+        <p className="sr-only" role="status">
+          {loading ? "Restoring your secure session…" : "Taking you to secure login…"}
+        </p>
       </main>
     );
+  }
+
+  // While the shared catalog is still streaming in, every catalog-backed page
+  // shows its own dummy layout (the "structure" the owner wants on page
+  // switch) instead of an empty real page. Once the catalog resolves, the
+  // real page mounts — Home already renders its own dimension-matched
+  // skeletons for signed-in learners above, so this gate covers the rest
+  // (signed-out Home, Store, product, cart, favourites and course).
+  const catalogBackedRoute =
+    hash.startsWith(HOME_HASH) ||
+    hash.startsWith(STORE_HASH) ||
+    hash.startsWith(PRODUCT_HASH) ||
+    hash.startsWith(COURSE_HASH) ||
+    hash.startsWith(CART_HASH) ||
+    hash.startsWith(FAVORITES_HASH);
+  if (catalogLoading && catalogBackedRoute) {
+    return <main className="min-h-[100dvh] px-5 py-6">{pageSkeleton(hash)}</main>;
   }
 
   if (!hash || hash.startsWith(LANDING_HASH)) return <LandingApp />;
@@ -1273,7 +1415,15 @@ function RootPage(): ReactNode {
   if (hash.startsWith(OPENING_PREVIEW_HASH)) return <OpeningAnimationPreview />;
   if (hash.startsWith(MINDMAP_PREVIEW_HASH)) return <MindMapPreview />;
   if (hash.startsWith(COURSE_HASH)) {
-    if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;
+    // The catalog for this deep link is still streaming in: show the course
+    // page's own dummy layout instead of a blank screen — the real player
+    // mounts the moment the product resolves. A genuinely unknown id (the
+    // catalog finished loading without it) still gets the explicit
+    // "Checkout session not found" screen.
+    if (!selectedCourseProduct) {
+      if (catalogLoading) return <main className="min-h-[100dvh] px-5 py-6">{pageSkeleton(hash)}</main>;
+      return <InvalidCheckout onBack={() => { window.location.hash = `${STORE_HASH}/purchases`; }} />;
+    }
     return (
       <PageEnter pageKey={pageEnterAppKey(hash)}>
       <CourseRouteGuard

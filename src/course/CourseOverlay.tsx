@@ -327,6 +327,15 @@ interface CourseOverlayProps {
   // buttons and every player preference). Owned by the parent for the same
   // reason as the mind map panel.
   playerPanel?: ReactNode;
+  /**
+   * True while the footer navigation is the bottom-centre PEEK dock (the
+   * desktop pattern, rendered by the parent as <CoursePeekDock />). In that
+   * mode the study pane does NOT render its own footer — the dock has moved
+   * out to the bottom centre of the whole player. False keeps the original
+   * always-visible in-pane dock (the Player settings' "Always-visible
+   * footer dock" preference).
+   */
+  peekDock?: boolean;
 }
 
 /**
@@ -739,7 +748,11 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // distance magnification, tinted icon plates + frosted tooltips. It is the
   // study pane's last child, i.e. the DOM is
   // `[data-course-study-pane] [data-course-dock]`.
-  const dock = (
+  //
+  // In PEEK mode the dock has moved out to the bottom centre of the whole
+  // player (<CoursePeekDock />, rendered by the parent) and the study pane
+  // renders no footer of its own — the parent passes `peekDock` accordingly.
+  const dock = props.peekDock ? null : (
     <div
       className="relative z-50 shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),10px)] pt-2"
       data-course-dock
@@ -770,7 +783,12 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
+          // In peek mode the footer lives at the bottom centre of the player,
+          // so the study content clears the line (and the safe area) instead
+          // of the in-pane dock it used to sit above.
+          props.peekDock ? "pb-[calc(max(env(safe-area-inset-bottom),10px)+16px)]" : ""
+        }`}
       >
         {studyBody}
       </motion.div>

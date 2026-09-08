@@ -207,6 +207,7 @@ export default function GlassDock({
   siteFooter = false,
   leading,
   compact = false,
+  pointerX,
 }: {
   items: GlassDockItem[]
   onSelect: (id: string) => void
@@ -219,8 +220,17 @@ export default function GlassDock({
    * tooltips are otherwise identical.
    */
   compact?: boolean
+  /**
+   * Optional EXTERNAL pointer X the magnification wave follows. The dock
+   * normally tracks the pointer itself; when a parent drives the same
+   * gesture from elsewhere (e.g. the Course Player's bottom-centre peek
+   * LINE — hold + drag across the line selects a tab), it passes its own
+   * motion value here so the wave follows the finger during that drag too.
+   */
+  pointerX?: MotionValue<number>
 }) {
-  const mouseX = useMotionValue(-200)
+  const internalMouseX = useMotionValue(-200)
+  const mouseX = pointerX ?? internalMouseX
   const skipClickRef = useRef(false)
 
   const trackPointer = (clientX: number) => mouseX.set(clientX)

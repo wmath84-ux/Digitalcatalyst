@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { GlassSurface } from "../components/ui/glass";
+import PageSkeleton from "../components/PageSkeleton";
 import StoreHeader from "../components/Header";
 import PageTabs, { type PageTabItem } from "../components/ui/PageTabs";
 import { useRegisterTopBarTabs, useTopBarTabsHost } from "../components/TopBarTabsContext";
@@ -342,9 +343,25 @@ export default function RevisionApp() {
 
             {revisionAccessLoading || revisionDataLoading ? (
               <div data-revision-access-loading data-revision-content className="grid min-h-0 flex-1 place-items-center bg-transparent px-4">
-                <GlassSurface radius={24} className="dc-scene-plate text-white/55" contentClassName="flex flex-col items-center gap-2 px-8 py-7">
-                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/10 border-t-violet-500" />
-                  <p className="text-xs font-semibold">{revisionAccessLoading ? "Checking your membership…" : "Syncing your Test Bank…"}</p>
+                <GlassSurface radius={24} className="dc-scene-plate text-white/55" contentClassName="flex w-full max-w-sm flex-col gap-3 px-8 py-7">
+                  {/* The page's own dummy layout while membership / test-bank
+                      data streams in — a page swap shows the structure, never
+                      a bare spinner. The real panels replace it when the data
+                      lands. */}
+                  <PageSkeleton
+                    label="Loading revision"
+                    header={false}
+                    footer={false}
+                    blocks={[
+                      { width: "72%", height: 18 },
+                      { width: "100%", height: 64 },
+                      { width: "100%", height: 64 },
+                      { width: "88%", height: 64 },
+                    ]}
+                  />
+                  <p className="sr-only" role="status">
+                    {revisionAccessLoading ? "Checking your membership…" : "Syncing your Test Bank…"}
+                  </p>
                 </GlassSurface>
               </div>
             ) : (
