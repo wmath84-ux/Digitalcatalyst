@@ -73,7 +73,11 @@ export default function SeatRig({
   /** Fired when the learner turns the head by hand, so the HUD can un-pin. */
   onManualLook?: () => void;
 }) {
-  const { camera, gl, size } = useThree();
+  const camera = useThree((state) => state.camera);
+  const gl = useThree((state) => state.gl);
+  const size = useThree((state) => state.size);
+  const get = useThree((state) => state.get);
+  const setDpr = useThree((state) => state.setDpr);
   const target = useRef({ yaw: 0, pitch: 0, zoom: BOARD_ZOOM_MIN });
   const current = useRef({ yaw: 0, pitch: 0, zoom: BOARD_ZOOM_MIN });
   const dragging = useRef(false);
@@ -87,17 +91,12 @@ export default function SeatRig({
   // Every pointer currently on the canvas, for the drag-vs-pinch split.
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ distance: number; zoom: number; applied: number } | null>(null);
-  // Live render resolution for the drag-dip (Part 13): a drag temporarily
-  // drops dpr to 1× and dragend restores the snapshot — unless the quality
-  // governor moved the resolution meanwhile, in which case its live decision
-  // wins. Read through refs so the once-attached listeners never go stale.
-  const liveDpr = useThree((state) => state.viewport.dpr);
-  const setDpr = useThree((state) => state.setDpr);
-  const dprRef = useRef(liveDpr);
-  dprRef.current = liveDpr;
-  const setDprRef = useRef(setDpr);
-  setDprRef.current = setDpr;
+  // Read the store at gesture edges, not through a whole-store or live-DPR
+  // subscription. A governor change during a drag must beat its snapshot.
   const dipDpr = useRef<number | null>(null);
+  const dipPerformance = useRef(1);
+  const onManualLookRef = useRef(onManualLook);
+  onManualLookRef.current = onManualLook;
 
   // A focus change re-aims the head. `recenterSignal` re-aims without a focus
   // change — Fit-to-screen recentres the board even when already on "board".
@@ -126,12 +125,15 @@ export default function SeatRig({
         // restore on release; the dip only engages above 1× and dragend
         // restores only what the dip itself set (never the governor's).
         element.parentElement?.classList.add("dc-dragging");
-        if (dprRef.current > 1.01 && dipDpr.current === null) {
-          dipDpr.current = dprRef.current;
-          setDprRef.current(1);
+        const state = get();
+        if (state.viewport.dpr > 1.01 && dipDpr.current === null) {
+          dipDpr.current = state.viewport.dpr;
+          dipPerformance.current = state.performance.current;
+          setDpr(1);
         }
         dragging.current = true;
-        last.current = { x: event.clientX, y: event.clientY };
+        last.current.x = event.clientX;
+        last.current.y = event.clientY;
       } else if (pointers.current.size === 2) {
         // The second fingertip turns the drag into a pinch: rotation stops
         // and the finger spread takes over as the zoom control.
@@ -145,8 +147,10 @@ export default function SeatRig({
       element.setPointerCapture?.(event.pointerId);
     };
     const move = (event: PointerEvent) => {
-      if (!pointers.current.has(event.pointerId)) return;
-      pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      const pointer = pointers.current.get(event.pointerId);
+      if (!pointer) return;
+      pointer.x = event.clientX;
+      pointer.y = event.clientY;
       if (pointers.current.size >= 2) {
         // Two fingers on the room drive the FIT ⇄ FILL blend — on any of the
         // three boards, not just the centre one. Over the desk the gesture is
@@ -172,7 +176,7 @@ export default function SeatRig({
       // and none of them should allocate.
       last.current.x = event.clientX;
       last.current.y = event.clientY;
-      if (Math.abs(dx) + Math.abs(dy) > 1) onManualLook?.();
+      if (Math.abs(dx) + Math.abs(dy) > 1) onManualLookRef.current?.();
       target.current.yaw = clamp(target.current.yaw + dx * 0.0042, YAW_LIMIT.min, YAW_LIMIT.max);
       target.current.pitch = clamp(target.current.pitch - dy * 0.0032, PITCH_LIMIT.min, PITCH_LIMIT.max);
     };
@@ -192,7 +196,10 @@ export default function SeatRig({
         // (its live decision always wins over this stale snapshot).
         element.parentElement?.classList.remove("dc-dragging");
         if (dipDpr.current !== null) {
-          if (dprRef.current <= 1.01) setDprRef.current(dipDpr.current);
+          const state = get();
+          if (Math.abs(state.viewport.dpr - 1) < 0.01 && state.performance.current === dipPerformance.current) {
+            setDpr(dipDpr.current);
+          }
           dipDpr.current = null;
         }
       }
@@ -209,8 +216,13 @@ export default function SeatRig({
       element.removeEventListener("pointerup", up);
       element.removeEventListener("pointercancel", up);
       element.removeEventListener("pointerleave", up);
+      element.parentElement?.classList.remove("dc-dragging");
+      pointers.current.clear();
+      dragging.current = false;
+      pinch.current = null;
+      dipDpr.current = null;
     };
-  }, [gl, onManualLook]);
+  }, [gl, get, setDpr]);
 
   // Wheel over the empty room leans toward the board — board only, so a wheel
   // anywhere else never arms a surprise zoom for the way back. A native
@@ -332,7 +344,7 @@ export default function SeatRig({
     camera.rotation.x = pitch + swayX;
     camera.rotation.z = 0;
     camera.updateMatrixWorld();
-  });
+  }, -2);
 
   // ── Orientation-aware field of view ────────────────────────────────────
   // The Course Player is NOT landscape-only: it is the one screen in the app

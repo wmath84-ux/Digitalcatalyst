@@ -120,21 +120,21 @@ test("quality tiers pin snow, lamp lights and spill behaviour", () => {
 // B2. The governor bridges the monitor to AdaptiveDpr/AdaptiveEvents.
 // ---------------------------------------------------------------------------
 
-test("QualityGovernor samples fps and writes tiers to the fiber store", () => {
+test("QualityGovernor keeps the monitor bridge, with recoverable gradual DPR", () => {
   assert.match(governor, /<PerformanceMonitor/);
   assert.match(governor, /factor=\{QUALITY_FACTOR\[startTier\]\}/);
   assert.match(governor, /ms=\{SAMPLE_MS\}/);
   assert.match(governor, /iterations=\{SAMPLE_ITERATIONS\}/);
+  assert.match(governor, /step=\{0\.05\}/);
+  assert.match(governor, /bounds=\{\(\) => classroomFrameBounds\(budget\.target\)\}/);
+  // drei counts even healthy inclines at factor=1 as "flips". It must not
+  // permanently lock quality low after seven such windows.
+  assert.match(governor, /FALLBACK_FLIPFLOPS = Infinity;/);
   assert.match(governor, /flipflops=\{FALLBACK_FLIPFLOPS\}/);
-  assert.match(governor, /onChange=\{\(api\) => applyTier\(qualityForFactor\(api\.factor\)\)\}/);
-  // An unstable device locks to low (which also stops the sampling).
-  assert.match(governor, /onFallback=\{\(\) => applyTier\("low"\)\}/);
-  // The bridge drei 10 no longer builds itself: the tier's resolution scale
-  // is written to performance.current, where AdaptiveDpr/AdaptiveEvents read it.
-  assert.match(governor, /performance: \{ \.\.\.state\.performance, current: TIER_PERFORMANCE\[tier\] \},/);
-  assert.match(governor, /high: 1,\n  medium: 0\.75,\n  low: 0\.6,/);
-  // Tier edges persist for the session and re-render the room once — never
-  // per frame — and the governor itself renders exactly once.
+  assert.ok(!governor.includes('onFallback={() => applyTier("low")}'));
+  assert.match(governor, /performance: \{ \.\.\.state\.performance, current, min: MIN_CLASSROOM_PERFORMANCE \}/);
+  assert.match(governor, /current === state\.performance\.current && state\.performance\.min === MIN_CLASSROOM_PERFORMANCE \? state/);
+  assert.match(governor, /qualityForFactor\(factor, lastTier\.current\)/);
   assert.match(governor, /rememberTier\(tier\);/);
   assert.match(governor, /if \(tier === lastTier\.current\) return;/);
   assert.match(governor, /export default memo\(QualityGovernor\);/);
@@ -300,17 +300,19 @@ test("SeatRig gestures allocate nothing and never setState", () => {
   assert.ok(!seatRig.includes("useState"));
   // The spring targets still report zoom deltas and manual looks.
   assert.match(seatRig, /onZoomDeltaRef\.current\?\.(\(delta\));/);
-  assert.match(seatRig, /onManualLook\?\.\(\);/);
+  assert.match(seatRig, /onManualLookRef\.current\?\.\(\);/);
 });
 
 test("SeatRig dips resolution + fidelity while dragging, then restores", () => {
   assert.match(seatRig, /classList\.add\("dc-dragging"\);/);
   assert.match(seatRig, /classList\.remove\("dc-dragging"\);/);
-  assert.match(seatRig, /dipDpr\.current = dprRef\.current;/);
-  assert.match(seatRig, /setDprRef\.current\(1\);/);
+  assert.match(seatRig, /dipDpr\.current = state\.viewport\.dpr;/);
+  assert.match(seatRig, /setDpr\(1\);/);
   // Dragend restores the snapshot only if the governor hasn't moved dpr
   // meanwhile — its live decision always wins over the stale snapshot.
-  assert.match(seatRig, /if \(dprRef\.current <= 1\.01\) setDprRef\.current\(dipDpr\.current\);/);
+  assert.match(seatRig, /Math\.abs\(state\.viewport\.dpr - 1\) < 0\.01/);
+  assert.match(seatRig, /state\.performance\.current === dipPerformance\.current/);
+  assert.match(seatRig, /setDpr\(dipDpr\.current\);/);
   // rotation.order is assigned once in the lens effect, never per frame.
   assert.equal((seatRig.match(/rotation\.order\s*=/g) || []).length, 1);
 });

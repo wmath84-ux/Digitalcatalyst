@@ -1,0 +1,2097 @@
+{
+  "date": "2026-09-08",
+  "baselineCommit": "76549cd71415858b1b40cd0820db41452e08a13c",
+  "browser": "149.0.7827.0",
+  "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "method": "Production builds; two fresh-context 10-second samples per scenario; same scripted paths. Pooled frame intervals. Fixed governor for geometry comparisons, plus separate live-governor runs. I uses intended low-tier settings but DPR differs because the baseline resets adaptive DPR.",
+  "limitations": [
+    "SwiftShader software GPU, not a physical old phone or high-end desktop.",
+    "Third-party network is fixture-isolated; no genuine YouTube decode, Google Docs or native PDF rendering benchmark.",
+    "Dropped frames are 60-Hz estimates, not compositor telemetry.",
+    "FPS samples preceded final unmount-only shared-resource listener cleanup; per-frame rendering code is unchanged.",
+    "Do not infer whole-app retained-heap or GC improvement from geometry-buffer savings."
+  ],
+  "scenarios": [
+    {
+      "id": "A",
+      "description": "Classroom idle, seat facing board",
+      "before": {
+        "runs": 2,
+        "frames": 77,
+        "fps": 3.975445172415688,
+        "fpsPerRun": [
+          4.151358532079864,
+          3.801304772178559
+        ],
+        "frameMs": {
+          "mean": 251.54415584414858,
+          "p50": 252.40000000037253,
+          "p95": 404.5,
+          "p99": 482.79999999981374,
+          "max": 482.79999999981374
+        },
+        "calls": {
+          "median": 24,
+          "max": 24
+        },
+        "triangles": {
+          "median": 1670,
+          "max": 1670
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1086,
+        "over33ms": 76,
+        "over50ms": 75,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          102,
+          102
+        ],
+        "materialCounts": [
+          102,
+          102
+        ],
+        "geometryBytes": [
+          536420,
+          536420
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          22.351810455322266,
+          23.424726486206055
+        ],
+        "firstDisplayRenderEntryMs": [
+          1252.2999999998137,
+          820.9000000003725
+        ],
+        "rootCommits": [
+          {},
+          {}
+        ],
+        "applicationErrors": []
+      },
+      "after": {
+        "runs": 2,
+        "frames": 78,
+        "fps": 3.9666395443449955,
+        "fpsPerRun": [
+          4.098570623495056,
+          3.836639911151497
+        ],
+        "frameMs": {
+          "mean": 252.10256410256412,
+          "p50": 239.40000000037253,
+          "p95": 482,
+          "p99": 547.2000000001863,
+          "max": 547.2000000001863
+        },
+        "calls": {
+          "median": 24,
+          "max": 24
+        },
+        "triangles": {
+          "median": 1670,
+          "max": 1670
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1099,
+        "over33ms": 76,
+        "over50ms": 76,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          55,
+          55
+        ],
+        "materialCounts": [
+          59,
+          59
+        ],
+        "geometryBytes": [
+          223484,
+          223484
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          20.82761573791504,
+          22.623674392700195
+        ],
+        "firstDisplayRenderEntryMs": [
+          1208.5999999996275,
+          805.1999999992549
+        ],
+        "rootCommits": [
+          {
+            "1": 2
+          },
+          {}
+        ],
+        "applicationErrors": []
+      }
+    },
+    {
+      "id": "B",
+      "description": "Camera movement via focus shortcuts",
+      "before": {
+        "runs": 2,
+        "frames": 62,
+        "fps": 3.1786069498702316,
+        "fpsPerRun": [
+          3.1309684085286973,
+          3.224603726432621
+        ],
+        "frameMs": {
+          "mean": 314.6032258064576,
+          "p50": 289.59999999962747,
+          "p95": 568,
+          "p99": 701.7999999998137,
+          "max": 701.7999999998137
+        },
+        "calls": {
+          "median": 34,
+          "max": 52
+        },
+        "triangles": {
+          "median": 3530,
+          "max": 6310
+        },
+        "shadowRebakes": 22,
+        "estimatedMissed60Hz": 1110,
+        "over33ms": 56,
+        "over50ms": 56,
+        "longTasks": 2,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          102,
+          102
+        ],
+        "materialCounts": [
+          102,
+          102
+        ],
+        "geometryBytes": [
+          536420,
+          536420
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          22.202951431274414,
+          22.480730056762695
+        ],
+        "firstDisplayRenderEntryMs": [
+          788.2000000001863,
+          821.7000000001863
+        ],
+        "rootCommits": [
+          {
+            "1": 103,
+            "2": 22
+          },
+          {
+            "1": 110,
+            "2": 24
+          }
+        ],
+        "applicationErrors": []
+      },
+      "after": {
+        "runs": 2,
+        "frames": 67,
+        "fps": 3.4450134715451513,
+        "fpsPerRun": [
+          3.1534509943543054,
+          3.7430208257518385
+        ],
+        "frameMs": {
+          "mean": 290.2746268656772,
+          "p50": 273.3999999994412,
+          "p95": 642,
+          "p99": 1020.3000000007451,
+          "max": 1020.3000000007451
+        },
+        "calls": {
+          "median": 27,
+          "max": 35
+        },
+        "triangles": {
+          "median": 1796,
+          "max": 3748
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1103,
+        "over33ms": 61,
+        "over50ms": 60,
+        "longTasks": 2,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          55,
+          55
+        ],
+        "materialCounts": [
+          59,
+          59
+        ],
+        "geometryBytes": [
+          223484,
+          223484
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          20.304122924804688,
+          20.338239669799805
+        ],
+        "firstDisplayRenderEntryMs": [
+          849.2000000001863,
+          854.7000000001863
+        ],
+        "rootCommits": [
+          {
+            "1": 110,
+            "2": 24
+          },
+          {
+            "1": 111,
+            "2": 24
+          }
+        ],
+        "applicationErrors": []
+      }
+    },
+    {
+      "id": "C",
+      "description": "Fast canvas pointer drag",
+      "before": {
+        "runs": 2,
+        "frames": 65,
+        "fps": 3.3310443080139165,
+        "fpsPerRun": [
+          3.354238028927825,
+          3.3074593544250863
+        ],
+        "frameMs": {
+          "mean": 300.20615384615957,
+          "p50": 283.6000000005588,
+          "p95": 546.1000000005588,
+          "p99": 800.8999999994412,
+          "max": 800.8999999994412
+        },
+        "calls": {
+          "median": 41,
+          "max": 56
+        },
+        "triangles": {
+          "median": 4594,
+          "max": 7104
+        },
+        "shadowRebakes": 35,
+        "estimatedMissed60Hz": 1107,
+        "over33ms": 61,
+        "over50ms": 61,
+        "longTasks": 2,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          102,
+          102
+        ],
+        "materialCounts": [
+          102,
+          102
+        ],
+        "geometryBytes": [
+          536420,
+          536420
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          23.747282028198242,
+          24.537357330322266
+        ],
+        "firstDisplayRenderEntryMs": [
+          869,
+          784.7999999998137
+        ],
+        "rootCommits": [
+          {
+            "1": 185,
+            "2": 41
+          },
+          {
+            "1": 143,
+            "2": 31
+          }
+        ],
+        "applicationErrors": []
+      },
+      "after": {
+        "runs": 2,
+        "frames": 76,
+        "fps": 3.8395473375770433,
+        "fpsPerRun": [
+          3.7333387147224015,
+          3.9460504082645205
+        ],
+        "frameMs": {
+          "mean": 260.44736842105266,
+          "p50": 254.59999999962747,
+          "p95": 468.09999999962747,
+          "p99": 600.0999999996275,
+          "max": 600.0999999996275
+        },
+        "calls": {
+          "median": 29,
+          "max": 38
+        },
+        "triangles": {
+          "median": 2070,
+          "max": 4180
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1111,
+        "over33ms": 74,
+        "over50ms": 71,
+        "longTasks": 2,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          55,
+          55
+        ],
+        "materialCounts": [
+          59,
+          59
+        ],
+        "geometryBytes": [
+          223484,
+          223484
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          21.40291404724121,
+          18.933417320251465
+        ],
+        "firstDisplayRenderEntryMs": [
+          889.7000000001863,
+          841.7999999998137
+        ],
+        "rootCommits": [
+          {
+            "1": 160,
+            "2": 35
+          },
+          {
+            "1": 186,
+            "2": 40
+          }
+        ],
+        "applicationErrors": []
+      }
+    },
+    {
+      "id": "D",
+      "description": "Board fill/zoom",
+      "before": {
+        "runs": 2,
+        "frames": 64,
+        "fps": 3.255009663309938,
+        "fpsPerRun": [
+          3.1480071084031476,
+          3.36237200061134
+        ],
+        "frameMs": {
+          "mean": 307.21875,
+          "p50": 299.29999999981374,
+          "p95": 513.6000000005588,
+          "p99": 552.5,
+          "max": 552.5
+        },
+        "calls": {
+          "median": 14,
+          "max": 14
+        },
+        "triangles": {
+          "median": 202,
+          "max": 202
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1113,
+        "over33ms": 62,
+        "over50ms": 62,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          102,
+          102
+        ],
+        "materialCounts": [
+          102,
+          102
+        ],
+        "geometryBytes": [
+          536420,
+          536420
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          22.885430335998535,
+          23.425347328186035
+        ],
+        "firstDisplayRenderEntryMs": [
+          833.7000000001863,
+          787.4000000003725
+        ],
+        "rootCommits": [
+          {},
+          {}
+        ],
+        "applicationErrors": []
+      },
+      "after": {
+        "runs": 2,
+        "frames": 66,
+        "fps": 3.3474840614111483,
+        "fpsPerRun": [
+          3.279898323151857,
+          3.4136888924589512
+        ],
+        "frameMs": {
+          "mean": 298.73181818181536,
+          "p50": 295.20000000018626,
+          "p95": 493.6000000005588,
+          "p99": 609.6999999992549,
+          "max": 609.6999999992549
+        },
+        "calls": {
+          "median": 14,
+          "max": 14
+        },
+        "triangles": {
+          "median": 202,
+          "max": 202
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1118,
+        "over33ms": 65,
+        "over50ms": 65,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          55,
+          55
+        ],
+        "materialCounts": [
+          59,
+          59
+        ],
+        "geometryBytes": [
+          223484,
+          223484
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          22.45017719268799,
+          22.699088096618652
+        ],
+        "firstDisplayRenderEntryMs": [
+          854.1000000005588,
+          749.0999999996275
+        ],
+        "rootCommits": [
+          {},
+          {}
+        ],
+        "applicationErrors": []
+      }
+    },
+    {
+      "id": "E",
+      "description": "Notes / mind map focus",
+      "before": {
+        "runs": 2,
+        "frames": 62,
+        "fps": 3.1720856463122993,
+        "fpsPerRun": [
+          3.1638787111785174,
+          3.180335268892096
+        ],
+        "frameMs": {
+          "mean": 315.250000000015,
+          "p50": 315.29999999981374,
+          "p95": 580.7999999998137,
+          "p99": 660.7999999998137,
+          "max": 660.7999999998137
+        },
+        "calls": {
+          "median": 34,
+          "max": 52
+        },
+        "triangles": {
+          "median": 3530,
+          "max": 6310
+        },
+        "shadowRebakes": 28,
+        "estimatedMissed60Hz": 1109,
+        "over33ms": 62,
+        "over50ms": 62,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          102,
+          102
+        ],
+        "materialCounts": [
+          102,
+          102
+        ],
+        "geometryBytes": [
+          536420,
+          536420
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          24.0973482131958,
+          23.894697189331055
+        ],
+        "firstDisplayRenderEntryMs": [
+          852.1000000005588,
+          674.6000000005588
+        ],
+        "rootCommits": [
+          {
+            "1": 138,
+            "2": 30
+          },
+          {
+            "1": 138,
+            "2": 30
+          }
+        ],
+        "applicationErrors": []
+      },
+      "after": {
+        "runs": 2,
+        "frames": 67,
+        "fps": 3.4443758996505864,
+        "fpsPerRun": [
+          3.456830289967189,
+          3.4316376190676254
+        ],
+        "frameMs": {
+          "mean": 290.3283582089413,
+          "p50": 284.30000000074506,
+          "p95": 474.8999999994412,
+          "p99": 506,
+          "max": 506
+        },
+        "calls": {
+          "median": 28,
+          "max": 35
+        },
+        "triangles": {
+          "median": 2158,
+          "max": 3748
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1100,
+        "over33ms": 64,
+        "over50ms": 64,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          55,
+          55
+        ],
+        "materialCounts": [
+          59,
+          59
+        ],
+        "geometryBytes": [
+          223484,
+          223484
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          21.632061004638672,
+          21.62646198272705
+        ],
+        "firstDisplayRenderEntryMs": [
+          802.7000000001863,
+          774.9000000003725
+        ],
+        "rootCommits": [
+          {
+            "1": 138,
+            "2": 30
+          },
+          {
+            "1": 138,
+            "2": 30
+          }
+        ],
+        "applicationErrors": []
+      }
+    },
+    {
+      "id": "F",
+      "description": "YouTube wall active (fixture if network=fixtures)",
+      "before": {
+        "runs": 2,
+        "frames": 73,
+        "fps": 3.7092176599409226,
+        "fpsPerRun": [
+          3.7075943891735395,
+          3.7107984234123372
+        ],
+        "frameMs": {
+          "mean": 269.59863013698885,
+          "p50": 264.70000000018626,
+          "p95": 481.80000000074506,
+          "p99": 488.09999999962747,
+          "max": 488.09999999962747
+        },
+        "calls": {
+          "median": 24,
+          "max": 24
+        },
+        "triangles": {
+          "median": 1670,
+          "max": 1670
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1110,
+        "over33ms": 71,
+        "over50ms": 71,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          102,
+          102
+        ],
+        "materialCounts": [
+          102,
+          102
+        ],
+        "geometryBytes": [
+          536420,
+          536420
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          23.34323501586914,
+          23.091201782226562
+        ],
+        "firstDisplayRenderEntryMs": [
+          859.7999999998137,
+          776.0999999996275
+        ],
+        "rootCommits": [
+          {},
+          {}
+        ],
+        "applicationErrors": []
+      },
+      "after": {
+        "runs": 2,
+        "frames": 79,
+        "fps": 4.032896181000388,
+        "fpsPerRun": [
+          4.084675319370474,
+          3.9811355423530816
+        ],
+        "frameMs": {
+          "mean": 247.9607594936756,
+          "p50": 252.70000000018626,
+          "p95": 405.79999999981374,
+          "p99": 522.3999999994412,
+          "max": 522.3999999994412
+        },
+        "calls": {
+          "median": 24,
+          "max": 24
+        },
+        "triangles": {
+          "median": 1670,
+          "max": 1670
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1093,
+        "over33ms": 75,
+        "over50ms": 74,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          55,
+          55
+        ],
+        "materialCounts": [
+          59,
+          59
+        ],
+        "geometryBytes": [
+          223484,
+          223484
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          22.88511848449707,
+          22.739534378051758
+        ],
+        "firstDisplayRenderEntryMs": [
+          794.7000000001863,
+          763.8999999994412
+        ],
+        "rootCommits": [
+          {},
+          {}
+        ],
+        "applicationErrors": []
+      }
+    },
+    {
+      "id": "G",
+      "description": "Docs wall active (fixture if network=fixtures)",
+      "before": {
+        "runs": 2,
+        "frames": 74,
+        "fps": 3.8154360166847257,
+        "fpsPerRun": [
+          3.8122713925094014,
+          3.81860589922994
+        ],
+        "frameMs": {
+          "mean": 262.09324324324825,
+          "p50": 252.1000000005588,
+          "p95": 403.70000000018626,
+          "p99": 481.5,
+          "max": 481.5
+        },
+        "calls": {
+          "median": 24,
+          "max": 24
+        },
+        "triangles": {
+          "median": 1670,
+          "max": 1670
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1091,
+        "over33ms": 72,
+        "over50ms": 72,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          102,
+          102
+        ],
+        "materialCounts": [
+          102,
+          102
+        ],
+        "geometryBytes": [
+          536420,
+          536420
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          21.762825965881348,
+          21.826791763305664
+        ],
+        "firstDisplayRenderEntryMs": [
+          901,
+          743.0999999996275
+        ],
+        "rootCommits": [
+          {},
+          {}
+        ],
+        "applicationErrors": []
+      },
+      "after": {
+        "runs": 2,
+        "frames": 76,
+        "fps": 3.8756725056732706,
+        "fpsPerRun": [
+          3.737600258601391,
+          4.016436493960051
+        ],
+        "frameMs": {
+          "mean": 258.01973684210526,
+          "p50": 239.09999999962747,
+          "p95": 438.70000000018626,
+          "p99": 728.7000000001863,
+          "max": 728.7000000001863
+        },
+        "calls": {
+          "median": 24,
+          "max": 24
+        },
+        "triangles": {
+          "median": 1670,
+          "max": 1670
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1100,
+        "over33ms": 74,
+        "over50ms": 74,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          55,
+          55
+        ],
+        "materialCounts": [
+          59,
+          59
+        ],
+        "geometryBytes": [
+          223484,
+          223484
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          21.089085578918457,
+          21.382319450378418
+        ],
+        "firstDisplayRenderEntryMs": [
+          770.5,
+          843.7000000001863
+        ],
+        "rootCommits": [
+          {},
+          {}
+        ],
+        "applicationErrors": []
+      }
+    },
+    {
+      "id": "H",
+      "description": "All-object diagnostic view from rear of room",
+      "before": {
+        "runs": 2,
+        "frames": 74,
+        "fps": 3.7497783070257666,
+        "fpsPerRun": [
+          3.655453225429839,
+          3.843741781473092
+        ],
+        "frameMs": {
+          "mean": 266.68243243243245,
+          "p50": 245.29999999981374,
+          "p95": 404.5,
+          "p99": 577.4000000003725,
+          "max": 577.4000000003725
+        },
+        "calls": {
+          "median": 82,
+          "max": 82
+        },
+        "triangles": {
+          "median": 12610,
+          "max": 12610
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1111,
+        "over33ms": 73,
+        "over50ms": 73,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          102,
+          102
+        ],
+        "materialCounts": [
+          102,
+          102
+        ],
+        "geometryBytes": [
+          536420,
+          536420
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          21.37563705444336,
+          21.51287078857422
+        ],
+        "firstDisplayRenderEntryMs": [
+          802.1999999992549,
+          806.0999999996275
+        ],
+        "rootCommits": [
+          {},
+          {
+            "1": 2
+          }
+        ],
+        "applicationErrors": []
+      },
+      "after": {
+        "runs": 2,
+        "frames": 82,
+        "fps": 4.1499655856513975,
+        "fpsPerRun": [
+          4.1220944261242565,
+          4.178216207402656
+        ],
+        "frameMs": {
+          "mean": 240.9658536585275,
+          "p50": 236.6000000005588,
+          "p95": 412.40000000037253,
+          "p99": 461.80000000074506,
+          "max": 461.80000000074506
+        },
+        "calls": {
+          "median": 80,
+          "max": 80
+        },
+        "triangles": {
+          "median": 11194,
+          "max": 11194
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1105,
+        "over33ms": 81,
+        "over50ms": 79,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          59,
+          59
+        ],
+        "materialCounts": [
+          59,
+          59
+        ],
+        "geometryBytes": [
+          246472,
+          246472
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          17.71186065673828,
+          18.0562801361084
+        ],
+        "firstDisplayRenderEntryMs": [
+          778.2000000001863,
+          769
+        ],
+        "rootCommits": [
+          {},
+          {}
+        ],
+        "applicationErrors": []
+      }
+    },
+    {
+      "id": "I",
+      "description": "Mobile-like 640x360, low tier, 4x CPU throttle",
+      "before": {
+        "runs": 2,
+        "frames": 145,
+        "fps": 7.313038390929608,
+        "fpsPerRun": [
+          7.384478433276268,
+          7.24200362100181
+        ],
+        "frameMs": {
+          "mean": 136.7420689655211,
+          "p50": 136.1000000005588,
+          "p95": 203.59999999962747,
+          "p99": 232.70000000018626,
+          "max": 258.1000000005588
+        },
+        "calls": {
+          "median": 24,
+          "max": 24
+        },
+        "triangles": {
+          "median": 1670,
+          "max": 1670
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1048,
+        "over33ms": 142,
+        "over50ms": 140,
+        "longTasks": 0,
+        "dpr": [
+          0.7
+        ],
+        "tier": [
+          "low"
+        ],
+        "geometryCounts": [
+          102,
+          102
+        ],
+        "materialCounts": [
+          102,
+          102
+        ],
+        "geometryBytes": [
+          532820,
+          532820
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          18.648439407348633,
+          19.197864532470703
+        ],
+        "firstDisplayRenderEntryMs": [
+          2128.2000000001863,
+          2049.0999999996275
+        ],
+        "rootCommits": [
+          {},
+          {}
+        ],
+        "applicationErrors": []
+      },
+      "after": {
+        "runs": 2,
+        "frames": 262,
+        "fps": 13.147594291334261,
+        "fpsPerRun": [
+          13.326519774350212,
+          12.968082432772054
+        ],
+        "frameMs": {
+          "mean": 76.05954198473496,
+          "p50": 75.59999999962747,
+          "p95": 106,
+          "p99": 140.70000000018626,
+          "max": 153.40000000037253
+        },
+        "calls": {
+          "median": 24,
+          "max": 24
+        },
+        "triangles": {
+          "median": 1670,
+          "max": 1670
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 933,
+        "over33ms": 257,
+        "over50ms": 246,
+        "longTasks": 0,
+        "dpr": [
+          0.42
+        ],
+        "tier": [
+          "low"
+        ],
+        "geometryCounts": [
+          55,
+          55
+        ],
+        "materialCounts": [
+          59,
+          59
+        ],
+        "geometryBytes": [
+          223484,
+          223484
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          23.60015296936035,
+          22.852733612060547
+        ],
+        "firstDisplayRenderEntryMs": [
+          2061.7999999998137,
+          2073.0999999996275
+        ],
+        "rootCommits": [
+          {},
+          {}
+        ],
+        "applicationErrors": []
+      }
+    },
+    {
+      "id": "J",
+      "description": "Desktop 1280x720, high tier",
+      "before": {
+        "runs": 2,
+        "frames": 20,
+        "fps": 1.0246269077272336,
+        "fpsPerRun": [
+          1.0419922892570594,
+          1.0078308456708815
+        ],
+        "frameMs": {
+          "mean": 975.9649999999907,
+          "p50": 970.5,
+          "p95": 1717.2999999998137,
+          "p99": 1760.7999999998137,
+          "max": 1760.7999999998137
+        },
+        "calls": {
+          "median": 24,
+          "max": 24
+        },
+        "triangles": {
+          "median": 1670,
+          "max": 1670
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1151,
+        "over33ms": 19,
+        "over50ms": 19,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          102,
+          102
+        ],
+        "materialCounts": [
+          102,
+          102
+        ],
+        "geometryBytes": [
+          536420,
+          536420
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          21.171196937561035,
+          21.51146125793457
+        ],
+        "firstDisplayRenderEntryMs": [
+          887.3000000007451,
+          844.2000000001863
+        ],
+        "rootCommits": [
+          {},
+          {
+            "1": 2
+          }
+        ],
+        "applicationErrors": []
+      },
+      "after": {
+        "runs": 2,
+        "frames": 19,
+        "fps": 1.0612805746554808,
+        "fpsPerRun": [
+          1.134970717755506,
+          0.9898703269871039
+        ],
+        "frameMs": {
+          "mean": 942.2578947368617,
+          "p50": 897.5999999996275,
+          "p95": 1412.5,
+          "p99": 1412.5,
+          "max": 1412.5
+        },
+        "calls": {
+          "median": 24,
+          "max": 24
+        },
+        "triangles": {
+          "median": 1670,
+          "max": 1670
+        },
+        "shadowRebakes": 0,
+        "estimatedMissed60Hz": 1056,
+        "over33ms": 18,
+        "over50ms": 18,
+        "longTasks": 0,
+        "dpr": [
+          1
+        ],
+        "tier": [
+          "high"
+        ],
+        "geometryCounts": [
+          55,
+          55
+        ],
+        "materialCounts": [
+          59,
+          59
+        ],
+        "geometryBytes": [
+          223484,
+          223484
+        ],
+        "textures": [
+          3,
+          3
+        ],
+        "endHeapMiB": [
+          21.076074600219727,
+          20.432799339294434
+        ],
+        "firstDisplayRenderEntryMs": [
+          746.1000000005588,
+          822
+        ],
+        "rootCommits": [
+          {},
+          {}
+        ],
+        "applicationErrors": []
+      }
+    }
+  ],
+  "liveGovernor": {
+    "before": [
+      {
+        "id": "A",
+        "summary": {
+          "frames": 143,
+          "fps": 4.787107616187729,
+          "frameMs": {
+            "mean": 208.8944055944082,
+            "p50": 223.8999999994412,
+            "p95": 415.09999999962747,
+            "p99": 624.5999999996275,
+            "max": 728.6000000005588
+          },
+          "jank": {
+            "over25ms": 137,
+            "over50ms": 136,
+            "estimatedMissed60Hz": 1653,
+            "longTasks": 5
+          },
+          "calls": {
+            "median": 24,
+            "max": 42
+          },
+          "triangles": {
+            "median": 1670,
+            "max": 4594
+          },
+          "renderCpuMs": {
+            "mean": 4.208391608416357,
+            "p95": 0.7000000001862645
+          },
+          "gpuMs": null,
+          "shadowRebakes": 2,
+          "dpr": [
+            1
+          ],
+          "tier": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "frameBudgetMs": [
+            null
+          ],
+          "visibleDrawObjects": null,
+          "geometries": 102,
+          "materials": 102,
+          "geometryBytes": 532820,
+          "rendererGeometries": 102,
+          "textures": 3,
+          "heapBytes": 20235896,
+          "rootCommits": {
+            "1": 34,
+            "2": 12
+          }
+        },
+        "applicationErrors": []
+      },
+      {
+        "id": "I",
+        "summary": {
+          "frames": 225,
+          "fps": 7.521938988717091,
+          "frameMs": {
+            "mean": 132.94444444444446,
+            "p50": 133.6000000005588,
+            "p95": 184.80000000074506,
+            "p99": 223.5,
+            "max": 235.20000000018626
+          },
+          "jank": {
+            "over25ms": 224,
+            "over50ms": 222,
+            "estimatedMissed60Hz": 1568,
+            "longTasks": 0
+          },
+          "calls": {
+            "median": 24,
+            "max": 24
+          },
+          "triangles": {
+            "median": 1670,
+            "max": 1670
+          },
+          "renderCpuMs": {
+            "mean": 4.738666666634381,
+            "p95": 15.200000000186265
+          },
+          "gpuMs": null,
+          "shadowRebakes": 0,
+          "dpr": [
+            0.7
+          ],
+          "tier": [
+            "low"
+          ],
+          "frameBudgetMs": [
+            null
+          ],
+          "visibleDrawObjects": null,
+          "geometries": 102,
+          "materials": 102,
+          "geometryBytes": 532820,
+          "rendererGeometries": 102,
+          "textures": 3,
+          "heapBytes": 20955489,
+          "rootCommits": {
+            "1": 20,
+            "2": 5
+          }
+        },
+        "applicationErrors": []
+      }
+    ],
+    "after": [
+      {
+        "id": "A",
+        "summary": {
+          "frames": 205,
+          "fps": 6.887376279204242,
+          "frameMs": {
+            "mean": 145.1931707317055,
+            "p50": 123.70000000018626,
+            "p95": 305.5,
+            "p99": 398.90000000037253,
+            "max": 447.09999999962747
+          },
+          "jank": {
+            "over25ms": 193,
+            "over50ms": 180,
+            "estimatedMissed60Hz": 1586,
+            "longTasks": 12
+          },
+          "calls": {
+            "median": 24,
+            "max": 24
+          },
+          "triangles": {
+            "median": 1670,
+            "max": 1670
+          },
+          "renderCpuMs": {
+            "mean": 1.207804878028791,
+            "p95": 0.6000000005587935
+          },
+          "gpuMs": null,
+          "shadowRebakes": 0,
+          "dpr": [
+            0.948,
+            0.896,
+            0.845,
+            0.793,
+            0.741,
+            0.689,
+            0.637,
+            0.594,
+            0.55,
+            0.507,
+            0.463,
+            0.42
+          ],
+          "tier": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "frameBudgetMs": [
+            16.666666666666668
+          ],
+          "visibleDrawObjects": null,
+          "geometries": 55,
+          "materials": 59,
+          "geometryBytes": 223484,
+          "rendererGeometries": 55,
+          "textures": 3,
+          "heapBytes": 19391484,
+          "rootCommits": {
+            "1": 99,
+            "2": 44
+          }
+        },
+        "applicationErrors": []
+      },
+      {
+        "id": "I",
+        "summary": {
+          "frames": 383,
+          "fps": 12.776675062132004,
+          "frameMs": {
+            "mean": 78.26762402088772,
+            "p50": 77.09999999962747,
+            "p95": 104.20000000018626,
+            "p99": 122.20000000018626,
+            "max": 144.19999999925494
+          },
+          "jank": {
+            "over25ms": 381,
+            "over50ms": 371,
+            "estimatedMissed60Hz": 1426,
+            "longTasks": 0
+          },
+          "calls": {
+            "median": 24,
+            "max": 24
+          },
+          "triangles": {
+            "median": 1670,
+            "max": 1670
+          },
+          "renderCpuMs": {
+            "mean": 3.458746736295346,
+            "p95": 11.200000000186265
+          },
+          "gpuMs": null,
+          "shadowRebakes": 0,
+          "dpr": [
+            0.42
+          ],
+          "tier": [
+            "low"
+          ],
+          "frameBudgetMs": [
+            16.666666666666668,
+            33.333333333333336
+          ],
+          "visibleDrawObjects": null,
+          "geometries": 55,
+          "materials": 59,
+          "geometryBytes": 223484,
+          "rendererGeometries": 55,
+          "textures": 3,
+          "heapBytes": 19454062,
+          "rootCommits": {}
+        },
+        "applicationErrors": []
+      }
+    ]
+  },
+  "supplement": {
+    "before": [
+      {
+        "id": "P",
+        "summary": {
+          "frames": 19,
+          "fps": 3.3187193236796118,
+          "frameMs": {
+            "mean": 301.3210526316084,
+            "p50": 261.70000000018626,
+            "p95": 660.6000000005588,
+            "p99": 660.6000000005588,
+            "max": 660.6000000005588
+          },
+          "jank": {
+            "over25ms": 18,
+            "over50ms": 17,
+            "estimatedMissed60Hz": 326,
+            "longTasks": 0
+          },
+          "calls": {
+            "median": 24,
+            "max": 24
+          },
+          "triangles": {
+            "median": 1670,
+            "max": 1670
+          },
+          "renderCpuMs": {
+            "mean": 0.747368420964401,
+            "p95": 1.3999999994412065
+          },
+          "gpuMs": {
+            "samples": 6,
+            "mean": 223.50660449999998,
+            "p95": 253.511736
+          },
+          "shadowRebakes": 0,
+          "dpr": [
+            1
+          ],
+          "tier": [
+            "high"
+          ],
+          "frameBudgetMs": [
+            null
+          ],
+          "visibleDrawObjects": {
+            "median": 24,
+            "max": 24
+          },
+          "geometries": 102,
+          "materials": 102,
+          "geometryBytes": 536420,
+          "rendererGeometries": 102,
+          "textures": 3,
+          "heapBytes": 22352979,
+          "rootCommits": {}
+        },
+        "applicationErrors": []
+      },
+      {
+        "id": "K",
+        "summary": {
+          "frames": 65,
+          "fps": 10.941471543757126,
+          "frameMs": {
+            "mean": 91.39538461538748,
+            "p50": 55.90000000037253,
+            "p95": 323.70000000018626,
+            "p99": 366,
+            "max": 366
+          },
+          "jank": {
+            "over25ms": 43,
+            "over50ms": 34,
+            "estimatedMissed60Hz": 295,
+            "longTasks": 0
+          },
+          "calls": {
+            "median": 24,
+            "max": 24
+          },
+          "triangles": {
+            "median": 1670,
+            "max": 1670
+          },
+          "renderCpuMs": {
+            "mean": 0.5200000000831027,
+            "p95": 0.7999999998137355
+          },
+          "gpuMs": {
+            "samples": 2,
+            "mean": 371.216808,
+            "p95": 417.347275
+          },
+          "shadowRebakes": 0,
+          "dpr": [
+            1
+          ],
+          "tier": [
+            "high"
+          ],
+          "frameBudgetMs": [
+            null
+          ],
+          "visibleDrawObjects": {
+            "median": 24,
+            "max": 24
+          },
+          "geometries": 102,
+          "materials": 102,
+          "geometryBytes": 536420,
+          "rendererGeometries": 102,
+          "textures": 3,
+          "heapBytes": 20767630,
+          "rootCommits": {}
+        },
+        "applicationErrors": []
+      }
+    ],
+    "after": [
+      {
+        "id": "P",
+        "summary": {
+          "frames": 22,
+          "fps": 3.9097904707740576,
+          "frameMs": {
+            "mean": 255.76818181819874,
+            "p50": 217.1000000005588,
+            "p95": 499.40000000037253,
+            "p99": 573.3999999994412,
+            "max": 573.3999999994412
+          },
+          "jank": {
+            "over25ms": 21,
+            "over50ms": 21,
+            "estimatedMissed60Hz": 317,
+            "longTasks": 0
+          },
+          "calls": {
+            "median": 24,
+            "max": 24
+          },
+          "triangles": {
+            "median": 1670,
+            "max": 1670
+          },
+          "renderCpuMs": {
+            "mean": 0.6954545453190804,
+            "p95": 1
+          },
+          "gpuMs": {
+            "samples": 6,
+            "mean": 213.15268083333333,
+            "p95": 237.299764
+          },
+          "shadowRebakes": 0,
+          "dpr": [
+            1
+          ],
+          "tier": [
+            "high"
+          ],
+          "frameBudgetMs": [
+            16.666666666666668
+          ],
+          "visibleDrawObjects": {
+            "median": 24,
+            "max": 24
+          },
+          "geometries": 55,
+          "materials": 59,
+          "geometryBytes": 223484,
+          "rendererGeometries": 55,
+          "textures": 3,
+          "heapBytes": 21842452,
+          "rootCommits": {}
+        },
+        "applicationErrors": []
+      },
+      {
+        "id": "K",
+        "summary": {
+          "frames": 0,
+          "fps": null,
+          "frameMs": {
+            "mean": 0,
+            "p50": 0,
+            "p95": 0,
+            "p99": 0,
+            "max": 0
+          },
+          "jank": {
+            "over25ms": 0,
+            "over50ms": 0,
+            "estimatedMissed60Hz": 0,
+            "longTasks": 0
+          },
+          "calls": {
+            "median": 0,
+            "max": 0
+          },
+          "triangles": {
+            "median": 0,
+            "max": 0
+          },
+          "renderCpuMs": {
+            "mean": 0,
+            "p95": 0
+          },
+          "gpuMs": null,
+          "shadowRebakes": 0,
+          "dpr": [
+            1
+          ],
+          "tier": [
+            "high"
+          ],
+          "frameBudgetMs": [],
+          "visibleDrawObjects": {
+            "median": 0,
+            "max": 0
+          },
+          "geometries": 55,
+          "materials": 59,
+          "geometryBytes": 223484,
+          "rendererGeometries": 55,
+          "textures": 3,
+          "heapBytes": 23856665,
+          "rootCommits": {}
+        },
+        "applicationErrors": []
+      },
+      {
+        "id": "A",
+        "summary": {
+          "frames": 21,
+          "fps": 3.744917611812167,
+          "frameMs": {
+            "mean": 267.028571428598,
+            "p50": 304.5,
+            "p95": 412.40000000037253,
+            "p99": 450.59999999962747,
+            "max": 450.59999999962747
+          },
+          "jank": {
+            "over25ms": 20,
+            "over50ms": 19,
+            "estimatedMissed60Hz": 316,
+            "longTasks": 0
+          },
+          "calls": {
+            "median": 24,
+            "max": 24
+          },
+          "triangles": {
+            "median": 1670,
+            "max": 1670
+          },
+          "renderCpuMs": {
+            "mean": 0.7761904762259552,
+            "p95": 1.2999999998137355
+          },
+          "gpuMs": {
+            "samples": 8,
+            "mean": 230.52509299999997,
+            "p95": 247.215298
+          },
+          "shadowRebakes": 0,
+          "dpr": [
+            1
+          ],
+          "tier": [
+            "high"
+          ],
+          "frameBudgetMs": [
+            16.666666666666668
+          ],
+          "visibleDrawObjects": {
+            "median": 24,
+            "max": 24
+          },
+          "geometries": 55,
+          "materials": 59,
+          "geometryBytes": 223484,
+          "rendererGeometries": 55,
+          "textures": 3,
+          "heapBytes": 23477575,
+          "rootCommits": {}
+        },
+        "applicationErrors": []
+      },
+      {
+        "id": "H",
+        "summary": {
+          "frames": 21,
+          "fps": 3.5219535102138853,
+          "frameMs": {
+            "mean": 283.9333333333156,
+            "p50": 244.40000000037253,
+            "p95": 430.5,
+            "p99": 553.7999999998137,
+            "max": 553.7999999998137
+          },
+          "jank": {
+            "over25ms": 21,
+            "over50ms": 21,
+            "estimatedMissed60Hz": 335,
+            "longTasks": 0
+          },
+          "calls": {
+            "median": 80,
+            "max": 80
+          },
+          "triangles": {
+            "median": 11194,
+            "max": 11194
+          },
+          "renderCpuMs": {
+            "mean": 1.223809523774045,
+            "p95": 2.199999999254942
+          },
+          "gpuMs": {
+            "samples": 8,
+            "mean": 192.64666662500002,
+            "p95": 252.711142
+          },
+          "shadowRebakes": 0,
+          "dpr": [
+            1
+          ],
+          "tier": [
+            "high"
+          ],
+          "frameBudgetMs": [
+            16.666666666666668
+          ],
+          "visibleDrawObjects": {
+            "median": 80,
+            "max": 80
+          },
+          "geometries": 59,
+          "materials": 59,
+          "geometryBytes": 246472,
+          "rendererGeometries": 59,
+          "textures": 3,
+          "heapBytes": 21792696,
+          "rootCommits": {
+            "1": 1
+          }
+        },
+        "applicationErrors": []
+      }
+    ]
+  },
+  "visual": [
+    {
+      "pose": "seat",
+      "pixels": 230400,
+      "mae": 0,
+      "changed": 0,
+      "over8": 0
+    },
+    {
+      "pose": "rear",
+      "pixels": 230400,
+      "mae": 0.018447627314814814,
+      "changed": 362,
+      "over8": 188
+    }
+  ],
+  "memory": {
+    "attachedGeometryBytesBefore": 536420,
+    "attachedGeometryBytesAfter": 223484,
+    "afterIncludingUnusedLodBuffers": 259468,
+    "initialThreeVisitCheck": [
+      {
+        "description": "after interaction regression checks",
+        "geometries": 55,
+        "materials": 59,
+        "geometryBytes": 223484,
+        "heapBytes": 21211028
+      },
+      {
+        "cycle": 0,
+        "afterForcedGC": true,
+        "heapBytes": 20051839,
+        "geometries": 55,
+        "materials": 59,
+        "textures": 3,
+        "headGeometry": "1b1a64e9-ca6e-4785-ad75-e78d34411128"
+      },
+      {
+        "cycle": 1,
+        "afterForcedGC": true,
+        "heapBytes": 21798113,
+        "geometries": 55,
+        "materials": 59,
+        "textures": 3,
+        "headGeometry": "1b1a64e9-ca6e-4785-ad75-e78d34411128"
+      },
+      {
+        "cycle": 2,
+        "afterForcedGC": true,
+        "heapBytes": 22071043,
+        "geometries": 55,
+        "materials": 59,
+        "textures": 3,
+        "headGeometry": "1b1a64e9-ca6e-4785-ad75-e78d34411128"
+      },
+      {
+        "cycle": 3,
+        "afterForcedGC": true,
+        "heapBytes": 22924793,
+        "geometries": 55,
+        "materials": 59,
+        "textures": 3,
+        "headGeometry": "1b1a64e9-ca6e-4785-ad75-e78d34411128"
+      }
+    ],
+    "finalReleaseCheck": [
+      {
+        "description": "after interaction regression checks",
+        "geometries": 55,
+        "materials": 59,
+        "geometryBytes": 223484,
+        "heapBytes": 26336100
+      },
+      {
+        "cycle": 0,
+        "afterForcedGC": true,
+        "heapBytes": 20000971,
+        "geometries": 55,
+        "materials": 59,
+        "textures": 3,
+        "headDisposeListeners": 1,
+        "headGeometry": "a64c595a-d961-41e3-b0c7-57c91b1a64e9"
+      },
+      {
+        "cycle": 1,
+        "afterForcedGC": true,
+        "heapBytes": 21220026,
+        "geometries": 55,
+        "materials": 59,
+        "textures": 3,
+        "headDisposeListeners": 1,
+        "headGeometry": "a64c595a-d961-41e3-b0c7-57c91b1a64e9"
+      },
+      {
+        "cycle": 2,
+        "afterForcedGC": true,
+        "heapBytes": 21716789,
+        "geometries": 55,
+        "materials": 59,
+        "textures": 3,
+        "headDisposeListeners": 1,
+        "headGeometry": "a64c595a-d961-41e3-b0c7-57c91b1a64e9"
+      }
+    ]
+  },
+  "validation": {
+    "unitTests": 2250,
+    "failures": 0,
+    "build": "passed",
+    "typecheck": "Same six pre-existing errors as baseline; no new errors.",
+    "browserAssertions": [
+      "All four existing surfaces mount without an application error",
+      "Weak startup uses .84 DPR but retains the recoverable 2 DPR ceiling",
+      "Focus/portal rerenders do not reset an adaptive DPR",
+      "A governor decline during a drag wins over the stale drag snapshot",
+      "Recovery can reach the full area-capped DPR after a weak start",
+      "An unsaved note survives wall focus changes and still saves through NotesPanel",
+      "The iframe node and its internal state survive movement and focus-away/back",
+      "Completion toggling and FIT/FILL controls preserve their existing behavior",
+      "Native fullscreen sleeps hidden WebGL, keeps the iframe, and resumes the same Canvas on exit",
+      "Baked PCF shadows and shared-resource counts remain stable after interactions",
+      "Shared assets and GPU resource counts stay bounded across 2 leave/re-enter cycles"
+    ]
+  }
+}

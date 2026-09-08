@@ -11,7 +11,7 @@
 //
 // ── Part 13: what changed for performance ─────────────────────────────────
 //   · Repeated static props (desks, window frames, lamps, books) are merged
-//     into ~11 meshes (see mergedStatics.ts) instead of ~110 draw calls.
+//     into 13 meshes (see mergedStatics.ts) instead of ~110 draw calls.
 //   · The window glass is plain transparency now (the old glass forced a
 //     second scene render per surface) — it still reads as frosted glass
 //     and costs one blended quad.
@@ -22,11 +22,19 @@
 //     survives only where a shadow is actually visible.
 //   · Snowfall count follows the quality tier; the loop allocates nothing.
 
-import { memo, useMemo, useRef } from "react";
+import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { BOOK_BIN_COLORS, getMergedRoomStatics } from "./mergedStatics";
 import { ROOM } from "./roomGeometry";
+import { retainSharedResources } from "./resourceLifetime";
+import Classmates from "./Classmates";
+import StaticInstances, { type StaticPose } from "./StaticInstances";
+import { ObjectActivity, freezeStaticLocalMatrices } from "./objectActivity";
+
+const FAN_POSES: readonly StaticPose[] = [0, 1, 2].map(i => ({
+  position: [0, -0.14, 0], rotation: [0, (i * Math.PI * 2) / 3, 0],
+}));
 
 // The shell's measurements are shared with mergedStatics (windows, lamps,
 // books), Classroom3D (the board row) and SeatRig (the camera poses), so they
@@ -46,112 +54,72 @@ const wallMat = (
 
 function Snowfall({ count = 420 }: { count?: number }) {
   const ref = useRef<THREE.Points>(null);
-  const { positions, speeds } = useMemo(() => {
-    const positions = new Float32Array(count * 3);
-    const speeds = new Float32Array(count);
-    for (let i = 0; i < count; i += 1) {
+  const capacity = Math.max(420, count);
+  const { positions, speeds, bounds, activity } = useMemo(() => {
+    const positions = new Float32Array(capacity * 3);
+    const speeds = new Float32Array(capacity);
+    for (let i = 0; i < capacity; i += 1) {
       positions[i * 3] = ROOM.width / 2 + 1.6 + Math.random() * 5;
       positions[i * 3 + 1] = Math.random() * 9 - 1;
       positions[i * 3 + 2] = (Math.random() - 0.5) * 22;
       speeds[i] = 0.28 + Math.random() * 0.55;
     }
-    return { positions, speeds };
-  }, [count]);
-
-  // Allocation-free: the attribute array is reused in place every frame.
-  useFrame((_, delta) => {
-    const geometry = ref.current?.geometry;
-    if (!geometry) return;
-    const array = geometry.attributes.position.array as Float32Array;
-    for (let i = 0; i < count; i += 1) {
-      const y = i * 3 + 1;
-      array[y] -= speeds[i] * delta;
-      array[i * 3 + 2] += Math.sin(array[y] * 0.6 + i) * delta * 0.18;
-      if (array[y] < -1.2) array[y] = 8.5;
+    return {
+      positions, speeds,
+      bounds: new THREE.Sphere(new THREE.Vector3(ROOM.width / 2 + 4.1, 3.65, 0), 12.6),
+      activity: new ObjectActivity(),
+    };
+  }, [capacity]);
+  const pending = useRef(0);
+  useLayoutEffect(() => {
+    // A tier edge changes only the draw range, not a buffer's identity or
+    // every particle's location. Keep the existing 420 / 240 / 120 presets.
+    ref.current?.geometry.setDrawRange(0, count);
+    // Reactivated particles may lie outside the active subset's old bounds.
+    let minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i < count; i++) {
+      minZ = Math.min(minZ, positions[i * 3 + 2]);
+      maxZ = Math.max(maxZ, positions[i * 3 + 2]);
     }
-    geometry.attributes.position.needsUpdate = true;
+    if (count > 0) {
+      bounds.center.z = (minZ + maxZ) / 2;
+      bounds.radius = Math.hypot(2.5, 4.85, (maxZ - minZ) / 2) + 0.15;
+    }
+  }, [count, bounds, positions]);
+
+  useFrame((state, delta) => {
+    const points = ref.current;
+    if (!points || count <= 0) return;
+    const update = activity.shouldUpdate(state.camera, state.clock.elapsedTime, bounds);
+    points.visible = activity.visible;
+    if (!activity.visible) { pending.current = 0; return; }
+    pending.current += delta;
+    if (!update) return;
+    const dt = pending.current;
+    pending.current = 0;
+    const array = points.geometry.attributes.position.array as Float32Array;
+    let minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i < count; i += 1) {
+      const y = i * 3 + 1, z = i * 3 + 2;
+      array[y] -= speeds[i] * dt;
+      array[z] += Math.sin(array[y] * 0.6 + i) * dt * 0.18;
+      if (array[y] < -1.2) array[y] = 8.5;
+      minZ = Math.min(minZ, array[z]); maxZ = Math.max(maxZ, array[z]);
+    }
+    // Snow drifts along Z. A once-computed point bound becomes stale after
+    // several minutes; update the conservative envelope alongside the loop.
+    bounds.center.z = (minZ + maxZ) / 2;
+    bounds.radius = Math.hypot(2.5, 4.85, (maxZ - minZ) / 2) + 0.15;
+    points.geometry.attributes.position.needsUpdate = true;
   });
 
   return (
     <points ref={ref}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      <bufferGeometry boundingSphere={bounds}>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} usage={THREE.DynamicDrawUsage} />
       </bufferGeometry>
       <pointsMaterial color="#ffffff" size={0.075} sizeAttenuation transparent opacity={0.9} depthWrite={false} />
     </points>
-  );
-}
-
-/* ── A classmate: low-poly seated student with a breathing idle ─────────── */
-
-function Classmate({
-  position,
-  rotation = 0,
-  hue,
-  phase,
-  writing,
-}: {
-  position: [number, number, number];
-  rotation?: number;
-  hue: string;
-  phase: number;
-  writing: boolean;
-}) {
-  const torso = useRef<THREE.Group>(null);
-  const arm = useRef<THREE.Group>(null);
-  useFrame((state) => {
-    const t = state.clock.elapsedTime + phase;
-    if (torso.current) {
-      torso.current.rotation.x = Math.sin(t * 0.7) * 0.022;
-      torso.current.position.y = Math.sin(t * 1.1) * 0.012;
-    }
-    if (arm.current) {
-      arm.current.rotation.x = writing ? -0.9 + Math.sin(t * 3.1) * 0.14 : -0.55;
-      arm.current.rotation.z = writing ? Math.sin(t * 2.4) * 0.09 : 0;
-    }
-  });
-
-  return (
-    <group position={position} rotation={[0, rotation, 0]}>
-      <group ref={torso}>
-        {/* torso — winter jacket */}
-        <mesh position={[0, 0.62, 0]} castShadow>
-          <capsuleGeometry args={[0.19, 0.34, 4, 12]} />
-          <meshStandardMaterial color={hue} roughness={0.85} />
-        </mesh>
-        {/* scarf */}
-        <mesh position={[0, 0.86, 0.01]}>
-          <torusGeometry args={[0.15, 0.045, 8, 18]} />
-          <meshStandardMaterial color="#e2506a" roughness={0.9} />
-        </mesh>
-        {/* head */}
-        <mesh position={[0, 1.05, 0]} castShadow>
-          <sphereGeometry args={[0.145, 20, 16]} />
-          <meshStandardMaterial color="#c89272" roughness={0.75} />
-        </mesh>
-        {/* hair / beanie */}
-        <mesh position={[0, 1.11, -0.01]}>
-          <sphereGeometry args={[0.152, 18, 14, 0, Math.PI * 2, 0, Math.PI * 0.62]} />
-          <meshStandardMaterial color="#2a2333" roughness={0.95} />
-        </mesh>
-        {/* writing arm */}
-        <group ref={arm} position={[0.17, 0.76, 0.06]}>
-          <mesh position={[0, -0.02, 0.2]} rotation={[Math.PI / 2, 0, 0]}>
-            <capsuleGeometry args={[0.052, 0.34, 4, 8]} />
-            <meshStandardMaterial color={hue} roughness={0.85} />
-          </mesh>
-        </group>
-        <mesh position={[-0.2, 0.66, 0.12]} rotation={[1.15, 0, 0]}>
-          <capsuleGeometry args={[0.052, 0.3, 4, 8]} />
-          <meshStandardMaterial color={hue} roughness={0.85} />
-        </mesh>
-      </group>
-      {/* legs under the desk */}
-      <mesh position={[0, 0.24, 0.16]} rotation={[1.35, 0, 0]}>
-        <capsuleGeometry args={[0.075, 0.34, 4, 8]} />
-        <meshStandardMaterial color="#2f3646" roughness={0.9} />
-      </mesh>
-    </group>
   );
 }
 
@@ -169,9 +137,21 @@ function Steam({ position }: { position: [number, number, number] }) {
     }
     return array;
   }, []);
+  const activity = useMemo(() => new ObjectActivity(), []);
+  const bounds = useMemo(() => new THREE.Sphere(new THREE.Vector3(position[0], position[1] + 0.21, position[2]), 0.28), [position[0], position[1], position[2]]);
+  const localBounds = useMemo(() => new THREE.Sphere(new THREE.Vector3(0, 0.21, 0), 0.28), []);
+  const pending = useRef(0);
   useFrame((state, delta) => {
-    const geometry = ref.current?.geometry;
-    if (!geometry) return;
+    const points = ref.current;
+    if (!points) return;
+    const update = activity.shouldUpdate(state.camera, state.clock.elapsedTime, bounds);
+    points.visible = activity.visible;
+    if (!activity.visible) { pending.current = 0; return; }
+    pending.current += delta;
+    if (!update) return;
+    delta = pending.current;
+    pending.current = 0;
+    const geometry = points.geometry;
     const array = geometry.attributes.position.array as Float32Array;
     for (let i = 0; i < count; i += 1) {
       array[i * 3 + 1] += delta * 0.14;
@@ -185,8 +165,8 @@ function Steam({ position }: { position: [number, number, number] }) {
   });
   return (
     <points ref={ref} position={position}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      <bufferGeometry boundingSphere={localBounds}>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} usage={THREE.DynamicDrawUsage} />
       </bufferGeometry>
       <pointsMaterial color="#ffffff" size={0.035} transparent opacity={0.22} depthWrite={false} />
     </points>
@@ -196,32 +176,33 @@ function Steam({ position }: { position: [number, number, number] }) {
 /* ── The room ──────────────────────────────────────────────────────────── */
 
 function Room({ snow = 420, lampLights = 2 }: { snow?: number; lampLights?: 1 | 2 }) {
+  const root = useRef<THREE.Group>(null);
   const fan = useRef<THREE.Group>(null);
   const clock = useRef<THREE.Mesh>(null);
+  const animation = useMemo(() => ({
+    fan: new ObjectActivity(), clock: new ObjectActivity(),
+    fanBounds: new THREE.Sphere(new THREE.Vector3(0, ROOM.height - 0.39, 4), 0.78),
+    clockBounds: new THREE.Sphere(new THREE.Vector3(ROOM.width / 2 - 0.08, 2.59, -1.9), 0.14),
+  }), []);
   useFrame((state) => {
-    if (fan.current) fan.current.rotation.y = state.clock.elapsedTime * 0.35;
-    if (clock.current) clock.current.rotation.z = -state.clock.elapsedTime * 0.1;
+    const t = state.clock.elapsedTime;
+    if (fan.current && animation.fan.shouldUpdate(state.camera, t, animation.fanBounds)) {
+      fan.current.rotation.y = t * 0.35;
+    }
+    if (clock.current && animation.clock.shouldUpdate(state.camera, t, animation.clockBounds)) {
+      clock.current.rotation.z = -t * 0.1;
+    }
   });
+  useLayoutEffect(() => {
+    if (root.current) freezeStaticLocalMatrices(root.current);
+  }, [snow, lampLights]);
 
-  // Module-singleton merged geometry: built once, reused for the app's life.
+  // Module-singleton merged geometry: retained, never rebuilt per mount.
   const merged = getMergedRoomStatics();
-
-  const classmates = useMemo(
-    () =>
-      [
-        { pos: [-3.1, 0, 2.85], hue: "#4c6ef5", writing: true },
-        { pos: [3.3, 0, 2.85], hue: "#2f9e6e", writing: false },
-        { pos: [-3.1, 0, 5.35], hue: "#d97757", writing: false },
-        { pos: [0.15, 0, 5.35], hue: "#7c5cd6", writing: true },
-        { pos: [3.3, 0, 5.35], hue: "#b8455f", writing: true },
-        { pos: [-3.1, 0, 7.65], hue: "#3f7fb5", writing: false },
-        { pos: [3.3, 0, 7.65], hue: "#8a6b3d", writing: true },
-      ].map((entry, index) => ({ ...entry, phase: index * 1.37 })),
-    [],
-  );
+  useLayoutEffect(() => retainSharedResources(Object.values(merged).flat()), [merged]);
 
   return (
-    <group>
+    <group ref={root}>
       {/* Shell */}
       <mesh position={[0, ROOM.height / 2, 3]} receiveShadow>
         <boxGeometry args={[ROOM.width, ROOM.height, ROOM.depth]} />
@@ -292,13 +273,11 @@ function Room({ snow = 420, lampLights = 2 }: { snow?: number; lampLights?: 1 | 
           <cylinderGeometry args={[0.08, 0.08, 0.28, 10]} />
           <meshStandardMaterial color="#5c6473" metalness={0.6} roughness={0.4} />
         </mesh>
-        <group ref={fan}>
-          {[0, 1, 2].map((i) => (
-            <mesh key={i} rotation={[0, (i * Math.PI * 2) / 3, 0]} position={[0, -0.14, 0]}>
-              <boxGeometry args={[1.5, 0.02, 0.2]} />
-              <meshStandardMaterial color="#6d7688" roughness={0.6} />
-            </mesh>
-          ))}
+        <group ref={fan} userData={{ classroomAnimated: true }}>
+          <StaticInstances poses={FAN_POSES}>
+            <boxGeometry args={[1.5, 0.02, 0.2]} />
+            <meshStandardMaterial color="#6d7688" roughness={0.6} />
+          </StaticInstances>
         </group>
       </group>
 
@@ -308,7 +287,7 @@ function Room({ snow = 420, lampLights = 2 }: { snow?: number; lampLights?: 1 | 
           <cylinderGeometry args={[0.26, 0.26, 0.05, 24]} />
           <meshStandardMaterial color="#f4f6fb" roughness={0.6} />
         </mesh>
-        <mesh ref={clock} position={[0, 0.04, 0]}>
+        <mesh ref={clock} position={[0, 0.04, 0]} userData={{ classroomAnimated: true }}>
           <boxGeometry args={[0.02, 0.01, 0.18]} />
           <meshStandardMaterial color="#1b2432" />
         </mesh>
@@ -353,15 +332,7 @@ function Room({ snow = 420, lampLights = 2 }: { snow?: number; lampLights?: 1 | 
       </mesh>
 
       {/* Classmates */}
-      {classmates.map((mate, i) => (
-        <Classmate
-          key={i}
-          position={mate.pos as [number, number, number]}
-          hue={mate.hue}
-          phase={mate.phase}
-          writing={mate.writing}
-        />
-      ))}
+      <Classmates />
 
       {/* Warm mug on the learner's desk */}
       <group position={[0.8, 0.79, 1.9]}>
