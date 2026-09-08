@@ -5476,6 +5476,59 @@ html[data-course-player-active="true"] {
   padding-bottom: 6px;
 }
 
+/* ── Course Player peek dock ──────────────────────────────────────────────
+   The desktop peek dock pattern brought into the Course Player's footer
+   navigation: a thin frosted-glass line sits at the very bottom CENTRE of the
+   player; tapping/hovering it opens the same GlassDock the study pane used to
+   hold, and swiping left/right across the open dock selects the tab under the
+   finger on release (GlassDock's own onPointerUp). The line is the same
+   watercolor-frost strip as the desktop one; the container re-enables pointer
+   events only on the line (and the dock while it is open), so the player's
+   content is never blocked by the collapsed dock. */
+[data-course-peek-dock] {
+  pointer-events: none;
+  padding-bottom: max(env(safe-area-inset-bottom), 10px);
+}
+
+[data-course-peek-line],
+[data-course-peek-line] * {
+  max-width: none !important;
+}
+
+[data-course-peek-line] {
+  pointer-events: auto;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: min(22rem, 68%);
+  height: 8px;
+  margin: 0 auto;
+  border-radius: 9999px;
+  background: transparent !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.32),
+    0 10px 28px -12px rgba(0, 0, 0, 0.18);
+}
+
+[data-course-peek-panel] {
+  pointer-events: none;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+[data-course-peek-dock][data-open="true"] [data-course-peek-panel] {
+  pointer-events: auto;
+  height: auto;
+  overflow: visible;
+  opacity: 1;
+  transform: none;
+  padding-bottom: 6px;
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    CHROME GLASS — WebsiteGlass docs sensitivity on every header
    ══════════════════════════════════════════════════════════════════════
