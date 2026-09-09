@@ -79,6 +79,10 @@ interface PersonalModulesPanelProps {
   onOpenPersonalFile: (file: CourseFile, context: { moduleTitle: string }) => void;
   /** Open the account-wide central workspace. */
   onOpenLibrary?: () => void;
+  /** Open the AI Study Engine for a whole module (“Ask this Module”). */
+  onOpenModuleAi?: (module: PersonalCourseModule, view?: string, question?: string) => void;
+  /** Open the AI Study Engine scoped to one resource (“Ask AI about this”). */
+  onOpenResourceAi?: (resource: PersonalCourseResource, view?: string, question?: string) => void;
   /** Close the manager and restore the official modules list. */
   onExit: () => void;
 }
@@ -153,8 +157,8 @@ function PrimaryButton({ busy = false, children, ...props }: { busy?: boolean } 
   );
 }
 
-/** One resource row inside an expanded module: open + reorder + edit + delete. */
-function ResourceCard({ module, resource, busy, onOpen, onEdit, onDelete, onMove }: {
+/** One resource row inside an expanded module: open + reorder + edit + delete + Ask AI. */
+function ResourceCard({ module, resource, busy, onOpen, onEdit, onDelete, onMove, onAi }: {
   module: PersonalCourseModule;
   resource: PersonalCourseResource;
   busy: boolean;
@@ -162,6 +166,7 @@ function ResourceCard({ module, resource, busy, onOpen, onEdit, onDelete, onMove
   onEdit: () => void;
   onDelete: () => void;
   onMove: (nextIndex: number) => void;
+  onAi?: () => void;
 }) {
   const index = module.resources.findIndex((item) => item.id === resource.id);
   const last = module.resources.length - 1;
@@ -181,6 +186,9 @@ function ResourceCard({ module, resource, busy, onOpen, onEdit, onDelete, onMove
           </span>
         </span>
       </button>
+      {onAi ? (
+        <button type="button" aria-label={`Ask AI about ${resource.name}`} title="Ask AI about this" className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-violet-200 ring-1 ring-violet-400/25 transition hover:bg-violet-500/25 disabled:opacity-30" disabled={busy} onClick={onAi} data-personal-resource-ai=""><Sparkles size={12} /></button>
+      ) : null}
       <button type="button" aria-label="Move resource up" className={smallIconButtonClass} disabled={busy || index === 0} onClick={() => onMove(index - 1)} data-personal-resource-move-up><ChevronUp size={14} /></button>
       <button type="button" aria-label="Move resource down" className={smallIconButtonClass} disabled={busy || index === last} onClick={() => onMove(index + 1)} data-personal-resource-move-down><ChevronDown size={14} /></button>
       <button type="button" aria-label="Edit resource" className={smallIconButtonClass} disabled={busy} onClick={onEdit} data-personal-edit-resource><PencilLine size={14} /></button>
@@ -189,7 +197,7 @@ function ResourceCard({ module, resource, busy, onOpen, onEdit, onDelete, onMove
   );
 }
 
-export default function PersonalModulesPanel({ personal, productTitle, onOpenPersonalFile, onOpenLibrary, onExit }: PersonalModulesPanelProps) {
+export default function PersonalModulesPanel({ personal, productTitle, onOpenPersonalFile, onOpenLibrary, onOpenModuleAi, onOpenResourceAi, onExit }: PersonalModulesPanelProps) {
   const { access, usage, modules } = personal;
   const limits = access?.limits ?? null;
   const entitled = Boolean(access?.entitled);
@@ -554,6 +562,42 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
 
                   {open ? (
                     <div className="ml-2 space-y-1 border-l border-white/10 pl-3 pb-1" data-personal-module-body>
+                      {onOpenModuleAi ? (
+                        <div className="flex flex-wrap gap-1.5 pb-1" data-personal-module-ai="">
+                          <button
+                            type="button"
+                            onClick={() => onOpenModuleAi(module, "ask")}
+                            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 text-[11px] font-black text-white shadow-[0_6px_18px_rgba(139,92,246,0.28)] transition hover:bg-violet-500"
+                            data-personal-ask-module=""
+                          >
+                            <Sparkles size={13} /> Ask this Module
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onOpenModuleAi(module, "summary")}
+                            className="inline-flex min-h-9 items-center gap-1 rounded-xl bg-white/[0.06] px-3 text-[10px] font-black text-white/70 ring-1 ring-white/10 transition hover:bg-white/[0.09]"
+                            data-personal-summary-module=""
+                          >
+                            Summary
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onOpenModuleAi(module, "practice")}
+                            className="inline-flex min-h-9 items-center gap-1 rounded-xl bg-white/[0.06] px-3 text-[10px] font-black text-white/70 ring-1 ring-white/10 transition hover:bg-white/[0.09]"
+                            data-personal-questions-module=""
+                          >
+                            Questions
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onOpenModuleAi(module, "flashcards")}
+                            className="inline-flex min-h-9 items-center gap-1 rounded-xl bg-white/[0.06] px-3 text-[10px] font-black text-white/70 ring-1 ring-white/10 transition hover:bg-white/[0.09]"
+                            data-personal-flashcards-module=""
+                          >
+                            Flashcards
+                          </button>
+                        </div>
+                      ) : null}
                       {module.resources.map((resource) => (
                         <ResourceCard
                           key={resource.id}
@@ -571,6 +615,7 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
                           onEdit={() => openResourceEdit(module, resource)}
                           onDelete={() => handleDeleteResource(module, resource)}
                           onMove={(nextIndex) => { void run("move", () => personal.moveResource(module.id, resource.id, nextIndex)); }}
+                          onAi={onOpenResourceAi ? () => onOpenResourceAi(resource, "ask") : undefined}
                         />
                       ))}
                       <div className="flex flex-wrap gap-1.5 pt-1">

@@ -14,6 +14,7 @@ import SnowOverlay from "./course/SnowOverlay";
 // and the panel, once opened, stays mounted exactly as before.
 const MindMapPanel = lazy(() => import("./course/MindMapPanel"));
 const AddOfficialResourceDialog = lazy(() => import("./personal-library/AddOfficialResourceDialog"));
+const ModuleAiWorkspace = lazy(() => import("./ai/ModuleAiWorkspace"));
 import PlayerPanel from "./course/PlayerPanel";
 import CoursePeekDock from "./course/CoursePeekDock";
 import PersonalModulesPanel from "./course/PersonalModulesPanel";
@@ -398,7 +399,54 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     scope: "context",
     productDocumentId: product.documentId,
   });
+  // ── Personal AI Study Engine — one workspace for THIS course's My Modules ─
+  // The workspace is the same overlay used in StudyLibraryPage, scoped to the
+  // module or resource the learner chose. Opening it never leaves the player.
+  type AiTarget = {
+    moduleId: string | null;
+    storageModuleId: string;
+    moduleTitle: string;
+    productId: string;
+    resourceId?: string | null;
+    resourceTitle?: string;
+    view: import("./ai/ModuleAiWorkspace").ModuleAiView;
+    question?: string;
+  } | null;
+  const [personalAiTarget, setPersonalAiTarget] = useState<AiTarget>(null);
+  const openPersonalModuleAi = useCallback((module: import("./lib/personalCourseClient").PersonalCourseModule, view: import("./ai/ModuleAiWorkspace").ModuleAiView = "ask", question?: string) => {
+    setPersonalAiTarget({
+      moduleId: module.id,
+      storageModuleId: module.id,
+      moduleTitle: module.title,
+      productId: String(product.id),
+      view,
+      question,
+    });
+  }, [product.id]);
   const activeFileIsPersonal = Boolean(selectedFile && String((selectedFile as CourseFile).source || "") === "personal");
+  const openPersonalResourceAi = useCallback((resource: import("./lib/personalCourseClient").PersonalCourseResource, view: import("./ai/ModuleAiWorkspace").ModuleAiView = "ask", question?: string) => {
+    const moduleTitle = personalModules.allModules.find((item) => item.id === resource.personalModuleId)?.title
+      || (resource.state === "saved" ? "Saved for Later" : product.title);
+    setPersonalAiTarget({
+      moduleId: resource.personalModuleId || null,
+      storageModuleId: resource.storageModuleId,
+      moduleTitle,
+      productId: String(product.id),
+      resourceId: resource.id,
+      resourceTitle: resource.name,
+      view,
+      question,
+    });
+  }, [personalModules.allModules, product.title, product.id]);
+  // When the ACTIVE viewer is a personal file, look up its resource so the
+  // header banner can offer “Ask AI about this resource”.
+  const activePersonalResource = useMemo(() => {
+    if (!activeFileIsPersonal || !selectedFile) return null;
+    const rid = String((selectedFile as CourseFile).personalResourceId || selectedFile.id || "");
+    const sid = String((selectedFile as CourseFile).personalStorageModuleId || "");
+    const pool = [...personalModules.allModules.flatMap((item) => item.resources), ...personalModules.savedResources];
+    return pool.find((item) => item.id === rid && (!sid || item.storageModuleId === sid)) || pool.find((item) => item.id === rid) || null;
+  }, [activeFileIsPersonal, selectedFile, personalModules.allModules, personalModules.savedResources]);
   const selectedOfficialModule = selectedFile && !activeFileIsPersonal
     ? owningModuleForFile(modules, String(selectedFile.id))
     : null;
@@ -1107,6 +1155,8 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
             trackFeatureEvent("library_opened", { surface: "course_player" });
             window.location.hash = "#/study-library";
           }}
+          onOpenModuleAi={(module, view) => openPersonalModuleAi(module, (view as import("./ai/ModuleAiWorkspace").ModuleAiView) || "ask")}
+          onOpenResourceAi={(resource, view, question) => openPersonalResourceAi(resource, (view as import("./ai/ModuleAiWorkspace").ModuleAiView) || "ask", question)}
           onExit={() => setPersonalModulesOpen(false)}
         />
       )}
@@ -1148,6 +1198,32 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         data-course-split="on"
         {...(useLandscapeRails ? { "data-course-landscape-content": "" } : {})}
       >
+        {activePersonalResource ? (
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-white/10 bg-violet-500/[0.06] px-3 py-2" data-personal-viewer-ai-bar="">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-500/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-violet-200 ring-1 ring-violet-400/25">
+              My Modules → {activePersonalResource.name}
+            </span>
+            <span className="hidden text-[10px] font-bold text-white/30 sm:block">Ask the AI tutor about this resource</span>
+            <div className="ml-auto flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => openPersonalResourceAi(activePersonalResource, "ask")}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-violet-600 px-3.5 text-[11px] font-black text-white"
+                data-personal-viewer-ask-ai=""
+              >
+                <span aria-hidden="true">✦</span> Ask AI about this
+              </button>
+              <button
+                type="button"
+                onClick={() => openPersonalResourceAi(activePersonalResource, "summary")}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-white/[0.06] px-3.5 text-[11px] font-black text-white/75 ring-1 ring-white/10"
+                data-personal-viewer-summary=""
+              >
+                Summarize
+              </button>
+            </div>
+          </div>
+        ) : null}
         <SplitDeck
           axis={useLandscapeRails ? "row" : "column"}
           orientation={useLandscapeRails ? "landscape" : "portrait"}
@@ -1179,6 +1255,28 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           official={officialDialogTarget?.reference || null}
           resourceName={officialDialogTarget?.name || "Course resource"}
           resourceType={officialDialogTarget?.type}
+        />
+      </Suspense>
+    ) : null}
+    {personalAiTarget ? (
+      <Suspense fallback={null}>
+        <ModuleAiWorkspace
+          open={Boolean(personalAiTarget)}
+          onClose={() => setPersonalAiTarget(null)}
+          uid={user?.id || null}
+          moduleId={personalAiTarget.moduleId}
+          storageModuleId={personalAiTarget.storageModuleId}
+          moduleTitle={personalAiTarget.moduleTitle}
+          productId={personalAiTarget.productId}
+          resourceId={personalAiTarget.resourceId || null}
+          resourceTitle={personalAiTarget.resourceTitle}
+          initialView={personalAiTarget.view}
+          initialQuestion={personalAiTarget.question}
+          onExpandToModule={
+            personalAiTarget.resourceId
+              ? () => setPersonalAiTarget((current) => current ? { ...current, resourceId: null, resourceTitle: undefined, view: "ask" } as AiTarget : null)
+              : undefined
+          }
         />
       </Suspense>
     ) : null}
