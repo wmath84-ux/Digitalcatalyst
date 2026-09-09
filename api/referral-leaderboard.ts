@@ -12,6 +12,7 @@ import { applyCors } from "./_lib/cors.js";
 import { handleCreateQuery, handleListQueries, handleReplyQuery } from "./_lib/userQueries.js";
 import { handlePersonalCourse } from "./_lib/personalCourse.js";
 import { handlePersonalAi } from "./_lib/personalAi.js";
+import { handleStudyPacks } from "./_lib/studyPacks.js";
 
 type SubscriberRow = {
   uid: string;
@@ -172,6 +173,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return await handlePersonalAi(req, res);
       } catch (innerError) {
         return errorResponse(res, innerError, "The AI study engine hit an unexpected problem. Please try again.");
+      }
+    }
+    if (action.startsWith("studyPack.") || action.startsWith("studyStack.")) {
+      try {
+        return await handleStudyPacks(req, res);
+      } catch (innerError) {
+        return errorResponse(res, innerError, "Could not complete the study pack request.");
       }
     }
     if (action.startsWith("flowpath.")) {

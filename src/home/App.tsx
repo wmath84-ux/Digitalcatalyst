@@ -7,6 +7,7 @@ import CategoryNav from "./components/CategoryNav";
 import ProductCard from "./components/ProductCard";
 import ProductCardSkeleton from "./components/ProductCardSkeleton";
 import ContinueLearning from "./components/ContinueLearning";
+import PublicPacksRail from "../personal-library/PublicPacksRail";
 import ContinueLearningSkeleton from "./components/ContinueLearningSkeleton";
 import Reviews from "./components/Reviews";
 import BottomNav, { type TabKey } from "../components/BottomNav";
@@ -325,6 +326,8 @@ export default function App({
                   </div>
                 )
               )}
+
+              <PublicPacksRail />
 
               <section data-home-trending className="px-5 pt-6 md:px-8">
                 <div className="flex items-center justify-between">

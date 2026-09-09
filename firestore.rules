@@ -58,6 +58,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Shareable Study Pack snapshots. Public/unlisted docs are readable by
+    // anyone with the opaque id; private packs are owner-only. All writes go
+    // through the Admin SDK API so visibility and ownership cannot be spoofed.
+    match /studyPacks/{packId} {
+      allow read: if resource.data.visibility in ['public', 'unlisted']
+        || (signedIn() && resource.data.ownerUid == request.auth.uid)
+        || isAdmin();
+      allow create, update, delete: if false;
+    }
+
     // Feature availability is public catalog metadata. The app reads this
     // entry to decide whether a feature still has a subscription gate.
     match /subscriptionFeatures/{featureId} {

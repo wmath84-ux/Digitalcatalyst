@@ -104,6 +104,17 @@ export const AI_ANALYTICS_EVENTS = [
 
 export type AiAnalyticsEvent = (typeof AI_ANALYTICS_EVENTS)[number];
 
+export const trackStudyShareEvent = (eventName: string, params?: AnalyticsParams) => {
+  if (!eventName) return;
+  const fullName = String(eventName).replace(/^personal_/i, "");
+  void loadAnalytics().then((loaded) => {
+    if (!loaded) return;
+    try {
+      loaded.analytics.logEvent(loaded.analytics.getAnalytics(loaded.app), fullName, params);
+    } catch { /* best-effort */ }
+  });
+};
+
 export const trackAiEvent = (eventName: AiAnalyticsEvent | string, params?: AnalyticsParams) => {
   if (!eventName) return;
   const bare = String(eventName).replace(/^ai_/i, "");
