@@ -347,6 +347,13 @@ interface CourseOverlayProps {
    * footer dock" preference).
    */
   peekDock?: boolean;
+  /**
+   * Production AI chat (ZIP Lumen). Owned by the Course Player so its
+   * conversation state survives tab switches; the overlay hosts it as a
+   * sibling of the keyed tab body and keeps it mounted (hidden) when
+   * another tab is active. Absent → the Coming Soon placeholder.
+   */
+  aiPanel?: ReactNode;
 }
 
 /**
@@ -682,6 +689,7 @@ export function StudyContent({
   playerPanel,
   personalModulesOpen = false,
   personalModulesPanel,
+  aiPanel,
 }: {
   tab: DockTab;
   rows: SheetRowSpec[];
@@ -693,6 +701,7 @@ export function StudyContent({
   /** My Modules: the modules tab swaps to the learner's own-content panel. */
   personalModulesOpen?: boolean;
   personalModulesPanel?: ReactNode;
+  aiPanel?: ReactNode;
 }) {
   return (
     // Content swaps in place — the pane itself never closes. No slide
@@ -724,14 +733,18 @@ export function StudyContent({
           panelAttr="data-course-brain-panel"
         />
       ) : tab === "ai" ? (
-        // Dummy for now — the AI buddy's functionality lands later.
-        <ComingSoonPanel
-          icon={AiTabIcon}
-          color="#22D3EE"
-          title="AI"
-          subtitle="AI study buddy — jald aa raha hai"
-          panelAttr="data-course-ai-panel"
-        />
+        // Production chat is hosted as a sibling of the keyed tab body so
+        // Lumen state survives tab switches. The Coming Soon panel stays
+        // as the fallback when no aiPanel is handed down.
+        aiPanel ? null : (
+          <ComingSoonPanel
+            icon={AiTabIcon}
+            color="#22D3EE"
+            title="AI"
+            subtitle="AI study buddy — jald aa raha hai"
+            panelAttr="data-course-ai-panel"
+          />
+        )
       ) : (
         <SnapList
           rows={rows}
@@ -787,6 +800,7 @@ export default function CourseOverlay(props: CourseOverlayProps) {
       playerPanel={props.playerPanel ?? PLAYER_FALLBACK}
       personalModulesOpen={props.personalModulesOpen}
       personalModulesPanel={props.personalModulesPanel}
+      aiPanel={props.aiPanel}
     />
   );
 
@@ -823,6 +837,9 @@ export default function CourseOverlay(props: CourseOverlayProps) {
   // fills it: tab body, footer dock (in that order). There is NO header row —
   // every tab starts at the very top of the pane so the content keeps every
   // pixel the header used to take.
+  const peekPad = props.peekDock ? "pb-[calc(max(env(safe-area-inset-bottom),10px)+16px)]" : "";
+  const hideKeyedBody = Boolean(props.aiPanel) && props.tab === "ai";
+
   return (
     <>
       {/* A tab switch inside the pane crossfades (opacity 150 ms + a 6 px rise). */}
@@ -831,15 +848,20 @@ export default function CourseOverlay(props: CourseOverlayProps) {
         initial={{ opacity: paneCrossfade ? 0 : 1, y: paneCrossfade ? 6 : 0 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.15, ease: EASE_OUT_MOTION }}
-        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
-          // In peek mode the footer lives at the bottom centre of the player,
-          // so the study content clears the line (and the safe area) instead
-          // of the in-pane dock it used to sit above.
-          props.peekDock ? "pb-[calc(max(env(safe-area-inset-bottom),10px)+16px)]" : ""
-        }`}
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${peekPad} ${hideKeyedBody ? "hidden" : ""}`}
       >
         {studyBody}
       </motion.div>
+      {props.aiPanel ? (
+        <div
+          className={`h-full min-h-0 flex-1 flex-col overflow-hidden ${peekPad} ${props.tab === "ai" ? "flex" : "hidden"}`}
+          data-course-ai-panel
+          hidden={props.tab !== "ai"}
+          aria-hidden={props.tab !== "ai"}
+        >
+          {props.aiPanel}
+        </div>
+      ) : null}
       {dock}
     </>
   );

@@ -14,6 +14,7 @@ import SnowOverlay from "./course/SnowOverlay";
 // and the panel, once opened, stays mounted exactly as before.
 const MindMapPanel = lazy(() => import("./course/MindMapPanel"));
 const AddOfficialResourceDialog = lazy(() => import("./personal-library/AddOfficialResourceDialog"));
+const LumenChat = lazy(() => import("./lumen/App"));
 import PlayerPanel from "./course/PlayerPanel";
 import CoursePeekDock from "./course/CoursePeekDock";
 import ChargingCompleteButton from "./course/ChargingCompleteButton";
@@ -337,6 +338,12 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const [playbackReady, setPlaybackReady] = useState(false);
   // Bottom dock state — which of the seven footer tabs the study pane shows.
   const [dockTab, setDockTab] = useState<DockTab>("modules");
+  // ZIP Lumen chat is lazy-loaded on first AI tab open, then stays mounted
+  // (hidden) so conversation state survives tab switches.
+  const [aiOpened, setAiOpened] = useState(false);
+  useEffect(() => {
+    if (dockTab === "ai") setAiOpened(true);
+  }, [dockTab]);
   // ── Split Deck — the player's ONE layout ────────────────────────────────
   // The old "sheet" home and its Split-mode settings toggle are gone (owner's
   // direction): the player is ALWAYS two glass panes — the lesson on one side
@@ -1160,6 +1167,32 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       // whole player (<CoursePeekDock /> below), so the study pane renders no
       // footer of its own. The legacy preference keeps the in-pane dock.
       peekDock={!legacyFooterDock}
+      aiPanel={
+        user?.id && aiOpened ? (
+          <Suspense
+            fallback={(
+              <div className="grid min-h-0 flex-1 place-items-center p-6 text-center text-sm font-semibold text-white/60">
+                <span className="block h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-cyan-400" />
+              </div>
+            )}
+          >
+            <LumenChat
+              key={product.id}
+              uid={user.id}
+              productId={product.id}
+              courseTitle={product.title}
+              courseShort={product.title.length > 18 ? `${product.title.slice(0, 18).trimEnd()}…` : product.title}
+              moduleId={selectedOfficialModule ? String(selectedOfficialModule.id) : (selectedFile?.personalModuleId || null)}
+              moduleTitle={selectedOfficialModule?.title || (activeFileIsPersonal ? "My Modules" : null)}
+              resourceName={selectedFile?.name || null}
+              resourceType={selectedFile?.type || null}
+              selectedFile={selectedFile}
+              notes={notes}
+              profile={{ name: user.name, photoURL: user.photoURL }}
+            />
+          </Suspense>
+        ) : undefined
+      }
     />
   );
 

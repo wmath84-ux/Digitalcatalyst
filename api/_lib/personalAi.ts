@@ -227,6 +227,61 @@ const toScopeResource = (uid: string, storageModuleId: string, snapshot: { id: s
   };
 };
 
+/** Stable, valid personal-id for an official Course Player conversation. */
+function coursePlayerStorageId(productId: string): string {
+  const cleaned = String(productId || "").replace(/[^a-zA-Z0-9_-]/g, "_").replace(/^_+/, "");
+  const id = `cp_${cleaned || "course"}`.slice(0, 128);
+  if (isValidPersonalId(id)) return id;
+  return `cp_${personalAiHash(String(productId || "course"))}`.slice(0, 128);
+}
+
+/**
+ * Course Player asks (official lessons) have no personal module. Build a
+ * virtual owner-scoped shell so the existing ask path can run: empty
+ * resources (honest — we never pretend to have extracted official files)
+ * plus the published course/module/resource titles as the module brief.
+ */
+function virtualCoursePlayerScope(_uid: string, body: Body): Scope | null {
+  const ctx = asRecord(body.courseContext);
+  const productId = text(ctx.productId);
+  if (!productId) return null;
+  const storageModuleId = coursePlayerStorageId(productId);
+  const courseTitle = text(ctx.courseTitle) || "Course";
+  const moduleTitle = text(ctx.moduleTitle);
+  const resourceName = text(ctx.resourceName);
+  const resourceType = text(ctx.resourceType);
+  const description = [moduleTitle, resourceName, resourceType].filter(Boolean).join(" · ");
+  return {
+    moduleId: null,
+    storageModuleId,
+    saved: false,
+    module: {
+      id: storageModuleId,
+      title: courseTitle,
+      description,
+      productId,
+    },
+    resources: [],
+    resourceId: null,
+  };
+}
+
+/**
+ * Ask from the Course Player: a valid personal module id uses the existing
+ * personal-module path. Official lessons (no personal id, but a product
+ * context) get a virtual owner-scoped shell so threads still persist under
+ * `cp_*` without inventing official-file extraction.
+ */
+async function resolveAskScope(db: Db, uid: string, body: Body): Promise<Scope> {
+  const requested = text(body.moduleId) || text(body.storageModuleId);
+  if (requested && isValidPersonalId(requested)) {
+    return resolveScope(db, uid, body);
+  }
+  const virtual = virtualCoursePlayerScope(uid, body);
+  if (virtual) return virtual;
+  return resolveScope(db, uid, body);
+}
+
 /**
  * Resolve the requested scope from the caller's OWN Firestore namespace.
  *
@@ -891,7 +946,7 @@ async function handleContext(db: Db, uid: string, body: Body) {
 
 /** `personalAi.ask` — one grounded chat answer scoped to a module or resource. */
 async function handleAsk(db: Db, uid: string, body: Body, req: VercelRequest) {
-  const scope = await resolveScope(db, uid, body);
+  const scope = await resolveAskScope(db, uid, body);
   const question = cleanAiText(body.question, PERSONAL_AI_QUESTION_CHARS_MAX);
   if (!question) fail(400, "VALIDATION", "Type a question first.");
   const content = await readScopeContent(db, uid, scope);
