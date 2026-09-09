@@ -145,12 +145,19 @@ test("Mark complete toggles both ways so an accidental tap is reversible", () =>
   // The button is never disabled once complete — that is what made it a
   // one-way door before.
   assert.doesNotMatch(coursePlayer, /disabled=\{isDone\}/);
-  // The control is now the charging-widget button (ChargingCompleteButton)
-  // inside the footer dock's Player tab: the player wires the same reversible
-  // toggle through `onToggleComplete`, and the button itself carries the
-  // aria/data contract.
-  assert.match(coursePlayer, /onToggleComplete=\{\(\) => void toggleComplete\(\)\}/);
-  assert.match(playerPanel, /<ChargingCompleteButton done=\{isDone\} onToggle=\{onToggleComplete\} size=\{42\} \/>/);
+  // The control is the SAME charging-widget button (ChargingCompleteButton),
+  // moved out of the footer dock's Player tab into the player's TOP chrome:
+  // a thin always-visible top progress line (the canonical progress number)
+  // whose tap reveals the big CENTER circular control and flips the same
+  // reversible `toggleComplete`. The settings panel no longer hosts the
+  // circular control or a progress bar — one progress surface, one toggle.
+  assert.match(coursePlayer, /import ChargingCompleteButton from "\.\/course\/ChargingCompleteButton"/);
+  assert.match(coursePlayer, /void toggleComplete\(\)/);
+  assert.match(coursePlayer, /data-course-top-progress/);
+  assert.match(coursePlayer, /data-course-center-complete/);
+  assert.match(coursePlayer, /<ChargingCompleteButton[\s\S]*?onToggle=\{\(\) => \{\s*\n\s*void toggleComplete\(\);\s*\n\s*revealCenterCompletion\(\);[\s\S]*?size=\{132\}/);
+  assert.doesNotMatch(playerPanel, /ChargingCompleteButton/);
+  assert.doesNotMatch(playerPanel, /ShimmerProgress/);
   assert.match(chargingButton, /aria-pressed=\{done\}/);
   assert.match(chargingButton, /Tap to mark as not complete/);
   assert.match(chargingButton, /data-completed=\{done \? "true" : "false"\}/);

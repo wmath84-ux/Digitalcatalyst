@@ -5495,6 +5495,33 @@ html[data-course-player-active="true"] {
   max-width: none !important;
 }
 
+/* The line's invisible HIT STRIP (src/course/CoursePeekDock.tsx): the 8px
+   pill alone is a brutal touch target — and it sits right on the Android
+   gesture bar when the status bar is hidden — so every pointer / keyboard
+   interaction lands on this taller transparent strip that centres the pill
+   at its bottom. The container is bottom-anchored, so the extra grab area
+   grows upward without moving the pill a single pixel. Once the dock is
+   OPEN the strip collapses — the dock itself is the interactive surface
+   then, at exactly the position it always opened at. */
+[data-course-peek-line-hit] {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: min(26rem, 92%);
+  padding: 30px 24px 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* The strip is the drag surface: hold + drag left/right scrolls the dock
+     and selects the tab on release, so the browser must not steal the
+     gesture (the pill keeps its own `touch-action: none` too). */
+  touch-action: none;
+}
+
+[data-course-peek-dock][data-open="true"] [data-course-peek-line-hit] {
+  padding-top: 0;
+}
+
 [data-course-peek-line] {
   pointer-events: auto;
   position: relative;

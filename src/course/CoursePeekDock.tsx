@@ -153,8 +153,13 @@ export default function CoursePeekDock({
       >
         <GlassDock compact items={items} onSelect={handleSelect} pointerX={pointerX} />
       </div>
+      {/* The line's HIT STRIP: the 8px visual pill alone is a brutal touch
+          target (and sits right on the Android gesture bar in fullscreen), so
+          every pointer/keyboard handler lives on this taller transparent
+          strip that centres the pill at its bottom. The pill itself is pure
+          paint — same look, much more clickable. */}
       <div
-        data-course-peek-line=""
+        data-course-peek-line-hit=""
         role="button"
         tabIndex={0}
         aria-label="Show course navigation"
@@ -200,6 +205,15 @@ export default function CoursePeekDock({
             if (pointerTypeRef.current !== 'mouse') setPinned(!wasOpenRef.current)
             return
           }
+          // A drag only SELECTS when it is dominantly horizontal — a mostly
+          // vertical swipe (a scroll / system-gesture intent) must never
+          // activate a tab by accident.
+          const isHorizontalDrag =
+            Math.abs(dx) >= DRAG_SELECT_THRESHOLD && Math.abs(dx) > Math.abs(dy)
+          if (!isHorizontalDrag) {
+            close()
+            return
+          }
           // A real left/right drag: the button the finger settled on is the
           // one that is clicked.
           const id = tabAtX(event.clientX)
@@ -216,7 +230,9 @@ export default function CoursePeekDock({
           }
         }}
       >
-        <GlassMaterial radius={6} />
+        <div data-course-peek-line="">
+          <GlassMaterial radius={6} />
+        </div>
       </div>
     </div>
   )

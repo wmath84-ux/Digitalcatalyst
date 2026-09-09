@@ -48,7 +48,10 @@ test("the player's My Modules hook never touches official course progress", () =
 });
 
 test("the Player panel flags personal files instead of offering mark-complete", () => {
-  assert.match(player, /canMarkComplete=\{Boolean\(selectedFile\) && !activeFileIsPersonal\}/);
+  // The mark-complete interaction lives in the player's top chrome now; the
+  // personal-file guard moved with it (personal My Modules content never
+  // joins official completion).
+  assert.match(player, /const canMarkCompleteTop = Boolean\(selectedFile\) && !activeFileIsPersonal;/);
   assert.match(playerPanelSource, /activeFilePersonal\?: boolean/);
   assert.match(playerPanelSource, /data-course-personal-progress-note/);
   assert.match(playerPanelSource, /data-course-file-provenance/);

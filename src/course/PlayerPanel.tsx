@@ -11,8 +11,11 @@
 //   1. COURSE — the website logo (tap = back to Purchases, hold = open Home,
 //      the same useHomeHold contract the old header had), the course title
 //      and the subscription / preview badges.
-//   2. PROGRESS — the charging-widget "Mark complete" toggle plus the
-//      shimmer progress bar, exactly the controls the header used to carry.
+//   2. PROGRESS — a text summary of the canonical course progress. The
+//      progress line itself and the reversible mark-complete interaction
+//      live in the player's TOP chrome now (the always-visible top progress
+//      bar + the center charging control — src/CoursePlayerApp.tsx), so the
+//      panel no longer hosts a second bar or the circular control.
 //   3. ACTIVE FILE — the buttons the file's own viewer header provided
 //      (open original, download, fullscreen, Google editor, personal copy),
 //      reported live by the active ResourceViewer, so the list always
@@ -28,9 +31,7 @@ import type { CSSProperties, ComponentType, ReactNode } from "react";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassPrefToggle } from "../components/ui/glass-pref-toggle";
 import { toast } from "../components/ui/glass-toast";
-import ShimmerProgress from "../components/ui/ShimmerProgress";
 import { useHomeHold } from "../hooks/useHomeHold";
-import ChargingCompleteButton from "./ChargingCompleteButton";
 import type { CourseFileActions } from "./ResourceViewer";
 
 // ── Preference row accents — the same colours the ⚙ popover used ──────────
@@ -138,11 +139,12 @@ export interface PlayerPanelProps {
   hasActiveSubscription: boolean;
   showPreviewBadge: boolean;
   onBack: () => void;
-  // Progress
+  // Progress. The progress LINE and the mark-complete interaction now live in
+  // the player's TOP chrome (the always-visible top progress bar + the center
+  // charging control — see src/CoursePlayerApp.tsx); the panel keeps only
+  // this honest text summary of the same canonical number.
   progress: number;
   isDone: boolean;
-  canMarkComplete: boolean;
-  onToggleComplete: () => void;
   /**
    * True when the ACTIVE file is a personal (My Modules) resource: official
    * progress is never counted against it, so the progress section shows an
@@ -184,8 +186,6 @@ export default function PlayerPanel({
   onBack,
   progress,
   isDone,
-  canMarkComplete,
-  onToggleComplete,
   activeFilePersonal = false,
   fileActions,
   showPersonalLibraryActions = false,
@@ -262,32 +262,28 @@ export default function PlayerPanel({
         </div>
       </div>
 
-      {/* ── 2. Progress — the charging-widget toggle + shimmer bar ────── */}
+      {/* ── 2. Progress — a text summary only ────────────────────────────
+          The progress LINE and the reversible mark-complete interaction moved
+          to the player's TOP chrome (always visible, every orientation): the
+          thin top progress bar IS the progress display, and tapping it
+          reveals the big center charging control. This section keeps a plain
+          text status so the Player tab still answers "how far along am I?"
+          without hosting a second bar or a second completion control. */}
       <SectionLabel>Progress</SectionLabel>
       <div className="flex items-center gap-3 px-3 py-1.5" data-course-panel-section="progress">
-        {canMarkComplete ? (
-          <ChargingCompleteButton done={isDone} onToggle={onToggleComplete} size={42} />
-        ) : null}
         <div className="min-w-0 flex-1">
           <p className="text-xs font-black text-white/90">
-            {activeFilePersonal ? "Personal module content" : (isDone ? "Lesson completed" : "Mark complete")}
+            {activeFilePersonal ? "Personal module content" : (isDone ? "Lesson completed" : "Lesson not completed")}
           </p>
           {activeFilePersonal ? (
             <p className="mt-0.5 text-[9px] font-bold text-[var(--course-muted)]" data-course-personal-progress-note>
               Not counted in official course progress
             </p>
-          ) : null}
-          <div className="mt-1.5 flex items-center gap-2" data-course-progress-summary>
-            <ShimmerProgress
-              value={progress}
-              orientation="horizontal"
-              thickness={6}
-              className="min-w-0 flex-1"
-              data-course-progress-bar=""
-              data-progress-value={progress}
-            />
-            <span className="shrink-0 text-[9px] font-black leading-none text-[var(--course-muted)]" data-course-progress-label>{progress}%</span>
-          </div>
+          ) : (
+            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--course-muted)]" data-course-progress-label>
+              Course progress {progress}% · tap the top progress bar to {isDone ? "unmark" : "complete"} this lesson
+            </p>
+          )}
         </div>
       </div>
 

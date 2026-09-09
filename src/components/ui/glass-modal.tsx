@@ -38,6 +38,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ShieldCheck, X } from "lucide-react";
+import { useOverlayBounds, useOverlayBox } from "./overlayBounds";
 
 export interface GlassModalProps {
   open: boolean;
@@ -88,6 +89,17 @@ export default function GlassModal({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
 
+  // [digitalcatalyst] Overlay bounds — when the dialog is opened inside an
+  // `OverlayBoundsProvider` (e.g. the Subscription page's content column),
+  // the backdrop layer is constrained to that column's measured rectangle on
+  // tablet / desktop widths, so the centered card belongs to the host page
+  // instead of the whole browser window. No provider → the original
+  // full-viewport centred dialog, byte for byte.
+  const contextBounds = useOverlayBounds();
+  const { scoped, box } = useOverlayBox(open, contextBounds);
+  const layerStyle =
+    scoped && box ? { top: box.top, left: box.left, width: box.width, height: box.height } : undefined;
+
   // Escape to dismiss + body scroll lock while the dialog owns the screen.
   useEffect(() => {
     if (!open) return undefined;
@@ -116,19 +128,22 @@ export default function GlassModal({
     <AnimatePresence>
       {open ? (
         <div
-          className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto p-4"
+          className={`fixed z-[120] flex items-center justify-center overflow-y-auto p-4${layerStyle ? "" : " inset-0"}`}
+          style={layerStyle}
           role="dialog"
           aria-modal="true"
           {...rest}
         >
-          {/* Backdrop — deep blur, matching the upstream scene treatment. */}
+          {/* Backdrop — deep blur, matching the upstream scene treatment.
+              Scoped: it covers exactly the host column and follows its
+              rounded frame. */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25, ease: EASE }}
             onClick={onClose}
-            className="absolute inset-0 bg-[#1A1A19]/70"
+            className={`absolute inset-0 bg-[#1A1A19]/70${layerStyle ? " rounded-[1.75rem]" : ""}`}
             style={{
               backdropFilter: "blur(18px) saturate(1.4)",
               WebkitBackdropFilter: "blur(18px) saturate(1.4)",

@@ -19,6 +19,7 @@ import {
 import { createPortal } from "react-dom";
 import { GlassSurface } from "@/components/ui/glass";
 import { cn } from "@/lib/utils";
+import { useOverlayBounds, useOverlayBox } from "./overlayBounds";
 
 interface SheetCtx { open: boolean; setOpen: (v: boolean) => void }
 const SheetContext = createContext<SheetCtx>({ open: false, setOpen: () => undefined });
@@ -94,6 +95,23 @@ const boundsInset = (bounds: SheetBounds): CSSProperties => ({
   left: px(bounds.left ?? 0),
 });
 
+/**
+ * The PANEL's own inset for a bounded sheet. The scrim can take the plain
+ * four-edge inset, but a bottom / top sheet must not be pinned on the far
+ * edge of its sliding axis (top + height + bottom would over-constrain and
+ * pin it at the WRONG edge): the far edge acts as a max-height cap instead,
+ * and the width comes from the left + right pair rather than `w-full`.
+ */
+const panelInset = (bounds: SheetBounds, side: Side): CSSProperties => {
+  if (side === "bottom") {
+    return { left: px(bounds.left ?? 0), right: px(bounds.right ?? 0), bottom: px(bounds.bottom ?? 0) };
+  }
+  if (side === "top") {
+    return { left: px(bounds.left ?? 0), right: px(bounds.right ?? 0), top: px(bounds.top ?? 0) };
+  }
+  return boundsInset(bounds);
+};
+
 interface SheetContentProps extends ComponentProps<"div"> {
   side?: Side;
   tint?: number;
@@ -107,6 +125,26 @@ interface SheetContentProps extends ComponentProps<"div"> {
 export function GlassSheetContent({ side = "right", tint = 0.5, className, children, bounds, style, contentClassName, ...props }: SheetContentProps) {
   const { open, setOpen } = useContext(SheetContext);
   const [mounted, setMounted] = useState(false);
+
+  // [digitalcatalyst] Overlay bounds — when the sheet is opened inside an
+  // `OverlayBoundsProvider` (e.g. the Subscription page's content column),
+  // BOTH the scrim and the panel are constrained to that column's measured
+  // on-screen rectangle on tablet / desktop widths, so the sheet visually
+  // belongs to the host page instead of spanning the whole browser window.
+  // Phones (and every call site without a provider) keep the classic
+  // full-viewport sheet — the same reuse Modal.tsx / ConfirmDialog.tsx
+  // already build on, never a second positioning architecture.
+  const contextBounds = useOverlayBounds();
+  const { scoped, box } = useOverlayBox(open, contextBounds);
+  const measuredBounds: SheetBounds | undefined = scoped && box
+    ? {
+        top: box.top,
+        left: box.left,
+        right: Math.max(0, window.innerWidth - box.left - box.width),
+        bottom: Math.max(0, window.innerHeight - box.top - box.height),
+      }
+    : undefined;
+  const resolvedBounds = bounds ?? measuredBounds;
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -123,15 +161,23 @@ export function GlassSheetContent({ side = "right", tint = 0.5, className, child
   // A side sheet that is bounded top AND bottom stretches between the two
   // instead of keeping `h-full`; a right sheet that is bounded on the left
   // keeps its right edge pinned and caps its width so its left edge never
-  // slides under the left chrome.
-  const boundsStyle: CSSProperties | undefined = bounds
+  // slides under the left chrome. A bounded bottom / top sheet spans the
+  // content column horizontally (left + right instead of `w-full`) and is
+  // capped by the column's far edge instead of the viewport's.
+  const boundsStyle: CSSProperties | undefined = resolvedBounds
     ? {
-        ...boundsInset(bounds),
-        ...((side === "right" || side === "left") && bounds.top != null && bounds.bottom != null
+        ...panelInset(resolvedBounds, side),
+        ...((side === "right" || side === "left") && resolvedBounds.top != null && resolvedBounds.bottom != null
           ? { height: "auto" }
           : null),
-        ...(bounds.left != null && side === "right"
-          ? { maxWidth: `calc(100vw - ${px(bounds.left)})` }
+        ...(resolvedBounds.left != null && side === "right"
+          ? { maxWidth: `calc(100vw - ${px(resolvedBounds.left)})` }
+          : null),
+        ...(side === "bottom" && resolvedBounds.top != null
+          ? { width: "auto", maxHeight: `calc(100vh - ${px(resolvedBounds.top)} - ${px(resolvedBounds.bottom ?? 0)})` }
+          : null),
+        ...(side === "top" && resolvedBounds.bottom != null
+          ? { width: "auto", maxHeight: `calc(100vh - ${px(resolvedBounds.bottom)} - ${px(resolvedBounds.top ?? 0)})` }
           : null),
       }
     : undefined;
@@ -143,8 +189,13 @@ export function GlassSheetContent({ side = "right", tint = 0.5, className, child
     <div className="pointer-events-none fixed inset-0 z-[100]">
       <style>{`@keyframes glass-sheet-in{from{transform:var(--sheet-from)}to{transform:translate(0,0)}}`}</style>
       <div
-        className="pointer-events-auto absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in-0 duration-200"
-        style={bounds ? boundsInset(bounds) : undefined}
+        className={cn(
+          "pointer-events-auto absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in-0 duration-200",
+          // A scoped scrim covers exactly the host column, so it follows the
+          // column's rounded frame instead of painting over its corners.
+          scoped && box ? "rounded-[1.75rem]" : undefined,
+        )}
+        style={resolvedBounds ? boundsInset(resolvedBounds) : undefined}
         onClick={() => setOpen(false)}
       />
       <GlassSurface
