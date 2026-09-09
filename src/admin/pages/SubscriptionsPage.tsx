@@ -1102,6 +1102,33 @@ export default function SubscriptionsPage() {
               planId={editingPlan.id ?? "new"}
               onChange={(next) => setEditingPlan({ ...editingPlan, personalModules: next })}
             />
+            <div className="rounded-xl border border-cyan-200 bg-cyan-50/60 p-3" data-admin-plan-study-packs>
+              <p className="text-sm font-semibold text-slate-900">Study Packs &amp; Study Stacks</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">Independent monthly / yearly limits. Existing packs are never deleted on downgrade.</p>
+              {(["monthly", "yearly"] as const).map((cycle) => {
+                const slice = (editingPlan as { studyPacks?: any }).studyPacks?.[cycle] || { creationEnabled: cycle !== "monthly", maxPublishedPacks: 25, maxImportsPerMonth: 40, studyStackEnabled: true, maxStudyStacks: 20 };
+                const setSlice = (patch: Record<string, unknown>) => setEditingPlan({
+                  ...editingPlan,
+                  studyPacks: {
+                    monthly: (editingPlan as { studyPacks?: any }).studyPacks?.monthly || slice,
+                    yearly: (editingPlan as { studyPacks?: any }).studyPacks?.yearly || slice,
+                    [cycle]: { ...slice, ...patch },
+                  },
+                } as Partial<Plan>);
+                return (
+                  <div key={cycle} className="mt-2 rounded-lg border border-cyan-100 bg-white p-2.5">
+                    <p className="mb-2 text-xs font-bold capitalize text-cyan-800">{cycle}</p>
+                    <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={Boolean(slice.creationEnabled)} onChange={(e) => setSlice({ creationEnabled: e.target.checked })} /> Pack creation</label>
+                    <label className="mt-1 flex items-center gap-2 text-xs"><input type="checkbox" checked={Boolean(slice.studyStackEnabled)} onChange={(e) => setSlice({ studyStackEnabled: e.target.checked })} /> Study Stacks</label>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      <Field label="Max packs"><input className={inputClass} type="number" value={slice.maxPublishedPacks ?? 25} onChange={(e) => setSlice({ maxPublishedPacks: Number(e.target.value) })} /></Field>
+                      <Field label="Imports / month"><input className={inputClass} type="number" value={slice.maxImportsPerMonth ?? 40} onChange={(e) => setSlice({ maxImportsPerMonth: Number(e.target.value) })} /></Field>
+                      <Field label="Max stacks"><input className={inputClass} type="number" value={slice.maxStudyStacks ?? 20} onChange={(e) => setSlice({ maxStudyStacks: Number(e.target.value) })} /></Field>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Access tier">

@@ -47,6 +47,7 @@ const RevisionApp = lazyRoute(() => import("./revision/RevisionApp"));
 const ProfileApp = lazyRoute(() => import("./profile/App"));
 const SettingsPage = lazyRoute(() => import("./settings/SettingsPage"));
 const StudyLibraryPage = lazyRoute(() => import("./personal-library/StudyLibraryPage"));
+const StudyPackPage = lazyRoute(() => import("./personal-library/StudyPackPage"));
 const SubscriberExperiencePage = lazyRoute(() => import("./profile/SubscriberExperiencePage"));
 const ProfilePreview = lazyRoute(() => import("./profile/ProfilePreview"));
 const MindMapPreview = lazyRoute(() => import("./course/MindMapPreview"));
@@ -159,6 +160,7 @@ const PROFILE_HASH = "#/profile";
 // Dedicated Settings / Preferences page (the desktop rail's Settings entry).
 const SETTINGS_HASH = "#/settings";
 const STUDY_LIBRARY_HASH = "#/study-library";
+const STUDY_PACK_HASH = "#/pack/";
 const PROFILE_SUBSCRIBER_EXPERIENCE_HASH = "#/profile/subscriber-experience";
 const COURSE_HASH = "#/course/";
 const CART_HASH = "#/cart";
@@ -529,6 +531,7 @@ function routeChunkFor(hash: string): { preload: () => Promise<unknown> } | null
   if (hash.startsWith(COURSE_HASH)) return CourseRouteGuard;
   if (hash.startsWith(SETTINGS_HASH)) return SettingsPage;
   if (hash.startsWith(STUDY_LIBRARY_HASH)) return StudyLibraryPage;
+  if (hash.startsWith(STUDY_PACK_HASH)) return StudyPackPage;
   if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return SubscriberExperiencePage;
   if (hash.startsWith(PROFILE_HASH)) return ProfileApp;
   if (hash.startsWith(MY_DAY_HASH)) return MyDayApp;
@@ -1534,6 +1537,7 @@ function RootPage(): ReactNode {
   }
   // Settings renders inside the desktop shell like the Profile page does.
   if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
+  if (hash.startsWith(STUDY_PACK_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><StudyPackPage /></PageEnter>;
   if (hash.startsWith(STUDY_LIBRARY_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><StudyLibraryPage /></PageEnter>;
   if (hash.startsWith(PROFILE_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><ProfileApp /></PageEnter>;
   if (hash.startsWith(MY_DAY_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><MyDayApp /></PageEnter>;

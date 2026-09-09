@@ -3,7 +3,7 @@ import {
   ArrowDown, ArrowLeft, ArrowUp, Bookmark, BookOpen, ChevronRight,
   ExternalLink, FileText, FolderOpen, Globe2, GraduationCap,
   Image as ImageIcon, Layers3, Library, Link2, LoaderCircle, MoreHorizontal,
-  Music2, PencilLine, Play, Plus, Presentation, RefreshCw, Search, Sheet,
+  Music2, PencilLine, Play, Plus, Presentation, RefreshCw, Search, Share2, Sheet,
   Sparkles, Trash2, Video,
 } from "lucide-react";
 import Header from "../components/Header";
@@ -54,6 +54,8 @@ import {
   usageAtResourceLimit,
 } from "../../utils/personalCourse";
 import ModuleAiWorkspace, { type ModuleAiView } from "../ai/ModuleAiWorkspace";
+import CreateStudyPackDialog from "./CreateStudyPackDialog";
+import CreateStudyStackDialog from "./CreateStudyStackDialog";
 import {
   filterPersonalLibraryResources,
   normalizeLibrarySearchText,
@@ -137,6 +139,10 @@ export default function StudyLibraryPage() {
   // Part 2 — the AI Study Engine surface for whichever module / resource the
   // learner opened. One workspace instance; opening a new scope replaces it.
   const [aiTarget, setAiTarget] = useState<AiTarget | null>(null);
+  const [packModule, setPackModule] = useState<PersonalCourseModule | null>(null);
+  const [stackModule, setStackModule] = useState<PersonalCourseModule | null>(null);
+  const [stackSteps, setStackSteps] = useState<PersonalCourseResource[] | null>(null);
+  const [stackIndex, setStackIndex] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const deleteRef = useRef(false);
 
@@ -398,6 +404,8 @@ export default function StudyLibraryPage() {
                         onMove={(delta) => void reorderModule(module, delta)}
                         canAdd={canCreateResource && !atResourceLimit && !usageAtPerModuleLimit(module.resources.length, limits)}
                         onAi={(view) => openModuleAi(module, view || "ask")}
+                        onCreatePack={() => setPackModule(module)}
+                        onCreateStack={() => setStackModule(module)}
                       />;
                     })}
                     {personal.allModules.length === 0 ? (
@@ -443,6 +451,21 @@ export default function StudyLibraryPage() {
         <BottomNav active="profile" onChange={navigateFromBottom} purchasesBadge={purchasedIds.size} />
       </div>
 
+      <CreateStudyPackDialog open={Boolean(packModule)} module={packModule} onClose={() => setPackModule(null)} />
+      <CreateStudyStackDialog
+        open={Boolean(stackModule) && !stackSteps}
+        module={stackModule}
+        onClose={() => setStackModule(null)}
+        onStart={(_id, steps) => { setStackSteps(steps); setStackIndex(0); trackFeatureEvent("study_stack_started", { steps: steps.length }); if (steps[0]) openResource(steps[0]); }}
+      />
+      {stackSteps ? (
+        <div className="fixed bottom-20 left-1/2 z-40 flex w-[min(92vw,420px)] -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-slate-950/90 px-3 py-2 text-xs font-black backdrop-blur">
+          <span className="flex-1 truncate">Stack {stackIndex + 1}/{stackSteps.length}</span>
+          <button type="button" className="min-h-11 px-3" onClick={() => { const next = Math.max(0, stackIndex - 1); setStackIndex(next); openResource(stackSteps[next]); }}>Prev</button>
+          <button type="button" className="min-h-11 px-3" onClick={() => { const next = Math.min(stackSteps.length - 1, stackIndex + 1); setStackIndex(next); openResource(stackSteps[next]); }}>Next</button>
+          <button type="button" className="min-h-11 px-3 text-rose-200" onClick={() => { setStackSteps(null); setStackModule(null); }}>Exit</button>
+        </div>
+      ) : null}
       <LibraryEditorDialog state={dialog} personal={personal} onClose={() => setDialog(null)} />
       <ModuleAiWorkspace
         open={Boolean(aiTarget)}
@@ -529,8 +552,8 @@ function SavedModuleCard({ count, active, onOpen, onAdd, canAdd }: { count: numb
   return <article className={`flex min-h-44 flex-col rounded-3xl border p-4 ${active ? "border-amber-300/45 bg-amber-500/15" : "border-white/10 bg-white/[0.04]"}`} data-library-saved-bucket><div className="flex items-start justify-between"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-500/15 text-amber-200"><Bookmark size={20} /></span><span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-black">{count}</span></div><button type="button" onClick={onOpen} className="mt-3 min-h-11 flex-1 text-left"><h3 className="text-sm font-black">Saved for Later</h3><p className="mt-1 text-xs font-medium leading-5 text-white/45">Unsorted resources waiting for a module.</p></button><button type="button" onClick={onAdd} disabled={!canAdd} className="mt-2 min-h-11 rounded-xl text-[11px] font-black text-amber-100 ring-1 ring-amber-400/20 disabled:opacity-35"><Plus size={13} className="mr-1 inline" />Add link</button></article>;
 }
 
-function ModuleCard({ module, index, count, busy, active, onOpen, onAdd, onEdit, onDelete, onMove, canAdd, onAi }: { module: PersonalCourseModule; index: number; count: number; busy: boolean; active: boolean; onOpen: () => void; onAdd: () => void; onEdit: () => void; onDelete: () => void; onMove: (delta: number) => void; canAdd: boolean; onAi: (view?: ModuleAiView) => void }) {
-  return <article className={`flex min-h-44 flex-col rounded-3xl border p-4 ${active ? "border-violet-300/45 bg-violet-500/15" : "border-white/10 bg-white/[0.04]"}`} data-library-module={module.id}><div className="flex items-start justify-between gap-2"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-500/15 text-sm font-black text-violet-200">{index + 1}</span><div className="flex"><IconButton label="Move module up" icon={ArrowUp} disabled={busy || index <= 0} onClick={() => onMove(-1)} /><IconButton label="Move module down" icon={ArrowDown} disabled={busy || index >= count - 1} onClick={() => onMove(1)} /></div></div><button type="button" onClick={onOpen} className="mt-2 min-h-12 flex-1 text-left"><h3 className="line-clamp-2 text-sm font-black">{module.title}</h3><p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-white/45">{module.description || `${module.resources.length} ${module.resources.length === 1 ? "resource" : "resources"}`}</p></button><div className="mt-2 flex items-center gap-1"><button type="button" onClick={onAdd} disabled={!canAdd || busy} aria-label={`Add resource to ${module.title}`} title={!canAdd ? "This module has reached a plan limit" : undefined} className="grid h-11 w-11 place-items-center rounded-xl text-violet-200 ring-1 ring-white/10 disabled:opacity-35"><Plus size={15} /></button><button type="button" onClick={() => onAi("ask")} disabled={busy} aria-label={`AI study tools for ${module.title}`} title="AI study tools for this module" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-violet-200 ring-1 ring-violet-400/25 transition hover:bg-violet-500/25 disabled:opacity-25" data-module-ai-open=""><Sparkles size={15} /></button><IconButton label={`Rename ${module.title}`} icon={PencilLine} disabled={busy} onClick={onEdit} /><IconButton label={`Delete ${module.title}`} icon={Trash2} disabled={busy} onClick={onDelete} tone="danger" /><button type="button" onClick={onOpen} className="ml-auto inline-flex min-h-11 items-center gap-1 px-2 text-[11px] font-black text-white/60">Open <ChevronRight size={14} /></button></div></article>;
+function ModuleCard({ module, index, count, busy, active, onOpen, onAdd, onEdit, onDelete, onMove, canAdd, onAi, onCreatePack, onCreateStack }: { module: PersonalCourseModule; index: number; count: number; busy: boolean; active: boolean; onOpen: () => void; onAdd: () => void; onEdit: () => void; onDelete: () => void; onMove: (delta: number) => void; canAdd: boolean; onAi: (view?: ModuleAiView) => void; onCreatePack: () => void; onCreateStack: () => void }) {
+  return <article className={`flex min-h-44 flex-col rounded-3xl border p-4 ${active ? "border-violet-300/45 bg-violet-500/15" : "border-white/10 bg-white/[0.04]"}`} data-library-module={module.id}><div className="flex items-start justify-between gap-2"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-500/15 text-sm font-black text-violet-200">{index + 1}</span><div className="flex"><IconButton label="Move module up" icon={ArrowUp} disabled={busy || index <= 0} onClick={() => onMove(-1)} /><IconButton label="Move module down" icon={ArrowDown} disabled={busy || index >= count - 1} onClick={() => onMove(1)} /></div></div><button type="button" onClick={onOpen} className="mt-2 min-h-12 flex-1 text-left"><h3 className="line-clamp-2 text-sm font-black">{module.title}</h3><p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-white/45">{module.description || `${module.resources.length} ${module.resources.length === 1 ? "resource" : "resources"}`}</p></button><div className="mt-2 flex items-center gap-1"><button type="button" onClick={onAdd} disabled={!canAdd || busy} aria-label={`Add resource to ${module.title}`} title={!canAdd ? "This module has reached a plan limit" : undefined} className="grid h-11 w-11 place-items-center rounded-xl text-violet-200 ring-1 ring-white/10 disabled:opacity-35"><Plus size={15} /></button><button type="button" onClick={() => onAi("ask")} disabled={busy} aria-label={`AI study tools for ${module.title}`} title="AI study tools for this module" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-violet-200 ring-1 ring-violet-400/25 transition hover:bg-violet-500/25 disabled:opacity-25" data-module-ai-open=""><Sparkles size={15} /></button><button type="button" onClick={onCreatePack} disabled={busy} aria-label={`Create Study Pack from ${module.title}`} title="Create Study Pack" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-cyan-200 ring-1 ring-white/10" data-create-study-pack=""><Share2 size={15} /></button><button type="button" onClick={onCreateStack} disabled={busy} aria-label={`Start Study Stack for ${module.title}`} title="Start Study Stack" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-emerald-200 ring-1 ring-white/10" data-start-study-stack=""><Play size={15} /></button><IconButton label={`Rename ${module.title}`} icon={PencilLine} disabled={busy} onClick={onEdit} /><IconButton label={`Delete ${module.title}`} icon={Trash2} disabled={busy} onClick={onDelete} tone="danger" /><button type="button" onClick={onOpen} className="ml-auto inline-flex min-h-11 items-center gap-1 px-2 text-[11px] font-black text-white/60">Open <ChevronRight size={14} /></button></div></article>;
 }
 
 function IconButton({ label, icon: Icon, disabled, onClick, tone = "normal" }: { label: string; icon: ComponentType<{ size?: number }>; disabled?: boolean; onClick: () => void; tone?: "normal" | "danger" }) {

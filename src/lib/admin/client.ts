@@ -15,6 +15,7 @@ import type { PaidUpdate, ProductModule } from "./types";
 import { normalizeRevisionTestBankLimits } from "../../../utils/revisionLimits.js";
 import { normalizePlanAiAllowances } from "../../../utils/aiAllowances.js";
 import { normalizePlanPersonalModules } from "../../../utils/personalCourse.js";
+import { normalizePlanStudyPacks } from "../../../utils/studyPacks.js";
 
 export class ApiError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status; } }
 const bodyOf = (init?: RequestInit) => init?.body ? JSON.parse(String(init.body)) as Record<string, any> : {};
@@ -235,7 +236,7 @@ async function subscriptionPlansRequest(init?: RequestInit) {
       return { id: item.id, name: data.name || "Plan", description: data.description || "", billingCycles: [
         { cycle: "monthly", label: "Monthly", price: money(data.monthlyPrice ?? data.priceMonthly ?? 0) },
         { cycle: "yearly", label: "Yearly", price: money(data.yearlyPrice ?? data.priceYearly ?? 0) },
-      ], revisionTestBankLimits: normalizeRevisionTestBankLimits(data.revisionTestBankLimits, item.id), aiAllowances: normalizePlanAiAllowances(data.aiAllowances), personalModules: normalizePlanPersonalModules(data, item.id), accessTier: data.accessTier || item.id, badge: data.badge || null, cta: data.cta || "Subscribe", featured: Boolean(data.featured), active: data.active !== false, visibleCycles: normaliseVisibleCycles(data.visibleCycles), subscriberPricingOverride: normaliseSubscriberPricing(data.subscriberPricingOverride) };
+      ], revisionTestBankLimits: normalizeRevisionTestBankLimits(data.revisionTestBankLimits, item.id), aiAllowances: normalizePlanAiAllowances(data.aiAllowances), personalModules: normalizePlanPersonalModules(data, item.id), studyPacks: normalizePlanStudyPacks(data, item.id), accessTier: data.accessTier || item.id, badge: data.badge || null, cta: data.cta || "Subscribe", featured: Boolean(data.featured), active: data.active !== false, visibleCycles: normaliseVisibleCycles(data.visibleCycles), subscriberPricingOverride: normaliseSubscriberPricing(data.subscriberPricingOverride) };
     }) };
   }
   const body = bodyOf(init); const recordId = String(body.id || id()); const ref = doc(db, "subscriptionPlans", recordId);
@@ -256,6 +257,7 @@ async function subscriptionPlansRequest(init?: RequestInit) {
     // Prices are never part of this block — plan prices live at the top
     // level (monthlyPrice/yearlyPrice) and are untouched by this save.
     personalModules: persistPersonalModulesBlock(body.personalModules, recordId),
+    studyPacks: normalizePlanStudyPacks({ studyPacks: body.studyPacks }, recordId),
     accessTier: body.accessTier || "basic",
     badge: body.badge || null,
     cta: body.cta || "Subscribe",
