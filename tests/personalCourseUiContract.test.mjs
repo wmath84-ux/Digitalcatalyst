@@ -84,8 +84,9 @@ test("every client mutation talks to the server API — never writes Firestore d
   assert.doesNotMatch(clientSource, /firebase\/firestore/);
   assert.match(clientSource, /apiFetch\("\/api\/personal-course"/);
   assert.match(clientSource, /Bearer \$\{token\}/);
-  assert.match(hookSource, /fetchPersonalCourseStatus/);
-  assert.match(hookSource, /fetchPersonalCourseModules/);
+  assert.match(hookSource, /fetchPersonalCourseLibrary/);
+  assert.match(hookSource, /autoLoad/);
+  assert.match(hookSource, /runMutation/);
 });
 
 test("the admin plan editor exposes the per-plan My Modules configuration", () => {
@@ -112,7 +113,7 @@ test("firestore rules: personal paths are owner-read, server-write only", () => 
 
 test("product analytics events stay lightweight and cannot break user actions", () => {
   assert.match(analytics, /trackFeatureEvent/);
-  assert.match(analytics, /personal_course_/);
+  assert.match(analytics, /ANALYTICS_EVENT_PREFIX = "personal"/);
   assert.match(analytics, /voided|best-effort|never surface/);
   assert.match(panel, /trackFeatureEvent\("upgrade_clicked"\)/);
 });

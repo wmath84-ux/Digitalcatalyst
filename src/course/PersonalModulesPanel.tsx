@@ -77,6 +77,8 @@ interface PersonalModulesPanelProps {
   landscape: boolean;
   /** Open a personal resource in the existing ResourceViewer stack. */
   onOpenPersonalFile: (file: CourseFile, context: { moduleTitle: string }) => void;
+  /** Open the account-wide central workspace. */
+  onOpenLibrary?: () => void;
   /** Close the manager and restore the official modules list. */
   onExit: () => void;
 }
@@ -187,7 +189,7 @@ function ResourceCard({ module, resource, busy, onOpen, onEdit, onDelete, onMove
   );
 }
 
-export default function PersonalModulesPanel({ personal, productTitle, onOpenPersonalFile, onExit }: PersonalModulesPanelProps) {
+export default function PersonalModulesPanel({ personal, productTitle, onOpenPersonalFile, onOpenLibrary, onExit }: PersonalModulesPanelProps) {
   const { access, usage, modules } = personal;
   const limits = access?.limits ?? null;
   const entitled = Boolean(access?.entitled);
@@ -408,7 +410,7 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
     }
 
     // ── Locked / disabled / upsell states ────────────────────────────────
-    if (!entitled) {
+    if (!entitled && modules.length === 0) {
       const disabled = Boolean(access?.disabled);
       const planName = access?.planName || null;
       return (
@@ -450,10 +452,18 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
       );
     }
 
-    // ── Entitled home: usage + module list ───────────────────────────────
+    // Existing content remains readable and organisable after a downgrade;
+    // only new module/resource creation is blocked.
     const planName = access?.planName || "your plan";
     return (
       <div className="flex min-h-0 flex-1 flex-col">
+        {!entitled ? (
+          <div className="mx-4 mt-2 rounded-2xl border border-amber-400/25 bg-amber-500/10 px-3 py-2.5" data-personal-downgrade-readable>
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-200">Read-only creation mode</p>
+            <p className="mt-0.5 text-[10px] font-semibold leading-relaxed text-white/65">Your saved content remains available. Renew or upgrade to create additional modules or resources.</p>
+            <button type="button" onClick={goToSubscription} className="mt-1.5 min-h-8 rounded-xl px-3 text-[10px] font-black text-amber-100 ring-1 ring-amber-400/25">View plans</button>
+          </div>
+        ) : null}
         <div className="px-4 pb-1 pt-2" data-personal-usage-summary>
           <div className="flex items-center gap-3 rounded-2xl px-2 py-2">
             <RowPlate icon={<Sparkles size={20} />} color="#B388FF" />
@@ -469,7 +479,7 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
           <button
             type="button"
             className={plainRowClass}
-            disabled={atModuleLimit || Boolean(busyAction)}
+            disabled={!entitled || atModuleLimit || Boolean(busyAction)}
             onClick={openModuleCreate}
             data-personal-add-module
           >
@@ -477,7 +487,7 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
             <span className="min-w-0 flex-1">
               <span className="block truncate text-xs font-black text-white/90">New module</span>
               <span className="mt-0.5 block truncate text-[10px] font-bold uppercase tracking-wide text-[var(--course-muted)]">
-                {atModuleLimit ? personalLimitMessage("module", limits, planName) : "Name it and start adding resources"}
+                {!entitled ? "Upgrade or renew to create more" : atModuleLimit ? personalLimitMessage("module", limits, planName) : "Name it and start adding resources"}
               </span>
             </span>
           </button>
@@ -551,7 +561,8 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
                           resource={resource}
                           busy={Boolean(busyAction)}
                           onOpen={() => {
-                            trackFeatureEvent("resource_opened", { type: resource.type });
+                            trackFeatureEvent("resource_opened", { type: resource.type, surface: "course_player" });
+                            void personal.markOpened(resource);
                             onOpenPersonalFile(
                               personalResourceToCourseFile(resource, module.id),
                               { moduleTitle: module.title },
@@ -567,7 +578,7 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
                           type="button"
                           className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black text-violet-200 transition-colors hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-40"
                           style={{ background: "#B388FF14", border: "1px solid #B388FF2B" }}
-                          disabled={atResourceLimit || moduleAtResourceLimit || Boolean(busyAction)}
+                          disabled={!entitled || atResourceLimit || moduleAtResourceLimit || Boolean(busyAction)}
                           onClick={() => openResourceCreate(module)}
                           data-personal-add-resource
                         >
@@ -840,6 +851,16 @@ export default function PersonalModulesPanel({ personal, productTitle, onOpenPer
           <p className="truncate text-xs font-black text-white/90" data-personal-heading>My Modules</p>
           <p className="truncate text-[10px] font-bold uppercase tracking-wide text-[var(--course-muted)]">{productTitle}</p>
         </div>
+        {onOpenLibrary ? (
+          <button
+            type="button"
+            onClick={onOpenLibrary}
+            className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-[10px] font-black text-violet-200 ring-1 ring-violet-400/25 transition hover:bg-violet-500/10"
+            data-open-study-library
+          >
+            <Library size={14} /> Library
+          </button>
+        ) : null}
       </div>
       <div className="min-h-0 flex-1">
         {view === "module-create" ? renderModuleForm(true)

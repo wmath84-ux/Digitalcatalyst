@@ -11,13 +11,13 @@
 //     without the module never crash, never log, never block.
 //   · Every call is voided: tracking can never fail a user action, delay it,
 //     or surface an error UI.
-//   · Event names follow the `personal_course_*` snake_case convention so
-//     they group cleanly in the Analytics console.
+//   · Event names follow the requested `personal_*` snake_case convention so
+//     Study Library, module, save/move and Course Player actions group cleanly.
 //
 // The helper is imported by the My Modules UI only; official course content
 // flows are untouched.
 
-const ANALYTICS_EVENT_PREFIX = "personal_course";
+const ANALYTICS_EVENT_PREFIX = "personal";
 
 type AnalyticsParams = Record<string, string | number | boolean | null | undefined>;
 
@@ -60,7 +60,7 @@ const loadAnalytics = (): Promise<{ analytics: AnalyticsLike; app: unknown } | n
  */
 export const trackFeatureEvent = (eventName: string, params?: AnalyticsParams) => {
   if (!eventName) return;
-  const fullName = `${ANALYTICS_EVENT_PREFIX}_${eventName.replace(/^personal_course_/i, "")}`;
+  const fullName = `${ANALYTICS_EVENT_PREFIX}_${eventName.replace(/^personal_(?:course_)?/i, "")}`;
   void loadAnalytics().then((loaded) => {
     if (!loaded) return;
     try {

@@ -146,6 +146,42 @@ export function useOverlayBox(
   return { scoped: Boolean(open && box), box };
 }
 
+/**
+ * Full visible viewport bounds for unscoped/phone overlays. `100dvh` is a
+ * useful fallback, but iOS and in-app keyboards can resize/offset the visual
+ * viewport without changing the layout viewport in time. Consumers use this
+ * measured box whenever VisualViewport is available, with no guessed keyboard
+ * height and no device-specific constants.
+ */
+export function useVisualViewportBox(open: boolean): OverlayBox | null {
+  const [box, setBox] = useState<OverlayBox | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || typeof window === "undefined" || !window.visualViewport) {
+      setBox(null);
+      return;
+    }
+    const viewport = window.visualViewport;
+    const measure = () => setBox({
+      top: viewport.offsetTop,
+      left: viewport.offsetLeft,
+      width: viewport.width,
+      height: viewport.height,
+    });
+    measure();
+    viewport.addEventListener("resize", measure);
+    viewport.addEventListener("scroll", measure);
+    window.addEventListener("orientationchange", measure);
+    return () => {
+      viewport.removeEventListener("resize", measure);
+      viewport.removeEventListener("scroll", measure);
+      window.removeEventListener("orientationchange", measure);
+    };
+  }, [open]);
+
+  return open ? box : null;
+}
+
 /*
  * Body scroll locking with reference counting. Several overlays can stack
  * (e.g. Modal + ConfirmDialog); the lock must only be released when the last

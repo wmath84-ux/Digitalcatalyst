@@ -23,7 +23,7 @@
 //      "player bars" hide toggles are gone too because there is no header
 //      left to hide.
 
-import { Download, ExternalLink, FileStack, FileQuestion, Maximize2, PencilLine, Eye, MonitorSmartphone, RefreshCw } from "lucide-react";
+import { BookmarkPlus, Download, ExternalLink, FileStack, FileQuestion, FolderPlus, Maximize2, PencilLine, Eye, MonitorSmartphone, RefreshCw } from "lucide-react";
 import type { CSSProperties, ComponentType, ReactNode } from "react";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassPrefToggle } from "../components/ui/glass-pref-toggle";
@@ -151,6 +151,11 @@ export interface PlayerPanelProps {
   activeFilePersonal?: boolean;
   // Active file's own actions, reported live by the active ResourceViewer.
   fileActions: CourseFileActions | null;
+  /** Official resources can be snapshotted into personal storage. */
+  showPersonalLibraryActions?: boolean;
+  personalLibraryActionBusy?: "save" | null;
+  onAddToPersonalModule?: () => void;
+  onSaveForLater?: () => void;
   // Preferences
   snowMode: boolean;
   onSnowModeChange: (next: boolean) => void;
@@ -183,6 +188,10 @@ export default function PlayerPanel({
   onToggleComplete,
   activeFilePersonal = false,
   fileActions,
+  showPersonalLibraryActions = false,
+  personalLibraryActionBusy = null,
+  onAddToPersonalModule,
+  onSaveForLater,
   snowMode,
   onSnowModeChange,
   showViewportToggle,
@@ -296,6 +305,29 @@ export default function PlayerPanel({
             ) : null}
           </div>
           <div className="space-y-1">
+            {showPersonalLibraryActions && onAddToPersonalModule ? (
+              <PanelActionRow
+                icon={FolderPlus}
+                color="#B388FF"
+                label="Add to My Module"
+                hint="Choose a module or create one"
+                disabled={Boolean(personalLibraryActionBusy)}
+                onPress={onAddToPersonalModule}
+                dataAttrs={{ "data-course-add-to-personal-module": "" }}
+              />
+            ) : null}
+            {showPersonalLibraryActions && onSaveForLater ? (
+              <PanelActionRow
+                icon={BookmarkPlus}
+                color="#FFBE0B"
+                label="Save for later"
+                hint="Keep it in My Study Library"
+                busy={personalLibraryActionBusy === "save"}
+                disabled={Boolean(personalLibraryActionBusy)}
+                onPress={onSaveForLater}
+                dataAttrs={{ "data-course-save-for-later": "" }}
+              />
+            ) : null}
             {fileActions.externalUrl ? (
               <PanelActionRow
                 icon={ExternalLink}

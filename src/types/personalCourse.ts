@@ -1,94 +1,118 @@
-// src/types/personalCourse.ts
-//
-// Personal Course Modules ("My Modules") — the student-created content model
-// for the Course Player. This is a PAID, user-owned supplement to the
-// official course: the learner builds their own modules/resources inside a
-// course they can already access. It is deliberately a SEPARATE model from
-// the instructor's `CourseModule` / `CourseFile` tree:
-//
-//   · official course documents are never mutated by this feature;
-//   · ownership is always derived from the authenticated uid (server-side),
-//     never from a client-supplied `ownerUid`;
-//   · entitlement + per-plan/per-cycle limits are enforced by the
-//     authoritative API layer (`/api/personal-course`) and by
-//     firestore.rules, never only by the UI.
-//
-// Firestore layout (all under the user's own namespace, owner-read only):
-//
-//   users/{uid}/personalCourseModules/{moduleId}
-//     ├─ … resources live in the subcollection:
-//     users/{uid}/personalCourseModules/{moduleId}/resources/{resourceId}
-//   users/{uid}/personalCourseUsage/{productId}     (server-maintained counts)
-//
-// Types are intentionally structurally compatible with `CourseFileType`
-// (`src/types/course.ts` stays the source of truth for the type union), so a
-// personal resource opens through the exact same ResourceViewer / embed path
-// as the official file with the same type.
-
 import type { CourseFileType } from "./course";
 
-/** Firestore doc: `users/{uid}/personalCourseModules/{moduleId}`. */
-export interface PersonalCourseModule {
-  /** Server-generated doc id. */
-  id: string;
-  /** Always the authenticated user's uid; set by the server, never the client. */
-  ownerUid: string;
-  /** The course/product this module belongs to (`siteProducts/{productId}`). */
+/** The two destinations visible to a learner. Saved is backed by a hidden bucket. */
+export type PersonalResourceState = "module" | "saved";
+
+export interface PersonalResourceOfficialOrigin {
+  kind: "official";
   productId: string;
-  title: string;
-  description: string;
-  /** 0-based order inside the learner's module list for this product. */
-  sortOrder: number;
-  createdAt: number;
-  updatedAt: number;
+  productDocumentId?: string;
+  productTitle: string;
+  moduleId: string;
+  moduleTitle: string;
+  resourceId: string;
+  resourceName: string;
+  copiedAt: number;
 }
+
+export interface PersonalResourceManualOrigin {
+  kind: "manual";
+  createdAt: number;
+}
+
+export type PersonalResourceOrigin = PersonalResourceOfficialOrigin | PersonalResourceManualOrigin;
 
 /**
- * Firestore doc:
- * `users/{uid}/personalCourseModules/{moduleId}/resources/{resourceId}`.
- *
- * The URL/embed fields mirror the official `CourseFile` vocabulary exactly
- * (`url` / `embedUrl` / `youtubeUrl` / `youtubeVideoId` / `provider` /
- * `contentType`) so the existing resource adapter + ResourceViewer consume a
- * personal resource unchanged.
+ * One immutable/renderable personal snapshot. Even an official-origin item is
+ * `source: "personal"`: origin records provenance while source keeps official
+ * course completion, ordering, authorship and progress isolated.
  */
 export interface PersonalCourseResource {
-  /** Server-generated doc id. */
   id: string;
   ownerUid: string;
+  source: "personal";
+  /** Public learner destination. Null means Saved for Later / Unsorted. */
+  personalModuleId: string | null;
+  /** Internal parent document id; clients need it for targeted Admin API writes. */
+  storageModuleId: string;
+  state: PersonalResourceState;
   productId: string;
-  /** Owning personal module doc id. */
-  personalModuleId: string;
   name: string;
+  description: string;
   type: CourseFileType;
-  url?: string;
-  embedUrl?: string;
-  youtubeUrl?: string;
-  youtubeVideoId?: string;
-  provider?: string;
-  contentType?: string;
-  /** 0-based order inside the module's resource list. */
+  sourceUrl: string;
+  url: string;
+  embedUrl: string;
+  youtubeUrl: string;
+  youtubeVideoId: string;
+  provider: string;
+  contentType: string;
+  metadata: Record<string, string>;
+  identityKey: string;
+  originKind: "official" | "manual";
+  origin: PersonalResourceOrigin;
   sortOrder: number;
-  /** Original user-pasted URL (canonical forms live in `url` etc.). */
-  sourceUrl?: string;
   createdAt: number;
   updatedAt: number;
+  lastOpenedAt: number | null;
 }
 
-/** Server-maintained usage counters for one user + product. */
-export interface PersonalCourseUsage {
+export interface PersonalCourseModule {
+  id: string;
   ownerUid: string;
+  source: "personal";
+  kind: "module";
+  system: false;
+  /** Product context where the module was created; never an ownership scope. */
   productId: string;
+  productTitle: string;
+  title: string;
+  description: string;
+  sortOrder: number;
+  resourceCount: number;
+  createdAt: number;
+  updatedAt: number;
+  resources: PersonalCourseResource[];
+}
+
+export interface PersonalCourseUsage {
+  schemaVersion: 2;
+  scope: "account";
   moduleCount: number;
   resourceCount: number;
   updatedAt: number;
 }
 
-/** A resource with its owning module's display info (list view). */
-export type PersonalCourseResourceRow = PersonalCourseResource;
+export interface PersonalCourseOfficialReference {
+  productId: string;
+  /** Firestore siteProducts document id, when different from productId. */
+  productDocumentId?: string;
+  moduleId: string;
+  resourceId: string;
+}
 
-/** A module with its resources hydrated (panel view model). */
-export interface PersonalCourseModuleTree {
-  module: PersonalCourseModule;
-  resources: PersonalCourseResource[];
+export interface PersonalCourseStatus {
+  access: {
+    entitled: boolean;
+    disabled: boolean;
+    reason: string;
+    planId: string | null;
+    planName: string | null;
+    cycle: "monthly" | "yearly" | null;
+    limits: {
+      moduleLimit: number;
+      resourceLimit: number;
+      perModuleResourceLimit: number;
+      allowedTypes: CourseFileType[] | null;
+    } | null;
+    allowedTypes: CourseFileType[];
+    moduleCount: number;
+    resourceCount: number;
+  };
+  usage: PersonalCourseUsage;
+}
+
+export interface PersonalCourseLibrarySnapshot extends PersonalCourseStatus {
+  modules: PersonalCourseModule[];
+  savedResources: PersonalCourseResource[];
 }

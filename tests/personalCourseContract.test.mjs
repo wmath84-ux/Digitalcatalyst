@@ -142,6 +142,8 @@ test("flat legacy fields map onto both durations; structured block wins", () => 
   }, "basic");
   assert.equal(config.enabled, true);
   assert.equal(config.customEmbedEnabled, false);
+  assert.equal(isPersonalTypeAllowed(config, "monthly", "embed"), false);
+  assert.equal(isPersonalTypeAllowed(config, "yearly", "embed"), false);
   for (const cycle of ["monthly", "yearly"]) {
     const slice = personalModulesCycle(config, cycle);
     assert.equal(slice.moduleLimit, 3);

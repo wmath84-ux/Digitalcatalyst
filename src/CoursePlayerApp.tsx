@@ -13,10 +13,14 @@ import SnowOverlay from "./course/SnowOverlay";
 // never touches the mind map — while the element below stays byte-identical
 // and the panel, once opened, stays mounted exactly as before.
 const MindMapPanel = lazy(() => import("./course/MindMapPanel"));
+const AddOfficialResourceDialog = lazy(() => import("./personal-library/AddOfficialResourceDialog"));
 import PlayerPanel from "./course/PlayerPanel";
 import CoursePeekDock from "./course/CoursePeekDock";
 import PersonalModulesPanel from "./course/PersonalModulesPanel";
+import { toast } from "./components/ui/glass-toast";
+import { trackFeatureEvent } from "./utils/featureAnalytics";
 import { usePersonalModules } from "./hooks/usePersonalModules";
+import type { PersonalCourseOfficialReference } from "./lib/personalCourseClient";
 import useCourseMindMap from "./course/useCourseMindMap";
 import { combineHtml, loadLocalNotes, persistLocalNotes } from "./course/notesStore";
 import { getCoursePanelSession, resetCoursePanelSession } from "./course/coursePanelSession";
@@ -383,8 +387,27 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // panels). Entitlement + limits are enforced by the server API — the hook
   // only reflects its answers.
   const [personalModulesOpen, setPersonalModulesOpen] = useState(false);
-  const personalModules = usePersonalModules(user?.id, product.id);
+  const [addOfficialOpen, setAddOfficialOpen] = useState(false);
+  const [officialDialogTarget, setOfficialDialogTarget] = useState<{ reference: PersonalCourseOfficialReference; name: string; type: CourseFile["type"] } | null>(null);
+  const [personalLibraryActionBusy, setPersonalLibraryActionBusy] = useState<"save" | null>(null);
+  const personalActionRef = useRef(false);
+  // Course entry is lazy: ordinary lesson playback performs zero personal
+  // library requests. The manager/add dialog calls ensureLoaded on demand.
+  const personalModules = usePersonalModules(user?.id, product.id, {
+    autoLoad: false,
+    scope: "context",
+    productDocumentId: product.documentId,
+  });
   const activeFileIsPersonal = Boolean(selectedFile && String((selectedFile as CourseFile).source || "") === "personal");
+  const selectedOfficialModule = selectedFile && !activeFileIsPersonal
+    ? owningModuleForFile(modules, String(selectedFile.id))
+    : null;
+  const selectedOfficialReference = selectedFile && selectedOfficialModule && !activeFileIsPersonal ? {
+    productId: String(product.id),
+    productDocumentId: product.documentId,
+    moduleId: String(selectedOfficialModule.id),
+    resourceId: String(selectedFile.id),
+  } : null;
 
   // The modules-tab entry row subtitle follows the live server snapshot:
   // usage vs the plan's limits when entitled, a clear locked hint otherwise.
@@ -417,6 +440,43 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     userSelectedRef.current = true;
     setSelectedFile(file);
   }, []);
+
+  const openPersonalModules = () => {
+    setPersonalModulesOpen(true);
+    void personalModules.ensureLoaded();
+    trackFeatureEvent("module_manager_opened", { surface: "course_player" });
+  };
+
+  const closeAddOfficialDialog = useCallback(() => {
+    setAddOfficialOpen(false);
+    setOfficialDialogTarget(null);
+  }, []);
+
+  const saveSelectedOfficialForLater = async () => {
+    if (!selectedOfficialReference || personalActionRef.current) return;
+    personalActionRef.current = true;
+    setPersonalLibraryActionBusy("save");
+    trackFeatureEvent("save_for_later_submitted", { type: selectedFile?.type || "unknown" });
+    const result = await personalModules.addOfficial(selectedOfficialReference, { destination: "saved" });
+    personalActionRef.current = false;
+    setPersonalLibraryActionBusy(null);
+    if (!result.ok) {
+      toast({ title: "Couldn't save resource", description: result.message, variant: "error" });
+      trackFeatureEvent("save_for_later_failed", { code: result.code || "unknown" });
+      return;
+    }
+    if (result.alreadyExists) {
+      toast({
+        title: result.data?.existingState === "module" ? "Already in My Modules" : "Already saved",
+        description: result.data?.existingState === "module" ? "This resource is already organised in your library." : "This resource is already in Saved for Later.",
+        variant: "info",
+      });
+      trackFeatureEvent("official_already_added", { destination: "saved" });
+      return;
+    }
+    toast({ title: "Saved for later", description: `${selectedFile?.name || "Resource"} is in My Study Library.`, variant: "success" });
+    trackFeatureEvent("saved_for_later", { type: selectedFile?.type || "unknown" });
+  };
 
   // ── Per-module mind map ─────────────────────────────────────────────────
   // The player tracks the selected FILE, but the mind map is scoped per
@@ -946,6 +1006,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onToggleComplete={() => void toggleComplete()}
       activeFilePersonal={activeFileIsPersonal}
       fileActions={fileActions?.model ?? null}
+      showPersonalLibraryActions={Boolean(selectedOfficialReference)}
+      personalLibraryActionBusy={personalLibraryActionBusy}
+      onAddToPersonalModule={() => {
+        if (!selectedOfficialReference || personalActionRef.current) return;
+        setOfficialDialogTarget({ reference: selectedOfficialReference, name: selectedFile?.name || "Course resource", type: selectedFile!.type });
+        setAddOfficialOpen(true);
+        void personalModules.ensureLoaded();
+      }}
+      onSaveForLater={() => { void saveSelectedOfficialForLater(); }}
       snowMode={snowMode}
       onSnowModeChange={setSnowMode}
       showViewportToggle={showViewportToggle}
@@ -1034,11 +1103,15 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           productTitle={product.title}
           landscape={useLandscapeRails}
           onOpenPersonalFile={selectPersonalFile}
+          onOpenLibrary={() => {
+            trackFeatureEvent("library_opened", { surface: "course_player" });
+            window.location.hash = "#/study-library";
+          }}
           onExit={() => setPersonalModulesOpen(false)}
         />
       )}
       personalModulesEntry={personalModulesEntry}
-      onOpenPersonalModules={() => setPersonalModulesOpen(true)}
+      onOpenPersonalModules={openPersonalModules}
       // PEEK mode: the footer navigation lives at the bottom centre of the
       // whole player (<CoursePeekDock /> below), so the study pane renders no
       // footer of its own. The legacy preference keeps the in-pane dock.
@@ -1055,6 +1128,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // keeps the lesson above the study pane, landscape keeps it on the left,
   // and the footer dock rides inside the study pane in both.
   return (
+    <>
     <div
       ref={playerShellRef}
       className={`course-player-shell fixed inset-0 flex h-[100dvh] w-full overflow-hidden text-[var(--course-text)] ${useLandscapeRails ? "flex-row" : "flex-col"}`}
@@ -1096,5 +1170,18 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       {!legacyFooterDock ? <CoursePeekDock tab={dockTab} onTabChange={handleDockTabChange} /> : null}
       {snowMode ? <SnowOverlay /> : null}
     </div>
+    {addOfficialOpen ? (
+      <Suspense fallback={null}>
+        <AddOfficialResourceDialog
+          open
+          onClose={closeAddOfficialDialog}
+          personal={personalModules}
+          official={officialDialogTarget?.reference || null}
+          resourceName={officialDialogTarget?.name || "Course resource"}
+          resourceType={officialDialogTarget?.type}
+        />
+      </Suspense>
+    ) : null}
+    </>
   );
 }

@@ -132,6 +132,7 @@ export default function ProfilePreview() {
             renewal={subscriber && plan ? { tier, subscription: plan, now: Date.now(), onRenew: () => undefined, onToggleReminders: () => undefined } : null}
             myDayCard={mockMyDayCard}
             aiQuotaCard={mockAiQuotaCard}
+            onOpenStudyLibrary={() => undefined}
             library={{
               items: [
                 { id: "1", title: "Mastering React in 2026", image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=240&h=180&fit=crop" },

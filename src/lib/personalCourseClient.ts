@@ -1,22 +1,29 @@
-// src/lib/personalCourseClient.ts
-//
-// Typed client for the Personal Course Modules ("My Modules") server API
-// (`/api/personal-course`, dispatched to api/_lib/personalCourse.ts).
-//
-// Mirrors src/lib/myDayClient.ts: the Firebase auth token is attached by the
-// client but the SERVER re-derives the uid from the verified token — a forged
-// ownerUid in the payload is ignored. Entitlement + plan limits + allowed
-// resource types are enforced server-side inside Firestore transactions, so
-// everything this client sends is treated as a request, never as truth.
+// Typed client for the existing authenticated Personal Course API.
+// The verified server token is the only owner source; payload owner fields are
+// never accepted. All methods resolve only after the authoritative write.
 
 import { auth } from "../../firebase";
 import { apiFetch } from "../utils/apiBase";
 import type { CourseFile, CourseFileType } from "../types/course";
 import type { PersonalModulesCycleLimits } from "../../utils/personalCourse";
+import type {
+  PersonalCourseLibrarySnapshot,
+  PersonalCourseModule,
+  PersonalCourseOfficialReference,
+  PersonalCourseResource,
+  PersonalCourseUsage,
+} from "../types/personalCourse";
+
+export type {
+  PersonalCourseLibrarySnapshot,
+  PersonalCourseModule,
+  PersonalCourseOfficialReference,
+  PersonalCourseResource,
+  PersonalCourseUsage,
+} from "../types/personalCourse";
 
 export type PersonalCourseAccessState = "entitled" | "not-entitled" | "disabled";
 
-/** The `access` half of personalCourse.status — server-derived. */
 export interface PersonalCourseAccess {
   state: PersonalCourseAccessState;
   entitled: boolean;
@@ -26,7 +33,6 @@ export interface PersonalCourseAccess {
   cycle: "monthly" | "yearly" | null;
   featureId: "personal-modules";
   reason: string;
-  /** Live counts the server maintains (usage doc). */
   moduleCount: number;
   resourceCount: number;
   limits: PersonalModulesCycleLimits | null;
@@ -34,55 +40,44 @@ export interface PersonalCourseAccess {
   typeLimit: number;
 }
 
-export interface PersonalCourseUsage {
-  moduleCount: number;
-  resourceCount: number;
-  lastWriteAt: number;
-}
-
-export interface PersonalCourseResource {
-  id: string;
-  ownerUid: string;
-  productId: string;
-  personalModuleId: string;
-  type: CourseFileType;
-  name: string;
-  description: string;
-  url: string;
-  embedUrl?: string;
-  youtubeUrl?: string;
-  youtubeVideoId?: string;
-  provider?: string;
-  contentType?: string;
-  sourceUrl?: string;
-  sortOrder: number;
-  createdAt?: number;
-  updatedAt?: number;
-}
-
-export interface PersonalCourseModule {
-  id: string;
-  ownerUid: string;
-  productId: string;
-  title: string;
-  description: string;
-  sortOrder: number;
-  resourceCount: number;
-  createdAt?: number;
-  updatedAt?: number;
-  /** Nested resources, ordered by sortOrder (personalCourse.list). */
-  resources: PersonalCourseResource[];
-}
-
 export type PersonalCourseMutation =
-  | { ok: true; message?: string }
-  | { ok: false; code?: string; error?: string };
+  | { ok: true; message?: string; alreadyExists?: boolean; data?: PersonalCourseMutationData }
+  | { ok: false; code?: string; message?: string; error?: string };
+
+export interface PersonalCourseMutationData {
+  module?: PersonalCourseModule;
+  resource?: PersonalCourseResource;
+  usage?: PersonalCourseUsage;
+  moduleId?: string;
+  resourceId?: string;
+  storageModuleId?: string;
+  fromStorageModuleId?: string;
+  removedResourceCount?: number;
+  orderedIds?: string[];
+  alreadyExists?: boolean;
+  existingState?: "module" | "saved";
+  existingModuleId?: string | null;
+  movedFromSaved?: boolean;
+  moved?: boolean;
+  lastOpenedAt?: number;
+}
 
 export interface PersonalCoursePayload {
   action: string;
+  requestId?: string;
   productId?: string;
+  productDocumentId?: string;
   moduleId?: string;
+  sourceModuleId?: string;
   resourceId?: string;
+  sourceResourceId?: string;
+  storageModuleId?: string;
+  fromStorageModuleId?: string;
+  toModuleId?: string;
+  scopeProductId?: string;
+  destination?: "module" | "saved";
+  newModuleTitle?: string;
+  newModuleDescription?: string;
   title?: string;
   description?: string;
   name?: string;
@@ -91,114 +86,215 @@ export interface PersonalCoursePayload {
   toIndex?: number;
 }
 
-type PersonalCourseResponse = {
+type Envelope<T> = {
   ok?: boolean;
+  data?: T;
   error?: string;
+  message?: string;
   code?: string;
-  access?: PersonalCourseAccess;
-  usage?: PersonalCourseUsage;
-  modules?: PersonalCourseModule[];
+  details?: unknown;
 };
 
 export class PersonalCourseApiError extends Error {
   code: string;
   status: number;
-  constructor(message: string, code = "PERSONAL_COURSE_ERROR", status = 400) {
+  details?: unknown;
+
+  constructor(message: string, code = "PERSONAL_COURSE_ERROR", status = 400, details?: unknown) {
     super(message);
+    this.name = "PersonalCourseApiError";
     this.code = code;
     this.status = status;
+    this.details = details;
   }
 }
 
-async function request(action: string, payload?: Partial<PersonalCoursePayload>): Promise<PersonalCourseResponse> {
+const requestId = () => {
+  try { return crypto.randomUUID(); } catch { return `web_${Date.now()}_${Math.random().toString(36).slice(2)}`; }
+};
+
+async function request<T>(action: string, payload: Omit<Partial<PersonalCoursePayload>, "action"> = {}): Promise<T> {
   const user = auth.currentUser;
-  if (!user) throw new PersonalCourseApiError("Please log in to use My Modules.", "AUTH_REQUIRED", 401);
-  const token = await user.getIdToken();
-  const response = await apiFetch("/api/personal-course", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ action, ...payload }),
-  });
-  const body = (await response.json().catch(() => ({}))) as PersonalCourseResponse;
-  if (!response.ok || !body.ok) {
-    throw new PersonalCourseApiError(body.error || "Could not update your personal modules.", body.code || "PERSONAL_COURSE_ERROR", response.status);
+  if (!user) throw new PersonalCourseApiError("Please log in to use My Study Library.", "AUTH_REQUIRED", 401);
+  let response: Response;
+  try {
+    const token = await user.getIdToken();
+    response = await apiFetch("/api/personal-course", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action, requestId: requestId(), ...payload }),
+    });
+  } catch (error) {
+    throw new PersonalCourseApiError(
+      typeof navigator !== "undefined" && navigator.onLine === false
+        ? "You're offline, so the result couldn't be confirmed. Reconnect and refresh your library before retrying."
+        : "The server result couldn't be confirmed. Refresh your library before retrying so you don't repeat a completed action.",
+      "NETWORK_ERROR",
+      0,
+      error,
+    );
   }
-  return body;
+  const body = (await response.json().catch(() => ({}))) as Envelope<T>;
+  if (!response.ok || !body.ok || body.data === undefined) {
+    // A gateway/function 5xx can arrive after the transaction committed but
+    // before its response reached the browser. Treat it as unconfirmed rather
+    // than claiming the mutation failed and inviting an unsafe immediate retry.
+    const unconfirmed = response.status >= 500 || (response.ok && (body.data === undefined || body.ok !== true));
+    throw new PersonalCourseApiError(
+      unconfirmed
+        ? "The server result couldn't be confirmed. Refresh your library before retrying."
+        : body.message || body.error || "My Study Library couldn't be updated.",
+      unconfirmed ? "UNCONFIRMED_RESULT" : body.code || "PERSONAL_COURSE_ERROR",
+      response.status,
+      body.details,
+    );
+  }
+  return body.data;
 }
 
-const id = (value: string | undefined, label: string) => {
+const id = (value: string | undefined | null, label: string) => {
   const clean = String(value || "").trim();
   if (!clean) throw new PersonalCourseApiError(`${label} is required.`, "INVALID_ID", 400);
   return clean;
 };
 
-export const fetchPersonalCourseStatus = (productId: string) =>
-  request("personalCourse.status", { productId: id(productId, "Course id") });
+const normalizeAccess = (access: PersonalCourseLibrarySnapshot["access"]): PersonalCourseAccess => ({
+  ...access,
+  state: access.entitled ? "entitled" : access.disabled ? "disabled" : "not-entitled",
+  featureId: "personal-modules",
+  typeLimit: access.allowedTypes.length,
+});
 
-export const fetchPersonalCourseModules = (productId: string) =>
-  request("personalCourse.list", { productId: id(productId, "Course id") });
+export const fetchPersonalCourseLibrary = async (): Promise<{
+  access: PersonalCourseAccess;
+  usage: PersonalCourseUsage;
+  modules: PersonalCourseModule[];
+  savedResources: PersonalCourseResource[];
+}> => {
+  const result = await request<PersonalCourseLibrarySnapshot>("personalCourse.library");
+  return { ...result, access: normalizeAccess(result.access) };
+};
 
-export const createPersonalModule = (productId: string, title: string, description: string) =>
-  request("personalCourse.module.create", { productId: id(productId, "Course id"), title, description });
+/** Backward-compatible status/list calls used by source contracts and older consumers. */
+export const fetchPersonalCourseStatus = async (_productId?: string) => {
+  const result = await request<Pick<PersonalCourseLibrarySnapshot, "access" | "usage">>("personalCourse.status");
+  return { ...result, access: normalizeAccess(result.access) };
+};
+export const fetchPersonalCourseModules = (_productId?: string) => request<{
+  modules: PersonalCourseModule[];
+  savedResources: PersonalCourseResource[];
+}>("personalCourse.list");
+
+export const createPersonalModule = (
+  productId: string | null | undefined,
+  title: string,
+  description: string,
+  productDocumentId?: string,
+) => request<PersonalCourseMutationData>("personalCourse.module.create", {
+  productId: productId || "__library__",
+  productDocumentId,
+  title,
+  description,
+});
 
 export const updatePersonalModule = (moduleId: string, title: string, description: string) =>
-  request("personalCourse.module.update", { moduleId: id(moduleId, "Module id"), title, description });
+  request<PersonalCourseMutationData>("personalCourse.module.update", { moduleId: id(moduleId, "Module id"), title, description });
 
 export const deletePersonalModule = (moduleId: string) =>
-  request("personalCourse.module.delete", { moduleId: id(moduleId, "Module id") });
+  request<PersonalCourseMutationData>("personalCourse.module.delete", { moduleId: id(moduleId, "Module id") });
 
-export const movePersonalModule = (moduleId: string, toIndex: number) =>
-  request("personalCourse.module.move", { moduleId: id(moduleId, "Module id"), toIndex });
+export const movePersonalModule = (moduleId: string, toIndex: number, scopeProductId?: string) =>
+  request<PersonalCourseMutationData>("personalCourse.module.reorder", { moduleId: id(moduleId, "Module id"), toIndex, scopeProductId });
+
+export interface PersonalResourceFields {
+  type: CourseFileType;
+  name: string;
+  description: string;
+  url: string;
+}
 
 export const createPersonalResource = (
-  moduleId: string,
-  fields: { type: CourseFileType; name: string; description: string; url: string },
-) =>
-  request("personalCourse.resource.create", {
-    moduleId: id(moduleId, "Module id"),
-    type: fields.type,
-    name: fields.name,
-    description: fields.description,
-    url: fields.url,
-  });
+  moduleId: string | null,
+  fields: PersonalResourceFields,
+  context?: { productId?: string; productDocumentId?: string },
+) => request<PersonalCourseMutationData>("personalCourse.resource.create", {
+  moduleId: moduleId || undefined,
+  destination: moduleId ? "module" : "saved",
+  productId: context?.productId,
+  productDocumentId: context?.productDocumentId,
+  ...fields,
+});
 
 export const updatePersonalResource = (
-  moduleId: string,
+  storageModuleId: string,
   resourceId: string,
-  fields: { type: CourseFileType; name: string; description: string; url: string },
-) =>
-  request("personalCourse.resource.update", {
-    moduleId: id(moduleId, "Module id"),
-    resourceId: id(resourceId, "Resource id"),
-    type: fields.type,
-    name: fields.name,
-    description: fields.description,
-    url: fields.url,
-  });
+  fields: PersonalResourceFields,
+) => request<PersonalCourseMutationData>("personalCourse.resource.update", {
+  storageModuleId: id(storageModuleId, "Module id"),
+  resourceId: id(resourceId, "Resource id"),
+  ...fields,
+});
 
-export const deletePersonalResource = (moduleId: string, resourceId: string) =>
-  request("personalCourse.resource.delete", {
-    moduleId: id(moduleId, "Module id"),
+export const deletePersonalResource = (storageModuleId: string, resourceId: string) =>
+  request<PersonalCourseMutationData>("personalCourse.resource.delete", {
+    storageModuleId: id(storageModuleId, "Module id"),
     resourceId: id(resourceId, "Resource id"),
   });
 
-export const movePersonalResource = (moduleId: string, resourceId: string, toIndex: number) =>
-  request("personalCourse.resource.move", {
-    moduleId: id(moduleId, "Module id"),
+/** Accessible reorder inside the current module/Saved list. */
+export const movePersonalResource = (storageModuleId: string, resourceId: string, toIndex: number) =>
+  request<PersonalCourseMutationData>("personalCourse.resource.reorder", {
+    storageModuleId: id(storageModuleId, "Module id"),
     resourceId: id(resourceId, "Resource id"),
     toIndex,
   });
 
+/** Move between a real module and Saved for Later without changing total usage. */
+export const movePersonalResourceToDestination = (
+  resource: Pick<PersonalCourseResource, "id" | "storageModuleId">,
+  toModuleId: string | null,
+) => request<PersonalCourseMutationData>("personalCourse.resource.move", {
+  fromStorageModuleId: id(resource.storageModuleId, "Source module id"),
+  resourceId: id(resource.id, "Resource id"),
+  destination: toModuleId ? "module" : "saved",
+  toModuleId: toModuleId || undefined,
+});
+
+export const markPersonalResourceOpened = (resource: Pick<PersonalCourseResource, "id" | "storageModuleId">) =>
+  request<PersonalCourseMutationData>("personalCourse.resource.open", {
+    storageModuleId: id(resource.storageModuleId, "Module id"),
+    resourceId: id(resource.id, "Resource id"),
+  });
+
+export interface AddOfficialResourceDestination {
+  moduleId?: string;
+  newModuleTitle?: string;
+  newModuleDescription?: string;
+  destination: "module" | "saved";
+}
+
+export const addOfficialResource = (
+  official: PersonalCourseOfficialReference,
+  destination: AddOfficialResourceDestination,
+) => request<PersonalCourseMutationData>("personalCourse.official.add", {
+  productId: id(official.productId, "Product id"),
+  productDocumentId: official.productDocumentId,
+  sourceModuleId: id(official.moduleId, "Official module id"),
+  sourceResourceId: id(official.resourceId, "Official resource id"),
+  destination: destination.destination,
+  moduleId: destination.moduleId,
+  newModuleTitle: destination.newModuleTitle,
+  newModuleDescription: destination.newModuleDescription,
+});
+
 /**
- * A validated personal resource → the official `CourseFile` shape, so the
- * EXISTING ResourceViewer renders it through its one `getCourseEmbed` path —
- * no second viewer, no duplicated type handling. Provenance fields mark the
- * file as personal so progress / notes / resume / mind-map / download
- * surfaces can tell it apart from official content.
+ * Personal snapshot → the canonical CourseFile consumed by the ONE existing
+ * ResourceViewer. `source` stays personal even when origin.kind is official,
+ * which guarantees no official completion/progress mutation.
  */
 export const personalResourceToCourseFile = (
   resource: PersonalCourseResource,
-  moduleId: string,
+  moduleId: string | null = resource.personalModuleId,
 ): CourseFile => ({
   id: resource.id,
   name: resource.name,
@@ -211,9 +307,14 @@ export const personalResourceToCourseFile = (
   contentType: resource.contentType || undefined,
   description: resource.description || undefined,
   accessLevel: "included",
-  // ── Personal provenance (see src/types/course.ts) ──────────────────────
   source: "personal",
   ownerUid: resource.ownerUid,
-  personalModuleId: moduleId,
+  personalModuleId: moduleId || undefined,
+  personalStorageModuleId: resource.storageModuleId,
   personalResourceId: resource.id,
+  personalState: resource.state,
+  personalOriginKind: resource.originKind,
+  officialSourceProductId: resource.origin.kind === "official" ? resource.origin.productId : undefined,
+  officialSourceModuleId: resource.origin.kind === "official" ? resource.origin.moduleId : undefined,
+  officialSourceResourceId: resource.origin.kind === "official" ? resource.origin.resourceId : undefined,
 });

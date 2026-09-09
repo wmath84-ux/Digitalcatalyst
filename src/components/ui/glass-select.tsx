@@ -111,7 +111,7 @@ export function GlassSelectContent({ tint = 0.6, className, children, ...props }
   const { open, setOpen, triggerRef } = useSelect();
   const ref = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [rect, setRect] = useState({ top: 0, left: 0, width: 224 });
+  const [rect, setRect] = useState({ top: 0, left: 0, width: 224, maxHeight: 256, origin: "top center" });
 
   useEffect(() => setMounted(true), []);
 
@@ -120,14 +120,37 @@ export function GlassSelectContent({ tint = 0.6, className, children, ...props }
     const place = () => {
       const t = triggerRef.current?.getBoundingClientRect();
       if (!t) return;
-      setRect({ top: t.bottom + 6, left: t.left, width: t.width });
+      const viewport = window.visualViewport;
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const viewportLeft = viewport?.offsetLeft ?? 0;
+      const viewportWidth = viewport?.width ?? window.innerWidth;
+      const viewportHeight = viewport?.height ?? window.innerHeight;
+      const viewportBottom = viewportTop + viewportHeight;
+      const viewportRight = viewportLeft + viewportWidth;
+      const maxHeight = Math.max(48, Math.min(256, viewportHeight - 16));
+      const menuHeight = Math.min(maxHeight, Math.max(48, ref.current?.offsetHeight || maxHeight));
+      const roomBelow = viewportBottom - t.bottom - 6;
+      const roomAbove = t.top - viewportTop - 6;
+      const placeAbove = roomBelow < Math.min(menuHeight, 160) && roomAbove > roomBelow;
+      const width = Math.min(t.width, Math.max(0, viewportWidth - 16));
+      const left = Math.max(viewportLeft + 8, Math.min(t.left, viewportRight - width - 8));
+      const top = placeAbove
+        ? Math.max(viewportTop + 8, t.top - menuHeight - 6)
+        : Math.min(t.bottom + 6, viewportBottom - Math.min(menuHeight, roomBelow) - 8);
+      setRect({ top, left, width, maxHeight, origin: placeAbove ? "bottom center" : "top center" });
     };
     place();
+    const frame = requestAnimationFrame(place);
     window.addEventListener("scroll", place, true);
     window.addEventListener("resize", place);
+    window.visualViewport?.addEventListener("resize", place);
+    window.visualViewport?.addEventListener("scroll", place);
     return () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("scroll", place, true);
       window.removeEventListener("resize", place);
+      window.visualViewport?.removeEventListener("resize", place);
+      window.visualViewport?.removeEventListener("scroll", place);
     };
   }, [open, triggerRef]);
 
@@ -161,13 +184,13 @@ export function GlassSelectContent({ tint = 0.6, className, children, ...props }
         transform: `scale(${open ? 1 : 0.97})`,
         pointerEvents: open ? "auto" : "none",
         zIndex: 1000,
-        transformOrigin: "top center",
+        transformOrigin: rect.origin,
         transition: "opacity 0.16s, transform 0.18s cubic-bezier(0.22,1.15,0.36,1.06)",
       }}
       className={cn(className)}
       {...props}
     >
-      <GlassSurface tint={tint} radius={16} className="max-h-64 overflow-auto py-1.5">
+      <GlassSurface tint={tint} radius={16} style={{ maxHeight: rect.maxHeight }} className="overflow-auto py-1.5">
         {children}
       </GlassSurface>
     </div>,

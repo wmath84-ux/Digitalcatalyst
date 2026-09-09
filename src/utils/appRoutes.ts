@@ -16,6 +16,7 @@ export const AUTH_REQUIRED_PREFIXES = [
   "#/checkout",
   "#/my-day",
   "#/profile",
+  "#/study-library",
   "#/course/",
   "#/subscription",
 ] as const;

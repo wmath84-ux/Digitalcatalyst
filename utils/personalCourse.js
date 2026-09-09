@@ -288,7 +288,13 @@ export const personalModulesCycle = (config, cycle) => {
 /** Effective allowed-type list (null = all 12). */
 export const personalAllowedTypes = (config, cycle) => {
   const slice = personalModulesCycle(config, cycle);
-  return slice.allowedTypes || ALL_PERSONAL_COURSE_TYPES;
+  const allowed = slice.allowedTypes || ALL_PERSONAL_COURSE_TYPES;
+  // The existing admin-level custom-embed switch is an authoritative ceiling
+  // across both cycles. A cycle may independently exclude embed through its
+  // allowedTypes list, but it can never re-enable embed while this switch is off.
+  return config?.customEmbedEnabled === false
+    ? allowed.filter((type) => type !== "embed")
+    : allowed;
 };
 
 export const personalTypeLimit = (config, cycle) => personalAllowedTypes(config, cycle).length;
