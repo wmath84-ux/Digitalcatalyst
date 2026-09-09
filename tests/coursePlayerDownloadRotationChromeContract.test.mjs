@@ -143,10 +143,14 @@ test("The player chrome hide toggles are gone — there IS no chrome to hide", (
 
 test("Mark-complete and the active file's actions live in the Player tab", () => {
   // The charging button — gesture, reversal, update arrow and double-tap —
-  // is the Player panel's progress row now.
-  assert.match(playerPanel, /<ChargingCompleteButton/);
+  // moved to the player's TOP chrome: the always-visible top progress line
+  // is the tap target, and the big CENTER control (the same animated
+  // ChargingCompleteButton) flips the same reversible toggle. The Player
+  // panel keeps only the text summary + the active file's own buttons.
+  assert.match(coursePlayer, /<ChargingCompleteButton/);
   assert.match(coursePlayer, /isDone=\{isDone\}/);
-  assert.match(coursePlayer, /onToggleComplete=\{\(\) => void toggleComplete\(\)\}/);
+  assert.match(coursePlayer, /void toggleComplete\(\)/);
+  assert.match(coursePlayer, /data-course-top-progress/);
   // So are the active file's download / open-external / media-fullscreen
   // buttons, reported live by the mounted viewer.
   assert.match(playerPanel, /data-course-viewer-kind/);

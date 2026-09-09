@@ -28,7 +28,10 @@ test("subscription loading and catalog-error states keep the header and footer",
   // Loading + error states render inside the shared shell instead of replacing the page.
   assert.match(subscriptionPage, /data-subscription-loading/);
   assert.match(subscriptionPage, /data-subscription-catalog-error/);
-  assert.match(subscriptionPage, /<main className="flex-1 overflow-y-auto">/);
+  // The main is also the page's overlay-bounds column (My Day's pattern):
+  // every picker opened from this page clamps to it on tablet / desktop.
+  assert.match(subscriptionPage, /<main ref=\{contentColumnRef\} className="flex-1 overflow-y-auto">/);
+  assert.match(subscriptionPage, /<OverlayBoundsProvider value=\{contentColumnRef\}>/);
 });
 
 test("subscription route wires the same navigation destinations as other pages", () => {

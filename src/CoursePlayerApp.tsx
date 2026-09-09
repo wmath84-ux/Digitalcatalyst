@@ -16,6 +16,7 @@ const MindMapPanel = lazy(() => import("./course/MindMapPanel"));
 const AddOfficialResourceDialog = lazy(() => import("./personal-library/AddOfficialResourceDialog"));
 import PlayerPanel from "./course/PlayerPanel";
 import CoursePeekDock from "./course/CoursePeekDock";
+import ChargingCompleteButton from "./course/ChargingCompleteButton";
 import PersonalModulesPanel from "./course/PersonalModulesPanel";
 import { toast } from "./components/ui/glass-toast";
 import { trackFeatureEvent } from "./utils/featureAnalytics";
@@ -344,6 +345,16 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   const splitDeckRef = useRef<SplitDeckHandle | null>(null);
   const playerShellRef = useRef<HTMLDivElement | null>(null);
   const [isLandscape, setIsLandscape] = useState(false);
+  // ── TOP PROGRESS + CENTER COMPLETION ────────────────────────────────────
+  // The player's application-level progress line (always at the TOP, every
+  // orientation, every mode) is also the tap target for the reversible
+  // mark-complete interaction: tapping it reveals the big circular charging
+  // control around the CENTER of the screen (the same animated
+  // ChargingCompleteButton the Player tab used to carry) and flips the
+  // canonical completion state. The control settles away on its own after a
+  // short idle window — it never blocks the player while it is up.
+  const [centerCompleteVisible, setCenterCompleteVisible] = useState(false);
+  const centerCompleteTimerRef = useRef<number | null>(null);
   // True while the document is actually in fullscreen — i.e. the Android
   // status bar is really hidden. Mirrors the live document state so the
   // "Hide status bar" toggle stays correct even when the learner swipes out
@@ -750,6 +761,32 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
     }, { merge: true });
   };
 
+  // Reveal (or keep alive) the center completion control. Purely presentational
+  // — the canonical completion state lives in `completedIds` + Firestore and is
+  // flipped ONLY by `toggleComplete`, so there is no second progress state to
+  // drift. The control auto-settles away after the idle window.
+  const revealCenterCompletion = useCallback(() => {
+    setCenterCompleteVisible(true);
+    if (centerCompleteTimerRef.current != null) window.clearTimeout(centerCompleteTimerRef.current);
+    centerCompleteTimerRef.current = window.setTimeout(() => setCenterCompleteVisible(false), 3200);
+  }, []);
+
+  useEffect(() => () => {
+    if (centerCompleteTimerRef.current != null) window.clearTimeout(centerCompleteTimerRef.current);
+  }, []);
+
+  /**
+   * The TOP progress interaction: flip the lesson's completion (both
+   * directions) and surface the big center control so the change reads as an
+   * animation, not a number jump. Personal (My Modules) content never joins
+   * official completion — the top bar simply isn't interactive for it.
+   */
+  const handleTopProgressActivate = () => {
+    if (!canMarkCompleteTop) return;
+    void toggleComplete();
+    revealCenterCompletion();
+  };
+
   // Notes are rich text. The HTML is sanitised on the way in (so a paste from
   // any site is safe) while keeping the exact formatting, and a plain-text
   // projection is stored alongside it for the thin saved-note strip.
@@ -871,7 +908,11 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
    * The dock's gesture map (Split Deck is the only layout now):
    *
    *   · a DIFFERENT tab swaps the study pane's content in place — the pane
-   *     never closes, it is the layout;
+   *     never closes, it is the layout. If the pane is peek-collapsed (its
+   *     28px rail), the tap also re-opens it — from the RIGHT side in
+   *     landscape (the deck is a row there), from the bottom in portrait —
+   *     so selecting a navigation tab always ACTIVATES the split content
+   *     instead of leaving the new tab hidden behind the rail;
    *   · the tab you are already on peek-collapses the study pane, so the
    *     footer stays reachable even when the pane has become a 28px rail.
    */
@@ -884,6 +925,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       return;
     }
     setDockTab(next);
+    splitDeckRef.current?.activateStudy();
   };
 
   // ⌘/Ctrl+1…7 walks the study tabs — a desktop shortcut, so it stays out of
@@ -925,6 +967,10 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
 
   const progress = totalEligibleFiles.length ? Math.round((completedIds.size / totalEligibleFiles.length) * 100) : 0;
   const isDone = Boolean(selectedFile && completedIds.has(selectedFile.id));
+  // The top progress bar's completion interaction is available for exactly the
+  // files that can join official completion (never personal My Modules
+  // content — that keeps its own rule from the Player tab, unchanged).
+  const canMarkCompleteTop = Boolean(selectedFile) && !activeFileIsPersonal;
   const useLandscapeRails = isLandscape;
   // The player is dark only, so the native controls (scrollbars, inputs, the
   // OS file picker) always resolve to the dark rendering.
@@ -1002,8 +1048,6 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
       onBack={onBack}
       progress={progress}
       isDone={isDone}
-      canMarkComplete={Boolean(selectedFile) && !activeFileIsPersonal}
-      onToggleComplete={() => void toggleComplete()}
       activeFilePersonal={activeFileIsPersonal}
       fileActions={fileActions?.model ?? null}
       showPersonalLibraryActions={Boolean(selectedOfficialReference)}
@@ -1123,15 +1167,19 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
   // rail's icon — the deck never keeps its own copy of the tab list.
   const activeStudyTab = dockTabRecord(dockTab);
 
-  // ── ONE shell for both orientations — content + footer navigation only ──
-  // There is NO header anywhere in the player (owner's direction): portrait
-  // keeps the lesson above the study pane, landscape keeps it on the left,
-  // and the footer dock rides inside the study pane in both.
+  // ── ONE shell for both orientations — progress + content + footer nav ──
+  // There is still no header (owner's direction): the ONE chrome row the
+  // player carries is the thin TOP PROGRESS line, pinned above the stage in
+  // BOTH orientations (portrait and landscape alike — it can never slide to
+  // the side, because the shell itself is a column and the stage below it is
+  // what flips between row/column). Portrait keeps the lesson above the study
+  // pane, landscape keeps it on the left, and the footer dock rides inside
+  // the study pane / the bottom-centre peek dock in both.
   return (
     <>
     <div
       ref={playerShellRef}
-      className={`course-player-shell fixed inset-0 flex h-[100dvh] w-full overflow-hidden text-[var(--course-text)] ${useLandscapeRails ? "flex-row" : "flex-col"}`}
+      className="course-player-shell fixed inset-0 flex h-[100dvh] w-full flex-col overflow-hidden text-[var(--course-text)]"
       data-course-player
       data-orientation={useLandscapeRails ? "landscape" : "portrait"}
       {...(useLandscapeRails
@@ -1142,6 +1190,62 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
         : {})}
       style={{ colorScheme: browserColorScheme }}
     >
+      {/* ── TOP PROGRESS LINE — the application-level progress indicator ──
+          Always visible while the player is open: portrait, landscape, split,
+          hidden-footer peek mode, collapsed panes — every state. It renders
+          the SAME canonical progress number the Player tab summarises
+          (completedIds / totalEligibleFiles — one source of truth), updates
+          the moment completion changes, and is the tap target for the
+          reversible mark-complete interaction (the big center control
+          below). Personal-module files are never completable, so the bar
+          stays a plain indicator for them. */}
+      <div
+        className="relative z-[75] flex shrink-0 items-center gap-2 border-b border-white/10 bg-[#0a0c12]/85 px-3 pb-[3px] pt-[max(env(safe-area-inset-top),3px)]"
+        data-course-progress-summary
+        data-course-top-progress
+        data-progress-value={progress}
+      >
+        <button
+          type="button"
+          onClick={handleTopProgressActivate}
+          disabled={!canMarkCompleteTop}
+          aria-label={
+            canMarkCompleteTop
+              ? `Course progress ${progress}%. ${isDone ? "Lesson completed — tap to mark as not complete" : "Tap to mark this lesson complete"}`
+              : `Course progress ${progress}%`
+          }
+          title={canMarkCompleteTop ? (isDone ? "Tap to mark as not complete" : "Mark this lesson complete") : undefined}
+          className="relative h-3 min-w-0 flex-1 cursor-pointer outline-none disabled:cursor-default"
+          data-course-progress-bar
+          data-progress-value={progress}
+        >
+          {/* The thin line itself: a 4px track + the progress fill. */}
+          <span aria-hidden className="pointer-events-none absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full bg-white/10" />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full transition-[width] duration-300 ease-out"
+            style={{
+              width: `${progress}%`,
+              background: "linear-gradient(90deg, #38bdf8, #a78bfa)",
+              boxShadow: "0 0 10px rgba(139, 92, 246, 0.45)",
+            }}
+          />
+        </button>
+        <span
+          aria-hidden
+          className="shrink-0 text-[9px] font-black leading-none tabular-nums text-white/60"
+          data-course-progress-label
+        >
+          {progress}%
+        </span>
+        <span role="status" aria-live="polite" className="sr-only">
+          {isDone ? "Lesson completed" : "Lesson not completed"}
+        </span>
+      </div>
+      {/* The stage: portrait = lesson above the study pane (column), landscape
+          = lesson left of the study pane (row) — the split always activates
+          from the RIGHT in landscape, never from the bottom. */}
+      <div className={`relative flex min-h-0 min-w-0 flex-1 ${useLandscapeRails ? "flex-row" : "flex-col"}`}>
       <section
         id="course-viewer"
         className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
@@ -1161,6 +1265,34 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate, initia
           handleRef={splitDeckRef}
         />
       </section>
+      </div>
+      {/* ── CENTER COMPLETION CONTROL ─────────────────────────────────────
+          Revealed by the top progress interaction (and kept alive by every
+          further tap): the SAME animated ChargingCompleteButton the Player
+          tab used to carry, at charging-widget scale, around the CENTER of
+          the screen. Only the circle is interactive — the wrapper never
+          blocks the player — and it settles away on its own after the idle
+          window. It is a reversible toggle, exactly like the control it
+          replaces. */}
+      {centerCompleteVisible ? (
+        <div
+          className="pointer-events-none fixed inset-0 z-[85] flex items-center justify-center"
+          data-course-center-complete
+          data-completed={isDone ? "true" : "false"}
+          role="status"
+          aria-live="polite"
+        >
+          <ChargingCompleteButton
+            done={isDone}
+            onToggle={() => {
+              void toggleComplete();
+              revealCenterCompletion();
+            }}
+            size={132}
+            className="pointer-events-auto"
+          />
+        </div>
+      ) : null}
       {/* ── Footer navigation: the bottom-centre PEEK dock ────────────────
           OFF by default (the owner's preferred interaction): a thin frosted
           line at the bottom centre — tap/hover opens the footer, swipe

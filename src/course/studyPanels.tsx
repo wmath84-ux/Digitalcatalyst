@@ -307,6 +307,14 @@ export interface SplitDeckHandle {
    * reachable either way, because the collapsed pane IS a button.
    */
   toggleStudy: () => void;
+  /**
+   * Selecting a study tab from the footer navigation while the study pane is
+   * peek-collapsed re-opens the pane — from the RIGHT in landscape (the deck
+   * is a row there), from the bottom in portrait. A navigation tap must
+   * ACTIVATE the split content, never leave the new tab hidden behind the
+   * pane's 28px rail. No-op while the pane is already open.
+   */
+  activateStudy: () => void;
 }
 
 export interface SplitDeckProps {
@@ -534,6 +542,9 @@ export function SplitDeck({
       restore,
       fiftyFifty,
       toggleStudy: () => (collapsedRef.current === "study" ? restore() : collapseTo("study")),
+      activateStudy: () => {
+        if (collapsedRef.current === "study") restore();
+      },
     }),
     [collapseTo, restore, fiftyFifty, handleRef],
   );

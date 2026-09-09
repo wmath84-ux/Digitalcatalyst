@@ -188,10 +188,14 @@ test("NotesPanel supports add, edit, and delete via a single + button", () => {
   assert.match(notesPanel, /data-course-note-delete/);
 });
 
-test("NotesPanel renders the empty state and a square-grid notes list", () => {
+test("NotesPanel renders an empty library bare — the circular + is the only add affordance", () => {
   assert.match(notesPanel, /data-course-notes-list/);
   assert.match(notesPanel, /data-course-notes-grid/);
-  assert.match(notesPanel, /No notes yet/);
+  // Owner's direction: an EMPTY notes library renders no top instruction pill
+  // / rectangular add button at all — the page keeps only the circular "+"
+  // at the grid's bottom-right (data-course-notes-add below).
+  assert.doesNotMatch(notesPanel, /No notes yet/);
+  assert.match(notesPanel, /notes\.length > 0 \? \(/);
   assert.match(notesPanel, /data-course-note/);
   assert.match(notesPanel, /aspect-square/);
   assert.match(notesPanel, /grid-cols-2/);

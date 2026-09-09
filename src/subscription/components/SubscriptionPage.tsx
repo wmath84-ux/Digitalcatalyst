@@ -62,6 +62,7 @@ import {
   formatExpiryDate,
   toMillis as renewalToMillis,
 } from "../../../utils/renewalPresentation";
+import { OverlayBoundsProvider } from "../../components/ui/overlayBounds";
 import {
   startCheckout,
   type SubscriptionCatalog,
@@ -110,6 +111,14 @@ export default function SubscriptionPage({
   const { settings: gateSettings } = useSubscriptionGateLogic();
   const renewalLoadedRef = useRef(false);
   const repairedOrderIdsRef = useRef<Set<string>>(new Set());
+  // The page's content column (the scrollable <main> under the header). Every
+  // picker overlay opened from this page (CourseSelectModal / FeatureSelectModal
+  // / HelpModal / the confirm GlassModal) clamps itself to this column's
+  // on-screen rectangle on tablet + desktop widths via OverlayBoundsProvider —
+  // the same reuse My Day already built for its create/edit overlays — so a
+  // picker visually belongs to the Subscription page instead of covering the
+  // whole browser window. Phones keep the full-window bottom sheet.
+  const contentColumnRef = useRef<HTMLElement>(null);
 
   // The buyer's live subscription record (null when never subscribed).
   const [activeSubscription, setActiveSubscription] = useState<SubscriptionRecordLike | null>(null);
@@ -943,6 +952,7 @@ export default function SubscriptionPage({
 
   // ---------- Render ----------
   return (
+    <OverlayBoundsProvider value={contentColumnRef}>
     <div className="min-h-screen sm:py-6">
       <div data-app-frame className="relative mx-auto flex min-h-screen w-full max-w-md flex-col sm:min-h-[calc(100vh-3rem)] sm:supports-[height:100dvh]:min-h-[calc(100dvh-3rem)] sm:overflow-hidden sm:rounded-[2rem] md:max-w-none md:rounded-none">
         <Header
@@ -954,7 +964,7 @@ export default function SubscriptionPage({
           onHelpClick={() => setHelpOpen(true)}
         />
 
-        <main className="flex-1 overflow-y-auto">
+        <main ref={contentColumnRef} className="flex-1 overflow-y-auto">
           <div className="flex min-h-full w-full flex-col">
             {catalogLoading ? (
               <div data-subscription-loading className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-white/55">
@@ -1437,6 +1447,7 @@ export default function SubscriptionPage({
         <BottomNav active={null} onChange={onNavigateFooter} purchasesBadge={purchasesBadge} />
       </div>
     </div>
+    </OverlayBoundsProvider>
   );
 }
 
