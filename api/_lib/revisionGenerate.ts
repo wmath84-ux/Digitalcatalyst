@@ -1331,3 +1331,64 @@ export async function handleRevisionGenerate(req: VercelRequest, res: VercelResp
     errorResponse(res, error, "Could not generate questions with AI.");
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Shared AI runtime (reused by the Personal Module AI Study Engine)   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Read the admin-published AI settings (`settings/revisionCatalog.aiSettings`)
+ * that drive provider defaults, allowance windows and model pricing.
+ */
+export async function loadAiSettings(): Promise<Record<string, unknown>> {
+  const catalogSnap = await adminDb().collection("settings").doc(REVISION_CATALOG_DOC).get();
+  return asRecord(asRecord(catalogSnap.data()).aiSettings);
+}
+
+/**
+ * The single AI runtime for every server-side AI surface in this app.
+ *
+ * `api/_lib/personalAi.ts` (the Personal Module AI Study Engine) imports THIS
+ * object instead of building a parallel provider/allowance stack, so:
+ *
+ *   · one provider adapter set (Gemini / OpenAI-compatible / Anthropic) with
+ *     the same SSRF-guarded base URLs, timeouts and retired-model fallbacks;
+ *   · ONE authoritative allowance ledger — `users/{uid}/aiUsage/current` —
+ *     with the same transactional reserve → call → finalise/release cycle, so
+ *     a module question and a revision test draw from the same plan quota and
+ *     a learner can never double-spend by switching surfaces;
+ *   · one entitlement resolution (`subscriptionUnlocksFeature` + plan
+ *     `aiAllowances` per billing cycle), so the upgrade flow, the plan copy and
+ *     the quota widget all stay in sync with what the server actually allows.
+ *
+ * Nothing here is new behaviour — these are the existing private helpers,
+ * exported so the second AI surface reuses them verbatim.
+ */
+export const revisionAiRuntime = {
+  asRecord,
+  readBody,
+  firstHeader,
+  parseOwnConfig,
+  loadSchoolConfig,
+  loadAiSettings,
+  resolveEffectiveAiPolicy,
+  getUsageStatus,
+  reserveUsage,
+  releaseUsage,
+  finalizeUsage,
+  completeJsonText,
+  findAiModelPrice,
+  estimateTokensFromText,
+  extractJson,
+  isBudgetLow,
+  enterHandler,
+  TimeBudgetExhausted,
+};
+
+export type RevisionAiRuntime = typeof revisionAiRuntime;
+export type {
+  AiConfig as RevisionAiConfig,
+  EffectiveAiPolicy as RevisionAiPolicy,
+  ProviderUsage as RevisionAiProviderUsage,
+  UsageReservation as RevisionAiReservation,
+};

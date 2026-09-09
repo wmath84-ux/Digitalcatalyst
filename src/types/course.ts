@@ -30,6 +30,18 @@ export interface CoursePlayerNote {
    * treat a missing value as an empty array.
    */
   links?: string[];
+  /**
+   * AI Study Engine provenance. Set ONLY when the note was created by the
+   * module AI ("Save as note" on an answer/summary) — never on a note the
+   * learner typed, and an AI note never overwrites a learner's own note.
+   * `aiKind` says which output it came from so the badge can name it.
+   */
+  aiGenerated?: boolean;
+  aiKind?: "answer" | "summary" | "explanation" | "question" | "flashcard" | "plan";
+  /** Personal module the AI output belonged to (My Study Library / My Modules). */
+  personalModuleId?: string;
+  /** Personal resource the AI output was scoped to, when it was. */
+  personalResourceId?: string;
 }
 
 export interface CourseAccessMeta {

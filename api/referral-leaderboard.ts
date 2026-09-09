@@ -11,6 +11,7 @@ import { handleSubscriptionGate } from "./_lib/subscriptionGateServer.js";
 import { applyCors } from "./_lib/cors.js";
 import { handleCreateQuery, handleListQueries, handleReplyQuery } from "./_lib/userQueries.js";
 import { handlePersonalCourse } from "./_lib/personalCourse.js";
+import { handlePersonalAi } from "./_lib/personalAi.js";
 
 type SubscriberRow = {
   uid: string;
@@ -160,6 +161,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // deployed function to stay within the Hobby 12-function cap.
     if (action.startsWith("personalCourse.")) {
       return handlePersonalCourse(req, res);
+    }
+    // Personal Module AI Study Engine ("Ask this Module") — grounded answers,
+    // summaries, questions, flashcards, weak topics, study mode + study plans
+    // for the learner's OWN modules. Shares this deployed function (and the
+    // existing AI provider + allowance runtime) to stay inside the Hobby
+    // 12-function cap.
+    if (action.startsWith("personalAi.")) {
+      try {
+        return await handlePersonalAi(req, res);
+      } catch (innerError) {
+        return errorResponse(res, innerError, "The AI study engine hit an unexpected problem. Please try again.");
+      }
     }
     if (action.startsWith("flowpath.")) {
       return handleFlowPathControl(req, res);
