@@ -187,17 +187,21 @@ async function request<T>(action: string, payload: Record<string, unknown> = {},
 }
 
 /** Attach the learner's resolved AI provider to a generation/ask request. */
-const withProvider = async (uid: string, payload: Record<string, unknown>) => {
+const withProvider = async (uid: string, payload: Record<string, unknown>, preferredSource?: "own" | "default") => {
   const provider = await resolvePersonalAiProvider(uid);
+  const source = preferredSource === "own" || preferredSource === "default"
+    ? preferredSource
+    : (provider.source === "own" ? "own" : "default");
+  const ownConfig = provider.config;
   return {
     ...payload,
-    source: provider.source === "own" ? "own" : "default",
-    config: provider.source === "own" && provider.config
+    source,
+    config: source === "own" && ownConfig
       ? {
-          provider: provider.config.provider,
-          apiKey: provider.config.apiKey,
-          baseUrl: provider.config.baseUrl,
-          model: provider.config.model,
+          provider: ownConfig.provider,
+          apiKey: ownConfig.apiKey,
+          baseUrl: ownConfig.baseUrl,
+          model: ownConfig.model,
         }
       : undefined,
   };
@@ -219,12 +223,24 @@ export const fetchModuleAiContext = (input: FetchModuleAiContextInput) =>
     { signal: input.signal, timeoutMs: 60_000 },
   );
 
+export interface CoursePlayerAiContext {
+  productId?: string | null;
+  courseTitle?: string | null;
+  moduleTitle?: string | null;
+  resourceName?: string | null;
+  resourceType?: string | null;
+}
+
 export interface AskModuleAiInput extends PersonalAiScopeInput {
   uid: string;
   question: string;
   notes?: PersonalAiNoteInput[];
   history?: { role: "user" | "assistant"; text: string }[];
   signal?: AbortSignal;
+  /** Prefer the learner's own key or the school AI for this turn. */
+  source?: "own" | "default";
+  /** Official Course Player context when the open lesson is not a personal module. */
+  courseContext?: CoursePlayerAiContext;
 }
 
 /** One grounded answer, with server-resolved provenance. */
@@ -234,7 +250,8 @@ export const askModuleAi = async (input: AskModuleAiInput): Promise<PersonalAiAn
     question: input.question,
     notes: input.notes || [],
     history: (input.history || []).slice(-8),
-  });
+    courseContext: input.courseContext || undefined,
+  }, input.source);
   return request<PersonalAiAnswerResult>("personalAi.ask", payload, { signal: input.signal, timeoutMs: 90_000 });
 };
 
