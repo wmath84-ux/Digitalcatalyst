@@ -70,3 +70,50 @@ export const trackFeatureEvent = (eventName: string, params?: AnalyticsParams) =
     }
   });
 };
+
+/* ------------------------------------------------------------------ */
+/* AI Study Engine events                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The AI events the product asked for, emitted through the SAME lazy,
+ * optional Firebase Analytics helper as the My Study Library events — no new
+ * analytics framework, and tracking can still never block or throw.
+ *
+ * Names are used verbatim (`ai_module_opened`, `ai_limit_reached`, …) so the
+ * AI funnel groups on its own prefix instead of colliding with `personal_*`.
+ */
+const AI_ANALYTICS_EVENT_PREFIX = "ai";
+
+/** Whitelisted so a typo can never create an unbounded event-name space. */
+export const AI_ANALYTICS_EVENTS = [
+  "module_opened",
+  "module_question_asked",
+  "resource_question_asked",
+  "summary_generated",
+  "questions_generated",
+  "flashcards_generated",
+  "study_mode_started",
+  "study_plan_generated",
+  "weak_topic_detected",
+  "explain_again_used",
+  "limit_reached",
+  "upgrade_clicked",
+  "unreadable_content_shown",
+] as const;
+
+export type AiAnalyticsEvent = (typeof AI_ANALYTICS_EVENTS)[number];
+
+export const trackAiEvent = (eventName: AiAnalyticsEvent | string, params?: AnalyticsParams) => {
+  if (!eventName) return;
+  const bare = String(eventName).replace(/^ai_/i, "");
+  const fullName = `${AI_ANALYTICS_EVENT_PREFIX}_${bare}`;
+  void loadAnalytics().then((loaded) => {
+    if (!loaded) return;
+    try {
+      loaded.analytics.logEvent(loaded.analytics.getAnalytics(loaded.app), fullName, params);
+    } catch {
+      // Tracking is best-effort — never surface.
+    }
+  });
+};

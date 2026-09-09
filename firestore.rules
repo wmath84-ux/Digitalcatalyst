@@ -397,6 +397,31 @@ service cloud.firestore {
         allow read: if isOwner(uid) || isAdmin();
         allow create, update, delete: if false;
       }
+
+      // ── Personal Module AI Study Engine ("Ask this Module") ────────────
+      // Everything the module AI derives about ONE learner's OWN material:
+      //   personalAi/content/items/{resourceId}  — cached extracted text
+      //   personalAi/artifacts/items/{id}        — summaries / questions /
+      //                                            flashcards / study plans
+      //   personalAi/threads/items/{moduleId}    — the module's AI conversation
+      //   personalAi/evidence/items/{moduleId}   — weak-topic evidence
+      //
+      // Same posture as personalCourseModules: the path lives under the owner's
+      // uid namespace (so ownership is re-derived from the path and can never be
+      // spoofed by a payload field), reads are owner/admin only, and ALL writes
+      // go through the authoritative API (`/api/personal-ai`,
+      // api/_lib/personalAi.ts) with the Admin SDK. Denying client writes means
+      // a browser can never plant AI content in someone else's namespace, forge
+      // provenance, re-own an artifact, or bypass the allowance ledger — the AI
+      // quota itself stays in `aiUsage/current`, which is already server-only.
+      match /personalAi/{bucket} {
+        allow read, write: if false;
+
+        match /items/{itemId} {
+          allow read: if isOwner(uid) || isAdmin();
+          allow create, update, delete: if false;
+        }
+      }
     }
 
     match /siteProducts/{productId} {
