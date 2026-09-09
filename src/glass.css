@@ -983,7 +983,8 @@ html[data-glass="on"] :where([data-store-coverflow]) :where(.dc-scene-ink) {
  * material with the header above it and the cards beside it. The pinned docs
  * SENSITIVITY is untouched — no TS number moved; this is the same CSS-side plate
  * the review cards wear, and the GlassMaterial lens still refracts the scene
- * through it. */
+ * through it. 2026-09-09: the lens's own wash is repainted with the header
+ * bar's exact tint too (the rule right below the plate) — see that comment. */
 html[data-glass="on"] :where([data-glass-dock]) {
   background-color: rgba(8, 14, 30, 0.74) !important;
   background-image: linear-gradient(
@@ -998,6 +999,26 @@ html[data-glass="on"] :where([data-glass-dock]) {
     inset 0 0 0 1px rgba(255, 255, 255, 0.12),
     inset 0 -1px 0 rgba(0, 0, 0, 0.26),
     0 18px 44px -20px rgba(2, 6, 16, 0.9) !important;
+}
+
+/* 2026-09-09 · owner direction: "Home footer navigation ka jo background
+   transparency color hai usko vaise hi exactly set karo jaisa Header ka hai."
+   The plate above is byte-identical to the header bar's, but the dock stacked
+   one more layer the header does not: GlassMaterial's lens wash
+   (`[data-glass-dock] > [aria-hidden] > div`), the pinned docs LENS gradient —
+   pale sky-blue → white → violet (rgba(186,230,253,0.17) / 0.025 /
+   rgba(196,181,253,0.14)) — painted ON TOP of the plate, so the footer read
+   lighter and cooler than the header above it. The Home header's own stack is
+   the plate + its pack GlassSurface's flat dark tint rgba(60,62,68,0.105)
+   (GLASS_DOCS_SURFACE.tintAlpha over the same GLASS_TINT_RGB the dock's panel
+   token uses). Repaint the wash with exactly that tint and the two bars are one
+   material, layer for layer: same plate, same over-plate tint, same
+   transparency. The refraction lens itself (the layer's backdrop-filter) is
+   untouched — it still refracts the plate beneath it — and `?glass=off` still
+   restores the published lens gradient, because this rule sits inside the
+   glass gate like every other dock rule. */
+html[data-glass="on"] :where([data-glass-dock]) > [aria-hidden] > div {
+  background: rgba(60, 62, 68, 0.105) !important;
 }
 
 /* The tooltip is the dock's only text and it floats over the dock's own plate,

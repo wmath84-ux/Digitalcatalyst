@@ -173,6 +173,24 @@ test("the dock plate wins the cascade against index.css's transparent panel", ()
   assert.match(css, /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) \{\s*\n\s*background-color:/);
 });
 
+test("the dock's lens wash is repainted with the header's exact tint", () => {
+  // 2026-09-09 · owner: "Home footer navigation ka jo background transparency
+  // color hai usko vaise hi exactly set karo jaisa Header ka hai." The plate
+  // numbers above already match the header bar's; the divergence was
+  // GlassMaterial's pale lens gradient stacked on top of the plate. The Home
+  // header's own stack is plate + its GlassSurface's flat dark tint
+  // rgba(60,62,68,0.105) — so the wash is repainted with that exact tint and
+  // the two bars are one material, layer for layer.
+  const rule =
+    /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) > \[aria-hidden\] > div \{([^}]*)\}/.exec(css)?.[1];
+  assert.ok(rule, "expected the lens-wash rule");
+  assert.match(rule, /background: rgba\(60, 62, 68, 0\.105\) !important/);
+  // The refraction lens itself is untouched: only the paint moves, the layer
+  // keeps its backdrop-filter, and the rule stays inside the glass gate so
+  // `?glass=off` restores the published lens gradient.
+  assert.doesNotMatch(rule, /backdrop-filter/);
+});
+
 test("the dock tooltips are an opaque plate and drop their six live filters", () => {
   const rule = /html\[data-glass="on"\] :where\(\[data-glass-dock-item\]\) > div:first-child \{([^}]*)\}/.exec(css)?.[1];
   assert.ok(rule, "expected the tooltip rule");
@@ -206,9 +224,9 @@ test("?glass=off finally switches the dock's refraction lens off", () => {
 });
 
 test("the dock plate actually clears AA over the brightest band of the scene", () => {
-  // Worst case: the plate over the lit snow, with GlassMaterial's light-blue
-  // wash (alpha 0.17 at the top of its gradient) composited on top, and the
-  // tooltip's 96% white label over that.
+  // Worst case: the plate over the lit snow, with the lens wash (the header
+  // bar's flat dark tint rgba(60,62,68,0.105) since 2026-09-09) composited on
+  // top, and the tooltip's 96% white label over that.
   const channel = (v) => {
     const s = v / 255;
     return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
@@ -225,7 +243,7 @@ test("the dock plate actually clears AA over the brightest band of the scene", (
     [206, 214, 226], // the lit snow / lake at its brightest
   ]) {
     const plate = over([8, 14, 30], 0.74, scene);
-    const washed = over([186, 230, 253], 0.17, plate);
+    const washed = over([60, 62, 68], 0.105, plate);
     const label = over([255, 255, 255], 0.96, washed);
     const r = ratio(label, washed);
     assert.ok(r >= 4.5, `dock label over ${scene} measures ${r.toFixed(2)}:1, under AA`);
