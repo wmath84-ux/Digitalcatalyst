@@ -34,7 +34,7 @@ const TABS: { key: TabKey; label: string; icon: typeof HomeIcon; color: string; 
 
 
 function railToTab(active: DesktopRailKey): TabKey | null {
-  if (active === 'favorites' || active === 'settings' || active === 'profile') return null
+  if (active === 'favorites' || active === 'settings' || active === 'profile' || active === 'study') return null
   return active
 }
 

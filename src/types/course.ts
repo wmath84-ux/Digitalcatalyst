@@ -69,7 +69,15 @@ export interface CourseFile extends CourseAccessMeta {
   source?: "official" | "personal";
   ownerUid?: string;
   personalModuleId?: string;
+  /** Internal hidden-bucket/module parent used only for targeted personal API writes. */
+  personalStorageModuleId?: string;
   personalResourceId?: string;
+  personalState?: "module" | "saved";
+  /** Provenance is separate from `source` so official snapshots remain progress-isolated. */
+  personalOriginKind?: "official" | "manual";
+  officialSourceProductId?: string;
+  officialSourceModuleId?: string;
+  officialSourceResourceId?: string;
   description?: string;
 }
 

@@ -8,6 +8,7 @@ import {
   unlockBodyScroll,
   useOverlayBox,
   useOverlayBounds,
+  useVisualViewportBox,
 } from "./overlayBounds";
 
 interface ConfirmDialogProps {
@@ -50,6 +51,7 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   const boundsRef = useOverlayBounds();
   const { scoped, box } = useOverlayBox(open, boundsRef);
+  const visualViewportBox = useVisualViewportBox(open);
 
   useEffect(() => {
     if (!open) return;
@@ -69,20 +71,16 @@ export default function ConfirmDialog({
   if (!open) return null;
 
   const isScoped = scoped && box !== null;
+  const positionBox = isScoped ? box : visualViewportBox;
 
   return (
     <div
       className={cn(
-        "animate-fadeIn flex",
-        isScoped && box
-          ? "fixed z-[60] items-center justify-center p-4 sm:p-6"
-          : "fixed inset-0 z-[60] items-center justify-center p-4",
+        "animate-fadeIn fixed z-[60] flex items-center justify-center p-4",
+        isScoped && "sm:p-6",
+        !positionBox && "inset-0",
       )}
-      style={
-        isScoped && box
-          ? { top: box.top, left: box.left, width: box.width, height: box.height }
-          : undefined
-      }
+      style={positionBox ? { top: positionBox.top, left: positionBox.left, width: positionBox.width, height: positionBox.height } : undefined}
     >
       <div
         className={cn(

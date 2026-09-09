@@ -143,6 +143,8 @@ export type ProfileLayoutProps = {
   myDayCard: ReactNode;
   aiQuotaCard: ReactNode;
 
+  onOpenStudyLibrary: () => void;
+
   library: {
     items: { id: string; title: string; image: string }[];
     ownedCount: number;
@@ -176,6 +178,7 @@ export default function ProfileLayout({
   renewal,
   myDayCard,
   aiQuotaCard,
+  onOpenStudyLibrary,
   library,
   onOpenSettings,
   saving,
@@ -278,6 +281,8 @@ export default function ProfileLayout({
         {referral ? (
           <ReferralCard code={referral.code} used={referral.used} appName={referral.appName} onCopy={referral.onCopy} />
         ) : null}
+
+        <StudyLibraryCard onOpen={onOpenStudyLibrary} />
 
         <LibraryCard
           items={library.items}
@@ -535,7 +540,28 @@ function ReferralCard({ code, used, appName, onCopy }: { code: string; used: boo
   );
 }
 
-/* ── Library card ───────────────────────────────────────────────────── */
+/* ── Personal Study Library card ────────────────────────────────────── */
+function StudyLibraryCard({ onOpen }: { onOpen: () => void }) {
+  return (
+    <GlassCard data-profile-study-library>
+      <div className="flex items-center gap-3">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-cyan-500/15 text-cyan-200 ring-1 ring-cyan-400/30">
+          <Boxes className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300">Personal workspace</p>
+          <h3 className="mt-0.5 text-base font-black text-white">My Study Library</h3>
+          <p className="mt-0.5 text-xs font-medium leading-5 text-white/55">Open your modules, Saved for Later and recently viewed resources.</p>
+        </div>
+      </div>
+      <GlassButton variant="capsule" onClick={onOpen} className="mt-4 w-full text-cyan-100 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:font-black">
+        <span className="inline-flex items-center gap-2">Open Study Library <ArrowRight className="h-4 w-4" /></span>
+      </GlassButton>
+    </GlassCard>
+  );
+}
+
+/* ── Owned course library card ───────────────────────────────────────── */
 function LibraryCard({
   items,
   ownedCount,

@@ -8,6 +8,7 @@ import {
   unlockBodyScroll,
   useOverlayBox,
   useOverlayBounds,
+  useVisualViewportBox,
   type OverlayBoundsRef,
 } from "./overlayBounds";
 
@@ -61,6 +62,7 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
   const contextBounds = useOverlayBounds();
   const resolvedBounds = boundsRef ?? contextBounds;
   const { scoped, box } = useOverlayBox(open, resolvedBounds);
+  const visualViewportBox = useVisualViewportBox(open);
 
   useEffect(() => {
     if (!open) return;
@@ -80,20 +82,18 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
   if (!open) return null;
 
   const isScoped = scoped && box !== null;
+  const positionBox = isScoped ? box : visualViewportBox;
 
   return (
     <div
       className={cn(
-        "animate-fadeIn flex",
-        isScoped && box
-          ? "fixed z-50 items-center justify-center p-4 sm:p-6"
-          : "fixed inset-0 z-50 items-end justify-center sm:items-center sm:p-4",
+        "animate-fadeIn fixed z-50 flex",
+        isScoped
+          ? "items-center justify-center p-4 sm:p-6"
+          : "items-end justify-center sm:items-center sm:p-4",
+        !positionBox && "inset-0",
       )}
-      style={
-        isScoped && box
-          ? { top: box.top, left: box.left, width: box.width, height: box.height }
-          : undefined
-      }
+      style={positionBox ? { top: positionBox.top, left: positionBox.left, width: positionBox.width, height: positionBox.height } : undefined}
     >
       <div
         className={cn(
@@ -114,8 +114,8 @@ export default function Modal({ open, onClose, title, children, maxWidth = "max-
         className={cn(
           "dc-scene-plate glass-dialog-in relative flex w-full flex-col overflow-hidden text-white",
           maxWidth,
-          isScoped && box
-            ? "max-h-full"
+          positionBox
+            ? "max-h-[calc(100%-0.5rem)] sm:max-h-[calc(100%-2rem)]"
             : "max-h-[calc(100vh-3.5rem)] supports-[height:100dvh]:max-h-[calc(100dvh-3.5rem)] sm:max-h-[calc(100vh-2rem)] sm:supports-[height:100dvh]:max-h-[calc(100dvh-2rem)]",
         )}
         contentClassName="flex min-h-0 flex-1 flex-col"

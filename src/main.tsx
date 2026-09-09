@@ -46,6 +46,7 @@ const LeaderboardApp = lazyRoute(() => import("./LeaderboardApp"));
 const RevisionApp = lazyRoute(() => import("./revision/RevisionApp"));
 const ProfileApp = lazyRoute(() => import("./profile/App"));
 const SettingsPage = lazyRoute(() => import("./settings/SettingsPage"));
+const StudyLibraryPage = lazyRoute(() => import("./personal-library/StudyLibraryPage"));
 const SubscriberExperiencePage = lazyRoute(() => import("./profile/SubscriberExperiencePage"));
 const ProfilePreview = lazyRoute(() => import("./profile/ProfilePreview"));
 const MindMapPreview = lazyRoute(() => import("./course/MindMapPreview"));
@@ -157,6 +158,7 @@ const REVISION_HASH = "#/revision";
 const PROFILE_HASH = "#/profile";
 // Dedicated Settings / Preferences page (the desktop rail's Settings entry).
 const SETTINGS_HASH = "#/settings";
+const STUDY_LIBRARY_HASH = "#/study-library";
 const PROFILE_SUBSCRIBER_EXPERIENCE_HASH = "#/profile/subscriber-experience";
 const COURSE_HASH = "#/course/";
 const CART_HASH = "#/cart";
@@ -261,6 +263,12 @@ const PAGE_SKELETON_BLOCKS: Record<string, PageSkeletonBlock[]> = {
     { width: "100%", height: 140 },
     { width: "100%", height: 140 },
   ],
+  library: [
+    { width: "62%", height: 24 },
+    { width: "100%", height: 120 },
+    { width: "100%", height: 176 },
+    { width: "100%", height: 150 },
+  ],
 };
 
 const PAGE_SKELETON_HERO = new Set(["product"]);
@@ -274,6 +282,7 @@ const PAGE_SKELETON_FOOTER = new Set([
   "flowpath",
   "notifications",
   "search",
+  "library",
 ]);
 
 /**
@@ -288,6 +297,7 @@ const pageSkeletonVariant = (hash: string) => {
   if (hash.startsWith(REVISION_HASH)) return "revision";
   if (hash.startsWith(SUBSCRIPTION_HASH)) return "subscription";
   if (hash.startsWith(PROFILE_HASH)) return "profile";
+  if (hash.startsWith(STUDY_LIBRARY_HASH)) return "library";
   if (hash.startsWith(FLOWPATH_HASH)) return "flowpath";
   if (hash.startsWith(NOTIFICATIONS_HASH)) return "notifications";
   if (hash.startsWith(SEARCH_HASH)) return "search";
@@ -488,12 +498,10 @@ function Root() {
  * slow network shows one consistent loading state instead of a blank page.
  */
 function RouteChunkFallback() {
+  const hash = typeof window === "undefined" ? "" : window.location.hash;
   return (
-    <main className="grid min-h-[100dvh] place-items-center px-6 text-center text-white" data-route-chunk-loading>
-      <div>
-        <span className="mx-auto block h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-violet-400" />
-        <p className="mt-4 text-sm font-semibold text-slate-300">Loading…</p>
-      </div>
+    <main className="min-h-[100dvh] px-5 py-6" data-route-chunk-loading>
+      {pageSkeleton(hash)}
     </main>
   );
 }
@@ -520,6 +528,7 @@ function routeChunkFor(hash: string): { preload: () => Promise<unknown> } | null
   if (hash.startsWith(SEARCH_HASH)) return SearchPage;
   if (hash.startsWith(COURSE_HASH)) return CourseRouteGuard;
   if (hash.startsWith(SETTINGS_HASH)) return SettingsPage;
+  if (hash.startsWith(STUDY_LIBRARY_HASH)) return StudyLibraryPage;
   if (hash.startsWith(PROFILE_SUBSCRIBER_EXPERIENCE_HASH)) return SubscriberExperiencePage;
   if (hash.startsWith(PROFILE_HASH)) return ProfileApp;
   if (hash.startsWith(MY_DAY_HASH)) return MyDayApp;
@@ -654,7 +663,9 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
             ? "Subscription"
             : hash.startsWith(PRODUCT_HASH)
               ? "Product details"
-              : undefined
+              : hash.startsWith(STUDY_LIBRARY_HASH)
+                ? "My Study Library"
+                : undefined
       }
       pageSubtitle={
         hash.startsWith("#/flowpath")
@@ -663,7 +674,9 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
             ? "Compare plans, add courses and features, and review before you buy"
             : hash.startsWith(PRODUCT_HASH)
               ? "Everything about this resource, before you buy"
-              : undefined
+              : hash.startsWith(STUDY_LIBRARY_HASH)
+                ? "Modules, saved resources and recent learning"
+                : undefined
       }
     >
       {children}
@@ -1521,6 +1534,7 @@ function RootPage(): ReactNode {
   }
   // Settings renders inside the desktop shell like the Profile page does.
   if (hash.startsWith(SETTINGS_HASH)) return <SettingsPage />;
+  if (hash.startsWith(STUDY_LIBRARY_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><StudyLibraryPage /></PageEnter>;
   if (hash.startsWith(PROFILE_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><ProfileApp /></PageEnter>;
   if (hash.startsWith(MY_DAY_HASH)) return <PageEnter pageKey={pageEnterAppKey(hash)}><MyDayApp /></PageEnter>;
   if (hash.startsWith(LEADERBOARD_HASH)) return <LeaderboardApp />;

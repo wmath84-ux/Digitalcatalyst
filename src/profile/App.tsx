@@ -323,6 +323,7 @@ export default function ProfileApp() {
               />
             }
             aiQuotaCard={membership.subscriber ? <AiQuotaCard uid={user.id} /> : null}
+            onOpenStudyLibrary={() => { window.location.hash = "#/study-library"; }}
             library={{
               items: purchasedProducts.map((p) => ({ id: p.id, title: p.title, image: p.image })),
               ownedCount,
