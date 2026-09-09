@@ -38,7 +38,6 @@ import { useEffect, useState } from "react";
 import { Check, Plus, X } from "lucide-react";
 import { GlassButton } from "../components/ui/glass-button";
 import { GlassCard } from "../components/ui/GlassCard";
-import { GlassSurface } from "../components/ui/glass";
 import type { CoursePlayerNote } from "../types/course";
 import RichTextEditor from "./RichTextEditor";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
@@ -264,15 +263,13 @@ export default function NotesPanel({
           pane, and the circular "+" floats at the bottom-right of the grid. */}
       {/* Note list — square cards in a grid. A saved note always collapses
           back to a compact square; the rich formatting is preserved
-          underneath and shown again the moment the note is reopened. */}
+          underneath and shown again the moment the note is reopened.
+          An EMPTY library renders nothing at all: the circular "+" at the
+          grid's bottom-right is the page's only add-new-note affordance
+          (owner's direction) — no top instruction pill, no second button. */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
       <div className="h-full overflow-y-auto p-3 pb-16">
-        {notes.length === 0 ? (
-          <GlassSurface radius={16} className="border border-dashed border-[var(--course-border)] text-white" contentClassName="p-4 text-center text-xs font-semibold text-[var(--course-muted)]">
-            {/* The empty pill is the pack surface — no bg-[var(--course-soft)] plate any more. */}
-            No notes yet — tap + to add one.
-          </GlassSurface>
-        ) : (
+        {notes.length > 0 ? (
           <ul className="grid grid-cols-2 gap-3.5 sm:grid-cols-3" data-course-notes-list data-course-notes-grid="true">
             {notes.map((note) => {
               const preview = notePreview(note);
@@ -314,7 +311,7 @@ export default function NotesPanel({
               );
             })}
           </ul>
-        )}
+        ) : null}
         </div>
         {/* The one "+" — a small circular button floating at the grid's
             bottom-right. It opens the same big composer the old header "+"

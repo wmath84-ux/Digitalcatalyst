@@ -46,9 +46,13 @@ test("the card preview pins the theme text colour", () => {
   assert.match(preview[0], /color:\s*var\(--course-text\)/);
 });
 
-test("the empty-state pill uses theme variables, not hardcoded white/slate", () => {
-  assert.match(notesPanel, /border-\[var\(--course-border\)\]/);
-  assert.match(notesPanel, /bg-\[var\(--course-soft\)\]/);
-  assert.match(notesPanel, /text-\[var\(--course-muted\)\]/);
+test("the empty-state pill is gone — an empty library renders bare", () => {
+  // Owner's direction: the notes library's add-new-note affordance is the
+  // circular "+" alone (bottom-right of the grid). The old top instruction
+  // pill was removed, so its theme-variable (and hardcoded) variants must
+  // not come back either.
+  assert.doesNotMatch(notesPanel, /No notes yet/);
+  assert.doesNotMatch(notesPanel, /border-\[var\(--course-border\)\]/);
+  assert.doesNotMatch(notesPanel, /bg-\[var\(--course-soft\)\]/);
   assert.doesNotMatch(notesPanel, /No notes yet[\s\S]{0,300}?bg-white\/80/);
 });
