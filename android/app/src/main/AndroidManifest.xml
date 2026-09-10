@@ -76,12 +76,18 @@
                                          (this is the one the user will
                                          see a system prompt for on first
                                          install)
-      • SCHEDULE_EXACT_ALARM           — exact-time local alarms
-      • USE_EXACT_ALARM                — Android 14+ replacement for
-                                         SCHEDULE_EXACT_ALARM that doesn't
-                                         require a user-granted permission
-                                         (system alarms like ours qualify
-                                         for this category)
+      • SCHEDULE_EXACT_ALARM           — exact-time local alarms. On
+                                         Android 14+ this is denied by
+                                         default; the app checks
+                                         AlarmManager.canScheduleExactAlarms()
+                                         at runtime (see capacitorBridge.ts)
+                                         and sends the user to the system
+                                         settings screen to grant it.
+                                         (USE_EXACT_ALARM is deliberately
+                                         NOT declared — Google Play policy
+                                         restricts it to alarm-clock and
+                                         calendar apps, and declaring it
+                                         risks Play Store suspension.)
       • RECEIVE_BOOT_COMPLETED          — re-schedule local alarms after
                                          a device reboot
       • WAKE_LOCK                      — let the AlarmManager fire even
@@ -98,7 +104,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />

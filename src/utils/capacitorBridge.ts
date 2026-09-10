@@ -226,11 +226,36 @@ export type LocalAlarmItem = {
  *  Permission: the LocalNotifications plugin prompts the user for
  *  POST_NOTIFY on first schedule. If the user denied, this is a
  *  no-op and the caller should fall back to in-app rendering. */
+/** Android 14+ denies SCHEDULE_EXACT_ALARM by default (and we deliberately
+ *  do NOT declare USE_EXACT_ALARM — Play policy restricts it to alarm-clock/
+ *  calendar apps). This helper checks AlarmManager.canScheduleExactAlarms()
+ *  via the LocalNotifications plugin and, if denied, opens the system
+ *  ACTION_REQUEST_SCHEDULE_EXACT_ALARM settings screen so the user can grant
+ *  it manually. Returns true when exact alarms are (or become) allowed.
+ *  On older Android / plugin versions without the API, assumes allowed. */
+async function ensureExactAlarmPermission(): Promise<boolean> {
+  try {
+    const { exact_alarm } = await LocalNotifications.checkExactNotificationSetting();
+    if (exact_alarm === "granted") return true;
+    // Opens Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM and resolves with
+    // the setting after the user returns from the system screen.
+    const changed = await LocalNotifications.changeExactNotificationSetting();
+    return changed.exact_alarm === "granted";
+  } catch {
+    // API not available (Android < 12 or older plugin) — exact alarms are
+    // implicitly allowed there, so don't block scheduling.
+    return true;
+  }
+}
+
 export async function scheduleLocalAlarm(item: LocalAlarmItem): Promise<boolean> {
   if (!isAndroidNative()) return false;
   try {
     // Android 8+ drops notifications posted to a non-existent channel.
     await ensureReminderChannel();
+    // Android 14+: SCHEDULE_EXACT_ALARM must be user-granted; without it the
+    // schedule() call below would either throw or silently fire inexactly.
+    if (!(await ensureExactAlarmPermission())) return false;
     let granted = await LocalNotifications.checkPermissions();
     if (granted.display !== "granted") {
       granted = await LocalNotifications.requestPermissions();
