@@ -728,21 +728,25 @@
   filter: drop-shadow(0 14px 26px rgba(2, 6, 16, 0.7)) drop-shadow(0 0 24px rgba(147, 197, 253, 0.35));
 }
 
-/* ── Internal side navigation ──────────────────────────────────────────── */
+/* ── Internal side navigation ────────────────────────────────────────────
+ * Tasks-reference pass: the rows grow slightly, the selected entry wears the
+ * reference's violet-gradient pill with its frosted icon tile + check dot, and
+ * every unselected row keeps the quiet translucent plate (never a solid box). */
 .myday-snav-item {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.65rem;
   width: 100%;
   text-align: left;
-  border-radius: 0.95rem;
-  padding: 0.62rem 0.8rem;
+  border-radius: 1rem;
+  padding: 0.66rem 0.7rem;
   font-size: 0.85rem;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.72);
-  border: 1px solid transparent;
+  border: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transition: all 0.2s ease;
   cursor: pointer;
 }
@@ -750,7 +754,7 @@
 .myday-snav-item:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .myday-snav-item:focus-visible {
@@ -760,21 +764,23 @@
 
 .myday-snav-item--active {
   color: #fff;
-  background: linear-gradient(135deg, rgba(124, 92, 255, 0.85), rgba(99, 102, 241, 0.8));
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.88), rgba(99, 102, 241, 0.82) 55%, rgba(79, 70, 229, 0.85));
   border-color: rgba(196, 181, 253, 0.5);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.28),
     0 10px 26px -10px rgba(124, 92, 255, 0.75),
-    0 0 0 1px rgba(124, 92, 255, 0.25);
+    0 0 0 1px rgba(124, 92, 255, 0.25),
+    0 0 34px -12px rgba(139, 92, 246, 0.55);
+  text-shadow: 0 1px 8px rgba(13, 10, 46, 0.6);
 }
 
 .myday-snav-icon {
   display: grid;
   place-items: center;
-  width: 1.9rem;
-  height: 1.9rem;
+  width: 2rem;
+  height: 2rem;
   flex-shrink: 0;
-  border-radius: 0.6rem;
+  border-radius: 0.7rem;
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.09);
   transition: all 0.2s ease;
@@ -782,7 +788,143 @@
 
 .myday-snav-item--active .myday-snav-icon {
   background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.myday-snav-dot {
+  display: grid;
+  place-items: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+  border-radius: 0.4rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* ── My Day panel calendar ──────────────────────────────────────────────
+ * A real month grid (‹ › navigate, "Today" returns, the live day carries the
+ * violet ring) styled like the reference card inside the side panel. It lives
+ * on the panel's plate, so it only adds a whisper of surface, never a solid. */
+.myday-cal {
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(6, 11, 26, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 0.8rem 0.75rem 0.75rem;
+}
+
+.myday-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.myday-cal-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.myday-cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.myday-cal-btn {
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 0.5rem;
+  color: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+
+.myday-cal-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.myday-cal-btn:focus-visible {
+  outline: 2px solid var(--myday-ring);
+  outline-offset: 2px;
+}
+
+.myday-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.1rem;
+  text-align: center;
+}
+
+.myday-cal-wd {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.42);
+  padding-bottom: 0.3rem;
+}
+
+.myday-cal-day {
+  display: grid;
+  place-items: center;
+  height: 1.6rem;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.78);
+  border-radius: 0.55rem;
+}
+
+.myday-cal-day--edge {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.myday-cal-day--today {
+  color: #fff;
+  font-weight: 800;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.95), rgba(99, 102, 241, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 0 0 3px rgba(124, 92, 255, 0.22),
+    0 6px 18px -6px rgba(124, 92, 255, 0.8);
+}
+
+.myday-cal-today {
+  display: block;
+  width: 100%;
+  margin-top: 0.55rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.34rem 0.5rem;
+  font-size: 11px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.88);
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+
+.myday-cal-today:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+.myday-cal-today:focus-visible {
+  outline: 2px solid var(--myday-ring);
+  outline-offset: 2px;
 }
 
 /* ── Creation hub (restyled, behaviour pinned by contract) ──────────────── */
@@ -928,5 +1070,564 @@
   }
   .myday-hero-quote {
     display: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * MY DAY · TASKS PAGE (desktop + mobile reference pass)
+ * ──────────────────────────────────────────────────────────────────────────
+ * The Tasks page wears the same night-sky glass world as the Overview. The
+ * big panel keeps the ONE shared plate (`dc-scene-plate`); everything below
+ * styles its INTERIOR — the hero cover, the toolbar, the search rail, the
+ * task rows, the empty state and the study-habit cards. Nothing here repaints
+ * the plate, and on a phone the Tasks panel deliberately fades to pure
+ * transparency (`[data-tasks-panel]`) so the cards float on the winter scene
+ * exactly like the mobile reference.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* Mobile: the panel is composition, not a wall. Its GlassSurface layers (the
+   plate backdrop, tint, sheen, rim) drop out below the md breakpoint — the
+   scene stays visible, each inner card floats on it. Desktop is untouched. */
+@media (max-width: 767.98px) {
+  .myday-scope [data-tasks-panel] > .dc-scene-plate > div[aria-hidden] {
+    display: none;
+  }
+  .myday-scope [data-tasks-panel] > .dc-scene-plate {
+    box-shadow: none !important;
+  }
+}
+
+/* ── Hero cover ───────────────────────────────────────────────────────────── */
+.myday-tasks-hero {
+  position: relative;
+  overflow: hidden;
+  margin: 0.65rem;
+  border-radius: 1.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(120% 150% at 85% -35%, rgba(124, 92, 255, 0.3), transparent 60%),
+    linear-gradient(150deg, rgba(10, 16, 36, 0.62), rgba(6, 10, 24, 0.55));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+/* A translucent night wash so the headline still lands on the brighter side of
+   the scene; the mountains below stay fully visible on the right half. */
+.myday-tasks-hero .myday-hero-art svg {
+  width: 72%;
+  min-width: 260px;
+  right: -1%;
+  bottom: -10%;
+  opacity: 0.9;
+}
+
+@media (min-width: 640px) {
+  .myday-tasks-hero {
+    margin: 0.9rem;
+  }
+  .myday-tasks-hero .myday-hero-art svg {
+    width: 62%;
+    bottom: -6%;
+  }
+}
+
+/* The date pill + Add Task live on the hero's top rail. On a phone the two
+   share one compact line — the pill truncates before the button ever wraps. */
+.myday-tasks-add {
+  padding: 0.48rem 0.8rem;
+  font-size: 0.74rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, #7c5cff, #6366f1 55%, #4f46e5);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .myday-tasks-add {
+    padding: 0.55rem 1.05rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* The phone hero is one compact moment: pill + button, title, sub, then the
+   progress card. The desktop ring + quote live in their own right rail. */
+.myday-scope .myday-tasks-hero .myday-date-pill {
+  font-size: 10.5px;
+  padding: 0.3rem 0.65rem;
+}
+
+@media (min-width: 640px) {
+  .myday-scope .myday-tasks-hero .myday-date-pill {
+    font-size: 0.72rem;
+    padding: 0.35rem 0.8rem;
+  }
+}
+
+.myday-hero-rail {
+  display: none;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.9rem;
+}
+
+@media (min-width: 640px) {
+  .myday-hero-rail {
+    display: flex;
+  }
+}
+
+.myday-hero-quote--phone {
+  margin-top: 0.5rem;
+  margin-left: auto;
+  width: fit-content;
+  max-width: 15rem;
+}
+
+/* Phone "Today's Progress" card inside the cover — the mobile reference's
+   own glass moment under the title; from `sm` the hero rail carries the ring
+   and this card steps aside. */
+.myday-tasks-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.85rem;
+  border-radius: 1.05rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 13, 30, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  padding: 0.65rem 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .myday-tasks-progress {
+    display: none;
+  }
+}
+
+.myday-streak-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 146, 60, 0.35);
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.28), rgba(245, 158, 11, 0.16));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  padding: 0.34rem 0.6rem;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #fed7aa;
+  white-space: nowrap;
+}
+
+/* ── Toolbar controls ─────────────────────────────────────────────────────── */
+.myday-toolbar-extra .dc-glass-select {
+  white-space: nowrap;
+}
+
+/* The reference pill set reads as one instrument cluster; tighten spacing so
+   the row never wraps into a stack on desktop. */
+@media (min-width: 640px) and (max-width: 1100px) {
+  .myday-toolbar-extra {
+    margin-left: auto;
+  }
+}
+@media (min-width: 1101px) {
+  .myday-toolbar-extra {
+    margin-left: auto;
+  }
+}
+
+/* "Reset filters" — a real escape hatch whenever the toolbar is narrowed down. */
+.myday-reset-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  margin-left: 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(124, 92, 255, 0.2);
+  padding: 0.12rem 0.5rem;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #ddd6fe;
+  vertical-align: middle;
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+
+.myday-reset-filters:hover {
+  background: rgba(124, 92, 255, 0.35);
+  color: #fff;
+}
+
+.myday-reset-filters:focus-visible {
+  outline: 2px solid var(--myday-ring);
+  outline-offset: 2px;
+}
+
+/* ── Search rail + clear disc ─────────────────────────────────────────────── */
+.myday-clear-btn {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+
+.myday-clear-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.myday-clear-btn:focus-visible {
+  outline: 2px solid var(--myday-ring);
+  outline-offset: 2px;
+}
+
+.myday-search-add {
+  display: none;
+  border-radius: 0.85rem;
+  padding: 0.55rem 1.05rem;
+  font-size: 0.8rem;
+}
+
+@media (min-width: 640px) {
+  .myday-search-add {
+    display: inline-flex;
+  }
+}
+
+/* ── Task list inset rail ─────────────────────────────────────────────────── */
+.myday-tasks-inset {
+  margin: 0.65rem 0.65rem 0.65rem;
+  border-radius: 1.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  padding: 0.85rem 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .myday-tasks-inset {
+    margin: 0.2rem 0.9rem 0.9rem;
+    padding: 1rem 1rem 0.85rem;
+  }
+}
+
+.myday-task-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.6rem;
+}
+
+@media (min-width: 1280px) {
+  .myday-task-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Task row ─────────────────────────────────────────────────────────────── */
+.myday-task-row {
+  min-height: 4.2rem;
+}
+
+.myday-task-row:hover {
+  transform: translateY(-1px);
+}
+
+.myday-task-row:active {
+  transform: scale(0.995);
+}
+
+.myday-task-row:focus-visible {
+  outline: 2px solid var(--myday-ring);
+  outline-offset: 2px;
+}
+
+/* The reference keeps the row material identical; the status lives in the
+   ring + a faint tint. Never a solid colour block. */
+.myday-task-row--progress {
+  box-shadow:
+    inset 0 0 0 1px rgba(56, 189, 248, 0.45),
+    0 0 20px -8px rgba(56, 189, 248, 0.55) !important;
+  background: linear-gradient(120deg, rgba(56, 189, 248, 0.08), transparent 55%) !important;
+}
+
+.myday-task-row--done {
+  box-shadow:
+    inset 0 0 0 1px rgba(16, 185, 129, 0.45),
+    0 0 20px -8px rgba(16, 185, 129, 0.55) !important;
+  background: linear-gradient(120deg, rgba(16, 185, 129, 0.07), transparent 55%) !important;
+}
+
+.myday-task-row--flash {
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.55) !important;
+}
+
+/* Subject identity tile — the reference's little square badge on the row. */
+.myday-task-tile {
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex-shrink: 0;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.myday-task-tile--violet { background: linear-gradient(150deg, rgba(139, 92, 246, 0.4), rgba(109, 40, 217, 0.28)); border-color: rgba(196, 181, 253, 0.4); color: #ddd6fe; }
+.myday-task-tile--sky    { background: linear-gradient(150deg, rgba(56, 189, 248, 0.35), rgba(3, 105, 161, 0.28)); border-color: rgba(125, 211, 252, 0.4); color: #bae6fd; }
+.myday-task-tile--rose   { background: linear-gradient(150deg, rgba(244, 63, 94, 0.35), rgba(159, 18, 57, 0.28)); border-color: rgba(253, 164, 175, 0.4); color: #fecdd3; }
+.myday-task-tile--amber  { background: linear-gradient(150deg, rgba(245, 158, 11, 0.35), rgba(180, 83, 9, 0.28)); border-color: rgba(252, 211, 77, 0.4); color: #fde68a; }
+.myday-task-tile--emerald{ background: linear-gradient(150deg, rgba(16, 185, 129, 0.35), rgba(5, 150, 105, 0.28)); border-color: rgba(110, 231, 183, 0.4); color: #a7f3d0; }
+
+/* Time chip */
+.myday-task-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.13rem 0.5rem;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
+}
+
+/* Priority — small premium indicators, deliberately low-saturation. */
+.myday-pri {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.45rem;
+  padding: 0.1rem 0.42rem;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.myday-pri--high { color: #fecdd3; border-color: rgba(251, 113, 133, 0.4); background: rgba(244, 63, 94, 0.14); }
+.myday-pri--med  { color: #fde68a; border-color: rgba(251, 191, 36, 0.4); background: rgba(245, 158, 11, 0.14); }
+.myday-pri--low  { color: #a7f3d0; border-color: rgba(52, 211, 153, 0.4); background: rgba(16, 185, 129, 0.14); }
+
+/* Status badge — small, outlined, and it cycles on click. */
+.myday-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.45rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  transition: filter 0.18s ease, background 0.18s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.myday-status:hover { filter: brightness(1.25); }
+.myday-status:focus-visible { outline: 2px solid var(--myday-ring); outline-offset: 2px; }
+
+.myday-status--pending  { color: rgba(255, 255, 255, 0.72); border-color: rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.05); }
+.myday-status--progress { color: #bae6fd; border-color: rgba(56, 189, 248, 0.45); background: rgba(56, 189, 248, 0.12); }
+.myday-status--done     { color: #a7f3d0; border-color: rgba(16, 185, 129, 0.45); background: rgba(16, 185, 129, 0.12); }
+
+/* Row icon buttons — circular glass discs like the reference's controls. */
+.myday-task-action {
+  border-radius: 999px;
+}
+
+.myday-task-action:hover {
+  filter: brightness(1.18);
+}
+
+/* Touch: give the compact discs a comfortable ≥36px hit pad on phones. */
+@media (max-width: 639.98px) {
+  .myday-task-action {
+    padding: 4px;
+    margin: -4px;
+  }
+}
+
+/* ── Big Tasks empty state ────────────────────────────────────────────────── */
+.myday-tasks-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2.1rem 1rem 1.9rem;
+}
+
+.myday-tasks-empty-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 4.6rem;
+  height: 4.6rem;
+  border-radius: 1.45rem;
+  color: #c4b5fd;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  background:
+    radial-gradient(80% 70% at 50% 0%, rgba(139, 92, 246, 0.32), rgba(139, 92, 246, 0.12));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 34px -6px rgba(124, 92, 255, 0.55),
+    0 18px 40px -18px rgba(2, 6, 16, 0.9);
+}
+
+.myday-tasks-empty-spark {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #a5b4fc;
+  box-shadow: 0 0 10px 2px rgba(165, 180, 252, 0.8);
+}
+
+.myday-tasks-empty-spark--a { top: -5px; right: -6px; }
+.myday-tasks-empty-spark--b { bottom: 4px; left: -9px; width: 5px; height: 5px; opacity: 0.7; }
+
+.myday-tasks-empty-title {
+  margin-top: 1.05rem;
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: -0.015em;
+  color: var(--myday-ink);
+  text-shadow: 0 2px 14px rgba(4, 8, 20, 0.5);
+}
+
+.myday-tasks-empty-sub {
+  margin-top: 0.35rem;
+  max-width: 24rem;
+  font-size: 0.83rem;
+  line-height: 1.55;
+  color: var(--myday-ink-soft);
+}
+
+/* Strip quote closing the list — the reference's soft violet line. */
+.myday-strip-quote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.1rem;
+  padding: 0 0.5rem 0.4rem;
+  text-align: center;
+  font-size: 0.78rem;
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1.5;
+  color: rgba(196, 181, 253, 0.85);
+  text-shadow: 0 1px 10px rgba(4, 8, 20, 0.6);
+}
+
+.myday-strip-quote-mark {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+  color: rgba(139, 92, 246, 0.85);
+}
+
+/* ── Study-habit cards — visually secondary to the workflow ──────────────── */
+.myday-tips-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  list-style: none;
+  padding: 0;
+}
+
+@media (min-width: 1024px) {
+  .myday-tips-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.7rem;
+    margin-top: 0.9rem;
+  }
+}
+
+.myday-tip-card {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  border-radius: 1.05rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 14, 30, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 26px -16px rgba(2, 6, 16, 0.8);
+  padding: 0.7rem 0.8rem;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.myday-tip-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(12, 19, 40, 0.6);
+}
+
+.myday-tip-icon {
+  display: grid;
+  place-items: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  flex-shrink: 0;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.myday-tip-icon--sky     { color: #7dd3fc; background: linear-gradient(150deg, rgba(56, 189, 248, 0.25), rgba(3, 105, 161, 0.2)); border-color: rgba(125, 211, 252, 0.35); }
+.myday-tip-icon--violet  { color: #c4b5fd; background: linear-gradient(150deg, rgba(139, 92, 246, 0.28), rgba(109, 40, 217, 0.2)); border-color: rgba(196, 181, 253, 0.35); }
+.myday-tip-icon--rose    { color: #fda4af; background: linear-gradient(150deg, rgba(244, 63, 94, 0.25), rgba(159, 18, 57, 0.2)); border-color: rgba(253, 164, 175, 0.35); }
+.myday-tip-icon--amber   { color: #fcd34d; background: linear-gradient(150deg, rgba(245, 158, 11, 0.25), rgba(180, 83, 9, 0.2)); border-color: rgba(252, 211, 77, 0.35); }
+
+/* ── Tasks pass · motion discipline ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .myday-task-row,
+  .myday-tip-card,
+  .myday-status,
+  .myday-cal-btn,
+  .myday-cal-today,
+  .myday-reset-filters,
+  .myday-clear-btn {
+    transition: none;
+  }
+  .myday-task-row:hover {
+    transform: none;
+  }
+}
+
+/* ── Responsive hero / toolbar / row refinements ────────────────────────
+   Plain-CSS rules here win over the Tailwind utilities (layer order), so the
+   date-pill width and phone-only tweaks live on this side on purpose. */
+@media (max-width: 639.98px) {
+  /* phones: pill shrinks (never pushes Add Task to its own line) */
+  .myday-hero-top { flex-wrap: nowrap; }
+  .myday-hero-top .myday-date-pill { flex: 1 1 0; min-width: 0; }
+  /* phones: identity tile hides so the title keeps its full line */
+  .myday-task-tile { display: none; }
+  /* progress card: streak pill drops under the copy when it can't share */
+  .myday-tasks-progress { flex-wrap: wrap; }
+  .myday-streak-mini { margin-left: auto; }
+  /* two-line titles beat a hard single-line ellipsis on phones */
+  .myday-task-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: clip;
   }
 }
