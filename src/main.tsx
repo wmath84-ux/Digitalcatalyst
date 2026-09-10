@@ -103,6 +103,8 @@ import { resolveActiveFromHash } from "./components/DesktopShell";
 import { useResponsiveCategory } from "./utils/responsive";
 import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../utils/webPush";
 import { collectDueMyDayItems, collectUpcomingMyDayItems, MYDAY_UPCOMING_HORIZON_MS, type MyDayDocData } from "../utils/pushScheduler";
+import { collectDueFlowPathItems, collectUpcomingFlowPathItems, FLOWPATH_UPCOMING_HORIZON_MS, type FlowPathSchedulableItem } from "../utils/flowPathScheduler";
+import { flowpathControl } from "./flowpath/lib/flowpathControlClient";
 import { playSfxAdd, playSfxError, playSfxRemove } from "./utils/sfx";
 import {
   ensureReminderChannel,
@@ -986,6 +988,137 @@ function RootPage(): ReactNode {
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       unsubscribe();
+      window.clearInterval(timer);
+      window.clearInterval(reschedule);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [user]);
+
+  // Foreground safety net for FlowPath — the parallel twin of the My Day
+  // effect above. FlowPath reminders previously had NO notification wiring
+  // at all; this subscribes to the user's flowpathActivities collection
+  // (via the same flowpath.list API the dashboard hook uses), fires every
+  // due reminder/task/schedule/revision through the SAME "eduvora-reminders"
+  // channel, and pre-schedules TWA local alarms for upcoming items so they
+  // fire on the dot even when the app is closed. Deliberately independent
+  // of the My Day effect (own timers, own storage keys, own collector) so a
+  // FlowPath failure can never break My Day delivery, and vice versa.
+  useEffect(() => {
+    if (!user) return undefined;
+    let current: FlowPathSchedulableItem[] = [];
+    const pending = new Set<string>();
+    const shownKey = `eduvora.flowPathSystemNotifications.v1:${user.id}`;
+    const readShown = (): Record<string, number> => {
+      try { return JSON.parse(localStorage.getItem(shownKey) || "{}"); } catch { return {}; }
+    };
+    // Same stable 31-bit hash the My Day effect uses, under a distinct name
+    // so the two alarm-id spaces stay obviously separate at a glance.
+    const flowAlarmId = (key: string) => {
+      let hash = 0;
+      for (let i = 0; i < key.length; i += 1) hash = ((hash << 5) - hash + `flowpath:${key}`.charCodeAt(i)) | 0;
+      return Math.abs(hash) || 1;
+    };
+    // FlowPath docs carry absolute `scheduledFor` epoch-ms (UTC), so unlike
+    // My Day there is no per-doc saved offset to prefer — the device offset
+    // only scopes the "HH:mm" fallbacks and the per-day dedupe keys.
+    const tzOffset = () => new Date().getTimezoneOffset();
+    const checkDue = () => {
+      if (current.length === 0) return;
+      const now = Date.now();
+      const shown = readShown();
+      const due = collectDueFlowPathItems(current, now, tzOffset(), shown);
+      for (const item of due) {
+        if (shown[item.key] || pending.has(item.key)) continue;
+        pending.add(item.key);
+        const itemUrl = `/#/flowpath?item=${encodeURIComponent(item.itemId)}`;
+        if (isAndroidNative()) {
+          const alarm: LocalAlarmItem = {
+            id: flowAlarmId(item.key),
+            at: item.dueAt,
+            title: item.title,
+            body: item.body,
+            url: itemUrl,
+            tag: `flowpath-${item.key}`,
+          };
+          void scheduleLocalAlarm(alarm);
+        }
+        void showLocalSystemNotification(item.title, item.body, itemUrl, `flowpath-${item.key}`)
+          .then((displayed) => {
+            if (!displayed) return;
+            const latest = readShown();
+            latest[item.key] = Date.now();
+            try { localStorage.setItem(shownKey, JSON.stringify(latest)); } catch { /* restricted storage */ }
+          })
+          .finally(() => pending.delete(item.key));
+      }
+      const cutoff = now - 2 * 24 * 60 * 60 * 1000;
+      Object.keys(shown).forEach((key) => { if (shown[key] < cutoff) delete shown[key]; });
+      try { localStorage.setItem(shownKey, JSON.stringify(shown)); } catch { /* restricted storage */ }
+    };
+    const scheduleUpcoming = () => {
+      if (!isAndroidNative() || current.length === 0) return;
+      const now = Date.now();
+      const shown = readShown();
+      const items = collectUpcomingFlowPathItems(current, now, tzOffset(), shown, FLOWPATH_UPCOMING_HORIZON_MS);
+      const seen = new Set<number>();
+      for (const item of items) {
+        if (item.dueAt <= now) continue;
+        const id = flowAlarmId(item.key);
+        seen.add(id);
+        const itemUrl = `/#/flowpath?item=${encodeURIComponent(item.itemId)}`;
+        void scheduleLocalAlarm({
+          id,
+          at: item.dueAt,
+          title: item.title,
+          body: item.body,
+          url: itemUrl,
+          tag: `flowpath-${item.key}`,
+        });
+      }
+      try {
+        const cacheKey = `eduvora.flowPathAlarmIds.v1:${user.id}`;
+        const prior: number[] = JSON.parse(localStorage.getItem(cacheKey) || "[]");
+        const orphans = prior.filter((id) => !seen.has(id));
+        if (orphans.length) void cancelLocalAlarms(orphans);
+        localStorage.setItem(cacheKey, JSON.stringify(Array.from(seen)));
+      } catch {
+        // ignore — next pass will reconcile.
+      }
+    };
+    const onDataChange = () => {
+      checkDue();
+      scheduleUpcoming();
+    };
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await flowpathControl<{ items: FlowPathSchedulableItem[] }>({
+          action: "flowpath.list",
+          uid: user.id,
+          limit: 250,
+        });
+        if (cancelled || !res.ok) return;
+        // Defensive: a malformed response degrades to "keep the last good
+        // snapshot" instead of wiping the schedule the alarms were armed from.
+        if (!Array.isArray(res.items)) return;
+        current = res.items.filter(
+          (item): item is FlowPathSchedulableItem =>
+            Boolean(item) && typeof item === "object" && typeof item.id === "string",
+        );
+        onDataChange();
+      } catch {
+        // Offline / transient — keep the last snapshot; next poll retries.
+      }
+    };
+    void poll();
+    const refresh = window.setInterval(poll, 60_000);
+    const timer = window.setInterval(checkDue, 15_000);
+    const reschedule = window.setInterval(scheduleUpcoming, 5 * 60_000);
+    const onVisible = () => { if (document.visibilityState === "visible") checkDue(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      window.clearInterval(refresh);
       window.clearInterval(timer);
       window.clearInterval(reschedule);
       document.removeEventListener("visibilitychange", onVisible);

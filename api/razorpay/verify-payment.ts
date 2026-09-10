@@ -41,6 +41,7 @@ import { loadServerQuoteForUser } from "../_lib/quotes.js";
 import { applyCors } from "../_lib/cors.js";
 import { grantEntitlementsFromQuote, grantSubscriptionFromQuote } from "../_lib/entitlements.js";
 import { pushToUser } from "../_lib/pushNotify.js";
+import { fcmPushToUser } from "../_lib/fcm.js";
 
 const cleanRazorpayId = (value: unknown) =>
   String(value || "").trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 100);
@@ -112,7 +113,13 @@ async function announceUnlock(
       createdAt: Timestamp.now(),
       target: { type: "subscription" },
     }, { merge: true });
-    await pushToUser(db, uid, { title, body, tag: `unlock-${orderId}`, url: "/#/subscription" });
+    // Dual transport: Web Push alone cannot wake the installed Android TWA
+    // (its service worker is throttled like any background tab), so unlocks
+    // fan out to FCM too — same as every other instant path.
+    await Promise.all([
+      pushToUser(db, uid, { title, body, tag: `unlock-${orderId}`, url: "/#/subscription" }),
+      fcmPushToUser(db, uid, { title, body, tag: `unlock-${orderId}`, url: "/#/subscription" }),
+    ]);
     return;
   }
 
@@ -134,7 +141,10 @@ async function announceUnlock(
     createdAt: Timestamp.now(),
     target: { type: "purchases" },
   }, { merge: true });
-  await pushToUser(db, uid, { title, body, tag: `unlock-${orderId}`, url: "/#/store/purchases" });
+  await Promise.all([
+    pushToUser(db, uid, { title, body, tag: `unlock-${orderId}`, url: "/#/store/purchases" }),
+    fcmPushToUser(db, uid, { title, body, tag: `unlock-${orderId}`, url: "/#/store/purchases" }),
+  ]);
 }
 
 const cleanQuoteId = (value: unknown) =>
