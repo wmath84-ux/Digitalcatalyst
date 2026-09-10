@@ -51,6 +51,17 @@ type HeaderProps = {
   /** Highlights the search button while its input is open. */
   searchActive?: boolean;
   /**
+   * When provided, a centred search pill is rendered on desktop widths
+   * (the header search with its Ctrl+K hint). Phones keep the toggle
+   * strip driven by `onToggleSearch`.
+   */
+  centerSearch?: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    inputId?: string;
+  };
+  /**
    * When provided, a circular help (?) button is rendered at the far right
    * of the header. The subscription page uses this for its Help & FAQ
    * overlay so the shortcut lives on the main header itself.
@@ -81,6 +92,7 @@ export default function Header({
   onDownloadReport,
   onToggleSearch,
   searchActive = false,
+  centerSearch,
   onHelpClick,
 }: HeaderProps) {
   const liveNotificationCount = useUnreadNotificationCount();
@@ -195,6 +207,24 @@ export default function Header({
             <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-widest text-white/55">{subtitle}</p>
           </div>
         </div>
+
+        {centerSearch && (
+          <div className="hidden min-w-0 flex-1 justify-center px-2 lg:flex">
+            <label className="myrem-hsearch" htmlFor={centerSearch.inputId ?? "dc-header-search"}>
+              <SearchIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="sr-only">Search</span>
+              <input
+                id={centerSearch.inputId ?? "dc-header-search"}
+                type="search"
+                value={centerSearch.value}
+                onChange={(e) => centerSearch.onChange(e.target.value)}
+                placeholder={centerSearch.placeholder ?? "Search…"}
+                autoComplete="off"
+              />
+              <kbd>Ctrl + K</kbd>
+            </label>
+          </div>
+        )}
 
         <div className="flex shrink-0 items-center gap-2">
           <ExpandingTabs
