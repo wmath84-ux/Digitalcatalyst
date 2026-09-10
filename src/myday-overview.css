@@ -1,0 +1,932 @@
+/* ══════════════════════════════════════════════════════════════════════════
+ * MY DAY / OVERVIEW REDESIGN
+ * ──────────────────────────────────────────────────────────────────────────
+ * Visual layer for the premium My Day overview (desktop + mobile). This file
+ * only ADDS presentation for the redesign — every behaviour, handler, route,
+ * access gate, sync path and contract-pinned className lives in the TSX and
+ * is preserved verbatim there.
+ *
+ * Material discipline: panels keep the ONE shared glass material
+ * (GlassSurface + the shared plate hooks). The classes below style INTERIORS
+ * (gradients, glows, grids, art layers) and never repaint the plate itself,
+ * so `?glass=off` and the legibility floor stay intact.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+.myday-scope {
+  --myday-violet: #7c5cff;
+  --myday-violet-deep: #5b3df0;
+  --myday-indigo: #6366f1;
+  --myday-blue: #3b82f6;
+  --myday-sky: #38bdf8;
+  --myday-cyan: #22d3ee;
+  --myday-green: #10b981;
+  --myday-mint: #06d6a0;
+  --myday-pink: #ec4899;
+  --myday-rose: #ff5c8a;
+  --myday-amber: #f59e0b;
+  --myday-orange: #fb923c;
+  --myday-ink: rgba(255, 255, 255, 0.97);
+  --myday-ink-soft: rgba(255, 255, 255, 0.78);
+  --myday-ink-mute: rgba(255, 255, 255, 0.6);
+  --myday-ring: rgba(139, 92, 246, 0.55);
+  --myday-card-radius: 1.35rem;
+}
+
+/* ── Night sky enrichment ─────────────────────────────────────────────────
+ * The app already floats on the winter night scene (sky, mountains, snow,
+ * snowfall). This fixed layer adds what the overview reference needs on top:
+ * a star field, a violet horizon aura and a gentle vignette so the glass
+ * panels sit in depth. It is pointer-transparent and purely decorative. */
+.myday-sky {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.9), transparent 60%),
+    radial-gradient(1.5px 1.5px at 28% 8%, rgba(255, 255, 255, 0.75), transparent 60%),
+    radial-gradient(1px 1px at 44% 22%, rgba(255, 255, 255, 0.8), transparent 60%),
+    radial-gradient(1px 1px at 61% 10%, rgba(255, 255, 255, 0.85), transparent 60%),
+    radial-gradient(1.5px 1.5px at 74% 26%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(1px 1px at 88% 14%, rgba(255, 255, 255, 0.9), transparent 60%),
+    radial-gradient(1px 1px at 6% 42%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(1px 1px at 93% 44%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(1.5px 1.5px at 36% 34%, rgba(199, 210, 254, 0.8), transparent 60%),
+    radial-gradient(1px 1px at 68% 38%, rgba(199, 210, 254, 0.7), transparent 60%),
+    radial-gradient(120% 46% at 50% 108%, rgba(124, 92, 255, 0.22), transparent 62%),
+    radial-gradient(90% 30% at 50% -6%, rgba(56, 189, 248, 0.1), transparent 60%);
+}
+
+.myday-sky::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, rgba(4, 8, 20, 0.25), transparent 22%, transparent 70%, rgba(4, 8, 20, 0.35));
+}
+
+/* The frame content floats above the sky layer. */
+.myday-scope [data-myday-frame] {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Overview composition ───────────────────────────────────────────────── */
+.myday-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 5.5rem;
+  position: relative;
+  /* Decorative layers (snowman) may bleed past the column — clip them
+     instead of ever causing a page-level horizontal scrollbar. */
+  overflow-x: clip;
+}
+
+@media (min-width: 768px) {
+  .myday-overview {
+    gap: 1.25rem;
+    padding-bottom: 2rem;
+  }
+}
+
+/* Lower block: tasks / schedule / side (streak + quote).
+ * Mobile reference: full-width tasks, then schedule + side-by-side stack.
+ * Desktop reference: tasks + schedule side by side, streak below. */
+.myday-lower {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "tasks"
+    "schedule"
+    "side";
+}
+
+.myday-area-tasks { grid-area: tasks; min-width: 0; }
+.myday-area-schedule { grid-area: schedule; min-width: 0; position: relative; }
+.myday-area-side {
+  grid-area: side;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (min-width: 400px) {
+  .myday-lower {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+    grid-template-areas:
+      "tasks tasks"
+      "schedule side";
+  }
+}
+
+@media (min-width: 1024px) {
+  .myday-lower {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "tasks schedule"
+      "side side";
+  }
+  .myday-area-side {
+    flex-direction: row;
+  }
+  .myday-area-side > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+/* ── Hero ───────────────────────────────────────────────────────────────── */
+.myday-hero-art {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.myday-hero-art svg {
+  position: absolute;
+  right: -2%;
+  bottom: -4%;
+  width: 78%;
+  min-width: 340px;
+  height: auto;
+  opacity: 0.85;
+}
+
+.myday-hero-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, rgba(7, 12, 28, 0.55), rgba(7, 12, 28, 0.15) 55%, transparent 80%),
+    linear-gradient(to top, rgba(7, 12, 28, 0.35), transparent 45%);
+}
+
+.myday-hero-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 18% 22%, rgba(255, 255, 255, 0.9), transparent 60%),
+    radial-gradient(1px 1px at 34% 12%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(1.5px 1.5px at 52% 26%, rgba(255, 255, 255, 0.8), transparent 60%),
+    radial-gradient(1px 1px at 71% 14%, rgba(255, 255, 255, 0.85), transparent 60%),
+    radial-gradient(1px 1px at 86% 30%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(1px 1px at 63% 44%, rgba(199, 210, 254, 0.8), transparent 60%);
+}
+
+.myday-hero-shooting {
+  position: absolute;
+  top: 12%;
+  right: 30%;
+  width: 72px;
+  height: 2px;
+  border-radius: 999px;
+  transform: rotate(-24deg);
+  background: linear-gradient(to left, rgba(255, 255, 255, 0.95), transparent);
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.myday-date-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(10, 16, 34, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 0.35rem 0.8rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.myday-greeting {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--myday-ink);
+  text-wrap: balance;
+  text-shadow: 0 2px 18px rgba(4, 8, 20, 0.6);
+}
+
+.myday-subtitle {
+  color: var(--myday-ink-soft);
+  text-shadow: 0 1px 12px rgba(4, 8, 20, 0.6);
+}
+
+.myday-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 16, 34, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: rgba(255, 255, 255, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+}
+
+.myday-stat-pill--streak {
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.28), rgba(245, 158, 11, 0.18));
+  border-color: rgba(251, 146, 60, 0.35);
+  color: #fed7aa;
+}
+
+.myday-ring-glow {
+  filter: drop-shadow(0 0 18px rgba(124, 92, 255, 0.45));
+}
+
+.myday-progress-track {
+  height: 0.55rem;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 3px rgba(2, 6, 16, 0.5);
+}
+
+.myday-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--myday-violet-deep), var(--myday-violet), var(--myday-sky));
+  box-shadow: 0 0 12px rgba(124, 92, 255, 0.65);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.myday-hero-quote {
+  max-width: 13rem;
+  text-align: right;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 10px rgba(4, 8, 20, 0.7);
+}
+
+/* ── Section headings inside the overview ───────────────────────────────── */
+.myday-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.myday-section-title {
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--myday-ink);
+}
+
+.myday-see-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 0.6rem;
+  padding: 0.3rem 0.5rem;
+  margin: -0.3rem -0.5rem;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.myday-see-all:hover {
+  color: #c4b5fd;
+  background: rgba(124, 92, 255, 0.12);
+}
+
+.myday-see-all:focus-visible {
+  outline: 2px solid var(--myday-ring);
+  outline-offset: 2px;
+}
+
+/* ── Quick actions ──────────────────────────────────────────────────────── */
+.myday-qa-grid {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 400px) {
+  .myday-qa-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.myday-qa {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  min-height: 7.5rem;
+  padding: 0.8rem 0.75rem;
+  border-radius: 1.1rem;
+  overflow: hidden;
+  text-align: left;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 14px 30px -14px rgba(2, 6, 16, 0.8);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+@media (min-width: 768px) {
+  .myday-qa {
+    min-height: 8.5rem;
+    padding: 1rem 0.95rem;
+  }
+}
+
+.myday-qa:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+
+.myday-qa:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.myday-qa:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
+}
+
+.myday-qa::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(90% 70% at 85% -10%, rgba(255, 255, 255, 0.22), transparent 60%),
+    radial-gradient(120% 90% at 50% 115%, rgba(2, 6, 16, 0.28), transparent 55%);
+}
+
+.myday-qa--task { background: linear-gradient(150deg, rgba(124, 92, 255, 0.92), rgba(91, 61, 240, 0.88)); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 14px 32px -12px rgba(124, 92, 255, 0.55); }
+.myday-qa--note { background: linear-gradient(150deg, rgba(59, 130, 246, 0.92), rgba(37, 99, 235, 0.88)); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 14px 32px -12px rgba(59, 130, 246, 0.55); }
+.myday-qa--schedule { background: linear-gradient(150deg, rgba(16, 185, 129, 0.92), rgba(5, 150, 105, 0.9)); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 14px 32px -12px rgba(16, 185, 129, 0.5); }
+.myday-qa--revision { background: linear-gradient(150deg, rgba(236, 72, 153, 0.92), rgba(219, 39, 119, 0.88)); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 14px 32px -12px rgba(236, 72, 153, 0.5); }
+
+.myday-qa-icon {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  margin-bottom: 0.35rem;
+  position: relative;
+  z-index: 1;
+}
+
+.myday-qa-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  position: relative;
+  z-index: 1;
+}
+
+@media (min-width: 768px) {
+  .myday-qa-title { font-size: 0.86rem; }
+}
+
+.myday-qa-sub {
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.3;
+  position: relative;
+  z-index: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.myday-qa-arrow {
+  position: absolute;
+  right: 0.55rem;
+  bottom: 0.6rem;
+  z-index: 1;
+  color: rgba(255, 255, 255, 0.85);
+  transition: transform 0.2s ease;
+}
+
+.myday-qa:hover .myday-qa-arrow {
+  transform: translateX(3px);
+}
+
+/* ── Overview cards (tasks / schedule previews) ─────────────────────────── */
+.myday-card-pad {
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .myday-card-pad { padding: 1.15rem 1.25rem; }
+}
+
+.myday-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.35rem;
+  border-radius: 1rem;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  background: rgba(6, 11, 26, 0.35);
+  padding: 1.4rem 1rem;
+}
+
+.myday-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 1rem;
+  margin-bottom: 0.35rem;
+  background: rgba(124, 92, 255, 0.14);
+  border: 1px solid rgba(124, 92, 255, 0.3);
+  color: #c4b5fd;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 22px -10px rgba(124, 92, 255, 0.5);
+}
+
+.myday-empty--blue .myday-empty-icon {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 22px -10px rgba(59, 130, 246, 0.5);
+}
+
+.myday-empty-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--myday-ink);
+}
+
+.myday-empty-sub {
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--myday-ink-soft);
+  max-width: 22rem;
+}
+
+.myday-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, var(--myday-violet), var(--myday-indigo) 60%, #4f46e5);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 26px -10px rgba(124, 92, 255, 0.7);
+  transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
+  cursor: pointer;
+}
+
+.myday-cta:hover {
+  filter: brightness(1.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 12px 30px -8px rgba(124, 92, 255, 0.8);
+}
+
+.myday-cta:active {
+  transform: scale(0.97);
+}
+
+.myday-cta:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.myday-cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.myday-cta--blue {
+  background: linear-gradient(135deg, #3b82f6, #2563eb 60%, #1d4ed8);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 26px -10px rgba(59, 130, 246, 0.7);
+}
+
+.myday-cta--sm {
+  padding: 0.6rem 1.1rem;
+  font-size: 0.76rem;
+}
+
+.myday-cta--blue:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 12px 30px -8px rgba(59, 130, 246, 0.8);
+}
+
+.myday-cta--rose {
+  background: linear-gradient(135deg, #f43f5e, #e11d48 60%, #be123c);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 26px -10px rgba(244, 63, 94, 0.65);
+}
+
+/* Compact preview rows (schedule preview on the overview). */
+.myday-mini-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.6rem 0.7rem;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.myday-mini-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.myday-mini-tile {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 0.75rem;
+}
+
+/* ── Streak + quote side cards ──────────────────────────────────────────── */
+.myday-streak {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--myday-card-radius);
+  border: 1px solid rgba(251, 146, 60, 0.28);
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(251, 146, 60, 0.22), transparent 55%),
+    linear-gradient(150deg, rgba(20, 16, 40, 0.72), rgba(10, 14, 30, 0.66));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 16px 36px -18px rgba(2, 6, 16, 0.9);
+}
+
+.myday-streak-flame {
+  display: grid;
+  place-items: center;
+  width: 2.9rem;
+  height: 2.9rem;
+  flex-shrink: 0;
+  border-radius: 1rem;
+  background: linear-gradient(150deg, rgba(251, 146, 60, 0.35), rgba(245, 158, 11, 0.18));
+  border: 1px solid rgba(251, 146, 60, 0.4);
+  color: #fdba74;
+  box-shadow: 0 0 22px -4px rgba(251, 146, 60, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.myday-quote-card {
+  position: relative;
+  overflow: hidden;
+  padding: 1.05rem 1.1rem;
+  border-radius: var(--myday-card-radius);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  background: linear-gradient(150deg, rgba(109, 72, 238, 0.55), rgba(76, 41, 190, 0.5));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 16px 36px -16px rgba(109, 72, 238, 0.6);
+}
+
+.myday-quote-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(100% 80% at 90% -10%, rgba(255, 255, 255, 0.16), transparent 55%);
+}
+
+/* ── Store banner ───────────────────────────────────────────────────────── */
+.myday-banner {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.95rem 1.1rem;
+  border-radius: var(--myday-card-radius);
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  background: linear-gradient(120deg, rgba(49, 46, 129, 0.85), rgba(76, 41, 190, 0.75) 55%, rgba(30, 27, 75, 0.85));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 18px 40px -18px rgba(76, 41, 190, 0.7);
+}
+
+.myday-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 120% at 8% 50%, rgba(56, 189, 248, 0.18), transparent 60%),
+    radial-gradient(50% 120% at 95% 50%, rgba(236, 72, 153, 0.14), transparent 60%);
+}
+
+.myday-banner-book {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  flex-shrink: 0;
+  border-radius: 0.95rem;
+  background: linear-gradient(150deg, rgba(147, 197, 253, 0.35), rgba(59, 130, 246, 0.25));
+  border: 1px solid rgba(147, 197, 253, 0.45);
+  color: #bfdbfe;
+  box-shadow: 0 8px 22px -8px rgba(59, 130, 246, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* ── Snowman companion (desktop decor, matches the reference) ───────────── */
+.myday-snowman {
+  position: absolute;
+  right: -0.5rem;
+  bottom: -2.5rem;
+  z-index: 5;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+@media (min-width: 1280px) {
+  .myday-snowman { display: flex; }
+}
+
+.myday-snowman-bubble {
+  position: relative;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(224, 231, 255, 0.92);
+  color: #312e81;
+  padding: 0.45rem 0.8rem;
+  text-align: center;
+  box-shadow: 0 12px 28px -10px rgba(2, 6, 16, 0.8);
+  margin-bottom: 0.55rem;
+}
+
+.myday-snowman-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  background: rgba(224, 231, 255, 0.92);
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.myday-snowman-body {
+  font-size: 4.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 14px 26px rgba(2, 6, 16, 0.7)) drop-shadow(0 0 24px rgba(147, 197, 253, 0.35));
+}
+
+/* ── Internal side navigation ──────────────────────────────────────────── */
+.myday-snav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  text-align: left;
+  border-radius: 0.95rem;
+  padding: 0.62rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.72);
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.myday-snav-item:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.myday-snav-item:focus-visible {
+  outline: 2px solid var(--myday-ring);
+  outline-offset: 2px;
+}
+
+.myday-snav-item--active {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.85), rgba(99, 102, 241, 0.8));
+  border-color: rgba(196, 181, 253, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 10px 26px -10px rgba(124, 92, 255, 0.75),
+    0 0 0 1px rgba(124, 92, 255, 0.25);
+}
+
+.myday-snav-icon {
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex-shrink: 0;
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  transition: all 0.2s ease;
+}
+
+.myday-snav-item--active .myday-snav-icon {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Creation hub (restyled, behaviour pinned by contract) ──────────────── */
+.myday-fab {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(140deg, #8b5cf6, #6366f1 55%, #4f46e5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 14px 32px -8px rgba(124, 92, 255, 0.8),
+    0 0 0 6px rgba(124, 92, 255, 0.14);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+@media (min-width: 768px) {
+  .myday-fab {
+    width: 4rem;
+    height: 4rem;
+  }
+}
+
+.myday-fab:hover {
+  filter: brightness(1.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 16px 36px -8px rgba(124, 92, 255, 0.9),
+    0 0 0 8px rgba(124, 92, 255, 0.16);
+}
+
+.myday-fab:active {
+  transform: scale(0.94);
+}
+
+.myday-fab--open {
+  transform: rotate(45deg);
+}
+
+.myday-fab:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 3px;
+}
+
+/* ── Sync status pill ───────────────────────────────────────────────────── */
+.myday-sync-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.myday-sync-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(6, 11, 26, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 0.3rem 0.85rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* ── Modal form polish (scoped to My Day sheets) ────────────────────────── */
+.myday-form-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.myday-form-label > span {
+  color: #fda4af;
+}
+
+.myday-tile-icon {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 1rem;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.myday-tile-icon--violet { background: linear-gradient(140deg, #8b5cf6, #6d28d9); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 8px 20px -8px rgba(139, 92, 246, 0.8); }
+.myday-tile-icon--sky { background: linear-gradient(140deg, #38bdf8, #0369a1); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 8px 20px -8px rgba(56, 189, 248, 0.8); }
+.myday-tile-icon--amber { background: linear-gradient(140deg, #fbbf24, #b45309); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 8px 20px -8px rgba(251, 191, 36, 0.7); }
+.myday-tile-icon--rose { background: linear-gradient(140deg, #fb7185, #be123c); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 8px 20px -8px rgba(251, 113, 133, 0.7); }
+
+/* Section rows inside full pages get a touch more air on desktop. */
+@media (min-width: 1024px) {
+  .myday-scope [data-page-enter-panel] > section {
+    max-width: 60rem;
+  }
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────── */
+@keyframes myday-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.myday-float {
+  animation: myday-float 5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .myday-float,
+  .myday-hero-shooting {
+    animation: none;
+  }
+  .myday-qa,
+  .myday-qa-arrow,
+  .myday-cta,
+  .myday-snav-item,
+  .myday-mini-row {
+    transition: none;
+  }
+}
+
+/* Compact CTA on narrow phones so empty-state buttons never wrap awkwardly. */
+@media (max-width: 479px) {
+  .myday-cta {
+    padding: 0.6rem 0.95rem;
+    font-size: 0.76rem;
+  }
+}
+
+/* ── Narrow-phone guards ────────────────────────────────────────────────── */
+@media (max-width: 359px) {
+  .myday-qa-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .myday-hero-quote {
+    display: none;
+  }
+}

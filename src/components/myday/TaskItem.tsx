@@ -16,27 +16,27 @@ interface TaskItemProps {
 }
 
 const priorityConfig: Record<Task["priority"], { label: string; cls: string }> = {
-  high: { label: "High", cls: "bg-rose-500/15 text-rose-300 ring-rose-400/30" },
-  medium: { label: "Med", cls: "bg-amber-500/15 text-amber-300 ring-amber-400/30" },
-  low: { label: "Low", cls: "bg-emerald-500/15 text-emerald-300 ring-emerald-400/30" },
+  high: { label: "High", cls: "bg-rose-500/20 text-rose-200 ring-rose-400/40 shadow-[0_0_12px_-4px_rgba(244,63,94,0.6)]" },
+  medium: { label: "Med", cls: "bg-amber-500/20 text-amber-200 ring-amber-400/40 shadow-[0_0_12px_-4px_rgba(245,158,11,0.6)]" },
+  low: { label: "Low", cls: "bg-emerald-500/20 text-emerald-200 ring-emerald-400/40 shadow-[0_0_12px_-4px_rgba(16,185,129,0.6)]" },
 };
 
 // Wave 13: the row is the pack GlassCard; only the *ring* carries the status
 // meaning colour (emerald done / sky in-progress), the material never changes.
 const statusConfig: Record<Task["status"], { ring: string; badge: string; badgeText: string }> = {
   completed: {
-    ring: "ring-1 ring-emerald-400/40",
-    badge: "border border-emerald-400/30 bg-emerald-500/20 text-emerald-200",
+    ring: "ring-1 ring-emerald-400/45 shadow-[0_0_18px_-6px_rgba(16,185,129,0.55)]",
+    badge: "border border-emerald-400/40 bg-emerald-500/25 text-emerald-100",
     badgeText: "Done",
   },
   "in-progress": {
-    ring: "ring-1 ring-sky-400/40",
-    badge: "border border-sky-400/30 bg-sky-500/20 text-sky-200",
+    ring: "ring-1 ring-sky-400/45 shadow-[0_0_18px_-6px_rgba(56,189,248,0.55)]",
+    badge: "border border-sky-400/40 bg-sky-500/25 text-sky-100",
     badgeText: "In Progress",
   },
   pending: {
-    ring: "",
-    badge: "border border-white/15 text-white/75",
+    ring: "hover:ring-1 hover:ring-violet-400/40",
+    badge: "border border-white/15 bg-white/[0.05] text-white/75",
     badgeText: "Pending",
   },
 };

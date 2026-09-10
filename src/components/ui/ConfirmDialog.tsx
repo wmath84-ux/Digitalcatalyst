@@ -97,17 +97,22 @@ export default function ConfirmDialog({
         role="alertdialog"
         aria-modal="true"
       >
-        <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-rose-500/20 text-rose-200 ring-1 ring-rose-400/30">
+        <div className={cn(
+          "mb-4 flex size-12 items-center justify-center rounded-2xl ring-1",
+          tone === "danger"
+            ? "bg-gradient-to-br from-rose-500/35 to-rose-700/25 text-rose-200 ring-rose-400/40 shadow-[0_0_24px_-6px_rgba(244,63,94,0.7),inset_0_1px_0_rgba(255,255,255,0.2)]"
+            : "bg-gradient-to-br from-violet-500/35 to-indigo-700/25 text-violet-200 ring-violet-400/40 shadow-[0_0_24px_-6px_rgba(124,92,255,0.7),inset_0_1px_0_rgba(255,255,255,0.2)]",
+        )}>
           <AlertTriangle className="h-6 w-6" />
         </div>
-        <h3 className="text-lg font-bold text-white">{title}</h3>
-        <p className="mt-1.5 text-sm text-white/70">{message}</p>
+        <h3 className="text-lg font-extrabold tracking-tight text-white">{title}</h3>
+        <p className="mt-1.5 text-sm leading-relaxed text-white/70">{message}</p>
         <div className="mt-6 flex gap-3">
           <GlassButton
             variant="capsule"
             type="button"
             onClick={onCancel}
-            className="flex-1 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:px-4"
+            className="flex-1 [&>span>div]:h-11 [&>span>div]:w-full [&>span>div]:px-4 [&>span>div]:font-bold"
           >
             Cancel
           </GlassButton>
@@ -115,8 +120,10 @@ export default function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             className={cn(
-              "h-11 flex-1 rounded-full px-4 text-sm font-bold text-white transition-colors",
-              tone === "danger" ? "bg-rose-600 hover:bg-rose-500" : "bg-indigo-600 hover:bg-indigo-500",
+              "h-11 flex-1 rounded-full border border-white/20 px-4 text-sm font-extrabold text-white transition-all hover:brightness-110 active:scale-[0.98]",
+              tone === "danger"
+                ? "bg-gradient-to-br from-rose-500 to-rose-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_10px_26px_-10px_rgba(244,63,94,0.7)]"
+                : "bg-gradient-to-br from-violet-500 to-indigo-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_10px_26px_-10px_rgba(124,92,255,0.7)]",
             )}
           >
             {confirmLabel}

@@ -87,11 +87,11 @@ export default function CreateMenu({ options, onSelect }: CreateMenuProps) {
           aria-haspopup="menu"
           onClick={() => setOpen((value) => !value)}
           className={cn(
-            "relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600 text-white transition active:scale-95 md:h-24 md:w-24",
-            open && "rotate-45",
+            "myday-fab",
+            open && "myday-fab--open",
           )}
         >
-          <Plus className="h-10 w-10 md:h-12 md:w-12" strokeWidth={2.5} />
+          <Plus className="h-7 w-7 md:h-8 md:w-8" strokeWidth={2.5} />
         </button>
         <p className="dc-scene-ink mt-3 text-sm font-semibold text-white/55 md:text-base">Add to your day</p>
 

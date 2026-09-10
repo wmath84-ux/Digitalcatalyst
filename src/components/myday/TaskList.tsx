@@ -93,11 +93,11 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-5 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-white">
+          <div className="myday-tile-icon myday-tile-icon--violet">
             <ClipboardList className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-white sm:text-lg">Today's Tasks</h2>
+            <h2 className="text-base font-extrabold tracking-tight text-white sm:text-lg">Today&apos;s Tasks</h2>
             <p className="text-xs font-medium text-white/55">
               {counts.completed} of {counts.all} completed
             </p>
@@ -191,27 +191,31 @@ export default function TaskList({ tasks, onToggle, onCycleStatus, onEdit, onDel
       {/* Task list */}
       <div ref={listRef} className="space-y-2 p-4 sm:p-6 sm:pt-4">
         {filtered.length === 0 ? (
-          <GlassCard contentClassName="flex flex-col items-center justify-center gap-3 py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-500/15">
-              {isSearchActive ? (
-                <Search className="h-6 w-6 text-white/55" />
-              ) : (
-                <ClipboardList className="h-6 w-6 text-white/55" />
-              )}
-            </div>
-            <div>
-              <p className="text-sm font-bold text-white/55">
+          <GlassCard contentClassName="flex flex-col items-center justify-center px-6 py-10 text-center">
+            <div className="myday-empty w-full">
+              <span className="myday-empty-icon">
+                {isSearchActive ? (
+                  <Search className="h-6 w-6" aria-hidden="true" />
+                ) : (
+                  <ClipboardList className="h-6 w-6" aria-hidden="true" />
+                )}
+              </span>
+              <p className="myday-empty-title">
                 {isSearchActive
                   ? `No tasks match "${searchQuery}"`
                   : "No tasks in this category"}
               </p>
               {!isSearchActive && (
-                <button
-                  onClick={onAdd}
-                  className="mt-2 text-sm font-semibold text-indigo-300 hover:text-indigo-200 hover:underline"
-                >
-                  + Create a new task
-                </button>
+                <>
+                  <p className="myday-empty-sub">Plan your first task and start making progress!</p>
+                  <button
+                    onClick={onAdd}
+                    className="myday-cta mt-2"
+                  >
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    Create a new task
+                  </button>
+                </>
               )}
             </div>
           </GlassCard>

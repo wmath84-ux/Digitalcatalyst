@@ -6813,3 +6813,32 @@ html[data-course-player-active="true"] {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * MY DAY OVERVIEW REDESIGN · desktop shell accents
+ * ──────────────────────────────────────────────────────────────────────────
+ * Attribute-scoped to the active My Day rail entry, so every other page
+ * keeps its existing chrome byte-for-byte:
+ *   · the wide rail's active "My Day" row glows violet (the reference's
+ *     active state) instead of the default indigo lens wash;
+ *   · while My Day is active, the top bar carries a violet hairline + glow.
+ * (Note: this block intentionally never names the shared plate hook —
+ * myDayScenePlateContract requires that hook to live in glass.css only.)
+ * ══════════════════════════════════════════════════════════════════════════ */
+.dc-desktop-shell [data-desktop-rail-item="myday"][data-active="true"] {
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.85), rgba(99, 102, 241, 0.75));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 10px 26px -10px rgba(124, 92, 255, 0.75),
+    0 0 0 1px rgba(196, 181, 253, 0.35);
+}
+
+.dc-desktop-shell [data-desktop-rail-item="myday"][data-active="true"] > span:first-of-type {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.dc-desktop-shell:has([data-desktop-rail-item="myday"][data-active="true"]) [data-desktop-topbar] {
+  border-bottom-color: rgba(139, 92, 246, 0.35);
+  box-shadow: 0 14px 34px -20px rgba(124, 92, 255, 0.55);
+}

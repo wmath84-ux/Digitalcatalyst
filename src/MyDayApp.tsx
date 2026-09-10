@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "./myday-overview.css";
 import { saveMyDayData, type MyDayCloudData } from "./lib/myDayClient";
 import {
   Bell,
@@ -20,6 +21,12 @@ import QuickNotes from "./components/myday/QuickNotes";
 import Reminders from "./components/myday/Reminders";
 import SideNav from "./components/myday/SideNav";
 import BottomNav from "./components/myday/BottomNav";
+import OverviewQuickActions from "./components/myday/OverviewQuickActions";
+import OverviewTasksCard from "./components/myday/OverviewTasksCard";
+import OverviewScheduleCard from "./components/myday/OverviewScheduleCard";
+import { QuoteCard, StreakCard } from "./components/myday/OverviewSideCards";
+import StoreBanner from "./components/myday/StoreBanner";
+import { useStudyStreak } from "./hooks/useStudyStreak";
 import ConfirmDialog from "./components/ui/ConfirmDialog";
 import { GlassInput } from "./components/ui/glass-input";
 import { GlassButton } from "./components/ui/glass-button";
@@ -121,6 +128,11 @@ export default function App() {
   const myDaySaveRunningRef = useRef(false);
 
   const userName = user?.name?.split(" ")[0] || "Learner";
+  const avatarInitial = (userName.trim().charAt(0) || "L").toUpperCase();
+
+  // Real study streak, derived from task completions (recorded below
+  // whenever a task transitions to completed).
+  const { streak, recordCompletionDay } = useStudyStreak(tasks);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({
@@ -311,6 +323,13 @@ export default function App() {
       window.location.hash = "#/home";
       return;
     }
+    // Focus Mode has no in-page section — it hands off to the existing
+    // Revision experience (tests & smart sessions), so the entry is real
+    // navigation, never a dead button.
+    if (id === "focus") {
+      window.location.hash = "#/revision";
+      return;
+    }
     setActiveSection(id as DaySection);
     setHighlightId(null);
   }, []);
@@ -354,10 +373,10 @@ export default function App() {
     const changed = next.find((task) => task.id === id);
     void persistMyDay({ tasks: next }).then((saved) => {
       if (!saved) return;
-      if (changed?.status === "completed") { playSfxComplete(); addToast("Task completed"); }
+      if (changed?.status === "completed") { playSfxComplete(); addToast("Task completed"); recordCompletionDay(); }
       else playSfxToggle();
     });
-  }, [addToast, canSaveMyDay, persistMyDay, tasks]);
+  }, [addToast, canSaveMyDay, persistMyDay, recordCompletionDay, tasks]);
 
   const handleCycleStatus = useCallback((id: string) => {
     if (!canSaveMyDay()) return;
@@ -371,10 +390,10 @@ export default function App() {
     });
     void persistMyDay({ tasks: next }).then((saved) => {
       if (!saved) return;
-      if (changed === "completed") { playSfxComplete(); addToast("Task completed"); }
+      if (changed === "completed") { playSfxComplete(); addToast("Task completed"); recordCompletionDay(); }
       else playSfxToggle();
     });
-  }, [addToast, canSaveMyDay, persistMyDay, tasks]);
+  }, [addToast, canSaveMyDay, persistMyDay, recordCompletionDay, tasks]);
 
   const handleDeleteTask = useCallback((id: string) => {
     if (!canSaveMyDay()) return;
@@ -593,7 +612,8 @@ export default function App() {
 
   return (
     <OverlayBoundsProvider value={contentColumnRef}>
-    <div className="dc-app-shell min-h-screen">
+    <div className="dc-app-shell myday-scope min-h-screen">
+      <div className="myday-sky" aria-hidden="true" />
       <div data-app-frame data-myday-frame className="dc-app-frame mx-auto flex min-h-screen max-w-md flex-col overflow-hidden md:max-w-none md:rounded-none md:bg-transparent md:shadow-none md:border-0 lg:max-w-7xl">
         <StoreHeader
           cartCount={cartIds.size}
@@ -606,6 +626,21 @@ export default function App() {
           onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
           onNavigateToCart={() => { window.location.hash = "#/cart"; }}
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
+          action={(
+            <button
+              type="button"
+              onClick={() => { window.location.hash = "#/profile"; }}
+              aria-label="Open profile"
+              title="Profile"
+              className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-xs font-black text-white ring-1 ring-white/25 transition hover:brightness-110 active:scale-95"
+            >
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="" width={40} height={40} className="h-full w-full object-cover" />
+              ) : (
+                <span aria-hidden="true">{avatarInitial}</span>
+              )}
+            </button>
+          )}
         />
 
         {/* The phone search strip is CHROME, so it wears the bar plate the
@@ -662,7 +697,8 @@ export default function App() {
                 shared hook for exactly that: a per-glyph dark scrim plus the
                 lifted ink floor. */}
             {(!cloudLoaded || savingMyDay || cloudSyncFailed) && (
-              <div className="mb-3 text-center">
+              <div className="myday-sync-wrap">
+                <span className="myday-sync-pill">
                 <p className={cloudSyncFailed ? "dc-scene-ink text-[11px] font-bold text-amber-200" : "dc-scene-ink text-[11px] font-semibold text-white/55"}>
                   {savingMyDay
                     ? "Saving My Day…"
@@ -672,17 +708,64 @@ export default function App() {
                         : "Saved on this device — sign in to sync to cloud"
                       : "Syncing My Day…"}
                 </p>
+                </span>
               </div>
             )}
             <div key={activeSection} data-page-enter-panel="">
             {activeSection === "overview" && (
-              <section className="space-y-8">
+              <section className="myday-overview">
                 <GreetingHeader
                   name={userName}
                   completed={completedCount}
                   total={tasks.length}
-                  streak={12}
+                  streak={streak}
                 />
+
+                <OverviewQuickActions
+                  onAddTask={openAddTask}
+                  onNewNote={() => handleNavigate("notes")}
+                  onViewSchedule={() => handleNavigate("schedule")}
+                  onStartRevision={() => { window.location.hash = "#/revision"; }}
+                  onSeeAll={() => handleNavigate("tasks")}
+                />
+
+                <div className="myday-lower">
+                  <div className="myday-area-tasks">
+                    <OverviewTasksCard
+                      tasks={tasks}
+                      onToggle={handleToggleTask}
+                      onCycleStatus={handleCycleStatus}
+                      onEdit={openEditTask}
+                      onDelete={handleDeleteTask}
+                      onAdd={openAddTask}
+                      onSeeAll={() => handleNavigate("tasks")}
+                    />
+                  </div>
+                  <div className="myday-area-schedule">
+                    <OverviewScheduleCard
+                      events={schedule}
+                      onAdd={openAddEvent}
+                      onEdit={openEditEvent}
+                      onSeeAll={() => handleNavigate("schedule")}
+                    />
+                    {/* Snowman companion (desktop decor, non-interactive). */}
+                    <div className="myday-snowman" aria-hidden="true">
+                      <div className="myday-snowman-bubble">
+                        <p className="text-xs font-black">You can do it!</p>
+                        <p className="text-[10px] font-semibold opacity-75">Stay consistent</p>
+                      </div>
+                      <span className="myday-snowman-body myday-float">⛄</span>
+                    </div>
+                  </div>
+                  <div className="myday-area-side">
+                    <StreakCard streak={streak} onOpen={() => handleNavigate("tasks")} />
+                    {/* The side navigation already carries the quote from md
+                        up — the in-content card is the mobile edition. */}
+                    <QuoteCard className="md:hidden" />
+                  </div>
+                </div>
+
+                <StoreBanner onExplore={() => { window.location.hash = "#/store"; }} />
 
                 {/* The big "+" creation hub — button + compact drop-up menu
                     live in `CreateMenu`; the page only handles selection
