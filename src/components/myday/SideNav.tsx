@@ -3,7 +3,6 @@ import {
   CalendarClock,
   ClipboardList,
   Crosshair,
-  Home,
   LayoutGrid,
   NotebookPen,
   Quote,
@@ -25,12 +24,11 @@ const items = [
   { id: "notes", label: "Notes", icon: NotebookPen },
   { id: "reminders", label: "Reminders", icon: Bell },
   { id: "focus", label: "Focus Mode", icon: Crosshair },
-  { id: "home", label: "Home", icon: Home },
 ];
 
 /**
  * The My Day secondary panel, redesigned to the approved Tasks reference: the
- * "My Day" identity at the top, the seven section buttons (every one of them
+ * "My Day" identity at the top, the six section buttons (every one of them
  * still a real `onNavigate` call — no dead decoration), the live month
  * calendar and the quote of the day, stacked in exactly the reference's
  * order. The pinned `dc-scene-plate` shell stays — this file restyles the

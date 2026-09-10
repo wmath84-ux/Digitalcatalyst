@@ -365,11 +365,11 @@ export default function AuthForm() {
 
       <p className="mt-4 text-center text-[11px] leading-5 text-white/55">
         By continuing you agree to our{" "}
-        <a href="/terms-of-service.html" className="font-semibold text-white/40 underline-offset-2 hover:text-white hover:underline">
+        <a href="/terms-of-service.html" className="font-semibold text-violet-300 underline underline-offset-2 hover:text-violet-200">
           Terms of Service
         </a>{" "}
         and{" "}
-        <a href="/privacy-policy.html" className="font-semibold text-white/40 underline-offset-2 hover:text-white hover:underline">
+        <a href="/privacy-policy.html" className="font-semibold text-violet-300 underline underline-offset-2 hover:text-violet-200">
           Privacy Policy
         </a>
         .

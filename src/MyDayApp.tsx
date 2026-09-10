@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./myday-overview.css";
+import "./myday-reminders.css";
 import { saveMyDayData, type MyDayCloudData } from "./lib/myDayClient";
 import {
   Bell,
@@ -360,6 +361,24 @@ export default function App() {
     return () => window.removeEventListener("hashchange", applyDeepLink);
   }, []);
 
+  // The desktop header search pill carries a Ctrl+K hint — honour it: focus
+  // the pill on desktop widths, otherwise open the phone search strip.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        const pill = document.getElementById("myday-header-search");
+        if (pill && pill.offsetParent !== null) {
+          (pill as HTMLInputElement).focus();
+        } else {
+          setShowMobileSearch(true);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const showConfirm = useCallback((title: string, message: string, onConfirm: () => void, confirmLabel = "Delete") => {
     setConfirmConfig({ title, message, onConfirm, confirmLabel });
     setConfirmOpen(true);
@@ -633,6 +652,12 @@ export default function App() {
           onDownloadReport={handleDownloadReport}
           onToggleSearch={() => setShowMobileSearch((s) => !s)}
           searchActive={showMobileSearch || Boolean(globalSearch)}
+          centerSearch={{
+            value: globalSearch,
+            onChange: setGlobalSearch,
+            placeholder: "Search for notes, tasks, topics...",
+            inputId: "myday-header-search",
+          }}
           onNavigateToSubscription={() => { window.location.hash = "#/subscription"; }}
           onNavigateToCart={() => { window.location.hash = "#/cart"; }}
           onNavigateToNotifications={() => { window.location.hash = "#/notifications"; }}
@@ -820,6 +845,8 @@ export default function App() {
                 onDelete={handleDeleteReminder}
                 highlightId={highlightId}
                 onRequireAccess={requireMyDayAccess}
+                loading={!cloudLoaded && reminders.length === 0}
+                globalSearch={globalSearch}
               />
             )}
 
