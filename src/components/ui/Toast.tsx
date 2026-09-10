@@ -20,6 +20,12 @@ export interface ToastMessage {
   id: string;
   text: string;
   type: ToastType;
+  /**
+   * Optional second line. The pack's glass card already renders a description
+   * under the title, so a My Day notice can say what happened AND what it
+   * means ("Event added" / "Your schedule has been updated.") in one card.
+   */
+  description?: string;
 }
 
 interface ToastProps {
@@ -43,7 +49,12 @@ export default function Toast({ toasts, onRemove }: ToastProps) {
     const live = new Set(toasts.map((t) => t.id));
     for (const t of toasts) {
       if (forwarded.current.has(t.id)) continue;
-      const packId = pushGlassToast({ title: t.text, variant: variantOf[t.type] });
+      // A description is optional and additive: the one-line call every other
+      // route already makes stays exactly as it was, and My Day's redesigned
+      // notices get their second line.
+      const packId = t.description
+        ? pushGlassToast({ title: t.text, variant: variantOf[t.type], description: t.description })
+        : pushGlassToast({ title: t.text, variant: variantOf[t.type] });
       forwarded.current.set(t.id, packId);
       // the pack auto-dismisses after its default 4000 ms; mirror that into
       // the parent's list so the two stores never drift apart

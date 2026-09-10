@@ -139,13 +139,14 @@ export default function App() {
     title: "",
     message: "",
     onConfirm: () => {},
+    confirmLabel: "Delete",
   });
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  const addToast = useCallback((text: string, type: ToastMessage["type"] = "success") => {
+  const addToast = useCallback((text: string, type: ToastMessage["type"] = "success", description?: string) => {
     const id = crypto.randomUUID();
-    setToasts((prev) => [...prev, { id, text, type }]);
+    setToasts((prev) => [...prev, { id, text, type, description }]);
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -263,7 +264,7 @@ export default function App() {
       // Every other failure (offline, wrong deploy, missing env var) becomes a
       // device-only save instead of a lost task + unreadable red message.
       setCloudSyncFailed(true);
-      addToast("Saved on this device. Cloud sync will be attempted again on your next save.", "info");
+      addToast("Saved on this device", "info", "Cloud sync is temporarily unavailable — we'll retry on your next save.");
       return true;
     } finally {
       myDaySaveRunningRef.current = false;
@@ -359,8 +360,8 @@ export default function App() {
     return () => window.removeEventListener("hashchange", applyDeepLink);
   }, []);
 
-  const showConfirm = useCallback((title: string, message: string, onConfirm: () => void) => {
-    setConfirmConfig({ title, message, onConfirm });
+  const showConfirm = useCallback((title: string, message: string, onConfirm: () => void, confirmLabel = "Delete") => {
+    setConfirmConfig({ title, message, onConfirm, confirmLabel });
     setConfirmOpen(true);
   }, []);
 
@@ -456,21 +457,30 @@ export default function App() {
       if (!saved) return;
       setScheduleModalOpen(false);
       playSfxSuccess();
-      addToast(editingEvent ? "Event updated" : "Event added to schedule");
+      addToast(
+        editingEvent ? "Event updated" : "Event added",
+        "success",
+        editingEvent ? "Your schedule has been updated." : "Your schedule has been updated.",
+      );
     });
   }, [addToast, canSaveMyDay, editingEvent, persistMyDay, requireMyDayAccess, schedule]);
 
   const handleDeleteEvent = useCallback((id: string) => {
     if (!canSaveMyDay()) return;
-    showConfirm("Delete Event", "Remove this event from your schedule?", () => {
-      const next = schedule.filter((event) => event.id !== id);
-      void persistMyDay({ schedule: next }).then((saved) => {
-        if (!saved) return;
-        playSfxRemove();
-        addToast("Event removed", "info");
-        setConfirmOpen(false);
-      });
-    });
+    showConfirm(
+      "Delete this event?",
+      "This event will be removed from your daily schedule.",
+      () => {
+        const next = schedule.filter((event) => event.id !== id);
+        void persistMyDay({ schedule: next }).then((saved) => {
+          if (!saved) return;
+          playSfxRemove();
+          addToast("Event removed", "info", "The schedule event was deleted.");
+          setConfirmOpen(false);
+        });
+      },
+      "Delete Event",
+    );
   }, [addToast, canSaveMyDay, persistMyDay, schedule, showConfirm]);
 
   const handleAddNote = useCallback((noteText: string) => {
@@ -848,6 +858,7 @@ export default function App() {
         open={confirmOpen}
         title={confirmConfig.title}
         message={confirmConfig.message}
+        confirmLabel={confirmConfig.confirmLabel}
         onConfirm={confirmConfig.onConfirm}
         onCancel={() => setConfirmOpen(false)}
       />
