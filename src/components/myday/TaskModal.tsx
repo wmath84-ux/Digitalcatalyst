@@ -78,7 +78,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Title */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
+          <label className="myday-form-label">
             Task Title <span className="text-rose-400">*</span>
           </label>
           <input
@@ -93,7 +93,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
         {/* Subject & Time row */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
+            <label className="myday-form-label">
               Subject
             </label>
             <input
@@ -106,7 +106,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
           <div>
             <label
               htmlFor="myday-task-time"
-              className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55"
+              className="myday-form-label"
             >
               Time
             </label>
@@ -145,7 +145,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
 
         {/* Priority */}
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-white/55">
+          <label className="myday-form-label">
             Priority
           </label>
           <GlassToggleGroup
@@ -166,7 +166,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
 
         {/* Status */}
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-white/55">
+          <label className="myday-form-label">
             Status
           </label>
           {/* `dc-segment dc-scene-plate`: inside the plated sheet the pack's
@@ -200,7 +200,7 @@ export default function TaskModal({ open, initialTask, onClose, onSave }: TaskMo
           <button
             type="submit"
             disabled={!task.title.trim()}
-            className="flex-1 rounded-full bg-indigo-600 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="myday-cta flex-1 py-3 text-sm"
           >
             {initialTask ? "Save Changes" : "Add Task"}
           </button>

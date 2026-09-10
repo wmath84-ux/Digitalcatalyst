@@ -311,13 +311,13 @@ export default function QuickNotes({ notes, onAdd, onEdit, onDelete, globalSearc
     <GlassSurface radius={24} className="dc-scene-plate text-white" contentClassName="flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-5 pb-4 sm:px-6">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500 text-white">
+        <div className="myday-tile-icon myday-tile-icon--rose">
           <NotebookPen className="h-5 w-5" />
         </div>
         <div className="flex-1">
-          <h2 className="text-base font-extrabold text-white sm:text-lg">Quick Notes</h2>
+          <h2 className="text-base font-extrabold tracking-tight text-white sm:text-lg">Quick Notes</h2>
           <p className="text-xs font-medium text-white/55">
-            {notes.length} note{notes.length !== 1 ? "s" : ""} • Click to edit
+            {notes.length} note{notes.length !== 1 ? "s" : ""} • Tap the pencil to edit
           </p>
         </div>
       </div>

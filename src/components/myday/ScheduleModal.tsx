@@ -50,7 +50,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Title */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
+          <label className="myday-form-label">
             Event Title <span className="text-rose-400">*</span>
           </label>
           <input
@@ -64,7 +64,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
 
         {/* Detail */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
+          <label className="myday-form-label">
             Details (optional)
           </label>
           <input
@@ -78,7 +78,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
         {/* Time row */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
+            <label className="myday-form-label">
               Start Time
             </label>
             <input
@@ -89,7 +89,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
+            <label className="myday-form-label">
               End Time
             </label>
             <input
@@ -103,7 +103,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
 
         {/* Type picker */}
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-white/55">
+          <label className="myday-form-label">
             Event Type
           </label>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
@@ -141,7 +141,7 @@ export default function ScheduleModal({ open, initialEvent, onClose, onSave }: S
           <button
             type="submit"
             disabled={!event.title.trim()}
-            className="flex-1 rounded-full bg-indigo-600 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="myday-cta myday-cta--blue flex-1 py-3 text-sm"
           >
             {initialEvent ? "Save Changes" : "Add Event"}
           </button>

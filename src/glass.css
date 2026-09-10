@@ -847,14 +847,21 @@ html[data-glass="on"] :where([data-search-frame]) {
  * MyDayApp already mounts <GlassBackdrop/> and its frame is transparent below
  * `lg` (so a phone already floats on Black Ice). Only the desktop "app card"
  * (lg:bg-white) covered it. Under glass that canvas becomes a translucent veil
- * at lg+ ONLY — the backdrop glows through while the dark ink stays readable —
- * and mobile/tablet keep their full float (no veil added where the frame was
+ * at lg+ ONLY — the backdrop glows through while the ink stays readable — and
+ * mobile/tablet keep their full float (no veil added where the frame was
  * already transparent). Scoped to MyDay's own `data-myday-frame` hook so the
  * shared `data-app-frame`/`dc-app-frame` (Revision, cart, home) is untouched.
- * `?glass=off` keeps the solid white card. */
+ * `?glass=off` keeps the solid white card.
+ *
+ * 2026-09-10 · overview redesign: the veil is a DARK navy tint, not white.
+ * My Day is a dark glass product (white ink on dark plates, exactly like the
+ * store / home / revision routes) — the former 55% white wash is what made
+ * the desktop overview read as a light page. The dark veil keeps the night
+ * atmosphere visible through the translucent panels on desktop, matching
+ * mobile, while the plates carry the contrast. */
 @media (min-width: 1024px) {
   html[data-glass="on"] :where([data-myday-frame]) {
-    background-color: rgb(var(--dc-paper-on-ink) / 0.55);
+    background-color: rgb(7 12 26 / 0.45);
   }
 }
 

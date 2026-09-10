@@ -77,11 +77,11 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 pt-5 pb-4 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500 text-white">
+          <div className="myday-tile-icon myday-tile-icon--sky">
             <CalendarClock className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-white sm:text-lg">Daily Schedule</h2>
+            <h2 className="text-base font-extrabold tracking-tight text-white sm:text-lg">Daily Schedule</h2>
             <p className="text-xs font-medium text-white/55">{events.length} events planned</p>
           </div>
         </div>
@@ -94,17 +94,21 @@ export default function Timeline({ events, onAdd, onEdit, onDelete, highlightId 
       {/* Timeline */}
       <div className="px-4 pb-5 sm:px-6">
         {sorted.length === 0 ? (
-          <GlassCard contentClassName="flex flex-col items-center justify-center gap-3 py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-500/15">
-              <CalendarClock className="h-6 w-6 text-white/55" />
+          <GlassCard contentClassName="flex flex-col items-center justify-center px-6 py-10 text-center">
+            <div className="myday-empty myday-empty--blue w-full">
+              <span className="myday-empty-icon">
+                <CalendarClock className="h-6 w-6" aria-hidden="true" />
+              </span>
+              <p className="myday-empty-title">Nothing scheduled</p>
+              <p className="myday-empty-sub">Plan your study sessions and stay consistent!</p>
+              <button
+                onClick={onAdd}
+                className="myday-cta myday-cta--blue mt-2"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add your first event
+              </button>
             </div>
-            <p className="text-sm font-bold text-white/55">No events scheduled</p>
-            <button
-              onClick={onAdd}
-              className="text-sm font-semibold text-sky-300 hover:underline"
-            >
-              + Add your first event
-            </button>
           </GlassCard>
         ) : (
           <div className="relative pl-7">

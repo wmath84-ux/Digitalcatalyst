@@ -692,6 +692,16 @@ export default function DesktopShell({
                 that morph into an icon-and-label pill for the active route. */}
             <div className="flex items-center gap-1.5" data-desktop-topbar-actions>
               {topBarRight}
+              <button
+                type="button"
+                onClick={() => handleNavigate("#/subscription")}
+                aria-label="Upgrade to Premium"
+                title="Upgrade"
+                className="mr-1 hidden h-9 shrink-0 items-center gap-1.5 rounded-full border border-violet-300/40 bg-gradient-to-br from-violet-500 to-indigo-600 px-3.5 text-xs font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_8px_20px_-8px_rgba(124,92,255,0.8)] transition hover:brightness-110 active:scale-95 sm:inline-flex"
+              >
+                <Crown size={14} aria-hidden="true" />
+                Upgrade
+              </button>
               <ExpandingTabs
                 ariaLabel="Quick actions"
                 itemSize={36}
@@ -745,6 +755,19 @@ export default function DesktopShell({
                   },
                 ]}
               />
+              <button
+                type="button"
+                onClick={() => handleNavigate(user ? "#/profile" : "#/auth?mode=login")}
+                aria-label={user ? `Profile — ${user.name}` : "Sign in"}
+                title={user ? user.name : "Sign in"}
+                className="ml-1 grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-xs font-black text-white ring-1 ring-white/25 transition hover:brightness-110 active:scale-95"
+              >
+                {user?.photoURL ? (
+                  <img src={user.photoURL} alt="" width={36} height={36} className="h-full w-full object-cover" />
+                ) : (
+                  <span aria-hidden="true">{initials}</span>
+                )}
+              </button>
             </div>
           </div>
 

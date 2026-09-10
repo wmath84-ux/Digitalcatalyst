@@ -89,11 +89,11 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-4 pt-5 pb-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500 text-white">
+            <div className="myday-tile-icon myday-tile-icon--amber">
               <Bell className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-white sm:text-lg">Reminders</h2>
+              <h2 className="text-base font-extrabold tracking-tight text-white sm:text-lg">Reminders</h2>
               <p className="text-xs font-medium text-white/55">
                 {pendingCount} pending reminder{pendingCount !== 1 ? "s" : ""}
               </p>
@@ -108,14 +108,18 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
         {/* List */}
         <div className="px-4 pb-5 sm:px-6">
           {sorted.length === 0 ? (
-            <GlassCard contentClassName="flex flex-col items-center justify-center gap-3 py-10 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/15">
-                <AlarmClock className="h-6 w-6 text-white/55" />
+            <GlassCard contentClassName="flex flex-col items-center justify-center px-6 py-10 text-center">
+              <div className="myday-empty w-full">
+                <span className="myday-empty-icon">
+                  <AlarmClock className="h-6 w-6" aria-hidden="true" />
+                </span>
+                <p className="myday-empty-title">No reminders set</p>
+                <p className="myday-empty-sub">Set a reminder and never miss what matters!</p>
+                <button onClick={openAdd} className="myday-cta mt-2">
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Set a reminder
+                </button>
               </div>
-              <p className="text-sm font-bold text-white/55">No reminders set</p>
-              <button onClick={openAdd} className="text-sm font-bold text-orange-300 hover:underline">
-                + Set a reminder
-              </button>
             </GlassCard>
           ) : (
             <div ref={listRef} className="space-y-2.5 max-h-72 overflow-y-auto custom-scrollbar">
@@ -217,7 +221,7 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
       >
         <form onSubmit={handleSave} className="space-y-5">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
+            <label className="myday-form-label">
               Reminder Text <span className="text-rose-400">*</span>
             </label>
             <input
@@ -229,7 +233,7 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">
+            <label className="myday-form-label">
               Time
             </label>
             <input
@@ -251,7 +255,7 @@ export default function Reminders({ reminders, onAdd, onEdit, onToggle, onDelete
             <button
               type="submit"
               disabled={!form.text.trim()}
-              className="flex-1 rounded-full bg-amber-500 py-3 text-sm font-semibold text-white transition hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="myday-cta flex-1 py-3 text-sm"
             >
               {editingReminder ? "Save Changes" : "Set Reminder"}
             </button>
