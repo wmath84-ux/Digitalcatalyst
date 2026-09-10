@@ -270,13 +270,15 @@ test("Android manifest declares POST_NOTIFICATIONS", () => {
   assert.match(manifest, /android\.permission\.POST_NOTIFICATIONS/);
 });
 
-test("Android manifest declares USE_EXACT_ALARM + SCHEDULE_EXACT_ALARM", () => {
-  // Exact-time alarms (the "9:00 AM Physics no matter what"
-  // guarantee) require these permissions. Android 14 added
-  // USE_EXACT_ALARM for system-alarm use-cases like ours;
-  // keeping SCHEDULE_EXACT_ALARM covers older versions.
-  assert.match(manifest, /android\.permission\.USE_EXACT_ALARM/);
+test("Android manifest declares SCHEDULE_EXACT_ALARM but not USE_EXACT_ALARM", () => {
+  // Exact-time alarms (the "9:00 AM Physics no matter what" guarantee) need
+  // SCHEDULE_EXACT_ALARM; on Android 12+ the app requests the "Alarms &
+  // reminders" grant via the system settings screen at runtime (see
+  // ensureExactAlarmPermission in capacitorBridge.ts). USE_EXACT_ALARM is
+  // DELIBERATELY absent — Play policy restricts it to alarm-clock and
+  // calendar apps, and declaring it risks store suspension.
   assert.match(manifest, /android\.permission\.SCHEDULE_EXACT_ALARM/);
+  assert.doesNotMatch(manifest, /android\.permission\.USE_EXACT_ALARM/);
 });
 
 test("Android manifest declares RECEIVE_BOOT_COMPLETED", () => {

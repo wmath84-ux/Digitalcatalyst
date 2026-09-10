@@ -32,6 +32,9 @@ test("shared push helper delivers per-user and broadcast, cleaning dead devices"
 test("purchase verification pushes the unlock instantly to the buyer", () => {
   assert.match(verifyPayment, /announceUnlock/);
   assert.match(verifyPayment, /pushToUser/);
+  // Dual transport: Web Push alone cannot wake the installed Android TWA,
+  // so unlocks must fan out to FCM too — like every other instant path.
+  assert.match(verifyPayment, /fcmPushToUser/);
   assert.match(verifyPayment, /Product unlocked/);
   assert.match(verifyPayment, /Subscription activated/);
   // Replays (page refresh, webhook retry) must never re-notify.
