@@ -42,6 +42,11 @@
 .myrem-rail-stats { grid-area: stats; min-width: 0; }
 .myrem-rail-quick { grid-area: quick; min-width: 0; }
 .myrem-banner { grid-area: banner; min-width: 0; }
+/* Clear the floating mobile dock (md:hidden), so the banner CTA is tappable. */
+.myrem-layout { padding-bottom: 5.5rem; }
+@media (min-width: 768px) {
+  .myrem-layout { padding-bottom: 0; }
+}
 
 @media (min-width: 1024px) {
   .myrem-layout {
