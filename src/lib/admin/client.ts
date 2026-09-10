@@ -236,7 +236,7 @@ async function subscriptionPlansRequest(init?: RequestInit) {
       return { id: item.id, name: data.name || "Plan", description: data.description || "", billingCycles: [
         { cycle: "monthly", label: "Monthly", price: money(data.monthlyPrice ?? data.priceMonthly ?? 0) },
         { cycle: "yearly", label: "Yearly", price: money(data.yearlyPrice ?? data.priceYearly ?? 0) },
-      ], revisionTestBankLimits: normalizeRevisionTestBankLimits(data.revisionTestBankLimits, item.id), aiAllowances: normalizePlanAiAllowances(data.aiAllowances), personalModules: normalizePlanPersonalModules(data, item.id), studyPacks: normalizePlanStudyPacks(data, item.id), accessTier: data.accessTier || item.id, badge: data.badge || null, cta: data.cta || "Subscribe", featured: Boolean(data.featured), active: data.active !== false, visibleCycles: normaliseVisibleCycles(data.visibleCycles), subscriberPricingOverride: normaliseSubscriberPricing(data.subscriberPricingOverride) };
+      ], revisionTestBankLimits: normalizeRevisionTestBankLimits(data.revisionTestBankLimits, item.id), aiAllowances: normalizePlanAiAllowances(data.aiAllowances, item.id), personalModules: normalizePlanPersonalModules(data, item.id), studyPacks: normalizePlanStudyPacks(data, item.id), accessTier: data.accessTier || item.id, badge: data.badge || null, cta: data.cta || "Subscribe", featured: Boolean(data.featured), active: data.active !== false, visibleCycles: normaliseVisibleCycles(data.visibleCycles), subscriberPricingOverride: normaliseSubscriberPricing(data.subscriberPricingOverride) };
     }) };
   }
   const body = bodyOf(init); const recordId = String(body.id || id()); const ref = doc(db, "subscriptionPlans", recordId);
@@ -252,7 +252,7 @@ async function subscriptionPlansRequest(init?: RequestInit) {
     yearlyPrice: Number(yearly),
     allowedCycles: ["monthly", "yearly"],
     revisionTestBankLimits: normalizeRevisionTestBankLimits(body.revisionTestBankLimits, recordId),
-    aiAllowances: normalizePlanAiAllowances(body.aiAllowances),
+    aiAllowances: normalizePlanAiAllowances(body.aiAllowances, recordId),
     // Personal Course Modules ("My Modules"): canonical per-plan config.
     // Prices are never part of this block — plan prices live at the top
     // level (monthlyPrice/yearlyPrice) and are untouched by this save.
@@ -554,10 +554,33 @@ async function customersRequest(url: URL, init?: RequestInit) {
       }
     }
     const orders=(await getDocs(collection(db,"siteOrders"))).docs.map(d=>({id:d.id,...d.data()})).filter((o:any)=>o.customerUid===uid).map(mapOrder);
-    return {customer:mapCustomer(uid,data,sub),orders,reviews:[]};}
+    // The learner's real allowance ledger, for support and for the daily token
+    // budget. `firestore.rules` lets an admin session READ `aiUsage/current`
+    // while every write stays Admin-SDK-only, so this panel can show the
+    // numbers without any chance of topping a quota up from the browser.
+    const usageSnap=await getDoc(doc(db,"users",uid,"aiUsage","current"));
+    return {customer:mapCustomer(uid,data,sub),orders,reviews:[],aiUsage:mapAiUsage(usageSnap.exists()?usageSnap.data():null)};}
   let rows=(await getDocs(collection(db,"users"))).docs.map(d=>mapCustomer(d.id,d.data())); const q=(url.searchParams.get("q")||"").toLowerCase();if(q)rows=rows.filter((r:any)=>`${r.uid} ${r.name} ${r.email}`.toLowerCase().includes(q));const s=url.searchParams.get("status");if(s)rows=rows.filter((r:any)=>r.status===s);const p=url.searchParams.get("provider");if(p && p !== null)rows=rows.filter((r:any)=>r.provider===p);return {customers:rows};
 }
 const mapCustomer=(uid:string,d:any,sub:Record<string, any>|null=null)=>({uid,name:d.name||null,email:d.email||"",mobile:d.mobile||null,provider:d.authProvider||"password",role:d.role||"user",status:d.status||"active",subscriptionId:d.subscriptionPlanId||sub?.planId||null,subscriptionCycle:sub?.cycle||null,subscriptionStatus:sub?.status||null,subscriptionExpiresAt:sub?.expiresAt?asDate(sub.expiresAt):null,revisionTestBankLimit:sub&&sub.revisionTestBankLimit!==undefined&&sub.revisionTestBankLimit!==null?Number(sub.revisionTestBankLimit):null,purchaseCount:Array.isArray(d.purchasedProductIds)?d.purchasedProductIds.length:0,wishlist:d.wishlistProductIds||[],cart:d.cartProductIds||[],joinedAt:asDate(d.createdAt),lastLoginAt:asDate(d.lastLoginAt||d.updatedAt||d.createdAt)});
+const mapAiUsage=(d:any)=>{
+  if(!d)return null;
+  const num=(v:any)=>Number.isFinite(Number(v))?Math.round(Number(v)):0;
+  const budget=d.dailyTokenBudget===undefined||d.dailyTokenBudget===null?-1:Math.round(Number(d.dailyTokenBudget));
+  const used=num(d.tokensUsedDay);
+  const pending=Array.isArray(d.reservations)?d.reservations.length:Object.keys(d.reservations||{}).length;
+  return {
+    planId:String(d.planId||"free"),planName:String(d.planName||"Free learner"),cycle:d.cycle==="yearly"?"yearly":"monthly",
+    dayKey:String(d.dayKey||""),dayCount:num(d.dayCount),dailyLimit:num(d.dailyLimit),
+    tokensDayKey:String(d.tokensDayKey||""),tokensUsedDay:used,
+    dailyTokenBudget:budget,tokensRemaining:budget<0?null:Math.max(0,budget-used),
+    tokenBudgetEnabled:d.tokenBudgetEnabled===true,
+    costEnabled:d.costEnabled===true,costBudgetMicros:d.costBudgetMicros===undefined?-1:Math.round(Number(d.costBudgetMicros)),
+    termCostMicros:num(d.termCostMicros),pendingReservations:pending,
+    lastUsage:d.lastUsage?{provider:String(d.lastUsage.provider||""),model:String(d.lastUsage.model||""),inputTokens:num(d.lastUsage.inputTokens),outputTokens:num(d.lastUsage.outputTokens),totalTokens:num(d.lastUsage.totalTokens),usageSource:d.lastUsage.usageSource==="actual"?"actual":"estimated",completedAt:num(d.lastUsage.completedAt)}:null,
+    updatedAt:num(d.updatedAt),
+  };
+};
 const mapOrder=(d:any)=>({id:String(d.id||""),customerId:d.customerUid||"",customerName:d.customerName||null,customerEmail:d.customerEmail||null,purchaseKind:d.checkoutType||d.purchaseKind||"product",items:(d.items||[]).map((i:any,index:number)=>({id:String(i.id||index),kind:i.kind||"product",refId:String(i.id||""),title:i.name||i.title||"Item",price:money(i.price)})),couponCode:d.couponCode||null,discountAmount:String(d.discountAmount||0),cashPaid:String(d.amountPaise?d.amountPaise/100:money(d.total)),finalAmount:String(d.amountPaise?d.amountPaise/100:money(d.total)),paymentStatus:String(d.paymentStatus||d.status||"verified").toLowerCase(),entitlementStatus:d.entitlementStatus||"access_granted",gatewayOrderId:d.gatewayOrderId||d.id||null,gatewayPaymentId:d.paymentId||null,grantedEntitlementIds:d.grantedEntitlementIds||[],failureReason:d.failureReason||null,createdAt:asDate(d.createdAt||d.date),verifiedAt:asDate(d.verifiedAt||d.createdAt||d.date)});
 
 async function ordersRequest(url:URL){const match=url.pathname.match(/\/orders\/([^/]+)$/);const snap=await getDocs(collection(db,"siteOrders"));const rows=snap.docs.map(d=>mapOrder({id:d.id,...d.data()}));if(match){const order=rows.find(o=>o.id===decodeURIComponent(match[1]));if(!order)throw new ApiError("Order not found",404);return {order};}let result=rows;const q=(url.searchParams.get("q")||"").toLowerCase();if(q)result=result.filter(o=>`${o.id} ${o.customerName} ${o.customerEmail}`.toLowerCase().includes(q));const status=url.searchParams.get("status");if(status)result=result.filter(o=>o.paymentStatus===status);const kind=url.searchParams.get("kind");if(kind)result=result.filter(o=>o.purchaseKind===kind);return {orders:result};}

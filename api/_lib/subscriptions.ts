@@ -74,6 +74,10 @@ const aiAllowanceSnapshot = (plan: SubscriptionPlanDoc, cycle: BillingCycle) => 
   return {
     aiDailyGenerationLimit: allowance.dailyGenerationLimit,
     aiCostBudgetMicros: allowance.costBudgetMicros,
+    // Real model tokens per local day for this term. Snapshotted like the other
+    // two so an admin editing the plan mid-term cannot silently cut a learner's
+    // purchased budget (or raise one they never paid for).
+    aiDailyTokenBudget: allowance.dailyTokenBudget,
   };
 };
 
@@ -905,6 +909,7 @@ export const writeSubscriptionAfterPayment = async (
       revisionTestBankLimit: Number(previousData.revisionTestBankLimit ?? revisionBankLimitForCycle(args.plan, args.cycle)),
       aiDailyGenerationLimit: Number(previousData.aiDailyGenerationLimit ?? aiAllowanceSnapshot(args.plan, args.cycle).aiDailyGenerationLimit),
       aiCostBudgetMicros: Number(previousData.aiCostBudgetMicros ?? aiAllowanceSnapshot(args.plan, args.cycle).aiCostBudgetMicros),
+      aiDailyTokenBudget: Number(previousData.aiDailyTokenBudget ?? aiAllowanceSnapshot(args.plan, args.cycle).aiDailyTokenBudget),
     };
   }
 
@@ -952,6 +957,7 @@ export const writeSubscriptionAfterPayment = async (
       revisionTestBankLimit: Number(previousData.revisionTestBankLimit ?? revisionBankLimitForCycle(args.plan, previousCycle === "yearly" ? "yearly" : "monthly")),
       aiDailyGenerationLimit: Number(previousData.aiDailyGenerationLimit ?? aiAllowanceSnapshot(args.plan, previousCycle === "yearly" ? "yearly" : "monthly").aiDailyGenerationLimit),
       aiCostBudgetMicros: Number(previousData.aiCostBudgetMicros ?? aiAllowanceSnapshot(args.plan, previousCycle === "yearly" ? "yearly" : "monthly").aiCostBudgetMicros),
+      aiDailyTokenBudget: Number(previousData.aiDailyTokenBudget ?? aiAllowanceSnapshot(args.plan, previousCycle === "yearly" ? "yearly" : "monthly").aiDailyTokenBudget),
     };
     tx.set(subRef, {
       ...addOnRecord,

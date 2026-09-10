@@ -10,6 +10,7 @@ import { BadgeCheck, Check, Crown, Lock, X as XIcon, ChevronDown, ChevronUp } fr
 import { GlassCard } from "../../components/ui/GlassCard";
 import { GlassToggleGroup, GlassToggleItem } from "../../components/ui/glass-toggle-group";
 import SubscriberOnlyPriceBadge from "../../components/subscription/SubscriberOnlyPriceBadge";
+import { defaultAiDailyTokensForPlan, formatAiDailyTokens } from "../../../utils/aiAllowances.js";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type {
@@ -230,10 +231,21 @@ export default function PlanOverview({
           <div data-school-ai-benefit className="relative mt-2 flex items-center gap-2 rounded-2xl bg-violet-400/10 px-3 py-2.5 text-[11px] font-semibold text-violet-50 ring-1 ring-violet-400/30">
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-sm">✨</span>
             <span>
-              School AI: {activePlan.aiAllowances?.[cycle]?.dailyGenerationLimit === 0 ? "unlimited" : `${activePlan.aiAllowances?.[cycle]?.dailyGenerationLimit ?? 20} successful tests/day`}
-              {(activePlan.aiAllowances?.[cycle]?.costBudgetMicros ?? -1) >= 0
-                ? ` · $${((activePlan.aiAllowances?.[cycle]?.costBudgetMicros ?? 0) / 1_000_000).toFixed(2)} model-cost budget per term when hybrid metering is enabled`
-                : ""}
+              {(() => {
+                const allowance = activePlan.aiAllowances?.[cycle];
+                const tokens = allowance?.dailyTokenBudget ?? defaultAiDailyTokensForPlan(activePlan.id);
+                const generations = allowance?.dailyGenerationLimit ?? 20;
+                return (
+                  <>
+                    School AI: {tokens < 0 ? "unlimited tokens" : `${formatAiDailyTokens(tokens)} tokens`}/day, counted from real model usage and reset at your midnight
+                    {" · "}
+                    {generations === 0 ? "unlimited" : `${generations} successful tests/day`} when the school counts generations
+                    {(allowance?.costBudgetMicros ?? -1) >= 0
+                      ? ` · $${((allowance?.costBudgetMicros ?? 0) / 1_000_000).toFixed(2)} model-cost budget per term when hybrid metering is enabled`
+                      : ""}
+                  </>
+                );
+              })()}
             </span>
           </div>
         ) : null}

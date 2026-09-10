@@ -1208,6 +1208,14 @@ export const personalAiFailure = (input) => {
       case "AI_ALLOWANCE_REACHED":
       case "AI_COST_ALLOWANCE_REACHED":
         return { message: message || "You've reached your AI allowance for now. It resets automatically — or upgrade for a higher limit.", retryable: false, upgrade: true, kind: "limit" };
+      // The daily real-token budget. Distinct from the count allowance because
+      // the honest advice is "wait for midnight", and only a request that is
+      // bigger than the whole remaining day can be trimmed by asking for less.
+      case "AI_TOKEN_BUDGET_REACHED":
+        return { message: message || "Today's AI token budget is used up. It resets at midnight your local time — or upgrade for a larger daily budget.", retryable: false, upgrade: true, kind: "limit" };
+      // AI Mentor is gated by its own subscription feature (ai-mentor).
+      case "AI_MENTOR_PLAN_REQUIRED":
+        return { message: message || "AI Mentor isn't included in your current plan. Upgrade to unlock it.", retryable: false, upgrade: true, kind: "entitlement" };
       case "REVISION_SUBSCRIPTION_REQUIRED":
       case "PLAN_REQUIRED":
       case "ENTITLEMENT_REQUIRED":
@@ -1231,6 +1239,12 @@ export const personalAiFailure = (input) => {
         return { message: message || "The AI didn't return a usable answer. Nothing was charged — please try again.", retryable: true, upgrade: false, kind: "provider" };
       case "NETWORK_ERROR":
         return { message: "Network problem — your device couldn't reach the AI service. Check your connection and try again.", retryable: true, upgrade: false, kind: "network" };
+      // `/api/personal-ai` shares one deployed function with several features.
+      // A 2xx that is `ok` but carries no `data` means the AI never ran, so the
+      // learner must be told to reload — not left on a generic failure that
+      // reads like an AI outage.
+      case "AI_ROUTE_UNAVAILABLE":
+        return { message: message || "The AI endpoint didn't answer this request — the shared API replied with a different service's result. Reload the page and try again.", retryable: true, upgrade: false, kind: "server" };
       default:
         return null;
     }

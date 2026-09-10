@@ -98,6 +98,136 @@ const incomingPath = (req: VercelRequest & { url?: string }) =>
 const routeQuery = (req: VercelRequest) =>
   String((req.query as { route?: string } | undefined)?.route || "");
 
+/* ── Shared-function routing guard ──────────────────────────────────────────
+   `vercel.json` rewrites every one of these paths onto this single deployed
+   function (the Hobby plan caps the project at 12 serverless entries), and the
+   dispatcher below chooses a feature by the `action` in the POST body.
+
+   That leaves a dangerous hole: a request addressed at, say,
+   `/api/personal-course` whose action the dispatcher cannot read — an unparsed
+   body, a method rewritten to GET by an upstream redirect, a stale cached
+   bundle calling an action that no longer exists — used to fall all the way
+   through to the LEADERBOARD branch and answer `200 { ok: true, subscribers,
+   users }`. That response is `ok` but carries no `data`, so every client that
+   speaks the `{ ok, data }` envelope reads it as a failed-but-possibly-committed
+   call. My Study Library rendered "The server result couldn't be confirmed.
+   Refresh your library before retrying." and the course-player AI died with a
+   generic error — while "Try again" could never work, because the library was
+   never asked for in the first place.
+
+   The guard below makes that impossible: traffic addressed at a shared route is
+   answered by that route (or by a precise error naming it), never by the
+   leaderboard. */
+const SHARED_ROUTES = [
+  "personal-course",
+  "personal-ai",
+  "myday",
+  "flowpath/control",
+  "revision/data",
+  "revision/generate",
+  "subscription-gate",
+  "embed-proxy",
+] as const;
+
+type SharedRoute = (typeof SHARED_ROUTES)[number];
+
+/** Which shared route (if any) this request was actually addressed at. */
+const sharedRouteAddressed = (req: VercelRequest & { url?: string }): SharedRoute | "" => {
+  const path = incomingPath(req);
+  for (const route of SHARED_ROUTES) {
+    const needle = `/api/${route}`;
+    if (path === needle || path.endsWith(needle)) return route;
+  }
+  const routed = routeQuery(req);
+  return SHARED_ROUTES.includes(routed as SharedRoute) ? (routed as SharedRoute) : "";
+};
+
+/** The friendly name used in dispatch-failure messages. */
+const ROUTE_LABEL: Record<SharedRoute, string> = {
+  "personal-course": "My Study Library",
+  "personal-ai": "the AI study engine",
+  myday: "My Day",
+  "flowpath/control": "FlowPath",
+  "revision/data": "the Revision Test Bank",
+  "revision/generate": "the Revision AI generator",
+  "subscription-gate": "the subscription gate",
+  "embed-proxy": "the embed proxy",
+};
+
+const jsonBody = (res: VercelResponse, status: number, body: unknown) => res.status(status).json(body);
+
+/* Vercel parses a JSON body for us, but only when the request reaches it with a
+   parseable `Content-Type`. A cross-origin redirect, a proxy that rewrites the
+   header, or a form-encoded caller all leave `req.body` undefined — which used
+   to silently disable dispatch for the whole feature. Recover the action by
+   reading the stream ourselves; never let this hang the function. */
+const MAX_RAW_BODY_BYTES = 512 * 1024;
+const RAW_BODY_TIMEOUT_MS = 2_000;
+
+type MaybeReadable = {
+  on?: (event: string, listener: (chunk?: unknown) => void) => void;
+  readableEnded?: boolean;
+  complete?: boolean;
+  read?: () => unknown;
+};
+
+const readRawBody = (req: VercelRequest): Promise<string> =>
+  new Promise((resolve) => {
+    const stream = req as unknown as MaybeReadable;
+    if (typeof stream.on !== "function" || stream.readableEnded === true || stream.complete === true) {
+      resolve("");
+      return;
+    }
+    let text = "";
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve(text);
+    };
+    const timer = setTimeout(finish, RAW_BODY_TIMEOUT_MS);
+    stream.on("data", (chunk) => {
+      if (settled) return;
+      if (text.length > MAX_RAW_BODY_BYTES) {
+        finish();
+        return;
+      }
+      text += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk ?? "");
+    });
+    stream.on("end", () => {
+      clearTimeout(timer);
+      finish();
+    });
+    stream.on("error", () => {
+      clearTimeout(timer);
+      finish();
+    });
+  });
+
+const parseJsonObject = (raw: string): Record<string, unknown> => {
+  if (!raw.trim()) return {};
+  try {
+    const value = JSON.parse(raw);
+    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+};
+
+/**
+ * Resolve the request body: the platform's parsed object when it exists, the
+ * raw stream parsed as JSON when it does not, `{}` as a last resort.
+ */
+async function resolveRequestBody(req: VercelRequest): Promise<Record<string, unknown>> {
+  const parsed = req.body;
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+  if (typeof parsed === "string") {
+    const fromString = parseJsonObject(parsed);
+    if (Object.keys(fromString).length) return fromString;
+  }
+  return parseJsonObject(await readRawBody(req));
+}
+
 const matchesApiRoute = (req: VercelRequest & { url?: string }, route: "manifest" | "brand-icon") => {
   const path = incomingPath(req);
   const url = `${incomingUrl(req)} ${String(req.url || "")}`;
@@ -125,6 +255,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // leaderboard JSON. Chrome then refused to install the web app.
   const reqWithUrl = req as VercelRequest & { url?: string };
   const path = incomingPath(reqWithUrl);
+  // Which feature this request was addressed at, per vercel.json's rewrites.
+  const route = sharedRouteAddressed(reqWithUrl);
   if (matchesApiRoute(reqWithUrl, "manifest")) {
     return handleManifest(req, res);
   }
@@ -149,7 +281,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Hobby cap. The body action safely dispatches cloud Test Bank writes while
   // the existing generation action keeps its original handler.
   if (req.method === "POST") {
-    const rawBody = typeof req.body === "string" ? (() => { try { return JSON.parse(req.body); } catch { return {}; } })() : (req.body || {});
+    const rawBody = await resolveRequestBody(req);
+    // Hand the recovered body to the feature handler too — every `_lib`
+    // dispatcher reads `req.body` itself, so a body the platform failed to
+    // parse has to be written back or the recovery stops at this layer.
+    if (!req.body || typeof req.body !== "object") req.body = rawBody;
     const action = String(rawBody?.action || "");
     if (action.startsWith("revision.data.")) {
       return handleRevisionData(req, res);
@@ -190,6 +326,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === "queries.create") return handleCreateQuery(req, res);
     if (action === "queries.list") return handleListQueries(req, res);
     if (action === "queries.reply") return handleReplyQuery(req, res);
+    // Nothing dispatched. `/api/revision/generate` and direct posts to this
+    // function keep their historical default handler; every other shared route
+    // must NOT fall through to the revision generator (or, worse, the
+    // leaderboard) — it gets an error naming its own feature so the client can
+    // show something the learner can act on.
+    if (route && route !== "revision/generate") {
+      return jsonBody(res, 400, {
+        ok: false,
+        code: action ? "UNKNOWN_ACTION" : "MISSING_ACTION",
+        error: action
+          ? `${ROUTE_LABEL[route]} rejected this request: "${action.slice(0, 60)}" is not a supported action. Reload the app and try again.`
+          : `${ROUTE_LABEL[route]} could not read this request. Reload the page (or the app) and try again — the request reached the server without its action.`,
+      });
+    }
     // AI generation can run tens of seconds; if anything ever rejects above
     // the handler's own try/catch (e.g. an unexpected Firestore fault), still
     // answer JSON so the client can show a real message instead of parsing a
@@ -204,7 +354,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (outerError) {
       console.error("[leaderboard] failed to write JSON error response", outerError);
       try {
-        if (!res.headersSent) {
+        // `headersSent` exists on the real Node response but not on the
+        // structural VercelResponse type this file compiles against.
+        if (!(res as unknown as { headersSent?: boolean }).headersSent) {
           res.setHeader("Content-Type", "application/json");
           res.status(500).json({
             ok: false,
@@ -218,6 +370,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
+  // A GET reaching this line for a shared route means the request never carried
+  // a dispatchable action — typically a POST turned into a GET by an upstream
+  // redirect (a browser drops the body on 301/302). Answer it as the feature
+  // it was aimed at, because returning leaderboard JSON here is what made My
+  // Study Library report an "unconfirmed" result and the course-player AI fail.
+  if (route) {
+    return jsonBody(res, 405, {
+      ok: false,
+      code: "METHOD_NOT_ALLOWED",
+      error: `${ROUTE_LABEL[route]} expects an authenticated POST. This request arrived as a ${req.method || "GET"}${req.body ? "" : " with no body"}, so it was never handled.`,
+    });
+  }
   try {
     const db = adminDb();
     // One-time self-healing: backfill referral usage that predates the

@@ -99,15 +99,36 @@ export class PersonalCourseApiError extends Error {
   code: string;
   status: number;
   details?: unknown;
+  /** Safe to fire again straight away: reads change nothing. */
+  retryable: boolean;
+  /** A write whose outcome the server could not confirm — retrying blindly may repeat it. */
+  unconfirmed: boolean;
 
-  constructor(message: string, code = "PERSONAL_COURSE_ERROR", status = 400, details?: unknown) {
+  constructor(
+    message: string,
+    code = "PERSONAL_COURSE_ERROR",
+    status = 400,
+    details?: unknown,
+    options: { retryable?: boolean; unconfirmed?: boolean } = {},
+  ) {
     super(message);
     this.name = "PersonalCourseApiError";
     this.code = code;
     this.status = status;
     this.details = details;
+    this.retryable = options.retryable ?? false;
+    this.unconfirmed = options.unconfirmed ?? false;
   }
 }
+
+/**
+ * Actions that only read state. They are idempotent, so a failure must be
+ * reported as "could not load — try again" and never as an unconfirmed write.
+ * The wording used to be shared by both, which told learners to avoid retrying
+ * a request that had only ever READ their library, and it sent an ordinary
+ * load failure to the dead-end "couldn't be confirmed" screen.
+ */
+const READ_ACTIONS = new Set(["personalCourse.library", "personalCourse.status", "personalCourse.list"]);
 
 const requestId = () => {
   try { return crypto.randomUUID(); } catch { return `web_${Date.now()}_${Math.random().toString(36).slice(2)}`; }
@@ -116,6 +137,8 @@ const requestId = () => {
 async function request<T>(action: string, payload: Omit<Partial<PersonalCoursePayload>, "action"> = {}): Promise<T> {
   const user = auth.currentUser;
   if (!user) throw new PersonalCourseApiError("Please log in to use My Study Library.", "AUTH_REQUIRED", 401);
+  const isRead = READ_ACTIONS.has(action);
+  const retryable = isRead;
   let response: Response;
   try {
     const token = await user.getIdToken();
@@ -125,13 +148,19 @@ async function request<T>(action: string, payload: Omit<Partial<PersonalCoursePa
       body: JSON.stringify({ action, requestId: requestId(), ...payload }),
     });
   } catch (error) {
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
     throw new PersonalCourseApiError(
-      typeof navigator !== "undefined" && navigator.onLine === false
-        ? "You're offline, so the result couldn't be confirmed. Reconnect and refresh your library before retrying."
-        : "The server result couldn't be confirmed. Refresh your library before retrying so you don't repeat a completed action.",
+      isRead
+        ? offline
+          ? "You're offline, so your library couldn't be loaded. Reconnect and try again."
+          : "Your library couldn't be loaded. Nothing was changed — try again."
+        : offline
+          ? "You're offline, so the result couldn't be confirmed. Reconnect and refresh your library before retrying."
+          : "The server result couldn't be confirmed. Refresh your library before retrying so you don't repeat a completed action.",
       "NETWORK_ERROR",
       0,
       error,
+      { retryable },
     );
   }
   const body = (await response.json().catch(() => ({}))) as Envelope<T>;
@@ -139,14 +168,31 @@ async function request<T>(action: string, payload: Omit<Partial<PersonalCoursePa
     // A gateway/function 5xx can arrive after the transaction committed but
     // before its response reached the browser. Treat it as unconfirmed rather
     // than claiming the mutation failed and inviting an unsafe immediate retry.
-    const unconfirmed = response.status >= 500 || (response.ok && (body.data === undefined || body.ok !== true));
+    const unconfirmed = !isRead && (response.status >= 500 || (response.ok && (body.data === undefined || body.ok !== true)));
+    // `ok: true` with no `data` is not a library answer at all: this API shares
+    // one deployed function with several features, and an undispatched request
+    // used to be answered by another one. Say so instead of blaming the user's
+    // connection or their library.
+    const foreign = !unconfirmed && body.ok === true && body.data === undefined;
+    if (unconfirmed) {
+      throw new PersonalCourseApiError(
+        "The server result couldn't be confirmed. Refresh your library before retrying.",
+        "UNCONFIRMED_RESULT",
+        response.status,
+        body.details,
+        { unconfirmed: true },
+      );
+    }
     throw new PersonalCourseApiError(
-      unconfirmed
-        ? "The server result couldn't be confirmed. Refresh your library before retrying."
+      isRead
+        ? foreign
+          ? "My Study Library didn't answer this request — the shared API replied with a different service's result. Reload the page and try again."
+          : body.message || body.error || "Your library couldn't be loaded. Try again."
         : body.message || body.error || "My Study Library couldn't be updated.",
-      unconfirmed ? "UNCONFIRMED_RESULT" : body.code || "PERSONAL_COURSE_ERROR",
+      foreign && isRead ? "LIBRARY_ROUTE_UNAVAILABLE" : body.code || "PERSONAL_COURSE_ERROR",
       response.status,
       body.details,
+      { retryable },
     );
   }
   return body.data;
@@ -162,7 +208,10 @@ const normalizeAccess = (access: PersonalCourseLibrarySnapshot["access"]): Perso
   ...access,
   state: access.entitled ? "entitled" : access.disabled ? "disabled" : "not-entitled",
   featureId: "personal-modules",
-  typeLimit: access.allowedTypes.length,
+  // A missing allowedTypes must never take the page down: the library renders
+  // its "no types enabled on this plan" banner from this count.
+  typeLimit: Array.isArray(access.allowedTypes) ? access.allowedTypes.length : 0,
+  allowedTypes: Array.isArray(access.allowedTypes) ? access.allowedTypes : [],
 });
 
 export const fetchPersonalCourseLibrary = async (): Promise<{
@@ -172,7 +221,24 @@ export const fetchPersonalCourseLibrary = async (): Promise<{
   savedResources: PersonalCourseResource[];
 }> => {
   const result = await request<PersonalCourseLibrarySnapshot>("personalCourse.library");
-  return { ...result, access: normalizeAccess(result.access) };
+  // Shape-check the snapshot before it reaches React state. Anything else used
+  // to surface as a render-time TypeError several frames later, which unmounted
+  // the whole route instead of showing a recoverable error card.
+  if (!result || typeof result !== "object" || !result.access || !Array.isArray(result.modules) || !Array.isArray(result.savedResources)) {
+    throw new PersonalCourseApiError(
+      "My Study Library returned an incomplete snapshot. Try again to reload it.",
+      "MALFORMED_SNAPSHOT",
+      200,
+      undefined,
+      { retryable: true },
+    );
+  }
+  return {
+    modules: result.modules,
+    savedResources: result.savedResources,
+    usage: result.usage,
+    access: normalizeAccess(result.access),
+  };
 };
 
 /** Backward-compatible status/list calls used by source contracts and older consumers. */

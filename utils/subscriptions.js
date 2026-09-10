@@ -85,7 +85,10 @@ export const normalisePlanDoc = (raw, id) => {
     autoRenewByDefault: raw.autoRenewByDefault !== false,
     sortOrder: Number.isFinite(Number(raw.sortOrder)) ? Math.floor(Number(raw.sortOrder)) : 0,
     revisionTestBankLimits: normalizeRevisionTestBankLimits(raw.revisionTestBankLimits, planId),
-    aiAllowances: normalizePlanAiAllowances(raw.aiAllowances),
+    // Plan id is passed through so a plan that never configured the new daily
+    // token budget inherits its tier's default (basic 2M, premium 5M, pro 10M)
+    // instead of one global number.
+    aiAllowances: normalizePlanAiAllowances(raw.aiAllowances, planId),
   };
 };
 

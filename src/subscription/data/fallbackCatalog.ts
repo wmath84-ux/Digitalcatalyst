@@ -29,7 +29,7 @@ export const FALLBACK_SUBSCRIPTION_CATALOG: SubscriptionCatalog = {
       autoRenewByDefault: true,
       sortOrder: 0,
       revisionTestBankLimits: { monthly: 20, yearly: 20 },
-      aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } },
+      aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1, dailyTokenBudget: 2_000_000 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1, dailyTokenBudget: 2_000_000 } },
     },
     {
       id: "premium",
@@ -48,7 +48,7 @@ export const FALLBACK_SUBSCRIPTION_CATALOG: SubscriptionCatalog = {
       autoRenewByDefault: true,
       sortOrder: 1,
       revisionTestBankLimits: { monthly: 50, yearly: 50 },
-      aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } },
+      aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1, dailyTokenBudget: 5_000_000 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1, dailyTokenBudget: 5_000_000 } },
     },
     {
       id: "pro",
@@ -67,7 +67,7 @@ export const FALLBACK_SUBSCRIPTION_CATALOG: SubscriptionCatalog = {
       autoRenewByDefault: true,
       sortOrder: 2,
       revisionTestBankLimits: { monthly: 100, yearly: 100 },
-      aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } },
+      aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1, dailyTokenBudget: 10_000_000 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1, dailyTokenBudget: 10_000_000 } },
     },
   ],
   features: [

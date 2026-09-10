@@ -29,6 +29,7 @@ import AiConfigForm from "@/revision/components/AiConfigForm";
 import {
   defaultCatalogAiSettings,
   getProvider,
+  normalizeAiAllowancePolicy,
   isSchoolAiAvailable,
   isSchoolAiPublished,
   loadAdminAiConfig,
@@ -39,6 +40,11 @@ import {
   type ProviderModel,
   type UserAiConfig,
 } from "@/revision/engine/aiConfig";
+import {
+  formatAiDailyTokens,
+  normalizeAiTokenBudgetValue,
+  PLAN_AI_DAILY_TOKEN_DEFAULTS,
+} from "../../../utils/aiAllowances.js";
 
 export default function RevisionPage() {
   const { notify } = useToast();
@@ -62,7 +68,9 @@ export default function RevisionPage() {
   const [dailyLimit, setDailyLimit] = useState(20);
   const [windowHours, setWindowHours] = useState(5);
   const [windowLimit, setWindowLimit] = useState(10);
-  const [allowancePolicy, setAllowancePolicy] = useState<CatalogAiSettings["allowancePolicy"]>("generation-only");
+  const [allowancePolicy, setAllowancePolicy] = useState<CatalogAiSettings["allowancePolicy"]>("token-budget");
+  // Free-learner fallback: plan-level budgets live on the subscription plan.
+  const [dailyTokenBudget, setDailyTokenBudget] = useState(PLAN_AI_DAILY_TOKEN_DEFAULTS.free);
   const [modelPricing, setModelPricing] = useState<AiModelPrice[]>([]);
   const [estimatedOutputTokensPerQuestion, setEstimatedOutputTokensPerQuestion] = useState(350);
   const [publishing, setPublishing] = useState(false);
@@ -84,7 +92,8 @@ export default function RevisionPage() {
     setDailyLimit(published.dailyLimit ?? 20);
     setWindowHours(published.windowHours ?? 5);
     setWindowLimit(published.windowLimit ?? 10);
-    setAllowancePolicy(published.allowancePolicy ?? "generation-only");
+    setAllowancePolicy(normalizeAiAllowancePolicy(published.allowancePolicy));
+    setDailyTokenBudget(normalizeAiTokenBudgetValue(published.dailyTokenBudget, PLAN_AI_DAILY_TOKEN_DEFAULTS.free));
     setModelPricing(published.modelPricing ?? []);
     setEstimatedOutputTokensPerQuestion(published.estimatedOutputTokensPerQuestion ?? 350);
     // We deliberately depend on the catalog identity so the seed
@@ -159,6 +168,7 @@ export default function RevisionPage() {
       windowHours: Math.max(1, Math.min(24, Math.round(Number(windowHours) || 5))),
       windowLimit: Math.max(-1, Math.round(Number(windowLimit) || 0)),
       allowancePolicy,
+      dailyTokenBudget: normalizeAiTokenBudgetValue(dailyTokenBudget, PLAN_AI_DAILY_TOKEN_DEFAULTS.free),
       modelPricing: modelPricing.slice(0, 500),
       estimatedOutputTokensPerQuestion: Math.max(50, Math.min(10_000, Math.round(Number(estimatedOutputTokensPerQuestion) || 350))),
     };
@@ -405,15 +415,44 @@ export default function RevisionPage() {
           <div className="mt-4 rounded-xl border border-violet-200 bg-white p-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-slate-900">Model-cost allowance policy</p>
+                <p className="text-sm font-semibold text-slate-900">AI usage limit policy</p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-                  Generation-only preserves the successful-test counter. Hybrid also deducts actual provider token usage—or a safe estimate when usage metadata is unavailable—from the learner&apos;s purchased plan budget.
+                  {allowancePolicy === "token-budget"
+                    ? "Daily token budget is ACTIVE: each learner gets a fixed number of real model tokens per day, counted from the provider's own usage report, and it resets at their local midnight. The test counter and rolling window below are not enforced."
+                    : allowancePolicy === "hybrid"
+                      ? "Hybrid is active: the successful-test counter runs, and actual provider token usage—or a safe estimate when usage metadata is unavailable—is also deducted from the learner's purchased plan term budget."
+                      : "Generation-only is active: the legacy successful-test counter runs and no token or cost budget is enforced. Switch to the daily token budget to count real usage."}
                 </p>
               </div>
-              <select className={selectClass} value={allowancePolicy} onChange={(e) => setAllowancePolicy(e.target.value === "hybrid" ? "hybrid" : "generation-only")}>
-                <option value="generation-only">Generation-only</option>
+              <select className={selectClass} value={allowancePolicy} onChange={(e) => setAllowancePolicy(normalizeAiAllowancePolicy(e.target.value))} data-admin-ai-allowance-policy="">
+                <option value="token-budget">Daily token budget (recommended)</option>
+                <option value="generation-only">Generation-only (legacy count)</option>
                 <option value="hybrid">Hybrid: generations + cost</option>
               </select>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field
+                label="Free learners: tokens / day"
+                hint={allowancePolicy === "token-budget"
+                  ? `Subscribers use their plan's own budget (Plans → School AI allowances). Blank or 0 = unlimited.`
+                  : "Not enforced while this policy is selected. Stored for when you switch back."}
+              >
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={0}
+                  step={50_000}
+                  placeholder={formatAiDailyTokens(PLAN_AI_DAILY_TOKEN_DEFAULTS.free)}
+                  value={dailyTokenBudget < 0 ? "" : dailyTokenBudget}
+                  onChange={(e) => setDailyTokenBudget(e.target.value === "" ? 0 : Math.max(0, Math.round(Number(e.target.value) || 0)))}
+                  data-admin-ai-daily-tokens=""
+                />
+              </Field>
+              <div className="flex items-end">
+                <p className="pb-2 text-[11px] leading-relaxed text-slate-500">
+                  Current value: <strong className="font-semibold text-slate-800">{formatAiDailyTokens(dailyTokenBudget)}</strong> tokens per day, resetting at local midnight.
+                </p>
+              </div>
             </div>
             <div className="mt-3 max-w-xs">
               <Field label="Estimated output tokens / question" hint="Used to reserve budget safely before the provider responds">

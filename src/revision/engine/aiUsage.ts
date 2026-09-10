@@ -14,6 +14,14 @@ export type AiUsageRecord = {
   uid: string;
   dayKey: string;
   dayCount: number;
+  /** Server-owned day key for the real-token budget (may differ from dayKey). */
+  tokensDayKey: string;
+  /** Real provider-reported tokens spent today, as accumulated by the server. */
+  dayTokens: number;
+  /** Whether the token budget is the enforced allowance kind. */
+  tokenBudgetEnabled: boolean;
+  /** -1 = unlimited. Mirrors the ledger doc's dailyTokenBudget. */
+  dailyTokenBudget: number;
   stamps: number[];
   updatedAt: number;
   planId: string;
@@ -63,6 +71,13 @@ export type AiUsageSnapshot = {
   costRemainingMicros: number;
   costUnlimited: boolean;
   termEndsAt: number;
+  /** Daily real-token budget, counted server-side from provider usage. */
+  tokensEnabled: boolean;
+  dailyTokenBudget: number;
+  tokensUsedDay: number;
+  tokensRemaining: number;
+  tokensUnlimited: boolean;
+  tokensResetsAt: number;
   allowed: boolean;
   blockedReason: string | null;
 };
@@ -92,6 +107,10 @@ export function emptyUsage(uid: string, now = Date.now()): AiUsageRecord {
     uid,
     dayKey: localDayKey(now),
     dayCount: 0,
+    tokensDayKey: localDayKey(now),
+    dayTokens: 0,
+    tokenBudgetEnabled: true,
+    dailyTokenBudget: -1,
     stamps: [],
     updatedAt: now,
     planId: "free",
@@ -126,6 +145,10 @@ export function parseUsage(uid: string, raw: unknown): AiUsageRecord {
     uid,
     dayKey: typeof r.dayKey === "string" && r.dayKey ? r.dayKey : localDayKey(),
     dayCount: Math.max(0, Math.round(Number(r.dayCount) || 0)),
+    tokensDayKey: typeof r.tokensDayKey === "string" && r.tokensDayKey ? r.tokensDayKey : localDayKey(),
+    dayTokens: Math.max(0, Math.round(Number(r.tokensUsedDay) || 0)),
+    tokenBudgetEnabled: r.tokenBudgetEnabled === true,
+    dailyTokenBudget: Math.round(Number(r.dailyTokenBudget ?? -1)),
     stamps,
     updatedAt: Number(r.updatedAt) || 0,
     planId: String(r.planId || "basic"),
@@ -178,14 +201,22 @@ export function computeUsageSnapshot(
   const costEnabled = record.costEnabled;
   const costUnlimited = record.costBudgetMicros < 0;
   const oldest = inWindow.length ? Math.min(...inWindow) : now;
+  // The token ledger is day-keyed by the server, so a stale day never carries
+  // over into today's local view either.
+  const tokenBudgetEnabled = record.tokenBudgetEnabled;
+  const dailyTokenBudget = Number.isFinite(record.dailyTokenBudget) ? Math.round(record.dailyTokenBudget) : -1;
+  const tokensUsedDay = record.tokensDayKey === currentDay ? record.dayTokens : 0;
+  const tokensUnlimited = dailyTokenBudget < 0;
   let blockedReason: string | null = null;
-  if (!record.hasAccess) {
+  if (tokenBudgetEnabled && !tokensUnlimited && tokensUsedDay >= dailyTokenBudget) {
+    blockedReason = "Today's AI token budget is used up. It resets at midnight your local time.";
+  } else if (!record.hasAccess) {
     blockedReason = "An active Revision Studio subscription is required for new AI tests.";
-  } else if (!dailyUnlimited && dayCount >= dailyLimit) {
+  } else if (!tokenBudgetEnabled && !dailyUnlimited && dayCount >= dailyLimit) {
     blockedReason = `Daily school-AI allowance reached (${dailyLimit} successful tests). It resets tomorrow.`;
-  } else if (!windowUnlimited && inWindow.length >= windowLimit) {
+  } else if (!tokenBudgetEnabled && !windowUnlimited && inWindow.length >= windowLimit) {
     blockedReason = `${windowHours}-hour school-AI limit reached (${windowLimit} tests). Try again later.`;
-  } else if (costEnabled && !costUnlimited && record.termCostMicros >= record.costBudgetMicros) {
+  } else if (!tokenBudgetEnabled && costEnabled && !costUnlimited && record.termCostMicros >= record.costBudgetMicros) {
     blockedReason = "School-AI model-cost allowance used for this billing term. Use your own API key or renew/upgrade.";
   }
   return {
@@ -209,6 +240,12 @@ export function computeUsageSnapshot(
     costRemainingMicros: costUnlimited ? 0 : Math.max(0, record.costBudgetMicros - record.termCostMicros),
     costUnlimited,
     termEndsAt: record.termEndsAt,
+    tokensEnabled: tokenBudgetEnabled,
+    dailyTokenBudget,
+    tokensUsedDay,
+    tokensRemaining: tokensUnlimited ? 0 : Math.max(0, dailyTokenBudget - tokensUsedDay),
+    tokensUnlimited,
+    tokensResetsAt: nextLocalDayResetAt(now),
     allowed: !blockedReason,
     blockedReason,
   };
@@ -262,6 +299,14 @@ export function parseAiUsageSnapshot(raw: unknown, now = Date.now()): AiUsageSna
     costRemainingMicros: costUnlimited ? 0 : Math.max(0, Math.round(snapshotNumber(row.costRemainingMicros))),
     costUnlimited,
     termEndsAt: Math.max(0, snapshotNumber(row.termEndsAt)),
+    tokensEnabled: row.tokensEnabled === true,
+    dailyTokenBudget: Math.round(snapshotNumber(row.dailyTokenBudget, -1)),
+    tokensUsedDay: Math.max(0, Math.round(snapshotNumber(row.tokensUsedDay))),
+    tokensUnlimited: row.tokensUnlimited === true,
+    tokensRemaining: row.tokensUnlimited === true
+      ? 0
+      : Math.max(0, Math.round(snapshotNumber(row.tokensRemaining))),
+    tokensResetsAt: Math.max(now, snapshotNumber(row.tokensResetsAt, nextLocalDayResetAt(now))),
     allowed: row.allowed === true && !blockedReason,
     blockedReason,
   };

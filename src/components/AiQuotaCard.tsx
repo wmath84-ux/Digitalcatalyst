@@ -21,6 +21,15 @@ function formatCountdown(ms: number): string {
   return `${Math.max(1, m)}m`;
 }
 
+/** Compact token count: 2000000 -> "2M". Full precision stays in the title attr. */
+function tokensFmt(value: number): string {
+  const n = Math.max(0, Math.round(Number(value) || 0));
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1).replace(/\.0$/, "")}K`;
+  return String(n);
+}
+
 function formatCycle(cycle: AiUsageSnapshot["cycle"]): string {
   return cycle === "yearly" ? "Yearly" : "Monthly";
 }
@@ -116,6 +125,10 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
     return () => window.clearTimeout(timer);
   }, [hasAuthoritativeSnapshot, refresh, snap.dailyResetsAt, snap.dailyUnlimited, snap.termEndsAt, snap.windowResetsAt, snap.windowUnlimited, snap.windowUsed]);
 
+  const tokensLeftLabel = snap.tokensUnlimited
+    ? "Unlimited"
+    : `${tokensFmt(Math.max(0, snap.dailyTokenBudget - snap.tokensUsedDay))} left`;
+  const tokensResetIn = snap.tokensResetsAt > now ? formatCountdown(snap.tokensResetsAt - now) : "now";
   const dailyLeftLabel = snap.dailyUnlimited ? "Unlimited" : `${snap.dailyRemaining} left`;
   const windowLeftLabel = snap.windowUnlimited ? "Unlimited" : `${snap.windowRemaining} left`;
   const windowResetIn = snap.windowResetsAt > now ? formatCountdown(snap.windowResetsAt - now) : "now";
@@ -181,7 +194,29 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
           </div>
         ) : (
           <>
-            <div className="mt-5">
+            {snap.tokensEnabled && (
+              <div className="mt-5">
+                <div className="flex items-center justify-between text-[11px] font-bold text-white/55">
+                  <span title={`${snap.tokensUsedDay} of ${snap.dailyTokenBudget} tokens`}>
+                    AI tokens today · {snap.tokensUnlimited ? "no daily cap" : `${tokensFmt(snap.tokensUsedDay)} / ${tokensFmt(snap.dailyTokenBudget)} used`}
+                  </span>
+                  <span className="text-violet-200">{tokensLeftLabel}</span>
+                </div>
+                <Bar used={snap.tokensUsedDay} limit={snap.dailyTokenBudget} unlimited={snap.tokensUnlimited} tone="bg-violet-500" />
+                {!snap.tokensUnlimited && (
+                  <p className="mt-1.5 text-[11px] font-semibold text-white/55">
+                    Resets in {tokensResetIn} · {new Date(snap.tokensResetsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.
+                  </p>
+                )}
+                {record.lastUsage && (
+                  <p className="mt-1 text-[10px] leading-relaxed text-white/55" data-ai-quota-last-usage>
+                    Last request: {record.lastUsage.totalTokens.toLocaleString()} tokens ({record.lastUsage.usageSource}) · {record.lastUsage.model}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {!snap.tokensEnabled && <div className="mt-5">
               <div className="flex items-center justify-between text-[11px] font-bold text-white/55">
                 <span>Today · {snap.dailyUnlimited ? "no daily cap" : `${snap.dailyUsed} / ${snap.dailyLimit} used`}</span>
                 <span className="text-violet-200">{dailyLeftLabel}</span>
@@ -192,9 +227,9 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
                   Resets in {dailyResetIn} · {new Date(snap.dailyResetsAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.
                 </p>
               )}
-            </div>
+            </div>}
 
-            <div className="mt-4">
+            {!snap.tokensEnabled && <div className="mt-4">
               <div className="flex items-center justify-between text-[11px] font-bold text-white/55">
                 <span className="inline-flex items-center gap-1">
                   <Clock3 className="h-3.5 w-3.5" />
@@ -206,7 +241,7 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
               {!snap.windowUnlimited && snap.windowUsed > 0 && (
                 <p className="mt-1.5 text-[11px] font-semibold text-white/55">Oldest use in this window frees in {windowResetIn}.</p>
               )}
-            </div>
+            </div>}
 
             {snap.costEnabled && (
               <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3">
@@ -231,7 +266,9 @@ export default function AiQuotaCard({ uid }: { uid: string }) {
               <p className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-500/15 px-3 py-2.5 text-xs font-semibold leading-5 text-rose-200">{snap.blockedReason}</p>
             ) : (
               <p className="mt-4 text-xs leading-5 text-white/75">
-                One complete school-AI test uses one generation. Provider failure, incomplete output and your own API key do not use this allowance.
+                {snap.tokensEnabled
+                  ? "Tokens are counted from the provider's own usage report for every school-AI request you make — Revision tests and the AI Mentor alike. Failed or incomplete requests are not charged, and the budget resets at midnight your local time."
+                  : "One complete school-AI test uses one generation. Provider failure, incomplete output and your own API key do not use this allowance."}
               </p>
             )}
           </>
