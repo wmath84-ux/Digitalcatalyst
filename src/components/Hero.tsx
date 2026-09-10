@@ -1,11 +1,11 @@
-import { BookOpenIcon, ShieldIcon, ZapIcon } from "./icons";
+import { ShieldIcon, ZapIcon } from "./icons";
 import { GlassSurface } from "./ui/glass";
 
 type HeroProps = {
   resourceCount: number;
 };
 
-export default function Hero({ resourceCount }: HeroProps) {
+export default function Hero({ resourceCount: _resourceCount }: HeroProps) {
   return (
     <section data-store-gutter className="relative overflow-hidden px-4 pb-6 pt-6 lg:pb-8 lg:pt-1">
       <div className="relative overflow-hidden rounded-[30px] border border-[#304d93]/70 bg-[#071435] shadow-[0_25px_70px_-35px_rgba(62,86,255,0.75)]">
@@ -41,10 +41,6 @@ export default function Hero({ resourceCount }: HeroProps) {
               </GlassSurface>
             </div>
 
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-extrabold text-white shadow-[0_16px_28px_-18px_rgba(99,102,241,0.95)]">
-              <BookOpenIcon className="h-4 w-4" />
-              {resourceCount} resource{resourceCount === 1 ? "" : "s"} available
-            </div>
           </div>
 
           <div className="relative min-h-[15rem] lg:min-h-[18rem]">

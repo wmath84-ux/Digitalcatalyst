@@ -1,3 +1,4 @@
+import { SlidersHorizontal } from "lucide-react";
 import { GlassSurface } from "@/components/ui/glass";
 import { GlassButton } from "@/components/ui/glass-button";
 import {
@@ -13,11 +14,12 @@ type SearchBarProps = {
   onChange: (value: string) => void;
   sort: string;
   onSortChange: (value: string) => void;
+  onOpenFilters?: () => void;
 };
 
 const SORT_OPTIONS = ["Recommended", "Price: Low to High", "Price: High to Low", "Top Rated", "Newest"];
 
-export default function SearchBar({ value, onChange, sort, onSortChange }: SearchBarProps) {
+export default function SearchBar({ value, onChange, sort, onSortChange, onOpenFilters }: SearchBarProps) {
   const openSearchPage = () => {
     const trimmed = value.trim();
     window.location.hash = trimmed ? `#/search?q=${encodeURIComponent(trimmed)}` : "#/search";
@@ -25,11 +27,11 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
 
   return (
     <div data-store-gutter className="px-4">
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-        <div className="w-full lg:max-w-2xl">
+      <div className="flex items-center gap-3">
+        <div className="w-full flex-1 lg:max-w-none">
           <div
             data-search-launcher
-            className="group relative block w-full cursor-pointer overflow-hidden rounded-2xl text-left outline-none transition active:scale-[0.99]"
+            className="group relative block w-full cursor-pointer overflow-hidden rounded-[24px] text-left outline-none transition active:scale-[0.99]"
             onClick={openSearchPage}
             role="button"
             tabIndex={0}
@@ -43,11 +45,11 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
           >
             <GlassSurface
               tint={0.4}
-              radius={18}
+              radius={20}
               className="dc-scene-plate pointer-events-none absolute inset-0"
             />
-            <div className="relative flex items-center gap-2 px-4 py-3.5">
-              <SearchIcon className="h-5 w-5 shrink-0 text-white/55" />
+            <div className="relative flex min-h-[66px] items-center gap-3 px-5 py-4 lg:min-h-[56px] lg:pr-4">
+              <SearchIcon className="h-6 w-6 shrink-0 text-white/55 lg:h-5 lg:w-5" />
               <input
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
@@ -69,16 +71,30 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
                 >
                   <XIcon className="h-4 w-4" />
                 </GlassButton>
-              ) : (
-                <span className="hidden shrink-0 rounded-md border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/85 sm:inline">
-                  Tap to search
-                </span>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
 
-        <div className="flex shrink-0 justify-end">
+        <button
+          type="button"
+          onClick={() => onOpenFilters?.()}
+          aria-label="Open store filters"
+          className="grid h-[66px] w-[66px] shrink-0 place-items-center rounded-[22px] border border-[#2b4381] bg-[#08183c]/95 text-white shadow-[0_18px_44px_-28px_rgba(71,106,255,0.82)] transition hover:brightness-110 lg:hidden"
+        >
+          <SlidersHorizontal className="h-6 w-6" />
+        </button>
+
+        <button
+          type="button"
+          onClick={openSearchPage}
+          className="hidden h-[56px] min-w-[10.5rem] shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#7448ff_0%,#5d40ff_60%,#4f36ff_100%)] px-8 text-sm font-black text-white shadow-[0_18px_34px_-22px_rgba(116,72,255,0.95)] transition hover:brightness-110 lg:inline-flex"
+        >
+          Search
+        </button>
+
+        <div className="hidden shrink-0 items-center gap-3 lg:flex">
+          <span className="text-sm font-medium text-white/72">Browse by</span>
           <GlassSelect value={sort} onValueChange={onSortChange}>
             <GlassSelectTrigger
               aria-label="Sort products"

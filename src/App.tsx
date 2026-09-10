@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { Bell, CalendarDays, ChevronDown, House, Mail, NotebookPen, Search, Store as StoreGlyph } from "lucide-react";
+import { Bell, Mail, Search } from "lucide-react";
 import Header from "./components/Header";
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import StorePage from "./components/StorePage";
@@ -123,48 +123,6 @@ function HeaderCircleButton({
   );
 }
 
-function StoreMobileFooter() {
-  const items = [
-    { key: "home", label: "Home", icon: House, onClick: () => { window.location.hash = "#/home"; } },
-    { key: "tasks", label: "Tasks", icon: CalendarDays, onClick: () => { window.location.hash = "#/my-day?section=tasks"; } },
-    { key: "schedule", label: "Schedule", icon: CalendarDays, onClick: () => { window.location.hash = "#/my-day?section=schedule"; } },
-    { key: "notes", label: "Notes", icon: NotebookPen, onClick: () => { window.location.hash = "#/my-day?section=notes"; } },
-    { key: "store", label: "Store", icon: StoreGlyph, onClick: () => { window.location.hash = "#/store"; } },
-  ] as const;
-
-  return (
-    <nav
-      data-site-footer-nav
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-2"
-      aria-label="Store quick navigation"
-    >
-      <div data-site-footer className="pointer-events-auto rounded-[28px] border border-[#284481] bg-[#041433]/96 shadow-[0_22px_50px_-28px_rgba(71,106,255,0.8)] backdrop-blur-xl">
-        <div className="grid grid-cols-5 gap-1 p-2">
-          {items.map((item) => {
-            const active = item.key === "store";
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={item.onClick}
-                className={`flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-[22px] px-1 text-center transition ${
-                  active
-                    ? "bg-[linear-gradient(135deg,#7448ff_0%,#5d40ff_60%,#4f36ff_100%)] text-white shadow-[0_18px_36px_-20px_rgba(116,72,255,0.95)]"
-                    : "text-white/92 hover:bg-white/6"
-                }`}
-              >
-                <Icon className={`h-6 w-6 ${active ? "text-white" : "text-white/92"}`} />
-                <span className={`text-[13px] font-medium ${active ? "text-white" : "text-white/88"}`}>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </nav>
-  );
-}
-
 export default function App({
   onNavigateToProduct,
   onNavigateToMyDay,
@@ -227,22 +185,18 @@ export default function App({
 
         {toast ? <span className="sr-only" role="status">{toast}</span> : null}
 
-        {activeTab === "store" ? (
-          <StoreMobileFooter />
-        ) : (
-          <BottomNav
-            active={activeTab === "purchases" ? "purchases" : "store"}
-            onChange={(tab) => {
-              if (tab === "home") onNavigateToHome();
-              else if (tab === "myday") onNavigateToMyDay();
-              else if (tab === "profile") onNavigateToProfile();
-              else if (tab === "purchases") window.location.hash = "#/store/purchases";
-              else window.location.hash = "#/store";
-            }}
-            storeBadge={1}
-            purchasesBadge={purchasesBadge}
-          />
-        )}
+        <BottomNav
+          active={activeTab === "purchases" ? "purchases" : "store"}
+          onChange={(tab) => {
+            if (tab === "home") onNavigateToHome();
+            else if (tab === "myday") onNavigateToMyDay();
+            else if (tab === "profile") onNavigateToProfile();
+            else if (tab === "purchases") window.location.hash = "#/store/purchases";
+            else window.location.hash = "#/store";
+          }}
+          storeBadge={1}
+          purchasesBadge={purchasesBadge}
+        />
       </div>
     </div>
   );

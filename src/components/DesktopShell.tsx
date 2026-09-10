@@ -640,17 +640,10 @@ export default function DesktopShell({
                 onSearch handler. The input is hidden on pages that
                 have no handler (e.g. media viewers, fullscreen flows). */}
             {onSearch ? (
-              <div className="relative flex w-[320px] max-w-[36vw] items-center">
-                {/* `glass-input` capsule. The field used to be a plain
-                    `bg-slate-50` box with an absolutely positioned icon; the
-                    registry item owns both (icon slot + focus glow) and its
-                    lens refracts the page content scrolling under the bar.
-                    Text colour for this LIGHT chrome is overridden by
-                    `.dc-glass-input` in src/glass.css — the item ships
-                    white-on-glass for dark pages. */}
+              <div className="relative flex w-[420px] max-w-[38vw] items-center">
                 <GlassInput
                   type="search"
-                  className="dc-glass-input w-full"
+                  className="dc-glass-input w-full pr-20"
                   icon={<Search className="h-4 w-4" aria-hidden="true" />}
                   value={query}
                   data-desktop-search
@@ -671,7 +664,7 @@ export default function DesktopShell({
                       setQuery("");
                     }
                   }}
-                  placeholder={`Search ${appName}…`}
+                  placeholder="Search for courses, notes, classes..."
                   aria-label="Search"
                 />
                 {query ? (
@@ -683,7 +676,11 @@ export default function DesktopShell({
                   >
                     <X size={12} />
                   </button>
-                ) : null}
+                ) : (
+                  <kbd className="pointer-events-none absolute right-2 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-bold text-white/60">
+                    Ctrl + K
+                  </kbd>
+                )}
               </div>
             ) : null}
 

@@ -661,6 +661,7 @@ function DesktopAppHost({ children }: { children: ReactNode }) {
   return (
     <AppShell
       active={resolveActiveFromHash(hash)}
+      onSearch={hash.startsWith(STORE_HASH) ? () => undefined : undefined}
       pageTitle={
         hash.startsWith("#/flowpath")
           ? "FlowPath"

@@ -199,7 +199,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
   const [search, setSearch] = useState("");
   const [activeFilterId, setActiveFilterId] = useState(ALL_STORE_FILTER.id);
   const [sort, setSort] = useState("Recommended");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -257,12 +257,27 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
     return list;
   }, [products, search, activeFilter, sort]);
 
+  const openFilterSheet = () => {
+    if (typeof document === "undefined") return;
+    const trigger = document.querySelector<HTMLElement>("[data-store-filters-toggle]");
+    trigger?.click();
+  };
+
   return (
     <div data-store-page className="relative pb-[7.5rem] lg:pb-8">
+      <section data-store-gutter className="px-4 pb-3 pt-4 lg:pt-1">
+        <h1 className="text-[3.35rem] font-black leading-none tracking-[-0.055em] text-white lg:text-[2.6rem]">
+          Store
+        </h1>
+        <p className="mt-1 text-[1.05rem] text-white/72 lg:text-base">
+          Browse the learning marketplace
+        </p>
+      </section>
+
       <Hero resourceCount={filtered.length} />
 
       <div className="space-y-4">
-        <SearchBar value={search} onChange={setSearch} sort={sort} onSortChange={setSort} />
+        <SearchBar value={search} onChange={setSearch} sort={sort} onSortChange={setSort} onOpenFilters={openFilterSheet} />
       </div>
 
       <div data-store-filter-bar className="dc-scene-plate dc-scene-plate--bar sticky top-0 z-20 mt-4 border-b border-white/10 bg-[var(--dc-chrome-glass)] py-2.5 [backdrop-filter:var(--dc-chrome-glass-blur)]">
@@ -314,24 +329,34 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
         <div className="dc-scene-ink mx-4 mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200 lg:mx-0">{error}</div>
       ) : loading ? (
         <div className="space-y-5 px-4 pt-4">
-          <div data-store-gutter data-store-list data-store-list-loading aria-busy="true" aria-label="Loading products" className="flex flex-col gap-3 px-4 pt-0">
-            {[0, 1, 2, 3, 4].map((item) => (
-              <GlassCard key={item} aria-hidden="true" contentClassName="flex p-0" className="flex overflow-hidden">
-                <div className="relative h-28 w-36 shrink-0 overflow-hidden sm:h-32 sm:w-44">
-                  <Skeleton width="100%" height="100%" radius={0} />
-                </div>
-                <div className="flex flex-1 flex-col gap-1.5 p-3 sm:p-4">
-                  <Skeleton width="80%" height="0.95rem" radius={6} />
-                  <Skeleton width="45%" height="0.75rem" radius={6} />
-                  <Skeleton width="60%" height="0.75rem" radius={6} />
-                  <div className="mt-auto flex items-center justify-between pt-2">
-                    <Skeleton width="30%" height="1rem" radius={6} />
-                    <Skeleton width="5.5rem" height="2rem" radius={999} />
+          <section data-store-gutter className="px-4 pt-0">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[1.65rem] leading-none text-[#ffd447]">★</span>
+                <Skeleton width="8.25rem" height="1.8rem" radius={10} />
+              </div>
+              <Skeleton width="5rem" height="1.15rem" radius={999} />
+            </div>
+            <div data-store-list data-store-list-loading aria-busy="true" aria-label="Loading products" className="flex gap-4 overflow-x-auto pb-2 min-[960px]:grid min-[960px]:grid-cols-[repeat(auto-fit,minmax(220px,1fr))] min-[960px]:gap-5 min-[960px]:overflow-visible">
+              {[0, 1, 2, 3, 4].map((item) => (
+                <GlassCard key={item} aria-hidden="true" contentClassName="p-0" className="min-w-[16.9rem] overflow-hidden rounded-[24px] border border-white/10 bg-[#061534]/95 min-[960px]:min-w-0">
+                  <div className="p-3">
+                    <Skeleton width="100%" height="15rem" radius={20} />
+                    <div className="space-y-3 px-1 pb-1 pt-3">
+                      <Skeleton width="82%" height="1rem" radius={8} />
+                      <Skeleton width="45%" height="0.875rem" radius={8} />
+                      <Skeleton width="55%" height="0.875rem" radius={8} />
+                      <div className="flex items-center gap-2">
+                        <Skeleton width="3rem" height="1.5rem" radius={999} />
+                        <Skeleton width="5rem" height="2rem" radius={999} />
+                      </div>
+                      <Skeleton width="100%" height="3rem" radius={16} />
+                    </div>
                   </div>
-                </div>
-              </GlassCard>
-            ))}
-          </div>
+                </GlassCard>
+              ))}
+            </div>
+          </section>
 
           <div data-store-gutter className="px-4">
             <div className="grid gap-3 md:grid-cols-3">
@@ -371,8 +396,28 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
         </GlassCard>
       ) : (
         <>
+          <section data-store-gutter className="px-4 pt-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[1.65rem] leading-none text-[#ffd447]">★</span>
+                <h2 className="text-[1.9rem] font-black tracking-[-0.04em] text-white lg:text-[1.6rem]">Top Rated</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setActiveFilterId(ALL_STORE_FILTER.id);
+                }}
+                className="inline-flex items-center gap-2 text-base font-medium text-white/78 transition hover:text-white lg:text-sm"
+              >
+                See all
+                <span aria-hidden="true" className="text-xl leading-none">→</span>
+              </button>
+            </div>
+          </section>
+
           {viewMode === "list" ? (
-            <div data-store-gutter data-store-list className="flex flex-col gap-3 px-4 pt-4">
+            <div data-store-gutter data-store-list className="flex flex-col gap-3 px-4 pt-0">
               {filtered.map((product) => (
                 <ProductCardList
                   key={product.id}
@@ -387,7 +432,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
               ))}
             </div>
           ) : viewMode === "mixed" ? (
-            <div data-store-gutter data-store-mixed className="grid grid-cols-2 gap-3 px-4 pt-4">
+            <div data-store-gutter data-store-mixed className="grid grid-cols-2 gap-3 px-4 pt-0">
               {filtered.map((product, index) =>
                 index % 3 === 0 ? (
                   <div key={product.id} data-store-mixed-feature className="col-span-2 flex">
@@ -417,19 +462,24 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
               )}
             </div>
           ) : (
-            <div data-store-gutter data-store-grid className="grid grid-cols-1 gap-4 px-4 pt-4 sm:grid-cols-2">
+            <div
+              data-store-gutter
+              data-store-grid
+              className="flex gap-4 overflow-x-auto pb-2 px-4 snap-x snap-mandatory min-[960px]:grid min-[960px]:grid-cols-[repeat(auto-fit,minmax(220px,1fr))] min-[960px]:gap-5 min-[960px]:overflow-visible"
+            >
               {filtered.map((product, index) => (
-                <ProductCard
-                  key={product.id}
-                  index={index}
-                  product={product}
-                  wishlisted={wishlist.has(product.id)}
-                  inCart={cartIds.has(product.id)}
-                  purchased={purchased.has(product.id)}
-                  onToggleWishlist={onToggleWishlist}
-                  onAddToCart={onAddToCart}
-                  onView={onView}
-                />
+                <div key={product.id} className="min-w-[16.9rem] snap-start min-[960px]:min-w-0">
+                  <ProductCard
+                    index={index}
+                    product={product}
+                    wishlisted={wishlist.has(product.id)}
+                    inCart={cartIds.has(product.id)}
+                    purchased={purchased.has(product.id)}
+                    onToggleWishlist={onToggleWishlist}
+                    onAddToCart={onAddToCart}
+                    onView={onView}
+                  />
+                </div>
               ))}
             </div>
           )}

@@ -178,9 +178,10 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
         <GlassButton
           variant="capsule"
           type="button"
+          data-store-filters-toggle
           onClick={() => setShowFilters((prev) => !prev)}
           aria-expanded={showFilters}
-          className={`shrink-0 [&>span>div]:h-10 [&>span>div]:gap-1.5 [&>span>div]:px-3.5 [&>span>div]:text-sm [&>span>div]:font-semibold ${showFilters ? "text-indigo-200" : ""}`}
+          className={`hidden shrink-0 [&>span>div]:h-10 [&>span>div]:gap-1.5 [&>span>div]:px-3.5 [&>span>div]:text-sm [&>span>div]:font-semibold ${showFilters ? "text-indigo-200" : ""}`}
         >
           <SlidersIcon className="h-4 w-4" />
           <span>Filters</span>
