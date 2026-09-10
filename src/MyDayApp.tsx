@@ -786,6 +786,8 @@ export default function App() {
                 onAdd={openAddTask}
                 globalSearch={globalSearch}
                 highlightId={highlightId}
+                streak={streak}
+                onViewSchedule={() => handleNavigate("schedule")}
               />
             )}
 
