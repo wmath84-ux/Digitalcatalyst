@@ -11,29 +11,14 @@ import { GlassTag, glassTagColor } from "./ui/glass-tags";
 import { LiquidMetalButton } from "./ui/LiquidMetalButton";
 
 type FilterChipsProps = {
-  /** Chips to render — admin-managed, already ordered and active-filtered. */
   filters: StoreFilter[];
   activeId: string;
   onSelect: (id: string) => void;
 };
 
-/**
- * Store filter row. The chips come from the admin panel
- * (`settings/storeFilters`), so a filter added in Products → Store filters
- * appears here for everyone without a deploy.
- *
- * The "Filters" button opens a full-screen glass overlay (portalled to
- * <body>, so no ancestor's overflow can clip it) where EVERY filter renders
- * as an AI Canvas Glass Tag (https://aicanvas.me/components/glass-tags):
- * frosted pills with per-tag colour accents, staggered spring entrance, and
- * a colour dot that swaps for a spring-drawn check mark on selection.
- */
 export default function FilterChips({ filters, activeId, onSelect }: FilterChipsProps) {
   const [showFilters, setShowFilters] = useState(false);
   const closeTimer = useRef<number | null>(null);
-  // Mouse parity: the chip row is a touch scroller with its scrollbar hidden,
-  // so a desktop pointer drags it left/right like a thumb — and a drag that
-  // ends on a chip does not fire that filter.
   const chipRow = useDragScroll<HTMLDivElement>();
 
   const grouped = useMemo(() => {
@@ -48,7 +33,6 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
 
   const allFilter = useMemo(() => filters.find((filter) => filter.id === "all") ?? null, [filters]);
 
-  // Escape closes the overlay; the page behind must not scroll while open.
   useEffect(() => {
     if (!showFilters) return undefined;
     const onKey = (event: KeyboardEvent) => {
@@ -67,15 +51,12 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
     if (closeTimer.current) window.clearTimeout(closeTimer.current);
   }, []);
 
-  // Pick a tag, let its check mark draw, then close the overlay.
   const pickFilter = (id: string) => {
     onSelect(id);
     if (closeTimer.current) window.clearTimeout(closeTimer.current);
     closeTimer.current = window.setTimeout(() => setShowFilters(false), 450);
   };
 
-  // A single running index across "All" + every group keeps the entrance
-  // stagger and the colour cycle continuous, exactly like the source demo.
   let tagIndex = 0;
 
   const overlay = (
@@ -90,7 +71,6 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
         >
-          {/* Backdrop */}
           <button
             type="button"
             aria-label="Close filters"
@@ -189,23 +169,7 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
   );
 
   return (
-    /* `data-store-gutter` is the desktop-alignment hook (index.css): the
-       mobile px-4 is zeroed inside the desktop shell so the chips sit on the
-       same gutter as the hero, search and cards. */
     <div data-store-gutter className="relative px-4">
-      {/* Wave 3 (commerce): the chip row is `glass-toggle-group`, so the selected
-          filter is a droplet that *slides* between chips instead of a repaint —
-          one moving lens rather than N pills. `dc-chip-group` re-inks the pack's
-          white-on-dark labels for this light strip (see src/glass.css). The row
-          still scrolls sideways, and the indicator rides inside the group, so it
-          stays glued to its chip while scrolling. `dc-segment` is the shared
-          light-theme recipe in src/glass.css (the PDP tab strip uses it too).
-
-          Store legibility (same pass as Home): `dc-scene-plate` puts the shared
-          dark contrast backing under the pill so an unselected chip label no
-          longer washes out against the bright snow, and `useDragScroll` lets a
-          mouse drag the row left/right exactly like a thumb — with the drag
-          never firing the chip it happens to end on. */}
       <div
         ref={chipRow.ref}
         onPointerDown={chipRow.onPointerDown}
@@ -242,8 +206,6 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
         </GlassToggleGroup>
       </div>
 
-      {/* Portalled to <body>: the sticky filter bar's `overflow-hidden`
-          ancestors can never clip the overlay again. */}
       {typeof document !== "undefined" ? createPortal(overlay, document.body) : null}
     </div>
   );

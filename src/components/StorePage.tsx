@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
 import Hero from "./Hero";
@@ -11,6 +11,7 @@ import { GlassSurface } from "./ui/glass";
 import { GlassButton } from "./ui/glass-button";
 import Skeleton from "./ui/Skeleton";
 import { BookOpenIcon } from "./icons";
+import { Download, Gift, ShieldCheck } from "lucide-react";
 import { useStoreFilters } from "../hooks/useStoreFilters";
 import {
   ALL_STORE_FILTER,
@@ -29,8 +30,6 @@ type StorePageProps = {
   onAddToCart: (id: string) => void;
   onView: (product: Product) => void;
 };
-
-/* ── View-mode icons (inline SVGs for the dropdown) ──────────────────── */
 
 function GridIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -79,7 +78,29 @@ const VIEW_OPTIONS: { mode: ViewMode; label: string; Icon: typeof GridIcon }[] =
   { mode: "mixed", label: "Mixed", Icon: MixedIcon },
 ];
 
-/* ── ProductCard variant for list / rectangular view ──────────────────── */
+const BENEFITS = [
+  {
+    title: "Special Offers",
+    body: "Grab the best deals on top resources!",
+    Icon: Gift,
+    accent: "linear-gradient(135deg,#7b4dff 0%,#5c3fff 100%)",
+    ringClass: "border-violet-400/35",
+  },
+  {
+    title: "100% Secure",
+    body: "Safe & encrypted payments",
+    Icon: ShieldCheck,
+    accent: "linear-gradient(135deg,#0f56ff 0%,#1ad6ff 100%)",
+    ringClass: "border-sky-400/35",
+  },
+  {
+    title: "Instant Access",
+    body: "Start learning immediately",
+    Icon: Download,
+    accent: "linear-gradient(135deg,#773cff 0%,#a941ff 100%)",
+    ringClass: "border-fuchsia-400/35",
+  },
+];
 
 function ProductCardList({
   product,
@@ -98,10 +119,9 @@ function ProductCardList({
   onAddToCart: (id: string) => void;
   onView: (product: Product) => void;
 }) {
-  const discount =
-    product.originalPrice > 0
-      ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-      : 0;
+  const discount = product.originalPrice > 0
+    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+    : 0;
   const unavailable = product.availableForSale === false && !purchased;
 
   return (
@@ -110,7 +130,6 @@ function ProductCardList({
       contentClassName="flex p-0"
       className="group relative flex overflow-hidden transition duration-300 hover:-translate-y-1"
     >
-      {/* Image — left side */}
       <div className="relative h-auto w-36 shrink-0 overflow-hidden sm:w-44">
         <img src={product.image} alt={product.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         <div className="absolute left-2 top-2 flex gap-1">
@@ -132,11 +151,7 @@ function ProductCardList({
         </GlassButton>
       </div>
 
-      {/* Content — right side */}
       <div className="relative flex flex-1 flex-col gap-1.5 p-3 sm:p-4">
-        {/* Same hierarchy contract as the grid card: title leads, proof
-            follows, byline is the quietest line — so switching layouts never
-            changes what the eye reads first. */}
         <h3 className="text-sm font-extrabold leading-[1.35] dc-ink-1 sm:text-[15px]">{product.title}</h3>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="inline-flex items-center gap-1">
@@ -156,9 +171,6 @@ function ProductCardList({
             <span className="dc-save-pill">Save ₹{product.originalPrice - product.price} · {discount}%</span>
           )}
         </div>
-        {/* Wave 10: terminal states are flat meaning-colour plates (amber /
-            emerald, same rule as the grid card); the actionable state is the
-            solid indigo primary capsule. */}
         {purchased || inCart || unavailable ? (
           <div
             className={`mt-1 flex w-full cursor-default items-center justify-center rounded-full border px-3 py-2.5 text-xs font-extrabold uppercase tracking-wide ${
@@ -181,22 +193,18 @@ function ProductCardList({
   );
 }
 
-/* ── Main StorePage ──────────────────────────────────────────────────── */
-
 export default function StorePage({ wishlist, cartIds, purchased, onToggleWishlist, onAddToCart, onView }: StorePageProps) {
   const { products, loading, error } = useCatalog();
   const { filters: adminFilters } = useStoreFilters();
   const [search, setSearch] = useState("");
   const [activeFilterId, setActiveFilterId] = useState(ALL_STORE_FILTER.id);
   const [sort, setSort] = useState("Recommended");
-  // Default to the second layout option ("Cards" / rectangular list view).
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
   useEffect(() => {
-    if (!viewDropdownOpen) return;
+    if (!viewDropdownOpen) return undefined;
     const close = (e: Event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setViewDropdownOpen(false);
@@ -206,11 +214,6 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
     return () => document.removeEventListener("pointerdown", close);
   }, [viewDropdownOpen]);
 
-  /**
-   * The chip row. Filters created in the admin panel (Products → Store
-   * filters) are authoritative; until one exists we derive chips from the
-   * catalog so the store is never filter-less. "All" is always first.
-   */
   const chips: StoreFilter[] = useMemo(() => {
     const active = adminFilters.filter((filter) => filter.active);
     const list = active.length > 0 ? active : derivedStoreFilters(products);
@@ -222,7 +225,6 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
     [chips, activeFilterId],
   );
 
-  // A chip the admin deleted or hid must not keep filtering the store.
   useEffect(() => {
     if (activeFilterId !== ALL_STORE_FILTER.id && !chips.some((filter) => filter.id === activeFilterId)) {
       setActiveFilterId(ALL_STORE_FILTER.id);
@@ -231,13 +233,14 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
 
   const filtered = useMemo(() => {
     let list = products.filter((p) => {
+      const query = search.toLowerCase();
       const matchesSearch =
-        !search.trim() ||
-        p.title.toLowerCase().includes(search.toLowerCase()) ||
-        p.subject.toLowerCase().includes(search.toLowerCase()) ||
-        p.instructor.toLowerCase().includes(search.toLowerCase()) ||
-        p.tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase())) ||
-        (p.searchKeywords || []).some((keyword) => keyword.toLowerCase().includes(search.toLowerCase()));
+        !search.trim()
+        || p.title.toLowerCase().includes(query)
+        || p.subject.toLowerCase().includes(query)
+        || p.instructor.toLowerCase().includes(query)
+        || p.tags.some((tag) => tag.toLowerCase().includes(query))
+        || (p.searchKeywords || []).some((keyword) => keyword.toLowerCase().includes(query));
 
       const matchesChip = productMatchesStoreFilter(p, activeFilter);
 
@@ -247,143 +250,103 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
     list = [...list];
     if (sort === "Price: Low to High") list.sort((a, b) => a.price - b.price);
     if (sort === "Price: High to Low") list.sort((a, b) => b.price - a.price);
-    if (sort === "Top Rated") list.sort((a, b) => b.rating - a.rating);
+    if (sort === "Top Rated") list.sort((a, b) => b.rating - a.rating || b.reviews - a.reviews);
     if (sort === "Newest") list.reverse();
+    if (sort === "Recommended") list.sort((a, b) => b.rating - a.rating || b.reviews - a.reviews || a.price - b.price);
 
     return list;
   }, [products, search, activeFilter, sort]);
 
   return (
-    /* No `overflow-hidden` here on purpose: an `overflow` ancestor other
-       than `visible` becomes the sticky element's offset container, which
-       would silently disable the filter bar's sticky behaviour. Every child
-       that can overflow (hero, coverflow, cards) clips itself. */
-    <div data-store-page className="relative pb-6">
-      {/* Phase A: the page paints no ambient wash or orbs of its own — the
-          single fixed Black Ice backdrop is the background on every device. */}
-
+    <div data-store-page className="relative pb-[7.5rem] lg:pb-8">
       <Hero resourceCount={filtered.length} />
-
-      {/* AI Canvas Tilted Coverflow — the store's top-rated rail. Slides are
-          ranked by a Bayesian weighted rating (see topRatedSlides) and update
-          automatically whenever the catalog snapshot changes; the source
-          demo's default cards fill the fan until seven products exist.
-          `data-store-top-rated` is the desktop-alignment hook (index.css):
-          the shell zeroes the label's mobile px-4 so the caption lines up
-          with the shell gutter. */}
-      <section aria-label="Top rated" data-store-top-rated className="pt-1 lg:pt-2">
-        {/* Loose ink straight on the scene (not inside a card), so it takes the
-            same text-shadow scrim Home uses: `.dc-section-label` is white at
-            56%, which washes out over the snow behind the coverflow. */}
-        <p className="dc-scene-ink dc-section-label px-4">Top rated</p>
-        <TiltedCoverflow products={products} onOpenProduct={onView} />
-      </section>
 
       <div className="space-y-4">
         <SearchBar value={search} onChange={setSearch} sort={sort} onSortChange={setSort} />
       </div>
 
-      {/* The bar is a SIBLING of the search wrapper, not a child: a sticky
-          element is confined to its containing block, so inside the old
-          `space-y-4` box (which ends at the bar's own bottom edge) it could
-          only "stick" for ~65 px of scroll. At page level its containing
-          block runs to the end of the product list, so the chips stay
-          reachable the whole time the user browses. The 16 px gap it used to
-          get from `space-y-4` is now an explicit `mt-4`.
-
-          Same chrome plate as the header: this sticky bar painted the pack's
-          10% `--dc-chrome-glass` tint, i.e. nothing visible over the snow the
-          products scroll through. `dc-scene-plate--bar` gives it the shared
-          dark plate + hairline rim + soft drop (src/glass.css), and outranks
-          both the token utilities below and index.css's chrome rule while
-          glass is on. (On desktop, `top` is lifted below the shell's top bar
-          by a shell-scoped rule in index.css — the class list stays `top-0`
-          for the mobile scroller.) */}
       <div data-store-filter-bar className="dc-scene-plate dc-scene-plate--bar sticky top-0 z-20 mt-4 border-b border-white/10 bg-[var(--dc-chrome-glass)] py-2.5 [backdrop-filter:var(--dc-chrome-glass-blur)]">
-          {/* Mobile overlap fix: the view-mode toggle is a normal flex
-              sibling (shrink-0) instead of an absolutely-positioned overlay,
-              so the scrolling chip row and the button can never paint on top
-              of each other at any viewport width. */}
-          <div className="flex items-center gap-1 pr-3">
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <FilterChips filters={chips} activeId={activeFilter.id} onSelect={setActiveFilterId} />
-            </div>
-
-            {/* View mode toggle — anchored at the right edge of the bar */}
-            <div ref={dropdownRef} className="relative z-10 shrink-0">
-              <GlassButton
-                type="button"
-                aria-label="Change view layout"
-                aria-expanded={viewDropdownOpen}
-                onClick={() => setViewDropdownOpen((o) => !o)}
-                className={`[&_.size-12]:size-9 ${viewDropdownOpen ? "text-indigo-200" : ""}`}
-              >
-                <LayoutIcon className="h-[18px] w-[18px]" />
-              </GlassButton>
-
-              {/* Same plate as everything else that floats over the scene —
-                  and being a pack surface it also loses its live blur, which
-                  matters here because the popover hangs over scrolling cards.
-                  The anchor geometry below is the shape
-                  storeViewDropdownResponsiveContract pins, untouched. */}
-              {viewDropdownOpen && (
-                <GlassSurface
-                  data-store-view-options
-                  className="dc-scene-plate absolute right-0 top-full z-30 mt-1.5 flex w-max text-white"
-                  radius={16}
-                  contentClassName="flex w-max gap-1 p-1.5"
-                >
-                  {VIEW_OPTIONS.map(({ mode, label, Icon }) => (
-                    <GlassButton
-                      key={mode}
-                      type="button"
-                      onClick={() => { setViewMode(mode); setViewDropdownOpen(false); }}
-                      title={label}
-                      aria-label={`${label} view`}
-                      aria-pressed={viewMode === mode}
-                      className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl transition [&_.size-12]:size-9 ${
-                        viewMode === mode ? "[&_svg]:text-violet-300" : "[&_svg]:text-white/70"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                    </GlassButton>
-                  ))}
-                </GlassSurface>
-              )}
-            </div>
+        <div className="flex items-center gap-1 pr-3">
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <FilterChips filters={chips} activeId={activeFilter.id} onSelect={setActiveFilterId} />
           </div>
+
+          <div ref={dropdownRef} className="relative z-10 shrink-0">
+            <GlassButton
+              type="button"
+              aria-label="Change view layout"
+              aria-expanded={viewDropdownOpen}
+              onClick={() => setViewDropdownOpen((o) => !o)}
+              className={`[&_.size-12]:size-9 ${viewDropdownOpen ? "text-indigo-200" : ""}`}
+            >
+              <LayoutIcon className="h-[18px] w-[18px]" />
+            </GlassButton>
+
+            {viewDropdownOpen && (
+              <GlassSurface
+                data-store-view-options
+                className="dc-scene-plate absolute right-0 top-full z-30 mt-1.5 flex w-max text-white"
+                radius={16}
+                contentClassName="flex w-max gap-1 p-1.5"
+              >
+                {VIEW_OPTIONS.map(({ mode, label, Icon }) => (
+                  <GlassButton
+                    key={mode}
+                    type="button"
+                    onClick={() => { setViewMode(mode); setViewDropdownOpen(false); }}
+                    title={label}
+                    aria-label={`${label} view`}
+                    aria-pressed={viewMode === mode}
+                    className={`flex h-9 w-9 flex-none items-center justify-center rounded-xl transition [&_.size-12]:size-9 ${
+                      viewMode === mode ? "[&_svg]:text-violet-300" : "[&_svg]:text-white/70"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </GlassButton>
+                ))}
+              </GlassSurface>
+            )}
+          </div>
+        </div>
       </div>
 
       {error ? (
         <div className="dc-scene-ink mx-4 mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200 lg:mx-0">{error}</div>
       ) : loading ? (
-        /* Dimension-matched skeletons: the store defaults to the horizontal
-           list card (w-36/sm:w-44 artwork + text column), so each
-           placeholder mirrors that exact geometry inside the same flex
-           column + gaps the real cards use — zero layout shift when the
-           live list replaces them. The old state was four h-72 pulse
-           blocks that jumped to a different layout. */
-        <div data-store-gutter data-store-list data-store-list-loading aria-busy="true" aria-label="Loading products" className="flex flex-col gap-3 px-4 pt-4">
-          {[0, 1, 2, 3, 4, 5].map((item) => (
-            <GlassCard key={item} aria-hidden="true" contentClassName="flex p-0" className="flex overflow-hidden">
-              <div className="relative h-28 w-36 shrink-0 overflow-hidden sm:h-32 sm:w-44">
-                <Skeleton width="100%" height="100%" radius={0} />
-              </div>
-              <div className="flex flex-1 flex-col gap-1.5 p-3 sm:p-4">
-                <Skeleton width="80%" height="0.95rem" radius={6} />
-                <Skeleton width="45%" height="0.75rem" radius={6} />
-                <Skeleton width="60%" height="0.75rem" radius={6} />
-                <div className="mt-auto flex items-center justify-between pt-2">
-                  <Skeleton width="30%" height="1rem" radius={6} />
-                  <Skeleton width="5.5rem" height="2rem" radius={999} />
+        <div className="space-y-5 px-4 pt-4">
+          <div data-store-gutter data-store-list data-store-list-loading aria-busy="true" aria-label="Loading products" className="flex flex-col gap-3 px-4 pt-0">
+            {[0, 1, 2, 3, 4].map((item) => (
+              <GlassCard key={item} aria-hidden="true" contentClassName="flex p-0" className="flex overflow-hidden">
+                <div className="relative h-28 w-36 shrink-0 overflow-hidden sm:h-32 sm:w-44">
+                  <Skeleton width="100%" height="100%" radius={0} />
                 </div>
-              </div>
-            </GlassCard>
-          ))}
+                <div className="flex flex-1 flex-col gap-1.5 p-3 sm:p-4">
+                  <Skeleton width="80%" height="0.95rem" radius={6} />
+                  <Skeleton width="45%" height="0.75rem" radius={6} />
+                  <Skeleton width="60%" height="0.75rem" radius={6} />
+                  <div className="mt-auto flex items-center justify-between pt-2">
+                    <Skeleton width="30%" height="1rem" radius={6} />
+                    <Skeleton width="5.5rem" height="2rem" radius={999} />
+                  </div>
+                </div>
+              </GlassCard>
+            ))}
+          </div>
+
+          <div data-store-gutter className="px-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              {BENEFITS.map(({ title }, index) => (
+                <Skeleton key={title + index} width="100%" height="5.6rem" radius={24} />
+              ))}
+            </div>
+          </div>
+
+          <div data-store-gutter className="px-4 pt-1">
+            <Skeleton width="13rem" height="1rem" radius={8} />
+            <Skeleton width="100%" height="18rem" radius={28} className="mt-3" />
+          </div>
         </div>
       ) : filtered.length === 0 ? (
-        /* Educational empty state: says what happened, why, and gives the
-           user a one-tap way out instead of a dead end. */
         <GlassCard className="mx-4 mt-6 lg:mx-0" contentClassName="dc-empty">
           <span className="dc-empty-art" aria-hidden="true">
             <BookOpenIcon className="h-7 w-7 text-indigo-300" />
@@ -406,39 +369,13 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
             </button>
           ) : null}
         </GlassCard>
-      ) : viewMode === "list" ? (
-        /* ── Rectangular cards / list view ── */
-        <div data-store-gutter data-store-list className="flex flex-col gap-3 px-4 pt-4">
-          {filtered.map((product) => (
-            <ProductCardList
-              key={product.id}
-              product={product}
-              wishlisted={wishlist.has(product.id)}
-              inCart={cartIds.has(product.id)}
-              purchased={purchased.has(product.id)}
-              onToggleWishlist={onToggleWishlist}
-              onAddToCart={onAddToCart}
-              onView={onView}
-            />
-          ))}
-        </div>
-      ) : viewMode === "mixed" ? (
-        /* ── Mixed view: every 3rd item is a full-row featured card, the rest
-           flow in the grid. One flat container at every breakpoint (the old
-           per-pair wrappers were overridden by the desktop `data-store-grid`
-           auto-fill rule, which left two cards stranded in empty tracks).
-           Mobile: grid-cols-2 with the featured card spanning both tracks —
-           identical to the old pair behaviour. Desktop (index.css): the same
-           auto-fill columns as the grid view. */
-        <div data-store-gutter data-store-mixed className="grid grid-cols-2 gap-3 px-4 pt-4">
-          {filtered.map((product, index) =>
-            index % 3 === 0 ? (
-              /* Featured card. The wrapper is `flex` so the horizontal card
-                 stretches to the row height (set by the taller vertical
-                 cards beside it) instead of floating with dead space under
-                 it. */
-              <div key={product.id} data-store-mixed-feature className="col-span-2 flex">
+      ) : (
+        <>
+          {viewMode === "list" ? (
+            <div data-store-gutter data-store-list className="flex flex-col gap-3 px-4 pt-4">
+              {filtered.map((product) => (
                 <ProductCardList
+                  key={product.id}
                   product={product}
                   wishlisted={wishlist.has(product.id)}
                   inCart={cartIds.has(product.id)}
@@ -447,37 +384,103 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
                   onAddToCart={onAddToCart}
                   onView={onView}
                 />
-              </div>
-            ) : (
-              <ProductCard
-                key={product.id}
-                product={product}
-                wishlisted={wishlist.has(product.id)}
-                inCart={cartIds.has(product.id)}
-                purchased={purchased.has(product.id)}
-                onToggleWishlist={onToggleWishlist}
-                onAddToCart={onAddToCart}
-                onView={onView}
-              />
-            ),
+              ))}
+            </div>
+          ) : viewMode === "mixed" ? (
+            <div data-store-gutter data-store-mixed className="grid grid-cols-2 gap-3 px-4 pt-4">
+              {filtered.map((product, index) =>
+                index % 3 === 0 ? (
+                  <div key={product.id} data-store-mixed-feature className="col-span-2 flex">
+                    <ProductCardList
+                      product={product}
+                      wishlisted={wishlist.has(product.id)}
+                      inCart={cartIds.has(product.id)}
+                      purchased={purchased.has(product.id)}
+                      onToggleWishlist={onToggleWishlist}
+                      onAddToCart={onAddToCart}
+                      onView={onView}
+                    />
+                  </div>
+                ) : (
+                  <ProductCard
+                    key={product.id}
+                    index={index}
+                    product={product}
+                    wishlisted={wishlist.has(product.id)}
+                    inCart={cartIds.has(product.id)}
+                    purchased={purchased.has(product.id)}
+                    onToggleWishlist={onToggleWishlist}
+                    onAddToCart={onAddToCart}
+                    onView={onView}
+                  />
+                ),
+              )}
+            </div>
+          ) : (
+            <div data-store-gutter data-store-grid className="grid grid-cols-1 gap-4 px-4 pt-4 sm:grid-cols-2">
+              {filtered.map((product, index) => (
+                <ProductCard
+                  key={product.id}
+                  index={index}
+                  product={product}
+                  wishlisted={wishlist.has(product.id)}
+                  inCart={cartIds.has(product.id)}
+                  purchased={purchased.has(product.id)}
+                  onToggleWishlist={onToggleWishlist}
+                  onAddToCart={onAddToCart}
+                  onView={onView}
+                />
+              ))}
+            </div>
           )}
-        </div>
-      ) : (
-        /* ── Default grid view ── */
-        <div data-store-gutter data-store-grid className="grid grid-cols-1 gap-4 px-4 pt-4 sm:grid-cols-2">
-          {filtered.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              wishlisted={wishlist.has(product.id)}
-              inCart={cartIds.has(product.id)}
-              purchased={purchased.has(product.id)}
-              onToggleWishlist={onToggleWishlist}
-              onAddToCart={onAddToCart}
-              onView={onView}
-            />
-          ))}
-        </div>
+
+          <section data-store-gutter className="px-4 pt-6">
+            <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
+              {BENEFITS.map(({ title, body, Icon, accent, ringClass }) => (
+                <div key={title} className={`rounded-[24px] border bg-[#08173a]/95 p-4 shadow-[0_20px_50px_-35px_rgba(71,106,255,0.85)] ${ringClass}`}>
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="grid h-14 w-14 shrink-0 place-items-center rounded-[18px] text-white shadow-[0_14px_30px_-16px_rgba(132,74,255,0.95)]"
+                      style={{ backgroundImage: accent }}
+                    >
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-lg font-black tracking-[-0.03em] text-white">{title}</p>
+                      <p className="mt-1 text-sm leading-6 text-white/70">{body}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => { setSearch(""); setActiveFilterId(ALL_STORE_FILTER.id); }}
+                className="hidden items-center justify-between rounded-[24px] border border-violet-400/30 bg-[linear-gradient(135deg,#6e42ff_0%,#5a39ff_55%,#4330f9_100%)] px-6 py-5 text-left shadow-[0_25px_55px_-35px_rgba(103,79,255,0.95)] transition hover:brightness-110 lg:flex"
+              >
+                <span>
+                  <span className="block text-lg font-black tracking-[-0.03em] text-white">View All Resources</span>
+                  <span className="mt-1 block text-sm text-white/80">Browse the full catalog again</span>
+                </span>
+                <span className="text-2xl font-black text-white">→</span>
+              </button>
+            </div>
+          </section>
+
+          <section aria-label="Top rated" data-store-top-rated className="pt-8 lg:pt-10">
+            <div data-store-gutter className="px-4">
+              <p className="dc-scene-ink dc-section-label px-4">Top rated</p>
+              <h2 className="dc-scene-ink mt-2 text-[1.8rem] font-black leading-none tracking-[-0.04em] text-white sm:text-[2.1rem]">
+                top viral products check it out
+              </h2>
+              <p className="dc-scene-ink mt-2 max-w-2xl text-sm leading-6 text-white/72 sm:text-base">
+                Swipe through the products learners are opening the most right now.
+              </p>
+            </div>
+            <div className="mt-4 overflow-hidden rounded-[30px] border border-[#2b4381] bg-[#05132f]/92 shadow-[0_25px_70px_-42px_rgba(74,92,255,0.85)]">
+              <TiltedCoverflow products={products} onOpenProduct={onView} />
+            </div>
+          </section>
+        </>
       )}
     </div>
   );
