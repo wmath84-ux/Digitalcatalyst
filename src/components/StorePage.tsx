@@ -485,34 +485,36 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
           )}
 
           <section data-store-gutter className="px-4 pt-6">
-            <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
-              {BENEFITS.map(({ title, body, Icon, accent, ringClass }) => (
-                <div key={title} className={`rounded-[24px] border bg-[#08173a]/95 p-4 shadow-[0_20px_50px_-35px_rgba(71,106,255,0.85)] ${ringClass}`}>
-                  <div className="flex items-center gap-4">
-                    <div
-                      className="grid h-14 w-14 shrink-0 place-items-center rounded-[18px] text-white shadow-[0_14px_30px_-16px_rgba(132,74,255,0.95)]"
-                      style={{ backgroundImage: accent }}
-                    >
-                      <Icon className="h-6 w-6" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-lg font-black tracking-[-0.03em] text-white">{title}</p>
-                      <p className="mt-1 text-sm leading-6 text-white/70">{body}</p>
+            <div className="overflow-hidden rounded-[28px] border border-[#2b4381] bg-[#08173a]/94 shadow-[0_24px_60px_-40px_rgba(71,106,255,0.9)]">
+              <div className="grid gap-px bg-white/8 lg:grid-cols-[repeat(3,minmax(0,1fr))_minmax(230px,1.1fr)]">
+                {BENEFITS.map(({ title, body, Icon, accent, ringClass }) => (
+                  <div key={title} className={`bg-[#08173a]/96 p-4 ${ringClass}`}>
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="grid h-14 w-14 shrink-0 place-items-center rounded-[18px] text-white shadow-[0_14px_30px_-16px_rgba(132,74,255,0.95)]"
+                        style={{ backgroundImage: accent }}
+                      >
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-lg font-black tracking-[-0.03em] text-white">{title}</p>
+                        <p className="mt-1 text-sm leading-6 text-white/70">{body}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => { setSearch(""); setActiveFilterId(ALL_STORE_FILTER.id); }}
-                className="hidden items-center justify-between rounded-[24px] border border-violet-400/30 bg-[linear-gradient(135deg,#6e42ff_0%,#5a39ff_55%,#4330f9_100%)] px-6 py-5 text-left shadow-[0_25px_55px_-35px_rgba(103,79,255,0.95)] transition hover:brightness-110 lg:flex"
-              >
-                <span>
-                  <span className="block text-lg font-black tracking-[-0.03em] text-white">View All Resources</span>
-                  <span className="mt-1 block text-sm text-white/80">Browse the full catalog again</span>
-                </span>
-                <span className="text-2xl font-black text-white">→</span>
-              </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => { setSearch(""); setActiveFilterId(ALL_STORE_FILTER.id); }}
+                  className="flex items-center justify-between bg-[linear-gradient(135deg,#6e42ff_0%,#5a39ff_55%,#4330f9_100%)] px-6 py-5 text-left shadow-[0_25px_55px_-35px_rgba(103,79,255,0.95)] transition hover:brightness-110"
+                >
+                  <span>
+                    <span className="block text-lg font-black tracking-[-0.03em] text-white">View All Resources</span>
+                    <span className="mt-1 block text-sm text-white/80">Browse the full catalog again</span>
+                  </span>
+                  <span className="text-2xl font-black text-white">→</span>
+                </button>
+              </div>
             </div>
           </section>
 

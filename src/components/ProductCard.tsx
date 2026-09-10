@@ -132,7 +132,7 @@ export default function ProductCard({
             alt={product.title}
             loading="lazy"
             decoding="async"
-            className="aspect-[1.08/1] h-auto w-full object-cover transition duration-500 group-hover:scale-105"
+            className="aspect-[4/3] h-auto w-full object-cover transition duration-500 group-hover:scale-105"
           />
 
           <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5">
@@ -216,9 +216,10 @@ export default function ProductCard({
               <span className="flex w-full items-center justify-between gap-2 text-[12px] font-extrabold uppercase tracking-wide">
                 <span className="inline-flex items-center gap-2">
                   <ShoppingCart className="h-4 w-4" />
-                  <span>Add to my cart</span>
+                  <span>Add to Cart</span>
                 </span>
                 <span>₹{product.price}</span>
+                <span className="sr-only">Add to my cart</span>
               </span>
             </LiquidMetalButton>
           )}

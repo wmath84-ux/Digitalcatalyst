@@ -640,7 +640,7 @@ export default function DesktopShell({
                 onSearch handler. The input is hidden on pages that
                 have no handler (e.g. media viewers, fullscreen flows). */}
             {onSearch ? (
-              <div className="relative flex w-[420px] max-w-[38vw] items-center">
+              <div className="relative flex w-[600px] max-w-[45vw] items-center">
                 <GlassInput
                   type="search"
                   className="dc-glass-input w-full pr-20"

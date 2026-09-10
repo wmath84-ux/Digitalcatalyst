@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  BookOpen,
+  CheckCheck,
+  FileText,
+  Gift,
+  GraduationCap,
+  Grid2X2,
+  NotebookText,
+  Settings2,
+} from "lucide-react";
 import { useDragScroll } from "@/hooks/useDragScroll";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckIcon, SlidersIcon, XIcon } from "./icons";
@@ -15,6 +25,19 @@ type FilterChipsProps = {
   activeId: string;
   onSelect: (id: string) => void;
 };
+
+function filterIcon(filter: StoreFilter) {
+  const label = `${filter.label} ${filter.id}`.toLowerCase();
+  if (filter.id === "all" || label.includes("all")) return Grid2X2;
+  if (label.includes("course")) return BookOpen;
+  if (label.includes("note")) return NotebookText;
+  if (label.includes("pdf")) return FileText;
+  if (label.includes("test")) return CheckCheck;
+  if (label.includes("tool")) return Settings2;
+  if (label.includes("class")) return GraduationCap;
+  if (label.includes("free")) return Gift;
+  return Grid2X2;
+}
 
 export default function FilterChips({ filters, activeId, onSelect }: FilterChipsProps) {
   const [showFilters, setShowFilters] = useState(false);
@@ -193,17 +216,21 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
           onValueChange={onSelect}
           aria-label="Filter the catalogue"
         >
-          {filters.map((filter) => (
-            <GlassToggleItem
-              key={filter.id}
-              value={filter.id}
-              title={filter.description || filter.label}
-              className="shrink-0 whitespace-nowrap px-3.5 py-1.5 text-[13px] font-semibold"
-            >
-              {activeId === filter.id && <CheckIcon className="h-3.5 w-3.5" />}
-              {filter.label}
-            </GlassToggleItem>
-          ))}
+          {filters.map((filter) => {
+            const Icon = filterIcon(filter);
+            return (
+              <GlassToggleItem
+                key={filter.id}
+                value={filter.id}
+                title={filter.description || filter.label}
+                className="shrink-0 whitespace-nowrap px-3.5 py-1.5 text-[13px] font-semibold"
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {activeId === filter.id && <CheckIcon className="h-3.5 w-3.5" />}
+                {filter.label}
+              </GlassToggleItem>
+            );
+          })}
         </GlassToggleGroup>
       </div>
 

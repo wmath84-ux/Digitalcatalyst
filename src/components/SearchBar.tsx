@@ -28,7 +28,7 @@ export default function SearchBar({ value, onChange, sort, onSortChange, onOpenF
   return (
     <div data-store-gutter className="px-4">
       <div className="flex items-center gap-3">
-        <div className="w-full flex-1 lg:max-w-none">
+        <div className="relative w-full flex-1 lg:max-w-none">
           <div
             data-search-launcher
             className="group relative block w-full cursor-pointer overflow-hidden rounded-[24px] text-left outline-none transition active:scale-[0.99]"
@@ -48,7 +48,7 @@ export default function SearchBar({ value, onChange, sort, onSortChange, onOpenF
               radius={20}
               className="dc-scene-plate pointer-events-none absolute inset-0"
             />
-            <div className="relative flex min-h-[66px] items-center gap-3 px-5 py-4 lg:min-h-[56px] lg:pr-4">
+            <div className="relative flex min-h-[66px] items-center gap-3 px-5 py-4 lg:min-h-[56px] lg:pr-[10.5rem]">
               <SearchIcon className="h-6 w-6 shrink-0 text-white/55 lg:h-5 lg:w-5" />
               <input
                 value={value}
@@ -67,13 +67,21 @@ export default function SearchBar({ value, onChange, sort, onSortChange, onOpenF
                     e.stopPropagation();
                     onChange("");
                   }}
-                  className="shrink-0 [&_.size-12]:size-7"
+                  className="shrink-0 lg:hidden [&_.size-12]:size-7"
                 >
                   <XIcon className="h-4 w-4" />
                 </GlassButton>
               ) : null}
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={openSearchPage}
+            className="absolute right-3 top-1/2 hidden h-[44px] min-w-[9.75rem] -translate-y-1/2 items-center justify-center rounded-full bg-[linear-gradient(135deg,#7448ff_0%,#5d40ff_60%,#4f36ff_100%)] px-8 text-sm font-black text-white shadow-[0_18px_34px_-22px_rgba(116,72,255,0.95)] transition hover:brightness-110 lg:inline-flex"
+          >
+            Search
+          </button>
         </div>
 
         <button
@@ -83,14 +91,6 @@ export default function SearchBar({ value, onChange, sort, onSortChange, onOpenF
           className="grid h-[66px] w-[66px] shrink-0 place-items-center rounded-[22px] border border-[#2b4381] bg-[#08183c]/95 text-white shadow-[0_18px_44px_-28px_rgba(71,106,255,0.82)] transition hover:brightness-110 lg:hidden"
         >
           <SlidersHorizontal className="h-6 w-6" />
-        </button>
-
-        <button
-          type="button"
-          onClick={openSearchPage}
-          className="hidden h-[56px] min-w-[10.5rem] shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#7448ff_0%,#5d40ff_60%,#4f36ff_100%)] px-8 text-sm font-black text-white shadow-[0_18px_34px_-22px_rgba(116,72,255,0.95)] transition hover:brightness-110 lg:inline-flex"
-        >
-          Search
         </button>
 
         <div className="hidden shrink-0 items-center gap-3 lg:flex">
