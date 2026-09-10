@@ -42,6 +42,7 @@ import { adminDb, requireFirebaseUser, type VercelRequest, type VercelResponse }
 import { revisionAiRuntime, type RevisionAiConfig, type RevisionAiPolicy, type RevisionAiProviderUsage, type RevisionAiReservation } from "./revisionGenerate.js";
 import { readResourceContent, type ContentExtraction } from "./personalAiContent.js";
 import { isValidPersonalId } from "../../utils/personalCourse.js";
+import { subscriptionUnlocksFeature } from "../../utils/subscriptions.js";
 import {
   PERSONAL_AI_ARTIFACT_TTL_MS,
   PERSONAL_AI_FLASHCARD_DEFAULT,
@@ -755,6 +756,55 @@ interface ModelCall {
  * finalise — and release the reservation on any failure so a learner is never
  * charged for an error.
  */
+/**
+ * The AI Mentor subscription feature (`subscriptionFeatures/ai-mentor`).
+ *
+ * Until now the mentor inherited its entitlement from the Revision feature
+ * alone, and the "AI Mentor" row on the subscription page was pure marketing
+ * copy: `aiMentorLocked` is normalised in utils/subscriptionAccess.ts and read
+ * by nothing, so no plan actually gated it — any signed-in learner could use it
+ * for free. This closes the loop without breaking anyone who already paid:
+ *
+ *   · no `ai-mentor` feature doc, or `active: false` → open. A fresh database
+ *     behaves exactly as it does today, and a feature can never be paywalled by
+ *     accident.
+ *   · feature doc present and active → the caller's subscription must unlock
+ *     `ai-mentor`. A plan that unlocks `revision` also qualifies, so no
+ *     Revision Studio subscriber loses the mentor mid-term.
+ *
+ * Checked here, at the single choke point every model call passes through, so a
+ * client cannot skip it by choosing a different action.
+ */
+const AI_MENTOR_FEATURE_ID = "ai-mentor";
+
+async function assertAiMentorEntitlement(db: Db, uid: string): Promise<void> {
+  const [featureSnap, subscriptionSnap] = await Promise.all([
+    db.collection("subscriptionFeatures").doc(AI_MENTOR_FEATURE_ID).get(),
+    db.collection("users").doc(uid).collection("subscription").doc("current").get(),
+  ]);
+  if (!featureSnap.exists || featureSnap.data()?.active === false) return;
+  const record = asRecord(subscriptionSnap.data());
+  const hasStoredFeatureList = Array.isArray(record.features) && record.features.length > 0;
+  // The mentor is sold as its own feature (`ai-mentor`), so a membership that
+  // carries a feature list is checked against exactly what its plan shipped —
+  // that is where the admin's per-plan choice lives.
+  const entitled = hasStoredFeatureList
+    ? subscriptionUnlocksFeature(record, AI_MENTOR_FEATURE_ID)
+    // A membership written before feature ids were stored has nothing to
+    // respect, and the safe reading is the one My Day and Revision already use
+    // for exactly this case: an active subscription is the entitlement. Those
+    // learners keep the mentor instead of losing it because of a field format.
+    : subscriptionUnlocksFeature(record, "revision")
+      || subscriptionUnlocksFeature(record, AI_MENTOR_FEATURE_ID);
+  if (entitled) return;
+  const planName = String(record.planName || record.planId || "your current plan").trim() || "your current plan";
+  fail(
+    403,
+    "AI_MENTOR_PLAN_REQUIRED",
+    `AI Mentor isn't included in ${planName}. Upgrade your plan to unlock the AI study partner for your modules and course.`,
+  );
+}
+
 async function groundedCompletion(input: {
   uid: string;
   req: VercelRequest;
@@ -771,6 +821,7 @@ async function groundedCompletion(input: {
   if (!policy.hasAccess) {
     fail(403, "REVISION_SUBSCRIPTION_REQUIRED", "Your plan's AI allowance isn't active. Renew or upgrade to use the AI study engine on your modules.");
   }
+  await assertAiMentorEntitlement(adminDb(), uid);
   const requestedSource = body.source === "own" ? "own" : "default";
   let config: RevisionAiConfig;
   if (requestedSource === "own") {

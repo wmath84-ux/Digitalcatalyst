@@ -12,7 +12,7 @@
 import { randomUUID } from "node:crypto";
 import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "./firebaseAdmin.js";
 import { normalisePlanDoc, subscriptionUnlocksFeature } from "../../utils/subscriptions.js";
-import { aiAllowanceForCycle } from "../../utils/aiAllowances.js";
+import { aiAllowanceForCycle, defaultAiDailyTokensForPlan, normalizeAiAllowancePolicy, normalizeAiTokenBudgetValue } from "../../utils/aiAllowances.js";
 import { calculateAiCostMicros, estimateTokensFromText, findAiModelPrice, normalizeAiModelPricing, type AiModelPrice } from "../../utils/aiPolicy.js";
 import { normalizeCompleteAiQuestions } from "../../utils/aiGeneratedTest.js";
 import { mixedModeSplit, planModeEnforcement, type ModeNeed } from "../../utils/questionTypeGuard.js";
@@ -145,6 +145,15 @@ type EffectiveAiPolicy = {
   windowLimit: number;
   costEnabled: boolean;
   costBudgetMicros: number;
+  /**
+   * True when the daily REAL-token budget is the active allowance kind. It
+   * supersedes the "N successful tests per day" count and the rolling window,
+   * which stop being enforced so an admin can switch models without a data
+   * migration (and switch back by re-selecting the old policy).
+   */
+  tokenBudgetEnabled: boolean;
+  /** Real model tokens usable per local calendar day. -1 = unlimited. */
+  dailyTokenBudget: number;
   termKey: string;
   termStartsAt: number;
   termEndsAt: number;
@@ -155,6 +164,8 @@ type EffectiveAiPolicy = {
 type UsageReservation = {
   id: string;
   estimatedCostMicros: number;
+  /** Tokens held against the daily budget until the provider's real count lands. */
+  estimatedTokens: number;
 };
 
 const asRecord = (value: unknown): Record<string, unknown> =>
@@ -585,7 +596,7 @@ async function resolveEffectiveAiPolicy(uid: string, settingsInput?: Record<stri
     ? await db.collection("subscriptionPlans").doc(planId).get()
     : null;
   const plan = planSnap?.exists ? normalisePlanDoc(planSnap.data() || {}, planSnap.id) : null;
-  const currentAllowance = aiAllowanceForCycle(plan ?? { aiAllowances: null }, cycle);
+  const currentAllowance = aiAllowanceForCycle(plan ?? { aiAllowances: null }, cycle, planId);
   const fallbackDaily = Math.max(0, Math.min(10_000, Math.round(Number(settings.dailyLimit ?? 20) || 0)));
   const snapshotDailyRaw = Number(subscription.aiDailyGenerationLimit);
   const snapshotDaily = Number.isFinite(snapshotDailyRaw)
@@ -616,16 +627,52 @@ async function resolveEffectiveAiPolicy(uid: string, settingsInput?: Record<stri
   const windowLimit = Number.isFinite(windowLimitRaw)
     ? Math.max(-1, Math.min(10_000, Math.round(windowLimitRaw)))
     : 10;
+
+  // ── Daily REAL-token budget (the allowance kind enabled by default) ───────
+  // `allowancePolicy` selects which kind is enforced, so the admin can activate
+  // this and stand the old counting model down (or back) without a migration:
+  //   · "token-budget"    → tokens only. Count + rolling-window + cost checks
+  //                         are not enforced.
+  //   · "generation-only" → historical successful-tests-per-day counting.
+  //   · "hybrid"          → counting plus the per-term model-cost budget.
+  // Anything else (a catalog written before this field existed, a hand-edited
+  // doc) resolves to "token-budget": the safe default, because a real token
+  // count cannot be faked by asking for one long test.
+  const allowancePolicy = normalizeAiAllowancePolicy(settings.allowancePolicy);
+  const tokenBudgetEnabled = allowancePolicy === "token-budget";
+  const planTokenBudget = currentAllowance.dailyTokenBudget;
+  const snapshotTokenRaw = Number(subscription.aiDailyTokenBudget);
+  const snapshotTokenBudget = Number.isFinite(snapshotTokenRaw)
+    ? normalizeAiTokenBudgetValue(snapshotTokenRaw, planTokenBudget)
+    : planTokenBudget;
+  // A purchased benefit is never silently reduced mid-term — same rule the
+  // other two allowances follow, so an admin raising a plan's budget helps
+  // existing subscribers today instead of only the next renewal.
+  const tokenBudgetForTerm = !active || !plan || snapshotTokenBudget < 0 || planTokenBudget < 0
+    ? -1
+    : Math.max(snapshotTokenBudget, planTokenBudget);
+  // Free learners have no plan doc, so they take the catalog-wide value.
+  const fallbackTokenBudget = normalizeAiTokenBudgetValue(
+    settings.dailyTokenBudget,
+    defaultAiDailyTokensForPlan("free"),
+  );
+  const dailyTokenBudget = active && plan ? tokenBudgetForTerm : fallbackTokenBudget;
+
   return {
     hasAccess,
     planId,
     planName: active ? String(plan?.name || planId || "Basic") : "Free learner",
     cycle,
-    dailyLimit,
+    // The two modes are mutually exclusive on purpose. Leaving the count limit
+    // live alongside the token budget would block a learner who has budget
+    // left, and the admin's "deactivate the old one" switch would lie.
+    dailyLimit: tokenBudgetEnabled ? 0 : dailyLimit,
     windowHours,
-    windowLimit,
-    costEnabled: settings.allowancePolicy === "hybrid",
+    windowLimit: tokenBudgetEnabled ? -1 : windowLimit,
+    costEnabled: allowancePolicy === "hybrid",
     costBudgetMicros,
+    tokenBudgetEnabled,
+    dailyTokenBudget,
     termKey,
     termStartsAt: activatedAt,
     termEndsAt: expiresAt,
@@ -663,11 +710,49 @@ function usageSnapshot(
   const dailyUsed = dayCount + pendingToday;
   const windowUsed = stamps.length + pendingWindow;
   const costUsedMicros = termCostMicros + pendingCostMicros;
+  // ── Daily REAL-token budget ──────────────────────────────────────────────
+  // `tokensUsedDay` is only ever written from the provider's own usage report
+  // (Gemini `usageMetadata` / OpenAI+Anthropic `usage`), falling back to the
+  // server-side estimate when a provider omits it — never from the browser. The
+  // key carries the local day, so the budget rolls over at the learner's
+  // midnight with no cron job and no client-visible counter to reset. Pending
+  // reservations hold their estimate against the same day so two concurrent
+  // generations cannot both spend the last of the budget.
+  const tokensDayMatches = String(data.tokensDayKey || "") === currentDay;
+  const tokensUsedDay = tokensDayMatches ? Math.max(0, Math.round(Number(data.tokensUsedDay) || 0)) : 0;
+  const pendingTokens = pending
+    .filter((row) => row.dayKey === currentDay)
+    .reduce((sum, row) => sum + Math.max(0, Math.round(Number(row.estimatedTokens) || 0)), 0);
+  const tokensBudget = policy.dailyTokenBudget;
+  const tokensUnlimited = !policy.tokenBudgetEnabled || tokensBudget < 0;
+  const tokensCommitted = tokensUsedDay + pendingTokens;
+  const tokensRemaining = tokensUnlimited ? null : Math.max(0, tokensBudget - tokensCommitted);
   let blockedReason: string | null = null;
-  if (!policy.hasAccess) blockedReason = "An active Revision Studio subscription is required to generate a new test.";
-  else if (policy.dailyLimit > 0 && dailyUsed >= policy.dailyLimit) blockedReason = `Daily school-AI allowance reached (${policy.dailyLimit} successful tests). It resets tomorrow.`;
-  else if (effectiveWindowLimit >= 0 && windowUsed >= effectiveWindowLimit) blockedReason = `${policy.windowHours}-hour school-AI limit reached (${effectiveWindowLimit} tests). Try again later.`;
-  else if (policy.costEnabled && policy.costBudgetMicros >= 0 && costUsedMicros >= policy.costBudgetMicros) blockedReason = "Your school-AI model-cost allowance for this billing term has been used. Use your own API key or renew/upgrade your plan.";
+  // The reason is prose for a human; the code is what the client maps to an
+  // action (retry / upgrade / renew). Reserve and status share them so the
+  // learner sees the same explanation whether the budget ran out mid-day or
+  // this single request is simply bigger than what is left.
+  let blockedCode: string | null = null;
+  if (!policy.hasAccess) {
+    blockedReason = "An active Revision Studio subscription is required to generate a new test.";
+    blockedCode = "REVISION_SUBSCRIPTION_REQUIRED";
+  }
+  else if (policy.tokenBudgetEnabled && tokensBudget >= 0 && tokensUsedDay >= tokensBudget) {
+    blockedReason = `Today's AI token budget is used up (${tokensBudget.toLocaleString("en-US")} tokens). It resets at midnight your local time — your own API key is unaffected.`;
+    blockedCode = "AI_TOKEN_BUDGET_REACHED";
+  }
+  else if (policy.dailyLimit > 0 && dailyUsed >= policy.dailyLimit) {
+    blockedReason = `Daily school-AI allowance reached (${policy.dailyLimit} successful tests). It resets tomorrow.`;
+    blockedCode = "AI_ALLOWANCE_REACHED";
+  }
+  else if (effectiveWindowLimit >= 0 && windowUsed >= effectiveWindowLimit) {
+    blockedReason = `${policy.windowHours}-hour school-AI limit reached (${effectiveWindowLimit} tests). Try again later.`;
+    blockedCode = "AI_ALLOWANCE_REACHED";
+  }
+  else if (policy.costEnabled && policy.costBudgetMicros >= 0 && costUsedMicros >= policy.costBudgetMicros) {
+    blockedReason = "Your school-AI model-cost allowance for this billing term has been used. Use your own API key or renew/upgrade your plan.";
+    blockedCode = "AI_COST_ALLOWANCE_REACHED";
+  }
   const oldest = stamps.length ? Math.min(...stamps) : now;
   return {
     planId: policy.planId,
@@ -690,11 +775,22 @@ function usageSnapshot(
     costUsedMicros: termCostMicros,
     costRemainingMicros: policy.costBudgetMicros < 0 ? null : Math.max(0, policy.costBudgetMicros - costUsedMicros),
     costUnlimited: policy.costBudgetMicros < 0,
+    // Real-token budget. `tokensEnabled` tells the UI which kind of limit the
+    // admin has activated, so the card never shows a stale count next to a live
+    // token number.
+    tokensEnabled: policy.tokenBudgetEnabled,
+    dailyTokenBudget: tokensBudget,
+    tokensUsedDay,
+    tokensCommitted,
+    tokensRemaining,
+    tokensUnlimited,
+    tokensResetsAt: nextDayResetAt(now, tzOffsetMinutes),
     termKey: policy.termKey,
     termStartsAt: policy.termStartsAt,
     termEndsAt: policy.termEndsAt,
     allowed: !blockedReason,
     blockedReason,
+    blockedCode,
   };
 }
 
@@ -715,6 +811,8 @@ async function getUsageStatus(uid: string, policy: EffectiveAiPolicy, tzOffsetMi
     windowLimit: policy.windowLimit,
     costEnabled: policy.costEnabled,
     costBudgetMicros: policy.costBudgetMicros,
+    tokenBudgetEnabled: policy.tokenBudgetEnabled,
+    dailyTokenBudget: policy.dailyTokenBudget,
     termKey: policy.termKey,
     termStartsAt: policy.termStartsAt,
     termEndsAt: policy.termEndsAt,
@@ -739,6 +837,10 @@ async function reserveUsage(
   const estimatedCostMicros = policy.costEnabled
     ? calculateAiCostMicros(price, estimatedInputTokens, estimatedOutputTokens)
     : 0;
+  // Held against the daily token budget until the provider's real count lands,
+  // so concurrent generations cannot each assume the whole budget is free.
+  const estimatedTokens = Math.max(0, Math.round(Number(estimatedInputTokens) || 0))
+    + Math.max(0, Math.round(Number(estimatedOutputTokens) || 0));
   const id = randomUUID();
   const db = adminDb();
   const ref = db.collection("users").doc(uid).collection("aiUsage").doc("current");
@@ -747,17 +849,30 @@ async function reserveUsage(
     const now = Date.now();
     const data = asRecord(snap.data());
     const status = usageSnapshot(data, policy, tzOffsetMinutes, now);
-    if (!status.allowed) throw Object.assign(new Error(status.blockedReason || "School AI allowance reached."), { statusCode: status.blockedReason?.includes("subscription") ? 403 : 429, code: "AI_ALLOWANCE_REACHED" });
+    if (!status.allowed) {
+      throw Object.assign(new Error(status.blockedReason || "School AI allowance reached."), {
+        statusCode: status.blockedCode === "REVISION_SUBSCRIPTION_REQUIRED" ? 403 : 429,
+        code: status.blockedCode || "AI_ALLOWANCE_REACHED",
+      });
+    }
     if (policy.costEnabled && policy.costBudgetMicros >= 0 && estimatedCostMicros > Number(status.costRemainingMicros || 0)) {
       throw Object.assign(new Error("This test's estimated model cost is above your remaining school-AI term allowance. Reduce the question count, use your own API key, or renew/upgrade."), { statusCode: 429, code: "AI_COST_ALLOWANCE_REACHED" });
     }
+    if (policy.tokenBudgetEnabled && policy.dailyTokenBudget >= 0
+      && estimatedTokens > Number(status.tokensRemaining ?? estimatedTokens)) {
+      throw Object.assign(new Error(
+        `This request needs about ${estimatedTokens.toLocaleString("en-US")} tokens but only ${Math.max(0, Number(status.tokensRemaining || 0)).toLocaleString("en-US")} are left in today's AI budget. Ask for less, or wait for the midnight reset — your own API key is unaffected.`,
+      ), { statusCode: 429, code: "AI_TOKEN_BUDGET_REACHED" });
+    }
     const reservations = normalizedReservations(data.reservations, now);
+    const currentDay = dayKey(now, tzOffsetMinutes);
     reservations[id] = {
       createdAt: now,
       expiresAt: now + 10 * 60_000,
-      dayKey: dayKey(now, tzOffsetMinutes),
+      dayKey: currentDay,
       termKey: policy.termKey,
       estimatedCostMicros,
+      estimatedTokens,
     };
     tx.set(ref, {
       uid,
@@ -771,6 +886,17 @@ async function reserveUsage(
       windowLimit: policy.windowLimit,
       costEnabled: policy.costEnabled,
       costBudgetMicros: policy.costBudgetMicros,
+      tokenBudgetEnabled: policy.tokenBudgetEnabled,
+      dailyTokenBudget: policy.dailyTokenBudget,
+      // Persist the day key so a learner crossing midnight mid-generation still
+      // charges the new day, matching what usageSnapshot reads back. The day's
+      // total travels WITH the key: writing a fresh key while an older day's
+      // number sits in the doc would make the ledger read yesterday's spend as
+      // today's and lock the learner out of a budget they have not used.
+      tokensDayKey: currentDay,
+      tokensUsedDay: String(data.tokensDayKey || "") === currentDay
+        ? Math.max(0, Math.round(Number(data.tokensUsedDay) || 0))
+        : 0,
       termKey: policy.termKey,
       termStartsAt: policy.termStartsAt,
       termEndsAt: policy.termEndsAt,
@@ -778,7 +904,7 @@ async function reserveUsage(
       updatedAt: now,
     }, { merge: true });
   });
-  return { id, estimatedCostMicros };
+  return { id, estimatedCostMicros, estimatedTokens };
 }
 
 async function releaseUsage(uid: string, reservationId: string): Promise<void> {
@@ -825,6 +951,13 @@ async function finalizeUsage(
     const actualCostMicros = policy.costEnabled
       ? calculateAiCostMicros(price, usage.inputTokens, usage.outputTokens)
       : 0;
+    // The day's REAL token total. Accumulated whether or not the budget is the
+    // enforced kind, so activating the limit inherits history instead of
+    // starting from zero, and `usage.source` records whether the provider
+    // reported the number or the server had to estimate it.
+    const tokensDayMatches = String(data.tokensDayKey || "") === currentDay;
+    const tokensBeforeToday = tokensDayMatches ? Math.max(0, Math.round(Number(data.tokensUsedDay) || 0)) : 0;
+    const tokensChargedToday = Math.max(0, Math.round(Number(usage.totalTokens) || 0));
     tx.set(ref, {
       uid,
       dayKey: currentDay,
@@ -840,6 +973,10 @@ async function finalizeUsage(
       windowLimit: policy.windowLimit,
       costEnabled: policy.costEnabled,
       costBudgetMicros: policy.costBudgetMicros,
+      tokenBudgetEnabled: policy.tokenBudgetEnabled,
+      dailyTokenBudget: policy.dailyTokenBudget,
+      tokensDayKey: currentDay,
+      tokensUsedDay: tokensBeforeToday + tokensChargedToday,
       termKey: policy.termKey,
       termStartsAt: policy.termStartsAt,
       termEndsAt: policy.termEndsAt,
@@ -852,6 +989,7 @@ async function finalizeUsage(
         totalTokens: usage.totalTokens,
         usageSource: usage.source,
         estimatedReservedCostMicros: reservation.estimatedCostMicros,
+        estimatedReservedTokens: reservation.estimatedTokens,
         actualCostMicros,
         completedAt: now,
       },

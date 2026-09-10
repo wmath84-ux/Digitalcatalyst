@@ -30,6 +30,11 @@ import {
 import { CURRICULUM_SYSTEM_PROMPT, normalizeCurriculumClass } from "./curriculumCatalog";
 import type { CurriculumClass } from "../data/curriculum";
 import { normalizeAiModelPricing, type AiModelPrice } from "../../../utils/aiPolicy.js";
+import {
+  normalizeAiTokenBudgetValue,
+  normalizeAiAllowancePolicy as sharedNormalizeAiAllowancePolicy,
+  PLAN_AI_DAILY_TOKEN_DEFAULTS,
+} from "../../../utils/aiAllowances.js";
 import { planModeEnforcement } from "../../../utils/questionTypeGuard.js";
 
 export type { AiModelPrice } from "../../../utils/aiPolicy.js";
@@ -78,8 +83,22 @@ export type CatalogAiSettings = {
   windowHours: number;
   /** Max AI generations inside the rolling window (0 = same as daily, -1 unlimited). */
   windowLimit: number;
-  /** Generation-only keeps legacy counting; hybrid also enforces the purchased term's model-cost budget. */
-  allowancePolicy: "generation-only" | "hybrid";
+  /**
+   * Which allowance kind the server enforces:
+   *  · `token-budget` (default) — a per-learner budget of REAL model tokens per
+   *    local calendar day, counted from the provider's own usage report and reset
+   *    at midnight. The test count and rolling window are not enforced.
+   *  · `generation-only` — the legacy "N successful tests per day" counting.
+   *  · `hybrid` — that counting plus the purchased term's model-cost budget.
+   */
+  allowancePolicy: "generation-only" | "hybrid" | "token-budget";
+  /**
+   * Daily token budget for learners WITHOUT a plan that configures one (free
+   * learners). Plan-level budgets live in the subscription plan's
+   * `aiAllowances.dailyTokenBudget` and always win for subscribers.
+   * -1 = unlimited.
+   */
+  dailyTokenBudget: number;
   /** Admin-maintained dynamic pricing catalog. No source edit is needed when models or prices change. */
   modelPricing: AiModelPrice[];
   /** Conservative output-token reservation used before provider usage is available. */
@@ -807,6 +826,15 @@ export async function generateRevisionQuestions(args: RevisionGenerateArgs): Pro
 /* Admin-published defaults (stored in the revision catalog)           */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The admin's allowance-kind switch. Delegates to the same helper the server
+ * policy uses (`utils/aiAllowances.js`), so the admin UI and the API can never
+ * disagree about what an unrecognised value means.
+ */
+export function normalizeAiAllowancePolicy(value: unknown): CatalogAiSettings["allowancePolicy"] {
+  return sharedNormalizeAiAllowancePolicy(value);
+}
+
 export function defaultCatalogAiSettings(): CatalogAiSettings {
   return {
     provider: "gemini",
@@ -818,7 +846,12 @@ export function defaultCatalogAiSettings(): CatalogAiSettings {
     dailyLimit: 20,
     windowHours: 5,
     windowLimit: 10,
-    allowancePolicy: "generation-only",
+    // The daily real-token budget is the default allowance kind everywhere:
+    // a fresh catalog enforces it from the first request, so no deployment can
+    // run with the count-based limit that a learner can outrun by asking for a
+    // longer generation.
+    allowancePolicy: "token-budget",
+    dailyTokenBudget: PLAN_AI_DAILY_TOKEN_DEFAULTS.free,
     modelPricing: [],
     estimatedOutputTokensPerQuestion: 350,
   };
@@ -874,7 +907,8 @@ export function normalizeCatalogAiSettings(raw: unknown): CatalogAiSettings {
     dailyLimit,
     windowHours,
     windowLimit,
-    allowancePolicy: r.allowancePolicy === "hybrid" ? "hybrid" : "generation-only",
+    allowancePolicy: normalizeAiAllowancePolicy(r.allowancePolicy),
+    dailyTokenBudget: normalizeAiTokenBudgetValue(r.dailyTokenBudget, PLAN_AI_DAILY_TOKEN_DEFAULTS.free),
     modelPricing: normalizeAiModelPricing(r.modelPricing),
     estimatedOutputTokensPerQuestion: clampLimit(
       r.estimatedOutputTokensPerQuestion,

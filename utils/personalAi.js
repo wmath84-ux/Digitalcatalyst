@@ -1208,6 +1208,14 @@ export const personalAiFailure = (input) => {
       case "AI_ALLOWANCE_REACHED":
       case "AI_COST_ALLOWANCE_REACHED":
         return { message: message || "You've reached your AI allowance for now. It resets automatically — or upgrade for a higher limit.", retryable: false, upgrade: true, kind: "limit" };
+      // The daily real-token budget. Distinct from the count allowance because
+      // the honest advice is "wait for midnight", and only a request that is
+      // bigger than the whole remaining day can be trimmed by asking for less.
+      case "AI_TOKEN_BUDGET_REACHED":
+        return { message: message || "Today's AI token budget is used up. It resets at midnight your local time — or upgrade for a larger daily budget.", retryable: false, upgrade: true, kind: "limit" };
+      // AI Mentor is gated by its own subscription feature (ai-mentor).
+      case "AI_MENTOR_PLAN_REQUIRED":
+        return { message: message || "AI Mentor isn't included in your current plan. Upgrade to unlock it.", retryable: false, upgrade: true, kind: "entitlement" };
       case "REVISION_SUBSCRIPTION_REQUIRED":
       case "PLAN_REQUIRED":
       case "ENTITLEMENT_REQUIRED":

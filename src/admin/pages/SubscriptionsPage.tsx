@@ -6,6 +6,11 @@ import { useConfirm, useToast } from "@/components/admin/AdminProviders";
 import { adminFetch } from "@/lib/admin/client";
 import { resolveFeaturePrice, toPaise } from "../../../utils/featurePricing";
 import {
+  defaultAiDailyTokensForPlan,
+  formatAiDailyTokens,
+  normalizeAiTokenBudgetValue,
+} from "../../../utils/aiAllowances.js";
+import {
   defaultPersonalModulesForPlan,
   normalizePlanPersonalModules,
   PERSONAL_COURSE_TYPE_ORDER,
@@ -26,8 +31,8 @@ type Plan = {
   active: boolean;
   revisionTestBankLimits: { monthly: number; yearly: number };
   aiAllowances: {
-    monthly: { dailyGenerationLimit: number; costBudgetMicros: number };
-    yearly: { dailyGenerationLimit: number; costBudgetMicros: number };
+    monthly: { dailyGenerationLimit: number; costBudgetMicros: number; dailyTokenBudget: number };
+    yearly: { dailyGenerationLimit: number; costBudgetMicros: number; dailyTokenBudget: number };
   };
   /** Phase-1: which billing cycles are SHOWN to non-subscribers. */
   visibleCycles?: string[];
@@ -108,7 +113,7 @@ type SubscriptionProductRow = {
   subscriberPricingOverride?: { monthly: number | null; yearly: number | null; lifetime: number | null };
 };
 
-const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }, { cycle: "yearly", label: "Yearly", price: 0 }], revisionTestBankLimits: { monthly: 20, yearly: 20 }, aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1 } }, accessTier: "basic", cta: "Subscribe", featured: false, active: true, personalModules: defaultPersonalModulesForPlan("new", 0, 0) };
+const EMPTY_PLAN: Partial<Plan> = { name: "", description: "", billingCycles: [{ cycle: "monthly", label: "Monthly", price: 0 }, { cycle: "yearly", label: "Yearly", price: 0 }], revisionTestBankLimits: { monthly: 20, yearly: 20 }, aiAllowances: { monthly: { dailyGenerationLimit: 20, costBudgetMicros: -1, dailyTokenBudget: 2_000_000 }, yearly: { dailyGenerationLimit: 20, costBudgetMicros: -1, dailyTokenBudget: 2_000_000 } }, accessTier: "basic", cta: "Subscribe", featured: false, active: true, personalModules: defaultPersonalModulesForPlan("new", 0, 0) };
 const EMPTY_FEATURE: Partial<FeatureRow> = { key: "", name: "", description: "", individualPrice: "0", monthlyPrice: "", yearlyPrice: "", planPricing: {}, icon: "sparkles", included: false, badge: "", sortOrder: 0, freeItemsPerDay: 1, active: true };
 const EMPTY_SUB_PRODUCT: Partial<SubscriptionProductRow> = { productId: "", name: "", individualPrice: "0", monthlyPrice: "", yearlyPrice: "", planPricing: {}, included: false, sortOrder: 0, active: true };
 
@@ -554,6 +559,7 @@ export default function SubscriptionsPage() {
                   </p>
                   <p className="mt-1 text-[11px] font-semibold text-violet-600">
                     School AI/day: {p.aiAllowances?.monthly?.dailyGenerationLimit === 0 ? "Unlimited" : p.aiAllowances?.monthly?.dailyGenerationLimit ?? 20} monthly · {p.aiAllowances?.yearly?.dailyGenerationLimit === 0 ? "Unlimited" : p.aiAllowances?.yearly?.dailyGenerationLimit ?? 20} yearly
+                    {" · "}tokens/day: {formatAiDailyTokens(p.aiAllowances?.monthly?.dailyTokenBudget ?? defaultAiDailyTokensForPlan(p.id))} monthly · {formatAiDailyTokens(p.aiAllowances?.yearly?.dailyTokenBudget ?? defaultAiDailyTokensForPlan(p.id))} yearly
                   </p>
                   <p className="mt-1 text-[11px] font-semibold text-fuchsia-600">
                     My Modules: {p.personalModules?.enabled ? "Enabled" : "Off"} · {p.personalModules?.monthly?.moduleLimit ?? "—"} monthly modules · {p.personalModules?.yearly?.moduleLimit ?? "—"} yearly modules
@@ -1054,22 +1060,23 @@ export default function SubscriptionsPage() {
             <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3">
               <p className="text-sm font-semibold text-slate-900">School AI allowances</p>
               <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-                Configure each billing duration independently. Every successfully generated complete test uses one daily generation. Cost budget is the maximum school-model spend for that purchased term; leave it blank for unlimited. A learner&apos;s own API key never uses either allowance.
+                Configure each billing duration independently. The daily token budget is the active limit: real model tokens a learner may spend per day, counted server-side from the provider's usage report and reset at their local midnight. Every successfully generated complete test uses one daily generation (only enforced when the school selects Generation-only / Hybrid), and the cost budget caps school-model spend for that purchased term. A learner&apos;s own API key never uses any of these.
               </p>
               {(["monthly", "yearly"] as const).map((cycle) => {
-                const allowance = editingPlan.aiAllowances?.[cycle] ?? { dailyGenerationLimit: 20, costBudgetMicros: -1 };
+                const planTokenDefault = defaultAiDailyTokensForPlan(editingPlan.id || editingPlan.name);
+                const allowance = editingPlan.aiAllowances?.[cycle] ?? { dailyGenerationLimit: 20, costBudgetMicros: -1, dailyTokenBudget: planTokenDefault };
                 const setAllowance = (patch: Partial<typeof allowance>) => setEditingPlan({
                   ...editingPlan,
                   aiAllowances: {
-                    monthly: editingPlan.aiAllowances?.monthly ?? { dailyGenerationLimit: 20, costBudgetMicros: -1 },
-                    yearly: editingPlan.aiAllowances?.yearly ?? { dailyGenerationLimit: 20, costBudgetMicros: -1 },
+                    monthly: editingPlan.aiAllowances?.monthly ?? { dailyGenerationLimit: 20, costBudgetMicros: -1, dailyTokenBudget: 2_000_000 },
+                    yearly: editingPlan.aiAllowances?.yearly ?? { dailyGenerationLimit: 20, costBudgetMicros: -1, dailyTokenBudget: 2_000_000 },
                     [cycle]: { ...allowance, ...patch },
                   },
                 });
                 return (
                   <div key={cycle} className="mt-3 rounded-lg border border-violet-100 bg-white p-2.5">
                     <p className="mb-2 text-xs font-bold capitalize text-violet-800">{cycle} membership</p>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                       <Field label="Successful tests / day" hint="0 = unlimited">
                         <input
                           className={inputClass}
@@ -1078,6 +1085,22 @@ export default function SubscriptionsPage() {
                           max={10000}
                           value={allowance.dailyGenerationLimit}
                           onChange={(e) => setAllowance({ dailyGenerationLimit: Math.max(0, Math.min(10000, Math.round(Number(e.target.value) || 0))) })}
+                        />
+                      </Field>
+                      <Field label="Tokens / day" hint={`Real model tokens per day. Blank = this plan's default (${formatAiDailyTokens(planTokenDefault)}).`}>
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min={0}
+                          step={100000}
+                          placeholder={formatAiDailyTokens(planTokenDefault)}
+                          value={allowance.dailyTokenBudget < 0 ? "" : allowance.dailyTokenBudget}
+                          onChange={(e) => setAllowance({
+                            dailyTokenBudget: e.target.value === ""
+                              ? planTokenDefault
+                              : normalizeAiTokenBudgetValue(e.target.value, planTokenDefault),
+                          })}
+                          data-admin-plan-ai-daily-tokens=""
                         />
                       </Field>
                       <Field label="Term cost budget (USD)" hint="Blank = unlimited">

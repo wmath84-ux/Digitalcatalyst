@@ -48,10 +48,15 @@ export interface SubscriptionPlanDoc {
   sortOrder: number;
   /** Cloud Test Bank capacity per billing duration (-1 = unlimited). */
   revisionTestBankLimits: { monthly: number; yearly: number };
-  /** School-AI daily successful-test and per-term model-cost allowances. */
+  /**
+   * School-AI allowances for this plan: the daily successful-test count, the
+   * per-term model-cost budget, and the active daily real-token budget
+   * (`dailyTokenBudget`, counted server-side from the provider's usage report
+   * and reset at the learner's local midnight; -1 = unlimited).
+   */
   aiAllowances: {
-    monthly: { dailyGenerationLimit: number; costBudgetMicros: number };
-    yearly: { dailyGenerationLimit: number; costBudgetMicros: number };
+    monthly: { dailyGenerationLimit: number; costBudgetMicros: number; dailyTokenBudget?: number };
+    yearly: { dailyGenerationLimit: number; costBudgetMicros: number; dailyTokenBudget?: number };
   };
 }
 

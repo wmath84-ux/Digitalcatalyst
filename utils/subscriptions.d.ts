@@ -128,6 +128,8 @@ export interface SubscriptionRecord {
   aiDailyGenerationLimit?: number;
   /** Purchased school-AI model-cost budget snapshot in micro-USD (-1 = unlimited). */
   aiCostBudgetMicros?: number;
+  /** Purchased school-AI real-token budget per local calendar day (-1 = unlimited). */
+  aiDailyTokenBudget?: number;
 }
 
 export const normalisePlanDoc: (raw: unknown, id?: string) => SubscriptionPlanDoc | null;
