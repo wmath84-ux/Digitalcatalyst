@@ -886,6 +886,30 @@
   border-radius: 0.55rem;
 }
 
+/* The Schedule page's calendar makes every day a real button. `:where(button)`
+   keeps this reset at the same specificity as `.myday-cal-day`, so the
+   `--today` / `--selected` states written below still win on source order. */
+:where(button).myday-cal-day {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+button.myday-cal-day:not(.myday-cal-day--selected):hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+button.myday-cal-day:focus-visible {
+  outline: 2px solid var(--myday-ring);
+  outline-offset: 1px;
+}
+
 .myday-cal-day--edge {
   color: rgba(255, 255, 255, 0.28);
 }
@@ -1630,4 +1654,1263 @@
     overflow: hidden;
     text-overflow: clip;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * MY DAY / SCHEDULE REDESIGN
+ * ──────────────────────────────────────────────────────────────────────────
+ * Visual layer for the premium Schedule page (desktop + mobile). Like the
+ * Tasks pass before it, this file only ADDS presentation: the component keeps
+ * every prop, sort, active / next / past detection, handler, deep-link scroll
+ * and persistence path it has always had.
+ *
+ * Material discipline (unchanged): panels keep the ONE shared glass material
+ * (GlassSurface + the `dc-scene-plate` hook). These rules style INTERIORS —
+ * gradients, the time axis, the cards, the calendar panel — and never repaint
+ * the plate, so `?glass=off` and the legibility floor stay intact.
+ *
+ * The Schedule identity leans on the sky / blue accent (the Tasks page leans
+ * violet), which is the only deliberate difference in the family.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+.myday-schedule {
+  position: relative;
+  /* Decorative glows may bleed past the column — clip them instead of ever
+     causing a page-level horizontal scrollbar. */
+  overflow-x: clip;
+  padding-bottom: 2rem;
+}
+
+@media (min-width: 768px) {
+  .myday-schedule {
+    padding-bottom: 0;
+  }
+}
+
+/* Mobile: the panel is composition, not a wall. Its GlassSurface layers (the
+   plate backdrop, tint, sheen, rim) drop out below the md breakpoint — the
+   scene stays visible and each inner card floats on it, exactly like the
+   mobile reference. Desktop is untouched. */
+@media (max-width: 767.98px) {
+  .myday-scope [data-schedule-panel] > .dc-scene-plate > div[aria-hidden] {
+    display: none;
+  }
+  .myday-scope [data-schedule-panel] > .dc-scene-plate {
+    box-shadow: none !important;
+  }
+}
+
+/* ── Hero cover ───────────────────────────────────────────────────────────── */
+.myday-sched-hero {
+  position: relative;
+  overflow: hidden;
+  margin: 0.65rem;
+  border-radius: 1.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(120% 150% at 88% -40%, rgba(56, 189, 248, 0.26), transparent 58%),
+    radial-gradient(90% 120% at 8% 120%, rgba(99, 102, 241, 0.22), transparent 60%),
+    linear-gradient(150deg, rgba(10, 16, 36, 0.62), rgba(6, 10, 24, 0.55));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.myday-sched-hero .myday-hero-art svg {
+  width: 72%;
+  min-width: 260px;
+  right: -1%;
+  bottom: -10%;
+  opacity: 0.88;
+}
+
+@media (min-width: 640px) {
+  .myday-sched-hero {
+    margin: 0.9rem;
+  }
+  .myday-sched-hero .myday-hero-art svg {
+    width: 60%;
+    bottom: -6%;
+  }
+}
+
+/* The Add Event CTA — sky/blue, so it reads as Schedule's own action next to
+   the Tasks page's violet one. Compact on a phone, never wrapping. */
+.myday-sched-add {
+  padding: 0.48rem 0.8rem;
+  font-size: 0.74rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, #38bdf8, #3b82f6 55%, #4f46e5);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .myday-sched-add {
+    padding: 0.55rem 1.05rem;
+    font-size: 0.8rem;
+  }
+}
+
+.myday-scope .myday-sched-hero .myday-date-pill {
+  font-size: 10.5px;
+  padding: 0.3rem 0.65rem;
+}
+
+@media (min-width: 640px) {
+  .myday-scope .myday-sched-hero .myday-date-pill {
+    font-size: 0.72rem;
+    padding: 0.35rem 0.8rem;
+  }
+}
+
+/* Live status line under the headline — small, one line, truncating. */
+.myday-sched-hero-note {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+  min-width: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #bae6fd;
+  text-shadow: 0 1px 12px rgba(4, 8, 20, 0.7);
+}
+
+/* Desktop right rail — the live clock over the day's shape. */
+.myday-sched-rail {
+  display: none;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .myday-sched-rail {
+    display: flex;
+  }
+}
+
+.myday-sched-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  border-radius: 1.05rem;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  background: rgba(8, 13, 30, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  padding: 0.55rem 0.85rem;
+}
+
+.myday-sched-clock-time {
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.myday-sched-clock-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(186, 230, 253, 0.85);
+}
+
+.myday-sched-railstats {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.myday-sched-railstats > div {
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 13, 30, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 0.35rem 0.6rem;
+  text-align: right;
+}
+
+.myday-sched-railstats dt {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.myday-sched-railstats dd {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+/* Phone day card — the mobile reference's own glass moment under the title;
+   from `sm` the hero rail carries the clock and this steps aside. */
+.myday-sched-daycard {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.85rem;
+  border-radius: 1.05rem;
+  border: 1px solid rgba(125, 211, 252, 0.2);
+  background: rgba(8, 13, 30, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  padding: 0.6rem 0.7rem;
+}
+
+@media (min-width: 640px) {
+  .myday-sched-daycard {
+    display: none;
+  }
+}
+
+.myday-sched-daycard-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: linear-gradient(140deg, rgba(56, 189, 248, 0.22), rgba(79, 70, 229, 0.16));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 900;
+  color: #e0f2fe;
+  font-variant-numeric: tabular-nums;
+}
+
+.myday-sched-daycard-count {
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.24rem 0.5rem;
+  font-size: 10px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+}
+
+/* ── Day selector strip ───────────────────────────────────────────────────── */
+.myday-sched-datestrip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.85rem 0.65rem 0;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 13, 30, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  padding: 0.4rem 0.45rem;
+}
+
+@media (min-width: 640px) {
+  .myday-sched-datestrip {
+    margin: 0.2rem 0.9rem 0;
+    padding: 0.45rem 0.6rem;
+  }
+}
+
+.myday-sched-daynav {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.myday-sched-daynav:hover {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(125, 211, 252, 0.4);
+  color: #fff;
+}
+
+.myday-sched-daynav:active {
+  transform: scale(0.95);
+}
+
+.myday-sched-daynav:focus-visible {
+  outline: 2px solid var(--myday-ring);
+  outline-offset: 2px;
+}
+
+.myday-sched-daykind {
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: #fff;
+  line-height: 1.15;
+}
+
+.myday-sched-daydate {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(186, 230, 253, 0.85);
+}
+
+/* Honest context line: the plan is a daily one, so an off-today view says so. */
+.myday-sched-dayhint {
+  margin: 0.5rem 0.65rem 0;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+@media (min-width: 640px) {
+  .myday-sched-dayhint {
+    margin: 0.5rem 0.9rem 0;
+  }
+}
+
+/* ── Body: calendar panel beside the timeline ─────────────────────────────── */
+.myday-sched-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.85rem;
+  margin: 0.85rem 0.65rem 0.65rem;
+}
+
+@media (min-width: 640px) {
+  .myday-sched-body {
+    margin: 0.85rem 0.9rem 0.9rem;
+    gap: 1rem;
+  }
+}
+
+/* 1024–1279px: the calendar earns its column, but the timeline keeps the
+   majority of the width — the gutter tightens so a card never drops below a
+   comfortable ~300px inside the bounded content column. */
+@media (min-width: 1024px) {
+  .myday-sched-body {
+    grid-template-columns: minmax(0, 14.5rem) minmax(0, 1fr);
+    align-items: start;
+  }
+  .myday-tl-row,
+  .myday-tl-nowrow {
+    grid-template-columns: 4.6rem 1.6rem minmax(0, 1fr);
+  }
+  .myday-tl-time {
+    padding-right: 0.25rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .myday-sched-body {
+    grid-template-columns: minmax(0, 18rem) minmax(0, 1fr);
+  }
+  .myday-tl-row,
+  .myday-tl-nowrow {
+    grid-template-columns: 5.25rem 1.75rem minmax(0, 1fr);
+  }
+  .myday-tl-time {
+    padding-right: 0.35rem;
+  }
+}
+
+.myday-sched-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+/* On a phone / tablet the month grid steps aside — the compact day strip above
+   already carries the date, and a full month on a 360px screen is noise. */
+@media (max-width: 1023.98px) {
+  .myday-sched-side {
+    display: none;
+  }
+}
+
+.myday-sched-cal {
+  min-width: 0;
+}
+
+.myday-sched-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.myday-sched-stat {
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 14, 30, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  padding: 0.55rem 0.7rem;
+}
+
+.myday-sched-stat dt {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.myday-sched-stat dd {
+  margin: 0.1rem 0 0;
+  font-size: 1.02rem;
+  font-weight: 900;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Block mix — a small, honest read on how the day is spent. */
+.myday-sched-mix {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0.75rem 0.8rem;
+  border-radius: 1.05rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 14, 30, 0.5);
+}
+
+.myday-sched-mixrow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.myday-sched-mixicon {
+  display: grid;
+  place-items: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  flex-shrink: 0;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.myday-sched-mixlabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.myday-sched-mixcount {
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+.myday-sched-mixbar {
+  display: block;
+  margin-top: 0.25rem;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.myday-sched-mixbar > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(var(--tl-rgb), 0.95), rgba(var(--tl-rgb), 0.45));
+  box-shadow: 0 0 10px -2px rgba(var(--tl-rgb), 0.8);
+}
+
+/* ── Timeline column ──────────────────────────────────────────────────────── */
+.myday-sched-main {
+  min-width: 0;
+}
+
+.myday-sched-mainhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.15rem 0.6rem;
+}
+
+.myday-sched-maintitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.myday-sched-mainsub {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(186, 230, 253, 0.8);
+  font-variant-numeric: tabular-nums;
+}
+
+.myday-tl {
+  position: relative;
+  min-width: 0;
+}
+
+/* ── One timeline row: time gutter · axis rail · card ─────────────────────── */
+.myday-tl-row {
+  display: grid;
+  grid-template-columns: 5.25rem 1.75rem minmax(0, 1fr);
+  grid-template-areas: "time rail card";
+  column-gap: 0.1rem;
+  min-width: 0;
+}
+
+.myday-tl-time {
+  grid-area: time;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-top: 0.95rem;
+  padding-right: 0.35rem;
+  text-align: right;
+}
+
+.myday-tl-rail {
+  grid-area: rail;
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.myday-tl-card {
+  grid-area: card;
+}
+
+.myday-tl-start {
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.2;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.myday-tl-end {
+  margin-top: 0.05rem;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.myday-tl-dur {
+  margin-top: 0.3rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.05rem 0.35rem;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+
+/* The axis: a faint luminous line bridging every row. */
+.myday-tl-rail::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: -1rem;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.16) 24%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+}
+
+.myday-tl-row:last-child .myday-tl-rail::before {
+  bottom: auto;
+  height: 2.1rem;
+}
+
+/* The "now" marker can be the last row on screen. Two separate rules (not a
+   selector list) so a browser without `:has()` only loses this refinement and
+   keeps the `:last-child` case above. */
+.myday-tl-row:nth-last-child(2):has(+ .myday-tl-nowrow) .myday-tl-rail::before {
+  bottom: auto;
+  height: 2.1rem;
+}
+
+/* The dot — small, elegant, coloured by the event's own type. */
+.myday-tl-dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  margin-top: 0.85rem;
+  border-radius: 999px;
+  color: rgb(var(--tl-rgb));
+  background:
+    radial-gradient(80% 80% at 50% 0%, rgba(var(--tl-rgb), 0.32), rgba(var(--tl-rgb), 0.08)),
+    rgba(9, 14, 32, 0.94);
+  border: 1px solid rgba(var(--tl-rgb), 0.5);
+  box-shadow: 0 0 0 3px rgba(9, 14, 32, 0.75);
+}
+
+.myday-tl-dot--past {
+  opacity: 0.55;
+}
+
+.myday-tl-dot--next {
+  border-color: rgba(var(--tl-rgb), 0.85);
+  box-shadow:
+    0 0 0 3px rgba(9, 14, 32, 0.75),
+    0 0 16px -2px rgba(var(--tl-rgb), 0.75);
+}
+
+/* Live: a restrained breathing ring — never a flashing beacon. */
+.myday-tl-dot--live {
+  border-color: rgba(var(--tl-rgb), 0.95);
+  box-shadow:
+    0 0 0 3px rgba(9, 14, 32, 0.75),
+    0 0 22px -2px rgba(var(--tl-rgb), 0.9);
+  animation: myday-tl-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes myday-tl-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(9, 14, 32, 0.75), 0 0 12px -4px rgba(var(--tl-rgb), 0.55); }
+  50%      { box-shadow: 0 0 0 3px rgba(9, 14, 32, 0.75), 0 0 22px -2px rgba(var(--tl-rgb), 0.9); }
+}
+
+/* ── Event card ───────────────────────────────────────────────────────────── */
+.myday-tl-card {
+  cursor: pointer;
+  transition: transform 0.2s ease, filter 0.2s ease;
+  min-width: 0;
+}
+
+.myday-tl-card:hover {
+  transform: translateY(-1px);
+}
+
+.myday-tl-card:active {
+  transform: scale(0.995);
+}
+
+.myday-tl-card:focus-visible {
+  outline: 2px solid var(--myday-ring);
+  outline-offset: 2px;
+}
+
+.myday-tl-card-in {
+  position: relative;
+  padding: 0.8rem 0.85rem;
+  min-width: 0;
+}
+
+/* A hairline accent on the leading edge — the card's type, at a whisper. */
+.myday-tl-card-in::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.9rem;
+  bottom: 0.9rem;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(to bottom, rgba(var(--tl-rgb), 0.85), rgba(var(--tl-rgb), 0.15));
+  opacity: 0.75;
+}
+
+.myday-tl-card--live {
+  box-shadow:
+    inset 0 0 0 1px rgba(99, 102, 241, 0.55),
+    0 0 26px -10px rgba(99, 102, 241, 0.75) !important;
+  background: linear-gradient(120deg, rgba(99, 102, 241, 0.14), rgba(56, 189, 248, 0.05) 60%) !important;
+}
+
+.myday-tl-card--next {
+  box-shadow:
+    inset 0 0 0 1px rgba(56, 189, 248, 0.5),
+    0 0 24px -12px rgba(56, 189, 248, 0.7) !important;
+  background: linear-gradient(120deg, rgba(56, 189, 248, 0.1), transparent 60%) !important;
+}
+
+.myday-tl-card--flash {
+  box-shadow:
+    inset 0 0 0 2px rgba(56, 189, 248, 0.9),
+    0 0 30px -10px rgba(56, 189, 248, 0.9) !important;
+}
+
+/* Past: present and legible, never nearly invisible. */
+.myday-tl-card--past {
+  opacity: 0.72;
+}
+
+.myday-tl-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.myday-tl-icon {
+  display: grid;
+  place-items: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  flex-shrink: 0;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.myday-tl-titlerow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.myday-tl-title {
+  min-width: 0;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: #fff;
+  /* Two lines on a wide card, then an ellipsis — a long title never explodes
+     the row horizontally. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.myday-tl-detail {
+  margin-top: 0.2rem;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.6);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.myday-tl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.myday-tl-badge--live {
+  color: #e0e7ff;
+  border-color: rgba(129, 140, 248, 0.6);
+  background: rgba(99, 102, 241, 0.28);
+}
+
+.myday-tl-badge--live > i {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #c7d2fe;
+  box-shadow: 0 0 8px 1px rgba(199, 210, 254, 0.9);
+  animation: myday-tl-blink 2.6s ease-in-out infinite;
+}
+
+@keyframes myday-tl-blink {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 1; }
+}
+
+.myday-tl-badge--next {
+  color: #bae6fd;
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(56, 189, 248, 0.18);
+}
+
+.myday-tl-badge--done {
+  color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Metadata rail: time, type and duration — small but scannable. */
+.myday-tl-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+  padding-left: 2.75rem;
+  min-width: 0;
+}
+
+.myday-tl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.14rem 0.5rem;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
+}
+
+.myday-tl-chip--time {
+  color: rgba(255, 255, 255, 0.92);
+  font-variant-numeric: tabular-nums;
+}
+
+.myday-tl-chip--type {
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+/* Row actions — always reachable on touch, revealed on hover where hover
+   exists (the `(hover: hover)` gate is pinned by the My Day contract). They
+   sit in the flow (never on top of the title) so hiding them costs no layout
+   shift and a thumb always lands on a real ≥36px target. */
+.myday-tl-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.myday-tl-action {
+  border-radius: 999px;
+}
+
+/* Touch: a comfortable ≥36px hit pad on phones. */
+@media (max-width: 639.98px) {
+  .myday-tl-action {
+    padding: 4px;
+    margin: -4px;
+  }
+}
+
+/* ── The live "now" marker ────────────────────────────────────────────────── */
+.myday-tl-nowrow {
+  display: grid;
+  grid-template-columns: 5.25rem 1.75rem minmax(0, 1fr);
+  grid-template-areas: "time rail card";
+  column-gap: 0.1rem;
+  align-items: center;
+  min-height: 1.9rem;
+}
+
+.myday-tl-nowrow-time {
+  grid-area: time;
+  text-align: right;
+  padding-right: 0.35rem;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #7dd3fc;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.myday-tl-nowrow-rail {
+  grid-area: rail;
+  display: grid;
+  place-items: center;
+}
+
+.myday-tl-nowrow-rail > i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #38bdf8;
+  box-shadow: 0 0 12px 2px rgba(56, 189, 248, 0.75);
+}
+
+.myday-tl-nowrow-line {
+  grid-area: card;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(to right, rgba(56, 189, 248, 0.75), rgba(56, 189, 248, 0.05));
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.myday-sched-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border-radius: 1.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  padding: 2.2rem 1.1rem 2rem;
+}
+
+.myday-sched-empty-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 4.6rem;
+  height: 4.6rem;
+  border-radius: 1.45rem;
+  color: #bae6fd;
+  border: 1px solid rgba(125, 211, 252, 0.45);
+  background: radial-gradient(80% 70% at 50% 0%, rgba(56, 189, 248, 0.32), rgba(56, 189, 248, 0.12));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 34px -6px rgba(56, 189, 248, 0.55),
+    0 18px 40px -18px rgba(2, 6, 16, 0.9);
+}
+
+.myday-sched-empty-spark {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #7dd3fc;
+  box-shadow: 0 0 10px 2px rgba(125, 211, 252, 0.8);
+}
+
+.myday-sched-empty-spark--a { top: -5px; right: -6px; }
+.myday-sched-empty-spark--b { bottom: 4px; left: -9px; width: 5px; height: 5px; opacity: 0.7; }
+
+.myday-sched-empty-title {
+  margin-top: 1.05rem;
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: -0.015em;
+  color: var(--myday-ink);
+  text-shadow: 0 2px 14px rgba(4, 8, 20, 0.5);
+}
+
+.myday-sched-empty-sub {
+  margin-top: 0.35rem;
+  max-width: 22rem;
+  font-size: 0.83rem;
+  line-height: 1.55;
+  color: var(--myday-ink-soft);
+}
+
+/* Closing line under the timeline. */
+.myday-sched-footquote {
+  margin-top: 1rem;
+  padding: 0 0.5rem 0.35rem;
+  text-align: center;
+  font-size: 0.78rem;
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1.5;
+  color: rgba(186, 230, 253, 0.85);
+  text-shadow: 0 1px 10px rgba(4, 8, 20, 0.6);
+}
+
+/* ── Phone FAB ────────────────────────────────────────────────────────────── */
+.myday-sched-fab {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 5.75rem);
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 3.15rem;
+  padding: 0 1.15rem 0 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: linear-gradient(135deg, #38bdf8, #3b82f6 55%, #4f46e5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 14px 30px -8px rgba(37, 99, 235, 0.85);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 900;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.myday-sched-fab:active {
+  transform: scale(0.96);
+}
+
+.myday-sched-fab:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 3px;
+}
+
+@media (min-width: 768px) {
+  .myday-sched-fab {
+    display: none;
+  }
+}
+
+/* The dock sits under the FAB — keep the last card clear of both. */
+@media (max-width: 767.98px) {
+  .myday-schedule {
+    padding-bottom: 7rem;
+  }
+}
+
+/* ── Calendar: the Schedule page's panel variant ──────────────────────────── */
+.myday-cal--panel {
+  border-radius: 1.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 14, 30, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  padding: 0.85rem 0.9rem 0.9rem;
+}
+
+.myday-cal--panel .myday-cal-head {
+  margin-bottom: 0.6rem;
+}
+
+.myday-cal-year {
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 700;
+}
+
+.myday-cal--panel .myday-cal-grid {
+  gap: 0.2rem;
+}
+
+.myday-cal--panel .myday-cal-day {
+  height: 1.95rem;
+  font-size: 11.5px;
+}
+
+/* A real selected state: the day the page is showing. */
+.myday-cal-day--selected {
+  color: #04121f !important;
+  background: linear-gradient(140deg, #7dd3fc, #38bdf8 60%, #0ea5e9) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  font-weight: 900 !important;
+  box-shadow: 0 0 18px -6px rgba(56, 189, 248, 0.9);
+}
+
+.myday-cal-day--today:not(.myday-cal-day--selected) {
+  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.7);
+}
+
+/* ── Motion discipline ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .myday-tl-card,
+  .myday-sched-daynav,
+  .myday-sched-fab {
+    transition: none;
+  }
+  .myday-tl-card:hover {
+    transform: none;
+  }
+  .myday-tl-dot--live,
+  .myday-tl-badge--live > i {
+    animation: none;
+  }
+}
+
+/* ── Phone composition: the time moves above the card ─────────────────────── */
+@media (max-width: 767.98px) {
+  .myday-tl-row {
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+    grid-template-areas:
+      "spacer time"
+      "rail   card";
+    column-gap: 0.4rem;
+    row-gap: 0.35rem;
+  }
+  .myday-tl-time {
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    padding-top: 0;
+    padding-right: 0;
+    text-align: left;
+  }
+  .myday-tl-start { font-size: 0.82rem; }
+  .myday-tl-end { margin-top: 0; }
+  .myday-tl-end::before { content: "– "; }
+  .myday-tl-dur { margin-top: 0; }
+
+  .myday-tl-dot { margin-top: 0.15rem; }
+  .myday-tl-row:last-child .myday-tl-rail::before { height: 1.6rem; }
+  .myday-tl-row:nth-last-child(2):has(+ .myday-tl-nowrow) .myday-tl-rail::before { height: 1.6rem; }
+
+  .myday-tl-meta { padding-left: 0; }
+
+  .myday-tl-nowrow {
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+    grid-template-areas: "rail card";
+    column-gap: 0.4rem;
+    min-height: 1.5rem;
+  }
+  .myday-tl-nowrow-time { display: none; }
+
+  /* Two comfortable lines beat a hard one-line ellipsis on a phone. */
+  .myday-tl-detail { -webkit-line-clamp: 3; }
+}
+
+/* ── Schedule modal interior ──────────────────────────────────────────────
+ * The sheet itself (GlassSurface + `dc-scene-plate` + the overlay maths) is
+ * shared and untouched — these rules give the FORM its Schedule identity:
+ * a hero strip, grouped fields, a live duration readout and a roomier type
+ * picker. Every `.dc-field` / `.dc-tile` string the contract pins is intact;
+ * the restyle happens on the wrappers around them. */
+.myday-sched-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.05rem;
+}
+
+.myday-sched-form-hero {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  background:
+    radial-gradient(120% 140% at 92% -30%, rgba(56, 189, 248, 0.26), transparent 62%),
+    linear-gradient(150deg, rgba(10, 16, 36, 0.55), rgba(6, 10, 24, 0.4));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  padding: 0.75rem 0.85rem;
+}
+
+.myday-sched-form-hero-icon {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  flex-shrink: 0;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: linear-gradient(140deg, #38bdf8, #3b82f6 55%, #4f46e5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 10px 24px -10px rgba(37, 99, 235, 0.9);
+  color: #fff;
+}
+
+.myday-sched-form-hero-title {
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+.myday-sched-form-hero-sub {
+  margin-top: 0.1rem;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.myday-sched-field {
+  min-width: 0;
+}
+
+.myday-sched-field-hint {
+  margin-top: 0.35rem;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* The two native time inputs share one well, with the live duration under
+   them — the sheet never has to guess how long a block is. */
+.myday-sched-timegroup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  padding: 0.85rem 0.9rem 0.8rem;
+}
+
+.myday-sched-duration {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.12);
+  padding: 0.18rem 0.6rem;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #bae6fd;
+  white-space: nowrap;
+}
+
+.myday-sched-duration--warn {
+  border-color: rgba(251, 113, 133, 0.45);
+  background: rgba(244, 63, 94, 0.14);
+  color: #fecdd3;
+}
+
+/* Five types, no horizontal scrolling: three-up on a phone, five-up once the
+   sheet has the room. */
+.myday-sched-types {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+@media (min-width: 420px) {
+  .myday-sched-types {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.myday-sched-types .dc-tile {
+  width: 100%;
+  border-radius: 0.85rem;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.myday-sched-types .dc-tile:hover {
+  transform: translateY(-1px);
+}
+
+.myday-sched-types .dc-tile[data-selected] {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 10px 24px -12px rgba(56, 189, 248, 0.9);
 }
