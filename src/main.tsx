@@ -1,6 +1,6 @@
 import { StrictMode, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { doc, onSnapshot } from "firebase/firestore";
+import { collection, doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import "@xyflow/react/dist/style.css";
 import "./index.css";
@@ -105,6 +105,17 @@ import { ensureSavedWebPushSubscription, showLocalSystemNotification } from "../
 import { collectDueMyDayItems, collectUpcomingMyDayItems, MYDAY_UPCOMING_HORIZON_MS, type MyDayDocData } from "../utils/pushScheduler";
 import { collectDueFlowPathItems, collectUpcomingFlowPathItems, FLOWPATH_UPCOMING_HORIZON_MS, type FlowPathSchedulableItem } from "../utils/flowPathScheduler";
 import { flowpathControl } from "./flowpath/lib/flowpathControlClient";
+import {
+  INBOX_SEEN_RETENTION_MS,
+  collectUnsurfacedInboxNotifications,
+  pruneSeenMap,
+  type InboxNotificationDoc,
+} from "../utils/inboxBridge";
+import { subscribeShared } from "./lib/sharedSnapshot";
+// Reusing the bell's own query key is the point: `subscribeShared` ref-counts
+// by key, so this joins the listener the badge already opened instead of
+// adding a second one on users/{uid}/notifications.
+import { notificationsKey } from "./hooks/useUnreadNotificationCount";
 import { playSfxAdd, playSfxError, playSfxRemove } from "./utils/sfx";
 import {
   ensureReminderChannel,
@@ -1125,12 +1136,124 @@ function RootPage(): ReactNode {
     };
   }, [user]);
 
+  // Notification inbox bridge — the same reliability trick that makes My Day
+  // work, extended to every OTHER alert in the product: a new product being
+  // published, a product unlocked by a purchase, "your course has new
+  // content", subscription renewal reminders, admin announcements and
+  // community activity.
+  //
+  // Those are all generated on the server, which delivers them over Web Push /
+  // FCM and ALSO writes one idempotent doc to users/{uid}/notifications. The
+  // transport is the fragile part (VAPID keys missing, GitHub's minute pinger
+  // auto-disabled after 60 idle days, a throttled TWA service worker, device
+  // unreachable at that minute) and when it misses, the alert is gone for good
+  // — the bell fills up but nothing ever dings. Watching the bell collection
+  // instead means any server-generated alert still reaches the device: this
+  // pass renders whatever it has not rendered before, keyed by the doc id, so
+  // it can neither duplicate (tags match the server's, and each id is surfaced
+  // once per device ever) nor invent notifications (it never creates or edits
+  // a doc — see utils/inboxBridge.js for why the old client-side generator
+  // was deleted). It shares the bell's ONE Firestore listener via
+  // subscribeShared, so it costs no extra reads.
+  useEffect(() => {
+    if (!user) return undefined;
+    const shownKey = `eduvora.inboxNotifications.v1:${user.id}`;
+    const readSeen = (): Record<string, number> => {
+      try { return JSON.parse(localStorage.getItem(shownKey) || "{}"); } catch { return {}; }
+    };
+    const writeSeen = (map: Record<string, number>) => {
+      try { localStorage.setItem(shownKey, JSON.stringify(map)); } catch { /* restricted storage */ }
+    };
+    // Stable 31-bit notification id, in its own namespace (`inbox:` prefix) so
+    // a bell doc can never hash onto the same id as a My Day or FlowPath alarm
+    // and cancel it.
+    const inboxAlarmId = (key: string) => {
+      let hash = 0;
+      const seeded = `inbox:${key}`;
+      for (let i = 0; i < seeded.length; i += 1) hash = ((hash << 5) - hash + seeded.charCodeAt(i)) | 0;
+      return Math.abs(hash) || 1;
+    };
+    const pending = new Set<string>();
+    let latest: InboxNotificationDoc[] = [];
+    let lastPassAt = 0;
+
+    const runPass = () => {
+      if (latest.length === 0) return;
+      const now = Date.now();
+      lastPassAt = now;
+      const seen = readSeen();
+      const items = collectUnsurfacedInboxNotifications(latest, now, seen);
+      // Prune ids we surfaced long ago; docs stop being eligible after the
+      // freshness window, so this can never resurrect an old alert.
+      const pruned = pruneSeenMap(seen, now, INBOX_SEEN_RETENTION_MS);
+      if (Object.keys(pruned).length !== Object.keys(seen).length) writeSeen(pruned);
+      for (const item of items) {
+        if (pending.has(item.key)) continue;
+        pending.add(item.key);
+        const display = async (): Promise<boolean> => {
+          if (isAndroidNative()) {
+            // On the TWA the local-notification channel is the path that
+            // survives a locked screen and doze; reuse "eduvora-reminders"
+            // (created by ensureReminderChannel) exactly like My Day does.
+            await ensureReminderChannel();
+            return scheduleLocalAlarm({
+              id: inboxAlarmId(item.key),
+              // Alarms must be in the future; the event already happened, so
+              // this is a post-now delivery rather than a scheduled one.
+              at: Math.max(now + 400, item.createdAt + 1000),
+              title: item.title,
+              body: item.body,
+              url: item.url,
+              tag: item.tag,
+            });
+          }
+          return showLocalSystemNotification(item.title, item.body, item.url, item.tag);
+        };
+        void display()
+          .then((displayed) => {
+            // Do not dedupe a failed display (permission not granted yet); the
+            // next pass must be allowed to retry it while the doc is fresh.
+            if (!displayed) return;
+            const map = readSeen();
+            map[item.key] = Date.now();
+            writeSeen(map);
+          })
+          .finally(() => pending.delete(item.key));
+      }
+    };
+
+    const unsubscribe = subscribeShared(
+      notificationsKey(user.id),
+      () => collection(db, "users", user.id, "notifications"),
+      (docs, error) => {
+        if (error) return;
+        latest = docs as InboxNotificationDoc[];
+        runPass();
+      },
+    );
+    // The bridge is a safety net for pushes this device never received, so it
+    // only needs to re-check periodically — and the grace window means a doc
+    // written a second ago is picked up on the next tick, after the real push
+    // had its chance.
+    const timer = window.setInterval(runPass, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastPassAt > 5_000) runPass();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      unsubscribe();
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [user]);
+
   // Renewal reminders, product unlocks, new-product announcements and course
   // content updates are all SERVER-GENERATED now (the GitHub Actions minute
   // pinger drives api/cron/subscription-renewals; instant paths live in
   // api/razorpay/verify-payment and api/push/send). The server writes the
   // cross-device bell doc AND sends the Web Push, so the app never needs to
-  // be open — and there is no client-side baseline diff left to misfire.
+  // be open — and the inbox effect above only READS those docs to re-deliver
+  // ones the push transport dropped; it is not a generator.
   //
   // The old client-side generator that lived here recomputed a localStorage
   // baseline on every app open; because `purchasedIds` streams in after the
