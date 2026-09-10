@@ -1231,6 +1231,12 @@ export const personalAiFailure = (input) => {
         return { message: message || "The AI didn't return a usable answer. Nothing was charged — please try again.", retryable: true, upgrade: false, kind: "provider" };
       case "NETWORK_ERROR":
         return { message: "Network problem — your device couldn't reach the AI service. Check your connection and try again.", retryable: true, upgrade: false, kind: "network" };
+      // `/api/personal-ai` shares one deployed function with several features.
+      // A 2xx that is `ok` but carries no `data` means the AI never ran, so the
+      // learner must be told to reload — not left on a generic failure that
+      // reads like an AI outage.
+      case "AI_ROUTE_UNAVAILABLE":
+        return { message: message || "The AI endpoint didn't answer this request — the shared API replied with a different service's result. Reload the page and try again.", retryable: true, upgrade: false, kind: "server" };
       default:
         return null;
     }

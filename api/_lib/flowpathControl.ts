@@ -58,7 +58,10 @@ import { fcmPushToAllDevices, fcmPushToUser, fcmConfigured, type FcmPayload } fr
 import { pushToAllDevices, pushToUser, pushConfigured, type PushPayload } from "./pushNotify.js";
 import { getNotificationBrandChrome } from "./branding.js";
 import { resolveFlowPathAccess, type FlowPathAccess } from "./flowpathAccess.js";
-import { resolveLectureAccess, getLectureModules, getPurchasedProductIds } from "./lecturePlanner.js";
+// `getLectureCourses` must be imported: `flowpath.lecture.courses` calls it, and
+// an unimported symbol only fails at request time (the api tsconfig is not part
+// of `vite build`), which surfaced as a 500 in the FlowPath course picker.
+import { resolveLectureAccess, getLectureCourses, getLectureModules, getPurchasedProductIds } from "./lecturePlanner.js";
 
 /* -------------------------------------------------------------------------- */
 /*  Type definitions (kept in sync with src/flowpath/types/flowpath.ts)       */

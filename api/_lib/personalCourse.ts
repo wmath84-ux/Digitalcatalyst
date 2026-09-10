@@ -32,6 +32,12 @@ import {
 } from "../../utils/courseAccess.js";
 
 const GLOBAL_USAGE_ID = "__library__";
+/**
+ * Actions that only read. Kept in sync with READ_ACTIONS in
+ * src/lib/personalCourseClient.ts: a load failure is retryable and must never
+ * be worded like a lost write, so both layers need to agree on what is a read.
+ */
+const LIBRARY_READ_ACTIONS = new Set(["personalCourse.library", "personalCourse.status", "personalCourse.list"]);
 const USAGE_SCHEMA_VERSION = 2;
 const SORT_STEP = 1024;
 const MAX_BATCH_WRITES = 400;
@@ -1248,10 +1254,11 @@ export async function handlePersonalCourse(req: VercelRequest, res: VercelRespon
     return json(res, 405, { ok: false, code: "METHOD_NOT_ALLOWED", message: "Use POST." });
   }
 
+  let action = "";
   try {
     const uid = await authenticate(req);
     const body: Body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body as Body : {};
-    const action = text(body.action);
+    action = text(body.action);
     const db = adminDb();
     let data: unknown;
 
@@ -1279,10 +1286,19 @@ export async function handlePersonalCourse(req: VercelRequest, res: VercelRespon
       ? number((error as { statusCode?: unknown }).statusCode, 500)
       : 500;
     console.error("[personal-course] unexpected error", error);
+    // A failed READ must never be described as a failed UPDATE. The library
+    // screen and the course-player AI both reach this branch while merely
+    // loading, and "couldn't be updated" sent learners hunting for a write that
+    // never happened.
+    const reading = LIBRARY_READ_ACTIONS.has(action);
     return json(res, status, {
       ok: false,
       code: status === 503 ? "SERVER_CONFIGURATION" : "SERVER_ERROR",
-      message: status === 503 ? "My Study Library is temporarily unavailable. Please try again shortly." : "My Study Library couldn't be updated. Please try again.",
+      message: status === 503
+        ? "My Study Library is temporarily unavailable. Please try again shortly."
+        : reading
+          ? "Your library couldn't be loaded. Nothing was changed — please try again."
+          : "My Study Library couldn't be updated. Please try again.",
     });
   }
 }

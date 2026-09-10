@@ -177,8 +177,23 @@ async function request<T>(action: string, payload: Record<string, unknown> = {},
     );
   }
   if (!response.ok || body.ok !== true || body.data === undefined) {
+    const serverCode = String(body.code || "");
+    // Either the shared function answered with a different feature's envelope
+    // (`ok: true`, no `data`) or it explicitly refused to dispatch this action.
+    // Both are "the AI never ran": keep the Retry affordance alive, since the
+    // failure is recoverable, and never present it as an AI outage.
+    const undispatched =
+      (body.ok === true && body.data === undefined)
+      || serverCode === "MISSING_ACTION"
+      || serverCode === "UNKNOWN_ACTION"
+      || serverCode === "METHOD_NOT_ALLOWED"
+      || serverCode === "REQUEST_BODY_UNAVAILABLE";
     throw new PersonalAiApiError(
-      personalAiFailure({ code: body.code, message: body.message || body.error, status: response.status }),
+      personalAiFailure({
+        code: undispatched ? "AI_ROUTE_UNAVAILABLE" : body.code,
+        message: undispatched && !body.message && !body.error ? undefined : body.message || body.error,
+        status: response.status,
+      }),
       response.status,
       body.details,
     );
