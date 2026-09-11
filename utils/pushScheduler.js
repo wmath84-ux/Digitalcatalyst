@@ -11,12 +11,22 @@ export const MYDAY_LOOKBACK_MS = 15 * 60 * 1000;
 // missed item is never revisited once its day rolls over.
 //
 // 2h, not 1h: GitHub's schedule trigger was measured starting runs up to
-// 79 minutes apart on this repository. With a 1h cap, an item due right
-// after one run could fall OUTSIDE the window of the next — dropped
-// forever, which users experienced as "no notification until I opened
-// the app". The workflow now loops to keep real gaps near one minute,
-// but the cap must still cover a worst-case scheduler stall.
-export const MYDAY_MAX_CATCHUP_MS = 2 * 60 * 60 * 1000;
+// 79 minutes apart on this repository (later weeks showed gaps of several
+// hours, which is why the workflow now runs a 5-hour ping loop). With a
+// 1h cap, an item due right after one run could fall OUTSIDE the window
+// of the next — dropped forever, which users experienced as "no
+// notification until I opened the app".
+//
+// Override without a deploy by setting MYDAY_MAX_CATCHUP_HOURS on the
+// Vercel function (e.g. widen to 6h while recovering from a long pinger
+// outage so same-day reminders are swept up instead of skipped).
+export const MYDAY_MAX_CATCHUP_MS = (() => {
+  const envHours = Number(process.env.MYDAY_MAX_CATCHUP_HOURS);
+  if (Number.isFinite(envHours) && envHours > 0) {
+    return Math.round(envHours * 60 * 60 * 1000);
+  }
+  return 2 * 60 * 60 * 1000;
+})();
 
 /**
  * The window a scheduler run must cover.

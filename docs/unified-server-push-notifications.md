@@ -68,7 +68,13 @@ skipped). Same doc id as the instant path → no duplicates.
 
 ## Delivery guarantee (unchanged, now for everything)
 
-- `.github/workflows/push-scheduler.yml` pings the scheduler every minute.
+- `.github/workflows/push-scheduler.yml` (plus the identical
+  `push-scheduler-backup.yml`) pings the scheduler every minute via the
+  shared `.github/actions/ping-loop` action. Each scheduled start runs a
+  ~5-hour ping loop because GitHub's `schedule` trigger drifts 1–5+ hours
+  and often drops minute events; the two workflows share one concurrency
+  group so only one loop runs at a time.
 - Daily Vercel cron (`30 0 * * *`) is the safety net; `resolveLookbackMs`
-  sizes the catch-up window from the last successful run.
+  sizes the catch-up window from the last successful run (cap 2h, override
+  via `MYDAY_MAX_CATCHUP_HOURS`).
 - Dead push endpoints (404/410) are deleted on send.
