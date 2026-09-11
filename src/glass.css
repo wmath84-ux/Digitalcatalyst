@@ -47,6 +47,36 @@
   --glass-side-gutter: max(12px, env(safe-area-inset-left, 0px));
 }
 
+/* ── the owner's "density %" vocabulary (2026-09-10) ────────────────────────
+ * The owner specifies glass as two percentages: a BLUR density (how hard the
+ * background is frosted) and a COLOUR density (how much of the tint colour the
+ * surface carries). Both are pinned here — one number moves the whole app, and
+ * the percentages in the brief stay traceable to inspectable CSS:
+ *
+ *   · blur density %   → px against a 40 px ceiling   (46% → 18.4px, 40% → 16px)
+ *   · colour density % → the tint layer's alpha       (26% → 0.26,  18% → 0.18)
+ *
+ * The colour is light blue `rgb(173 216 255)` (Tailwind blue-200): the lightest
+ * blue that still reads as blue over the winter scene, and light enough that
+ * the surface stays see-through at 18–26%.
+ *
+ * Two materials read these tokens:
+ *   · the store's glass (hero card + product cards) — src/store-glass.css
+ *   · the footer navigation dock                    — the [data-glass-dock] rule below
+ * ──────────────────────────────────────────────────────────────────────── */
+:root {
+  --dc-glass-blue: 173, 216, 255;
+  --dc-glass-blur-ceiling: 40px; /* what "100% blur density" means */
+
+  /* store glass — blur 46% (brief: 42–50), colour 26% (brief: 22–30) */
+  --dc-store-glass-blur: 18.4px;
+  --dc-store-glass-tint: rgba(173, 216, 255, 0.26);
+
+  /* footer navigation — blur 40% (brief: 40), colour 18% (brief: 15–20) */
+  --dc-footer-nav-blur: 16px;
+  --dc-footer-nav-tint: rgba(173, 216, 255, 0.18);
+}
+
 /* ── quality tiers ──────────────────────────────────────────────────────────
  * Set once by glassQualityTier(): full = real refraction, lite = same shapes
  * with half the bending, off = no lens effects at all (kill switch).
@@ -985,26 +1015,48 @@ html[data-glass="on"] :where([data-store-coverflow]) :where(.dc-scene-ink) {
  * What was wrong: the panel's inline `background` is `DOCK_PANEL_BG`, the pack's
  * pinned docs tint rgba(60,62,68,0.105). Over the scene's snow that is 10% grey
  * on near-white — no edge, no material, and the bright tab icons and white
- * labels floated on nothing. It now wears the same plate numbers as the chrome
- * bars (0.72–0.78 navy) with the cards' rim recipe, so the footer reads as one
- * material with the header above it and the cards beside it. The pinned docs
- * SENSITIVITY is untouched — no TS number moved; this is the same CSS-side plate
- * the review cards wear, and the GlassMaterial lens still refracts the scene
- * through it. */
+ * labels floated on nothing. The first fix was the chrome bars' navy plate
+ * (0.72–0.78) with the cards' rim recipe. The pinned docs SENSITIVITY never
+ * moved — no TS number changed; the material has always lived here.
+ *
+ * 2026-09-10 · OWNER RE-SPEC: the footer nav is a LIGHT BLUE frosted bar —
+ * "background 40% blur karo aur background ka color ekadam bahut hi halka
+ * light blue, color density 15 to 20%". The navy plate above is replaced by
+ * the pinned footer-nav tokens (blur 16px = 40% of the 40px ceiling, tint
+ * rgba(173,216,255,0.18)), so the nav is one very light, see-through wash of
+ * blue with the scene frosted behind it. This rule is the dock's ONLY colour:
+ * the GlassMaterial layer below is stripped to frost-only, so the two never
+ * stack past the requested 20%. */
 html[data-glass="on"] :where([data-glass-dock]) {
-  background-color: rgba(8, 14, 30, 0.74) !important;
-  background-image: linear-gradient(
-    160deg,
-    rgba(12, 20, 40, 0.78) 0%,
-    rgba(8, 14, 30, 0.72) 55%,
-    rgba(6, 11, 24, 0.76) 100%
-  ) !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
+  background-color: var(--dc-footer-nav-tint) !important;
+  background-image: none !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.26),
-    0 18px 44px -20px rgba(2, 6, 16, 0.9) !important;
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(125, 178, 232, 0.22),
+    0 18px 44px -22px rgba(2, 6, 16, 0.8) !important;
+}
+
+/* The dock's own material layer (GlassMaterial, its first `aria-hidden`
+   child) keeps the frost and drops its colour: its gradient used to paint a
+   further ~17% blue/violet wash, which on top of the panel tint would land
+   the nav near 40% — double the brief. One flat blur stage, 40% density. */
+html[data-glass="on"] :where([data-glass-dock]) > [aria-hidden] > div {
+  background: transparent !important;
+  /* Webkit first, standard last — Lightning CSS keeps only the last of the two,
+     and the unprefixed form is the one Firefox reads. */
+  -webkit-backdrop-filter: blur(var(--dc-footer-nav-blur)) saturate(1.25) !important;
+  backdrop-filter: blur(var(--dc-footer-nav-blur)) saturate(1.25) !important;
+}
+
+/* The tab glyphs are the dock's only painted content and they are coloured
+   (amber / mint / coral / gold / blue / violet), so over the scene's bright
+   snow band a light plate leaves them without an edge. A dark drop-shadow on
+   the glyph keeps every colour readable at both ends of the background
+   without adding another layer between the nav and the scene. */
+html[data-glass="on"] :where([data-glass-dock]) button > span {
+  filter: drop-shadow(0 1px 2px rgba(4, 8, 18, 0.55));
 }
 
 /* The tooltip is the dock's only text and it floats over the dock's own plate,
