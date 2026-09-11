@@ -15,6 +15,11 @@ import "./winter-background.css";
 // Liquid Glass material layer (website-glass). Inert until
 // src/lib/glass.ts applies a tier to <html>; see docs/liquid-glass-rollout-plan.md.
 import "./glass.css";
+// The store's own glass material (owner brief 2026-09-10): a transparent
+// light-blue lens for the store hero card and every product card, plus the
+// store's type scale. AFTER glass.css on purpose — it has to out-rank the navy
+// contrast plate glass.css paints on `.dc-glass-card`.
+import "./store-glass.css";
 // The Course Player's panel language, ported from the removed 3D Classroom:
 // deep navy plates, one hairline, crisp white ink and the room's five surface
 // accents. Paint only, and scoped to `.course-player-shell`, so it must come

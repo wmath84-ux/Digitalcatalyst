@@ -753,9 +753,12 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
     font-size: clamp(0.9rem, 1.3vw, 1.1rem) !important;
   }
 
-  /* Cards scale */
+  /* Cards scale.
+     `[data-store-grid]` is deliberately NOT in this list any more (owner brief
+     2026-09-10): the store's cards are exact squares that fill their track, so
+     shrinking each card to `--tablet-scale` with `transform-origin: top left`
+     left a dead band under and beside every card and broke the square grid. */
   [data-home-grid] > *,
-  [data-store-grid] > *,
   [data-pdp-grid] > * {
     transform: scale(var(--tablet-scale));
     transform-origin: top left;
@@ -764,7 +767,6 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   /* But for landscape desktop mode, we override scale to 1 */
   @media (orientation: landscape) {
     [data-home-grid] > *,
-    [data-store-grid] > *,
     [data-pdp-grid] > * {
       transform: none !important;
     }
@@ -1163,9 +1165,10 @@ html[data-hide-frame-borders="true"] [data-app-frame] {
   padding-right: 0;
 }
 
-/* The "Top rated" label keeps its pinned `px-4` class (contract), so the
-   desktop zero-out is scoped to the section wrapper instead. */
-.dc-desktop-shell [data-store-top-rated] .dc-section-label {
+/* The store's section heading ("Top rated") keeps its own gutter class, so the
+   desktop zero-out is scoped to the heading itself. `.dc-section-label` stays
+   in the selector: it is the label every other page section still uses. */
+.dc-desktop-shell [data-store-top-rated] :where(.dc-section-label, .dc-store-section-title) {
   padding-left: 0;
   padding-right: 0;
 }
@@ -6841,4 +6844,57 @@ html[data-course-player-active="true"] {
 .dc-desktop-shell:has([data-desktop-rail-item="myday"][data-active="true"]) [data-desktop-topbar] {
   border-bottom-color: rgba(139, 92, 246, 0.35);
   box-shadow: 0 14px 34px -20px rgba(124, 92, 255, 0.55);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * STORE PRODUCT GRID · exact-square glass cards (owner brief 2026-09-10)
+ * ──────────────────────────────────────────────────────────────────────────
+ * "product ka by default mobile, tablet aur desktop ke liye grid square card
+ *  ratio set karo … card ka ratio exact square hona chahiye aur ek row mein do
+ *  card mobile aur tablet mein, desktop mein 4-5-6 jitna adjust ho jaaye, aur
+ *  spacing bahut kam rakhni hai."
+ *
+ * The square itself is the card's own `aspect-square` + `min-h-0`
+ * (src/components/ProductCard.tsx); this block owns the TRACKS, because three
+ * earlier rules in this file fight for them:
+ *
+ *   · 640–1023 portrait      `auto-fill minmax(180px, 1fr) !important`
+ *   · 640–1023 landscape     `auto-fill minmax(clamp(160px,18vw,220px),1fr) !important`
+ *   · 960+                   `auto-fill minmax(240px, 1fr) !important`
+ *
+ * All three would tile the store into 3–8 columns on a tablet, so the counts
+ * below are restated LATER in the file with the same importance — the last
+ * matching rule wins. The band split follows the app's own: below 960px is
+ * phone/tablet chrome (two cards a row), from 960px the desktop shell is up
+ * and the grid auto-fills 4–6 across.
+ *
+ * Gaps are the tightest that still leave two thumb targets side by side:
+ * 6px on a phone, 8px from `sm:` up. The page gutter comes from the card
+ * container's own px-3/px-4 (zeroed inside the desktop shell by
+ * `[data-store-gutter]`).
+ * ══════════════════════════════════════════════════════════════════════════ */
+[data-store-grid] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-items: stretch;
+}
+
+/* Phones and tablets: two per row, whatever the width. */
+@media (min-width: 640px) and (max-width: 959px) {
+  [data-store-grid] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+}
+
+/* Desktop shell: as many as fit — 4 at 960px, 5 around 1280–1600, 6 on a
+   1920 screen. The track minimum grows with the viewport (`14vw`, capped) so
+   the column count stays in that band instead of running away on wide
+   monitors. */
+@media (min-width: 960px) {
+  [data-store-grid] {
+    grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 14vw, 260px), 1fr)) !important;
+    gap: 8px !important;
+  }
 }

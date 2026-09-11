@@ -37,6 +37,13 @@ export type AppGlassCardProps = ComponentProps<typeof RegistryGlassCard> & {
   blur?: number;
   specular?: boolean;
   saturation?: number;
+  /**
+   * "r,g,b" of the tint layer. The registry card only types `tint`; the prop
+   * is forwarded (the vendored item spreads caller props into `GlassSurface`)
+   * and typed here — the store's light-blue lens (src/store-glass.css) needs
+   * the pack's dark `60,62,68` swapped for the owner's blue.
+   */
+  tintColor?: string;
 };
 
 /**

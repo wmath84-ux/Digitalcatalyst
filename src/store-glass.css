@@ -1,0 +1,227 @@
+/* ══ THE STORE'S GLASS ═════════════════════════════════════════════════════
+   Owner brief, 2026-09-10:
+
+     "store page per yah jo likha hai isko card mein pack karo, card ke
+      background mein add karo, text ka size aur color ekadam badhiya select
+      karo, design bhi uthakar sab kuchh clearly dikhe … transparent glass card
+      use karna hai aur uska background density blur 42 to 50% aur uska color
+      light blue, color density 22 to 30%."
+
+   So the store gets ONE new material — `.dc-store-glass` — a transparent
+   light-blue lens, and the store's copy gets a type scale that survives it:
+
+     · frost   blur 46% of the 40px ceiling  → 18.4px   (brief: 42–50)
+     · colour  light blue rgb(173,216,255) @ 26%         (brief: 22–30)
+
+   Both numbers are the pinned tokens in src/glass.css (`--dc-store-glass-blur`,
+   `--dc-store-glass-tint`); nothing here re-states them.
+
+   Two surfaces wear it, both pack `GlassSurface` trees (so the layer indexes
+   below are the engine's: 1 frost · 2 tint · 3 sheen · 4 rim):
+     · the store hero card  — src/components/Hero.tsx
+     · every product card   — src/components/ProductCard.tsx (GlassCard)
+
+   It is loaded AFTER src/glass.css (see src/main.tsx) because it has to
+   out-rank the navy contrast plate glass.css paints on `.dc-glass-card`:
+   same specificity, later file, `!important` on both — the store wins.
+
+   `?glass=off` still rolls the store back: the fallback at the bottom paints
+   the published opaque navy plate instead of a lens.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── the material ────────────────────────────────────────────────────────── */
+
+/* 1 · the frost stage. The pack writes `backdrop-filter` inline (blur 0 at the
+   pinned docs sensitivity), so the 46% blur has to be !important to land. */
+html[data-glass="on"] :where(.dc-store-glass) > div[aria-hidden]:nth-of-type(1) {
+  /* Webkit first, standard last: Lightning CSS treats the two as one logical
+     property and keeps only the last written, so the unprefixed one — the only
+     form Firefox reads — has to be the survivor. */
+  -webkit-backdrop-filter: blur(var(--dc-store-glass-blur)) saturate(1.3) !important;
+  backdrop-filter: blur(var(--dc-store-glass-blur)) saturate(1.3) !important;
+}
+
+/* 2 · the tint stage — light blue at 26%, flat (no gradient, so the density is
+   exactly the number in the brief at every point of the card). */
+html[data-glass="on"] :where(.dc-store-glass) > div[aria-hidden]:nth-of-type(2) {
+  background: var(--dc-store-glass-tint) !important;
+}
+
+/* 3 · the sheen stays the pack's, only quieter: on a light-blue tint a 10%
+   white sweep bleaches the first line of copy. */
+html[data-glass="on"] :where(.dc-store-glass) > div[aria-hidden]:nth-of-type(3) {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    transparent 46%,
+    transparent 62%,
+    rgba(255, 255, 255, 0.08) 100%
+  ) !important;
+}
+
+/* 4 · the rim: a bright top hairline (the light-blue glass reads as lit from
+   above) and a cool bottom edge instead of the dark ring the navy plate used. */
+html[data-glass="on"] :where(.dc-store-glass) > div[aria-hidden]:nth-of-type(4) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(125, 178, 232, 0.3) !important;
+}
+
+/* The surface itself: white ink and a soft lift off the scene. */
+html[data-glass="on"] :where(.dc-store-glass) {
+  color: #ffffff;
+  box-shadow:
+    0 18px 40px -22px rgba(2, 6, 16, 0.9),
+    0 4px 14px -8px rgba(2, 6, 16, 0.55);
+}
+
+@media (hover: hover) {
+  html[data-glass="on"] :where(.dc-store-glass):hover {
+    box-shadow:
+      0 26px 56px -24px rgba(2, 6, 16, 0.92),
+      0 6px 18px -8px rgba(2, 6, 16, 0.6);
+  }
+}
+
+/* ── the type scale ────────────────────────────────────────────────────────
+   "text ka size aur color ekadam badhiya select karo … sab kuchh clearly
+   dikhe." Sizes are fluid (clamp) so the hero reads as a headline on a phone
+   and on a 27" monitor, and every colour is near-white on the light-blue
+   lens — the copy also keeps the `.dc-scene-ink` dark scrim from glass.css,
+   which is what keeps white legible when the card slides over the scene's
+   bright snow band. ─────────────────────────────────────────────────────── */
+
+/* Store hero card */
+.dc-store-hero-eyebrow {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #dbeafe;
+}
+
+.dc-store-hero-title {
+  font-size: clamp(1.7rem, 7vw, 2.75rem);
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+}
+
+.dc-store-hero-body {
+  font-size: clamp(0.875rem, 3.6vw, 1.0625rem);
+  font-weight: 500;
+  line-height: 1.62;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+/* The three trust pills + the resource counter inside the hero card. */
+.dc-store-hero-chip {
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.dc-store-hero-count {
+  font-size: 13.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+}
+
+/* "Top rated" — a real heading, not a 10px eyebrow. */
+.dc-store-section-title {
+  font-size: clamp(1.5rem, 6vw, 2.375rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  text-transform: none;
+  color: #ffffff;
+}
+
+/* Product card copy. The title is the card's heading: it is the biggest thing
+   on the card at every breakpoint, and it clamps to two lines so a long title
+   can never push the price or the CTA out of the square. */
+.dc-store-card-title {
+  font-size: clamp(0.8rem, 3.5vw, 1.1875rem);
+  font-weight: 800;
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  color: #ffffff;
+}
+
+.dc-store-card-kicker {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: #dbeafe;
+}
+
+.dc-store-card-meta {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* The scrim under the rating chip, which sits on the artwork rather than on
+   the glass. A class (not a `bg-gradient-to-t` utility) on purpose: the store
+   surfaces are contractually free of painted gradient plates. */
+.dc-store-card-scrim {
+  background: linear-gradient(
+    to top,
+    rgba(4, 8, 18, 0.72) 0%,
+    rgba(4, 8, 18, 0.22) 55%,
+    transparent 100%
+  );
+}
+
+/* The headline's brand ramp, lifted once more inside the light-blue lens.
+   glass.css already lifts `.dc-scene-ink` gradients from the 600 stops to the
+   300 stops for the raw scene; over a 26% light-blue tint the 300 stops measure
+   ~3.0:1 in the scene's brightest glow band, so inside the store glass the ramp
+   goes to the 100/200 stops — same indigo → violet → fuchsia hue run, 4.8:1
+   over the lens. The JSX keeps the pinned 600 stops
+   (storeFiltersAdminProductContract); this is the CSS-side lift, exactly like
+   the one glass.css already does for the scene. */
+html[data-glass="on"] :where(.dc-store-glass) :where(.bg-clip-text.text-transparent) {
+  background-image: linear-gradient(to right, #e0e7ff 0%, #ede9fe 50%, #fae8ff 100%) !important;
+}
+
+/* ── kill switch ───────────────────────────────────────────────────────────
+   `?glass=off` restores a published, opaque plate: no lens, and enough ink
+   behind the copy that the store stays readable. The `flat` tier needs no
+   rule — glass.css strips every backdrop-filter in the document already, and
+   the tint layer above is unaffected by it. ─────────────────────────────── */
+html[data-glass="off"] :where(.dc-store-glass) > div[aria-hidden]:nth-of-type(1) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html[data-glass="off"] :where(.dc-store-glass) > div[aria-hidden]:nth-of-type(2) {
+  background: linear-gradient(
+    160deg,
+    rgba(12, 20, 40, 0.9) 0%,
+    rgba(8, 14, 30, 0.86) 55%,
+    rgba(6, 11, 24, 0.88) 100%
+  ) !important;
+}
+
+/* No backdrop-filter at all (very old WebView): a lens that cannot frost is
+   just a 26% blue wash, so fall back to the same opaque plate. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-glass="on"] :where(.dc-store-glass) > div[aria-hidden]:nth-of-type(2) {
+    background: linear-gradient(
+      160deg,
+      rgba(12, 20, 40, 0.9) 0%,
+      rgba(8, 14, 30, 0.86) 55%,
+      rgba(6, 11, 24, 0.88) 100%
+    ) !important;
+  }
+}

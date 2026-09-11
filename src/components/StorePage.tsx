@@ -108,7 +108,13 @@ function ProductCardList({
     <GlassCard
       onClick={() => onView(product)}
       contentClassName="flex p-0"
-      className="group relative flex overflow-hidden transition duration-300 hover:-translate-y-1"
+      /* Same light-blue lens as the square grid card (owner brief 2026-09-10),
+         so switching layout changes the shape and never the material. */
+      tint={0.62}
+      tintColor="173,216,255"
+      blur={0}
+      radius={22}
+      className="dc-store-glass dc-scene-ink group relative flex overflow-hidden transition duration-300 hover:-translate-y-1"
     >
       {/* Image — left side */}
       <div className="relative h-auto w-36 shrink-0 overflow-hidden sm:w-44">
@@ -189,8 +195,10 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
   const [search, setSearch] = useState("");
   const [activeFilterId, setActiveFilterId] = useState(ALL_STORE_FILTER.id);
   const [sort, setSort] = useState("Recommended");
-  // Default to the second layout option ("Cards" / rectangular list view).
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  /* Default = the square glass GRID (owner brief 2026-09-10: "product ka by
+     default … grid square card ratio set karo"). "Cards" (rectangular rows)
+     and "Mixed" stay one tap away in the layout dropdown. */
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -272,10 +280,13 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
           the shell zeroes the label's mobile px-4 so the caption lines up
           with the shell gutter. */}
       <section aria-label="Top rated" data-store-top-rated className="pt-1 lg:pt-2">
-        {/* Loose ink straight on the scene (not inside a card), so it takes the
-            same text-shadow scrim Home uses: `.dc-section-label` is white at
-            56%, which washes out over the snow behind the coverflow. */}
-        <p className="dc-scene-ink dc-section-label px-4">Top rated</p>
+        {/* A real heading, not a 10px eyebrow (owner brief 2026-09-10: "top
+            rated … text size badhao, ekadam heading jaisa dikhna chahiye").
+            Still loose ink on the scene, so it keeps the `.dc-scene-ink`
+            text-shadow scrim — white at full strength washes out over the snow
+            behind the coverflow without it. The size ramp itself is
+            `.dc-store-section-title` in src/store-glass.css. */}
+        <h2 className="dc-scene-ink dc-store-section-title px-3 sm:px-4">Top rated</h2>
         <TiltedCoverflow products={products} onOpenProduct={onView} />
       </section>
 
@@ -357,25 +368,23 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
       {error ? (
         <div className="dc-scene-ink mx-4 mt-6 rounded-3xl border border-rose-400/30 bg-rose-500/15 px-5 py-8 text-center text-sm font-semibold text-rose-200 lg:mx-0">{error}</div>
       ) : loading ? (
-        /* Dimension-matched skeletons: the store defaults to the horizontal
-           list card (w-36/sm:w-44 artwork + text column), so each
-           placeholder mirrors that exact geometry inside the same flex
-           column + gaps the real cards use — zero layout shift when the
-           live list replaces them. The old state was four h-72 pulse
-           blocks that jumped to a different layout. */
-        <div data-store-gutter data-store-list data-store-list-loading aria-busy="true" aria-label="Loading products" className="flex flex-col gap-3 px-4 pt-4">
-          {[0, 1, 2, 3, 4, 5].map((item) => (
-            <GlassCard key={item} aria-hidden="true" contentClassName="flex p-0" className="flex overflow-hidden">
-              <div className="relative h-28 w-36 shrink-0 overflow-hidden sm:h-32 sm:w-44">
+        /* Dimension-matched skeletons: the store defaults to the SQUARE grid,
+           so each placeholder is the same exact square in the same grid
+           container (`data-store-grid`) the live cards use — zero layout shift
+           when the real list replaces them, at every breakpoint. Inside, the
+           blocks mirror the live card's own budget: artwork on top, the
+           heading, then the CTA. */
+        <div data-store-gutter data-store-grid data-store-grid-loading aria-busy="true" aria-label="Loading products" className="grid grid-cols-2 gap-1.5 px-3 pt-3 sm:gap-2 sm:px-4 sm:pt-4">
+          {[0, 1, 2, 3, 4, 5, 6, 7].map((item) => (
+            <GlassCard key={item} aria-hidden="true" contentClassName="p-0" radius={22} className="dc-store-glass flex aspect-square w-full min-h-0 flex-col overflow-hidden">
+              <div className="relative h-[40%] w-full shrink-0 overflow-hidden sm:h-[46%]">
                 <Skeleton width="100%" height="100%" radius={0} />
               </div>
-              <div className="flex flex-1 flex-col gap-1.5 p-3 sm:p-4">
-                <Skeleton width="80%" height="0.95rem" radius={6} />
-                <Skeleton width="45%" height="0.75rem" radius={6} />
-                <Skeleton width="60%" height="0.75rem" radius={6} />
-                <div className="mt-auto flex items-center justify-between pt-2">
-                  <Skeleton width="30%" height="1rem" radius={6} />
-                  <Skeleton width="5.5rem" height="2rem" radius={999} />
+              <div className="flex min-h-0 flex-1 flex-col gap-1 p-1.5 sm:gap-1.5 sm:p-3">
+                <Skeleton width="92%" height="0.9rem" radius={6} />
+                <Skeleton width="64%" height="0.9rem" radius={6} />
+                <div className="mt-auto">
+                  <Skeleton width="100%" height="2rem" radius={999} />
                 </div>
               </div>
             </GlassCard>
@@ -408,7 +417,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
         </GlassCard>
       ) : viewMode === "list" ? (
         /* ── Rectangular cards / list view ── */
-        <div data-store-gutter data-store-list className="flex flex-col gap-3 px-4 pt-4">
+        <div data-store-gutter data-store-list className="flex flex-col gap-2 px-3 pt-3 sm:px-4 sm:pt-4">
           {filtered.map((product) => (
             <ProductCardList
               key={product.id}
@@ -430,7 +439,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
            Mobile: grid-cols-2 with the featured card spanning both tracks —
            identical to the old pair behaviour. Desktop (index.css): the same
            auto-fill columns as the grid view. */
-        <div data-store-gutter data-store-mixed className="grid grid-cols-2 gap-3 px-4 pt-4">
+        <div data-store-gutter data-store-mixed className="grid grid-cols-2 gap-1.5 px-3 pt-3 sm:gap-2 sm:px-4 sm:pt-4">
           {filtered.map((product, index) =>
             index % 3 === 0 ? (
               /* Featured card. The wrapper is `flex` so the horizontal card
@@ -463,8 +472,13 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
           )}
         </div>
       ) : (
-        /* ── Default grid view ── */
-        <div data-store-gutter data-store-grid className="grid grid-cols-1 gap-4 px-4 pt-4 sm:grid-cols-2">
+        /* ── Default grid view: exact-square glass cards ──
+           Two per row on phones AND tablets, and as many as fit (4–6) on
+           desktop; the gaps are the tightest the tap targets allow. The
+           column counts and gaps are pinned in index.css under
+           `[data-store-grid]` — the tablet auto-fill rules there used to win
+           the cascade, so the class list alone cannot hold this contract. */
+        <div data-store-gutter data-store-grid className="grid grid-cols-2 gap-1.5 px-3 pt-3 sm:gap-2 sm:px-4 sm:pt-4">
           {filtered.map((product) => (
             <ProductCard
               key={product.id}

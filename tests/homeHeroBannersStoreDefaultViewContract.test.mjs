@@ -3,7 +3,9 @@
 // Two user-facing contracts:
 //
 //   1. STORE PAGE — the product view-style dropdown (Grid / Cards / Mixed)
-//      must default to the SECOND option ("Cards" / rectangular list view).
+//      must default to the SQUARE GLASS GRID. (2026-09-10: the owner asked for
+//      the listing to be exact-square cards by default, so the default moved
+//      off the second option; all three views stay reachable in the dropdown.)
 //
 //   2. HOME HERO SLIDES — the sliding cards on the home page must be fully
 //      admin-editable: text, image, colour, and a link target that either
@@ -32,7 +34,7 @@ const adminHomePage = read("src/admin/pages/HomePage.tsx");
 const rules = read("firestore.rules");
 
 /* ------------------------------------------------------------------ */
-/* 1. Store page default view = second option (Cards / list)           */
+/* 1. Store page default view = the square glass grid                 */
 /* ------------------------------------------------------------------ */
 
 test("store view options order is Grid, Cards, Mixed", () => {
@@ -40,10 +42,13 @@ test("store view options order is Grid, Cards, Mixed", () => {
   assert.match(storePage, /const VIEW_OPTIONS[\s\S]*?\{ mode: "grid"[\s\S]*?\{ mode: "list"[\s\S]*?\{ mode: "mixed"/);
 });
 
-test("store page defaults to the second view option (list / Cards)", () => {
-  assert.match(storePage, /useState<ViewMode>\("list"\)/);
-  // The old grid default must be gone.
-  assert.doesNotMatch(storePage, /useState<ViewMode>\("grid"\)/);
+test("store page defaults to the square glass grid", () => {
+  // 2026-09-10 owner brief: "product ka by default mobile, tablet aur desktop
+  // ke liye grid square card ratio set karo." The listing opens as the grid of
+  // exact-square glass cards; "Cards" (rectangular rows) and "Mixed" are still
+  // one tap away in the layout dropdown above.
+  assert.match(storePage, /useState<ViewMode>\("grid"\)/);
+  assert.doesNotMatch(storePage, /useState<ViewMode>\("list"\)/);
 });
 
 /* ------------------------------------------------------------------ */

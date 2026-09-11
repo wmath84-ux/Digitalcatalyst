@@ -144,21 +144,36 @@ test("the dock's material is CSS — its files stay byte-comparable", () => {
   assert.match(css, /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) \{/);
 });
 
-test("the dock wears the same plate numbers as the bars and cards", () => {
+test("the dock wears the owner's light-blue frosted material (2026-09-10)", () => {
+  // Owner brief: "footer navigation ka background 40% blur karo aur background
+  // ka color ekadam bahut hi halka light blue, color density 15 to 20%."
+  // The navy chrome plate it wore before is gone: the nav is now ONE flat
+  // light-blue tint over a frosted backdrop, and the frost lives on the dock's
+  // own material layer so panel + lens can never stack past 20%.
   const rule = /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) \{([^}]*)\}/.exec(css)?.[1];
-  assert.ok(rule, "expected the dock plate rule");
-  // Same navy, same gradient stops as `.dc-scene-plate--bar`.
-  assert.match(rule, /background-color: rgba\(8, 14, 30, 0\.74\) !important/);
-  assert.match(rule, /rgba\(12, 20, 40, 0\.78\) 0%/);
-  assert.match(rule, /rgba\(8, 14, 30, 0\.72\) 55%/);
-  assert.match(rule, /rgba\(6, 11, 24, 0\.76\) 100%/);
-  // The rim recipe the cards wear, and a lift off the scene.
-  assert.match(rule, /inset 0 1px 0 rgba\(255, 255, 255, 0\.3\)/);
-  assert.match(rule, /0 18px 44px -20px rgba\(2, 6, 16, 0\.9\)/);
-  // Inline styles only yield to !important, so the two that fight the panel's
-  // inline `background` / `boxShadow` tokens carry it explicitly.
-  assert.match(rule, /background-image: linear-gradient\([\s\S]*?\) !important/);
+  assert.ok(rule, "expected the dock material rule");
+  assert.match(rule, /background-color: var\(--dc-footer-nav-tint\) !important/);
+  // No gradient: a gradient is a second density, and the brief pins one.
+  assert.match(rule, /background-image: none !important/);
+  // A rim and a lift, so a light plate still has an edge over the snow.
+  assert.match(rule, /inset 0 1px 0 rgba\(255, 255, 255, 0\.42\)/);
+  assert.match(rule, /0 18px 44px -22px rgba\(2, 6, 16, 0\.8\)/);
+  // Inline styles only yield to !important, and the panel paints both inline.
   assert.match(rule, /box-shadow:[\s\S]*?!important/);
+
+  // The pinned tokens, in the units the brief is written in: 40% of the 40px
+  // blur ceiling = 16px, colour density 18% (inside the 15–20 band).
+  assert.match(css, /--dc-glass-blur-ceiling: 40px;/);
+  assert.match(css, /--dc-footer-nav-blur: 16px;/);
+  assert.match(css, /--dc-footer-nav-tint: rgba\(173, 216, 255, 0\.18\);/);
+
+  // GlassMaterial's own gradient used to add ~17% more colour on top of the
+  // panel; inside the dock it is now frost-only, so 18% is the whole tint.
+  const lens = /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) > \[aria-hidden\] > div \{([^}]*)\}/.exec(css)?.[1];
+  assert.ok(lens, "expected the dock's material-layer rule");
+  assert.match(lens, /background: transparent !important/);
+  assert.match(lens, /-webkit-backdrop-filter: blur\(var\(--dc-footer-nav-blur\)\) saturate\(1\.25\) !important/);
+  assert.match(lens, /[^-]backdrop-filter: blur\(var\(--dc-footer-nav-blur\)\) saturate\(1\.25\) !important/);
 });
 
 test("the dock plate wins the cascade against index.css's transparent panel", () => {
@@ -205,10 +220,14 @@ test("?glass=off finally switches the dock's refraction lens off", () => {
   }
 });
 
-test("the dock plate actually clears AA over the brightest band of the scene", () => {
-  // Worst case: the plate over the lit snow, with GlassMaterial's light-blue
-  // wash (alpha 0.17 at the top of its gradient) composited on top, and the
-  // tooltip's 96% white label over that.
+test("the dock's only text — the tooltip — clears AA over the light plate", () => {
+  // 2026-09-10: the nav is a light plate now (18% light blue over the scene),
+  // so white text could no longer sit directly on it — and it does not. The
+  // dock's only text is the tooltip, which glass.css paints as an opaque navy
+  // plate with 96% white ink; the tabs themselves are coloured glyphs, and
+  // those keep a dark drop-shadow over the light plate (asserted below).
+  // Modelled against both extremes of the scene, with the 18% wash composited
+  // in — the worst case is the lit snow, where the plate is at its lightest.
   const channel = (v) => {
     const s = v / 255;
     return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
@@ -224,17 +243,23 @@ test("the dock plate actually clears AA over the brightest band of the scene", (
     [77, 81, 93], // the measured mid-band of the winter scene
     [206, 214, 226], // the lit snow / lake at its brightest
   ]) {
-    const plate = over([8, 14, 30], 0.74, scene);
-    const washed = over([186, 230, 253], 0.17, plate);
-    const label = over([255, 255, 255], 0.96, washed);
-    const r = ratio(label, washed);
-    assert.ok(r >= 4.5, `dock label over ${scene} measures ${r.toFixed(2)}:1, under AA`);
+    // The nav's material: 18% rgb(173,216,255) straight over the scene. The
+    // 40% blur does not change the composite, only what shows through it.
+    const plate = over([173, 216, 255], 0.18, scene);
 
-    const tooltip = over([6, 11, 26], 0.9, washed);
+    const tooltip = over([6, 11, 26], 0.9, plate);
     const tooltipInk = over([255, 255, 255], 0.96, tooltip);
     const rt = ratio(tooltipInk, tooltip);
     assert.ok(rt >= 4.5, `dock tooltip over ${scene} measures ${rt.toFixed(2)}:1, under AA`);
   }
+
+  // The tab glyphs have no plate of their own to measure, so the affordance is
+  // pinned instead: a dark drop-shadow keeps the amber / mint / coral / gold /
+  // blue / violet icons edged over a light plate.
+  assert.match(
+    css,
+    /html\[data-glass="on"\] :where\(\[data-glass-dock\]\) button > span \{\s*\n\s*filter: drop-shadow\(0 1px 2px rgba\(4, 8, 18, 0\.55\)\);/,
+  );
 });
 
 /* ------------------------------------------------------------------ */
@@ -280,17 +305,24 @@ test("the store's own surfaces wear the plate", () => {
   assert.match(storePage, /className="dc-scene-plate absolute right-0 top-full z-30 mt-1\.5 flex w-max text-white"/);
 });
 
-test("the store's loose copy on the scene takes the ink scrim", () => {
-  assert.match(storeHero, /<h2 className="dc-scene-ink mt-2\.5 text-\[28px\]/);
-  assert.match(storeHero, /<p className="dc-scene-ink mt-2 max-w-sm text-sm leading-relaxed text-white\/75">/);
-  assert.equal(storeHero.match(/dc-scene-plate/g)?.length, 4, "the brand pill + three trust pills");
-  // The plate's ink floor paints `color` on the surface root, so the brand pill's
-  // `text-indigo-200` accent has to be handed back explicitly.
-  assert.match(storeHero, /className="dc-scene-plate inline-block text-indigo-200"/);
+test("the store's copy keeps the ink scrim — on the hero card and on the scene", () => {
+  // 2026-09-10: the hero is no longer loose copy on the scene — the owner asked
+  // for the whole block to be packed into a card ("isko card mein pack karo"),
+  // so the scrim rides on the card root and every line inside it keeps the
+  // same dark text-shadow over the light-blue lens.
+  assert.match(storeHero, /className="dc-store-glass dc-scene-ink"/);
+  assert.match(storeHero, /<h2 className="dc-store-hero-title mt-3\.5">/);
+  assert.match(storeHero, /<p className="dc-store-hero-body mt-3 max-w-xl">/);
+  assert.match(css, /html\[data-glass="on"\] :where\(\.dc-scene-ink\) \{\s*\n\s*text-shadow:/);
+  // The plate's ink floor still hands a pill's accent back explicitly (the rule
+  // serves every `.dc-scene-plate` on the scene, not just the store hero).
   assert.match(css, /html\[data-glass="on"\] :where\(\.dc-scene-plate\):where\(\.text-indigo-200\) \{\s*\n\s*color: #c7d2fe;/);
-  assert.match(storePage, /className="dc-scene-ink dc-section-label px-4">Top rated</);
+  // "Top rated" is the one store heading still on the raw scene, and it is a
+  // real heading now (owner: "text size badhao, ekadam heading jaisa").
+  assert.match(storePage, /className="dc-scene-ink dc-store-section-title px-3 sm:px-4">Top rated</);
   assert.match(coverflow, /className="dc-scene-ink text-xs tracking-wide text-\[#9E9E98\]"/);
-  // `.dc-section-label` is white at 56% (--dc-ink-3): unreadable over snow.
+  // `.dc-section-label` is white at 56% (--dc-ink-3): unreadable over snow, so
+  // the sections that still use it keep the lifted ink.
   assert.match(indexCss, /\.dc-section-label \{\s*\n\s*color: var\(--dc-ink-3\)/);
 });
 
@@ -337,8 +369,32 @@ test("the ramp lift is justified by the band the hero actually sits on", () => {
     }
   }
 
+  // 2026-09-10 · the heading now sits INSIDE the store's light-blue lens
+  // (`.dc-store-glass`, 26% rgb(173,216,255)), which lifts the backdrop under
+  // it: measured over the glass, the 300 stops glass.css paints for the raw
+  // scene fall to ~2.9–3.4:1 in the glow bands. store-glass.css lifts the same
+  // ramp once more inside the glass, to the 100/200 stops, and those clear AA
+  // at every stop over the lens.
+  const glassed = Object.fromEntries(
+    Object.entries(bands).map(([band, bg]) => [band, over([173, 216, 255], 0.26, bg)]),
+  );
+  const inGlass = ["#e0e7ff", "#ede9fe", "#fae8ff"]; // the 100/200 stops, same hue run
+  for (const stop of lifted) {
+    const worst = Math.min(...Object.values(glassed).map((bg) => ratio(hex(stop), bg)));
+    assert.ok(worst < 4.5, `${stop} inside the glass still measures ${worst.toFixed(2)}:1 — the second lift would not be needed`);
+  }
+  for (const [band, bg] of Object.entries(glassed)) {
+    for (const stop of inGlass) {
+      const r = ratio(hex(stop), bg);
+      assert.ok(r >= 4.5, `${stop} inside the store glass over ${band} measures ${r.toFixed(2)}:1, under AA`);
+    }
+  }
+  const storeCss = read("src/store-glass.css");
+  assert.match(storeCss, /:where\(\.dc-store-glass\) :where\(\.bg-clip-text\.text-transparent\) \{/);
+  assert.match(storeCss, /linear-gradient\(to right, #e0e7ff 0%, #ede9fe 50%, #fae8ff 100%\) !important/);
+
   // And the scrim that carries the lifted ramp over the mountain's bright cap.
-  assert.match(storeHero, /<h2 className="dc-scene-ink mt-2\.5/);
+  assert.match(storeHero, /<h2 className="dc-store-hero-title mt-3\.5">/);
   assert.match(css, /:where\(\.dc-scene-ink\) \{\s*\n\s*text-shadow:/);
 });
 
