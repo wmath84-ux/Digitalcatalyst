@@ -15,12 +15,20 @@
 //      subscribed device; new modules/lessons in a purchased product push to
 //      that product's buyers. A Firestore baseline prevents repeat announcements.
 //
-// Invocation: the GitHub Actions minute pinger
-// (.github/workflows/push-scheduler.yml) calls this endpoint every minute with
-// `Authorization: Bearer $CRON_SECRET`, so EVERY notification kind above is
-// delivered at the exact time whether the app is open or closed. The daily
-// Vercel cron stays as a catch-up safety net. Every job is deduplicated, so
-// frequent pings are safe.
+// Invocation: Google Cloud Scheduler is the PRIMARY pinger — the HTTP job
+// `push-scheduler-minute` (project my-website-761e9, region asia-south1,
+// created by ops/setup-cloud-scheduler.sh) calls this endpoint every minute
+// with `Authorization: Bearer $CRON_SECRET`, so EVERY notification kind above
+// is delivered at the exact time whether the app is open or closed. The GitHub
+// Actions workflows (.github/workflows/push-scheduler.yml and
+// push-scheduler-backup.yml) stay enabled as a free backup, and the daily
+// Vercel cron is the catch-up safety net. Every job is deduplicated, so
+// overlapping pings from several sources are safe — see
+// ops/README-push-scheduler.md and ops/cloud-scheduler-setup.md.
+//
+// The function is allowed the full Hobby budget (`maxDuration: 60` for this
+// path in vercel.json), which sits inside the job's 120s attempt deadline, so
+// a cold start plus a full Firestore scan degrades to "slow" instead of 504.
 
 import { setVapidDetails, sendNotification } from "../_lib/webpush.js";
 import { FieldValue, Timestamp, type Firestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";

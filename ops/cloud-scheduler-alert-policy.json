@@ -1,0 +1,61 @@
+{
+  "displayName": "Eduvora push scheduler — minute pinger failing (push-scheduler-minute)",
+  "documentation": {
+    "subject": "[Eduvora] minute pinger push-scheduler-minute is not succeeding",
+    "mimeType": "text/markdown",
+    "content": "## What fired\n\nThe Cloud Scheduler job **push-scheduler-minute** (project `my-website-761e9`, region `asia-south1`) is the primary minute-level pinger for `https://eduvora.app/api/cron/subscription-renewals`. This policy fires when either:\n\n1. an execution came back with a **non-success response** (`response_code != \"200\"`), or\n2. **no execution at all** was recorded for 10 minutes — the job was paused, deleted, or Cloud Scheduler stopped firing it.\n\nWhile this is firing, exact-time reminders, renewal notices and content announcements stop arriving on schedule (the GitHub Actions backup pingers still cover the endpoint, but only at their own drift-prone cadence).\n\n## Triage, in order\n\n1. **Execution history** — Cloud Scheduler → `push-scheduler-minute` → Logs, or:\n   `gcloud logging read 'resource.type=\"cloud_scheduler_job\" resource.labels.job_id=\"push-scheduler-minute\"' --limit=15 --freshness=30m --project=my-website-761e9 --format='table(timestamp, httpRequest.status, jsonPayload.status)'`\n2. **Read the status code**\n   - `401` — the job's `Authorization: Bearer <CRON_SECRET>` header no longer matches the `CRON_SECRET` env var on Vercel. Re-run `ops/setup-cloud-scheduler.sh` with the current secret (it updates the job in place).\n   - `404` — the target URL changed.\n   - `405` — the job's HTTP method is not `GET`.\n   - `503` — `CRON_SECRET` is missing on Vercel.\n   - `504` / `DEADLINE_EXCEEDED` — the function overran; `vercel.json` pins `maxDuration: 60` for `api/cron/subscription-renewals.ts`, so check the latest Vercel deployment and Firestore scan sizes.\n   - **no executions** — the job is `PAUSED` or missing: `gcloud scheduler jobs describe push-scheduler-minute --location=asia-south1 --project=my-website-761e9`; re-run the setup script to resume/recreate.\n3. **Confirm real work happened, not just a 200** — Firestore → `settings/pushSchedulerState` → `lastRunAt` should advance every minute.\n4. **Widen catch-up while recovering** — set `MYDAY_MAX_CATCHUP_HOURS=6` on the Vercel function so same-day reminders are swept up instead of skipped (no deploy needed).\n\n## If this policy never evaluates\n\n`cloudscheduler.googleapis.com/*` is not listed in the public Cloud Monitoring metrics catalog, so some projects emit no data for it. Deploy the log-based twin instead (same channel id): `gcloud alpha monitoring policies create --project=my-website-761e9 --policy-from-file=ops/cloud-scheduler-alert-policy-logmatch.json`.\n\nFull walkthrough: `ops/cloud-scheduler-setup.md`.\n"
+  },
+  "combiner": "OR",
+  "enabled": true,
+  "conditions": [
+    {
+      "displayName": "push-scheduler-minute returned a non-success response",
+      "conditionThreshold": {
+        "filter": "resource.type = \"cloud_scheduler_job\" AND metric.type = \"cloudscheduler.googleapis.com/job/execution_count\" AND resource.label.\"job_id\" = \"push-scheduler-minute\" AND metric.label.\"response_code\" != \"200\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_RATE",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "groupByFields": [
+              "metric.label.response_code"
+            ]
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0,
+        "duration": "0s",
+        "trigger": {
+          "count": 1
+        },
+        "evaluationMissingData": "EVALUATION_MISSING_DATA_INACTIVE"
+      }
+    },
+    {
+      "displayName": "push-scheduler-minute produced no execution for 10 minutes",
+      "conditionAbsent": {
+        "filter": "resource.type = \"cloud_scheduler_job\" AND metric.type = \"cloudscheduler.googleapis.com/job/execution_count\" AND resource.label.\"job_id\" = \"push-scheduler-minute\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_RATE",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "duration": "600s",
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "604800s",
+    "notificationRateLimit": {
+      "period": "3600s"
+    }
+  },
+  "notificationChannels": [
+    "projects/my-website-761e9/notificationChannels/REPLACE_WITH_CHANNEL_ID"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "displayName": "Eduvora push scheduler — minute pinger attempt failed (log-based)",
+  "documentation": {
+    "subject": "[Eduvora] Cloud Scheduler logged a failed attempt for push-scheduler-minute",
+    "mimeType": "text/markdown",
+    "content": "## What fired\n\nCloud Scheduler wrote a **WARNING/ERROR execution log** for job **push-scheduler-minute** — i.e. an attempt at `GET https://eduvora.app/api/cron/subscription-renewals` did not succeed. Successful attempts log at `INFO` (`...AttemptFinished` with `httpRequest.status: 200`); anything at `WARNING` or above is a failed attempt.\n\nThis is the log-based twin of `ops/cloud-scheduler-alert-policy.json`. Use it when the metric-based policy cannot be created in your project (`cloudscheduler.googleapis.com/*` is absent from the public metrics catalog), or alongside it.\n\n## Triage\n\n1. Read the failing entries:\n   `gcloud logging read 'resource.type=\"cloud_scheduler_job\" resource.labels.job_id=\"push-scheduler-minute\" severity>=WARNING' --limit=10 --freshness=30m --project=my-website-761e9 --format='table(timestamp, httpRequest.status, jsonPayload.status, jsonPayload.@type)'`\n2. `401` → the `Authorization: Bearer <CRON_SECRET>` header no longer matches Vercel's `CRON_SECRET`; re-run `ops/setup-cloud-scheduler.sh` with the current secret. `503` → `CRON_SECRET` is missing on Vercel. `504`/`DEADLINE_EXCEEDED` → the function overran its 60s budget. No entries at all → the job is paused or deleted.\n3. Confirm the endpoint really ran: Firestore → `settings/pushSchedulerState` → `lastRunAt` advances every minute.\n\nA log-based alerting policy can hold only ONE condition, so this file deliberately watches failures only; use the metric policy (or the console job page) for the \"no executions at all\" case.\n\nFull walkthrough: `ops/cloud-scheduler-setup.md`.\n"
+  },
+  "combiner": "OR",
+  "enabled": true,
+  "conditions": [
+    {
+      "displayName": "Cloud Scheduler logged a failed attempt for push-scheduler-minute",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_scheduler_job\" AND resource.labels.job_id=\"push-scheduler-minute\" AND severity>=WARNING",
+        "labelExtractors": {
+          "job_id": "EXTRACT(resource.labels.job_id)",
+          "http_status": "EXTRACT(httpRequest.status)",
+          "attempt": "EXTRACT(jsonPayload.@type)"
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "604800s",
+    "notificationRateLimit": {
+      "period": "3600s"
+    }
+  },
+  "notificationChannels": [
+    "projects/my-website-761e9/notificationChannels/REPLACE_WITH_CHANNEL_ID"
+  ]
+}

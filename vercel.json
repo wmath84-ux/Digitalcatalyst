@@ -6,6 +6,9 @@
     }
   ],
   "functions": {
+    "api/cron/subscription-renewals.ts": {
+      "maxDuration": 60
+    },
     "api/referral-leaderboard.ts": {
       "maxDuration": 60
     }
