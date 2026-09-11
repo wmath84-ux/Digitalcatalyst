@@ -65,13 +65,24 @@ export default function ProductCard({
       tintColor="173,216,255"
       blur={0}
       radius={22}
-      className="dc-store-glass dc-scene-ink group relative flex aspect-square w-full min-h-0 flex-col overflow-hidden transition duration-300 hover:-translate-y-0.5"
+      /* `[&>div:last-child]` is the pack's content wrapper (GlassSurface puts
+         one between this root and the card's real children). It ships as a
+         BLOCK box, so a flex column on the root never reached the artwork /
+         copy below: `flex-1` and `mt-auto` did nothing and the CTA floated up
+         under the title. Making the wrapper the flex column fixes the card
+         without touching `contentClassName="p-0"` — the artwork stays
+         edge-to-edge, which liquidGlassWaveThreeContract pins. */
+      className="dc-store-glass dc-scene-ink group relative flex aspect-square w-full min-h-0 flex-col overflow-hidden transition duration-300 hover:-translate-y-0.5 [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-col"
     >
-      {/* Artwork — the top 40% of the square (46% from `sm:`, where the extra
-          copy below needs less of the card). `absolute inset-0` on the <img>
-          keeps it cropped to the box: index.css's unlayered `img { height:
-          auto }` (640–1366px) would otherwise beat a Tailwind `h-full`. */}
-      <div className="relative h-[40%] w-full shrink-0 overflow-hidden sm:h-[46%]">
+      {/* Artwork — 40% of the square (46% from `sm:`), but as a GROW/SHRINK
+          flex item rather than a fixed percentage height: on a 320px phone the
+          copy needs more of the card than 60% leaves, and a `shrink-0` band
+          pushed the CTA out of the square where `overflow-hidden` clipped it.
+          Now the copy keeps its natural height and the artwork gives way (and
+          on a big tablet card it grows to fill). `absolute inset-0` on the
+          <img> keeps it cropped to the box: index.css's unlayered
+          `img { height: auto }` (640–1366px) would beat a Tailwind `h-full`. */}
+      <div className="relative w-full basis-[40%] min-h-0 grow shrink overflow-hidden sm:basis-[46%]">
         <img src={product.image} alt={product.title} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         {/* Bottom scrim: the rating chip sits on the artwork, so it needs the
             same edge the copy gets from `.dc-scene-ink`. */}
@@ -127,25 +138,35 @@ export default function ProductCard({
         </span>
       </div>
 
-      <div className="relative z-20 flex min-h-0 flex-1 flex-col gap-1 p-1.5 sm:gap-1.5 sm:p-3">
+      {/* `shrink-0`: the copy never compresses, so the artwork above is what
+          absorbs a tight square. No auto top margin any more — the artwork's
+          `grow` is what pins this block to the card's bottom edge. (Braces
+          matter here: between JSX children a bare slash-star comment is
+          literal TEXT and paints itself onto the card.) */}
+      <div className="relative z-20 flex shrink-0 flex-col gap-1 px-1.5 pb-1.5 pt-2 sm:gap-1.5 sm:px-3 sm:pb-3 sm:pt-2.5">
         {/* The card's heading: title first, biggest and heaviest. */}
         <h3 className="dc-store-card-title line-clamp-2">{product.title}</h3>
 
-        {/* Anchoring + contrast effect: the struck reference price is quiet
-            and set BEFORE the payable price, so the eye lands on the smaller
-            number last. Loss aversion: the saving is framed as rupees the
-            user keeps, not as an abstract percentage alone. From `sm:` —
-            inside a 145px phone card the CTA already carries the price. */}
-        <p className="dc-store-card-meta hidden truncate sm:block">by {product.instructor}</p>
-        <div className="hidden flex-wrap items-baseline gap-x-1.5 gap-y-0.5 sm:flex">
+        {/* Anchoring + contrast: the struck reference price is quiet, and the
+            saving is framed as rupees the user keeps rather than an abstract
+            percentage. The price shows at EVERY breakpoint — hiding it below
+            `sm:` left a phone card with nothing but a title and a button. The
+            save pill is wrapped (not `hidden` on itself) because
+            `.dc-save-pill`'s `display: inline-flex` is unlayered CSS and would
+            beat the utility. */}
+        <div className="flex flex-wrap items-baseline gap-x-1.5">
+          <span className="text-[13px] dc-hero-price sm:text-lg">₹{product.price}</span>
           {product.originalPrice > product.price && (
-            <span className="text-[12px] dc-anchor-price">₹{product.originalPrice}</span>
+            <span className="text-[10px] dc-anchor-price sm:text-[12px]">₹{product.originalPrice}</span>
           )}
-          <span className="text-lg dc-hero-price">₹{product.price}</span>
           {discount > 0 && (
-            <span className="dc-save-pill">Save ₹{product.originalPrice - product.price} · {discount}%</span>
+            <span className="hidden sm:inline-flex">
+              <span className="dc-save-pill">Save ₹{product.originalPrice - product.price} · {discount}%</span>
+            </span>
           )}
         </div>
+
+        <p className="dc-store-card-meta hidden truncate sm:block">by {product.instructor}</p>
 
         {/* Two states on purpose: when the card can be acted on it is a
             `glass-button` capsule (gel press included); when it cannot, it stays
@@ -154,7 +175,7 @@ export default function ProductCard({
             The `[&.h-11]` / `[&_.h-11]` pair pulls the pack's 44px capsule down
             to 32px: inside an exact square the full-height CTA would push the
             heading out of the card on a phone. */}
-        <div className="mt-auto">
+        <div>
           {purchased || inCart || unavailable ? (
             <div
               className={`flex w-full items-center justify-between gap-1 rounded-full px-2.5 py-2 text-[10px] font-extrabold uppercase tracking-wide ${

@@ -376,11 +376,11 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
            heading, then the CTA. */
         <div data-store-gutter data-store-grid data-store-grid-loading aria-busy="true" aria-label="Loading products" className="grid grid-cols-2 gap-1.5 px-3 pt-3 sm:gap-2 sm:px-4 sm:pt-4">
           {[0, 1, 2, 3, 4, 5, 6, 7].map((item) => (
-            <GlassCard key={item} aria-hidden="true" contentClassName="p-0" radius={22} className="dc-store-glass flex aspect-square w-full min-h-0 flex-col overflow-hidden">
-              <div className="relative h-[40%] w-full shrink-0 overflow-hidden sm:h-[46%]">
+            <GlassCard key={item} aria-hidden="true" contentClassName="p-0" radius={22} className="dc-store-glass flex aspect-square w-full min-h-0 flex-col overflow-hidden [&>div:last-child]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-col">
+              <div className="relative w-full basis-[40%] min-h-0 grow shrink overflow-hidden sm:basis-[46%]">
                 <Skeleton width="100%" height="100%" radius={0} />
               </div>
-              <div className="flex min-h-0 flex-1 flex-col gap-1 p-1.5 sm:gap-1.5 sm:p-3">
+              <div className="flex shrink-0 flex-col gap-1 px-1.5 pb-1.5 pt-2 sm:gap-1.5 sm:px-3 sm:pb-3 sm:pt-2.5">
                 <Skeleton width="92%" height="0.9rem" radius={6} />
                 <Skeleton width="64%" height="0.9rem" radius={6} />
                 <div className="mt-auto">

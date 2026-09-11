@@ -195,13 +195,53 @@ test("every product card is an exact square", () => {
   // aspect-ratio 1/1, and min-height:0 so the grid item's automatic minimum
   // size cannot let long copy stretch the row and break the ratio.
   assert.match(card, /dc-store-glass dc-scene-ink group relative flex aspect-square w-full min-h-0 flex-col overflow-hidden/);
-  // The artwork is a percentage of the square, and the <img> is absolutely
-  // positioned so index.css's unlayered `img { height: auto }` (640–1366px)
-  // cannot stretch it out of the crop.
-  assert.match(card, /className="relative h-\[40%\] w-full shrink-0 overflow-hidden sm:h-\[46%\]"/);
+  // The artwork is a flex item sized off the square, and the <img> is
+  // absolutely positioned so index.css's unlayered `img { height: auto }`
+  // (640–1366px) cannot stretch it out of the crop.
+  assert.match(card, /className="relative w-full basis-\[40%\] min-h-0 grow shrink overflow-hidden sm:basis-\[46%\]"/);
   assert.match(card, /className="absolute inset-0 h-full w-full object-cover/);
   // The loading placeholders are the same square in the same grid.
   assert.match(storePage, /dc-store-glass flex aspect-square w-full min-h-0 flex-col overflow-hidden/);
+});
+
+test("the card's flex column reaches its children, so the CTA sits at the bottom", () => {
+  // Regression (2026-09-10, owner: "add to my cart button upar center me ho
+  // gaya hai"): GlassSurface puts a content wrapper between the card root and
+  // the card's real children, and that wrapper ships as `display: block`. A
+  // flex column on the ROOT therefore never reached the artwork / copy — so
+  // `flex-1` and `mt-auto` did nothing and the CTA floated up under the title.
+  // The wrapper is promoted to the flex column from the root's class list,
+  // which keeps `contentClassName="p-0"` (edge-to-edge artwork) intact.
+  for (const source of [card, storePage]) {
+    assert.match(source, /\[&>div:last-child\]:flex \[&>div:last-child\]:min-h-0 \[&>div:last-child\]:flex-col/);
+  }
+  assert.match(card, /contentClassName="p-0"/, "the artwork stays edge-to-edge");
+  // The copy block never compresses — the artwork is what gives way on a tight
+  // square, so no line of copy can be clipped by the card's overflow-hidden.
+  assert.match(card, /className="relative z-20 flex shrink-0 flex-col gap-1 px-1\.5 pb-1\.5 pt-2 sm:gap-1\.5 sm:px-3 sm:pb-3 sm:pt-2\.5"/);
+  // Comments are stripped first: the fix is documented in a comment that
+  // quotes the old class.
+  const bareCard = card.replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.doesNotMatch(bareCard, /mt-auto/, "nothing floats on auto margins in a block box any more");
+  assert.doesNotMatch(bareCard, /flex-1/, "no leftover flex-1 that the block wrapper would ignore");
+  // Between JSX children a bare slash-star comment is literal TEXT — it painted
+  // the comment onto the card. The copy block's comment must stay braced.
+  assert.match(card, /\{\/\* `shrink-0`: the copy never compresses/);
+  assert.doesNotMatch(card, /\n\s*\/\* `shrink-0`/);
+});
+
+test("the price is on the card at every breakpoint, not only from sm:", () => {
+  // The phone card used to hide the whole price row (`hidden … sm:flex`), which
+  // is what read as "text dikh nahi raha" on mobile. It is now always visible;
+  // only the save pill (the bulkiest chip) waits for `sm:`.
+  assert.match(card, /<div className="flex flex-wrap items-baseline gap-x-1\.5">/);
+  assert.match(card, /<span className="text-\[13px\] dc-hero-price sm:text-lg">₹\{product\.price\}<\/span>/);
+  assert.match(card, /<span className="text-\[10px\] dc-anchor-price sm:text-\[12px\]">₹\{product\.originalPrice\}<\/span>/);
+  // The pill is hidden via a WRAPPER: `.dc-save-pill` sets `display:
+  // inline-flex` in unlayered CSS, which beats a `hidden` utility on itself.
+  assert.match(card, /<span className="hidden sm:inline-flex">\s*\n\s*<span className="dc-save-pill">/);
+  // The byline stays the one `sm:`-only line — a 145px card cannot carry it.
+  assert.match(card, /<p className="dc-store-card-meta hidden truncate sm:block">by \{product\.instructor\}<\/p>/);
 });
 
 /* ------------------------------------------------------------------ */
