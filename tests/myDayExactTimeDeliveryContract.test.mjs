@@ -38,6 +38,10 @@ const read = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
 const cron = read("api/cron/subscription-renewals.ts");
 const workflow = read("ops/push-scheduler.workflow.yml");
 const liveWorkflow = read(".github/workflows/push-scheduler.yml");
+const backupWorkflow = read(".github/workflows/push-scheduler-backup.yml");
+// The actual ping loop (auth header, secrets, 60s ticks) lives in this
+// composite action; both live workflows and the ops template just call it.
+const pingLoop = read(".github/actions/ping-loop/action.yml");
 const vercelConfig = JSON.parse(read("vercel.json"));
 
 // 2026-08-13T04:30:00Z is exactly 10:00 IST (offset -330).
@@ -114,25 +118,47 @@ test("the foreground and server paths agree on the notification tag", () => {
 });
 
 test("a minute-level scheduler workflow is committed and active", () => {
-  // The live workflow must live under .github/workflows/ — that is the
-  // only location GitHub Actions schedules from. A template that only
-  // lived in ops/ meant reminders silently fell back to once-a-day.
+  // The live primary AND a backup workflow (same minute cron, same action)
+  // must live under .github/workflows/ — that is the only location GitHub
+  // Actions schedules from. A template that only lived in ops/ meant
+  // reminders silently fell back to once-a-day.
   assert.match(liveWorkflow, /name: Push scheduler/);
-  for (const source of [liveWorkflow, workflow]) {
+  assert.match(backupWorkflow, /name: Push scheduler \(backup\)/);
+  // Every workflow entry point must support manual runs, serialize through
+  // the shared concurrency group, and delegate to the shared ping loop.
+  for (const source of [liveWorkflow, backupWorkflow, workflow]) {
     assert.match(source, /workflow_dispatch/, "manual runs make this testable");
     assert.match(source, /concurrency:/, "a slow run must not overlap the next tick");
-    assert.match(source, /Authorization: Bearer/);
-    assert.match(source, /\$\{\{ secrets\.CRON_SECRET \}\}/);
-    assert.match(source, /\$\{\{ secrets\.SCHEDULER_URL \}\}/);
+    assert.match(source, /group: push-scheduler/, "primary and backup must share one concurrency group");
+    assert.match(source, /uses: \.\/\.github\/actions\/ping-loop/, "workflows must delegate to the shared loop");
   }
+  // The auth header and secret references live in the shared loop action.
+  assert.match(pingLoop, /Authorization: Bearer/);
+  assert.match(pingLoop, /\$\{\{ secrets\.CRON_SECRET \}\}/);
+  assert.match(pingLoop, /\$\{\{ secrets\.SCHEDULER_URL \}\}/);
 });
 
 test("the scheduler pings every minute for exact-time delivery", () => {
   // Exact-time reminders need a one-minute tick (the endpoint's own
   // lookback window absorbs jitter). Any coarser cadence makes a
   // reminder late, so guard the cron expression against loosening.
-  for (const source of [liveWorkflow, workflow]) {
+  for (const source of [liveWorkflow, backupWorkflow, workflow]) {
     assert.match(source, /cron: "\* \* \* \* \*"/, "scheduler must run every minute");
+  }
+});
+
+test("each scheduled run loops long enough to bridge GitHub schedule drift", () => {
+  // GitHub's schedule trigger starts runs 1–5+ hours apart and often drops
+  // minute events. A run that pings once (or loops only ~21 minutes) leaves
+  // multi-hour holes in which reminders arrive late or past the catch-up
+  // cap never. The loop therefore spans ~5h (GitHub's per-job ceiling is
+  // 6h), and the job timeout gives every tick headroom. Pin both so nobody
+  // shortens the loop back into the broken regime.
+  assert.match(pingLoop, /default: "300"/, "loop default must be 300 one-minute ticks (5h)");
+  assert.match(pingLoop, /LOOP_MINUTES:\s*\$\{\{ inputs\.loop-minutes \}\}/);
+  for (const source of [liveWorkflow, backupWorkflow, workflow]) {
+    assert.match(source, /loop-minutes: 300/, "workflow must request the 5h loop");
+    assert.match(source, /timeout-minutes: 330/, "job timeout must exceed the 5h loop");
   }
 });
 
@@ -147,9 +173,11 @@ test("a minute-level scheduler exists, because Vercel Hobby cron cannot do it", 
 test("the scheduler endpoint stays authenticated", () => {
   assert.match(cron, /CRON_SECRET/);
   assert.match(cron, /Unauthorized/);
-  // The workflow must not hard-code the secret or the host.
-  assert.match(workflow, /\$\{\{ secrets\.CRON_SECRET \}\}/);
-  assert.match(workflow, /\$\{\{ secrets\.SCHEDULER_URL \}\}/);
+  // The loop must not hard-code the secret or the host — both come from
+  // repository secrets (this also catches a workflow silently missing its
+  // env wiring, whose symptom is an all-failing red Actions run).
+  assert.match(pingLoop, /\$\{\{ secrets\.CRON_SECRET \}\}/);
+  assert.match(pingLoop, /\$\{\{ secrets\.SCHEDULER_URL \}\}/);
 });
 
 test("the daily Vercel cron still works as a fallback", () => {

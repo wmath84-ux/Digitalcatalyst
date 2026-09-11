@@ -1,0 +1,87 @@
+# Shared minute-ping loop for the push scheduler.
+#
+# Both .github/workflows/push-scheduler.yml and
+# .github/workflows/push-scheduler-backup.yml call this action, so the loop
+# logic lives in exactly one place. The two workflows share the
+# `push-scheduler` concurrency group, so only one loop ever runs at a time;
+# duplicate starts queue (or are dropped) instead of running two loops.
+#
+# Why the loop is 5 HOURS long:
+# GitHub's `schedule` trigger is best-effort. It was first measured starting
+# runs 11–79 minutes apart, but on this public repo recent history shows
+# starts 1h20m–5h20m apart (and GitHub silently drops most minute events).
+# A 21-minute loop therefore left multi-hour holes; reminders due in those
+# holes arrived late, and ones older than the 2h catch-up cap never arrived.
+# A ~5h loop (GitHub's per-job ceiling is 6h) stays alive across the gaps:
+# the next scheduled start queues behind it and starts the instant it ends,
+# so the scheduler is pinged essentially continuously even when GitHub only
+# delivers a schedule event every few hours.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   CRON_SECRET    — same value as the Vercel env var
+#   SCHEDULER_URL  — https://<your-domain>/api/cron/subscription-renewals
+name: Scheduler ping loop
+inputs:
+  loop-minutes:
+    description: "How many one-minute ticks the loop runs for."
+    required: false
+    default: "300"
+runs:
+  using: composite
+  steps:
+    - name: Trigger scheduled push jobs (minute loop)
+      shell: bash
+      env:
+        SCHEDULER_URL: ${{ secrets.SCHEDULER_URL }}
+        CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        LOOP_MINUTES: ${{ inputs.loop-minutes }}
+      run: |
+        set -uo pipefail
+        if [ -z "${SCHEDULER_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+          echo "::error::SCHEDULER_URL and CRON_SECRET repository secrets are required."
+          exit 1
+        fi
+        successes=0
+        failures=0
+        last_fail_code=""
+        last_fail_body=""
+        for tick in $(seq 1 "${LOOP_MINUTES}"); do
+          started="$(date +%s)"
+          body_file="$(mktemp)"
+          http_code="$(curl --silent --show-error \
+            --max-time 55 \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            --output "${body_file}" \
+            --write-out '%{http_code}' \
+            "${SCHEDULER_URL}")" || http_code=0
+          body="$(cat "${body_file}")"
+          rm -f "${body_file}"
+          if [ "${http_code}" -ge 200 ] && [ "${http_code}" -lt 300 ]; then
+            successes=$((successes + 1))
+            # Only log every 10th healthy tick plus the last one, so a 5h
+            # run doesn't produce a 300-line log.
+            if [ $((tick % 10)) -eq 0 ] || [ "${tick}" -eq "${LOOP_MINUTES}" ]; then
+              echo "tick ${tick}/${LOOP_MINUTES}: HTTP ${http_code} ${body}"
+            fi
+          else
+            failures=$((failures + 1))
+            last_fail_code="${http_code}"
+            last_fail_body="${body}"
+            # A single failed tick is not fatal — the next tick lands in
+            # 60s and the endpoint's lookback window covers the gap.
+            echo "::warning::tick ${tick}/${LOOP_MINUTES} failed (HTTP ${http_code}): ${body}"
+          fi
+          if [ "${tick}" -lt "${LOOP_MINUTES}" ]; then
+            elapsed=$(( $(date +%s) - started ))
+            sleep_for=$(( 60 - elapsed ))
+            if [ "${sleep_for}" -gt 0 ]; then sleep "${sleep_for}"; fi
+          fi
+        done
+        if [ "${successes}" -eq 0 ]; then
+          # Include the last HTTP code/body in the failure annotation so the
+          # run itself explains where to look (401 = CRON_SECRET mismatch,
+          # 000 = DNS/network/deployment down, 5xx = function error).
+          echo "::error::Every one of the ${LOOP_MINUTES} pings failed (last HTTP ${last_fail_code}): ${last_fail_body}. Check SCHEDULER_URL, CRON_SECRET and the Vercel deployment."
+          exit 1
+        fi
+        echo "Completed ${successes}/${LOOP_MINUTES} successful pings (${failures} failed). Last failure: HTTP ${last_fail_code:-none} ${last_fail_body}"

@@ -7,11 +7,14 @@
  * hand-drawn book-shaped placeholder that used to be rendered pixel-by-pixel
  * in pure JS.
  *
- * The `badge` is DIFFERENT on purpose: Web Push `badge` and local-notification
- * badges are rendered by the OS using only the alpha channel, so they must stay
- * a monochrome white glyph on a transparent background (Android shows any
- * opaque area as a solid white blob). We therefore keep the simple white
- * open-book glyph for the badge and never put the full-colour logo there.
+ * The `badge` is monochrome on purpose: Web Push `badge`, local-notification
+ * badges AND the Android status-bar small icon are rendered by the OS using
+ * only the alpha channel — any opaque area shows up as a solid white blob,
+ * and colour is ignored. We therefore derive the badge from the SAME master
+ * logo: take its alpha (silhouette), flatten the RGB to pure white, and keep
+ * a transparent background. The matching Android vector lives at
+ * android/app/src/main/res/drawable/ic_stat_eduvora.xml, so native FCM/local
+ * notifications and web push show the same brand glyph.
  *
  * Run: node scripts/generate-icons.cjs
  */
@@ -62,92 +65,37 @@ function encodePNG(w, h, rgba) {
   return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))]);
 }
 
-// ---------------------------------------------------------------- geometry
-const inRounded = (px, py, x0, y0, x1, y1, r) => {
-  if (px < x0 || px > x1 || py < y0 || py > y1) return false;
-  const cx = Math.max(x0 + r, Math.min(px, x1 - r));
-  const cy = Math.max(y0 + r, Math.min(py, y1 - r));
-  const dx = px - cx;
-  const dy = py - cy;
-  return dx * dx + dy * dy <= r * r;
-};
-
-const segDist = (px, py, ax, ay, bx, by) => {
-  const abx = bx - ax;
-  const aby = by - ay;
-  const apx = px - ax;
-  const apy = py - ay;
-  const t = Math.max(0, Math.min(1, (apx * abx + apy * aby) / (abx * abx + aby * aby)));
-  const dx = px - (ax + abx * t);
-  const dy = py - (ay + aby * t);
-  return Math.sqrt(dx * dx + dy * dy);
-};
-
-// Sample a cubic bezier into points (inclusive of endpoints).
-const cubic = (x0, y0, x1, y1, x2, y2, x3, y3, steps = 16) => {
-  const pts = [];
-  for (let i = 0; i <= steps; i += 1) {
-    const t = i / steps;
-    const u = 1 - t;
-    const x = u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3;
-    const y = u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3;
-    pts.push([x, y]);
-  }
-  return pts;
-};
-
 // ---------------------------------------------------------------- badge
-// Open-book outline in 192-space, shared by the badge only (kept as the simple
-// monochrome notification glyph — see header note).
-const bookOutlinePaths = () => {
-  const path1 = [
-    ...cubic(40, 58, 40, 48, 48, 40, 58, 40),
-    [96, 40], [96, 152], [58, 152],
-    ...cubic(58, 152, 48, 152, 40, 144, 40, 134),
-    [40, 58],
-  ];
-  const path2 = [
-    ...cubic(152, 58, 152, 48, 144, 40, 134, 40),
-    [96, 40], [96, 152], [134, 152],
-    ...cubic(134, 152, 144, 152, 152, 144, 152, 134),
-    [152, 58],
-  ];
-  return [path1, path2];
-};
+/**
+ * Build the monochrome notification badge from the master logo's alpha
+ * channel. The master is the brand glyph on a transparent background, so its
+ * alpha IS the silhouette: we resize it to the badge canvas and then force
+ * every pixel's RGB to white while preserving its alpha. The OS renders only
+ * that alpha, so the result is a crisp white brand mark on transparent —
+ * exactly what Android/Chrome require for the status-bar small icon / Web
+ * Push badge, with no risk of an opaque square blob.
+ */
+async function makeBadge(size) {
+  const { data, info } = await sharp(SRC_MASTER)
+    .resize(size, size, { fit: 'cover', kernel: sharp.kernel.lanczos3 })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
 
-const distanceToBookOutline = (px, py, scale, paths) => {
-  let min = Infinity;
-  for (const pts of paths) {
-    for (let i = 0; i < pts.length - 1; i += 1) {
-      const d = segDist(px, py, pts[i][0] * scale, pts[i][1] * scale, pts[i + 1][0] * scale, pts[i + 1][1] * scale);
-      if (d < min) min = d;
-    }
+  const out = Buffer.alloc(info.width * info.height * 4);
+  for (let p = 0; p < info.width * info.height; p += 1) {
+    const src = p * 4;
+    const dst = p * 4;
+    let alpha = data[src + 3];
+    // Drop faint halo pixels (<6% opacity) so resizing never leaves a ghost
+    // outline around the glyph; keep the rest anti-aliased for crisp edges.
+    if (alpha < 16) alpha = 0;
+    out[dst] = 255;
+    out[dst + 1] = 255;
+    out[dst + 2] = 255;
+    out[dst + 3] = alpha;
   }
-  return min;
-};
-
-function makeBadge(size) {
-  const buf = Buffer.alloc(size * size * 4);
-  // Android badges are rendered through the alpha channel only, so the glyph
-  // must be white on transparent. Zoom the book mark slightly past its icon
-  // bounds so it stays legible in the status bar, and stroke it much bolder
-  // than the app-icon stroke.
-  const zoom = 1.22;
-  const k = size / 192;
-  const zoomAt = (v) => (96 + (v - 96) * zoom) * k; // 192-space → badge px, zoomed about the centre
-  const scaled = bookOutlinePaths().map((pts) => pts.map(([x, y]) => [zoomAt(x), zoomAt(y)]));
-  const strokeHalf = 8 * k; // ≈16 units wide in 192-space — bold on small screens
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const px = x + 0.5;
-      const py = y + 0.5;
-      const i = (y * size + x) * 4;
-      if (distanceToBookOutline(px, py, 1, scaled) <= strokeHalf) {
-        buf[i] = 255; buf[i + 1] = 255; buf[i + 2] = 255; buf[i + 3] = 255;
-      }
-    }
-  }
-  return encodePNG(size, size, buf);
+  return encodePNG(info.width, info.height, out);
 }
 
 // ---------------------------------------------------------------- main logo icons
@@ -196,10 +144,11 @@ async function main() {
 
   fs.mkdirSync(outDir, { recursive: true });
 
-  // Notification badge — keep the existing monochrome white book glyph. A
-  // full-colour logo would be flattened to an opaque blob by the OS badge
-  // renderer, so we intentionally do NOT reuse the logo for this asset.
-  fs.writeFileSync(path.join(outDir, 'badge-96x96.png'), makeBadge(96));
+  // Notification badge — white-on-transparent silhouette OF THE BRAND LOGO
+  // (derived from its alpha channel). A full-colour image would be flattened
+  // to an opaque blob by the OS badge renderer; the silhouette matches the
+  // Android status-bar vector (res/drawable/ic_stat_eduvora.xml).
+  fs.writeFileSync(path.join(outDir, 'badge-96x96.png'), await makeBadge(96));
 
   // Full-colour web/PWA icons from the master logo.
   fs.writeFileSync(path.join(outDir, 'icon-192x192.png'), await makeLogoPng(192));

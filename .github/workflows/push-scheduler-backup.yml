@@ -1,0 +1,33 @@
+# Backup pinger for the real-time push scheduler.
+#
+# Identical to push-scheduler.yml (same minute cron, same secrets, same
+# 5-hour loop) so that when GitHub throttles or drops the scheduled events
+# of ONE workflow, this second one still has independent chances to start a
+# loop. Both share the `push-scheduler` concurrency group, which guarantees
+# that only one loop ever runs at a time — the extra start simply queues
+# behind the active loop and begins when it finishes. There is no double
+# work: the endpoint is idempotent and deduplicates every notification.
+#
+# Do not put loop logic here — it lives in .github/actions/ping-loop.
+
+name: Push scheduler (backup)
+
+on:
+  schedule:
+    - cron: "* * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: push-scheduler
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run scheduler ping loop
+        uses: ./.github/actions/ping-loop
+        with:
+          loop-minutes: 300
