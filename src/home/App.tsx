@@ -12,6 +12,10 @@ import ContinueLearningSkeleton from "./components/ContinueLearningSkeleton";
 import Reviews from "./components/Reviews";
 import BottomNav, { type TabKey } from "../components/BottomNav";
 import DeferredVisible from "../components/DeferredVisible";
+import EmptyProductState from "../components/EmptyProductState";
+import ProductFilterBar from "../components/ProductFilterBar";
+import { SearchIcon } from "../components/icons";
+import { useProductFilters } from "../hooks/useProductFilters";
 // Bottom-of-page feedback wall: matter.js physics + its own chunk, mounted
 // lazily by DeferredVisible below (see the section near the end of the page).
 const StickerWall = lazy(() => import("../components/StickerWall"));
@@ -161,13 +165,42 @@ export default function App({
 
   const [activeCategory, setActiveCategory] = useState("all");
 
+  /**
+   * The Store page's filtering system, mounted on Home (owner brief
+   * 2026-09-11): the same admin-managed chips (`settings/storeFilters`), the
+   * same matcher and the same overlay — not a second, Home-only filter. Home's
+   * own category strip narrows by product TYPE; this narrows by whatever the
+   * admin configured ("Notes", "Class 10", "Physics", …). The two compose: a
+   * tile has to satisfy both to reach the grid, and the grid's length is what
+   * decides whether the empty state appears — so every filter combination that
+   * can come back empty gets the same treatment, never one hardcoded category.
+   */
+  const productFilters = useProductFilters(catalogProducts);
+  const isFiltering = productFilters.isFiltered || activeCategory !== "all";
+  const resetHomeFilters = () => {
+    setActiveCategory("all");
+    productFilters.clearFilters();
+  };
+
+  const activeCategoryLabel = activeCategory === "all"
+    ? null
+    : categories.find((category) => category.id === activeCategory)?.label ?? null;
+
   const categoryFiltered: Product[] = useMemo(() => {
+    const visibleIds = new Set(productFilters.visible.map((product) => product.id));
+    const inStoreFilter = products.filter((product) => visibleIds.has(product.id));
     if (activeCategory === "all") {
       // "Trending Now" — show only the top 4 products, ranked by rating.
-      return [...products].sort((a, b) => b.rating - a.rating).slice(0, 4);
+      return [...inStoreFilter].sort((a, b) => b.rating - a.rating).slice(0, 4);
     }
-    return products.filter((p) => p.category === activeCategory);
-  }, [activeCategory, products]);
+    return inStoreFilter.filter((p) => p.category === activeCategory);
+  }, [activeCategory, products, productFilters.visible]);
+
+  const emptyProductsMessage = productFilters.isFiltered
+    ? `Nothing is live under “${productFilters.activeFilter.label}” right now. Clear the filter to see the full catalog.`
+    : activeCategoryLabel
+      ? `The ${activeCategoryLabel} shelf is empty for now — new drops land here as soon as they are published.`
+      : "No products are published yet. Fresh drops land here as soon as they go live.";
 
   const handleSelectSuggestion = (product: Product) => {
     setSearchQuery(product.title);
@@ -264,13 +297,16 @@ export default function App({
               </p>
 
               {searchResults.length === 0 ? (
-                <div className="dc-scene-ink mt-10 flex flex-col items-center gap-2 text-center text-white/55">
-                  <span className="text-4xl">🔎</span>
-                  <p className="text-sm">
-                    We couldn't find anything for "{searchQuery}".<br />
-                    Try searching a different keyword.
-                  </p>
-                </div>
+                <EmptyProductState
+                  className="mt-4"
+                  icon={<SearchIcon className="h-6 w-6" />}
+                  heading="No products found"
+                  message={`Nothing matches “${searchQuery.trim()}”. Try a shorter keyword — titles, authors and subjects all count.`}
+                  actionLabel="Clear search"
+                  onAction={() => setSearchQuery("")}
+                  secondaryLabel="Browse the store"
+                  onSecondaryAction={onNavigateToStore}
+                />
               ) : (
                 <div data-home-grid className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
                   {searchResults.map((product) => (
@@ -345,6 +381,28 @@ export default function App({
                   </button>
                 </div>
 
+                {/* The filter control, in the section's top area so it belongs
+                    to the heading and the grid it drives — Home's own category
+                    strip sits above it, the results sit below. `trigger`
+                    variant: the identical Filters button + overlay without a
+                    second chip rail. */}
+                <div data-home-filter className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                  <ProductFilterBar
+                    variant="trigger"
+                    className="min-w-0"
+                    chips={productFilters.chips}
+                    activeId={productFilters.activeFilterId}
+                    onSelect={productFilters.setActiveFilterId}
+                  />
+                  {/* The count is the filter's feedback: it moves as a chip is
+                      picked. While the catalog is still streaming there is
+                      nothing to count, so the slot stays empty. */}
+                  {catalogLoading ? null : (
+                    <span className="dc-scene-ink ml-auto shrink-0 text-[11px] font-semibold text-white/45">
+                      {categoryFiltered.length} shown
+                    </span>
+                  )}
+                </div>
 
                 {catalogLoading ? (
                   // Skeleton cards carry the EXACT geometry of ProductCard
@@ -371,9 +429,15 @@ export default function App({
                     {catalogError}
                   </div>
                 ) : categoryFiltered.length === 0 ? (
-                  <p className="dc-scene-ink mt-8 text-center text-sm text-white/55">
-                    No products in this category yet.
-                  </p>
+                  <EmptyProductState
+                    className="mt-4"
+                    heading="No products found"
+                    message={emptyProductsMessage}
+                    actionLabel={isFiltering ? "Clear filters" : undefined}
+                    onAction={isFiltering ? resetHomeFilters : undefined}
+                    secondaryLabel="Browse the store"
+                    onSecondaryAction={onNavigateToStore}
+                  />
                 ) : (
                   <div data-home-grid className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
                     {categoryFiltered.map((product) => (

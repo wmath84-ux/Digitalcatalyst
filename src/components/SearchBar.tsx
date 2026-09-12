@@ -117,7 +117,10 @@ export default function SearchBar({ value, onChange, sort, onSortChange }: Searc
           `aria-haspopup="listbox"` / `role="option"` come from the item itself.
           On desktop it shares the search row (right edge); on mobile it keeps
           its own right-aligned row. */}
-      <div className="flex shrink-0 justify-end">
+      {/* `dc-filter-ui` marks the sort control as part of the filter hierarchy,
+          so it takes the same controlled corner radius as the chip rail and the
+          Filters trigger next to it (see src/glass.css). */}
+      <div className="dc-filter-ui flex shrink-0 justify-end">
         <GlassSelect value={sort} onValueChange={onSortChange}>
           <GlassSelectTrigger
             aria-label="Sort products"

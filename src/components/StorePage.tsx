@@ -5,12 +5,12 @@ import Hero from "./Hero";
 import SearchBar from "./SearchBar";
 import FilterChips from "./FilterChips";
 import ProductCard from "./ProductCard";
+import EmptyProductState from "./EmptyProductState";
 import TiltedCoverflow from "./TiltedCoverflow";
 import { GlassCard } from "./ui/GlassCard";
 import { GlassSurface } from "./ui/glass";
 import { GlassButton } from "./ui/glass-button";
 import Skeleton from "./ui/Skeleton";
-import { BookOpenIcon } from "./icons";
 import { useStoreFilters } from "../hooks/useStoreFilters";
 import {
   ALL_STORE_FILTER,
@@ -310,7 +310,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
           glass is on. (On desktop, `top` is lifted below the shell's top bar
           by a shell-scoped rule in index.css — the class list stays `top-0`
           for the mobile scroller.) */}
-      <div data-store-filter-bar className="dc-scene-plate dc-scene-plate--bar sticky top-0 z-20 mt-4 border-b border-white/10 bg-[var(--dc-chrome-glass)] py-2.5 [backdrop-filter:var(--dc-chrome-glass-blur)]">
+      <div data-store-filter-bar className="dc-scene-plate dc-scene-plate--bar sticky top-0 z-20 dc-filter-ui mt-4 rounded-[var(--dc-filter-radius)] border border-white/10 bg-[var(--dc-chrome-glass)] py-1.5 [backdrop-filter:var(--dc-chrome-glass-blur)]">
           {/* Mobile overlap fix: the view-mode toggle is a normal flex
               sibling (shrink-0) instead of an absolutely-positioned overlay,
               so the scrolling chip row and the button can never paint on top
@@ -391,30 +391,21 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        /* Educational empty state: says what happened, why, and gives the
-           user a one-tap way out instead of a dead end. */
-        <GlassCard className="mx-4 mt-6 lg:mx-0" contentClassName="dc-empty">
-          <span className="dc-empty-art" aria-hidden="true">
-            <BookOpenIcon className="h-7 w-7 text-indigo-300" />
-          </span>
-          <p className="dc-empty-title">
-            {search.trim() ? `Nothing matched “${search.trim()}”` : "No resources in this filter yet"}
-          </p>
-          <p className="dc-empty-body">
-            {search.trim()
-              ? "We search titles, subjects, instructors and tags. Try a shorter keyword, or reset the filter to see the full catalog."
-              : "This category has no published resources right now. Switch back to All to browse everything available today."}
-          </p>
-          {(search.trim() || activeFilter.id !== ALL_STORE_FILTER.id) ? (
-            <button
-              type="button"
-              onClick={() => { setSearch(""); setActiveFilterId(ALL_STORE_FILTER.id); }}
-              className="dc-focusable mt-1 rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-[var(--dc-elev-accent)] transition hover:bg-indigo-500"
-            >
-              Show all resources
-            </button>
-          ) : null}
-        </GlassCard>
+        /* The shared empty state (src/components/EmptyProductState.tsx): the
+           same plate Home and My Purchases show, so an empty result reads as
+           one product-marketplace experience — and it still says what happened,
+           why, and hands back a one-tap way out instead of a dead end. */
+        <EmptyProductState
+          className="mx-4 mt-6 lg:mx-0"
+          heading="No products found"
+          message={search.trim()
+            ? `Nothing matched “${search.trim()}”. We search titles, subjects, instructors and tags — try a shorter keyword, or reset the filter to see the full catalog.`
+            : `Nothing is published under “${activeFilter.label}” right now. Clear the filter to browse everything available today.`}
+          actionLabel={(search.trim() || activeFilter.id !== ALL_STORE_FILTER.id) ? "Show all products" : undefined}
+          onAction={(search.trim() || activeFilter.id !== ALL_STORE_FILTER.id)
+            ? () => { setSearch(""); setActiveFilterId(ALL_STORE_FILTER.id); }
+            : undefined}
+        />
       ) : viewMode === "list" ? (
         /* ── Rectangular cards / list view ── */
         <div data-store-gutter data-store-list className="flex flex-col gap-2 px-3 pt-3 sm:px-4 sm:pt-4">

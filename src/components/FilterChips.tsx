@@ -9,12 +9,23 @@ import { GlassButton } from "./ui/glass-button";
 import { GlassToggleGroup, GlassToggleItem } from "./ui/glass-toggle-group";
 import { GlassTag, glassTagColor } from "./ui/glass-tags";
 import { LiquidMetalButton } from "./ui/LiquidMetalButton";
+import { cn } from "@/utils/cn";
 
 type FilterChipsProps = {
   /** Chips to render — admin-managed, already ordered and active-filtered. */
   filters: StoreFilter[];
   activeId: string;
   onSelect: (id: string) => void;
+  /**
+   * `full` (default, the Store bar) — the Filters trigger plus the scrolling
+   * chip rail. `trigger` — the same trigger plus an active-filter pill, for a
+   * section header that already owns a category strip (Home, My Purchases).
+   * Both open the identical overlay, so the filter experience is one thing
+   * wherever it is mounted; only how much of the rail the page shows changes.
+   */
+  variant?: "full" | "trigger";
+  /** Page-specific gutter. Merged with `cn`, so `px-0` really does zero the row. */
+  className?: string;
 };
 
 /**
@@ -28,7 +39,13 @@ type FilterChipsProps = {
  * frosted pills with per-tag colour accents, staggered spring entrance, and
  * a colour dot that swaps for a spring-drawn check mark on selection.
  */
-export default function FilterChips({ filters, activeId, onSelect }: FilterChipsProps) {
+export default function FilterChips({
+  filters,
+  activeId,
+  onSelect,
+  variant = "full",
+  className,
+}: FilterChipsProps) {
   const [showFilters, setShowFilters] = useState(false);
   const closeTimer = useRef<number | null>(null);
   // Mouse parity: the chip row is a touch scroller with its scrollbar hidden,
@@ -47,6 +64,14 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
   }, [filters]);
 
   const allFilter = useMemo(() => filters.find((filter) => filter.id === "all") ?? null, [filters]);
+
+  /* A page that mounts only the trigger still has to say what is filtering it:
+     this is the chip the rail would have highlighted, shown as its own small
+     box with a one-tap clear (Home, My Purchases). */
+  const activeChip = useMemo(
+    () => filters.find((filter) => filter.id === activeId && filter.id !== "all") ?? null,
+    [filters, activeId],
+  );
 
   // Escape closes the overlay; the page behind must not scroll while open.
   useEffect(() => {
@@ -188,59 +213,85 @@ export default function FilterChips({ filters, activeId, onSelect }: FilterChips
     </AnimatePresence>
   );
 
+  /* The Filters button is one node shared by both variants, so the trigger a
+     user learns on the Store is literally the same trigger on Home and on My
+     Purchases — same capsule, same overlay, same `aria-expanded` contract. */
+  const trigger = (
+    <GlassButton
+      variant="capsule"
+      type="button"
+      onClick={() => setShowFilters((prev) => !prev)}
+      aria-expanded={showFilters}
+      className={`dc-filter-trigger shrink-0 [&>span>div]:h-10 [&>span>div]:gap-1.5 [&>span>div]:px-3.5 [&>span>div]:text-sm [&>span>div]:font-semibold ${showFilters ? "text-indigo-200" : ""}`}
+    >
+      <SlidersIcon className="h-4 w-4" />
+      <span>Filters</span>
+    </GlassButton>
+  );
+
+  const rail = (
+    /* Wave 3 (commerce): the chip row is `glass-toggle-group`, so the selected
+       filter is a droplet that *slides* between chips instead of a repaint —
+       one moving lens rather than N pills. The row still scrolls sideways, and
+       the indicator rides inside the group, so it stays glued to its chip while
+       scrolling. `dc-segment` is the shared light-theme recipe in src/glass.css
+       (the PDP tab strip and Home's category rail use it too).
+
+       Store legibility (same pass as Home): `dc-scene-plate` puts the shared
+       dark contrast backing under the pill so an unselected chip label no
+       longer washes out against the bright snow, and `useDragScroll` lets a
+       mouse drag the row left/right exactly like a thumb — with the drag never
+       firing the chip it happens to end on. */
+    <div
+      ref={chipRow.ref}
+      onPointerDown={chipRow.onPointerDown}
+      className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:[scrollbar-width:thin] lg:[scrollbar-color:rgba(255,255,255,0.16)_transparent] lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:h-1 lg:[&::-webkit-scrollbar-track]:bg-transparent lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-white/15"
+    >
+      {trigger}
+
+      <GlassToggleGroup
+        className="dc-segment dc-scene-plate shrink-0"
+        value={activeId}
+        onValueChange={onSelect}
+        aria-label="Filter the catalogue"
+      >
+        {filters.map((filter) => (
+          <GlassToggleItem
+            key={filter.id}
+            value={filter.id}
+            title={filter.description || filter.label}
+            className="shrink-0 whitespace-nowrap px-3.5 py-1.5 text-[13px] font-semibold"
+          >
+            {activeId === filter.id && <CheckIcon className="h-3.5 w-3.5" />}
+            {filter.label}
+          </GlassToggleItem>
+        ))}
+      </GlassToggleGroup>
+    </div>
+  );
+
   return (
     /* `data-store-gutter` is the desktop-alignment hook (index.css): the
        mobile px-4 is zeroed inside the desktop shell so the chips sit on the
-       same gutter as the hero, search and cards. */
-    <div data-store-gutter className="relative px-4">
-      {/* Wave 3 (commerce): the chip row is `glass-toggle-group`, so the selected
-          filter is a droplet that *slides* between chips instead of a repaint —
-          one moving lens rather than N pills. `dc-chip-group` re-inks the pack's
-          white-on-dark labels for this light strip (see src/glass.css). The row
-          still scrolls sideways, and the indicator rides inside the group, so it
-          stays glued to its chip while scrolling. `dc-segment` is the shared
-          light-theme recipe in src/glass.css (the PDP tab strip uses it too).
-
-          Store legibility (same pass as Home): `dc-scene-plate` puts the shared
-          dark contrast backing under the pill so an unselected chip label no
-          longer washes out against the bright snow, and `useDragScroll` lets a
-          mouse drag the row left/right exactly like a thumb — with the drag
-          never firing the chip it happens to end on. */}
-      <div
-        ref={chipRow.ref}
-        onPointerDown={chipRow.onPointerDown}
-        className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:[scrollbar-width:thin] lg:[scrollbar-color:rgba(255,255,255,0.16)_transparent] lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:h-1 lg:[&::-webkit-scrollbar-track]:bg-transparent lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-white/15"
-      >
-        <GlassButton
-          variant="capsule"
-          type="button"
-          onClick={() => setShowFilters((prev) => !prev)}
-          aria-expanded={showFilters}
-          className={`shrink-0 [&>span>div]:h-10 [&>span>div]:gap-1.5 [&>span>div]:px-3.5 [&>span>div]:text-sm [&>span>div]:font-semibold ${showFilters ? "text-indigo-200" : ""}`}
-        >
-          <SlidersIcon className="h-4 w-4" />
-          <span>Filters</span>
-        </GlassButton>
-
-        <GlassToggleGroup
-          className="dc-segment dc-scene-plate shrink-0"
-          value={activeId}
-          onValueChange={onSelect}
-          aria-label="Filter the catalogue"
-        >
-          {filters.map((filter) => (
-            <GlassToggleItem
-              key={filter.id}
-              value={filter.id}
-              title={filter.description || filter.label}
-              className="shrink-0 whitespace-nowrap px-3.5 py-1.5 text-[13px] font-semibold"
+       same gutter as the hero, search and cards. `className` lets a page that
+       already owns a gutter (Home's section, My Purchases' list) drop it. */
+    <div data-store-gutter className={cn("relative px-4", className)}>
+      {variant === "trigger" ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {trigger}
+          {activeChip ? (
+            <button
+              type="button"
+              onClick={() => onSelect("all")}
+              aria-label={`Clear the ${activeChip.label} filter`}
+              className="dc-filter-active dc-focusable"
             >
-              {activeId === filter.id && <CheckIcon className="h-3.5 w-3.5" />}
-              {filter.label}
-            </GlassToggleItem>
-          ))}
-        </GlassToggleGroup>
-      </div>
+              <span className="truncate">{activeChip.label}</span>
+              <XIcon className="h-3 w-3 shrink-0" />
+            </button>
+          ) : null}
+        </div>
+      ) : rail}
 
       {/* Portalled to <body>: the sticky filter bar's `overflow-hidden`
           ancestors can never clip the overlay again. */}

@@ -179,7 +179,12 @@ test("copy with no surface under it carries the scene ink hook", () => {
   assert.match(home, /<h2 className="dc-scene-ink text-base font-bold text-white md:text-lg">/);
   assert.match(home, /dc-scene-ink text-xs font-semibold text-white\/55 hover:text-white\/85/);
   assert.match(home, /dc-scene-ink mt-1 text-xs text-white\/55/);
-  assert.match(home, /dc-scene-ink mt-8 text-center text-sm text-white\/55/);
+  // 2026-09-11 (empty-state pass): the plain "No products in this category
+  // yet." line is gone. An empty shelf is now the shared <EmptyProductState/>
+  // plate, which carries its own dark contrast surface, so there is no loose
+  // ink hook left to pin on that copy — and the plain sentence must stay gone.
+  assert.doesNotMatch(home, /No products in this category yet/);
+  assert.match(home, /<EmptyProductState/);
   assert.match(reviews, /<h2 className="dc-scene-ink text-base font-bold text-white">Loved by Learners<\/h2>/);
   assert.match(reviews, /dc-scene-ink text-xs font-semibold text-white\/55/);
   assert.match(continueLearning, /<h2 className="dc-scene-ink text-base font-bold text-white">Continue Learning<\/h2>/);

@@ -1148,3 +1148,102 @@ html[data-glass="on"] :where(.dc-scene-plate[data-rev-score-card]) > div[aria-hi
 html[data-glass="on"] :where([data-rev-plan-dots]) > span {
   box-shadow: 0 1px 6px rgba(4, 8, 18, 0.7);
 }
+
+/* ── THE FILTER HIERARCHY · one controlled radius, three pages ─────────────
+   Owner brief 2026-09-11: every box in the filter UI — the container, the
+   trigger, the chip rail, the option tags inside the overlay, the view dropdown
+   and the sort select — takes the SAME moderately rounded corner. No 9999px
+   capsule anywhere in this family, and no per-page one-off: the pages all mount
+   one component (`FilterChips`, directly on the Store bar and through
+   `ProductFilterBar` on Home / My Purchases), so one class list styles all
+   three.
+
+   `--dc-filter-radius` is ~10% of the 40px control the hierarchy is built
+   around, and it is carried to the larger boxes as-is — parent and child read
+   as one shape language instead of a nested set of different circles. The
+   droplet and the chips sit 4px inside the rail, so their radius is pulled back
+   by the inset (10 − 4 ≈ 6px): the corner a user actually sees follows the same
+   curve instead of fighting it.
+
+   Unlayered + `!important` where the pack writes the radius inline: the vendored
+   files stay byte-comparable to the registry (rollout rule 1), so the shape is
+   corrected here rather than by forking `glass-toggle-group` / `glass-button`. ── */
+:root {
+  --dc-filter-radius: 10px;
+}
+
+/* The parent container: the store's sticky bar, and the pack surface Home and
+   My Purchases wrap their trigger in. */
+.dc-filter-ui[data-store-filter-bar] {
+  border-radius: var(--dc-filter-radius);
+}
+
+/* The chip rail (the pack group is authored as a full pill) + its sliding
+   droplet + the chips themselves. */
+html[data-glass="on"] :where(.dc-filter-ui) .dc-segment {
+  border-radius: var(--dc-filter-radius) !important;
+}
+
+html[data-glass="on"] :where(.dc-filter-ui) .dc-segment > div:last-child > div[aria-hidden],
+html[data-glass="on"] :where(.dc-filter-ui) .dc-segment [data-toggle] {
+  border-radius: calc(var(--dc-filter-radius) - 4px);
+}
+
+/* The Filters trigger: the capsule's own root and the surface inside it. */
+html[data-glass="on"] :where(.dc-filter-ui) :where(.dc-filter-trigger),
+html[data-glass="on"] :where(.dc-filter-ui) :where(.dc-filter-trigger) > span > div {
+  border-radius: var(--dc-filter-radius) !important;
+}
+
+/* The active-filter pill Home / My Purchases show next to the trigger. */
+.dc-filter-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  max-width: 12rem;
+  padding: 0.4rem 0.55rem 0.4rem 0.7rem;
+  border-radius: var(--dc-filter-radius);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgb(255 255 255 / 0.85);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.dc-filter-active:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+/* The view-mode dropdown hanging off the bar: container + its option boxes. */
+html[data-glass="on"] :where(.dc-filter-ui) :where([data-store-view-options]) {
+  border-radius: var(--dc-filter-radius) !important;
+}
+
+html[data-glass="on"] :where(.dc-filter-ui) :where([data-store-view-options]) button {
+  border-radius: calc(var(--dc-filter-radius) - 4px);
+}
+
+/* The sort select is part of the same row, so it rounds like the row. */
+html[data-glass="on"] :where(.dc-filter-ui) .dc-glass-select {
+  border-radius: var(--dc-filter-radius);
+}
+
+/* The filter overlay is portalled to <body>, off the page's class tree, so it
+   is reached through the hook it already carries. Panel, option tags and the
+   two footer actions all take the same corner. */
+html[data-glass="on"] [data-store-filter-overlay] .dc-scene-plate {
+  border-radius: var(--dc-filter-radius) !important;
+}
+
+html[data-glass="on"] [data-store-filter-overlay] [aria-pressed],
+[data-store-filter-overlay] [aria-pressed] > span {
+  border-radius: var(--dc-filter-radius);
+}
+
+html[data-glass="on"] [data-store-filter-overlay] .liquid-metal-button > span > div {
+  border-radius: var(--dc-filter-radius) !important;
+}
