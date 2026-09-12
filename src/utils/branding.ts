@@ -1,3 +1,5 @@
+import { sanitizeSocialUrl } from "./socialPlatform";
+
 export const BRANDING_DOC_PATH = { collection: "settings", id: "branding" } as const;
 export const DEFAULT_LOGO_URL = "/icons/icon-512x512.png";
 export const DEFAULT_APP_NAME = "Eduvora";
@@ -37,6 +39,14 @@ export type Branding = {
    */
   supportEmail: string;
   supportPhone: string;
+  /**
+   * Social media URL for the Home page bottom profile card
+   * (Branding → Social profile). The admin's URL is stored verbatim
+   * (valid http(s) only); the card links to it and the platform icon is
+   * detected from its hostname. Empty = the card renders its clean
+   * non-clickable state.
+   */
+  socialUrl: string;
 };
 
 export const DEFAULT_BRANDING: Branding = {
@@ -49,6 +59,9 @@ export const DEFAULT_BRANDING: Branding = {
   homeGradientTo: DEFAULT_HOME_GRADIENT_TO,
   supportEmail: DEFAULT_SUPPORT_EMAIL,
   supportPhone: DEFAULT_SUPPORT_PHONE,
+  // No social profile by default — the Home page card renders its clean
+  // non-clickable state until the admin saves a URL.
+  socialUrl: "",
 };
 
 // v2 cache stores the full branding object (v1 only stored the logo URL).
@@ -85,6 +98,9 @@ export function normalizeBranding(data: Partial<Record<keyof Branding, unknown>>
     homeGradientTo: sanitizeColor(data?.homeGradientTo, DEFAULT_HOME_GRADIENT_TO),
     supportEmail: sanitize(data?.supportEmail, DEFAULT_SUPPORT_EMAIL, 120),
     supportPhone: sanitize(data?.supportPhone, DEFAULT_SUPPORT_PHONE, 160),
+    // Keep the admin's URL verbatim; anything that is not a valid
+    // absolute http(s) URL degrades to "" (clean non-clickable card).
+    socialUrl: sanitizeSocialUrl(data?.socialUrl),
   };
 }
 

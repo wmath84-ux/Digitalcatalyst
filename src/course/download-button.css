@@ -1,0 +1,140 @@
+/*
+ * src/course/download-button.css
+ *
+ * A faithful port of dovatgabriel's "slippery-owl-85" download button:
+ *   https://uiverse.io/dovatgabriel/slippery-owl-85
+ *
+ * The Course Player's download-action treatment — used for EVERY
+ * download control in the player (Player tab "Active file" download row
+ * and the resource viewer's missing-embed download action).
+ *
+ * Reference values kept exact: #4CC713 fill · 10px/25px padding ·
+ * 0.9em type · 15px text-indent · CSS-drawn download glyph (10×2 tray
+ * corner + 4px arrowhead) at left:15px / top:52% · hover #45a21a with
+ * #cdefbd glyph · 1s linear infinite arrow bob (paused at rest,
+ * running on hover). Component-scoped — never a global button rule.
+ */
+
+.dc-dl-btn {
+  display: inline-block;
+  position: relative;
+  padding: 10px 25px;
+  background-color: #4cc713;
+  color: #fff;
+  font-family: inherit;
+  text-decoration: none;
+  font-size: 0.9em;
+  text-align: center;
+  text-indent: 15px;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.dc-dl-btn:hover {
+  background-color: #45a21a;
+  color: #fff;
+}
+
+.dc-dl-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.dc-dl-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.dc-dl-btn:disabled::before,
+.dc-dl-btn:disabled::after {
+  animation: none;
+}
+
+/* CSS-drawn download glyph (the reference's :before tray corner). */
+.dc-dl-btn::before,
+.dc-dl-btn::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  left: 15px;
+  top: 52%;
+}
+
+.dc-dl-btn::before {
+  width: 10px;
+  height: 2px;
+  border-style: solid;
+  border-width: 0 2px 2px;
+}
+
+/* Arrowhead (the reference's :after) — bobs while hovered. */
+.dc-dl-btn::after {
+  width: 0;
+  height: 0;
+  margin-left: 3px;
+  margin-top: -7px;
+  border-style: solid;
+  border-width: 4px 4px 0 4px;
+  border-color: transparent;
+  border-top-color: inherit;
+  animation: dc-dl-arrow 1s linear infinite;
+  animation-play-state: paused;
+}
+
+.dc-dl-btn:hover::before {
+  border-color: #cdefbd;
+}
+
+.dc-dl-btn:hover::after {
+  border-top-color: #cdefbd;
+  animation-play-state: running;
+}
+
+/* "Open original" variant: the glyph slot carries a lucide ExternalLink
+   (same left slot) instead of the CSS download arrow. */
+.dc-dl-btn--open::before,
+.dc-dl-btn--open::after {
+  display: none;
+}
+
+.dc-dl-btn__open {
+  position: absolute;
+  left: 15px;
+  top: 52%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: inherit;
+}
+
+.dc-dl-btn:hover .dc-dl-btn__open {
+  color: #cdefbd;
+}
+
+@keyframes dc-dl-arrow {
+  0% {
+    margin-top: -7px;
+    opacity: 1;
+  }
+
+  0.001% {
+    margin-top: -15px;
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    margin-top: 0;
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-dl-btn::after {
+    animation: none;
+    margin-top: -3px;
+  }
+}

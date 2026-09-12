@@ -14,6 +14,8 @@ import BottomNav, { type TabKey } from "../components/BottomNav";
 import DeferredVisible from "../components/DeferredVisible";
 import { EmptyState } from "../components/ui/EmptyState";
 import { BookOpenIcon } from "../components/icons";
+import SocialProfileCard from "./components/SocialProfileCard";
+import { useBranding } from "../context/BrandingContext";
 // Bottom-of-page feedback wall: matter.js physics + its own chunk, mounted
 // lazily by DeferredVisible below (see the section near the end of the page).
 const StickerWall = lazy(() => import("../components/StickerWall"));
@@ -62,6 +64,10 @@ export default function App({
   onToggleFavorite,
 }: AppProps) {
   const { user } = useAuth();
+  // The bottom social profile card is fed by the SAME admin Branding
+  // settings the rest of the app uses (logo / app name / tagline + the
+  // new social URL) — one source of truth, no card-local values.
+  const branding = useBranding();
   const { products: catalogProducts, purchasedIds, loading: catalogLoading, error: catalogError } = useCatalog();
   // Hero slides are admin-editable (Admin → Home · Hero Slides). Live
   // Firestore list; falls back to the built-in slides until the admin
@@ -432,6 +438,22 @@ export default function App({
                     </Suspense>
                   </DeferredVisible>
                 </div>
+              </section>
+
+              {/* ── Social profile card (admin Branding → Social profile) ──
+                  The LAST home page content, before the bottom nav: the
+                  Uiverse-style profile card (grumpy-ape-40). Every value is
+                  branding data — logo, app name, tagline (bio) and the
+                  social URL, whose hostname also selects the platform icon.
+                  With no URL configured the card renders its clean
+                  non-clickable state (never a broken link or icon). */}
+              <section data-home-social-card-section className="mt-8 px-5 pb-2 md:px-8">
+                <SocialProfileCard
+                  logoUrl={branding.logoUrl}
+                  name={branding.appName}
+                  bio={branding.tagline}
+                  socialUrl={branding.socialUrl}
+                />
               </section>
             </>
           )}
